@@ -13,9 +13,8 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.search.models import Court, RECAPDocument
-from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
@@ -36,6 +35,7 @@ def get_dockets(options):
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
     session.login()
+    session_data = SessionData(session.cookies, session.proxy_address)
     for i, row in enumerate(reader):
         if i < options["offset"]:
             continue
@@ -55,7 +55,7 @@ def get_dockets(options):
                 get_appellate_docket_by_docket_number.s(
                     docket_number=row["Cleaned case_No"],
                     court_id=row["fjc_court_id"],
-                    cookies=session.cookies,
+                    session_data=session_data,
                     tag_names=[TAG],
                     **{
                         "show_docket_entries": True,
@@ -67,7 +67,6 @@ def get_dockets(options):
                         "show_caption": True,
                     },
                 ).set(queue=q),
-                add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
         elif task == "district":
             chain(
@@ -75,12 +74,12 @@ def get_dockets(options):
                     pass_through=None,
                     docket_number=row["Cleaned case_No"],
                     court_id=row["fjc_court_id"],
-                    cookies=session.cookies,
+                    session_data=session_data,
                     case_name=row["Title"],
                 ).set(queue=q),
                 get_docket_by_pacer_case_id.s(
                     court_id=row["fjc_court_id"],
-                    cookies=session.cookies,
+                    session_data=session_data,
                     tag_names=[TAG],
                     **{
                         "show_parties_and_counsel": True,
@@ -88,7 +87,6 @@ def get_dockets(options):
                         "show_list_of_member_cases": True,
                     },
                 ).set(queue=q),
-                add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
 
 

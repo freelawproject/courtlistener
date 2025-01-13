@@ -15,7 +15,7 @@ from cl.custom_filters.templatetags.text_filters import (
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
-from cl.lib.search_index_utils import null_map
+from cl.lib.search_index_utils import get_parties_from_case_name, null_map
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import (
     Attorney,
@@ -355,6 +355,11 @@ class AudioPercolator(AudioDocumentBase):
 
     def prepare_percolator_query(self, instance):
         qd = QueryDict(instance.query.encode(), mutable=True)
+        if "order_by" in qd:
+            # sorting key is not required in percolator queries. Adding it
+            # generates a custom function score for decay relevance, which breaks
+            # percolator queries.
+            del qd["order_by"]
         search_form = SearchForm(qd)
         if not search_form.is_valid():
             logger.warning(
@@ -365,8 +370,8 @@ class AudioPercolator(AudioDocumentBase):
 
         cd = search_form.cleaned_data
         search_query = AudioDocument.search()
-        query, _, _ = build_es_base_query(search_query, cd)
-        return query.to_dict()["query"]
+        es_queries = build_es_base_query(search_query, cd)
+        return es_queries.search_query.to_dict()["query"]
 
 
 class ES_CHILD_ID:
@@ -1239,6 +1244,14 @@ class DocketDocument(DocketBaseDocument, RECAPBaseDocument):
             out["party_id"].add(pk)
             out["party"].add(name)
 
+        if not out["party"]:
+            # Get party from docket case_name if no normalized parties are
+            # available.
+            party_from_case_name = get_parties_from_case_name(
+                instance.case_name
+            )
+            out["party"] = party_from_case_name if party_from_case_name else []
+
         # Extract only required attorney values.
         atty_values = (
             Attorney.objects.filter(roles__docket=instance)
@@ -1980,6 +1993,9 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
         from cl.alerts.utils import build_plain_percolator_query
 
         qd = QueryDict(instance.query.encode(), mutable=True)
+        # For RECAP percolator queries, we use build_plain_percolator_query to
+        # build the query. It does not add a custom function_score, so there is
+        # no need to remove the order_by sorting key as it is ignored.
         search_form = SearchForm(qd)
         if not search_form.is_valid():
             logger.warning(

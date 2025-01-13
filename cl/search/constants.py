@@ -1,21 +1,9 @@
-# Solr fields that are used for highlighting or other output in the search results
+# fields that are used for highlighting or other output in the search results
 import re
 from typing import Dict
 
 from cl.search.models import SEARCH_TYPES, Opinion
 
-SOLR_OPINION_HL_FIELDS = [
-    "caseName",
-    "citation",
-    "court_citation_string",
-    "docketNumber",
-    "judge",
-    "lexisCite",
-    "neutralCite",
-    "suitNature",
-    "text",
-]
-SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
 PEOPLE_ES_HL_FIELDS = {
     "name": 0,
     "dob_city": 0,
@@ -102,7 +90,6 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "citation",
     "judge",
     "caseNameFull",
-    "caseName",
     "status",
     "suitNature",
     "attorney",
@@ -110,17 +97,16 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "posture",
     "syllabus",
 ]
+SEARCH_MLT_OPINION_QUERY_FIELDS = [
+    "procedural_history.exact",
+    "posture.exact",
+    "syllabus.exact",
+    "text.exact",
+]
 
 # ES fields that are used for highlighting
 SEARCH_HL_TAG = "mark"
 ALERTS_HL_TAG = "strong"
-SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
-    "text",
-    "caseName",
-    "judge",
-    "docketNumber",
-    "court_citation_string",
-]
 SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = {
     "caseName": 0,
     "judge": 0,
@@ -133,18 +119,6 @@ SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = {
     "docketNumber": 0,
     "judge": 0,
 }
-SOLR_RECAP_HL_FIELDS = [
-    "assignedTo",
-    "caseName",
-    "cause",
-    "court_citation_string",
-    "docketNumber",
-    "juryDemand",
-    "referredTo",
-    "short_description",
-    "suitNature",
-    "text",
-]
 SEARCH_RECAP_HL_FIELDS = {
     "assignedTo": 0,
     "caseName": 0,
@@ -225,12 +199,19 @@ recap_boosts_qf = {
 }
 recap_boosts_es = {
     # Docket fields
-    "caseName": 4.0,
+    "caseName.exact": 4.0,
     "docketNumber": 3.0,
     # RECAPDocument fields:
     "description": 2.0,
 }
 recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
+opinion_boosts_es = {
+    "text": 1.0,
+    "type": 1.0,
+    # Cluster fields
+    "caseName.exact": 4.0,
+    "docketNumber": 2.0,
+}
 BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "qf": {
         SEARCH_TYPES.OPINION: {
@@ -245,7 +226,7 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
         SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_qf,
         SEARCH_TYPES.ORAL_ARGUMENT: {
             "text": 1.0,
-            "caseName": 4.0,
+            "caseName.exact": 4.0,
             "docketNumber": 2.0,
         },
         SEARCH_TYPES.PEOPLE: {
@@ -263,16 +244,7 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
         SEARCH_TYPES.RECAP: recap_boosts_es,
         SEARCH_TYPES.DOCKETS: recap_boosts_es,
         SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_es,
-    },
-    # Phrase-based boosts.
-    "pf": {
-        SEARCH_TYPES.OPINION: {"text": 3.0, "caseName": 3.0},
-        SEARCH_TYPES.RECAP: recap_boosts_pf,
-        SEARCH_TYPES.DOCKETS: recap_boosts_pf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3.0},
-        SEARCH_TYPES.PEOPLE: {
-            # None here. Phrases don't make much sense for people.
-        },
+        SEARCH_TYPES.OPINION: opinion_boosts_es,
     },
 }
 
@@ -293,19 +265,47 @@ o_type_index_map = {
     Opinion.TRIAL_COURT: "trial-court-document",
 }
 
-recap_document_indexed_fields = [
-    "id",
-    "docket_entry_id",
-    "description",
-    "entry_number",
-    "entry_date_filed",
-    "short_description",
-    "document_type",
-    "document_number",
-    "pacer_doc_id",
-    "plain_text",
-    "attachment_number",
-    "is_available",
-    "page_count",
-    "cites",
-]
+
+cardinality_query_unique_ids = {
+    SEARCH_TYPES.RECAP: "docket_id",
+    SEARCH_TYPES.DOCKETS: "docket_id",
+    SEARCH_TYPES.RECAP_DOCUMENT: "id",
+    SEARCH_TYPES.OPINION: "cluster_id",
+    SEARCH_TYPES.PEOPLE: "id",
+    SEARCH_TYPES.ORAL_ARGUMENT: "id",
+    SEARCH_TYPES.PARENTHETICAL: "id",
+}
+
+
+date_decay_relevance_types = {
+    SEARCH_TYPES.OPINION: {
+        "field": "dateFiled",
+        "scale": 50,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.RECAP: {
+        "field": "dateFiled",
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.DOCKETS: {
+        "field": "dateFiled",
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.RECAP_DOCUMENT: {
+        "field": "dateFiled",
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.ORAL_ARGUMENT: {
+        "field": "dateArgued",
+        "scale": 50,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+}

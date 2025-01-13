@@ -1,12 +1,13 @@
 from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin
 from django.db.models import QuerySet
-from django.forms import ModelForm
 from django.http import HttpRequest
 
-from cl.alerts.admin import DocketAlertInline
+from cl.alerts.models import DocketAlert
+from cl.lib.admin import build_admin_url
 from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.string_utils import trunc
 from cl.recap.management.commands.delete_document_from_ia import delete_from_ia
 from cl.search.models import (
     BankruptcyInformation,
@@ -24,8 +25,8 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SearchQuery,
 )
-from cl.search.tasks import add_items_to_solr
 
 
 @admin.register(Opinion)
@@ -45,18 +46,6 @@ class OpinionAdmin(CursorPaginatorAdmin):
         "date_created",
         "date_modified",
     )
-
-    def save_model(self, request, obj, form, change):
-        obj.save()
-        from cl.search.tasks import add_items_to_solr
-
-        add_items_to_solr.delay([obj.pk], "search.Opinion")
-
-    def delete_model(self, request, obj):
-        obj.delete()
-        from cl.search.tasks import delete_items
-
-        delete_items.delay([obj.pk], "search.Opinion")
 
 
 @admin.register(Citation)
@@ -98,16 +87,17 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         "date_created",
     )
 
-    def save_model(self, request, obj, form, change):
-        obj.save()
-        from cl.search.tasks import add_items_to_solr
-
-        add_items_to_solr.delay([obj.pk], "search.OpinionCluster")
-
 
 @admin.register(Court)
 class CourtAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "short_name", "position", "in_use", "pk")
+    list_display = (
+        "full_name",
+        "short_name",
+        "position",
+        "in_use",
+        "pk",
+        "jurisdiction",
+    )
     list_filter = (
         "jurisdiction",
         "in_use",
@@ -202,11 +192,6 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
             ocr_status=None,
         )
 
-        # Update solr
-        add_items_to_solr.delay(
-            [rd.pk for rd in queryset], "search.RECAPDocument"
-        )
-
         # Do a CloudFront invalidation
         invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
 
@@ -235,26 +220,40 @@ class RECAPDocumentInline(admin.StackedInline):
     )
     raw_id_fields = ("tags",)
 
-    # Essential so that we remove sealed content from Solr when updating it via
-    # admin interface.
-    def save_model(self, request, obj, form, change):
-        obj.save(index=True)
-
 
 @admin.register(DocketEntry)
 class DocketEntryAdmin(CursorPaginatorAdmin):
     inlines = (RECAPDocumentInline,)
+    search_help_text = (
+        "Search DocketEntries by Docket ID or RECAP sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "recap_sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "get_trunc_description",
+        "date_filed",
+        "time_filed",
+        "entry_number",
+        "recap_sequence_number",
+        "pacer_sequence_number",
+    )
     raw_id_fields = ("docket", "tags")
     readonly_fields = (
         "date_created",
         "date_modified",
     )
+    list_filter = ("date_filed", "date_created", "date_modified")
 
+    @admin.display(description="Docket entry")
+    def get_pk(self, obj):
+        return obj.pk
 
-class DocketEntryInline(admin.TabularInline):
-    model = DocketEntry
-    extra = 1
-    raw_id_fields = ("tags",)
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
 
 
 @admin.register(OriginatingCourtInformation)
@@ -267,16 +266,24 @@ class OriginatingCourtInformationAdmin(admin.ModelAdmin):
 
 @admin.register(Docket)
 class DocketAdmin(CursorPaginatorAdmin):
+    change_form_template = "admin/docket_change_form.html"
     prepopulated_fields = {"slug": ["case_name"]}
-    inlines = (
-        DocketEntryInline,
-        BankruptcyInformationInline,
-        DocketAlertInline,
+    list_display = (
+        "__str__",
+        "pacer_case_id",
+        "docket_number",
     )
+    search_help_text = "Search dockets by PK, PACER case ID, or Docket number."
+    search_fields = ("pk", "pacer_case_id", "docket_number")
+    inlines = (BankruptcyInformationInline,)
     readonly_fields = (
         "date_created",
         "date_modified",
         "view_count",
+    )
+    autocomplete_fields = (
+        "court",
+        "appeal_from",
     )
     raw_id_fields = (
         "panel",
@@ -285,38 +292,27 @@ class DocketAdmin(CursorPaginatorAdmin):
         "referred_to",
         "originating_court_information",
         "idb_data",
+        "parent_docket",
     )
 
-    def save_model(
-        self,
-        request: HttpRequest,
-        obj: Docket,
-        form: ModelForm,
-        change: bool,
-    ) -> None:
-        obj.save()
-        from cl.search.tasks import add_items_to_solr
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        """Add links to pre-filtered related admin pages."""
+        extra_context = extra_context or {}
+        query_params = {"docket": object_id}
 
-        ids = list(
-            RECAPDocument.objects.filter(
-                docket_entry__docket_id=obj.pk,
-            ).values_list("id", flat=True)
-        )
-        add_items_to_solr.delay(ids, "search.RECAPDocument")
-
-    def delete_model(self, request: HttpRequest, obj: Docket) -> None:
-        # Do the query before deleting the item. Otherwise, the query returns
-        # nothing.
-        ids = list(
-            RECAPDocument.objects.filter(
-                docket_entry__docket_id=obj.pk
-            ).values_list("id", flat=True)
+        extra_context["docket_entries_url"] = build_admin_url(
+            DocketEntry,
+            query_params,
         )
 
-        from cl.search.tasks import delete_items
+        extra_context["docket_alerts_url"] = build_admin_url(
+            DocketAlert,
+            query_params,
+        )
 
-        delete_items.delay(ids, "search.RECAPDocument")
-        obj.delete()
+        return super().change_view(
+            request, object_id, form_url, extra_context=extra_context
+        )
 
 
 @admin.register(OpinionsCited)
@@ -326,12 +322,6 @@ class OpinionsCitedAdmin(CursorPaginatorAdmin):
         "cited_opinion",
     )
     search_fields = ("=citing_opinion__id",)
-
-    def save_model(self, request, obj, form, change):
-        obj.save()
-        from cl.search.tasks import add_items_to_solr
-
-        add_items_to_solr.delay([obj.citing_opinion_id], "search.Opinion")
 
 
 @admin.register(Parenthetical)
@@ -350,3 +340,11 @@ class ParentheticalGroupAdmin(CursorPaginatorAdmin):
         "opinion",
         "representative",
     )
+
+
+@admin.register(SearchQuery)
+class SearchQueryAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("user",)
+    list_display = ("__str__", "engine", "source")
+    list_filter = ("engine", "source")
+    search_fields = ("user__username",)

@@ -1,12 +1,14 @@
 import datetime
 import math
 import re
+import urllib.parse
 from http import HTTPStatus
 from unittest import mock
 
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import AsyncClient, override_settings
@@ -19,9 +21,11 @@ from waffle.testutils import override_flag
 
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    compute_lowest_possible_estimate,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
+    simplify_estimated_count,
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
@@ -133,6 +137,29 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "     Got: %s\n\n" % (field_name, expected_count, got),
         )
 
+    def _compare_child_entry_date_filed(
+        self, article, html_content, child_index, expected_date
+    ):
+        """Assert entry date filed in child results."""
+        tree = html.fromstring(html_content)
+        article = tree.xpath("//article")[article]
+        col_md_offset_half_elements = article.xpath(
+            f".//div[@class='bottom']//div[@class='col-md-offset-half']"
+        )
+        col_md_offset_half_elem = col_md_offset_half_elements[child_index]
+        inline_element = col_md_offset_half_elem.xpath(
+            ".//div[contains(@class, 'date-block')]"
+        )[0]
+        date = inline_element.xpath(".//time[@class='meta-data-value']")
+        meta_data_value = date[0].text.strip()
+        self.assertEqual(
+            meta_data_value,
+            expected_date,
+            msg="Did not get the right expected entry date filed \n"
+            "Expected: %s\n"
+            "     Got: %s\n\n" % (expected_date, meta_data_value),
+        )
+
     def _assert_results_header_content(self, html_content, expected_text):
         h2_element = html.fromstring(html_content).xpath(
             '//h2[@id="result-count"]'
@@ -195,6 +222,21 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             msg="Did not get the right number of child documents %s\n"
             "Expected: %s\n"
             "     Got: %s\n\n" % (field_name, expected_count, got),
+        )
+
+    @staticmethod
+    def _parse_initial_document_button(response):
+        """Parse the initial document button within the HTML response."""
+        tree = html.fromstring(response.content.decode())
+        try:
+            initial_document = tree.xpath(
+                "//a[contains(@class, 'initial-document')]"
+            )[0]
+        except IndexError:
+            return None, None
+        return (
+            initial_document.get("href"),
+            initial_document.text_content().strip(),
         )
 
     def test_has_child_text_queries(self) -> None:
@@ -340,9 +382,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # The View Additional Results button is shown.
         self.assertIn("View Additional Results for", r.content.decode())
 
-    def test_match_all_query_and_docket_entries_count(self) -> None:
-        """Confirm a RECAP search with no params return a match all query.
-        The case and docket entries count is available.
+    def test_frontend_docket_and_docket_entries_count(self) -> None:
+        """Assert RECAP search results counts in the fronted. Below and
+        above the estimation threshold.
         """
 
         # Perform a RECAP match all search.
@@ -351,10 +393,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             params, 2, "match all query"
         )
-        # Two cases are returned.
-        self.assertIn("2 Cases", r.content.decode())
-        # 3 Docket entries in count.
-        self.assertIn("3 Docket", r.content.decode())
+        counts_text = self._get_frontend_counts_text(r)
+        # 2 cases and 3 Docket entries in counts are returned
+        self.assertIn("2 Cases and 3 Docket Entries", counts_text)
 
         with self.captureOnCommitCallbacks(execute=True):
             # Confirm an empty docket is shown in a match_all query.
@@ -370,10 +411,24 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             params, 3, "match all query"
         )
-        # 3 cases are returned.
-        self.assertIn("3 Cases", r.content.decode())
-        # 3 Docket entries in count.
-        self.assertIn("3 Docket", r.content.decode())
+        counts_text = self._get_frontend_counts_text(r)
+        # 3 cases and 3 Docket entries in counts are returned
+        self.assertIn("3 Cases and 3 Docket Entries", counts_text)
+
+        # Assert estimated counts above the threshold.
+        with mock.patch(
+            "cl.lib.elasticsearch_utils.simplify_estimated_count",
+            return_value=simplify_estimated_count(
+                compute_lowest_possible_estimate(
+                    settings.ELASTICSEARCH_CARDINALITY_PRECISION
+                )
+            ),
+        ):
+            r = async_to_sync(self.async_client.get)("/", params)
+        counts_text = self._get_frontend_counts_text(r)
+        self.assertIn(
+            "About 1,800 Cases and 1,800 Docket Entries", counts_text
+        )
         with self.captureOnCommitCallbacks(execute=True):
             empty_docket.delete()
 
@@ -809,7 +864,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket.delete()
             docket_2.delete()
 
-    async def test_party_name_filter(self) -> None:
+    def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
 
         params = {
@@ -818,7 +873,29 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
-        await self._test_article_count(params, 1, "party_name")
+        async_to_sync(self._test_article_count)(params, 1, "party_name")
+
+        # Confirm parties extracted from case_name are available in filters.
+        with self.captureOnCommitCallbacks(execute=True):
+            d = DocketFactory(
+                court=self.court,
+                pacer_case_id="345784",
+                docket_number="12-cv-03345",
+                case_name="John Smith v. Bank of America",
+                source=Docket.RECAP,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "John Smith",
+        }
+        async_to_sync(self._test_article_count)(params, 1, "party_name")
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Bank of America",
+        }
+        async_to_sync(self._test_article_count)(params, 1, "party_name")
+        d.delete()
 
     def test_party_name_and_children_filter(self) -> None:
         """Confirm dockets with children are shown when using the party filter"""
@@ -1277,7 +1354,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 1, "child filter + text query"
         )
 
-    @override_settings(VIEW_MORE_CHILD_HITS=6)
+    @override_settings(VIEW_MORE_CHILD_HITS=6, RECAP_CHILD_HITS_PER_RESULT=5)
     def test_docket_child_documents(self) -> None:
         """Confirm results contain the right number of child documents"""
         # Get results for a broad filter
@@ -1308,14 +1385,28 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=False,
             )
 
-        params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "docket_number": "1:21-bk-1234",
+            "q": "SUBPOENAS SERVED ON",
+        }
         # Frontend
         r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
         # Count child documents under docket.
         self._count_child_documents(0, r.content.decode(), 5, "docket_number")
 
-        # Confirm view additional results button is shown.
+        # Confirm view additional results button is shown and link params are correct.
         self.assertIn("View Additional Results for", r.content.decode())
+        tree = html.fromstring(r.content.decode())
+        docket_id_link = tree.xpath(
+            '//a[@class="btn-default btn view-additional-results"]/@href'
+        )[0]
+        decoded_url = urllib.parse.unquote(docket_id_link)
+        self.assertIn(
+            f"(SUBPOENAS+SERVED+ON)+AND+docket_id:{self.de.docket_id}",
+            decoded_url,
+        )
+        self.assertIn("docket_number=1:21-bk-1234", decoded_url)
 
         # View additional results:
         params = {
@@ -1704,7 +1795,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "case_name": "SUBPOENAS SERVED ON",
         }
         r = await self._test_article_count(params, 1, "highlights caseName")
-        # Count child documents under docket.
         self.assertIn("<mark>SUBPOENAS</mark>", r.content.decode())
         self.assertIn("<mark>SERVED</mark>", r.content.decode())
         self.assertIn("<mark>ON</mark>", r.content.decode())
@@ -1989,6 +2079,20 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by entry_date_filed  desc.",
         )
 
+        # Confirm entry date filed are properly displayed.
+        self._compare_child_entry_date_filed(
+            0, r.content.decode(), 0, "August 19th, 2015"
+        )
+        self._compare_child_entry_date_filed(
+            0, r.content.decode(), 1, "August 19th, 2015"
+        )
+        self._compare_child_entry_date_filed(
+            1, r.content.decode(), 0, "July 5th, 2014"
+        )
+        self._compare_child_entry_date_filed(
+            2, r.content.decode(), 0, "February 23rd, 1732"
+        )
+
         # Order by entry_date_filed asc
         # Ordering by a child field, dockets without entries should come last.
         params = {
@@ -2007,6 +2111,20 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1236")
             < r.content.decode().index("12-1237"),
             msg="'12-0000' should come BEFORE '12-1235' when order_by entry_date_filed asc.",
+        )
+
+        # Confirm entry date filed are properly displayed.
+        self._compare_child_entry_date_filed(
+            0, r.content.decode(), 0, "February 23rd, 1732"
+        )
+        self._compare_child_entry_date_filed(
+            1, r.content.decode(), 0, "July 5th, 2014"
+        )
+        self._compare_child_entry_date_filed(
+            2, r.content.decode(), 0, "August 19th, 2015"
+        )
+        self._compare_child_entry_date_filed(
+            2, r.content.decode(), 1, "August 19th, 2015"
         )
 
         # Order by entry_date_filed desc in match all queries.
@@ -2169,6 +2287,899 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("encountered an error", r.content.decode())
 
+    def test_initial_document_button(self) -> None:
+        """Confirm the initial document button is properly shown on different
+        scenarios"""
+
+        district_court = CourtFactory(id="cand", jurisdiction="FD")
+
+        dockets_to_remove = []
+        # Add dockets with no documents
+        with self.captureOnCommitCallbacks(execute=True):
+
+            # District document initial document available
+            de_1 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=district_court,
+                    case_name="Lorem District vs Complaint Available",
+                    docket_number="1:21-bk-1234",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_1.docket)
+            sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
+            initial_document_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=True,
+                filepath_local=sample_file,
+                pacer_doc_id="1234567",
+            )
+            # This attachment 1 should be ignored for non-appellate courts
+            RECAPDocumentFactory(
+                docket_entry=de_1,
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=True,
+                filepath_local=sample_file,
+                pacer_doc_id="1234568",
+            )
+
+            # District document initial document not available
+            de_2 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=district_court,
+                    case_name="Lorem District vs Complaint Not Available",
+                    docket_number="1:21-bk-1235",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_2.docket)
+            initial_document_2 = RECAPDocumentFactory(
+                docket_entry=de_2,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=False,
+                pacer_doc_id="234563",
+            )
+            # This attachment 1 should be ignored for non-appellate courts
+            RECAPDocumentFactory(
+                docket_entry=de_2,
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=False,
+                pacer_doc_id="234564",
+            )
+
+            # Appellate document initial not available and not pacer_doc_id
+            de_3 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Appellate Complaint Not Available no pacer_doc_id",
+                    docket_number="1:21-bk-1235",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_3.docket)
+            initial_document_3 = RECAPDocumentFactory(
+                docket_entry=de_3,
+                document_number="1",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+
+            # Appellate document initial document available
+            de_4 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Lorem Appellate vs Complaint Available",
+                    docket_number="1:21-bk-1236",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_4.docket)
+            sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
+            initial_document_4 = RECAPDocumentFactory(
+                docket_entry=de_4,
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=True,
+                filepath_local=sample_file,
+                pacer_doc_id="7654321",
+            )
+
+            # Appellate document notice of appeal not available
+            de_5 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Lorem Appellate vs Notice of appeal not Available",
+                    docket_number="1:21-bk-1239",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_5.docket)
+            initial_document_5 = RECAPDocumentFactory(
+                docket_entry=de_5,
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=False,
+                pacer_doc_id="765425",
+            )
+
+            # No DocketEntry for the initial document available
+            empty_docket = DocketFactory(
+                court=district_court,
+                case_name="Lorem No Initial Complaint Entry",
+                docket_number="1:21-bk-1237",
+                source=Docket.RECAP,
+            )
+            dockets_to_remove.append(empty_docket)
+            # Bankruptcy document initial document available
+            de_6 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Lorem Bankruptcy vs Petition Available",
+                    docket_number="1:21-bk-1240",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_6.docket)
+            sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
+            initial_document_6 = RECAPDocumentFactory(
+                docket_entry=de_6,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=True,
+                filepath_local=sample_file,
+                pacer_doc_id="12345875",
+            )
+
+            # Bankruptcy document initial document not available
+            de_7 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Lorem Bankruptcy vs Petition Not Available",
+                    docket_number="1:21-bk-1240",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_7.docket)
+            initial_document_7 = RECAPDocumentFactory(
+                docket_entry=de_7,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=False,
+                pacer_doc_id="35345875",
+            )
+
+        # District document initial document available
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem District vs Complaint Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Document available"
+        )
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual("Initial Document", button_text)
+        self.assertEqual(initial_document_1.get_absolute_url(), button_url)
+
+        # District document initial document not available. Show Buy button.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem District vs Complaint Not Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint Not available"
+        )
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual("Buy Initial Document", button_text)
+        self.assertEqual(initial_document_2.pacer_url, button_url)
+
+        # Appellate notice of appeal available
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem Appellate vs Complaint Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint Appellate available"
+        )
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual("Initial Document", button_text)
+        self.assertEqual(initial_document_4.get_absolute_url(), button_url)
+
+        # No docket entry is available for the initial document. No button is shown.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem No Initial Complaint Entry"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint Entry no available"
+        )
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertIsNone(button_text)
+        self.assertIsNone(button_url)
+
+        # Appellate document initial not available and not pacer_doc_id.
+        # No button is shown.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Appellate Complaint Not Available no pacer_doc_id"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Appellate Complaint button no available"
+        )
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertIsNone(button_text)
+        self.assertIsNone(button_url)
+
+        # Appellate notice of appeal not available. Button Buy Notice of appeal
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem Appellate vs Notice of appeal not Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint Appellate available"
+        )
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual("Buy Initial Document", button_text)
+        self.assertEqual(initial_document_5.pacer_url, button_url)
+
+        "Lorem Bankruptcy vs Petition Available"
+
+        # Bankruptcy document initial petition available
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem Bankruptcy vs Petition Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint available"
+        )
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual("Initial Document", button_text)
+        self.assertEqual(initial_document_6.get_absolute_url(), button_url)
+
+        # Bankruptcy document initial petition not available. Show Buy button.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem Bankruptcy vs Petition Not Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint Not available"
+        )
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual(
+            "Buy Initial Document",
+            button_text,
+        )
+        self.assertEqual(initial_document_7.pacer_url, button_url)
+
+        for docket in dockets_to_remove:
+            docket.delete()
+
+    @mock.patch("cl.search.views.fetch_es_results")
+    @override_settings(
+        RECAP_SEARCH_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
+    )
+    async def test_micro_cache_for_search_results(self, mock_fetch_es) -> None:
+        """Assert micro-cache for search results behaves properly."""
+
+        # Clean search_results_cache before starting the test.
+        r = get_redis_interface("CACHE")
+        keys = r.keys("search_results_cache")
+        if keys:
+            r.delete(*keys)
+
+        mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
+            *args, **kwargs
+        )
+        # Combine query and filter.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "available_only": True,
+            "q": "Amicus Curiae Lorem",
+        }
+        # First query shouldn't be cached.
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is called one time.
+        self.assertEqual(mock_fetch_es.call_count, 1)
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "child filter + text query"
+        )
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        # Repeat the query:
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 1)
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "child filter + text query"
+        )
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+        # 1ms query time when using the micro-cache.
+        self.assertIn("1ms", r.content.decode())
+
+        # Change params order and repeat the query:
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Amicus Curiae Lorem",
+            "available_only": True,
+        }
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 1)
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        # Change query content.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Amicus Curiae",
+            "available_only": True,
+        }
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 2)
+
+        # Confirm searches with no results are also cached.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Index Curiae",
+            "available_only": True,
+        }
+        r = await self._test_article_count(params, 0, "filter + text query")
+        self.assertIn(
+            "had no results",
+            r.content.decode(),
+        )
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 3)
+
+        # Repeat the query:
+        r = await self._test_article_count(params, 0, "filter + text query")
+        self.assertIn(
+            "had no results",
+            r.content.decode(),
+        )
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 3)
+
+        # Confirm results without page parameter are cached as page 1.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "",
+        }
+        r = await self._test_article_count(params, 2, "filter + text query")
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 4)
+
+        # Confirm results without q parameter are cached as q="".
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+        }
+        r = await self._test_article_count(params, 2, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 4)
+
+        # Same parameters, including page: 1 explicitly.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "",
+            "page": "1",
+        }
+        r = await self._test_article_count(params, 2, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 4)
+
+        # Same parameters page 2.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "",
+            "page": "2",
+        }
+        r = await self._test_article_count(params, 0, "filter + text query")
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 5)
+        cache.clear()
+
+    def test_uses_exact_version_for_case_name_field(self) -> None:
+        """Confirm that stemming and synonyms are disabled on the case_name
+        filter and text query.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            de = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Howell v. Indiana",
+                    case_name_short="Dolor",
+                    case_name_full="Ipsum Dolor",
+                    docket_number="1:21-bk-1235",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            RECAPDocumentFactory(
+                docket_entry=de,
+                document_number="1",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+            RECAPDocumentFactory(
+                docket_entry=de,
+                document_number="2",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+            docket_2 = DocketFactory(
+                court=self.court_2,
+                case_name="Howells v. Indiana",
+                case_name_short="Dolor",
+                case_name_full="Lorem Ipsum",
+                docket_number="1:21-bk-1235",
+                source=Docket.RECAP,
+            )
+            DocketFactory(
+                court=self.court_2,
+                case_name="Howells v. LLC Indiana",
+                case_name_short="Dolor",
+                case_name_full="Lorem Ipsum",
+                docket_number="1:21-bk-1235",
+                source=Docket.RECAP,
+            )
+
+        # case_name filter: Howell
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howell",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self._count_child_documents(
+            0, r.content.decode(), 2, "case_name filter"
+        )
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # case_name filter: Howell + document_number 1
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howell",
+            "document_number": 1,
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Disable stemming case_name + child filter."
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 1, "case_name + child filter"
+        )
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # case_name filter: Howells
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howells",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 2, "Disable stemming")
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # quoted case_name filter: "Howells v. Indiana" expect exact match
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": '"Howells v. Indiana"',
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self.assertIn("<mark>Howells v. Indiana</mark>", r.content.decode())
+
+        # No quoted case_name filter: A match for 'Indiana Howell' is expected,
+        # as the order is not mandatory
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Indiana Howell",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "No phrase search.")
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+        self.assertIn("<mark>Indiana</mark>", r.content.decode())
+
+        # Quoted case_name filter: "Indiana v. Howells" match is not expected
+        # as order is mandatory
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": '"Indiana v. Howells"',
+        }
+        async_to_sync(self._test_article_count)(cd, 0, "Phrase search.")
+
+        # text query: Howell
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howell",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "text query")
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # text query: Howells
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howells",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 2, "Disable stemming")
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # text query: Howell ind (stemming and synonyms disabled)
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howell ind",
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 0, "Disable stemming and synonyms"
+        )
+
+        de.docket.delete()
+        docket_2.delete()
+
+
+class RECAPSearchDecayRelevancyTest(
+    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+):
+    """
+    RECAP Search Decay Relevancy  Tests
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.Docket")
+
+        # Same keywords but different dateFiled
+        cls.docket_old = DocketFactory(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1235",
+            source=Docket.RECAP,
+            date_filed=datetime.date(1832, 2, 23),
+        )
+        cls.rd_old = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_old,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="019036000435",
+        )
+
+        cls.docket_recent = DocketFactory(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1236",
+            source=Docket.RECAP,
+            date_filed=datetime.date(2024, 2, 23),
+        )
+        cls.rd_recent = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_recent,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="019036000436",
+        )
+
+        # Different relevance with same dateFiled
+        cls.docket_low_relevance = DocketFactory(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            nature_of_suit="",
+            docket_number="1:21-bk-1238",
+            source=Docket.RECAP,
+            date_filed=datetime.date(2022, 2, 23),
+        )
+        cls.rd_low_relevance = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_low_relevance,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="019036000437",
+        )
+
+        cls.docket_high_relevance = DocketFactory(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1237",
+            source=Docket.RECAP,
+            nature_of_suit="More Highly Relevant Keywords",
+            cause="More Highly Relevant Keywords",
+            date_filed=datetime.date(2022, 2, 23),
+        )
+        cls.rd_high_relevance = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_high_relevance,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600048",
+        )
+
+        # Different relevance with different dateFiled
+        cls.docket_high_relevance_old_date = DocketFactory(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1239",
+            source=Docket.RECAP,
+            nature_of_suit="More Ipsum Dolor Terms",
+            cause="More Ipsum Dolor Terms",
+            date_filed=datetime.date(1900, 2, 23),
+        )
+        cls.rd_high_relevance_old_date = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_high_relevance_old_date,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600049",
+        )
+
+        cls.docket_high_relevance_null_date = DocketFactory(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1240",
+            source=Docket.RECAP,
+            nature_of_suit="More Ipsum Dolor Terms",
+            cause="More Ipsum Dolor Terms",
+            date_filed=None,
+        )
+        cls.rd_high_relevance_null_date = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_high_relevance_null_date,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600050",
+        )
+
+        cls.docket_low_relevance_new_date = DocketFactory(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            nature_of_suit="",
+            docket_number="1:21-bk-1241",
+            source=Docket.RECAP,
+            date_filed=datetime.date(2024, 12, 23),
+        )
+        cls.rd_low_relevance_new_date = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_low_relevance_new_date,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600051",
+        )
+
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+        cls.test_cases = [
+            {
+                "name": "Same keywords, different dateFiled",
+                "search_params": {
+                    "q": "Keyword Match",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_recent.docket_number,  # Most recent dateFiled
+                    cls.docket_old.docket_number,  # Oldest dateFiled
+                ],
+                "expected_order": [  # API
+                    cls.docket_recent.pk,
+                    cls.docket_old.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy same dateFiled",
+                "search_params": {
+                    "q": "Highly Relevant Keywords",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_high_relevance.docket_number,
+                    # Most relevant by keywords
+                    cls.docket_low_relevance.docket_number,
+                    # Less relevant by keywords
+                ],
+                "expected_order": [  # API
+                    cls.docket_high_relevance.pk,
+                    cls.docket_low_relevance.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy different dateFiled",
+                "search_params": {
+                    "q": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,  # Combination of relevance and date rank it first.
+                    cls.docket_high_relevance_old_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,  # docs with a null dateFiled are ranked lower.
+                ],
+                "expected_order": [  # API
+                    cls.docket_low_relevance_new_date.pk,
+                    cls.docket_high_relevance_old_date.pk,
+                    cls.docket_high_relevance_null_date.pk,
+                ],
+            },
+            {
+                "name": "Fixed main score for all (0 or 1) (using filters) and different dateFiled",
+                "search_params": {
+                    "case_name": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,  # Most recent dateFiled
+                    cls.docket_high_relevance_old_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,  # docs with a null dateFiled are ranked lower.
+                ],
+                "expected_order": [  # API
+                    cls.docket_low_relevance_new_date.pk,
+                    cls.docket_high_relevance_old_date.pk,
+                    cls.docket_high_relevance_null_date.pk,
+                ],
+            },
+            {
+                "name": "Match all query decay relevancy.",
+                "search_params": {
+                    "q": "",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,
+                    # 2024, 12, 23 1:21-bk-1241
+                    cls.docket_recent.docket_number,
+                    # 2024, 2, 23 1:21-bk-1236
+                    cls.docket_low_relevance.docket_number,
+                    # 2022, 2, 23 1:21-bk-1238 Indexed first, displayed first.
+                    cls.docket_high_relevance.docket_number,
+                    # 2022, 2, 23 1:21-bk-1237
+                    cls.docket_high_relevance_old_date.docket_number,
+                    # 1800, 2, 23 1:21-bk-1239
+                    cls.docket_old.docket_number,  # 1732, 2, 23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.docket_number,
+                    # Null dateFiled 1:21-bk-1240
+                ],
+                "expected_order": [  # V4 API
+                    cls.docket_low_relevance_new_date.pk,
+                    # 2024, 12, 23 1:21-bk-1241
+                    cls.docket_recent.pk,
+                    # 2024, 2, 23 1:21-bk-1236
+                    cls.docket_high_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1237 Higher PK in V4, API pk is a secondary sorting key.
+                    cls.docket_low_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1238 Lower PK
+                    cls.docket_high_relevance_old_date.pk,
+                    # 1800, 2, 23 1:21-bk-1239
+                    cls.docket_old.pk,  # 1732, 2, 23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.pk,
+                    # Null 1:21-bk-1240
+                ],
+                "expected_order_v3": [  # V3 API
+                    cls.docket_low_relevance_new_date.pk,
+                    # 2024, 12, 23 1:21-bk-1241
+                    cls.docket_recent.pk,
+                    # 2024, 2, 23 1:21-bk-1236
+                    cls.docket_low_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1238 Indexed first, displayed first.
+                    cls.docket_high_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1237
+                    cls.docket_high_relevance_old_date.pk,
+                    # 1800, 2, 23 1:21-bk-1239
+                    cls.docket_old.pk,  # 1732, 2, 23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.pk,
+                    # Null 1:21-bk-1240
+                ],
+            },
+        ]
+
+    def test_relevancy_decay_scoring_frontend(self) -> None:
+        """Test relevancy decay scoring for RECAP search Frontend"""
+
+        for test in self.test_cases:
+            with self.subTest(test["name"]):
+                r = async_to_sync(self._test_article_count)(
+                    test["search_params"],
+                    len(test["expected_order_frontend"]),
+                    f"Failed count {test["name"]}",
+                )
+                self._assert_order_in_html(
+                    r.content.decode(), test["expected_order_frontend"]
+                )
+
+    def test_relevancy_decay_scoring_v4_api(self) -> None:
+        """Test relevancy decay scoring for RECAP search V4 API"""
+
+        search_types = [
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+            SEARCH_TYPES.RECAP_DOCUMENT,
+        ]
+        for search_type in search_types:
+            for test in self.test_cases:
+                test["search_params"]["type"] = search_type
+                self._test_results_ordering(test, "docket_id", version="v4")
+
+    def test_relevancy_decay_scoring_v3_api(self) -> None:
+        """Test relevancy decay scoring for RECAP search V4 API"""
+
+        search_types = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+        for search_type in search_types:
+            for test in self.test_cases:
+                test["search_params"]["type"] = search_type
+                self._test_results_ordering(test, "docket_id", version="v3")
+
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
@@ -2236,7 +3247,9 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             cited_opinion=cls.opinion,
             depth=1,
         )
-        BankruptcyInformationFactory(docket=cls.de_api.docket)
+        BankruptcyInformationFactory(
+            docket=cls.de_api.docket, trustee_str="Lorem Ipsum"
+        )
 
         cls.de_empty_fields_api = DocketEntryWithParentsFactory(
             docket=DocketFactory(
@@ -2258,6 +3271,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             court=cls.court_api,
             date_argued=None,
             source=Docket.RECAP_AND_IDB,
+            case_name_full="",
         )
 
     async def _test_api_results_count(
@@ -2470,7 +3484,6 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         )
 
 
-@override_flag("r-es-search-api-active", active=True)
 class RECAPSearchAPIV3Test(
     RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
 ):
@@ -2702,28 +3715,6 @@ class RECAPSearchAPIV3Test(
         }
         # API
         await self._test_api_results_count(params, 3, "order random")
-
-        # Order by score desc (relevance).
-        params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": "SUBPOENAS SERVED",
-            "order_by": "score desc",
-        }
-        # API
-        r = await self._test_api_results_count(params, 3, "order score desc")
-        self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by score desc.",
-        )
-
-        params["type"] = SEARCH_TYPES.DOCKETS
-        r = await self._test_api_results_count(params, 2, "order")
-        self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by score desc.",
-        )
 
         # Order by entry_date_filed desc
         params = {
@@ -3174,6 +4165,7 @@ class RECAPSearchAPIV4Test(
             docket_entry_recent = DocketEntryWithParentsFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Lorem Ipsum",
+                docket__case_name_full="",
                 docket__date_filed=datetime.date(2024, 2, 23),
                 date_filed=datetime.date(2022, 2, 23),
             )
@@ -3223,7 +4215,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Query string, order by dateFiled desc",
                 "search_params": search_params,
-                "expected_results": 5,
                 "expected_order": [
                     docket_entry_recent.docket.pk,  # 2024/02/23
                     self.de_1.docket.pk,  # 2016/08/16
@@ -3235,7 +4226,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Query string, order by dateFiled asc",
                 "search_params": params_date_filed_asc,
-                "expected_results": 5,
                 "expected_order": [
                     docket_old.pk,  # 1732/2/23
                     self.de.docket.pk,  # 2015/8/16
@@ -3247,7 +4237,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Match all query, order by dateFiled desc",
                 "search_params": params_match_all_date_filed_desc,
-                "expected_results": 8,
                 "expected_order": [
                     docket_entry_recent.docket.pk,  # 2024/2/23
                     self.de_1.docket.pk,  # 2016/8/16
@@ -3262,7 +4251,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Match all query, order by dateFiled asc",
                 "search_params": params_match_all_date_filed_asc,
-                "expected_results": 8,
                 "expected_order": [
                     docket_old.pk,  # 1732/2/23
                     self.de.docket.pk,  # 2015/8/16
@@ -3277,7 +4265,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Query string, order by entry_date_filed asc",
                 "search_params": params_entry_date_filed_asc,
-                "expected_results": 5,
                 "expected_order": [
                     self.de_1.docket.pk,  # 2014/7/19
                     self.de.docket.pk,  # 2015/8/16
@@ -3289,7 +4276,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Match all query, order by  entry_date_filed asc",
                 "search_params": params_match_all_entry_date_filed_asc,
-                "expected_results": 8,
                 "expected_order": [
                     self.de_1.docket.pk,  # 2014/7/19
                     self.de.docket.pk,  # 2015/8/16
@@ -4411,7 +5397,9 @@ class RECAPSearchAPIV4Test(
         and empties the list field.
         """
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            d = DocketFactory(court=self.court, source=Docket.RECAP)
+            d = DocketFactory(
+                case_name="Lorem Ipsum", court=self.court, source=Docket.RECAP
+            )
             firm = AttorneyOrganizationFactory(
                 lookup_key="00kingofprussiaroadradnorkesslertopazmeltze87437",
                 name="Law Firm LLP",
@@ -4788,6 +5776,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             docket_entry=self.de,
             document_number="1",
             attachment_number=2,
+            document_type=RECAPDocument.ATTACHMENT,
         )
         self.de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(
@@ -5764,7 +6753,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             non_recap_docket = DocketFactory(
@@ -5783,7 +6772,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             non_recap_docket.source = Docket.HARVARD
@@ -5796,7 +6785,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             non_recap_docket.source = Docket.RECAP_AND_IDB_AND_HARVARD
@@ -5810,7 +6799,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             docket = DocketFactory(
@@ -5829,7 +6818,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             docket_2 = DocketFactory(
@@ -5847,7 +6836,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             docket.save()
@@ -5858,7 +6847,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             docket.save()
@@ -5870,7 +6859,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             docket.blocked = True
@@ -5883,7 +6872,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             docket.docket_number = "21-43434"
@@ -5903,7 +6892,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             docket.docket_number = "21-43435"
@@ -5935,7 +6924,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             de_1 = DocketEntryWithParentsFactory(
@@ -5960,7 +6949,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             de_2 = DocketEntryWithParentsFactory(
@@ -5977,7 +6966,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             rd_1.save()
@@ -5988,7 +6977,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             rd_1.is_sealed = True
@@ -6001,7 +6990,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             rd_1.description = "Lorem Ipsum"
@@ -6017,7 +7006,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             rd_1.page_count = 6
@@ -6040,7 +7029,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             rd_1.docket_entry = de_2
@@ -6068,7 +7057,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             rd_1.pacer_doc_id = "99999999"
@@ -6085,7 +7074,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             OpinionsCitedByRECAPDocument.objects.bulk_create(
@@ -6112,7 +7101,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             OpinionsCitedByRECAPDocument.objects.filter(
@@ -6129,7 +7118,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             o_cited = OpinionsCitedByRECAPDocument(
@@ -6324,6 +7313,100 @@ class RECAPIndexingTest(
             parties_prepared["firm"],
             {firm.name, firm_2.name, firm_2_1.name, firm_1_2.name},
         )
+
+    def test_index_party_from_case_name_when_parties_are_not_available(
+        self,
+    ) -> None:
+        """Confirm that the party field is populated by splitting the case_name
+        when a valid separator is present.
+        """
+
+        docket_with_parties = DocketFactory(
+            court=self.court,
+            case_name="Lorem v. Dolor",
+            docket_number="1:21-bk-4444",
+            source=Docket.RECAP,
+        )
+        firm = AttorneyOrganizationFactory(
+            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck1536",
+            name="Law Firm LLP",
+        )
+        attorney = AttorneyFactory(
+            name="Emily Green",
+            organizations=[firm],
+            docket=docket_with_parties,
+        )
+        party_type = PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Mary Williams Corp.",
+                docket=docket_with_parties,
+                attorneys=[attorney],
+            ),
+            docket=docket_with_parties,
+        )
+        index_docket_parties_in_es.delay(docket_with_parties.pk)
+        docket_with_no_parties = DocketFactory(
+            court=self.court,
+            case_name="Bank v. Smith",
+            docket_number="1:21-bk-4445",
+            source=Docket.RECAP,
+        )
+
+        docket_doc_parties = DocketDocument.get(docket_with_parties.pk)
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+
+        # Assert party on initial indexing.
+        self.assertEqual(docket_doc_parties.party, ["Mary Williams Corp."])
+        self.assertEqual(docket_doc_no_parties.party, ["Bank", "Smith"])
+
+        # Modify the docket case_name. Assert that parties are not overwritten
+        # in a docket with normalized parties.
+        docket_with_parties.case_name = "Lorem v. Ipsum"
+        docket_with_parties.save()
+        docket_doc_parties = DocketDocument.get(docket_with_parties.pk)
+        self.assertEqual(docket_doc_parties.party, ["Mary Williams Corp."])
+
+        # Modify the docket case_name. Assert that parties are updated if the
+        # docket does not contain normalized parties.
+        docket_with_no_parties.case_name = "America v. Smith"
+        docket_with_no_parties.save()
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+        self.assertEqual(docket_doc_no_parties.party, ["America", "Smith"])
+
+        # Test that parties are not extracted from the case_name if it does not contain
+        # a valid separator.
+        docket_with_no_parties_no_separator = DocketFactory(
+            court=self.court,
+            case_name="In re: Bank Smith",
+            docket_number="1:21-bk-4446",
+            source=Docket.RECAP,
+        )
+        docket_with_no_parties_no_separator = DocketDocument.get(
+            docket_with_no_parties_no_separator.pk
+        )
+        self.assertEqual(docket_with_no_parties_no_separator.party, [])
+
+        # Confirm that normalized parties can overwrite the case_name parties.
+        attorney_2 = AttorneyFactory(
+            name="John Green",
+            organizations=[firm],
+            docket=docket_with_no_parties,
+        )
+        PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Bank Corp.",
+                docket=docket_with_no_parties,
+                attorneys=[attorney_2],
+            ),
+            docket=docket_with_no_parties,
+        )
+        index_docket_parties_in_es.delay(docket_with_no_parties.pk)
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+        self.assertEqual(docket_doc_no_parties.party, ["Bank Corp."])
+
+        docket_with_parties.delete()
+        docket_doc_no_parties.delete()
+        docket_with_no_parties_no_separator.delete()
 
 
 class RECAPHistoryTablesIndexingTest(

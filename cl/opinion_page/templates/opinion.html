@@ -48,7 +48,7 @@
                            class="btn btn-primary btn-xs">Cluster</a>
                     {% endif %}
                     {% if perms.search.change_opinion %}
-                        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                        {% for sub_opinion in cluster.sub_opinions.all %}
                             <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
                                class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion</a>
                         {% endfor %}
@@ -100,7 +100,7 @@
             {% endfor %}
           </ul>
           <h4>
-            <a href="{% url "view_summaries" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
+            <a href="{% url "view_case_summaries" cluster.pk cluster.slug %}{% querystring %}"
                class="btn btn-default">
               View All Summaries
             </a>
@@ -123,7 +123,7 @@
             <ul>
               {% for citing_cluster in citing_clusters %}
                 <li>
-                  <a href="{{ citing_cluster.absolute_url }}?{{ request.META.QUERY_STRING }}">{{ citing_cluster.caseName|safe|truncatewords:12|v_wrapper }} ({{ citing_cluster.dateFiled|date:"Y" }})</a>
+                  <a href="{{ citing_cluster.absolute_url }}{% querystring %}">{{ citing_cluster.caseName|safe|truncatewords:12|v_wrapper }} ({{ citing_cluster.dateFiled|date:"Y" }})</a>
                 </li>
               {% endfor %}
             </ul>
@@ -134,7 +134,17 @@
               >View Citing Opinions</a>
             </p>
           {% else %}
-            <p>This case has not yet been cited in our system.</p>
+            {% if queries_timeout %}
+              <p>Unable to retrieve citing clusters. Please try by clicking the button below:</p>
+              <p>
+                <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+                   rel="nofollow"
+                   class="btn btn-default"
+                >View Citing Opinions</a>
+              </p>
+            {% else %}
+               <p>This case has not yet been cited in our system.</p>
+            {% endif %}
           {% endif %}
           <div class="btn-group">
             <a href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
@@ -159,14 +169,13 @@
 
 
         {# Related opinions #}
-        {% if related_clusters %}
+        {% if related_clusters or queries_timeout %}
             <div id="recommendations" class="sidebar-section">
                 <h3><span>Related Case Law</span></h3>
-
-                <p class="bottom">The following case law covers similar topics:</p>
-
+                {% if not related_clusters and queries_timeout %}
+                    <p class="bottom">Unable to retrieve related clusters. Please try by clicking the button below:</p>
+                {% endif %}
                 {% url 'show_results' as show_results_url %}
-
                 {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
                 {% with opinions=related_clusters full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
 
@@ -350,7 +359,7 @@
                         Download Original <span class="caret"></span>
                     </button>
                     <ul class="dropdown-menu">
-                        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                        {% for sub_opinion in cluster.sub_opinions.all %}
                             {% if sub_opinion.local_path %}
                                 <li>
                                     <a href="{{ sub_opinion.local_path.url }}"
@@ -361,7 +370,7 @@
                                 </li>
                             {% endif %}
                         {% endfor %}
-                        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                        {% for sub_opinion in cluster.sub_opinions.all %}
                             {% if sub_opinion.download_url %}
                                 {% if forloop.counter == 1 %}
                                     <li role="separator" class="divider"></li>
@@ -399,7 +408,7 @@
             {# Only display tabs and make panels if more than one sub-opinion. #}
             {% if opinion_count > 1 %}
                 <ul class="nav nav-tabs v-offset-below-1" role="tablist">
-                    {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                    {% for sub_opinion in cluster.sub_opinions.all %}
                         <li role="presentation" {% if forloop.first %}class="active"{% endif %}>
                             <a href="#{{ sub_opinion.type }}{{ forloop.counter }}"
                                aria-controls="{{ sub_opinion.type }}{{ forloop.counter }}"
@@ -411,7 +420,7 @@
             {% endif %}
 
             <div class="tab-content">
-                {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                {% for sub_opinion in cluster.sub_opinions.all %}
                     <div {% if opinion_count > 1 %}
                             role="tabpanel"
                             class="tab-pane {% if forloop.first %}active{% endif %}"

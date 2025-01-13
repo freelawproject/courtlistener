@@ -1,12 +1,14 @@
 import random
 import re
 import urllib.parse
+from datetime import datetime, timezone
 
 import waffle
 from django import template
 from django.core.exceptions import ValidationError
 from django.template import Context
 from django.template.context import RequestContext
+from django.template.defaultfilters import date as date_filter
 from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
@@ -289,14 +291,9 @@ def alerts_supported(context: RequestContext, search_type: str) -> str:
     """
 
     request = context["request"]
-    return (
-        search_type == SEARCH_TYPES.OPINION
-        or search_type == SEARCH_TYPES.ORAL_ARGUMENT
-        or (
-            search_type == SEARCH_TYPES.RECAP
-            and waffle.flag_is_active(request, "recap-alerts-active")
-        )
-    )
+    if search_type == SEARCH_TYPES.RECAP:
+        return waffle.flag_is_active(request, "recap-alerts-active")
+    return search_type in (SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT)
 
 
 @register.filter
@@ -327,3 +324,44 @@ def group_courts(courts: list[Court], num_columns: int) -> list:
         start = end
 
     return groups
+
+
+@register.filter
+def format_date(date_str: str) -> str:
+    """Formats a date string in the format 'F jS, Y'. Useful for formatting
+    ES child document results where dates are not date objects."""
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        return date_filter(date_obj, "F jS, Y")
+    except (ValueError, TypeError):
+        return date_str
+
+
+@register.filter
+def datetime_in_utc(date_obj) -> str:
+    """Formats a datetime object in UTC with timezone displayed.
+    For example: 'Nov. 25, 2024, 01:28 p.m. UTC'"""
+    if date_obj is None:
+        return ""
+    try:
+        return date_filter(
+            date_obj.astimezone(timezone.utc),
+            "M. j, Y, h:i a T",
+        )
+    except (ValueError, TypeError):
+        return date_obj
+
+
+@register.filter
+def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
+    """Build a query string that includes the docket ID and any existing query
+    parameters.
+
+    :param request_q: The current query string, if present.
+    :param docket_id: The docket_id to append to the query string.
+    :return:The query string with the docket_id included.
+    """
+
+    if request_q:
+        return f"({request_q}) AND docket_id:{docket_id}"
+    return f"docket_id:{docket_id}"

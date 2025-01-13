@@ -30,6 +30,7 @@ from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
+from cl.scrapers.utils import scraped_citation_object_is_valid
 from cl.search.models import Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ ExtractProcessResult = Tuple[str, Optional[str]]
 
 def update_document_from_text(
     opinion: Opinion, juriscraper_module: str = ""
-) -> None:
+) -> dict:
     """Extract additional metadata from document text
 
     We use this code with BIA decisions. Previously Tax.
@@ -54,12 +55,13 @@ def update_document_from_text(
 
     :param opinion: Opinion object
     :param juriscraper_module: full module to get Site object
-    :return: None
+    :return: the extracted data dictionary
     """
     court = opinion.cluster.docket.court.pk
     site = get_scraper_object_by_name(court, juriscraper_module)
     if site is None:
-        return
+        logger.debug("No site found %s", juriscraper_module)
+        return {}
 
     metadata_dict = site.extract_from_text(opinion.plain_text or opinion.html)
     for model_name, data in metadata_dict.items():
@@ -70,13 +72,17 @@ def update_document_from_text(
             opinion.cluster.__dict__.update(data)
         elif model_name == "Citation":
             data["cluster_id"] = opinion.cluster_id
-            ModelClass.objects.get_or_create(**data)
+            if scraped_citation_object_is_valid(data):
+                _, citation_created = ModelClass.objects.get_or_create(**data)
+                metadata_dict["Citation"]["created"] = citation_created
         elif model_name == "Opinion":
             opinion.__dict__.update(data)
         else:
             raise NotImplementedError(
                 f"Object type of {model_name} not yet supported."
             )
+
+    return metadata_dict
 
 
 @app.task(
@@ -188,19 +194,12 @@ def extract_doc_content(
         )
         return
 
-    # Save item, and index Solr if needed.
+    # Save item
     # noinspection PyBroadException
     try:
         opinion.cluster.docket.save()
-        opinion.cluster.save(index=False)
-        if not citation_jitter:
-            # No waiting around. Save to the database now, but don't bother
-            # with the index yet because citations are being done imminently.
-            opinion.save(index=False)
-        else:
-            # Save to the index now, citations come later, commit comes
-            # according to schedule
-            opinion.save(index=True)
+        opinion.cluster.save()
+        opinion.save()
     except Exception:
         logger.error(
             "****Error saving text to the db for: %s****\n%s",
@@ -321,9 +320,7 @@ async def extract_recap_pdf_base(
                 rd.ocr_status = RECAPDocument.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
-        # Do not do indexing here. Creates race condition in celery.
         await rd.asave(
-            index=False,
             do_extraction=False,
             update_fields=["ocr_status", "plain_text"],
         )
@@ -410,15 +407,16 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     :param court_id: The court of the docket. Needed for throttling by court.
     :return: None
     """
-    cookies = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     s = ProxyPacerSession(
-        cookies=cookies,
+        cookies=session_data.cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
+        proxy=session_data.proxy_address,
     )
     d = Docket.objects.get(pk=d_pk, court_id=court_id)
     report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
@@ -438,7 +436,7 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     save_iquery_to_docket(
         self,
         report.data,
+        report.response.text,
         d,
         tag_names=None,
-        add_to_solr=True,
     )

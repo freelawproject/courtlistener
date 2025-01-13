@@ -328,7 +328,8 @@ def find_just_name(text: str) -> str:
 
     # Next up is full names followed by a comma
     match_titles = re.search(
-        "(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-'']{2,}(\s(IV|I|II|III|V|Jr\.|JR\.|Sr\.|SR\.))?),",
+        # adding 'r' prefix to address python 3.12 strickness around escape sequences in string literals
+        r"(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-'']{2,}(\s(IV|I|II|III|V|Jr\.|JR\.|Sr\.|SR\.))?),",
         cleaned_text,
     )
     if match_titles:
@@ -571,8 +572,7 @@ async def lookup_judge_by_full_name_and_set_attr(
     if not full_name:
         return None
     judge = await lookup_judge_by_full_name(full_name, court_id, event_date)
-    if judge is not None:
-        setattr(item, target_field, judge)
+    setattr(item, target_field, judge)
 
 
 async def lookup_judge_by_last_name(

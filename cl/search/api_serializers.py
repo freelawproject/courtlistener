@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from datetime import timezone
 
 from drf_dynamic_fields import DynamicFieldsMixin
@@ -268,57 +267,6 @@ class TagSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
         fields = "__all__"
 
 
-class SearchResultSerializer(serializers.Serializer):
-    """The serializer for search results.
-
-    Does not presently support the fields argument.
-    """
-
-    def update(self, instance, validated_data):
-        raise NotImplementedError
-
-    def create(self, validated_data):
-        raise NotImplementedError
-
-    solr_field_mappings = {
-        "boolean": serializers.BooleanField,
-        "string": serializers.CharField,
-        "text_en_splitting_cl": serializers.CharField,
-        "text_no_word_parts": serializers.CharField,
-        "date": serializers.DateTimeField,
-        # Numbers
-        "int": serializers.IntegerField,
-        "tint": serializers.IntegerField,
-        "long": serializers.IntegerField,
-        # schema.SolrFloatField: serializers.FloatField,
-        # schema.SolrDoubleField: serializers.IntegerField,
-        # Other
-        "pagerank": serializers.CharField,
-    }
-    skipped_fields = ["_version_", "django_ct", "django_id", "text"]
-
-    def get_fields(self):
-        """Return a list of fields so that they don't have to be declared one
-        by one and updated whenever there's a new field.
-        """
-        fields = {
-            "snippet": serializers.CharField(read_only=True),
-        }
-        # Map each field in the Solr schema to a DRF field
-        for field in self._context["schema"]["fields"]:
-            if field.get("multiValued"):
-                drf_field = serializers.ListField
-            else:
-                drf_field = self.solr_field_mappings[field["type"]]
-            fields[field["name"]] = drf_field(read_only=True)
-
-        for field in self.skipped_fields:
-            if field in fields:
-                fields.pop(field)
-        fields = OrderedDict(sorted(fields.items()))  # Sort by key
-        return fields
-
-
 class V3OAESResultSerializer(DocumentSerializer):
     """The serializer for Oral argument results."""
 
@@ -435,7 +383,11 @@ class V3OpinionESResultSerializer(DocumentSerializer):
         )
 
 
-class MetaDataSerializer(serializers.Serializer):
+class ScoreDataSerializer(serializers.Serializer):
+    bm25 = serializers.FloatField(read_only=True, source="bm25_score")
+
+
+class BaseMetaDataSerializer(serializers.Serializer):
     """The metadata serializer V4 Search API."""
 
     timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
@@ -444,29 +396,47 @@ class MetaDataSerializer(serializers.Serializer):
     )
 
 
-class RECAPMetaDataSerializer(MetaDataSerializer):
+class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
+    """The metadata serializer V4 Search API for main documents.
+    Includes the score field.
+    """
+
+    score = ScoreDataSerializer(source="*", read_only=True)
+
+
+class RECAPMetaDataSerializer(MainDocumentMetaDataSerializer):
     """The metadata serializer for the RECAP search type includes the
     additional more_docs field.
     """
 
     more_docs = serializers.BooleanField(
-        read_only=True, source="child_remaining"
+        read_only=True, source="child_remaining", default=False
     )
 
 
-class MetaMixin(serializers.Serializer):
-    """Mixin to add nested metadata serializer."""
+class RECAPWebhookMetaDataSerializer(BaseMetaDataSerializer):
+    """The metadata serializer for the RECAP search Webhook that includes the
+    additional more_docs field without the score field.
+    """
 
-    meta = MetaDataSerializer(source="*", read_only=True)
-
-
-class RECAPMetaMixin(serializers.Serializer):
-    """Mixin to add nested metadata serializer for the RECAP search type."""
-
-    meta = RECAPMetaDataSerializer(source="*", read_only=True)
+    more_docs = serializers.BooleanField(
+        read_only=True, source="child_remaining", default=False
+    )
 
 
-class BaseRECAPDocumentESResultSerializer(MetaMixin, DocumentSerializer):
+class MainMetaMixin(serializers.Serializer):
+    """Mixin to add nested metadata serializer for main documents."""
+
+    meta = MainDocumentMetaDataSerializer(source="*", read_only=True)
+
+
+class ChildMetaMixin(serializers.Serializer):
+    """Mixin to add nested metadata serializer for child documents."""
+
+    meta = BaseMetaDataSerializer(source="*", read_only=True)
+
+
+class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
     """The base serializer class for RECAP_DOCUMENT search type results."""
 
     # Fields from the RECAPDocument
@@ -505,6 +475,12 @@ class BaseRECAPDocumentESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
+class NestedRECAPDocumentESResultSerializer(
+    BaseRECAPDocumentESResultSerializer, ChildMetaMixin
+):
+    """Mixin to add nested metadata serializer for nested Recap documents."""
+
+
 class BaseDocketESResultSerializer(DocumentSerializer):
     """The serializer class for DOCKETS Search type results."""
 
@@ -541,25 +517,37 @@ class BaseDocketESResultSerializer(DocumentSerializer):
         )
 
 
-class RECAPDocumentESResultSerializer(BaseRECAPDocumentESResultSerializer):
+class RECAPDocumentESResultSerializer(
+    BaseRECAPDocumentESResultSerializer, MainMetaMixin
+):
     """The serializer for RECAP_DOCUMENT search type results."""
 
     docket_id = serializers.IntegerField(read_only=True)
 
 
-class DocketESResultSerializer(MetaMixin, BaseDocketESResultSerializer):
+class DocketESResultSerializer(MainMetaMixin, BaseDocketESResultSerializer):
     """The serializer class for DOCKETS Search type results."""
 
 
-class RECAPESResultSerializer(RECAPMetaMixin, BaseDocketESResultSerializer):
+class RECAPESResultSerializer(BaseDocketESResultSerializer):
     """The serializer class for RECAP search type results."""
 
-    recap_documents = BaseRECAPDocumentESResultSerializer(
+    recap_documents = NestedRECAPDocumentESResultSerializer(
         many=True, read_only=True, source="child_docs"
     )
+    meta = RECAPMetaDataSerializer(source="*", read_only=True)
 
 
-class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
+class RECAPESWebhookResultSerializer(BaseDocketESResultSerializer):
+    """The serializer class for RECAP search Webhooks results."""
+
+    recap_documents = NestedRECAPDocumentESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+    meta = RECAPWebhookMetaDataSerializer(source="*", read_only=True)
+
+
+class OpinionDocumentESResultSerializer(ChildMetaMixin, DocumentSerializer):
     """The serializer for OpinionDocument results."""
 
     snippet = HighlightedField(read_only=True, source="text")
@@ -579,7 +567,7 @@ class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
-class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
+class OpinionClusterBaseESResultSerializer(DocumentSerializer):
     """The serializer for OpinionCluster Search results."""
 
     opinions = OpinionDocumentESResultSerializer(
@@ -609,7 +597,21 @@ class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
-class PositionESResultSerializer(MetaMixin, DocumentSerializer):
+class OpinionClusterESResultSerializer(
+    OpinionClusterBaseESResultSerializer, MainMetaMixin
+):
+    """The serializer for OpinionCluster Search results."""
+
+
+class OpinionClusterWebhookResultSerializer(
+    OpinionClusterBaseESResultSerializer
+):
+    """The serializer class for OpinionCluster search Webhooks results."""
+
+    meta = BaseMetaDataSerializer(source="*", read_only=True)
+
+
+class PositionESResultSerializer(ChildMetaMixin, DocumentSerializer):
     """The serializer for Positions Search results."""
 
     class Meta:
@@ -644,7 +646,7 @@ class PositionESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
-class PersonESResultSerializer(MetaMixin, DocumentSerializer):
+class PersonESResultSerializer(MainMetaMixin, DocumentSerializer):
     """The serializer for Person Search results."""
 
     name = HighlightedField(read_only=True)
@@ -674,7 +676,7 @@ class PersonESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
-class OAESResultSerializer(MetaMixin, DocumentSerializer):
+class OAESResultSerializer(MainMetaMixin, DocumentSerializer):
     """The serializer for V4 Oral argument results."""
 
     snippet = HighlightedField(read_only=True, source="text")

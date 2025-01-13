@@ -30,13 +30,12 @@ cnt = CaseNameTweaker()
 @transaction.atomic
 def save_everything(
     items: Dict[str, Union[Docket, Audio]],
-    index: bool = False,
     backscrape: bool = False,
 ) -> None:
     docket, af = items["docket"], items["audio_file"]
     docket.save()
     af.docket = docket
-    af.save(index=index)
+    af.save()
     candidate_judges = []
     if af.docket.court_id != "scotus":
         if af.judges:
@@ -74,9 +73,10 @@ def make_objects(
     docket = update_or_create_docket(
         item["case_names"],
         case_name_short,
-        court.pk,
+        court,
         item.get("docket_numbers", ""),
         item.get("source") or Docket.SCRAPER,
+        from_harvard=False,
         blocked=blocked,
         date_blocked=date_blocked,
         date_argued=item["case_dates"],
@@ -105,84 +105,49 @@ def make_objects(
 
 
 class Command(cl_scrape_opinions.Command):
-    def scrape_court(
+    scrape_target_descr = "oral arguments"
+    juriscraper_module_type = "oral_args"
+
+    def ingest_a_case(
         self,
+        item,
+        next_case_date: date | None,
+        ocr_available: bool,
         site,
-        full_crawl: bool = False,
+        dup_checker: DupChecker,
+        court: Court,
         backscrape: bool = False,
-    ) -> None:
-        # Get the court object early for logging
-        # opinions.united_states.federal.ca9_u --> ca9
-        court_str = site.court_id.split(".")[-1].split("_")[0]
-        court = Court.objects.get(pk=court_str)
+    ):
+        content = get_binary_content(item["download_urls"], site)
+        # request.content is sometimes a str, sometimes unicode, so
+        # force it all to be bytes, pleasing hashlib.
+        sha1_hash = sha1(force_bytes(content))
 
-        dup_checker = DupChecker(court, full_crawl=full_crawl)
-        abort = dup_checker.abort_by_url_hash(site.url, site.hash)
-        if abort:
-            return
+        dup_checker.press_on(
+            Audio,
+            item["case_dates"],
+            next_case_date,
+            lookup_value=sha1_hash,
+            lookup_by="sha1",
+        )
 
-        if site.cookies:
-            logger.info(f"Using cookies: {site.cookies}")
-        for i, item in enumerate(site):
-            msg, r = get_binary_content(
-                item["download_urls"],
-                site,
-                headers={"User-Agent": "CourtListener"},
-                method=site.method,
-            )
-            if msg:
-                fingerprint = [f"{court_str}-unexpected-content-type"]
-                logger.error(msg, extra={"fingerprint": fingerprint})
-                continue
+        logger.info(
+            "Adding new %s found at: %s",
+            self.scrape_target_descr,
+            item["download_urls"].encode(),
+        )
+        dup_checker.reset()
 
-            content = site.cleanup_content(r.content)
+        docket, audio_file = make_objects(item, court, sha1_hash, content)
 
-            current_date = item["case_dates"]
-            try:
-                next_date = site[i + 1]["case_dates"]
-            except IndexError:
-                next_date = None
+        save_everything(
+            items={"docket": docket, "audio_file": audio_file},
+            backscrape=backscrape,
+        )
+        process_audio_file.delay(audio_file.pk)
 
-            # request.content is sometimes a str, sometimes unicode, so
-            # force it all to be bytes, pleasing hashlib.
-            sha1_hash = sha1(force_bytes(content))
-            onwards = dup_checker.press_on(
-                Audio,
-                current_date,
-                next_date,
-                lookup_value=sha1_hash,
-                lookup_by="sha1",
-            )
-            if dup_checker.emulate_break:
-                break
-
-            if onwards:
-                # Not a duplicate, carry on
-                logger.info(
-                    f"Adding new document found at: {item['download_urls'].encode()}"
-                )
-                dup_checker.reset()
-
-                docket, audio_file = make_objects(
-                    item, court, sha1_hash, content
-                )
-
-                save_everything(
-                    items={"docket": docket, "audio_file": audio_file},
-                    index=False,
-                    backscrape=backscrape,
-                )
-                process_audio_file.delay(audio_file.pk)
-
-                logger.info(
-                    "Successfully added audio file {pk}: {name}".format(
-                        pk=audio_file.pk,
-                        name=item["case_names"].encode(),
-                    )
-                )
-
-        # Update the hash if everything finishes properly.
-        logger.info(f"{site.court_id}: Successfully crawled oral arguments.")
-        if not full_crawl:
-            # Only update the hash if no errors occurred.
-            dup_checker.update_site_hash(site.hash)
+        logger.info(
+            "Successfully added audio file %s: %s",
+            audio_file.pk,
+            item["case_names"].encode(),
+        )

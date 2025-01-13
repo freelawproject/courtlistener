@@ -1,7 +1,8 @@
 import logging
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta, timezone
-from typing import Dict, List, Set, TypedDict, Union
+from itertools import batched, chain
+from typing import Any, Dict, List, Set, TypedDict, Union
 
 import eyecite
 from dateutil import parser
@@ -10,6 +11,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.db.models import F
+from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
@@ -27,8 +29,14 @@ from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
+from rest_framework_filters.filterset import related
 
-from cl.api.models import WEBHOOK_EVENT_STATUS, Webhook, WebhookEvent
+from cl.api.models import (
+    WEBHOOK_EVENT_STATUS,
+    Webhook,
+    WebhookEvent,
+    WebhookVersions,
+)
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.models import Event
@@ -84,6 +92,133 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
 
     def to_html(self, request, queryset, view):
         return ""
+
+
+class FilterManyToManyMixin:
+    """
+    Mixin for filtering nested many-to-many relationships.
+
+    Provides helper methods to efficiently filter nested querysets when using
+    `RelatedFilter` classes in filtersets. This is particularly useful for
+    scenarios where you need to filter on attributes of related models through
+    many-to-many relationships.
+
+    **Required Properties:**
+    - **`join_table_cleanup_mapping`**: A dictionary mapping the field_name
+      or custom labels used for `RelatedFilter` fields to the corresponding
+      field names in the join table. This mapping is essential for correct
+      filtering.
+    """
+
+    join_table_cleanup_mapping: dict[str, str] = {}
+
+    def _get_filter_label(self: FilterSet, field_name: str) -> str:
+        """
+        Maps a filter field name to its corresponding label.
+
+        When defining filters(Declarative or using the `fields` attribute) in a
+        filterset, the field name used internally might not directly match the
+        the label used in the request. This method helps resolve this
+        discrepancy by mapping the given `field_name` to its correct label.
+
+        This is particularly useful for custom filter methods where only the
+        field name is available, and obtaining the triggering label is not
+        straightforward.
+
+        Args:
+            field_name (str): The field name as used within the filterset.
+
+        Returns:
+            str: The corresponding label for the given field name.
+        """
+
+        FIELD_NAME_LABEL_MAPPING = {
+            filter_class.field_name: label
+            for label, filter_class in self.filters.items()
+        }
+        return FIELD_NAME_LABEL_MAPPING[field_name]
+
+    def _clean_join_table_key(self, key: str) -> str:
+        """
+        Cleans and adjusts a given key for compatibility with prefetch queries.
+
+        This method modifies specific lookups within the `key` to ensure
+        correct filtering when used in prefetch queries. It iterates over a
+        mapping of URL keys to new keys, replacing instances of URL keys with
+        their corresponding new keys.
+
+        Args:
+            key (str): The original key to be cleaned.
+
+        Returns:
+            str: The cleaned key, adjusted for prefetch query compatibility.
+        """
+        join_table_key = key
+        for url_key, new_key in self.join_table_cleanup_mapping.items():
+            join_table_key = join_table_key.replace(url_key, new_key, 1)
+        return join_table_key
+
+    def get_filters_for_join_table(self: FilterSet) -> dict[str, Any]:
+        """
+        Processes request filters for use in a join table query.
+
+        Iterates through the request filters, cleaning and transforming them to
+        be suitable for applying filtering conditions to a join table. Returns
+        a dictionary containing the filtered criteria to be applied to the join
+        table query.
+
+        Args:
+            name: The name of label used to trigger the custom filtering method
+
+        Returns:
+            dict: A dictionary containing the filtered criteria for the join
+            table query.
+        """
+        filters: dict[str, Any] = {}
+        # Iterate over related filtersets
+        for related_name, related_filterset in self.related_filtersets.items():
+            prefix = f"{related(self, related_name)}{LOOKUP_SEP}"
+            # Check if the related filterset has data to apply
+            if not any(value.startswith(prefix) for value in self.data):
+                # Skip processing if no parameter starts with the prefix
+                continue
+
+            # Extract and clean the field name to be used as a filter.
+            #
+            # We start with the field name from the `filters` dictionary,
+            # which is associated with the `related_name`.
+            #
+            # The `_clean_join_table_key` method is used to ensure
+            # compatibility with prefetch queries.  The cleaned field name is
+            # then used to  construct a lookup expression that will perform
+            # an `IN` query. This approach is efficient for filtering multiple
+            # values.
+            clean_field_name = self._clean_join_table_key(
+                self.filters[related_name].field_name
+            )
+            lookup_expr = LOOKUP_SEP.join([clean_field_name, "in"])
+
+            # Extract the field name to retrieve values from the subquery.
+            #
+            # This field is determined by the `to_field_name` attribute of
+            # the related filterset's field. If not specified, the default `pk`
+            # (primary key) is used.
+            #
+            # The subquery is constructed using the underlying form's
+            # `cleaned_data` to ensure that invalid lookups in the request are
+            # gracefully ignored.
+            to_field_name = (
+                getattr(
+                    self.filters[related_name].field, "to_field_name", "pk"
+                )
+                or "pk"
+            )
+            subquery = related_filterset.qs.values(to_field_name)
+
+            # Merge the current lookup expression into the existing filter set.
+            filters = filters | {lookup_expr: subquery}
+
+        return filters
 
 
 class NoEmptyFilterSet(FilterSet):
@@ -186,11 +321,11 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         return actions
 
 
-def get_logging_prefix() -> str:
+def get_logging_prefix(api_version: str) -> str:
     """Simple tool for getting the prefix for logging API requests. Useful for
     mocking the logger.
     """
-    return "api:v3"
+    return f"api:{api_version}"
 
 
 class LoggingMixin:
@@ -227,7 +362,7 @@ class LoggingMixin:
             # noinspection PyBroadException
             try:
                 results = self._log_request(request)
-                self._handle_events(results, request.user)
+                self._handle_events(results, request.user, request.version)
             except Exception as e:
                 logger.exception(
                     "Unable to log API response timing info: %s", e
@@ -255,7 +390,7 @@ class LoggingMixin:
 
         r = get_redis_interface("STATS")
         pipe = r.pipeline()
-        api_prefix = get_logging_prefix()
+        api_prefix = get_logging_prefix(request.version)
 
         # Global and daily tallies for all URLs.
         pipe.incr(f"{api_prefix}.count")
@@ -291,19 +426,23 @@ class LoggingMixin:
         results = pipe.execute()
         return results
 
-    def _handle_events(self, results, user):
+    def _handle_events(self, results, user, api_version):
         total_count = results[0]
         user_count = results[4]
 
         if total_count in MILESTONES_FLAT:
             Event.objects.create(
-                description=f"API has logged {total_count} total requests."
+                description=f"API {api_version} has logged {total_count} total requests."
             )
         if user.is_authenticated:
             if user_count in self.milestones:
                 Event.objects.create(
-                    description="User '%s' has placed their %s API request."
-                    % (user.username, intcomma(ordinal(user_count))),
+                    description="User '%s' has placed their %s API %s request."
+                    % (
+                        user.username,
+                        intcomma(ordinal(user_count)),
+                        api_version,
+                    ),
                     user=user,
                 )
 
@@ -566,56 +705,64 @@ def invert_user_logs(
     end: Union[str, datetime],
     add_usernames: bool = True,
 ) -> Dict[str, Dict[str, int]]:
-    """Invert the user logs for a period of time
+    """Aggregate API usage statistics per user over a date range.
 
-    The user logs have the date in the key and the user as part of the set:
+    - Anonymous users are aggregated under the key 'AnonymousUser'.
+    - Both v3 and v4 API counts are combined in the results.
 
-        'api:v3.user.d:2016-10-01.counts': {
-           mlissner: 22,
-           joe_hazard: 33,
-        }
+    :param start: Beginning date (inclusive) for the query range
+    :param end: End date (inclusive) for the query range
+    :param add_usernames: If True, replaces user IDs with usernames as keys.
+        When False, uses only user IDs as keys.
 
-    This inverts these entries to:
-
-        users: {
-            mlissner: {
-                2016-10-01: 22,
-                total: 22,
-            },
-            joe_hazard: {
-                2016-10-01: 33,
-                total: 33,
-            }
-        }
-    :param start: The beginning date (inclusive) you want the results for. A
-    :param end: The end date (inclusive) you want the results for.
-    :param add_usernames: Stats are stored with the user ID. If this is True,
-    add an alias in the returned dictionary that contains the username as well.
-    :return The inverted dictionary
+    :return: Dictionary mapping user identifiers (usernames if `add_usernames=True`,
+        otherwise user IDs) to their daily API usage counts and totals.
+        Inner dictionaries are ordered by date. Only dates with usage are included.
     """
     r = get_redis_interface("STATS")
     pipe = r.pipeline()
 
     dates = make_date_str_list(start, end)
+    versions = ["v3", "v4"]
     for d in dates:
-        pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1, withscores=True)
+        for version in versions:
+            pipe.zrange(
+                f"api:{version}.user.d:{d}.counts",
+                0,
+                -1,
+                withscores=True,
+            )
+
+    # results contains alternating v3/v4 API usage data for each date queried.
+    # For example, if querying 2023-01-01 to 2023-01-02, results might look like:
+    # [
+    #     # 2023-01-01 v3 data: [(user_id, count), ...]
+    #     [("1", 100.0), ("2", 50.0)],
+    #     # 2023-01-01 v4 data
+    #     [("1", 50.0), ("2", 25.0)],
+    #     # 2023-01-02 v3 data
+    #     [("1", 200.0), ("2", 100.0)],
+    #     # 2023-01-02 v4 data
+    #     [("1", 100.0), ("2", 50.0)]
+    # ]
+    # We zip this with dates to combine v3/v4 counts per user per day
     results = pipe.execute()
 
-    # results is a list of results for each of the zrange queries above. Zip
-    # those results with the date that created it, and invert the whole thing.
     out: defaultdict = defaultdict(dict)
-    for d, result in zip(dates, results):
-        for user_id, count in result:
-            if user_id == "None" or user_id == "AnonymousUser":
-                user_id = "AnonymousUser"
-            else:
-                user_id = int(user_id)
-            count = int(count)
-            if out.get(user_id):
-                out[user_id][d] = count
-                out[user_id]["total"] += count
-            else:
-                out[user_id] = {d: count, "total": count}
+
+    def update_user_counts(_user_id, _count, _date):
+        user_is_anonymous = _user_id == "None" or _user_id == "AnonymousUser"
+        _user_id = "AnonymousUser" if user_is_anonymous else int(_user_id)
+        _count = int(_count)
+        out.setdefault(_user_id, OrderedDict())
+        out[_user_id].setdefault(_date, 0)
+        out[_user_id][_date] += _count
+        out[_user_id].setdefault("total", 0)
+        out[_user_id]["total"] += _count
+
+    for d, api_usage in zip(dates, batched(results, len(versions))):
+        for user_id, count in chain(*api_usage):
+            update_user_counts(user_id, count, d)
 
     # Sort the values
     for k, v in out.items():
@@ -874,12 +1021,47 @@ class WebhookKeyType(TypedDict):
     deprecation_date: str | None
 
 
+def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
+    """Convert a webhook deprecation date string to ISO-8601 format with
+     UTC timezone.
+
+    :param webhook_deprecation_date: The deprecation date as a string in
+    "YYYY-MM-DD" format.
+    :return: The ISO-8601 formatted date string with UTC timezone.
+    """
+
+    deprecation_date = (
+        datetime.strptime(webhook_deprecation_date, "%Y-%m-%d")
+        .replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+        )
+        .isoformat()
+    )
+    return deprecation_date
+
+
 def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
+    """Generate a dictionary representing the content for the webhook key.
+
+    :param webhook: The Webhook instance.
+    :return: A dictionary containing webhook details, event type, version,
+    creation date in ISO format, and deprecation date according webhook version.
+    """
+
+    deprecation_date: str | None = None
+    match webhook.version:
+        case WebhookVersions.v1:
+            deprecation_date = get_webhook_deprecation_date(
+                settings.WEBHOOK_V1_DEPRECATION_DATE  # type: ignore
+            )
+        case WebhookVersions.v2:
+            deprecation_date = None
+
     return {
         "event_type": webhook.event_type,
         "version": webhook.version,
         "date_created": webhook.date_created.isoformat(),
-        "deprecation_date": None,
+        "deprecation_date": deprecation_date,
     }
 
 

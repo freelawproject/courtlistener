@@ -1,9 +1,9 @@
 import datetime
 import io
-import os
 from datetime import date
-from pathlib import Path
+from http import HTTPStatus
 from unittest import mock
+from urllib.parse import parse_qs
 
 import pytz
 import time_machine
@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
-from django.test import override_settings
+from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
@@ -25,19 +25,13 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
+from cl.lib.elasticsearch_utils import simplify_estimated_count
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.search_utils import make_fq
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import (
-    AudioTestCase,
-    CourtTestCase,
-    EmptySolrTestCase,
-    IndexedSolrTestCase,
-    PeopleTestCase,
-    SolrTestCase,
-)
+from cl.lib.test_helpers import AudioTestCase, CourtTestCase, PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -47,7 +41,6 @@ from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
-from cl.scrapers.factories import PACERFreeDocumentLogFactory
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
@@ -69,7 +62,6 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
-from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
     log_last_document_indexed,
@@ -89,122 +81,15 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     RECAPDocument,
+    SearchQuery,
     sort_cites,
 )
-from cl.search.tasks import (
-    add_docket_to_solr_by_rds,
-    get_es_doc_id_and_parent_id,
-    index_dockets_in_bulk,
-)
+from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
-
-
-class UpdateIndexCommandTest(SolrTestCase):
-    args = [
-        "--type",
-        "search.Opinion",
-        "--noinput",
-    ]
-
-    def _get_result_count(self, results):
-        return results.result.numFound
-
-    def test_updating_all_opinions(self) -> None:
-        """If we have items in the DB, can we add/delete them to/from Solr?
-
-        This tests is rather long because we need to test adding and deleting,
-        and it's hard to setup/dismantle the indexes before/after every test.
-        """
-
-        # First, we add everything to Solr.
-        args = list(self.args)  # Make a copy of the list.
-        args.extend(
-            [
-                "--solr-url",
-                f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
-                "--update",
-                "--everything",
-                "--do-commit",
-            ]
-        )
-        call_command("cl_update_index", *args)
-        results = self.si_opinion.query("*").execute()
-        actual_count = self._get_result_count(results)
-        self.assertEqual(
-            actual_count,
-            self.expected_num_results_opinion,
-            msg="Did not get expected number of results.\n"
-            "\tGot:\t%s\n\tExpected:\t %s"
-            % (
-                actual_count,
-                self.expected_num_results_opinion,
-            ),
-        )
-
-        # Check a simple citation query
-        results = self.si_opinion.query(cites=self.opinion_3.pk).execute()
-        actual_count = self._get_result_count(results)
-        expected_citation_count = 2
-        self.assertEqual(
-            actual_count,
-            expected_citation_count,
-            msg="Did not get the expected number of citation counts.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
-        )
-
-        # Next, we delete everything from Solr
-        args = list(self.args)  # Make a copy of the list.
-        args.extend(
-            [
-                "--solr-url",
-                f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
-                "--delete",
-                "--everything",
-                "--do-commit",
-            ]
-        )
-        call_command("cl_update_index", *args)
-        results = self.si_opinion.query("*").execute()
-        actual_count = self._get_result_count(results)
-        expected_citation_count = 0
-        self.assertEqual(
-            actual_count,
-            expected_citation_count,
-            msg="Did not get the expected number of counts in empty index.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
-        )
-
-        # Add things back, but do it by ID
-        args = list(self.args)  # Make a copy of the list.
-        args.extend(
-            [
-                "--solr-url",
-                f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
-                "--update",
-                "--items",
-                f"{self.opinion_1.pk}",
-                f"{self.opinion_2.pk}",
-                f"{self.opinion_3.pk}",
-                "--do-commit",
-            ]
-        )
-        call_command("cl_update_index", *args)
-        results = self.si_opinion.query("*").execute()
-        actual_count = self._get_result_count(results)
-        expected_citation_count = 3
-        self.assertEqual(
-            actual_count,
-            expected_citation_count,
-            msg="Did not get the expected number of citation counts.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
-        )
 
 
 class ModelTest(TestCase):
@@ -249,7 +134,7 @@ class ModelTest(TestCase):
             cf = ContentFile(io.BytesIO(b"blah").read())
             self.o.file_with_date = date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
-            self.o.save(index=False)
+            self.o.save()
         except ValueError:
             raise ValueError(
                 "Unable to save a case older than 1900. Did you "
@@ -298,6 +183,92 @@ class ModelTest(TestCase):
             .count()
         )
         self.assertEqual(cluster_count, expected_count)
+
+    def test_opinions_order(self) -> None:
+        """Test opinions order"""
+
+        # Create court
+        court = CourtFactory(id="nyappdiv")
+
+        # Create cluster
+        cluster = OpinionClusterFactory(
+            case_name="Foo v. Bar",
+            case_name_short="Foo v. Bar",
+            docket=DocketFactory(
+                court=court,
+            ),
+            date_filed=date(1978, 3, 10),
+            source="U",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+
+        # Create three opinions
+        op_1 = OpinionFactory(
+            cluster=cluster,
+            type=Opinion.LEAD,
+            ordering_key=1,
+        )
+        op_2 = OpinionFactory(
+            cluster=cluster,
+            type=Opinion.CONCURRENCE,
+            ordering_key=2,
+        )
+        op_3 = OpinionFactory(
+            cluster=cluster,
+            type=Opinion.DISSENT,
+            ordering_key=3,
+        )
+
+        # Test that the value of the order field matches the order in which
+        # they were created
+        self.assertEqual(op_1.ordering_key, 1)
+        self.assertEqual(op_2.ordering_key, 2)
+        self.assertEqual(op_3.ordering_key, 3)
+
+        # Can we swap orders?
+        op_1.ordering_key = None
+        op_1.save()
+
+        op_2.ordering_key = 1
+        op_2.save()
+
+        op_1.ordering_key = 2
+        op_1.save()
+
+        # Can we update an opinion using an existing position?
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                op_3.ordering_key = 2
+                op_3.save()
+
+        # Validate unique cluster/order
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                op = OpinionFactory(
+                    cluster=cluster,
+                    type=Opinion.ADDENDUM,
+                )
+                op.ordering_key = 3
+                op.save()
+
+        # Can we use avoid negative positions?
+        with transaction.atomic():
+            with self.assertRaises(ValidationError):
+                op = OpinionFactory(cluster=cluster, type=Opinion.LEAD)
+                op.ordering_key = -1
+                op.save()
+
+        # Can we order the opinions from a cluster using the field?
+        qs = (
+            cluster.sub_opinions.all()
+            .order_by("ordering_key")
+            .values_list("ordering_key", flat=True)
+        )
+        self.assertEqual(list(qs), [1, 2, 3, None])
+
+        # Order default value is null
+        op_5 = OpinionFactory(cluster=cluster, type="Lead Opinion")
+        self.assertEqual(op_5.ordering_key, None)
 
 
 class DocketValidationTest(TestCase):
@@ -359,152 +330,58 @@ class DocketValidationTest(TestCase):
                 )
 
 
-class IndexingTest(EmptySolrTestCase):
-    """Are things indexed properly?"""
-
-    fixtures = ["test_court.json"]
-
-    def test_issue_729_url_coalescing(self) -> None:
-        """Are URL's coalesced properly?"""
-        # Save a docket to the backend using coalescing
-
-        test_dir = (
-            Path(settings.INSTALL_ROOT)
-            / "cl"
-            / "assets"
-            / "media"
-            / "test"
-            / "search"
-        )
-        self.att_filename = "fake_document.html"
-        fake_path = os.path.join(test_dir, self.att_filename)
-
-        d = Docket.objects.create(
-            source=Docket.RECAP,
-            docket_number="asdf",
-            pacer_case_id="asdf",
-            court_id="test",
-        )
-        de = DocketEntry.objects.create(docket=d, entry_number=1)
-        rd1 = RECAPDocument.objects.create(
-            docket_entry=de,
-            document_type=RECAPDocument.PACER_DOCUMENT,
-            document_number="1",
-            pacer_doc_id="1",
-            filepath_local=fake_path,
-        )
-        rd2 = RECAPDocument.objects.create(
-            docket_entry=de,
-            document_type=RECAPDocument.ATTACHMENT,
-            document_number="1",
-            attachment_number=1,
-            pacer_doc_id="2",
-            filepath_local=fake_path,
-        )
-        # Do the absolute URLs differ when pulled from the DB?
-        self.assertNotEqual(rd1.get_absolute_url(), rd2.get_absolute_url())
-
-        add_docket_to_solr_by_rds([rd1.pk, rd2.pk], force_commit=True)
-
-        # Do the absolute URLs differ when pulled from Solr?
-        r1 = self.si_recap.get(rd1.pk)
-        r2 = self.si_recap.get(rd2.pk)
-        self.assertNotEqual(
-            r1.result.docs[0]["absolute_url"],
-            r2.result.docs[0]["absolute_url"],
-        )
-        Docket.objects.all().delete()
-        DocketEntry.objects.all().delete()
-        RECAPDocument.objects.all().delete()
-
-
-class AdvancedTest(IndexedSolrTestCase):
-    """
-    Advanced query techniques
-    """
-
+class RECAPDocumentValidationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
-        cls.de = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=cls.court, case_name="SUBPOENAS SERVED ON"
-            ),
-            description="MOTION for Leave to File Amicus Curiae august",
-        )
-        cls.rd = RECAPDocumentFactory(
-            docket_entry=cls.de, description="Leave to File"
-        )
+        cls.docket_entry = DocketEntryWithParentsFactory()
 
-        cls.de_1 = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=cls.court, case_name="SUBPOENAS SERVED OFF"
-            ),
-            description="MOTION for Leave to File Amicus Curiae september",
+    def test_attachment_with_attachment_number(self):
+        """Attachments with attachment_number should not raise ValidationError."""
+        document = RECAPDocument.objects.create(
+            docket_entry=self.docket_entry,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
         )
-        cls.rd_1 = RECAPDocumentFactory(
-            docket_entry=cls.de_1, description="Leave to File"
-        )
-        super().setUpTestData()
+        self.assertIsNotNone(document.id)
 
-    def test_make_fq(self) -> None:
-        """Test make_fq method, checks query formatted is correctly performed."""
-        args = (
-            {
-                "q": "",
-                "description": '"leave to file" AND amicus',
-            },
-            "description",
-            "description",
-        )
-        fq = make_fq(*args)
-        self.assertEqual(fq, 'description:("leave to file" AND amicus)')
-
-        args[0]["description"] = '"leave to file" curie'
-        fq = make_fq(*args)
-        self.assertEqual(fq, 'description:("leave to file" AND curie)')
-
-        args[0]["description"] = '"leave to file" AND "amicus curie"'
-        fq = make_fq(*args)
+    def test_attachment_without_attachment_number(self):
+        """Attachments without attachment_number should raise ValidationError."""
+        with self.assertRaises(ValidationError) as cm:
+            RECAPDocument.objects.create(
+                docket_entry=self.docket_entry,
+                document_type=RECAPDocument.ATTACHMENT,
+                attachment_number=None,
+            )
+        # Assert that the error message is as expected
+        self.assertIn("attachment_number", cm.exception.message_dict)
         self.assertEqual(
-            fq, 'description:("leave to file" AND "amicus curie")'
+            cm.exception.message_dict["attachment_number"],
+            ["attachment_number cannot be null for an attachment."],
         )
 
-        args[0][
-            "description"
-        ] = '"leave to file" AND "amicus curie" "by august"'
-        fq = make_fq(*args)
+    def test_main_document_with_attachment_number(self):
+        """Main PACER documents with attachment_number should raise ValidationError."""
+        with self.assertRaises(ValidationError) as cm:
+            RECAPDocument.objects.create(
+                docket_entry=self.docket_entry,
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                attachment_number=1,
+            )
+        # Assert that the error message is as expected
+        self.assertIn("attachment_number", cm.exception.message_dict)
         self.assertEqual(
-            fq,
-            'description:("leave to file" AND "amicus curie" AND "by august")',
+            cm.exception.message_dict["attachment_number"],
+            ["attachment_number must be null for a main PACER document."],
         )
 
-        args[0][
-            "description"
-        ] = '"leave to file" AND "amicus curie" OR "by august"'
-        fq = make_fq(*args)
-        self.assertEqual(
-            fq,
-            'description:("leave to file" AND "amicus curie" OR "by august")',
+    def test_main_document_without_attachment_number(self):
+        """Main PACER documents without attachment_number should not raise ValidationError."""
+        document = RECAPDocument.objects.create(
+            docket_entry=self.docket_entry,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            attachment_number=None,
         )
-        args[0][
-            "description"
-        ] = '"leave to file" NOT "amicus curie" OR "by august"'
-        fq = make_fq(*args)
-        self.assertEqual(
-            fq,
-            'description:("leave to file" NOT "amicus curie" OR "by august")',
-        )
-
-        args[0]["description"] = '"leave to file amicus curie"'
-        fq = make_fq(*args)
-        self.assertEqual(fq, 'description:("leave to file amicus curie")')
-
-        args[0]["description"] = "leave to file AND amicus curie"
-        fq = make_fq(*args)
-        self.assertEqual(
-            fq, "description:(leave AND to AND file AND amicus AND curie)"
-        )
+        self.assertIsNotNone(document.id)
 
 
 class ESCommonSearchTest(ESIndexTestCase, TestCase):
@@ -545,36 +422,63 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                html_columbia="<p>Code, &#167; 1-815</p>",
+                html_columbia="<p>Code, &#167; 1-815 </p>",
+                plain_text="",
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Lorem.",
+            case_name_full="Strickland v. Lorem.",
             docket=DocketFactory(court=cls.court, docket_number="123456"),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Motion",
+            ),
         )
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="America vs Bank",
+            case_name_full="America vs Bank",
             docket=DocketFactory(
                 court=cls.child_court_1, docket_number="34-2535"
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Strickland Motion",
+            ),
         )
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Johnson v. National",
+            case_name_full="Johnson v. National",
             docket=DocketFactory(
                 court=cls.child_court_2_2, docket_number="36-2000"
             ),
+            judges="Computer point",
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Computer point",
+            ),
         )
 
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="California v. Nevada",
+            case_name_full="California v. Nevada",
             docket=DocketFactory(
                 court=cls.child_gand_2, docket_number="38-1000"
             ),
+            judges="Composition plant",
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Composition plant",
+            ),
         )
         call_command(
             "cl_index_parent_and_child_docs",
@@ -910,6 +814,469 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertNotIn("Did you mean", r.content.decode())
 
+    def test_round_estimated_search_counts(self) -> None:
+        """Confirm search counts above the threshold are properly rounded"""
+
+        tests = [
+            (13, 13),  # Below ELASTICSEARCH_CARDINALITY_PRECISION threshold
+            (109, 109),
+            (809, 809),
+            (1_074, 1_074),
+            (1_768, 1_768),
+            (1_881, 1_800),  # Above ELASTICSEARCH_CARDINALITY_PRECISION * 0.94
+            # threshold
+            (
+                11_740,
+                11_000,
+            ),
+            (367_740, 360_000),
+            (7_867_740, 7_800_000),
+            (95_367_740, 95_000_000),
+            (436_307_740, 430_000_000),
+        ]
+        for test in tests:
+            with self.subTest(test=test, msg="Test estimated search counts."):
+                self.assertEqual(simplify_estimated_count(test[0]), test[1])
+
+    def test_avoid_wrapping_boosted_numbers_in_quotes(self) -> None:
+        """Confirm that numbers in boost queries are not wrapped in quotes
+        that makes the query to fail.
+        """
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Jose^3",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertNotIn("encountered an error", r.content.decode())
+
+    def test_raise_forbidden_error_on_depth_pagination(self) -> None:
+        """Confirm that a 403 Forbidden error is raised on depth pagination."""
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Lorem",
+            "page": 101,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
+
+    def test_query_cleanup_function(self) -> None:
+        # Send string of search_query to the function and expect it
+        # to be encoded properly
+        q_a = (
+            (
+                "12-9238 happy Gilmore",
+                'docketNumber:"12-9238"~1 happy Gilmore',
+            ),
+            ("“ping tree” leads", '"ping tree" leads'),
+            ('"this is” a “test"', '"this is" a "test"'),
+            ("1chicken NUGGET", '"1chicken" NUGGET'),
+            (
+                "We can drive her home with 1headlight",
+                'We can drive her home with "1headlight"',
+            ),
+            # Tildes are ignored even though they have numbers?
+            ('"net neutrality"~2', '"net neutrality"~2'),
+            # No changes to regular queries?
+            ("Look Ma, no numbers!", "Look Ma, no numbers!"),
+            # Docket numbers hyphenated into phrases?
+            (
+                "12cv9834 Monkey Goose",
+                'docketNumber:"12-cv-9834"~1 Monkey Goose',
+            ),
+            # Valid dates ignored?
+            (
+                "2020-10-31T00:00:00Z Monkey Goose",
+                "2020-10-31T00:00:00Z Monkey Goose",
+            ),
+            # Simple range query?
+            ("[1 TO 4]", '["1" TO "4"]'),
+            # Dates ignored in ranges?
+            (
+                "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
+                "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
+            ),
+            ("id:10", "id:10"),
+            ("id:[* TO 5] Monkey Goose", 'id:[* TO "5"] Monkey Goose'),
+            (
+                "(Tempura AND 12cv3392) OR sushi",
+                '(Tempura AND docketNumber:"12-cv-3392"~1) OR sushi',
+            ),
+            # Phrase search with numbers (w/and w/o § mark)?
+            ('"18 USC 242"', '"18 USC 242"'),
+            ('"18 USC §242"', '"18 USC §242"'),
+            ('"this is a test" asdf', '"this is a test" asdf'),
+            ('asdf "this is a test" asdf', 'asdf "this is a test" asdf'),
+            (
+                '"this is a test" 22cv3332',
+                '"this is a test" docketNumber:"22-cv-3332"~1',
+            ),
+            (
+                '"this is a test" ~2',
+                '"this is a test"~2',
+            ),
+            (
+                '"this is a test" ~2 and "net neutrality" ~5 and 22cv3332',
+                '"this is a test"~2 and "net neutrality"~5 and docketNumber:"22-cv-3332"~1',
+            ),
+            (
+                "Strickland % Lorem % America",
+                "Strickland NOT Lorem NOT America",
+            ),
+            (
+                "Strickland% Lorem% America",
+                "Strickland% Lorem% America",
+            ),
+            (
+                "Strickland & Motion & Lorem",
+                "Strickland AND Motion AND Lorem",
+            ),
+            (
+                "!Strick !Mot",
+                "Strick* Mot*",
+            ),
+            (
+                "!111 !444",
+                '!"111" !"444"',
+            ),
+            (
+                "b*ra*e b*rav*",
+                "b?ra?e b?rav*",
+            ),
+        )
+        for q, a in q_a:
+            print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
+            self.assertEqual(cleanup_main_query(q), a)
+
+    def test_built_in_search_connectors(self) -> None:
+        """Verify that built in ES search connectors return the expected results."""
+
+        tests = [
+            {
+                "label": "NOT query",
+                "search_params": {
+                    "q": "Strickland   NOT  Lorem   NOT   America",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["1:21-cv-1234"],
+            },
+            {
+                "label": "AND connector test",
+                "search_params": {
+                    "q": "Strickland  AND  Motion  AND  Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["123456"],
+            },
+            {
+                "label": "Zero or more chars wildcard *",
+                "search_params": {
+                    "q": "Comp*",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Universal Character ?",
+                "search_params": {
+                    "q": "p??nt",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Combined operators",
+                "search_params": {
+                    "q": "Strickland AND moti* AND ba?k NOT Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["34-2535"],
+            },
+        ]
+
+        for test_case in tests:
+            with self.subTest(label=test_case["label"]):
+                response = self.client.get(
+                    reverse("show_results"),
+                    test_case["search_params"],
+                )
+                actual = self.get_article_count(response)
+                self.assertEqual(
+                    actual,
+                    test_case["expected_count"],
+                    msg=f"Failed on: {test_case['label']}",
+                )
+                decoded_content = response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on: {test_case['label']} missing {expected_str}",
+                    )
+
+    def test_support_search_connectors(self) -> None:
+        """Verify that new supported custom search connectors yield the
+        expected results.
+        """
+
+        tests = [
+            {
+                "label": "But not %",
+                "search_params": {
+                    "q": "Strickland % Lorem % America",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["1:21-cv-1234"],
+            },
+            {
+                "label": "& connector test",
+                "search_params": {
+                    "q": "Strickland & Motion & Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["123456"],
+            },
+            {
+                "label": "! Root expander suffix",
+                "search_params": {
+                    "q": "!Comp",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Universal Character *",
+                "search_params": {
+                    "q": "p**nt",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Combined operators",
+                "search_params": {
+                    "q": "Strickland & !moti & ba*k % Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["34-2535"],
+            },
+        ]
+
+        for test_case in tests:
+            with self.subTest(label=test_case["label"]):
+                # Frontend
+                response = self.client.get(
+                    reverse("show_results"),
+                    test_case["search_params"],
+                )
+                actual = self.get_article_count(response)
+                self.assertEqual(
+                    actual,
+                    test_case["expected_count"],
+                    msg=f"Failed on: {test_case['label']}",
+                )
+                decoded_content = response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on: {test_case['label']} missing {expected_str}",
+                    )
+
+                # API
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(
+                    len(api_response.data["results"]),
+                    test_case["expected_count"],
+                    msg=f"Failed on API: {test_case['label']}",
+                )
+                decoded_content = api_response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
+                    )
+
+    def test_support_search_connectors_filters(self) -> None:
+        """Verify that new supported custom search connectors yield the
+        expected results.
+        """
+
+        tests = [
+            {
+                "label": "But not %",
+                "search_params": {
+                    "case_name": "Strickland % Lorem % America",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["1:21-cv-1234"],
+            },
+            {
+                "label": "& connector test",
+                "search_params": {
+                    "case_name": "Strickland & Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["123456"],
+            },
+            {
+                "label": "! Root expander suffix",
+                "search_params": {
+                    "judge": "!Comp",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Universal Character *",
+                "search_params": {
+                    "judge": "p**nt",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Combined operators",
+                "search_params": {
+                    "case_name": "Calif*rnia & !Nev",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["38-1000"],
+            },
+        ]
+
+        for test_case in tests:
+            with self.subTest(label=test_case["label"]):
+                # Frontend
+                response = self.client.get(
+                    reverse("show_results"),
+                    test_case["search_params"],
+                )
+                actual = self.get_article_count(response)
+                self.assertEqual(
+                    actual,
+                    test_case["expected_count"],
+                    msg=f"Failed on: {test_case['label']}",
+                )
+                decoded_content = response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
+                    )
+
+                # API
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(
+                    len(api_response.data["results"]),
+                    test_case["expected_count"],
+                    msg=f"Failed on API: {test_case['label']}",
+                )
+                decoded_content = api_response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
+                    )
+
+    def test_disallowed_wildcard_pattern(self) -> None:
+        """Verify that expensive wildcard queries thrown an error."""
+
+        tests = [
+            {
+                "label": "Disallowed ! in short queries.",
+                "search_params": {
+                    "q": "!ap",
+                },
+            },
+            {
+                "label": "Disallowed * at the end in short queries.",
+                "search_params": {
+                    "q": "ap*",
+                },
+            },
+            {
+                "label": "Disallowed * at the beginning.",
+                "search_params": {
+                    "q": "*ing",
+                },
+            },
+            {
+                "label": "Disallowed ! in short queries - Filter.",
+                "search_params": {
+                    "case_name": "!ap",
+                },
+            },
+            {
+                "label": "Disallowed * at the end in short queries  - Filter.",
+                "search_params": {
+                    "judge": "ap*",
+                },
+            },
+            {
+                "label": "Disallowed * at the beginning  - Filter.",
+                "search_params": {
+                    "case_name": "*ing",
+                },
+            },
+        ]
+
+        for test_case in tests:
+            with self.subTest(label=test_case["label"]):
+                response = self.client.get(
+                    reverse("show_results"),
+                    test_case["search_params"],
+                )
+                decoded_content = response.content.decode()
+                tree = html.fromstring(decoded_content)
+                h2_error_element = tree.xpath('//h2[@class="alt"]')[0]
+                h2_text_error = "".join(
+                    h2_error_element.xpath(".//text()")
+                ).strip()
+                self.assertIn(
+                    "The query contains a disallowed wildcard pattern.",
+                    h2_text_error,
+                    msg=f"Failed on: {test_case['label']}, no disallowed wildcard pattern error.",
+                )
+
+                # API V4
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(api_response.status_code, 400)
+                self.assertEqual(
+                    api_response.data["detail"],
+                    "The query contains a disallowed wildcard pattern.",
+                    msg="Failed for V4",
+                )
+
+                # API V3
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v3"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(api_response.status_code, 400)
+                self.assertEqual(
+                    api_response.data["detail"],
+                    "The query contains a disallowed wildcard pattern.",
+                    msg="Failed for V3",
+                )
+
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
     """Common tests for the Search API V4 endpoints."""
@@ -977,38 +1344,7 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         )
 
 
-class PagerankTest(TestCase):
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        PACERFreeDocumentLogFactory.create()
-
-    def test_pagerank_calculation(self) -> None:
-        """Create a few items and fake citation relation among them, then
-        run the pagerank algorithm. Check whether this simple case can get the
-        correct result.
-        """
-        # calculate pagerank of these 3 document
-        comm = Command()
-        self.verbosity = 1
-        pr_results = comm.do_pagerank()
-
-        # Verify that whether the answer is correct, based on calculations in
-        # Gephi
-        answers = {
-            1: 0.369323534954,
-            2: 0.204581549974,
-            3: 0.378475867453,
-        }
-        for key, value in answers.items():
-            self.assertTrue(
-                abs(pr_results[key] - value) < 0.0001,
-                msg="The answer for item %s was %s when it should have been "
-                "%s" % (key, pr_results[key], answers[key]),
-            )
-
-
+@override_flag("ui_flag_for_o", False)
 class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
@@ -1023,7 +1359,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
-        UserProfileWithParentsFactory.create(
+        self.pandora_profile = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
@@ -1034,60 +1370,6 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         searchbox.submit()
         result_count = self.browser.find_element(By.ID, "result-count")
         self.assertIn("Opinions", result_count.text)
-
-    def test_query_cleanup_function(self) -> None:
-        # Send string of search_query to the function and expect it
-        # to be encoded properly
-        q_a = (
-            (
-                "12-9238 happy Gilmore",
-                'docketNumber:"12-9238"~1 happy Gilmore',
-            ),
-            ("1chicken NUGGET", '"1chicken" NUGGET'),
-            (
-                "We can drive her home with 1headlight",
-                'We can drive her home with "1headlight"',
-            ),
-            # Tildes are ignored even though they have numbers?
-            ('"net neutrality"~2', '"net neutrality"~2'),
-            # No changes to regular queries?
-            ("Look Ma, no numbers!", "Look Ma, no numbers!"),
-            # Docket numbers hyphenated into phrases?
-            (
-                "12cv9834 Monkey Goose",
-                'docketNumber:"12-cv-9834"~1 Monkey Goose',
-            ),
-            # Valid dates ignored?
-            (
-                "2020-10-31T00:00:00Z Monkey Goose",
-                "2020-10-31T00:00:00Z Monkey Goose",
-            ),
-            # Simple range query?
-            ("[1 TO 4]", '["1" TO "4"]'),
-            # Dates ignored in ranges?
-            (
-                "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
-                "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
-            ),
-            ("id:10", "id:10"),
-            ("id:[* TO 5] Monkey Goose", 'id:[* TO "5"] Monkey Goose'),
-            (
-                "(Tempura AND 12cv3392) OR sushi",
-                '(Tempura AND docketNumber:"12-cv-3392"~1) OR sushi',
-            ),
-            # Phrase search with numbers (w/and w/o § mark)?
-            ('"18 USC 242"', '"18 USC 242"'),
-            ('"18 USC §242"', '"18 USC §242"'),
-            ('"this is a test" asdf', '"this is a test" asdf'),
-            ('asdf "this is a test" asdf', 'asdf "this is a test" asdf'),
-            (
-                '"this is a test" 22cv3332',
-                '"this is a test" docketNumber:"22-cv-3332"~1',
-            ),
-        )
-        for q, a in q_a:
-            print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
-            self.assertEqual(cleanup_main_query(q), a)
 
     def test_query_cleanup_integration(self) -> None:
         # Dora goes to CL and performs a Search using a numbered citation
@@ -1149,6 +1431,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         for result in search_results.find_elements(By.TAG_NAME, "article"):
             self.assertIn("1337", result.text)
 
+    @override_flag("ui_flag_for_o", False)
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_opinion_search_result_detail_page(self) -> None:
         # Dora navitages to CL and does a simple wild card search
@@ -1411,6 +1694,203 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
 
         bootstrap_btns = self.browser.find_elements(By.CSS_SELECTOR, "a.btn")
         self.assertIn("Sign Back In", [btn.text for btn in bootstrap_btns])
+
+        # We are taking advantage of the queries done with authenticated and
+        # anonymous user to see if SearchQuery collection is working
+        lookup = {
+            "get_params": "q=lissner",
+            "user": None,
+            "query_time_ms__gte": 0,
+        }
+        self.assertTrue(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "a SearchQuery with get_params 'q=lissner' and anonymous user should have been created",
+        )
+        SearchQuery.objects.filter(user=None).delete()
+
+        lookup["user"] = self.pandora_profile.user
+        self.assertTrue(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "a SearchQuery with get_params 'q=lissner' and 'pandora' user should have been created",
+        )
+
+        # Test if the SearchQuery get's deleted when the user is deleted
+        self.pandora_profile.user.delete()
+        lookup.pop("user")
+        self.assertFalse(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "SearchQuery should have been deleted when the user was deleted",
+        )
+
+
+class SaveSearchQueryTest(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        # Using plain text, fielded queries and manual filters
+
+        self.base_searches = [
+            # Recap
+            r"type=r&q=trump&type=r&order_by=score%20desc&description=Notice",
+            # Audio
+            r"type=oa&q=company%20court_id:illappct&type=oa&order_by=score desc",
+            # Opinions
+            r"type=o&q=thomas&type=o&order_by=score%20desc&case_name=lorem",
+            # People
+            r"type=p&q=thomas&type=p&order_by=score%20desc&born_after=01/01/2080",
+        ]
+
+        self.searches = self.base_searches + [
+            # Repeat the same query, for testing cache
+            r"type=p&q=thomas&type=p&order_by=score%20desc&born_after=01/01/2080",
+        ]
+
+        super().setUp()
+        self.source_error_message = (
+            f"Saved wrong `engine` value, expected {SearchQuery.WEBSITE}"
+        )
+
+    @staticmethod
+    def normalize_query(query, replace_space=False):
+        """Normalize a query dictionary by sorting lists of values.
+        Sometimes the search process alters the order of the query parameters,
+        or duplicates them.
+        """
+
+        if replace_space:
+            query = query.replace("%20", "+")
+        parsed_query = parse_qs(query)
+        return {k: sorted(v) for k, v in parsed_query.items()}
+
+    @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
+    def test_search_query_saving(self) -> None:
+        """Do we save queries on all public endpoints"""
+        for query in self.searches:
+            url = f"{reverse('show_results')}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings;
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.ELASTICSEARCH,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.WEBSITE,
+                self.source_error_message,
+            )
+
+        self.assertTrue(
+            SearchQuery.objects.last().hit_cache,
+            "Repeated query not marked as having hit cache",
+        )
+
+    def test_failed_es_search_queries(self) -> None:
+        """Do we flag failed ElasticSearch queries properly?"""
+        query = "type=r&q=contains/sproximity token"
+        url = f"{reverse('show_results')}?{query}"
+        self.client.get(url)
+        last_query = SearchQuery.objects.last()
+        self.assertTrue(last_query.failed, "SearchQuery.failed should be True")
+        self.assertEqual(
+            last_query.query_time_ms, None, "Query time should be None"
+        )
+        self.assertEqual(
+            last_query.engine,
+            SearchQuery.ELASTICSEARCH,
+            f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+        )
+
+    def test_search_api_v4_query_saving(self) -> None:
+        """Do we save queries on all V4 Search endpoints"""
+        for query in self.base_searches:
+            url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings;
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.ELASTICSEARCH,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.API,
+                self.source_error_message,
+            )
+
+    def test_failed_es_search_v4_api_queries(self) -> None:
+        """Do we flag failed v4 API queries properly?"""
+        query = "type=r&q=contains/sproximity token"
+        url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 400)
+        last_query = SearchQuery.objects.last()
+        self.assertTrue(last_query.failed, "SearchQuery.failed should be True")
+        self.assertEqual(
+            last_query.query_time_ms, None, "Query time should be None"
+        )
+        self.assertEqual(
+            last_query.engine,
+            SearchQuery.ELASTICSEARCH,
+            f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+        )
+
+    def test_search_es_api_v3_query_saving(self) -> None:
+        """Do we save queries on all V3 Search endpoints"""
+        for query in self.base_searches:
+            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings;
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.ELASTICSEARCH,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.API,
+                self.source_error_message,
+            )
+
+    def test_failed_es_search_v3_api_queries(self) -> None:
+        """Do we flag failed ES v3 API queries properly?"""
+        query = "type=r&q=contains/sproximity token"
+        url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 500)
+        last_query = SearchQuery.objects.last()
+        self.assertTrue(last_query.failed, "SearchQuery.failed should be True")
+        self.assertEqual(
+            last_query.query_time_ms, None, "Query time should be None"
+        )
+        self.assertEqual(
+            last_query.engine,
+            SearchQuery.ELASTICSEARCH,
+            f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+        )
 
 
 class CaptionTest(TestCase):
@@ -2066,6 +2546,7 @@ class SweepIndexerCommandTest(
             docket_entry=cls.de,
             document_number="1",
             attachment_number=2,
+            document_type=RECAPDocument.ATTACHMENT,
         )
         cls.de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(

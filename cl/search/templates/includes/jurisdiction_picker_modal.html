@@ -2,240 +2,304 @@
 {% load extras %}
 
 <div class="modal" id="court-picker" role="dialog" aria-hidden="true">
-    <div class="modal-dialog" id="modal-court-picker">
-        <form id="court-picker-search-form" method="get" action="/">
-            <div class="modal-content">
-                <div class="row">
-                    <div class="col-xs-10">
-                        <div class="row">
-                            <div class="col-xs-12 col-sm-5">
-                                <h2 class="top">Select&nbsp;Jurisdictions</h2>
-                            </div>
-                            <div class="col-xs-12 col-sm-7">
-                                <div class="btn-group btn-group-xs">
-                                     <button type="button"
-                                             class="btn btn-default"
-                                             id="check-all">Check All</button>
-                                     <button type="button"
-                                             class="btn btn-default"
-                                             id="clear-all">Clear All</button>
-                                    {% if search_form.type.value != SEARCH_TYPES.ORAL_ARGUMENT and type != SEARCH_TYPES.ORAL_ARGUMENT %}
-                                        <button type="button"
-                                                class="btn btn-default"
-                                                id="check-current">Check Current Tab</button>
-                                        <button type="button"
-                                                class="btn btn-default"
-                                                id="clear-current">Clear Current Tab</button>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xs-2 right">
-                        <a class="close float-right pointer"
-                           data-dismiss="modal" aria-hidden="true">&times;</a>
-                    </div>
+  <div class="modal-dialog" id="modal-court-picker">
+    <form id="court-picker-search-form" method="get" action="/">
+      <div class="modal-content">
+        <div class="row">
+          <div class="col-xs-10">
+            <div class="row">
+              <div class="col-xs-12 col-sm-5">
+                <h2 class="top">Select&nbsp;Jurisdictions</h2>
+              </div>
+              <div class="col-xs-12 col-sm-7">
+                <div class="btn-group btn-group-xs">
+                  <button type="button"
+                          class="btn btn-default"
+                          id="check-all">Check All
+                  </button>
+                  <button type="button"
+                          class="btn btn-default"
+                          id="clear-all">Clear All
+                  </button>
+                  {% if search_form.type.value != SEARCH_TYPES.ORAL_ARGUMENT and type != SEARCH_TYPES.ORAL_ARGUMENT %}
+                    <button type="button"
+                            class="btn btn-default"
+                            id="check-current">Check Current Tab
+                    </button>
+                    <button type="button"
+                            class="btn btn-default"
+                            id="clear-current">Clear Current Tab
+                    </button>
+                  {% endif %}
                 </div>
-                <label class="sr-only"
-                       for="court-filter">Select Jurisdictions by Typing</label>
-                <input id="court-filter"
-                       type="text"
-                       placeholder="Select Jurisdictions by Typing"
-                       autocomplete="off"
-                       class="hidden-xs"/>
-                {% with search_form.type.value as v %}
-                <ul class="nav nav-tabs" id="court-picker-tabs">
-                    {% comment %}
-                                       Which Types Get Which Tabs?
-                              ┌──────┬───────┬───────┬───────┬─────────┐
-                              │ App. │ Dist. │ Bank. │ State │ Special │
-                              ├──────┼───────┼───────┼───────┼─────────┤
-                     opinions │   X  │   X   │   X   │   X   │    X    │
-                        recap │   X  │   X   │   X   │       │    X    │
-                    oral args │   X  │       │       │       │         │
-                       people │   X  │   X   │   X   │   X   │    X    │
-                              └──────┴───────┴───────┴───────┴─────────┘
-
-                    {% endcomment %}
-                    <li class="active">
-                        <a href="#tab-federal-appellate"
-                           data-toggle="tab">
-                            <span class="hidden-xs hidden-sm">Federal Appellate</span>
-                            <span class="hidden-md hidden-lg">Fed. App.</span>
-                        </a>
-                    </li>
-                    {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
-                        <li>
-                            <a href="#tab-federal-district"
-                               data-toggle="tab">
-                                <span class="hidden-xs hidden-sm">Federal District</span>
-                                <span class="hidden-md hidden-lg">Fed. Dist.</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#tab-bankruptcy"
-                               data-toggle="tab">
-                                <span class="hidden-xs hidden-sm">Bankruptcy</span>
-                                <span class="hidden-md hidden-lg">Bankr.</span>
-                            </a>
-                        </li>
-                    {% endif %}
-                    {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE %}
-                        <li>
-                            <a href="#tab-state"
-                               data-toggle="tab">State</a>
-                        </li>
-                    {% endif %}
-                    {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
-                        <li>
-                            <a href="#tab-special"
-                               data-toggle="tab">Special</a>
-                        </li>
-                    {% endif %}
-                </ul>
-                <div class="tab-content">
-                    <div class="tab-pane active" id="tab-federal-appellate">
-                        <div class="row">
-                            {% for row in courts.federal|rows:4 %}
-                                <div class="col-sm-3">
-                                    {% for court in row %}
-                                      {% include "includes/court_checkbox.html" %}
-                                    {% endfor %}
-                                </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% if search_form.type.value != SEARCH_TYPES.ORAL_ARGUMENT %}
-                        <div class="tab-pane" id="tab-federal-district">
-                            {# Regroup into closed/open courts #}
-                            {% regroup  courts.district|dictsort:"is_terminated" by is_terminated as district_courts %}
-
-                            {% for group in district_courts %}
-                                <h3 class="bottom inline">
-                                    {% if group.grouper %}
-                                        Terminated Courts
-                                    {% else %}
-                                        Active Courts
-                                    {% endif %}
-                                </h3>
-                                <div class="row">
-                                    {% for row in group.list|rows:4 %}
-                                        <div class="col-sm-3">
-                                            {% for court in row %}
-                                                {% include "includes/court_checkbox.html" with hide_term_str=True %}
-                                            {% endfor %}
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% endfor %}
-                        </div>
-                        <div class="tab-pane" id="tab-bankruptcy">
-                          {% if courts.bankruptcy_panel %}
-                            <h3 class="bottom inline">
-                              Bankruptcy Appellate Panels
-                            </h3>
-                            {% for bank_bundle in courts.bankruptcy_panel %}
-                              <div class="row">
-                                {% for row in bank_bundle|rows:4 %}
-                                  <div class="col-sm-3">
-                                    {% for court in row %}
-                                      {% include "includes/court_checkbox.html" %}
-                                    {% endfor %}
-                                  </div>
-                                {% endfor %}
-                              </div>
-                            {% endfor %}
-                          {% endif %}
-                          {% if courts.bankruptcy %}
-                            <h3 class="bottom inline">
-                              Bankruptcy District Courts
-                            </h3>
-                            {% for bank_bundle in courts.bankruptcy %}
-                              <div class="row">
-                                {% for row in bank_bundle|rows:4 %}
-                                  <div class="col-sm-3">
-                                    {% for court in row %}
-                                      {% include "includes/court_checkbox.html" %}
-                                    {% endfor %}
-                                  </div>
-                                {% endfor %}
-                              </div>
-                            {% endfor %}
-                          {% endif %}
-                        </div>
-                    {% endif %}
-
-                    {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE %}
-                        <div class="tab-pane" id="tab-state">
-                            {% for group in courts.state %}
-                                {% if forloop.counter == 1 %}
-                                    <h3 class="bottom inline">State Courts</h3>
-                                {% elif forloop.counter == 2 %}
-                                    <hr>
-                                    <h3 class="bottom inline">U.S. Territory Courts</h3>
-                                {% endif %}
-                            <div class="row">
-                                {% for col_bundle in group|group_courts:3 %}
-                                    <div class="col-sm-4">
-                                    {% for court in col_bundle %}
-                                        {% if court.jurisdiction == 'S' %}
-                                            {% include "includes/court_checkbox.html" %}
-                                        {% else %}
-                                            {% include "includes/court_checkbox.html" with indent=True %}
-                                        {% endif %}
-                                    {% endfor %}
-                                    </div>
-                                {% endfor %}
-                            </div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-
-                    {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
-                        <div class="tab-pane" id="tab-special">
-                            {# Regroup into closed/open courts #}
-                            {% regroup  courts.special|dictsort:"is_terminated" by is_terminated as special_courts %}
-
-                            {% for group in special_courts %}
-                                <h3 class="bottom inline">
-                                    {% if group.grouper %}
-                                        Terminated Courts
-                                    {% else %}
-                                        Active Courts
-                                    {% endif %}
-                                </h3>
-                                <div class="row">
-                                    {% for row in group.list|rows:3 %}
-                                        <div class="col-sm-4">
-                                            {% for court in row %}
-                                                <div class="checkbox">
-                                                    <label for="id_{{ court.pk }}">
-                                                    <input
-                                                            id="id_{{ court.pk }}"
-                                                            name="{{ court.pk }}"
-                                                            {% if court.checked %}checked="checked"{% endif %}
-                                                            type="checkbox"
-                                                            class="external-input court-checkbox">
-                                                        {{ court.short_name }}
-                                                        {% if court.end_date %}
-                                                            <span class="gray">({{ court.end_date.year }})</span>
-                                                        {% endif %}
-                                                    </label>
-                                                </div>
-                                            {% endfor %}
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-                {% endwith %}
-                <div class="text-right">
-                    <button type="submit" class="btn btn-primary btn-lg">Apply</button>
-                </div>
+              </div>
             </div>
-        </form>
-    </div>
+          </div>
+
+          <div class="col-xs-2 right">
+            <a class="close float-right pointer"
+               data-dismiss="modal" aria-hidden="true">&times;</a>
+          </div>
+        </div>
+        <label class="sr-only"
+               for="court-filter">Select Jurisdictions by Typing</label>
+        <input id="court-filter"
+               type="text"
+               placeholder="Select Jurisdictions by Typing"
+               autocomplete="off"
+               class="hidden-xs"/>
+        {% with search_form.type.value as v %}
+          <ul class="nav nav-tabs" id="court-picker-tabs">
+            {% comment %}
+                               Which Types Get Which Tabs?
+                      ┌──────┬───────┬───────┬───────┬──────┐
+                      │ App. │ Dist. │ Bank. │ State │ More │
+                      ├──────┼───────┼───────┼───────┼──────┤
+             opinions │   X  │   X   │   X   │   X   │   X  │
+                recap │   X  │   X   │   X   │       │   X  │
+            oral args │   X  │       │       │       │      │
+               people │   X  │   X   │   X   │   X   │   X  │
+                      └──────┴───────┴───────┴───────┴──────┘
+
+            {% endcomment %}
+            <li class="active">
+              <a href="#tab-federal-appellate"
+                 data-toggle="tab">
+                <span class="hidden-xs hidden-sm">Federal Appellate</span>
+                <span class="hidden-md hidden-lg">Fed. App.</span>
+              </a>
+            </li>
+            {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
+              <li>
+                <a href="#tab-federal-district"
+                   data-toggle="tab">
+                  <span class="hidden-xs hidden-sm">Federal District</span>
+                  <span class="hidden-md hidden-lg">Fed. Dist.</span>
+                </a>
+              </li>
+              <li>
+                <a href="#tab-bankruptcy"
+                   data-toggle="tab">
+                  <span class="hidden-xs hidden-sm">Bankruptcy</span>
+                  <span class="hidden-md hidden-lg">Bankr.</span>
+                </a>
+              </li>
+            {% endif %}
+            {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE %}
+              <li>
+                <a href="#tab-state"
+                   data-toggle="tab">State</a>
+              </li>
+            {% endif %}
+            {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
+              <li>
+                <a href="#tab-more"
+                   data-toggle="tab">More</a>
+              </li>
+            {% endif %}
+          </ul>
+          <div class="tab-content">
+            <div class="tab-pane active" id="tab-federal-appellate">
+              <div class="row">
+                {% for row in courts.federal|rows:4 %}
+                  <div class="col-sm-3">
+                    {% for court in row %}
+                      {% include "includes/court_checkbox.html" %}
+                    {% endfor %}
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% if search_form.type.value != SEARCH_TYPES.ORAL_ARGUMENT %}
+              <div class="tab-pane" id="tab-federal-district">
+                {# Regroup into closed/open courts #}
+                {% regroup  courts.district|dictsort:"is_terminated" by is_terminated as district_courts %}
+
+                {% for group in district_courts %}
+                  <h3 class="bottom inline">
+                    {% if group.grouper %}
+                      Historical Courts
+                    {% else %}
+                      Miscellaneous Courts
+                    {% endif %}
+                  </h3>
+                  <div class="row">
+                    {% for row in group.list|rows:4 %}
+                      <div class="col-sm-3">
+                        {% for court in row %}
+                          {% include "includes/court_checkbox.html" with hide_term_str=True %}
+                        {% endfor %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endfor %}
+              </div>
+              <div class="tab-pane" id="tab-bankruptcy">
+                {% if courts.bankruptcy_panel %}
+                  <h3 class="bottom inline">
+                    Bankruptcy Appellate Panels
+                  </h3>
+                  {% for bank_bundle in courts.bankruptcy_panel %}
+                    <div class="row">
+                      {% for row in bank_bundle|rows:4 %}
+                        <div class="col-sm-3">
+                          {% for court in row %}
+                            {% include "includes/court_checkbox.html" %}
+                          {% endfor %}
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% endfor %}
+                {% endif %}
+                {% if courts.bankruptcy %}
+                  <h3 class="bottom inline">
+                    Bankruptcy District Courts
+                  </h3>
+                  {% for bank_bundle in courts.bankruptcy %}
+                    <div class="row">
+                      {% for row in bank_bundle|rows:4 %}
+                        <div class="col-sm-3">
+                          {% for court in row %}
+                            {% include "includes/court_checkbox.html" %}
+                          {% endfor %}
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% endfor %}
+                {% endif %}
+              </div>
+            {% endif %}
+
+            {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE %}
+              <div class="tab-pane" id="tab-state">
+                {% for group in courts.state %}
+                  {% if forloop.counter == 1 %}
+                    <h3 class="bottom inline">State Courts</h3>
+                  {% elif forloop.counter == 2 %}
+                    <hr>
+                    <h3 class="bottom inline">U.S. Territory Courts</h3>
+                  {% endif %}
+                  <div class="row">
+                    {% for col_bundle in group|group_courts:3 %}
+                      <div class="col-sm-4">
+                        {% for court in col_bundle %}
+                          {% if court.jurisdiction == 'S' or court.jurisdiction == 'TS' %}
+                            {% include "includes/court_checkbox.html" %}
+                          {% else %}
+                            {% include "includes/court_checkbox.html" with indent=True %}
+                          {% endif %}
+                        {% endfor %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
+              <div class="tab-pane" id="tab-more">
+
+                {% if courts.military %}
+                  <h3 class="bottom inline">
+                    Military Courts
+                  </h3>
+                  <div class="row">
+                    {% for row in courts.military|rows:3 %}
+                      <div class="col-sm-4">
+                        {% for court in row %}
+                          <div class="checkbox">
+                            <label for="id_{{ court.pk }}">
+                              <input
+                                id="id_{{ court.pk }}"
+                                name="{{ court.pk }}"
+                                {% if court.checked %}checked="checked"{% endif %}
+                                type="checkbox"
+                                class="external-input court-checkbox">
+                              {{ court.short_name }}
+                              {% if court.end_date %}
+                                <span
+                                  class="gray">({{ court.end_date.year }})</span>
+                              {% endif %}
+                            </label>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+
+                {% if courts.tribal %}
+                  <h3 class="bottom inline">
+                    Tribal Courts
+                  </h3>
+                  <div class="row">
+                    {% for row in courts.tribal|rows:3 %}
+                      <div class="col-sm-4">
+                        {% for court in row %}
+                          <div class="checkbox">
+                            <label for="id_{{ court.pk }}">
+                              <input
+                                id="id_{{ court.pk }}"
+                                name="{{ court.pk }}"
+                                {% if court.checked %}checked="checked"{% endif %}
+                                type="checkbox"
+                                class="external-input court-checkbox">
+                              {{ court.short_name }}
+                              {% if court.end_date %}
+                                <span
+                                  class="gray">({{ court.end_date.year }})</span>
+                              {% endif %}
+                            </label>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+
+                {# Regroup into closed/open courts #}
+                {% regroup  courts.special|dictsort:"is_terminated" by is_terminated as special_courts %}
+
+                {% for group in special_courts %}
+                  <h3 class="bottom inline">
+                    {% if group.grouper %}
+                      Historical Courts
+                    {% else %}
+                      Miscellaneous Courts
+                    {% endif %}
+                  </h3>
+                  <div class="row">
+                    {% for row in group.list|rows:3 %}
+                      <div class="col-sm-4">
+                        {% for court in row %}
+                          <div class="checkbox">
+                            <label for="id_{{ court.pk }}">
+                              <input
+                                id="id_{{ court.pk }}"
+                                name="{{ court.pk }}"
+                                {% if court.checked %}checked="checked"{% endif %}
+                                type="checkbox"
+                                class="external-input court-checkbox">
+                              {{ court.short_name }}
+                              {% if court.end_date %}
+                                <span
+                                  class="gray">({{ court.end_date.year }})</span>
+                              {% endif %}
+                            </label>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endwith %}
+        <div class="text-right">
+          <button type="submit" class="btn btn-primary btn-lg">Apply</button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>

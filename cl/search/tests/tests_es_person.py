@@ -12,7 +12,7 @@ from elasticsearch_dsl import Q
 from lxml import html
 
 from cl.lib.elasticsearch_utils import build_es_base_query, build_es_main_query
-from cl.lib.search_index_utils import solr_list
+from cl.lib.search_index_utils import extract_field_values
 from cl.lib.test_helpers import (
     CourtTestCase,
     PeopleTestCase,
@@ -464,39 +464,47 @@ class PeopleV3APISearchTest(
         positions = self.person_2.positions.all()
         self.assertEqual(
             Counter(r.data["results"][0]["date_nominated"]),
-            Counter(solr_list(positions, "date_nominated")),
+            Counter(extract_field_values(positions, "date_nominated")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_elected"]),
-            Counter(solr_list(positions, "date_elected")),
+            Counter(extract_field_values(positions, "date_elected")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_recess_appointment"]),
-            Counter(solr_list(positions, "date_recess_appointment")),
+            Counter(
+                extract_field_values(positions, "date_recess_appointment")
+            ),
         )
         self.assertEqual(
             Counter(
                 r.data["results"][0]["date_referred_to_judicial_committee"]
             ),
             Counter(
-                solr_list(positions, "date_referred_to_judicial_committee")
+                extract_field_values(
+                    positions, "date_referred_to_judicial_committee"
+                )
             ),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_judicial_committee_action"]),
-            Counter(solr_list(positions, "date_judicial_committee_action")),
+            Counter(
+                extract_field_values(
+                    positions, "date_judicial_committee_action"
+                )
+            ),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_hearing"]),
-            Counter(solr_list(positions, "date_hearing")),
+            Counter(extract_field_values(positions, "date_hearing")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_confirmation"]),
-            Counter(solr_list(positions, "date_confirmation")),
+            Counter(extract_field_values(positions, "date_confirmation")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_start"]),
-            Counter(solr_list(positions, "date_start")),
+            Counter(extract_field_values(positions, "date_start")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_granularity_start"]),
@@ -510,11 +518,11 @@ class PeopleV3APISearchTest(
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_retirement"]),
-            Counter(solr_list(positions, "date_retirement")),
+            Counter(extract_field_values(positions, "date_retirement")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_termination"]),
-            Counter(solr_list(positions, "date_termination")),
+            Counter(extract_field_values(positions, "date_termination")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_granularity_termination"]),
@@ -616,6 +624,7 @@ class PeopleV4APISearchTest(
         search_params = {
             "type": SEARCH_TYPES.PEOPLE,
             "q": f"id:{self.person_2.pk} AND nomination_process:(U.S. Senate)",
+            "order_by": "score desc",
         }
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
@@ -662,6 +671,7 @@ class PeopleV4APISearchTest(
         search_params = {
             "type": SEARCH_TYPES.PEOPLE,
             "q": f"id:{person.pk}",
+            "order_by": "score desc",
         }
         # API
         r = async_to_sync(self._test_api_results_count)(
@@ -869,6 +879,7 @@ class PeopleV4APISearchTest(
             "q": f"id:{self.person_2.pk} name:Sheindlin dob_city:Brookyln nomination_process:(U.S. Senate) political_affiliation:Democratic",
             "school": "New York Law School",
             "dob_state": "NY",
+            "order_by": "score desc",
         }
 
         # Judged Search type HL disabled.
@@ -1342,7 +1353,8 @@ class PeopleSearchTestElasticSearch(
             "type": SEARCH_TYPES.PEOPLE,
         }
         s = PersonDocument.search()
-        main_query, _, _ = build_es_base_query(s, cd)
+        es_queries = build_es_base_query(s, cd)
+        main_query = es_queries.search_query
         self.assertEqual(main_query.count(), 2)
 
         # Query by parent field dob_state and child field selection_method.
@@ -1352,7 +1364,8 @@ class PeopleSearchTestElasticSearch(
             "type": SEARCH_TYPES.PEOPLE,
         }
         s = PersonDocument.search()
-        main_query, _, _ = build_es_base_query(s, cd)
+        es_queries = build_es_base_query(s, cd)
+        main_query = es_queries.search_query
         self.assertEqual(main_query.count(), 1)
 
         position_5.delete()
@@ -1956,6 +1969,34 @@ class PeopleSearchTestElasticSearch(
         }
         r = self._test_article_count(params, 1, "q")
         self.assertIn("<mark>Independent</mark>", r.content.decode())
+
+    def test_frontend_judges_count(self) -> None:
+        """Assert Judges search results counts in the fronted. Below and
+        above the estimation threshold.
+        """
+        search_params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        counts_text = self._get_frontend_counts_text(r)
+        # 2 cases and 3 Docket entries in counts are returned
+        self.assertIn("2 Judges", counts_text)
+
+        # Assert estimated counts above the threshold.
+        with mock.patch(
+            "cl.lib.elasticsearch_utils.simplify_estimated_count",
+            return_value=2300,
+        ):
+            r = self.client.get(
+                reverse("show_results"),
+                search_params,
+            )
+        counts_text = self._get_frontend_counts_text(r)
+        self.assertIn("About 2,300 Judges", counts_text)
 
 
 class IndexJudgesPositionsCommandTest(
@@ -2636,7 +2677,7 @@ class PeopleIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             person = PersonFactory.create(
@@ -2657,7 +2698,7 @@ class PeopleIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             position = PositionFactory.create(
@@ -2685,7 +2726,7 @@ class PeopleIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             person.save()
@@ -2696,7 +2737,7 @@ class PeopleIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             position.save()
@@ -2707,7 +2748,7 @@ class PeopleIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             person.name_first = "Barack"
@@ -2731,7 +2772,7 @@ class PeopleIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             person.religion = "pr"
@@ -2746,7 +2787,7 @@ class PeopleIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             position.nomination_process = "state_senate"
@@ -2761,7 +2802,7 @@ class PeopleIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             position.predecessor = self.person_2

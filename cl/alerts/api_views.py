@@ -7,7 +7,7 @@ from cl.alerts.api_serializers import (
 )
 from cl.alerts.filters import DocketAlertFilter, SearchAlertFilter
 from cl.alerts.models import Alert, DocketAlert
-from cl.api.api_permissions import IsOwner
+from cl.api.api_permissions import IsOwner, V3APIPermission
 from cl.api.pagination import MediumAdjustablePagination
 from cl.api.utils import LoggingMixin
 
@@ -15,7 +15,7 @@ from cl.api.utils import LoggingMixin
 class SearchAlertViewSet(LoggingMixin, ModelViewSet):
     """A ModelViewset to handle CRUD operations for SearchAlerts."""
 
-    permission_classes = [IsOwner, IsAuthenticated]
+    permission_classes = [IsOwner, IsAuthenticated, V3APIPermission]
     serializer_class = SearchAlertSerializer
     pagination_class = MediumAdjustablePagination
     filterset_class = SearchAlertFilter
@@ -42,7 +42,7 @@ class SearchAlertViewSet(LoggingMixin, ModelViewSet):
 class DocketAlertViewSet(LoggingMixin, ModelViewSet):
     """A ModelViewset to handle CRUD operations for DocketAlerts."""
 
-    permission_classes = [IsOwner, IsAuthenticated]
+    permission_classes = [IsOwner, IsAuthenticated, V3APIPermission]
     serializer_class = DocketAlertSerializer
     pagination_class = MediumAdjustablePagination
     filterset_class = DocketAlertFilter

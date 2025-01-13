@@ -3,7 +3,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Any, Literal, Type, Union
 
-from elasticsearch_dsl.response import Hit
+from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrList
 
 from cl.alerts.models import Alert
@@ -102,13 +102,33 @@ ESDictDocument = dict[str, Any]
 # TODO: Remove after scheduled OA alerts have been processed.
 PercolatorResponseType = tuple[list[Hit], ESDictDocument]
 
-PercolatorResponsesType = tuple[
-    list[Hit], list[Hit], list[Hit], ESDictDocument, str
-]
+
+@dataclass
+class SendAlertsResponse:
+    main_alerts_triggered: list[Hit]
+    rd_alerts_triggered: list[Hit]
+    d_alerts_triggered: list[Hit]
+    document_content: ESDictDocument
+    app_label_model: str
+
+
+@dataclass
+class PercolatorResponses:
+    main_response: Response
+    rd_response: Response | None
+    d_response: Response | None
+
+
 # TODO: Remove after scheduled OA alerts have been processed.
 SaveDocumentResponseType = tuple[str, ESDictDocument]
 
-SaveESDocumentReturnType = tuple[str, ESDictDocument, str]
+
+@dataclass
+class SaveESDocumentReturn:
+    document_id: str
+    document_content: ESDictDocument
+    app_label: str
+
 
 SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
 

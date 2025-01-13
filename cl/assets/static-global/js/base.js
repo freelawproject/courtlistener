@@ -103,6 +103,8 @@ $(document).ready(function () {
         .val(el.val())
         .appendTo('#search-form');
     });
+    installProgressBar();
+    disableAllSubmitButtons();
     document.location = '/?' + $('#search-form').serialize();
   }
 
@@ -305,10 +307,7 @@ $(document).ready(function () {
   if (modal_exist) {
     $('#open-modal-on-load').modal();
   }
-
 });
-
-
 
 // Debounce - rate limit a function
 // https://davidwalsh.name/javascript-debounce-function
@@ -367,3 +366,4 @@ if (form && button) {
     button.disabled = true;
   });
 }
+

@@ -212,18 +212,29 @@ class ESIndexTestCase(SimpleTestCase):
 
         return xml_tree
 
+    @staticmethod
+    def _get_frontend_counts_text(r):
+        """Extract and clean frontend counts text from the response content."""
+        tree = html.fromstring(r.content.decode())
+        counts_h2_element = tree.xpath('//h2[@id="result-count"]')[0]
+        counts_text = " ".join(counts_h2_element.xpath(".//text()"))
+        counts_text = counts_text.replace("&nbsp;", " ")
+        counts_text = counts_text.split()
+        return " ".join(counts_text)
+
 
 class CountESTasksTestCase(SimpleTestCase):
     def setUp(self):
         self.task_call_count = 0
 
-    def count_task_calls(self, task, *args, **kwargs) -> None:
+    def count_task_calls(
+        self, task, immutable_signature, *args, **kwargs
+    ) -> None:
         """Wraps the task to count its calls and assert the expected count."""
         # Increment the call count
         self.task_call_count += 1
-
         # Call the task
-        if task.__name__ in ["es_save_document", "update_es_document"]:
+        if immutable_signature:
             return task.s(*args, **kwargs)
         else:
             task.apply_async(args=args, kwargs=kwargs)
@@ -251,11 +262,25 @@ class V4SearchAPIAssertions(SimpleTestCase):
         meta_expected_value = await sync_to_async(get_meta_expected_value)(
             content_to_compare
         )
-        self.assertEqual(
-            meta_value,
-            meta_expected_value,
-            f"The field '{meta_field}' does not match.",
-        )
+        if meta_field == "score":
+            # Special case for the score field. Only confirm the presence of
+            # keys and avoid comparing values, as they differ in each response.
+            self.assertEqual(
+                set(meta_value.keys()),
+                set(meta_expected_value.keys()),
+                f"The keys in field '{meta_field}' do not match.",
+            )
+            for score_value in meta_value.values():
+                self.assertIsNotNone(
+                    score_value, f"The score value can't be None."
+                )
+
+        else:
+            self.assertEqual(
+                meta_value,
+                meta_expected_value,
+                f"The field '{meta_field}' does not match.",
+            )
 
     async def _test_api_fields_content(
         self,
@@ -285,6 +310,10 @@ class V4SearchAPIAssertions(SimpleTestCase):
                                     meta_value,
                                 ) in child_value.items():
                                     with self.subTest(meta_field=meta_field):
+                                        self.assertFalse(
+                                            meta_field == "score",
+                                            msg="score key should not be present in nested documents",
+                                        )
                                         await self._compare_field(
                                             meta_field,
                                             meta_value,
@@ -317,23 +346,63 @@ class V4SearchAPIAssertions(SimpleTestCase):
                         f"Parent field '{field}' does not match.",
                     )
 
-    def _test_results_ordering(self, test, field):
+    def _test_results_ordering(self, test, field, version="v4"):
         """Ensure dockets appear in the response in a specific order."""
 
         with self.subTest(test=test, msg=f'{test["name"]}'):
             r = self.client.get(
-                reverse("search-list", kwargs={"version": "v4"}),
+                reverse("search-list", kwargs={"version": version}),
                 test["search_params"],
             )
-            self.assertEqual(len(r.data["results"]), test["expected_results"])
+
+            expected_order_key = "expected_order"
+            if version == "v3":
+                expected_order_key = (
+                    "expected_order_v3"
+                    if "expected_order_v3" in test
+                    else "expected_order"
+                )
+
+            self.assertEqual(
+                len(r.data["results"]), len(test[expected_order_key])
+            )
             # Note that dockets where the date_field is null are sent to the bottom
             # of the results
             actual_order = [result[field] for result in r.data["results"]]
             self.assertEqual(
                 actual_order,
-                test["expected_order"],
-                msg=f'Expected order {test["expected_order"]}, but got {actual_order}',
+                test[expected_order_key],
+                msg=f"Expected order {test[expected_order_key]}, but got {actual_order} for "
+                f"Search type: {test["search_params"]["type"]}",
             )
+
+    def _assert_order_in_html(
+        self, decoded_content: str, expected_order: list
+    ) -> None:
+        """Assert that the expected order of documents appears correctly in the
+        HTML content."""
+
+        for i in range(len(expected_order) - 1):
+            self.assertTrue(
+                decoded_content.index(str(expected_order[i]))
+                < decoded_content.index(str(expected_order[i + 1])),
+                f"Expected {expected_order[i]} to appear before {expected_order[i + 1]} in the HTML content.",
+            )
+
+    async def _test_article_count(self, params, expected_count, field_name):
+        r = await self.async_client.get("/", params)
+        tree = html.fromstring(r.content.decode())
+        got = len(tree.xpath("//article"))
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in Frontend with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
 
     def _test_page_variables(
         self, response, test_case, current_page, search_type
@@ -388,7 +457,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
         return next_page, previous_page, current_page
 
 
-class RECAPAlertsAssertions:
+class SearchAlertsAssertions:
 
     @staticmethod
     def get_html_content_from_email(email_content):
@@ -482,7 +551,9 @@ class RECAPAlertsAssertions:
                 case_text_cleaned = self.clean_case_title(case_text)
                 if case_title == case_text_cleaned:
                     child_hit_count = len(
-                        case.xpath("following-sibling::ul[1]/li/a")
+                        case.xpath(
+                            "following-sibling::ul[1]/li/a | following-sibling::ul[1]/li/strong"
+                        )
                     )
                     self.assertEqual(
                         child_hit_count,
@@ -511,8 +582,8 @@ class RECAPAlertsAssertions:
             child_documents = case_item.xpath("./following-sibling::ul[1]/li")
             results = []
             for li in child_documents:
-                a_tag = li.xpath(".//a")[0]
-                full_text = a_tag.text_content()
+                child_tag = li.xpath(".//a | .//strong")[0]
+                full_text = child_tag.text_content()
                 first_part = full_text.split("\u2014")[0].strip()
                 results.append(first_part)
 
@@ -539,6 +610,7 @@ class RECAPAlertsAssertions:
         expected_hits,
         case_title,
         expected_child_hits,
+        nested_field="recap_documents",
     ):
         """Confirm the following assertions for the search alert webhook:
         - An specific alert webhook was triggered.
@@ -546,6 +618,8 @@ class RECAPAlertsAssertions:
         - The specified case contains the expected number of child hits.
         """
 
+        matched_alert_name = None
+        matched_case_title = None
         for webhook in webhooks:
             if webhook["payload"]["alert"]["name"] == alert_title:
                 webhook_cases = webhook["payload"]["results"]
@@ -555,14 +629,21 @@ class RECAPAlertsAssertions:
                     msg=f"Did not get the right number of hits for the alert %s. "
                     % alert_title,
                 )
+                matched_alert_name = True
                 for case in webhook["payload"]["results"]:
                     if case_title == strip_tags(case["caseName"]):
+                        matched_case_title = True
+                        if nested_field is None:
+                            self.assertTrue(nested_field not in case)
+                            continue
                         self.assertEqual(
-                            len(case["recap_documents"]),
+                            len(case[nested_field]),
                             expected_child_hits,
                             msg=f"Did not get the right number of child documents for the case %s. "
                             % case_title,
                         )
+        self.assertTrue(matched_alert_name, msg="Alert name didn't match")
+        self.assertTrue(matched_case_title, msg="Case title didn't match")
 
     def _count_percolator_webhook_hits_and_child_hits(
         self,
@@ -627,13 +708,19 @@ class RECAPAlertsAssertions:
         field_name,
         hl_expected,
         child_field,
+        nested_field="recap_documents",
     ):
         """Assert Hl in webhook fields."""
         for webhook in webhooks:
             if webhook["payload"]["alert"]["name"] == alert_title:
                 hit = webhook["payload"]["results"][0]
                 if child_field:
-                    child_field_content = hit["recap_documents"][0][field_name]
+                    self.assertNotIn(
+                        "score",
+                        hit[nested_field][0]["meta"],
+                        msg="score shouldn't be present on webhook nested documents",
+                    )
+                    child_field_content = hit[nested_field][0][field_name]
                     self.assertIn(
                         hl_expected,
                         child_field_content,
@@ -641,6 +728,11 @@ class RECAPAlertsAssertions:
                         % field_name,
                     )
                 else:
+                    self.assertNotIn(
+                        "score",
+                        hit["meta"],
+                        msg="score shouldn't be present on webhook main document",
+                    )
                     parent_field_content = hit[field_name]
                     self.assertIn(
                         hl_expected,

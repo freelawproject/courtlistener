@@ -27,14 +27,7 @@ from cl.search.tasks import (
 )
 from cl.search.types import ESDocumentClassType
 
-supported_models = [
-    "audio.Audio",
-    "people_db.Person",
-    "search.OpinionCluster",
-    "search.Opinion",
-    "search.Docket",
-    "search.RECAPDocument",
-]
+supported_models = settings.ELASTICSEARCH_SWEEP_INDEXER_MODELS  # type: ignore
 r = get_redis_interface("CACHE")
 
 
@@ -366,7 +359,7 @@ class Command(VerboseCommand):
         processed_count = 0
         accumulated_chunk = 0
         throttle = CeleryThrottle(
-            poll_interval=10,
+            poll_interval=settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL,  # type: ignore
             min_items=self.chunk_size,
             queue_name=self.queue,
         )
@@ -412,8 +405,17 @@ class Command(VerboseCommand):
                         ).set(queue=self.queue).apply_async()
 
                 accumulated_chunk += len(chunk)
+                if not testing_mode:
+                    # Wait for 1/ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS
+                    # before processing the next chunk.
+                    # e.g: With a poll interval of 10 and a chunk size of 10,
+                    # it will wait for 0.1 seconds for every 10 documents processed,
+                    # maintaining an index rate of 100 documents per second.
+                    time.sleep(
+                        1 / settings.ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS  # type: ignore
+                    )
                 self.stdout.write(
-                    "\rProcessed {}/{}, ({:.0%}), last {} PK indexed: {},".format(
+                    "\rProcessed {}/{}, ({:.0%}), last {} ID indexed: {},".format(
                         processed_count,
                         count,
                         processed_count * 1.0 / count,

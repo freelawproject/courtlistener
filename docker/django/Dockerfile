@@ -1,4 +1,4 @@
-FROM python:3.12-slim as build-base
+FROM python:3.13-slim AS build-base
 
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
@@ -24,7 +24,7 @@ ENV PGSSLCERT=/tmp/postgresql.crt
 
 # poetry
 # https://python-poetry.org/docs/configuration/#using-environment-variables
-ENV POETRY_VERSION=1.7.1 \
+ENV POETRY_VERSION=1.8.4 \
     # make poetry install to this location
     POETRY_HOME="/opt/poetry" \
     # Don't build a virtualenv to save space
@@ -41,7 +41,7 @@ RUN python -m venv $POETRY_HOME && \
     ln -s $POETRY_HOME/bin/poetry "$(dirname $(which python))/poetry"  # make accessible via $PATH
 
 ARG BUILD_ENV=prod
-FROM build-base as python-base
+FROM build-base AS python-base
 
 WORKDIR $PYSETUP_PATH
 
@@ -71,8 +71,7 @@ RUN mkdir /var/log/courtlistener \
 WORKDIR /opt/courtlistener
 
 
-## Needs to be two commands so second one can use variables from first.
-ENV PYTHONPATH="${PYTHONPATH}:/opt/courtlistener"
+ENV PYTHONPATH="/opt/courtlistener"
 
 USER root
 ## Creates a directory for Hyperscan db

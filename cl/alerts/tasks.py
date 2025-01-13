@@ -51,11 +51,11 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
     ESDocumentNameType,
-    PercolatorResponsesType,
     PercolatorResponseType,
     SaveDocumentResponseType,
-    SaveESDocumentReturnType,
+    SaveESDocumentReturn,
     SearchAlertHitType,
+    SendAlertsResponse,
 )
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
@@ -373,27 +373,20 @@ def send_alert_and_webhook(
 
 
 @app.task(ignore_result=True)
-def send_alerts_and_webhooks(
-    data: Dict[str, Union[List[Tuple], List[int]]]
-) -> List[int]:
+def send_alerts_and_webhooks(data: list[tuple[int, datetime]]) -> List[int]:
     """Send many docket alerts at one time without making numerous calls
     to the send_alert_and_webhook function.
 
-    :param data: A dict with up to two keys:
+    :param data: A list of tuples. Each tuple contains the docket ID, and
+        a time. The time indicates that alerts should be sent for
+        items *after* that point.
 
-      d_pks_to_alert: A list of tuples. Each tuple contains the docket ID, and
-                      a time. The time indicates that alerts should be sent for
-                      items *after* that point.
-        rds_for_solr: A list of RECAPDocument ids that need to be sent to Solr
-                      to be made searchable.
-    :returns: Simply passes through the rds_for_solr list, in case it is
-    consumed by the next task. If rds_for_solr is not provided, returns an
-    empty list.
+    :returns: An empty list
     """
-    for args in data["d_pks_to_alert"]:
+    for args in data:
         send_alert_and_webhook(*args)
 
-    return cast(List[int], data.get("rds_for_solr", []))
+    return []
 
 
 @app.task(ignore_result=True)
@@ -643,25 +636,27 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
 
 
 @app.task(ignore_result=True)
-def percolator_response_processing(response: PercolatorResponsesType) -> None:
+def percolator_response_processing(response: SendAlertsResponse) -> None:
     """Process the response from the percolator and handle alerts triggered by
      the percolator query.
 
-    :param response: A two tuple, a list of Alerts triggered and the document
-    data that triggered the alert.
+    :param response: A `SendAlertsResponse` object containing A list of hits
+    for main, docket only and recap-only alerts, the document data that
+    triggered the alerts and The related app label model.
     :return: None
     """
     if not response:
         return None
 
     scheduled_hits_to_create = []
-    (
-        main_alerts_triggered,
-        rd_alerts_triggered,
-        d_alerts_triggered,
-        document_content,
-        app_label_model,
-    ) = response
+    email_alerts_to_send = []
+    rt_alerts_to_send = []
+
+    main_alerts_triggered = response.main_alerts_triggered
+    rd_alerts_triggered = response.rd_alerts_triggered
+    d_alerts_triggered = response.d_alerts_triggered
+    document_content = response.document_content
+    app_label_model = response.app_label_model
     app_label_str, model_str = app_label_model.split(".")
     instance_content_type = ContentType.objects.get(
         app_label=app_label_str, model=model_str.lower()
@@ -847,8 +842,8 @@ def send_or_schedule_alerts(
     interval_start=5,
 )
 def send_or_schedule_search_alerts(
-    self: Task, response: SaveESDocumentReturnType | None
-) -> PercolatorResponsesType | None:
+    self: Task, response: SaveESDocumentReturn | None
+) -> SendAlertsResponse | None:
     """Send real-time alerts based on the Elasticsearch search response.
 
     Or schedule other rates alerts to send them later.
@@ -861,17 +856,31 @@ def send_or_schedule_search_alerts(
     until all results are retrieved or no more results are available.
 
     :param self: The celery task
-    :param response: A two tuple, the document ID to be percolated in
-    ES index and the document data that triggered the alert.
-    :return: A two tuple, a list of Alerts triggered and the document data that
-    triggered the alert.
+    :param response: An optional `SaveESDocumentReturn` object containing the
+    ID of the document saved in the ES index, the content of the document and
+    the app label associated with the document.
+    :return: A SendAlertsResponse dataclass containing the main alerts
+    triggered, the recap documents alerts triggered, the docket alerts
+    triggered, the document content that triggered the alert, and the related
+    app label model or None.
     """
 
-    if not response or not settings.PERCOLATOR_SEARCH_ALERTS_ENABLED:
+    if not response:
         self.request.chain = None
         return None
 
-    document_id, document_content, app_label = response
+    if (
+        not settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
+        and response.app_label in ["search.RECAPDocument", "search.Docket"]
+    ):
+        # Disable percolation for RECAP search alerts until
+        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED is set to True.
+        self.request.chain = None
+        return None
+
+    app_label = response.app_label
+    document_id = response.document_id
+    document_content = response.document_content
 
     # Perform an initial percolator query and process its response.
     percolator_index, es_document_index, documents_to_percolate = (
@@ -888,7 +897,7 @@ def send_or_schedule_search_alerts(
         documents_to_percolate,
         app_label,
     )
-    if not percolator_responses[0]:
+    if not percolator_responses.main_response:
         self.request.chain = None
         return None
 
@@ -908,12 +917,12 @@ def send_or_schedule_search_alerts(
         )
     )
 
-    return (
-        main_alerts_triggered,
-        rd_alerts_triggered,
-        d_alerts_triggered,
-        document_content,
-        app_label,
+    return SendAlertsResponse(
+        main_alerts_triggered=main_alerts_triggered,
+        rd_alerts_triggered=rd_alerts_triggered,
+        d_alerts_triggered=d_alerts_triggered,
+        document_content=document_content,
+        app_label_model=app_label,
     )
 
 

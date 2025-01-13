@@ -8,7 +8,7 @@ from cl.search.models import OpinionCluster, ParentheticalGroup
 
 async def get_or_create_parenthetical_groups(
     cluster: OpinionCluster,
-) -> QuerySet[ParentheticalGroup]:
+) -> QuerySet[ParentheticalGroup, ParentheticalGroup]:
     """
     Given a cluster, return its existing ParentheticalGroup's from the database
     or compute and store new ones if they do not yet exist or need to be updated.

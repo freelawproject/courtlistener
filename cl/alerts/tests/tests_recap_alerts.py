@@ -2,7 +2,7 @@ import datetime
 from unittest import mock
 
 import time_machine
-from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.test.utils import override_settings
@@ -24,12 +24,11 @@ from cl.alerts.utils import (
     build_plain_percolator_query,
     percolate_es_document,
     prepare_percolator_content,
-    recap_document_hl_matched,
 )
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
+from cl.api.utils import get_webhook_deprecation_date
 from cl.donate.models import NeonMembership
-from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
 from cl.people_db.factories import (
@@ -52,7 +51,7 @@ from cl.search.factories import (
 from cl.search.models import Docket
 from cl.search.tasks import index_docket_parties_in_es
 from cl.stats.models import Stat
-from cl.tests.cases import ESIndexTestCase, RECAPAlertsAssertions, TestCase
+from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -62,7 +61,7 @@ from cl.users.factories import UserProfileWithParentsFactory
     return_value="alert_hits_sweep",
 )
 class RECAPAlertsSweepIndexTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase, RECAPAlertsAssertions
+    RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
     """
     RECAP Alerts Sweep Index Tests
@@ -102,73 +101,6 @@ class RECAPAlertsSweepIndexTest(
         if keys:
             self.r.delete(*keys)
 
-    async def test_recap_document_hl_matched(self, mock_prefix) -> None:
-        """Test recap_document_hl_matched method that determines weather a hit
-        contains RECAPDocument HL fields."""
-
-        # Index base document factories.
-        with time_machine.travel(self.mock_date, tick=False):
-            index_daily_recap_documents(
-                self.r,
-                DocketDocument._index._name,
-                RECAPSweepDocument,
-                testing=True,
-            )
-
-        # Docket-only query
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": '"401 Civil"',
-        }
-        search_query = RECAPSweepDocument.search()
-        results, parent_results, _ = await sync_to_async(
-            do_es_sweep_alert_query
-        )(
-            search_query,
-            search_query,
-            search_params,
-        )
-        docket_result = results[0]
-        for rd in docket_result["child_docs"]:
-            rd_field_matched = recap_document_hl_matched(rd)
-            self.assertEqual(rd_field_matched, False)
-
-        # RECAPDocument-only query
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": '"Mauris iaculis, leo sit amet hendrerit vehicula"',
-        }
-        search_query = RECAPSweepDocument.search()
-        results, parent_results, _ = await sync_to_async(
-            do_es_sweep_alert_query
-        )(
-            search_query,
-            search_query,
-            search_params,
-        )
-        docket_result = results[0]
-        for rd in docket_result["child_docs"]:
-            rd_field_matched = recap_document_hl_matched(rd)
-            self.assertEqual(rd_field_matched, True)
-
-        # Cross-object query
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": "SUBPOENAS SERVED OFF Mauris iaculis",
-        }
-        search_query = RECAPSweepDocument.search()
-        results, parent_results, _ = await sync_to_async(
-            do_es_sweep_alert_query
-        )(
-            search_query,
-            search_query,
-            search_params,
-        )
-        docket_result = results[0]
-        for rd in docket_result["child_docs"]:
-            rd_field_matched = recap_document_hl_matched(rd)
-            self.assertEqual(rd_field_matched, True)
-
     def test_filter_recap_alerts_to_send(self, mock_prefix) -> None:
         """Test filter RECAP alerts that met the conditions to be sent:
         - RECAP type alert.
@@ -181,24 +113,21 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test RT RECAP Alert",
             query='q="401 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         dly_recap_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.DAILY,
             name="Test DLY RECAP Alert",
             query='q="401 Civil"&type=r',
-        )
-        AlertFactory(
-            user=self.user_profile_2.user,
-            rate=Alert.REAL_TIME,
-            name="Test RT RECAP Alert",
-            query='q="401 Civil"',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         AlertFactory(
             user=self.user_profile_no_member.user,
             rate=Alert.REAL_TIME,
             name="Test RT RECAP Alert no Member",
             query='q="401 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
 
         with mock.patch(
@@ -459,6 +388,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only",
             query='q="401 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -494,6 +424,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only Not Triggered",
             query='q="405 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         # Simulate docket is ingested a day before.
         one_day_before = self.mock_date - datetime.timedelta(days=1)
@@ -550,6 +481,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only",
             query='q="plain text for 018036652436"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -640,6 +572,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only Docket Entry",
             query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -674,6 +607,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query",
             query=f'q="Motion to File 2"&docket_number={docket.docket_number}&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -695,6 +629,18 @@ class RECAPAlertsSweepIndexTest(
             alert_de.docket.case_name,
             [rd_2.description],
         )
+        webhook_events = WebhookEvent.objects.all().values_list(
+            "content", flat=True
+        )
+        # Assert webhook event child hits.
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
+            cross_object_alert.name,
+            1,
+            alert_de.docket.case_name,
+            1,
+        )
+
         # Assert email text version:
         txt_email = mail.outbox[4].body
         self.assertIn(cross_object_alert.name, txt_email)
@@ -718,6 +664,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query",
             query=f"q=docket_id:{self.de.docket.pk} OR pacer_doc_id:{self.rd_2.pacer_doc_id}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -764,6 +711,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query",
             query=f"q=docket_id:{self.de.docket.pk} OR pacer_doc_id:{self.rd.pacer_doc_id}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -810,6 +758,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object text query",
             query=f'q="United states"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         two_days_before = self.mock_date - datetime.timedelta(days=2)
         mock_two_days_before = two_days_before.replace(hour=5)
@@ -979,6 +928,7 @@ class RECAPAlertsSweepIndexTest(
             f"pacer_doc_id:{self.rd.pacer_doc_id} OR "
             f'("United States of America" OR '
             f"pacer_doc_id:{rd_3.pacer_doc_id})&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1036,6 +986,7 @@ class RECAPAlertsSweepIndexTest(
             name="Test Alert Cross-object query combined.",
             query=f'q=("United States of America" AND '
             f"pacer_doc_id:{rd_3.pacer_doc_id})&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1084,15 +1035,15 @@ class RECAPAlertsSweepIndexTest(
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             rd_descriptions = []
-            for i in range(6):
+            for i in range(4):
                 rd = RECAPDocumentFactory(
                     docket_entry=alert_de,
                     description=f"Motion to File {i+1}",
                     document_number=f"{i+1}",
                     pacer_doc_id=f"018036652436{i+1}",
                 )
-                if i < 5:
-                    # Omit the last alert to compare. Only up to 5 should be
+                if i < 3:
+                    # Omit the last alert to compare. Only up to 3 should be
                     # included in the case.
                     rd_descriptions.append(rd.description)
 
@@ -1101,6 +1052,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only Docket Entry",
             query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1116,13 +1068,13 @@ class RECAPAlertsSweepIndexTest(
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(recap_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 1)
-        # The case alert should contain up to 5 child hits.
+        # The case alert should contain up to 3 child hits.
         self._count_alert_hits_and_child_hits(
             html_content,
             recap_only_alert.name,
             1,
             self.de.docket.case_name,
-            5,
+            3,
         )
         self._assert_child_hits_content(
             html_content,
@@ -1202,12 +1154,14 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only",
             query='q="410 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         recap_only_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only Docket Entry",
             query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         cross_object_alert_with_hl = AlertFactory(
             user=self.user_profile.user,
@@ -1217,6 +1171,7 @@ class RECAPAlertsSweepIndexTest(
             f'"plain text lorem" AND "410 Civil" AND '
             f"id:{rd_2.pk}&docket_number={docket.docket_number}"
             f'&case_name="{docket.case_name}"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         AlertFactory(
             user=self.user_profile_2.user,
@@ -1226,6 +1181,7 @@ class RECAPAlertsSweepIndexTest(
             f'"plain text lorem" AND "410 Civil" AND '
             f"id:{rd_2.pk}&docket_number={docket.docket_number}"
             f'&case_name="{docket.case_name}"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
 
         with mock.patch(
@@ -1401,18 +1357,21 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.WEEKLY,
             name="Test Alert Docket Only",
             query='q="401 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         recap_only_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.MONTHLY,
             name="Test Alert RECAP Only Docket Entry",
             query=f"q=docket_entry_id:{self.de.pk}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         cross_object_alert_with_hl = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert Cross-object",
             query=f'q="401 Civil" id:{self.rd.pk}&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1556,14 +1515,13 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
         alert_de.docket.delete()
 
-    @override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
+    @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
     def test_percolator_plus_sweep_alerts_integration(
         self, mock_prefix
     ) -> None:
         """Integration test to confirm alerts missing by the percolator approach
         are properly send by the sweep index without duplicating alerts.
         """
-
         # Rename percolator index for this test to avoid collisions.
         RECAPPercolator._index._name = "recap_percolator_sweep"
         RECAPPercolator._index.delete(ignore=404)
@@ -1574,19 +1532,31 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only",
             query='q="410 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         cross_object_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object",
             query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         cross_object_alert_after_update = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object 2",
             query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE UPDATED"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
+
+        with mock.patch("cl.users.signals.notify_new_or_updated_webhook"):
+            webhook_2_1 = WebhookFactory(
+                user=self.user_profile.user,
+                event_type=WebhookEventType.SEARCH_ALERT,
+                url="https://example.com/",
+                enabled=True,
+                version=2,
+            )
 
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1631,10 +1601,25 @@ class RECAPAlertsSweepIndexTest(
         webhook_events = WebhookEvent.objects.all().values_list(
             "content", flat=True
         )
-        # 2 webhooks should be triggered one for each document ingested that
-        # matched each alert.
+        # One webhook should be triggered for each webhook version (V1, V2) and
+        # for each document ingested that matched each alert. 4 Webhook events total.
         self.assertEqual(
-            len(webhook_events), 2, msg="Webhook events didn't match."
+            len(webhook_events), 4, msg="Webhook events didn't match."
+        )
+
+        # Confirm webhooks for V1 and V2 are properly triggered.
+        webhook_versions = [
+            webhook["webhook"]["version"] for webhook in webhook_events
+        ]
+        self.assertEqual(
+            webhook_versions.count(2),
+            2,
+            msg="Wrong number of V2 webhook events.",
+        )
+        self.assertEqual(
+            webhook_versions.count(1),
+            2,
+            msg="Wrong number of V1 webhook events.",
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[0])
@@ -1694,10 +1679,40 @@ class RECAPAlertsSweepIndexTest(
         webhook_events = WebhookEvent.objects.all().values_list(
             "content", flat=True
         )
-        # 3 webhooks should be triggered one for each document ingested that
-        # matched each alert.
+        # One webhook should be triggered for each webhook version (V1, V2) and
+        # for each document ingested that matched each alert. 6 Webhook events total.
         self.assertEqual(
-            len(webhook_events), 3, msg="Webhook events didn't match."
+            len(webhook_events), 6, msg="Webhook events didn't match."
+        )
+
+        # Confirm webhooks for V1 and V2 are properly triggered.
+        webhook_versions = [
+            webhook["webhook"]["version"] for webhook in webhook_events
+        ]
+        self.assertEqual(
+            webhook_versions.count(2),
+            3,
+            msg="Wrong number of V2 webhook events.",
+        )
+        self.assertEqual(
+            webhook_versions.count(1),
+            3,
+            msg="Wrong number of V1 webhook events.",
+        )
+
+        # Confirm deprecation date webhooks according the version.
+        v1_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_enabled
+        ).first()
+        v2_webhook_event = WebhookEvent.objects.filter(
+            webhook=webhook_2_1
+        ).first()
+        self.assertEqual(
+            v1_webhook_event.content["webhook"]["deprecation_date"],
+            get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
+        )
+        self.assertEqual(
+            v2_webhook_event.content["webhook"]["deprecation_date"], None
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
@@ -1721,13 +1736,13 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
 
 
-@override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
+@override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
 @mock.patch(
     "cl.alerts.utils.get_alerts_set_prefix",
     return_value="alert_hits_percolator",
 )
 class RECAPAlertsPercolatorTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase, RECAPAlertsAssertions
+    RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
     """
     RECAP Alerts Percolator Tests
@@ -1857,9 +1872,9 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd_att.pk)
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         # Test Percolate a RECAPDocument. It should match the query containing
@@ -1876,9 +1891,10 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd.pk)
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_1), True
+            self.confirm_query_matched(responses.main_response, query_id_1),
+            True,
         )
 
         # Test Percolate a RECAPDocument. It should match the query containing
@@ -1894,12 +1910,14 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd.pk)
         )
         expected_queries = 2
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_1), True
+            self.confirm_query_matched(responses.main_response, query_id_1),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
 
         # Test Percolate a RECAPDocument. It should match the query containing
@@ -1916,18 +1934,21 @@ class RECAPAlertsPercolatorTest(
         )
         expected_queries = 3
         self.assertEqual(
-            len(responses[0]),
+            len(responses.main_response),
             expected_queries,
             msg="Wrong number of queries matched.",
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_1), True
+            self.confirm_query_matched(responses.main_response, query_id_1),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_3), True
+            self.confirm_query_matched(responses.main_response, query_id_3),
+            True,
         )
 
     def test_recap_document_percolator(self, mock_prefix) -> None:
@@ -1939,7 +1960,7 @@ class RECAPAlertsPercolatorTest(
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": '"Mauris iaculis" AND pacer_doc_id:016156723121 AND '
-            "entry_date_filed:[2014-07-18T00:00:00Z TO 2014-07-20T00:00:00Z]",
+            "entry_date_filed:[2014-07-04T00:00:00Z TO 2014-07-20T00:00:00Z]",
             "document_number": "3",
             "description": "Leave to File",
             "order_by": "score desc",
@@ -1951,9 +1972,13 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd_2.pk)
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            len(responses.main_response),
+            expected_queries,
+            msg="Matched queries didn't match.",
+        )
+        self.assertEqual(
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         # Test percolate only filters combination.
@@ -1970,9 +1995,13 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd_att.pk)
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            len(responses.main_response),
+            expected_queries,
+            msg="Matched queries didn't match.",
+        )
+        self.assertEqual(
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         # Test percolate a different document targeting a different filters
@@ -1989,9 +2018,13 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd.pk)
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            len(responses.main_response),
+            expected_queries,
+            msg="Matched queries didn't match.",
+        )
+        self.assertEqual(
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         # Test percolate the same document loosen the query.
@@ -2006,12 +2039,17 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd.pk)
         )
         expected_queries = 2
-        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            len(responses.main_response),
+            expected_queries,
+            msg="Matched queries didn't match.",
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id), True
+        )
+        self.assertEqual(
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
 
     def test_docket_percolator(self, mock_prefix) -> None:
@@ -2036,7 +2074,7 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 0
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
 
         # Test Percolate a docket object. It shouldn't match the query
         # containing text query terms contained only in a RD.
@@ -2053,7 +2091,7 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 0
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
 
         # Test Percolate a docket object. Combining docket terms OR RECAPDocument
         # fields. This query can be triggered only by the Docket document.
@@ -2070,9 +2108,12 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries, msg="error 1")
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            len(responses.main_response), expected_queries, msg="error 1"
+        )
+        self.assertEqual(
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
 
         # Test percolate text query + different filters.
@@ -2092,12 +2133,14 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_3), True
+            self.confirm_query_matched(responses.main_response, query_id_3),
+            True,
         )
 
         # Test percolate text query + case_name filter.
@@ -2115,9 +2158,10 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_4), True
+            self.confirm_query_matched(responses.main_response, query_id_4),
+            True,
         )
 
         # Test percolate one filter.
@@ -2134,9 +2178,10 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_5), True
+            self.confirm_query_matched(responses.main_response, query_id_5),
+            True,
         )
 
         # Test percolate text query.
@@ -2153,15 +2198,18 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 3
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_3), True
+            self.confirm_query_matched(responses.main_response, query_id_3),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_6), True
+            self.confirm_query_matched(responses.main_response, query_id_6),
+            True,
         )
 
     def test_index_and_delete_recap_alerts_from_percolator(
@@ -2173,12 +2221,19 @@ class RECAPAlertsPercolatorTest(
             user=self.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert Docket Only",
-            query='q="401 Civil"&type=r',
+            query='q="401 Civil"&type=r&order_by=score desc',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert.pk),
             msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
         )
+        alert_doc = RECAPPercolator.get(id=docket_only_alert.pk)
+        response_str = str(alert_doc.to_dict())
+        self.assertIn("401 Civil", response_str)
+        self.assertIn("'rate': 'wly'", response_str)
+        # function_score breaks percolator queries. Ensure it is never indexed.
+        self.assertNotIn("function_score", response_str)
 
         docket_only_alert_id = docket_only_alert.pk
         # Remove the alert.
@@ -2194,6 +2249,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.WEEKLY,
             name="Test Alert Docket Only",
             query='q="401 Civil"&case_name="Lorem Ipsum"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert_filter.pk),
@@ -2216,6 +2272,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only 1",
             query='q="SUBPOENAS SERVED CASE"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2252,6 +2309,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only 2",
             query='q="plain text for 018036652436"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2305,6 +2363,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only 3",
             query='q="Hearing for Leave"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2357,6 +2416,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only 4",
             query='q="Hearing to File Updated"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2410,6 +2470,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only 5",
             query='q="SUBPOENAS SERVED LOREM"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2443,6 +2504,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only 6",
             query="q=(SUBPOENAS SERVED) AND chapter:7&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2467,6 +2529,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only 7",
             query='atty_name="John Lorem"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         firm = AttorneyOrganizationFactory(
             name="Associates LLP 2", lookup_key="firm_llp"
@@ -2514,6 +2577,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only",
             query='q="SUBPOENAS SERVED CASE"&docket_number="1:21-bk-1234"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2544,6 +2608,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only",
             query='q="plain text for 018036652000"&description="Affidavit Of Compliance"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2582,7 +2647,9 @@ class RECAPAlertsPercolatorTest(
             f"<strong>{rd.docket_entry.description}</strong>", html_content
         )
 
-    @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
+    @override_settings(
+        SCHEDULED_ALERT_HITS_LIMIT=3, RECAP_CHILD_HITS_PER_RESULT=5
+    )
     def test_group_percolator_alerts(self, mock_prefix) -> None:
         """Test group Percolator RECAP Alerts in an email and hits."""
 
@@ -2647,18 +2714,21 @@ class RECAPAlertsPercolatorTest(
                 rate=Alert.REAL_TIME,
                 name="Test Alert Docket Only",
                 query='q="410 Civil"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
             )
             docket_only_alert_no_member = AlertFactory(
                 user=self.user_profile_no_member.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert Docket Only",
                 query='q="410 Civil"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
             )
             recap_only_alert = AlertFactory(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert RECAP Only Docket Entry",
                 query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
             )
             cross_object_alert_with_hl = AlertFactory(
                 user=self.user_profile.user,
@@ -2668,6 +2738,7 @@ class RECAPAlertsPercolatorTest(
                 f'"plain text lorem" AND "410 Civil" AND '
                 f"id:{rd_1.pk}&docket_number={docket.docket_number}"
                 f'&case_name="{docket.case_name}"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
             )
 
         self.assertEqual(
@@ -2886,6 +2957,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only Not Triggered",
             query='q="405 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2930,12 +3002,14 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query AND",
             query=f'q="405 Civil" AND pacer_doc_id:018036652436&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         cross_object_alert_d_or_rd_field = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query OR",
             query=f'q="018036652436" OR cause:405&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         # RD ingestion.
         with mock.patch(
@@ -3013,6 +3087,7 @@ class RECAPAlertsPercolatorTest(
                 rate=Alert.WEEKLY,
                 name=f"Test Alert Docket Only {i}",
                 query='q="405 Civil"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
             )
             alerts_created_user_1.append(docket_only_alert)
             docket_only_alert_2 = AlertFactory(
@@ -3020,6 +3095,7 @@ class RECAPAlertsPercolatorTest(
                 rate=Alert.WEEKLY,
                 name=f"Test Alert Docket Only {i}",
                 query='q="405 Civil"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
             )
             alerts_created_user_2.append(docket_only_alert_2)
 

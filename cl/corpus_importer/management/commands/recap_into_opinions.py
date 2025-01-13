@@ -1,51 +1,11 @@
-from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.management import BaseCommand
 from django.db.models import Q
-from eyecite.tokenizers import HyperscanTokenizer
-from httpx import (
-    HTTPStatusError,
-    NetworkError,
-    RemoteProtocolError,
-    Response,
-    TimeoutException,
-)
 
-from cl.corpus_importer.tasks import ingest_recap_document
+from cl.corpus_importer.tasks import recap_document_into_opinions
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
-from cl.lib.decorators import retry
-from cl.lib.microservice_utils import microservice
 from cl.search.models import SOURCES, Court, OpinionCluster, RECAPDocument
-
-HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
-
-
-@retry(
-    ExceptionToCheck=(
-        NetworkError,
-        TimeoutException,
-        RemoteProtocolError,
-        HTTPStatusError,
-    ),
-    tries=3,
-    delay=5,
-    backoff=2,
-    logger=logger,
-)
-def extract_recap_document(rd: RECAPDocument) -> Response:
-    """Call recap-extract from doctor with retries
-
-    :param rd: the recap document to extract
-    :return: Response object
-    """
-    response = async_to_sync(microservice)(
-        service="recap-extract",
-        item=rd,
-        params={"strip_margin": True},
-    )
-    response.raise_for_status()
-    return response
 
 
 def import_opinions_from_recap(
@@ -55,7 +15,6 @@ def import_opinions_from_recap(
     total_count: int = 0,
     queue: str = "batch1",
     db_connection: str = "default",
-    add_to_solr: bool = False,
 ) -> None:
     """Import recap documents into opinion db
 
@@ -65,7 +24,6 @@ def import_opinions_from_recap(
     :param total_count: The number of new opinions to add
     :param queue: The queue to use for celery
     :param db_connection: The db to use
-    :param add_to_solr: Whether to add to solr
     :return: None
     """
     court_query = Court.objects.using(db_connection)
@@ -89,6 +47,8 @@ def import_opinions_from_recap(
 
         # Manually select the replica db which has an addt'l index added to
         # improve this query.
+        # Since we don't have scrapers for FD courts, the last documents
+        # that are not from SOURCES.RECAP should be from Harvard or other import
         latest_date_filed = (
             OpinionCluster.objects.using(db_connection)
             .filter(docket__court=court)
@@ -97,7 +57,7 @@ def import_opinions_from_recap(
             .values_list("date_filed", flat=True)
             .first()
         )
-        if latest_date_filed == None:
+        if latest_date_filed is None:
             logger.error(
                 msg=f"Court {court.id} has no opinion clusters for recap import"
             )
@@ -121,8 +81,8 @@ def import_opinions_from_recap(
                 f"{count}: Importing rd {recap_document.id} in {court.id}"
             )
             throttle.maybe_wait()
-            ingest_recap_document.apply_async(
-                args=[recap_document.id, add_to_solr], queue=queue
+            recap_document_into_opinions.apply_async(
+                args=[{}, recap_document.id], queue=queue
             )
             count += 1
             if total_count > 0 and count >= total_count:
@@ -178,12 +138,6 @@ class Command(BaseCommand):
             default=False,
             help="Use this flag to run the queries in the replica db",
         )
-        parser.add_argument(
-            "--add-to-solr",
-            action="store_true",
-            default=False,
-            help="Use this flag to add items to solr",
-        )
 
     def handle(self, *args, **options):
         jurisdiction = options.get("jurisdiction")
@@ -191,7 +145,6 @@ class Command(BaseCommand):
         skip_until = options.get("skip_until")
         total_count = options.get("total")
         queue = options.get("queue")
-        add_to_solr = options.get("add_to_solr")
         db_connection = (
             "replica"
             if options.get("use_replica") and "replica" in settings.DATABASES
@@ -205,5 +158,4 @@ class Command(BaseCommand):
             total_count,
             queue,
             db_connection,
-            add_to_solr,
         )

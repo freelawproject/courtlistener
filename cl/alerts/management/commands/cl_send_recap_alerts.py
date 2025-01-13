@@ -2,7 +2,7 @@ import copy
 import datetime
 import time
 import traceback
-from typing import Any, Literal, Type
+from typing import Any, Literal
 
 import pytz
 from asgiref.sync import async_to_sync
@@ -20,9 +20,9 @@ from redis import Redis
 from cl.alerts.models import Alert, ScheduledAlertHit
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import (
+    TaskCompletionStatus,
     add_document_hit_to_alert_set,
     has_document_alert_hit_been_triggered,
-    recap_document_hl_matched,
     scheduled_alert_hits_limit_reached,
 )
 from cl.api.models import WebhookEventType
@@ -38,6 +38,7 @@ from cl.search.documents import (
 )
 from cl.search.exception import (
     BadProximityQuery,
+    DisallowedWildcardPattern,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
 )
@@ -66,27 +67,34 @@ def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
 
 
 def compute_estimated_remaining_time(
-    initial_wait: float, start_time_millis: int, created: int, total: int
+    initial_wait: float, task_status: TaskCompletionStatus
 ) -> float:
     """Compute the estimated remaining time for the re_index task to complete.
 
     :param initial_wait: The default wait time in seconds.
-    :param start_time_millis: The start time in milliseconds epoch.
-    :param created: The number of items created so far.
-    :param total: The total number of items to be created.
+    :param task_status: An instance of `TaskCompletionStatus` containing task
+    information.
     :return: The estimated remaining time in seconds. If the start time,
     created, or total are invalid, the initial default time is returned.
     """
 
-    if start_time_millis is None or not created or not total:
+    if (
+        task_status.start_time_millis is None
+        or not task_status.created
+        or not task_status.total
+    ):
         return initial_wait
 
-    start_time = datetime.datetime.fromtimestamp(start_time_millis / 1000.0)
+    start_time = datetime.datetime.fromtimestamp(
+        task_status.start_time_millis / 1000.0
+    )
     time_now = datetime.datetime.now()
     estimated_time_remaining = max(
         datetime.timedelta(
-            seconds=((time_now - start_time).total_seconds() / created)
-            * (total - created)
+            seconds=(
+                (time_now - start_time).total_seconds() / task_status.created
+            )
+            * (task_status.total - task_status.created)
         ).total_seconds(),
         initial_wait,
     )
@@ -94,35 +102,29 @@ def compute_estimated_remaining_time(
     return estimated_time_remaining
 
 
-def retrieve_task_info(task_info: dict[str, Any]) -> dict[str, Any]:
+def retrieve_task_info(task_info: dict[str, Any]) -> TaskCompletionStatus:
     """Retrieve task information from the given task dict.
 
     :param task_info: A dictionary containing the task status information.
-    :return: A dictionary with the task completion status, created documents
-    count, total documents count, and the task start time in milliseconds.
-    Retrieve default values in case task_info is not valid.
+    :return: A `TaskCompletionStatus` object representing the extracted task
+    information.
     """
 
     if task_info:
         status = task_info["task"]["status"]
-        return {
-            "completed": task_info["completed"],
-            "created": status["created"],
-            "total": status["total"],
-            "start_time_millis": task_info["task"]["start_time_in_millis"],
-        }
-    return {
-        "completed": False,
-        "created": 0,
-        "total": 0,
-        "start_time_millis": None,
-    }
+        return TaskCompletionStatus(
+            completed=task_info["completed"],
+            created=status["created"],
+            total=status["total"],
+            start_time_millis=task_info["task"]["start_time_in_millis"],
+        )
+    return TaskCompletionStatus()
 
 
 def index_daily_recap_documents(
     r: Redis,
     source_index_name: str,
-    target_index: Type[RECAPSweepDocument] | Type[ESRECAPSweepDocument],
+    target_index: type[RECAPSweepDocument] | type[ESRECAPSweepDocument],
     testing: bool = False,
     only_rd: bool = False,
 ) -> int:
@@ -141,7 +143,9 @@ def index_daily_recap_documents(
     :return: The total number of documents re-indexed.
     """
 
-    if r.exists("alert_sweep:main_re_index_completed"):
+    if target_index is RECAPSweepDocument and r.exists(
+        "alert_sweep:main_re_index_completed"
+    ):
         logger.info(
             "The main re-index task has been completed and will be omitted."
         )
@@ -149,7 +153,9 @@ def index_daily_recap_documents(
         # proceed with RECAPDocument re-index.
         return 0
 
-    if r.exists("alert_sweep:rd_re_index_completed"):
+    if target_index is ESRECAPSweepDocument and r.exists(
+        "alert_sweep:rd_re_index_completed"
+    ):
         logger.info(
             "The RECAPDocument only re-index task has been completed and will "
             "be omitted."
@@ -340,41 +346,35 @@ def index_daily_recap_documents(
 
     initial_wait = 0.01 if testing else 60.0
     time.sleep(initial_wait)
-    get_task_info = retrieve_task_info(get_task_status(task_id, es))
+    task_info = retrieve_task_info(get_task_status(task_id, es))
     iterations_count = 0
     estimated_time_remaining = compute_estimated_remaining_time(
-        initial_wait,
-        get_task_info["start_time_millis"],
-        get_task_info["created"],
-        get_task_info["total"],
+        initial_wait, task_info
     )
-    while not get_task_info["completed"]:
+    while not task_info.completed:
         logger.info(
-            f"Task progress: {get_task_info['created']}/{get_task_info['total']} documents. "
+            f"Task progress: {task_info.created}/{task_info.total} documents. "
             f"Estimated time to finish: {estimated_time_remaining} seconds."
         )
-        task_info = get_task_status(task_id, es)
-        get_task_info = retrieve_task_info(task_info)
-        time.sleep(estimated_time_remaining)
-        if task_info and not get_task_info["completed"]:
+        task_status = get_task_status(task_id, es)
+        task_info = retrieve_task_info(task_status)
+        time.sleep(min(estimated_time_remaining, 900))
+        if task_info and not task_info.completed:
             estimated_time_remaining = compute_estimated_remaining_time(
-                initial_wait,
-                get_task_info["start_time_millis"],
-                get_task_info["created"],
-                get_task_info["total"],
+                initial_wait, task_info
             )
         if not task_info:
             iterations_count += 1
         if iterations_count > 10:
             logger.error(
                 "Re_index alert sweep index task has failed: %s/%s",
-                get_task_info["created"],
-                get_task_info["total"],
+                task_info.created,
+                task_info.total,
             )
             break
 
     r.delete("alert_sweep:task_id")
-    return get_task_info["total"]
+    return task_info.total
 
 
 def should_docket_hit_be_included(
@@ -408,7 +408,7 @@ def filter_rd_alert_hits(
     alert_id: int,
     rd_hits: AttrList,
     rd_ids: list[int],
-    check_rd_hl=False,
+    check_rd_matched=False,
 ):
     """Filter RECAP document hits based on specified conditions.
 
@@ -417,8 +417,8 @@ def filter_rd_alert_hits(
     :param rd_hits: A list of RECAPDocument hits to be processed.
     :param rd_ids: A list of RECAPDocument IDs that matched the RECAPDocument
     only query.
-    :param check_rd_hl: A boolean indicating whether to check if the RECAP
-    document hit matched RD HLs.
+    :param check_rd_matched: A boolean indicating whether to check if the RECAP
+     document hit from the main query also matches the RECAPDocument-only query
     :return: A list of RECAP document hits that meet all specified conditions.
     """
 
@@ -429,11 +429,10 @@ def filter_rd_alert_hits(
                 r, alert_id, "r", rd_hit["_source"]["id"]
             )
         ]
-        if check_rd_hl:
-            if not recap_document_hl_matched(rd_hit):
-                # If the RECAPDocument hit didn't match any HL. Check if it should be included
-                # due to it matched the RECAPDocument only query.
-                conditions.append(rd_hit["_source"]["id"] in rd_ids)
+        if check_rd_matched:
+            # Add condition to check if the RD hit is within the RD IDS returned
+            # by the RECAPDocument-only query.
+            conditions.append(rd_hit["_source"]["id"] in rd_ids)
         if all(conditions):
             rds_to_send.append(rd_hit)
             add_document_hit_to_alert_set(
@@ -457,6 +456,7 @@ def query_alerts(
         UnbalancedParenthesesQuery,
         UnbalancedQuotesQuery,
         BadProximityQuery,
+        DisallowedWildcardPattern,
         TransportError,
         ConnectionError,
         RequestError,
@@ -496,7 +496,11 @@ def process_alert_hits(
             if hit.docket_id in docket_ids:
                 # Possible Docket-only alert
                 rds_to_send = filter_rd_alert_hits(
-                    r, alert_id, hit["child_docs"], rd_ids, check_rd_hl=True
+                    r,
+                    alert_id,
+                    hit["child_docs"],
+                    rd_ids,
+                    check_rd_matched=True,
                 )
                 if rds_to_send:
                     # Docket OR RECAPDocument alert.
@@ -567,9 +571,8 @@ def query_and_send_alerts(
     alerts_sent_count = 0
     now_time = datetime.datetime.now()
     for user in alert_users:
-        if rate == Alert.REAL_TIME:
-            if not user.profile.is_member:
-                continue
+        if rate == Alert.REAL_TIME and not user.profile.is_member:
+            continue
         alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
         logger.info(f"Running alerts for user '{user}': {alerts}")
 
@@ -587,21 +590,22 @@ def query_and_send_alerts(
             results_to_send = process_alert_hits(
                 r, results, parent_results, child_results, alert.pk, query_date
             )
-            if results_to_send:
-                hits.append(
-                    [
-                        alert,
-                        search_type,
-                        results_to_send,
-                        len(results_to_send),
-                    ]
-                )
-                alert.query_run = search_params.urlencode()  # type: ignore
-                alert.date_last_hit = timezone.now()
-                alert.save()
+            if not results_to_send:
+                continue
+            hits.append(
+                [
+                    alert,
+                    search_type,
+                    results_to_send,
+                    len(results_to_send),
+                ]
+            )
+            alert.query_run = search_params.urlencode()  # type: ignore
+            alert.date_last_hit = timezone.now()
+            alert.save()
 
-                # Send webhooks
-                send_search_alert_webhooks(user, results_to_send, alert.pk)
+            # Send webhooks
+            send_search_alert_webhooks(user, results_to_send, alert.pk)
 
         if hits:
             send_search_alert_emails.delay([(user.pk, hits)])
@@ -646,33 +650,34 @@ def query_and_schedule_alerts(
             results_to_send = process_alert_hits(
                 r, results, parent_results, child_results, alert.pk, query_date
             )
-            if results_to_send:
-                for hit in results_to_send:
-                    # Schedule DAILY, WEEKLY and MONTHLY Alerts
-                    if scheduled_alert_hits_limit_reached(alert.pk, user.pk):
-                        # Skip storing hits for this alert-user combination because
-                        # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
-                        continue
+            if not results_to_send:
+                continue
+            for hit in results_to_send:
+                # Schedule DAILY, WEEKLY and MONTHLY Alerts
+                if scheduled_alert_hits_limit_reached(alert.pk, user.pk):
+                    # Skip storing hits for this alert-user combination because
+                    # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
+                    continue
 
-                    child_result_objects = []
-                    hit_copy = copy.deepcopy(hit)
-                    if hasattr(hit_copy, "child_docs"):
-                        for child_doc in hit_copy.child_docs:
-                            child_result_objects.append(
-                                child_doc["_source"].to_dict()
-                            )
-                    hit_copy["child_docs"] = child_result_objects
-                    scheduled_hits_to_create.append(
-                        ScheduledAlertHit(
-                            user=user,
-                            alert=alert,
-                            document_content=hit_copy.to_dict(),
-                            content_type=docket_content_type,
-                            object_id=hit_copy.docket_id,
+                child_result_objects = []
+                hit_copy = copy.deepcopy(hit)
+                if hasattr(hit_copy, "child_docs"):
+                    for child_doc in hit_copy.child_docs:
+                        child_result_objects.append(
+                            child_doc["_source"].to_dict()
                         )
+                hit_copy["child_docs"] = child_result_objects
+                scheduled_hits_to_create.append(
+                    ScheduledAlertHit(
+                        user=user,
+                        alert=alert,
+                        document_content=hit_copy.to_dict(),
+                        content_type=docket_content_type,
+                        object_id=hit_copy.docket_id,
                     )
-                    # Send webhooks
-                    send_search_alert_webhooks(user, results_to_send, alert.pk)
+                )
+                # Send webhooks
+                send_search_alert_webhooks(user, results_to_send, alert.pk)
 
         # Create scheduled WEEKLY and MONTHLY Alerts in bulk.
         if scheduled_hits_to_create:

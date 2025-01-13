@@ -31,7 +31,12 @@ from timeout_decorator import timeout_decorator
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert, DocketAlertEvent
 from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import (
+    Webhook,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookVersions,
+)
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
     DocketTag,
@@ -173,6 +178,45 @@ class UserTest(LiveServerTestCase):
                         % next_param,
                     )
 
+    async def test_prevent_text_injection_in_success_registration(self):
+        """Can we handle text injection attacks?"""
+        evil_text = "visit https://evil.com/malware.exe to win $100 giftcard"
+        url_params = [
+            # A safe redirect and email
+            (reverse("faq"), "test@free.law", False),
+            # Text injection attack
+            (reverse("faq"), evil_text, True),
+            # open redirect and text injection attack
+            ("https://evil.com&email=e%40e.net", evil_text, True),
+        ]
+
+        for next_param, email, is_evil in url_params:
+            url = "{host}{path}?next={next}&email={email}".format(
+                host=self.live_server_url,
+                path=reverse("register_success"),
+                next=next_param,
+                email=email,
+            )
+            response = await self.async_client.get(url)
+            with self.subTest("Checking url", url=url):
+                if is_evil:
+                    self.assertNotIn(
+                        email,
+                        response.content.decode(),
+                        msg="'%s' found in HTML of response. This indicates a "
+                        "potential security vulnerability. The view likely "
+                        "failed to properly validate it." % email,
+                    )
+                else:
+                    self.assertIn(
+                        email,
+                        response.content.decode(),
+                        msg="'%s' not found in HTML of response. This suggests a "
+                        "a potential issue with the validation logic. The email "
+                        "address may have been incorrectly identified as invalid"
+                        % email,
+                    )
+
     async def test_login_redirects(self) -> None:
         """Do we allow good redirects in login while banning bad ones?"""
         next_params = [
@@ -235,6 +279,50 @@ class UserDataTest(LiveServerTestCase):
             reverse("sign-in"), params, follow=True
         )
         self.assertRedirects(r, "/")
+
+    async def test_registration_rejects_malicious_first_name_input(
+        self,
+    ) -> None:
+        tests = (
+            # Invalid
+            ("evil.com", False),
+            ("http://test", False),
+            ("email@test.test", False),
+            ("/test/", False),
+            # Valid
+            ("My fullname", True),
+            ("Test Test", True),
+            ("Éric Terrien-Pascal", True),
+            ("Tel'c", True),
+        )
+        for first_name, is_valid in tests:
+            with self.subTest(
+                f"Trying to register using {first_name} as first name.",
+                first_name=first_name,
+                is_valid=is_valid,
+            ):
+                r = await self.async_client.post(
+                    reverse("register"),
+                    {
+                        "username": "aamon",
+                        "email": "user@free.law",
+                        "password1": "a",
+                        "password2": "a",
+                        "first_name": first_name,
+                        "last_name": "Marquis of Hell",
+                        "skip_me_if_alive": "",
+                    },
+                )
+                if not is_valid:
+                    self.assertIn(
+                        "First name must not contain any special characters.",
+                        r.content.decode(),
+                    )
+                else:
+                    self.assertNotIn(
+                        "First name must not contain any special characters.",
+                        r.content.decode(),
+                    )
 
     async def test_confirming_an_email_address(self) -> None:
         """Tests whether we can confirm the case where an email is associated
@@ -1375,14 +1463,14 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         msg = EmailMultiAlternatives(
             subject="This is the subject",
-            body="Body goes here",
+            body="Body goes here 世界 ñ ⚖️",
             from_email="testing@courtlistener.com",
             to=["success@simulator.amazonses.com"],
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
             headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
-        html = "<p>Body goes here</p>"
+        html = "<p>Body goes here 世界 ñ ⚖️</p>"
         msg.attach_alternative(html, "text/html")
         msg.send()
 
@@ -1392,8 +1480,10 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(
             stored_email[0].to, ["success@simulator.amazonses.com"]
         )
-        self.assertEqual(stored_email[0].plain_text, "Body goes here")
-        self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here 世界 ñ ⚖️")
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body goes here 世界 ñ ⚖️</p>"
+        )
         self.assertEqual(
             stored_email[0].bcc, ["bcc_success@simulator.amazonses.com"]
         )
@@ -1416,8 +1506,8 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents, this message has a plain and html version
-        self.assertEqual(plaintext_body, "Body goes here")
-        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(plaintext_body, "Body goes here 世界 ñ ⚖️")
+        self.assertEqual(html_body, "<p>Body goes here 世界 ñ ⚖️</p>")
 
     def test_multialternative_only_plain_email(self) -> None:
         """This test checks if Django EmailMultiAlternatives class works
@@ -3149,11 +3239,13 @@ class WebhooksHTMXTests(APITestCase):
         url="https://example.com",
         event_type=WebhookEventType.DOCKET_ALERT,
         enabled=True,
+        version=WebhookVersions.v1,
     ):
         data = {
             "url": url,
             "event_type": event_type,
             "enabled": enabled,
+            "version": version,
         }
         return await client.post(self.webhook_path, data)
 
@@ -3282,6 +3374,7 @@ class WebhooksHTMXTests(APITestCase):
             "url": "https://example.com/updated",
             "event_type": webhooks_first.event_type,
             "enabled": webhooks_first.enabled,
+            "version": webhooks_first.version,
         }
         response = await self.client.put(webhook_1_path_detail, data_updated)
 
@@ -3374,7 +3467,7 @@ class WebhooksHTMXTests(APITestCase):
         response = await self.client.get(webhook_event_path_list)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         # There shouldn't be results for user_1
-        self.assertEqual(response.content, b"\n\n")
+        self.assertEqual(response.content.strip(), b"")
 
         sa_webhook = await sync_to_async(WebhookFactory)(
             user=self.user_1,
@@ -3392,7 +3485,71 @@ class WebhooksHTMXTests(APITestCase):
         response = await self.client.get(webhook_event_path_list)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         # There should be results for user_1
-        self.assertNotEqual(response.content, b"\n\n")
+        self.assertNotEqual(response.content.strip(), b"")
+
+    async def test_get_available_webhook_versions(self) -> None:
+        """Can we get users available versions for a webhook event type?"""
+
+        await sync_to_async(WebhookFactory)(
+            user=self.user_2,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            version=WebhookVersions.v1,
+            enabled=True,
+        )
+
+        available_versions_path = reverse(
+            "webhooks-get-available-versions",
+            kwargs={"format": "html"},
+        )
+        webhooks = Webhook.objects.all()
+        self.assertEqual(await webhooks.acount(), 1)
+
+        # Test without event_type parameter
+        response = await self.client.get(available_versions_path)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # No version choices
+        self.assertIn("Select an event type first", response.content.decode())
+
+        # Test with event_type parameter for user_1 (no existing webhooks)
+        response = await self.client.get(
+            available_versions_path,
+            {"event_type": WebhookEventType.DOCKET_ALERT},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # Should return all versions available (1,2)
+        self.assertIn('value="1"', response.content.decode())
+        self.assertIn('value="2"', response.content.decode())
+
+        # Create a webhook with version 1 for user_1
+        await sync_to_async(WebhookFactory)(
+            user=self.user_1,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            version=WebhookVersions.v1,
+            enabled=True,
+        )
+        self.assertEqual(await webhooks.acount(), 2)
+
+        # Test with event_type parameter for user_1 (has webhook with version 1)
+        response = await self.client.get(
+            available_versions_path,
+            {"event_type": WebhookEventType.DOCKET_ALERT},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # Should return  only version 2 available
+        self.assertNotIn('value="1"', response.content.decode())
+        self.assertIn('value="2"', response.content.decode())
+
+        # Test with a different event_type
+        response = await self.client.get(
+            available_versions_path,
+            {"event_type": WebhookEventType.SEARCH_ALERT},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # Should return all versions available for SEARCH_ALERT event type
+        self.assertIn('value="1"', response.content.decode())
+        self.assertIn('value="2"', response.content.decode())
 
 
 @override_settings(DEVELOPMENT=False)

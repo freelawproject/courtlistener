@@ -10,7 +10,12 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import IsOwner
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import (
+    Webhook,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookVersions,
+)
 from cl.api.tasks import send_test_webhook_event
 from cl.users.filters import WebhookEventViewFilter
 from cl.users.forms import WebhookForm
@@ -115,50 +120,71 @@ class WebhooksViewSet(ModelViewSet):
 
         webhook = self.get_object()
         event_type = webhook.event_type
+        version = webhook.version
         match event_type:
             case WebhookEventType.DOCKET_ALERT:
                 event_template = loader.get_template(
                     "includes/docket_alert_webhook_dummy.txt"
                 )
-                event_dummy_content = event_template.render().strip()
+                event_dummy_content = event_template.render(
+                    {"webhook_version": version}
+                ).strip()
                 event_curl_template = loader.get_template(
                     "includes/docket_alert_webhook_dummy_curl.txt"
                 )
                 event_dummy_curl = event_curl_template.render(
-                    {"endpoint_url": webhook.url}
+                    {"endpoint_url": webhook.url, "webhook_version": version}
                 ).strip()
             case WebhookEventType.SEARCH_ALERT:
-                event_template = loader.get_template(
-                    "includes/search_alert_webhook_dummy.txt"
+                event_template = (
+                    loader.get_template(
+                        "includes/search_alert_webhook_dummy.txt"
+                    )
+                    if version == WebhookVersions.v1
+                    else loader.get_template(
+                        "includes/search_alert_webhook_dummy_v2.txt"
+                    )
                 )
-                event_dummy_content = event_template.render().strip()
-                event_curl_template = loader.get_template(
-                    "includes/search_alert_webhook_dummy_curl.txt"
+                event_dummy_content = event_template.render(
+                    {"webhook_version": version}
+                ).strip()
+                event_curl_template = (
+                    loader.get_template(
+                        "includes/search_alert_webhook_dummy_curl.txt"
+                    )
+                    if version == WebhookVersions.v1
+                    else loader.get_template(
+                        "includes/search_alert_webhook_dummy_curl_v2.txt"
+                    )
                 )
                 event_dummy_curl = event_curl_template.render(
-                    {"endpoint_url": webhook.url}
+                    {"endpoint_url": webhook.url, "webhook_version": version}
                 ).strip()
             case WebhookEventType.OLD_DOCKET_ALERTS_REPORT:
                 event_template = loader.get_template(
                     "includes/old_alerts_report_webhook_dummy.txt"
                 )
-                event_dummy_content = event_template.render().strip()
+                event_dummy_content = event_template.render(
+                    {"webhook_version": version}
+                ).strip()
                 event_curl_template = loader.get_template(
                     "includes/old_alerts_report_webhook_dummy_curl.txt"
                 )
                 event_dummy_curl = event_curl_template.render(
-                    {"endpoint_url": webhook.url}
+                    {"endpoint_url": webhook.url, "webhook_version": version}
                 ).strip()
             case WebhookEventType.RECAP_FETCH:
                 event_template = loader.get_template(
                     "includes/recap_fetch_webhook_dummy.txt"
                 )
-                event_dummy_content = event_template.render().strip()
+                event_dummy_content = event_template.render(
+                    {"webhook_version": version}
+                ).strip()
                 event_curl_template = loader.get_template(
                     "includes/recap_fetch_webhook_dummy_curl.txt"
                 )
                 event_dummy_curl = event_curl_template.render(
-                    {"endpoint_url": webhook.url}
+                    {"endpoint_url": webhook.url, "webhook_version": version}
                 ).strip()
             case _:
                 # Webhook types with no support yet.
@@ -191,6 +217,38 @@ class WebhooksViewSet(ModelViewSet):
         send_test_webhook_event.delay(webhook.pk, event_dummy_content)
         return Response(
             status=HTTPStatus.OK,
+        )
+
+    @action(detail=False, methods=["get"])
+    def get_available_versions(self, request, *args, **kwargs):
+        """Render the webhook version field containing available versions for
+        the select event type.
+        """
+
+        event_type = request.GET.get("event_type")
+        htmx_template = "includes/webhooks_htmx/webhook-version-select.html"
+        context = {"version_choices": []}
+        if not event_type:
+            return render(request, htmx_template, context)
+
+        # Get user webhooks for this event type
+        existing_webhooks = Webhook.objects.filter(
+            user=request.user, event_type=event_type
+        )
+        used_versions = set(
+            existing_webhooks.values_list("version", flat=True)
+        )
+        # Get available webhook versions, excluding used ones
+        version_choices = [
+            (v, label)
+            for v, label in WebhookVersions.choices
+            if v not in used_versions
+        ]
+        context["version_choices"] = version_choices
+        return render(
+            request,
+            htmx_template,
+            context,
         )
 
 

@@ -28,6 +28,48 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Multiple accounts
+        "api_1": "1/hour",
+        "api_2": "1/hour",
+        "api_account_1": "1/hour",
+        "api_account_2": "1/hour",
+        "api_account_3": "1/hour",
+        "api_account_4": "1/hour",
+        "api_account_5": "1/hour",
+        "court_test_account_3": "1/hour",
+        "court_test_account_2": "1/hour",
+        "court_api_1": "1/hour",
+        "court_api_2": "1/hour",
+        "court_api_3": "1/hour",
+        "court_api_4": "1/hour",
+        "court_api_5": "1/hour",
+        "JamesBond": "1/hour",
+        "JackSparrow": "1/hour",
+        "PeterPan": "1/hour",
+        "HomerSimpson": "1/hour",
+        "BruceWayne": "1/hour",
+        # Unresponsive
+        "court_test_account": "1/hour",
+        "jmmckinnie": "1/hour",
+        "projecttesting": "1/hour",
+        "SAGW": "1/hour",
+        # Bounced
+        "riwiko8259": "1/hour",
+        "xicaro7027": "1/hour",
+        "nayibij851": "1/hour",
+        "testname2024": "1/hour",
+        "cadebe2258": "1/hour",
+        # Disposable email
+        "a29883f4-3958-484b-9f46-aa9796110dd0_IddU": "1/hour",
+        # Didn't respond to emails, 2024-10-14
+        "ashishjaddu": "10/hour",
+        # Made 1M requests for commercial enterprise
+        "haoren": "10/hour",
+        # Used a fake email address, 2024-10-02
+        "xinfu.zheng": "10/hour",
+        "fdgbhgope4wuo8049": "10/hour",
+        # Didn't respond to emails, 2024-08-12
+        "fruitfranky": "10/hour",
         # Email non-functional; making many requests, 2024-04-23
         "NicolasMadan": "10/hour",
         # Didn't respond to emails, 2023-10-02
@@ -109,3 +151,5 @@ REST_FRAMEWORK = {
 
 if DEVELOPMENT:
     REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"] = "10000/day"  # type: ignore
+
+BLOCK_NEW_V3_USERS = env.bool("BLOCK_NEW_V3_USERS", default=False)
