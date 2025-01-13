@@ -6,7 +6,6 @@ from typing import List, Optional, Tuple, Union
 import httpx
 import requests
 from asgiref.sync import async_to_sync
-from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from httpx import Response
@@ -30,7 +29,7 @@ from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
-from cl.scrapers.utils import scraped_citation_object_is_valid
+from cl.scrapers.utils import citation_is_duplicated, make_citation
 from cl.search.models import Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
@@ -50,31 +49,32 @@ def update_document_from_text(
     text. Formerly implemented in only Tax Court, but functional in all
     scrapers via AbstractSite object.
 
-    Note that this updates the values but does not save them. Saving is left to
-    the calling function.
+    Note that this updates the values but does not save them for
+    Docket, OpinionCluster and Opinion. Saving is left to
+    the calling function. It does save Citations
 
     :param opinion: Opinion object
     :param juriscraper_module: full module to get Site object
     :return: the extracted data dictionary
     """
-    court = opinion.cluster.docket.court.pk
-    site = get_scraper_object_by_name(court, juriscraper_module)
+    court_id = opinion.cluster.docket.court.pk
+    site = get_scraper_object_by_name(court_id, juriscraper_module)
     if site is None:
         logger.debug("No site found %s", juriscraper_module)
         return {}
 
     metadata_dict = site.extract_from_text(opinion.plain_text or opinion.html)
     for model_name, data in metadata_dict.items():
-        ModelClass = apps.get_model(f"search.{model_name}")
         if model_name == "Docket":
             opinion.cluster.docket.__dict__.update(data)
         elif model_name == "OpinionCluster":
             opinion.cluster.__dict__.update(data)
         elif model_name == "Citation":
-            data["cluster_id"] = opinion.cluster_id
-            if scraped_citation_object_is_valid(data):
-                _, citation_created = ModelClass.objects.get_or_create(**data)
-                metadata_dict["Citation"]["created"] = citation_created
+            citation = make_citation(data, opinion.cluster, court_id)
+            if not citation or citation_is_duplicated(citation, data):
+                continue
+            citation.save()
+            metadata_dict["citation_created"] = True
         elif model_name == "Opinion":
             opinion.__dict__.update(data)
         else:

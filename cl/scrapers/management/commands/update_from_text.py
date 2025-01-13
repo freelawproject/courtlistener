@@ -83,16 +83,11 @@ def rerun_extract_from_text(
             logger.debug("Opinion updated with data %s", changes["Opinion"])
             stats["Opinion"] += 1
 
-        if changes.get("Citation"):
-            if changes["Citation"].get("citation_created"):
-                logger.info(
-                    "Citation created with data %s", changes["Citation"]
-                )
-                stats["Citation"] += 1
-            else:
-                logger.debug(
-                    "Citation not created. Data %s", changes["Citation"]
-                )
+        if changes.get("citation_created"):
+            logger.info("Citation created with data %s", changes["Citation"])
+            stats["Citation"] += 1
+        else:
+            logger.debug("Citation not created. Data %s", changes["Citation"])
 
 
 class Command(ScraperCommand):
