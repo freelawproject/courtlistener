@@ -93,7 +93,7 @@ def rerun_extract_from_text(
         if changes.get("citation_created"):
             logger.info("Citation created with data %s", changes["Citation"])
             stats["Citation"] += 1
-        else:
+        elif changes.get("Citation"):
             logger.debug("Citation not created. Data %s", changes["Citation"])
 
 
