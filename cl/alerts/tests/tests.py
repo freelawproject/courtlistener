@@ -457,7 +457,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
         self.assert_text_in_node("editing your alert", "body")
 
 
-class AlertAPITests(APITestCase):
+class AlertAPITests(APITestCase, ESIndexTestCase):
     """Check that API CRUD operations are working well for search alerts."""
 
     @classmethod
@@ -522,11 +522,22 @@ class AlertAPITests(APITestCase):
         """
 
         # Make two alerts for user_1
-        alert_1 = await self.make_an_alert(self.client, alert_name="alert_1")
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
+        )
         alert_2 = await self.make_an_alert(self.client, alert_name="alert_2")
 
         search_alert = Alert.objects.all()
         self.assertEqual(await search_alert.acount(), 2)
+
+        # Confirm alert is indexed in ES
+        alert_1_id = alert_1.json()["id"]
+        self.assertTrue(
+            AudioPercolator.exists(id=alert_1_id),
+            msg=f"Alert id: {alert_1.json()["id"]} was not indexed.",
+        )
 
         alert_1_path_detail = reverse(
             "alert-detail",
@@ -537,6 +548,12 @@ class AlertAPITests(APITestCase):
         response = await self.client.delete(alert_1_path_detail)
         self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
         self.assertEqual(await search_alert.acount(), 1)
+
+        # Confirm alert was removed from ES
+        self.assertFalse(
+            AudioPercolator.exists(id=alert_1_id),
+            msg=f"Alert id: {alert_1.json()["id"]} shouldn't be indexed.",
+        )
 
         alert_2_path_detail = reverse(
             "alert-detail",
@@ -578,11 +595,20 @@ class AlertAPITests(APITestCase):
         alert_1 = await self.make_an_alert(
             self.client,
             alert_name="alert_1",
-            alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
         )
-        self.assertEqual(alert_1.json()["alert_type"], SEARCH_TYPES.RECAP)
+        self.assertEqual(
+            alert_1.json()["alert_type"], SEARCH_TYPES.ORAL_ARGUMENT
+        )
         search_alert = Alert.objects.all()
         self.assertEqual(await search_alert.acount(), 1)
+
+        # Confirm alert is indexed in ES upon creation.
+        doc = AudioPercolator.get(id=alert_1.json()["id"])
+        response_str = str(doc.to_dict())
+        self.assertIn("'query': 'testing_query'", response_str)
+        self.assertEqual(doc.rate, "dly")
+
         alert_1_path_detail = reverse(
             "alert-detail",
             kwargs={"pk": alert_1.json()["id"], "version": "v3"},
@@ -591,8 +617,8 @@ class AlertAPITests(APITestCase):
         # Update the alert
         data_updated = {
             "name": "alert_1_updated",
-            "query": alert_1.json()["query"],
-            "rate": alert_1.json()["rate"],
+            "query": f"q=testing_2_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
+            "rate": Alert.REAL_TIME,
         }
         response = await self.client.put(alert_1_path_detail, data_updated)
 
@@ -600,6 +626,12 @@ class AlertAPITests(APITestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["name"], "alert_1_updated")
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
+
+        # Confirm alert is updated in ES upon update.
+        doc = AudioPercolator.get(id=alert_1.json()["id"])
+        response_str = str(doc.to_dict())
+        self.assertIn("'query': 'testing_2_query'", response_str)
+        self.assertEqual(doc.rate, "rt")
 
     async def test_invalid_alert_type_fail(self) -> None:
         """Does creating an alert for an unsupported type raises an error?"""
