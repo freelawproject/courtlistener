@@ -178,19 +178,20 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
                 if not r.ok:
                     ia_failures.append(url)
 
-        queryset.update(
-            date_upload=None,
-            is_available=False,
-            is_sealed=True,
-            sha1="",
-            page_count=None,
-            file_size=None,
-            ia_upload_failure_count=None,
-            filepath_ia="",
-            thumbnail_status=THUMBNAIL_STATUSES.NEEDED,
-            plain_text="",
-            ocr_status=None,
-        )
+            # Clean up other fields and call save()
+            # Important to use save() to ensure these changes are updated in ES
+            rd.date_upload = None
+            rd.is_available = False
+            rd.is_sealed = True
+            rd.sha1 = ""
+            rd.page_count = None
+            rd.file_size = None
+            rd.ia_upload_failure_count = None
+            rd.filepath_ia = ""
+            rd.thumbnail_status = THUMBNAIL_STATUSES.NEEDED
+            rd.plain_text = ""
+            rd.ocr_status = None
+            rd.save()
 
         # Do a CloudFront invalidation
         invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
