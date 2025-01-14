@@ -1800,8 +1800,16 @@ class RecapAttPageFetchApiTest(TestCase):
     @mock.patch(
         "cl.recap.mergers.AttachmentPage", new=fakes.FakeAttachmentPage
     )
+    @mock.patch(
+        "cl.corpus_importer.tasks.is_appellate_court", return_value=False
+    )
+    @mock.patch("cl.recap.tasks.is_appellate_court", return_value=False)
     def test_fetch_att_page_all_systems_go(
-        self, mock_get_cookies, mock_court_accessible
+        self,
+        check_court_task,
+        check_court_parser,
+        mock_get_cookies,
+        mock_court_accessible,
     ):
         result = do_pacer_fetch(self.fq)
         result.get()
