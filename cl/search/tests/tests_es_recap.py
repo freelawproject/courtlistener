@@ -7413,7 +7413,7 @@ class RECAPIndexingTest(
 
     @mock.patch("cl.search.admin.delete_from_ia")
     @mock.patch("cl.search.admin.invalidate_cloudfront")
-    def test_seal_documents(
+    def test_seal_documents_action(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):
         """Confirm that seal_documents admin action updates related RDs in ES"""
@@ -7504,6 +7504,9 @@ class RECAPIndexingTest(
         self.assertEqual(rd_2_doc.plain_text, "")
         self.assertEqual(rd_2_doc.page_count, None)
         self.assertEqual(rd_2_doc.filepath_local, None)
+
+        # Clean up index.
+        docket.delete()
 
 
 class RECAPHistoryTablesIndexingTest(
