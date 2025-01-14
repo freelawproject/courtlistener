@@ -32,6 +32,7 @@ from httpx import (
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
+    AppellateAttachmentPage,
     AppellateDocketReport,
     AttachmentPage,
     CaseQuery,
@@ -65,6 +66,7 @@ from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    is_appellate_court,
     make_iquery_probing_key,
     mark_ia_upload_needed,
 )
@@ -1794,6 +1796,10 @@ def get_att_report_by_rd(
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
     att_report = AttachmentPage(pacer_court_id, s)
     att_report.query(rd.pacer_doc_id)
+    if is_appellate_court(pacer_court_id):
+        att_report = AppellateAttachmentPage(pacer_court_id, s)
+    else:
+        att_report = AttachmentPage(pacer_court_id, s)
     return att_report
 
 
