@@ -1818,10 +1818,6 @@ class OpinionsESSearchTest(
         r = await self._test_article_count(search_params, 0, "negation query")
         self.assertIn("had no results", r.content.decode())
 
-        search_params["q"] = "Howard !Honda"
-        r = await self._test_article_count(search_params, 0, "negation query")
-        self.assertIn("had no results", r.content.decode())
-
         search_params["q"] = "Howard -Honda"
         r = await self._test_article_count(search_params, 0, "negation query")
         self.assertIn("had no results", r.content.decode())

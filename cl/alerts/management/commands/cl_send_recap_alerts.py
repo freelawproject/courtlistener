@@ -38,6 +38,7 @@ from cl.search.documents import (
 )
 from cl.search.exception import (
     BadProximityQuery,
+    DisallowedWildcardPattern,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
 )
@@ -455,6 +456,7 @@ def query_alerts(
         UnbalancedParenthesesQuery,
         UnbalancedQuotesQuery,
         BadProximityQuery,
+        DisallowedWildcardPattern,
         TransportError,
         ConnectionError,
         RequestError,
