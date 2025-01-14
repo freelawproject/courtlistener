@@ -14,7 +14,7 @@ from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 
-from cl.corpus_importer.utils import mark_ia_upload_needed
+from cl.corpus_importer.utils import is_appellate_court, mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.model_helpers import clean_docket_number, make_docket_number_core
@@ -932,8 +932,6 @@ async def add_docket_entries(
         else:
             params["document_type"] = RECAPDocument.PACER_DOCUMENT
 
-        appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
-
         # Unlike district and bankr. dockets, where you always have a main
         # RD and can optionally have attachments to the main RD, Appellate
         # docket entries can either they *only* have a main RD (with no
@@ -945,9 +943,9 @@ async def add_docket_entries(
         # RDs. The check here ensures that if that happens for a particular
         # entry, we avoid creating the main RD a second+ time when we get the
         # docket sheet a second+ time.
-        appelate_court_id_exists = await appellate_court_ids.filter(
-            pk=d.court_id
-        ).aexists()
+        appelate_court_id_exists = await sync_to_async(is_appellate_court)(
+            d.court_id
+        )
         if de_created is False and appelate_court_id_exists:
             appellate_rd_att_exists = await de.recap_documents.filter(
                 document_type=RECAPDocument.ATTACHMENT
@@ -1789,10 +1787,7 @@ async def merge_attachment_page_data(
             ContentFile(text.encode()),
         )
 
-    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
-    court_is_appellate = await appellate_court_ids.filter(
-        pk=court.pk
-    ).aexists()
+    court_is_appellate = await sync_to_async(is_appellate_court)(court.pk)
     main_rd_to_att = False
     for attachment in attachment_dicts:
         sanity_checks = [
