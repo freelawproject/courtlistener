@@ -63,6 +63,7 @@ def update_document_from_text(
         logger.debug("No site found %s", juriscraper_module)
         return {}
 
+    citation_created = False
     metadata_dict = site.extract_from_text(opinion.plain_text or opinion.html)
     for model_name, data in metadata_dict.items():
         if model_name == "Docket":
@@ -74,13 +75,16 @@ def update_document_from_text(
             if not citation or citation_is_duplicated(citation, data):
                 continue
             citation.save()
-            metadata_dict["citation_created"] = True
+            citation_created = True
         elif model_name == "Opinion":
             opinion.__dict__.update(data)
         else:
             raise NotImplementedError(
                 f"Object type of {model_name} not yet supported."
             )
+
+    # if the candidate citation was saved successfully, it will have an id
+    metadata_dict["citation_created"] = citation_created
 
     return metadata_dict
 
