@@ -8,16 +8,16 @@ from unittest import mock
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
+from django.contrib import admin
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import AsyncClient, override_settings
+from django.test import AsyncClient, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
-from waffle.testutils import override_flag
 
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
@@ -46,6 +46,7 @@ from cl.people_db.factories import (
     PartyTypeFactory,
     PersonFactory,
 )
+from cl.search.admin import RECAPDocumentAdmin
 from cl.search.api_serializers import (
     DocketESResultSerializer,
     RECAPDocumentESResultSerializer,
@@ -2854,6 +2855,333 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         docket_2.delete()
 
 
+class RECAPSearchDecayRelevancyTest(
+    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+):
+    """
+    RECAP Search Decay Relevancy  Tests
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.Docket")
+
+        # Same keywords but different dateFiled
+        cls.docket_old = DocketFactory(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1235",
+            source=Docket.RECAP,
+            date_filed=datetime.date(1832, 2, 23),
+        )
+        cls.rd_old = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_old,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="019036000435",
+        )
+
+        cls.docket_recent = DocketFactory(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1236",
+            source=Docket.RECAP,
+            date_filed=datetime.date(2024, 2, 23),
+        )
+        cls.rd_recent = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_recent,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="019036000436",
+        )
+
+        # Different relevance with same dateFiled
+        cls.docket_low_relevance = DocketFactory(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            nature_of_suit="",
+            docket_number="1:21-bk-1238",
+            source=Docket.RECAP,
+            date_filed=datetime.date(2022, 2, 23),
+        )
+        cls.rd_low_relevance = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_low_relevance,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="019036000437",
+        )
+
+        cls.docket_high_relevance = DocketFactory(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1237",
+            source=Docket.RECAP,
+            nature_of_suit="More Highly Relevant Keywords",
+            cause="More Highly Relevant Keywords",
+            date_filed=datetime.date(2022, 2, 23),
+        )
+        cls.rd_high_relevance = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_high_relevance,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600048",
+        )
+
+        # Different relevance with different dateFiled
+        cls.docket_high_relevance_old_date = DocketFactory(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1239",
+            source=Docket.RECAP,
+            nature_of_suit="More Ipsum Dolor Terms",
+            cause="More Ipsum Dolor Terms",
+            date_filed=datetime.date(1900, 2, 23),
+        )
+        cls.rd_high_relevance_old_date = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_high_relevance_old_date,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600049",
+        )
+
+        cls.docket_high_relevance_null_date = DocketFactory(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1240",
+            source=Docket.RECAP,
+            nature_of_suit="More Ipsum Dolor Terms",
+            cause="More Ipsum Dolor Terms",
+            date_filed=None,
+        )
+        cls.rd_high_relevance_null_date = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_high_relevance_null_date,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600050",
+        )
+
+        cls.docket_low_relevance_new_date = DocketFactory(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            nature_of_suit="",
+            docket_number="1:21-bk-1241",
+            source=Docket.RECAP,
+            date_filed=datetime.date(2024, 12, 23),
+        )
+        cls.rd_low_relevance_new_date = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_low_relevance_new_date,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600051",
+        )
+
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+        cls.test_cases = [
+            {
+                "name": "Same keywords, different dateFiled",
+                "search_params": {
+                    "q": "Keyword Match",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_recent.docket_number,  # Most recent dateFiled
+                    cls.docket_old.docket_number,  # Oldest dateFiled
+                ],
+                "expected_order": [  # API
+                    cls.docket_recent.pk,
+                    cls.docket_old.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy same dateFiled",
+                "search_params": {
+                    "q": "Highly Relevant Keywords",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_high_relevance.docket_number,
+                    # Most relevant by keywords
+                    cls.docket_low_relevance.docket_number,
+                    # Less relevant by keywords
+                ],
+                "expected_order": [  # API
+                    cls.docket_high_relevance.pk,
+                    cls.docket_low_relevance.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy different dateFiled",
+                "search_params": {
+                    "q": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,  # Combination of relevance and date rank it first.
+                    cls.docket_high_relevance_old_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,  # docs with a null dateFiled are ranked lower.
+                ],
+                "expected_order": [  # API
+                    cls.docket_low_relevance_new_date.pk,
+                    cls.docket_high_relevance_old_date.pk,
+                    cls.docket_high_relevance_null_date.pk,
+                ],
+            },
+            {
+                "name": "Fixed main score for all (0 or 1) (using filters) and different dateFiled",
+                "search_params": {
+                    "case_name": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,  # Most recent dateFiled
+                    cls.docket_high_relevance_old_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,  # docs with a null dateFiled are ranked lower.
+                ],
+                "expected_order": [  # API
+                    cls.docket_low_relevance_new_date.pk,
+                    cls.docket_high_relevance_old_date.pk,
+                    cls.docket_high_relevance_null_date.pk,
+                ],
+            },
+            {
+                "name": "Match all query decay relevancy.",
+                "search_params": {
+                    "q": "",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,
+                    # 2024, 12, 23 1:21-bk-1241
+                    cls.docket_recent.docket_number,
+                    # 2024, 2, 23 1:21-bk-1236
+                    cls.docket_low_relevance.docket_number,
+                    # 2022, 2, 23 1:21-bk-1238 Indexed first, displayed first.
+                    cls.docket_high_relevance.docket_number,
+                    # 2022, 2, 23 1:21-bk-1237
+                    cls.docket_high_relevance_old_date.docket_number,
+                    # 1800, 2, 23 1:21-bk-1239
+                    cls.docket_old.docket_number,  # 1732, 2, 23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.docket_number,
+                    # Null dateFiled 1:21-bk-1240
+                ],
+                "expected_order": [  # V4 API
+                    cls.docket_low_relevance_new_date.pk,
+                    # 2024, 12, 23 1:21-bk-1241
+                    cls.docket_recent.pk,
+                    # 2024, 2, 23 1:21-bk-1236
+                    cls.docket_high_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1237 Higher PK in V4, API pk is a secondary sorting key.
+                    cls.docket_low_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1238 Lower PK
+                    cls.docket_high_relevance_old_date.pk,
+                    # 1800, 2, 23 1:21-bk-1239
+                    cls.docket_old.pk,  # 1732, 2, 23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.pk,
+                    # Null 1:21-bk-1240
+                ],
+                "expected_order_v3": [  # V3 API
+                    cls.docket_low_relevance_new_date.pk,
+                    # 2024, 12, 23 1:21-bk-1241
+                    cls.docket_recent.pk,
+                    # 2024, 2, 23 1:21-bk-1236
+                    cls.docket_low_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1238 Indexed first, displayed first.
+                    cls.docket_high_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1237
+                    cls.docket_high_relevance_old_date.pk,
+                    # 1800, 2, 23 1:21-bk-1239
+                    cls.docket_old.pk,  # 1732, 2, 23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.pk,
+                    # Null 1:21-bk-1240
+                ],
+            },
+        ]
+
+    def test_relevancy_decay_scoring_frontend(self) -> None:
+        """Test relevancy decay scoring for RECAP search Frontend"""
+
+        for test in self.test_cases:
+            with self.subTest(test["name"]):
+                r = async_to_sync(self._test_article_count)(
+                    test["search_params"],
+                    len(test["expected_order_frontend"]),
+                    f"Failed count {test["name"]}",
+                )
+                self._assert_order_in_html(
+                    r.content.decode(), test["expected_order_frontend"]
+                )
+
+    def test_relevancy_decay_scoring_v4_api(self) -> None:
+        """Test relevancy decay scoring for RECAP search V4 API"""
+
+        search_types = [
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+            SEARCH_TYPES.RECAP_DOCUMENT,
+        ]
+        for search_type in search_types:
+            for test in self.test_cases:
+                test["search_params"]["type"] = search_type
+                self._test_results_ordering(test, "docket_id", version="v4")
+
+    def test_relevancy_decay_scoring_v3_api(self) -> None:
+        """Test relevancy decay scoring for RECAP search V4 API"""
+
+        search_types = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+        for search_type in search_types:
+            for test in self.test_cases:
+                test["search_params"]["type"] = search_type
+                self._test_results_ordering(test, "docket_id", version="v3")
+
+
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     version_api = "v3"
@@ -3389,28 +3717,6 @@ class RECAPSearchAPIV3Test(
         # API
         await self._test_api_results_count(params, 3, "order random")
 
-        # Order by score desc (relevance).
-        params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": "SUBPOENAS SERVED",
-            "order_by": "score desc",
-        }
-        # API
-        r = await self._test_api_results_count(params, 3, "order score desc")
-        self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by score desc.",
-        )
-
-        params["type"] = SEARCH_TYPES.DOCKETS
-        r = await self._test_api_results_count(params, 2, "order")
-        self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by score desc.",
-        )
-
         # Order by entry_date_filed desc
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -3910,7 +4216,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Query string, order by dateFiled desc",
                 "search_params": search_params,
-                "expected_results": 5,
                 "expected_order": [
                     docket_entry_recent.docket.pk,  # 2024/02/23
                     self.de_1.docket.pk,  # 2016/08/16
@@ -3922,7 +4227,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Query string, order by dateFiled asc",
                 "search_params": params_date_filed_asc,
-                "expected_results": 5,
                 "expected_order": [
                     docket_old.pk,  # 1732/2/23
                     self.de.docket.pk,  # 2015/8/16
@@ -3934,7 +4238,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Match all query, order by dateFiled desc",
                 "search_params": params_match_all_date_filed_desc,
-                "expected_results": 8,
                 "expected_order": [
                     docket_entry_recent.docket.pk,  # 2024/2/23
                     self.de_1.docket.pk,  # 2016/8/16
@@ -3949,7 +4252,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Match all query, order by dateFiled asc",
                 "search_params": params_match_all_date_filed_asc,
-                "expected_results": 8,
                 "expected_order": [
                     docket_old.pk,  # 1732/2/23
                     self.de.docket.pk,  # 2015/8/16
@@ -3964,7 +4266,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Query string, order by entry_date_filed asc",
                 "search_params": params_entry_date_filed_asc,
-                "expected_results": 5,
                 "expected_order": [
                     self.de_1.docket.pk,  # 2014/7/19
                     self.de.docket.pk,  # 2015/8/16
@@ -3976,7 +4277,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Match all query, order by  entry_date_filed asc",
                 "search_params": params_match_all_entry_date_filed_asc,
-                "expected_results": 8,
                 "expected_order": [
                     self.de_1.docket.pk,  # 2014/7/19
                     self.de.docket.pk,  # 2015/8/16
@@ -5771,6 +6071,8 @@ class RECAPIndexingTest(
 
     def setUp(self):
         self.court = CourtFactory(id="canb", jurisdiction="FB")
+        self.factory = RequestFactory()
+        self.site = admin.site
         super().setUp()
 
     def _compare_response_child_value(
@@ -7108,6 +7410,103 @@ class RECAPIndexingTest(
         docket_with_parties.delete()
         docket_doc_no_parties.delete()
         docket_with_no_parties_no_separator.delete()
+
+    @mock.patch("cl.search.admin.delete_from_ia")
+    @mock.patch("cl.search.admin.invalidate_cloudfront")
+    def test_seal_documents_action(
+        self, mock_delete_from_ia, mock_invalidate_cloudfront
+    ):
+        """Confirm that seal_documents admin action updates related RDs in ES"""
+
+        docket = DocketFactory(
+            court=self.court,
+            pacer_case_id="asdf",
+            docket_number="12-cv-02354",
+            case_name="Vargas v. Wilkins",
+            source=Docket.RECAP,
+        )
+        de_1 = DocketEntryWithParentsFactory(
+            docket=docket,
+            date_filed=datetime.date(2015, 8, 19),
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+            entry_number=None,
+        )
+        rd_1 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            document_number=1,
+            is_available=True,
+            page_count=5,
+            filepath_local="test.pdf",
+            plain_text="Lorem ipsum dolor text.",
+        )
+        rd_2 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            document_number=2,
+            is_available=True,
+            page_count=10,
+            filepath_local="test.pdf",
+            plain_text="Lorem ipsum dolor text 2.",
+        )
+
+        # Confirm initial indexing:
+        rd_1_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(rd_1_doc.is_available, True)
+        self.assertEqual(rd_1_doc.plain_text, rd_1.plain_text)
+        self.assertEqual(rd_1_doc.page_count, rd_1.page_count)
+        self.assertEqual(rd_1_doc.filepath_local, rd_1.filepath_local)
+
+        rd_2_doc = DocketDocument.get(id=ES_CHILD_ID(rd_2.pk).RECAP)
+        self.assertEqual(rd_2_doc.is_available, True)
+        self.assertEqual(rd_2_doc.plain_text, rd_2.plain_text)
+        self.assertEqual(rd_2_doc.page_count, rd_2.page_count)
+        self.assertEqual(rd_2_doc.filepath_local, rd_2.filepath_local)
+
+        # Call seal_documents action.
+        recap_admin = RECAPDocumentAdmin(RECAPDocument, self.site)
+        recap_admin.message_user = mock.Mock()
+        url = reverse("admin:search_recapdocument_changelist")
+        request = self.factory.post(url)
+
+        queryset = RECAPDocument.objects.filter(pk__in=[rd_1.pk, rd_2.pk])
+        recap_admin.seal_documents(request, queryset)
+
+        recap_admin.message_user.assert_called_once_with(
+            request,
+            "Successfully sealed and removed 2 document(s).",
+        )
+
+        # Confirm DB update:
+        rd_1.refresh_from_db()
+        self.assertEqual(rd_1.is_available, False)
+        self.assertEqual(rd_1.is_sealed, True)
+        self.assertEqual(rd_1.filepath_local, "")
+        self.assertIsNone(rd_1.page_count)
+        self.assertEqual(rd_1.sha1, "")
+        self.assertEqual(rd_1.plain_text, "")
+
+        rd_2.refresh_from_db()
+        self.assertEqual(rd_2.is_available, False)
+        self.assertEqual(rd_2.is_sealed, True)
+        self.assertEqual(rd_2.filepath_local, "")
+        self.assertIsNone(rd_2.page_count)
+        self.assertEqual(rd_2.sha1, "")
+        self.assertEqual(rd_2.plain_text, "")
+
+        # Confirm ES indexing:
+        rd_1_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(rd_1_doc.is_available, False)
+        self.assertEqual(rd_1_doc.plain_text, "")
+        self.assertEqual(rd_1_doc.page_count, None)
+        self.assertEqual(rd_1_doc.filepath_local, None)
+
+        rd_2_doc = DocketDocument.get(id=ES_CHILD_ID(rd_2.pk).RECAP)
+        self.assertEqual(rd_2_doc.is_available, False)
+        self.assertEqual(rd_2_doc.plain_text, "")
+        self.assertEqual(rd_2_doc.page_count, None)
+        self.assertEqual(rd_2_doc.filepath_local, None)
+
+        # Clean up index.
+        docket.delete()
 
 
 class RECAPHistoryTablesIndexingTest(

@@ -5,25 +5,21 @@
 {% load pacer %}
 {% load humanize %}
 
-{% block title %}RECAP Requests – CourtListener.com{% endblock %}
-{% block og_title %}RECAP Requests – CourtListener.com{% endblock %}
+{% block title %}Most Wanted PACER Documents — CourtListener.com{% endblock %}
+{% block og_title %}Most Wanted PACER Documents — CourtListener.com{% endblock %}
 
-{% block description %}RECAP Requests on CourtListener.{% endblock %}
-{% block og_description %}RECAP Requests on CourtListener.{% endblock %}
-
+{% block description %}CourtListener lets you request the purchase of legal documents. View the community's most wanted documents.{% endblock %}
+{% block og_description %}CourtListener lets you request the purchase of legal documents. View the community's most wanted documents.{% endblock %}
 
 {% block content %}
   <div class="col-xs-12">
-    <h1 class="text-center">Community's Most Requested Documents</h1>
+    <h1 class="text-center v-offset-below-3">Community's Most Wanted PACER Documents</h1>
+    <h3 class="text-center"><b>{{ granted_stats.prayer_count|intcomma }}</b> prayers granted totaling <b>${{ granted_stats.total_cost }}</b>.</h3>
+    <h3 class="text-center"><b>{{ waiting_stats.prayer_count|intcomma }}</b> prayers pending totaling at least <b>${{ waiting_stats.total_cost }}</b>.</h3>
   </div>
-
 
   <div class="col-xs-12">
     <div class="well well-sm">
-      <p>There have been <b>{{ granted_stats.prayer_count|intcomma }}</b> requests granted for <b>{{ granted_stats.distinct_count|intcomma }}</b> unique documents that cost <b>${{ granted_stats.total_cost }}</b>.</p>
-      <br>
-      <p>There are <b>{{ waiting_stats.prayer_count|intcomma }}</b> requests pending for <b>{{ waiting_stats.distinct_count|intcomma }}</b> unique documents that cost at least <b>${{ waiting_stats.total_cost }}</b>.</p>
-      <br>
       <p>{% if user.is_authenticated %}
       <a href="{% url 'user_prayers' user.username %}">View your prayers</a>
       {% else %}
@@ -42,6 +38,9 @@
               <th>Document Number</th>
               <th>Document Description</th>
               <th>Buy on Pacer</th>
+            {% if perms.favorites.change_prayer %}
+              <th>Action</th>
+            {% endif %}
             </tr>
         </thead>
         <tbody>
@@ -55,7 +54,7 @@
                 </a>
               </td>
               <td>
-                <a href="{% url "view_docket" docket.pk docket.slug %}#entry-{{ prayer.docket_entry.entry_number }}">
+                <a href="{% url "view_recap_document" docket.pk prayer.docket_entry.entry_number docket.slug %}">
                   {{ prayer.document_number }}
                 </a>
               </td>
@@ -70,6 +69,15 @@
                 {% endif %}
                   target="_blank"
                   rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
+              {% if perms.favorites.change_prayer %}
+                <td>
+                  <div class="flex">
+                    <a href="{% url 'admin:favorites_prayer_changelist' %}?recap_document={{prayer.id}}" class="btn btn-default btn-xs">
+                      <i class="fa fa-pencil"></i>&nbsp;Edit
+                    </a>
+                  </div>
+                </td>
+              {% endif %}
             </tr>
             {% empty %}
             <tr>
