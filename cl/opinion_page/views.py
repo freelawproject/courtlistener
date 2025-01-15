@@ -57,7 +57,7 @@ from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.ratelimiter import ratelimiter_all_10_per_h
-from cl.lib.search_utils import make_get_string
+from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
@@ -98,7 +98,6 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.selectors import get_clusters_from_citation_str
-from cl.search.views import do_es_search
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
