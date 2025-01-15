@@ -190,7 +190,9 @@ if DEVELOPMENT:
 
     # used to hot reload css changes
     INSTALLED_APPS.append("django_browser_reload")
-    MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
+    MIDDLEWARE.append(
+        "django_browser_reload.middleware.BrowserReloadMiddleware"
+    )
     if not TESTING:
         MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
 
