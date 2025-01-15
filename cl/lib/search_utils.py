@@ -1,3 +1,4 @@
+import logging
 import pickle
 import re
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
@@ -6,6 +7,7 @@ from urllib.parse import parse_qs, urlencode
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, Page, PageNotAnInteger
 from django.http import HttpRequest
 from django.http.request import QueryDict
@@ -38,7 +40,9 @@ from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
+    ESRECAPDocument,
     OpinionClusterDocument,
+    OpinionDocument,
     ParentheticalGroupDocument,
     PersonDocument,
 )
@@ -58,6 +62,19 @@ from cl.search.models import (
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+logger = logging.getLogger(__name__)
+
+
+def check_pagination_depth(page_number):
+    """Check if the pagination is too deep (indicating a crawler)"""
+
+    if page_number > settings.MAX_SEARCH_PAGINATION_DEPTH:
+        logger.warning(
+            "Query depth of %s denied access (probably a crawler)",
+            page_number,
+        )
+        raise PermissionDenied
 
 
 def make_get_string(
@@ -620,3 +637,94 @@ def do_es_search(
         ),
         "missing_citations": missing_citations_str,
     }
+
+
+def get_headers_for_search_export(type: str) -> list[str]:
+    """Creates a list of headers suitable for CSV export of search results.
+
+    :param type: The type of Elasticsearch search to be performed. Valid values
+        are defined in the `SEARCH_TYPES` enum.
+    :return: A list of strings representing the CSV headers.
+    """
+    match type:
+        case SEARCH_TYPES.PEOPLE:
+            keys = PersonDocument.__dict__["_fields"].keys()
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            keys = AudioDocument.__dict__["_fields"].keys()
+        case SEARCH_TYPES.PARENTHETICAL:
+            keys = ParentheticalGroupDocument.__dict__["_fields"].keys()
+        case SEARCH_TYPES.RECAP:
+            keys = set(
+                [
+                    *DocketDocument.__dict__["_fields"].keys(),
+                    *ESRECAPDocument.__dict__["_fields"].keys(),
+                ]
+            )
+        case SEARCH_TYPES.OPINION:
+            keys = set(
+                [
+                    *OpinionClusterDocument.__dict__["_fields"].keys(),
+                    *OpinionDocument.__dict__["_fields"].keys(),
+                ]
+            )
+
+    return [
+        key
+        for key in keys
+        if key not in ("person_child", "docket_child", "cluster_child")
+    ]
+
+
+def fetch_es_results_for_csv(
+    queryset: QueryDict, search_type: str
+) -> list[dict[str, Any]]:
+    """Retrieves matching results from Elasticsearch and returns them as a list
+
+    This method will flatten nested results (like those returned by opinion and
+    recap searches) and limit the number of results in the list to
+    `settings.MAX_SEARCH_RESULTS_EXPORTED`.
+
+    :param queryset: The query parameters sent by the user.
+    :param search_type: The type of Elasticsearch search to be performed.
+    :return: A list of dictionaries, where each dictionary represents a single
+        search result.
+    """
+    csv_rows: list[dict[str, Any]] = []
+    while len(csv_rows) <= settings.MAX_SEARCH_RESULTS_EXPORTED:
+        search = do_es_search(
+            queryset, rows=settings.MAX_SEARCH_RESULTS_EXPORTED
+        )
+        if search["error"]:
+            return csv_rows
+
+        results = search["results"]
+        match search_type:
+            case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP:
+                flat_results = []
+                for result in results.object_list:
+                    parent_dict = result.to_dict()
+                    child_docs = parent_dict.pop("child_docs")
+                    if child_docs:
+                        flat_results.extend(
+                            [
+                                parent_dict | doc["_source"].to_dict()
+                                for doc in child_docs
+                            ]
+                        )
+                    else:
+                        flat_results.extend([parent_dict])
+            case _:
+                flat_results = [
+                    result.to_dict() for result in results.object_list
+                ]
+
+        csv_rows.extend(flat_results)
+
+        if not results.has_next():
+            if len(csv_rows) <= settings.MAX_SEARCH_RESULTS_EXPORTED:
+                return csv_rows
+            break
+
+        queryset["page"] = results.next_page_number()
+
+    return csv_rows[: settings.MAX_SEARCH_RESULTS_EXPORTED]

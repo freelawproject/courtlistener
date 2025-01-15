@@ -1,13 +1,10 @@
-import logging
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
 
 from asgiref.sync import async_to_sync
 from cache_memoize import cache_memoize
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Sum
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
@@ -36,19 +33,6 @@ from cl.search.models import SEARCH_TYPES, Court, Opinion
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
-
-logger = logging.getLogger(__name__)
-
-
-def check_pagination_depth(page_number):
-    """Check if the pagination is too deep (indicating a crawler)"""
-
-    if page_number > settings.MAX_SEARCH_PAGINATION_DEPTH:
-        logger.warning(
-            "Query depth of %s denied access (probably a crawler)",
-            page_number,
-        )
-        raise PermissionDenied
 
 
 @cache_memoize(5 * 60)

@@ -1,5 +1,7 @@
+import csv
+import io
 import logging
-from datetime import date
+from datetime import date, datetime
 from importlib import import_module
 from random import randint
 from typing import Any, Generator
@@ -8,8 +10,12 @@ from celery import Task
 from celery.canvas import chain
 from django.apps import apps
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
+from django.http import QueryDict
+from django.template import loader
 from elasticsearch.exceptions import (
     ApiError,
     ConflictError,
@@ -34,6 +40,10 @@ from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.lib.elasticsearch_utils import build_daterange_query
 from cl.lib.search_index_utils import get_parties_from_case_name
+from cl.lib.search_utils import (
+    fetch_es_results_for_csv,
+    get_headers_for_search_export,
+)
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
@@ -45,6 +55,7 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
     Docket,
@@ -339,6 +350,76 @@ def document_fields_to_update(
             field_value = prepare_timestamp(main_instance)
             fields_to_update["timestamp"] = field_value
     return fields_to_update
+
+
+@app.task(
+    autoretry_for=(ConnectionError, ConflictError, ConnectionTimeout),
+    max_retries=3,
+    ignore_result=True,
+)
+def email_search_results(user_id: int, query: str):
+    """Sends an email to the user with their search results as a CSV attachment.
+
+    :param user_id: The ID of the user to send the email to.
+    :param query: The user's search query string.
+    """
+    user = User.objects.get(pk=user_id)
+    # Parse the query string into a dictionary
+    qd = QueryDict(query.encode(), mutable=True)
+
+    # Create a search form instance and validate the query data
+    search_form = SearchForm(qd)
+    if not search_form.is_valid():
+        return
+
+    # Get the cleaned data from the validated form
+    cd = search_form.cleaned_data
+
+    # Fetch search results from Elasticsearch based on query and search type
+    search_results = fetch_es_results_for_csv(
+        queryset=qd, search_type=cd["type"]
+    )
+    if not search_results:
+        return
+
+    # Get the headers for the CSV file based on the search type
+    csv_headers = get_headers_for_search_export(cd["type"])
+
+    # Create the CSV content and store in a StringIO object
+    csv_content = None
+    with io.StringIO() as output:
+        csvwriter = csv.DictWriter(
+            output,
+            fieldnames=csv_headers,
+            extrasaction="ignore",
+            quotechar='"',
+            quoting=csv.QUOTE_ALL,
+        )
+        csvwriter.writeheader()
+        for row in search_results:
+            csvwriter.writerow(row)
+
+        csv_content: str = output.getvalue()
+
+    # Prepare email content
+    txt_template = loader.get_template("search_results_email.txt")
+    email_context = {"username": user.username}
+
+    # Create email object
+    message = EmailMessage(
+        subject="Your Search Results are Ready!",
+        body=txt_template.render(email_context),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+
+    # Generate a filename for the CSV attachment with timestamp
+    now = datetime.now()
+    filename = f'search_results_{now.strftime("%Y%m%d_%H%M%S")}.csv'
+
+    # Send email with attachments
+    message.attach(filename, csv_content, "text/csv")
+    message.send(fail_silently=False)
 
 
 @app.task(
