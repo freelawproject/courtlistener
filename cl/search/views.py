@@ -66,6 +66,7 @@ from cl.search.documents import (
 )
 from cl.search.exception import (
     BadProximityQuery,
+    DisallowedWildcardPattern,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
 )
@@ -556,6 +557,9 @@ def do_es_search(
             suggested_query = "proximity_filter"
             if e.error_type == UnbalancedParenthesesQuery.QUERY_STRING:
                 suggested_query = "proximity_query"
+        except DisallowedWildcardPattern:
+            error = True
+            error_message = "disallowed_wildcard_pattern"
         finally:
             # Make sure to always call the _clean_form method
             search_form = _clean_form(

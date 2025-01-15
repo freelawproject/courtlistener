@@ -422,36 +422,63 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                html_columbia="<p>Code, &#167; 1-815</p>",
+                html_columbia="<p>Code, &#167; 1-815 </p>",
+                plain_text="",
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Lorem.",
+            case_name_full="Strickland v. Lorem.",
             docket=DocketFactory(court=cls.court, docket_number="123456"),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Motion",
+            ),
         )
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="America vs Bank",
+            case_name_full="America vs Bank",
             docket=DocketFactory(
                 court=cls.child_court_1, docket_number="34-2535"
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Strickland Motion",
+            ),
         )
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Johnson v. National",
+            case_name_full="Johnson v. National",
             docket=DocketFactory(
                 court=cls.child_court_2_2, docket_number="36-2000"
             ),
+            judges="Computer point",
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Computer point",
+            ),
         )
 
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="California v. Nevada",
+            case_name_full="California v. Nevada",
             docket=DocketFactory(
                 court=cls.child_gand_2, docket_number="38-1000"
             ),
+            judges="Composition plant",
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Composition plant",
+            ),
         )
         call_command(
             "cl_index_parent_and_child_docs",
@@ -838,6 +865,418 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
+    def test_query_cleanup_function(self) -> None:
+        # Send string of search_query to the function and expect it
+        # to be encoded properly
+        q_a = (
+            (
+                "12-9238 happy Gilmore",
+                'docketNumber:"12-9238"~1 happy Gilmore',
+            ),
+            ("“ping tree” leads", '"ping tree" leads'),
+            ('"this is” a “test"', '"this is" a "test"'),
+            ("1chicken NUGGET", '"1chicken" NUGGET'),
+            (
+                "We can drive her home with 1headlight",
+                'We can drive her home with "1headlight"',
+            ),
+            # Tildes are ignored even though they have numbers?
+            ('"net neutrality"~2', '"net neutrality"~2'),
+            # No changes to regular queries?
+            ("Look Ma, no numbers!", "Look Ma, no numbers!"),
+            # Docket numbers hyphenated into phrases?
+            (
+                "12cv9834 Monkey Goose",
+                'docketNumber:"12-cv-9834"~1 Monkey Goose',
+            ),
+            # Valid dates ignored?
+            (
+                "2020-10-31T00:00:00Z Monkey Goose",
+                "2020-10-31T00:00:00Z Monkey Goose",
+            ),
+            # Simple range query?
+            ("[1 TO 4]", '["1" TO "4"]'),
+            # Dates ignored in ranges?
+            (
+                "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
+                "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
+            ),
+            ("id:10", "id:10"),
+            ("id:[* TO 5] Monkey Goose", 'id:[* TO "5"] Monkey Goose'),
+            (
+                "(Tempura AND 12cv3392) OR sushi",
+                '(Tempura AND docketNumber:"12-cv-3392"~1) OR sushi',
+            ),
+            # Phrase search with numbers (w/and w/o § mark)?
+            ('"18 USC 242"', '"18 USC 242"'),
+            ('"18 USC §242"', '"18 USC §242"'),
+            ('"this is a test" asdf', '"this is a test" asdf'),
+            ('asdf "this is a test" asdf', 'asdf "this is a test" asdf'),
+            (
+                '"this is a test" 22cv3332',
+                '"this is a test" docketNumber:"22-cv-3332"~1',
+            ),
+            (
+                '"this is a test" ~2',
+                '"this is a test"~2',
+            ),
+            (
+                '"this is a test" ~2 and "net neutrality" ~5 and 22cv3332',
+                '"this is a test"~2 and "net neutrality"~5 and docketNumber:"22-cv-3332"~1',
+            ),
+            (
+                "Strickland % Lorem % America",
+                "Strickland NOT Lorem NOT America",
+            ),
+            (
+                "Strickland% Lorem% America",
+                "Strickland% Lorem% America",
+            ),
+            (
+                "Strickland & Motion & Lorem",
+                "Strickland AND Motion AND Lorem",
+            ),
+            (
+                "!Strick !Mot",
+                "Strick* Mot*",
+            ),
+            (
+                "!111 !444",
+                '!"111" !"444"',
+            ),
+            (
+                "b*ra*e b*rav*",
+                "b?ra?e b?rav*",
+            ),
+        )
+        for q, a in q_a:
+            print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
+            self.assertEqual(cleanup_main_query(q), a)
+
+    def test_built_in_search_connectors(self) -> None:
+        """Verify that built in ES search connectors return the expected results."""
+
+        tests = [
+            {
+                "label": "NOT query",
+                "search_params": {
+                    "q": "Strickland   NOT  Lorem   NOT   America",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["1:21-cv-1234"],
+            },
+            {
+                "label": "AND connector test",
+                "search_params": {
+                    "q": "Strickland  AND  Motion  AND  Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["123456"],
+            },
+            {
+                "label": "Zero or more chars wildcard *",
+                "search_params": {
+                    "q": "Comp*",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Universal Character ?",
+                "search_params": {
+                    "q": "p??nt",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Combined operators",
+                "search_params": {
+                    "q": "Strickland AND moti* AND ba?k NOT Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["34-2535"],
+            },
+        ]
+
+        for test_case in tests:
+            with self.subTest(label=test_case["label"]):
+                response = self.client.get(
+                    reverse("show_results"),
+                    test_case["search_params"],
+                )
+                actual = self.get_article_count(response)
+                self.assertEqual(
+                    actual,
+                    test_case["expected_count"],
+                    msg=f"Failed on: {test_case['label']}",
+                )
+                decoded_content = response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on: {test_case['label']} missing {expected_str}",
+                    )
+
+    def test_support_search_connectors(self) -> None:
+        """Verify that new supported custom search connectors yield the
+        expected results.
+        """
+
+        tests = [
+            {
+                "label": "But not %",
+                "search_params": {
+                    "q": "Strickland % Lorem % America",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["1:21-cv-1234"],
+            },
+            {
+                "label": "& connector test",
+                "search_params": {
+                    "q": "Strickland & Motion & Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["123456"],
+            },
+            {
+                "label": "! Root expander suffix",
+                "search_params": {
+                    "q": "!Comp",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Universal Character *",
+                "search_params": {
+                    "q": "p**nt",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Combined operators",
+                "search_params": {
+                    "q": "Strickland & !moti & ba*k % Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["34-2535"],
+            },
+        ]
+
+        for test_case in tests:
+            with self.subTest(label=test_case["label"]):
+                # Frontend
+                response = self.client.get(
+                    reverse("show_results"),
+                    test_case["search_params"],
+                )
+                actual = self.get_article_count(response)
+                self.assertEqual(
+                    actual,
+                    test_case["expected_count"],
+                    msg=f"Failed on: {test_case['label']}",
+                )
+                decoded_content = response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on: {test_case['label']} missing {expected_str}",
+                    )
+
+                # API
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(
+                    len(api_response.data["results"]),
+                    test_case["expected_count"],
+                    msg=f"Failed on API: {test_case['label']}",
+                )
+                decoded_content = api_response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
+                    )
+
+    def test_support_search_connectors_filters(self) -> None:
+        """Verify that new supported custom search connectors yield the
+        expected results.
+        """
+
+        tests = [
+            {
+                "label": "But not %",
+                "search_params": {
+                    "case_name": "Strickland % Lorem % America",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["1:21-cv-1234"],
+            },
+            {
+                "label": "& connector test",
+                "search_params": {
+                    "case_name": "Strickland & Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["123456"],
+            },
+            {
+                "label": "! Root expander suffix",
+                "search_params": {
+                    "judge": "!Comp",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Universal Character *",
+                "search_params": {
+                    "judge": "p**nt",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Combined operators",
+                "search_params": {
+                    "case_name": "Calif*rnia & !Nev",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["38-1000"],
+            },
+        ]
+
+        for test_case in tests:
+            with self.subTest(label=test_case["label"]):
+                # Frontend
+                response = self.client.get(
+                    reverse("show_results"),
+                    test_case["search_params"],
+                )
+                actual = self.get_article_count(response)
+                self.assertEqual(
+                    actual,
+                    test_case["expected_count"],
+                    msg=f"Failed on: {test_case['label']}",
+                )
+                decoded_content = response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
+                    )
+
+                # API
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(
+                    len(api_response.data["results"]),
+                    test_case["expected_count"],
+                    msg=f"Failed on API: {test_case['label']}",
+                )
+                decoded_content = api_response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
+                    )
+
+    def test_disallowed_wildcard_pattern(self) -> None:
+        """Verify that expensive wildcard queries thrown an error."""
+
+        tests = [
+            {
+                "label": "Disallowed ! in short queries.",
+                "search_params": {
+                    "q": "!ap",
+                },
+            },
+            {
+                "label": "Disallowed * at the end in short queries.",
+                "search_params": {
+                    "q": "ap*",
+                },
+            },
+            {
+                "label": "Disallowed * at the beginning.",
+                "search_params": {
+                    "q": "*ing",
+                },
+            },
+            {
+                "label": "Disallowed ! in short queries - Filter.",
+                "search_params": {
+                    "case_name": "!ap",
+                },
+            },
+            {
+                "label": "Disallowed * at the end in short queries  - Filter.",
+                "search_params": {
+                    "judge": "ap*",
+                },
+            },
+            {
+                "label": "Disallowed * at the beginning  - Filter.",
+                "search_params": {
+                    "case_name": "*ing",
+                },
+            },
+        ]
+
+        for test_case in tests:
+            with self.subTest(label=test_case["label"]):
+                response = self.client.get(
+                    reverse("show_results"),
+                    test_case["search_params"],
+                )
+                decoded_content = response.content.decode()
+                tree = html.fromstring(decoded_content)
+                h2_error_element = tree.xpath('//h2[@class="alt"]')[0]
+                h2_text_error = "".join(
+                    h2_error_element.xpath(".//text()")
+                ).strip()
+                self.assertIn(
+                    "The query contains a disallowed wildcard pattern.",
+                    h2_text_error,
+                    msg=f"Failed on: {test_case['label']}, no disallowed wildcard pattern error.",
+                )
+
+                # API V4
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(api_response.status_code, 400)
+                self.assertEqual(
+                    api_response.data["detail"],
+                    "The query contains a disallowed wildcard pattern.",
+                    msg="Failed for V4",
+                )
+
+                # API V3
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v3"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(api_response.status_code, 400)
+                self.assertEqual(
+                    api_response.data["detail"],
+                    "The query contains a disallowed wildcard pattern.",
+                    msg="Failed for V3",
+                )
+
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
     """Common tests for the Search API V4 endpoints."""
@@ -931,68 +1370,6 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         searchbox.submit()
         result_count = self.browser.find_element(By.ID, "result-count")
         self.assertIn("Opinions", result_count.text)
-
-    def test_query_cleanup_function(self) -> None:
-        # Send string of search_query to the function and expect it
-        # to be encoded properly
-        q_a = (
-            (
-                "12-9238 happy Gilmore",
-                'docketNumber:"12-9238"~1 happy Gilmore',
-            ),
-            ("1chicken NUGGET", '"1chicken" NUGGET'),
-            (
-                "We can drive her home with 1headlight",
-                'We can drive her home with "1headlight"',
-            ),
-            # Tildes are ignored even though they have numbers?
-            ('"net neutrality"~2', '"net neutrality"~2'),
-            # No changes to regular queries?
-            ("Look Ma, no numbers!", "Look Ma, no numbers!"),
-            # Docket numbers hyphenated into phrases?
-            (
-                "12cv9834 Monkey Goose",
-                'docketNumber:"12-cv-9834"~1 Monkey Goose',
-            ),
-            # Valid dates ignored?
-            (
-                "2020-10-31T00:00:00Z Monkey Goose",
-                "2020-10-31T00:00:00Z Monkey Goose",
-            ),
-            # Simple range query?
-            ("[1 TO 4]", '["1" TO "4"]'),
-            # Dates ignored in ranges?
-            (
-                "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
-                "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
-            ),
-            ("id:10", "id:10"),
-            ("id:[* TO 5] Monkey Goose", 'id:[* TO "5"] Monkey Goose'),
-            (
-                "(Tempura AND 12cv3392) OR sushi",
-                '(Tempura AND docketNumber:"12-cv-3392"~1) OR sushi',
-            ),
-            # Phrase search with numbers (w/and w/o § mark)?
-            ('"18 USC 242"', '"18 USC 242"'),
-            ('"18 USC §242"', '"18 USC §242"'),
-            ('"this is a test" asdf', '"this is a test" asdf'),
-            ('asdf "this is a test" asdf', 'asdf "this is a test" asdf'),
-            (
-                '"this is a test" 22cv3332',
-                '"this is a test" docketNumber:"22-cv-3332"~1',
-            ),
-            (
-                '"this is a test" ~2',
-                '"this is a test"~2',
-            ),
-            (
-                '"this is a test" ~2 and "net neutrality" ~5 and 22cv3332',
-                '"this is a test"~2 and "net neutrality"~5 and docketNumber:"22-cv-3332"~1',
-            ),
-        )
-        for q, a in q_a:
-            print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
-            self.assertEqual(cleanup_main_query(q), a)
 
     def test_query_cleanup_integration(self) -> None:
         # Dora goes to CL and performs a Search using a numbered citation

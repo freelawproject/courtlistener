@@ -72,6 +72,7 @@ class SCOTUSMapAdmin(admin.ModelAdmin):
         "published",
         "deleted",
     )
+    autocomplete_fields = ("user",)
     search_fields = (
         "id",
         "title",

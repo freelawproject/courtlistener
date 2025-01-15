@@ -1158,12 +1158,27 @@ class TestElasticsearchUtils(SimpleTestCase):
                 "sanitized": "This is unbalanced",
             },
             {
+                "input_str": "This is “unbalanced",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
                 "input_str": 'This is "unbalanced""',
                 "output": True,
                 "sanitized": 'This is "unbalanced"',
             },
             {
+                "input_str": "This is “unbalanced””",
+                "output": True,
+                "sanitized": 'This is "unbalanced"',
+            },
+            {
                 "input_str": 'This "is" unbalanced"',
+                "output": True,
+                "sanitized": 'This "is" unbalanced',
+            },
+            {
+                "input_str": 'This "is” unbalanced"',
                 "output": True,
                 "sanitized": 'This "is" unbalanced',
             },

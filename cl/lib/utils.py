@@ -11,6 +11,7 @@ import cl.search.models as search_model
 from cl.lib.crypto import sha256
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData
+from cl.search.exception import DisallowedWildcardPattern, QueryType
 
 
 class _UNSPECIFIED:
@@ -232,9 +233,79 @@ def modify_court_id_queries(query_str: str) -> str:
     return modified_query
 
 
+def check_query_for_disallowed_wildcards(query_string: str) -> bool:
+    """Check if the query_string contains not allowed wildcards that can be
+    really expensive.
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-wildcard
+
+    * at the beginning of a term
+    * in a term with less than 3 characters.
+    ! in a term with less than 3 characters.
+
+    Like:
+    *ing
+    a* or !a
+
+    :param query_string: The query string to be checked.
+    :return: A boolean indicating if the query string contains not allowed wildcards.
+    """
+
+    # Match any term that starts with *
+    wildcard_start = r"(?:^|\s)\*\w+"
+
+    # Match any term with less than 3 chars that ends with *
+    wildcard_end = r"(?:^|\s)\w{1,2}\*(?=$|\s)"
+
+    # Match any term with less than 3 chars that starts with !
+    root_expander_short_term = r"(?:^|\s)\![^\s]{1,2}(?=$|\s)"
+
+    if any(
+        re.search(pattern, query_string)
+        for pattern in [wildcard_start, wildcard_end, root_expander_short_term]
+    ):
+        return True
+    return False
+
+
+def perform_special_character_replacements(query_string: str) -> str:
+    """Perform a series of special character replacements in the given query
+    string to clean it up and support the % &, !, and * search connectors.
+
+    :param query_string: The user query string.
+    :return: The transformed query string with the specified replacements applied.
+    """
+
+    # Replace smart quotes with standard double quotes for consistency.
+    query_string = re.sub(r"[“”]", '"', query_string)
+
+    # Replace % (but not) by NOT
+    query_string = re.sub(r" % ", " NOT ", query_string)
+
+    # Replace & by AND
+    query_string = re.sub(r" & ", " AND ", query_string)
+
+    # Replace ! (root expander) at the beginning of words with * at the end.
+    root_expander_pattern = r"(^|\s)!([a-zA-Z]+)"
+    root_expander_replacement = r"\1\2*"
+    query_string = re.sub(
+        root_expander_pattern, root_expander_replacement, query_string
+    )
+
+    # Replace * (universal character) that is not at the end of a word with ?.
+    universal_char_pattern = r"\*(?=\w)"
+    universal_char_replacement = "?"
+    query_string = re.sub(
+        universal_char_pattern, universal_char_replacement, query_string
+    )
+
+    return query_string
+
+
 def cleanup_main_query(query_string: str) -> str:
     """Enhance the query string with some simple fixes
 
+     - Check for expensive wildcards and thrown an error if found.
+     - Perform special character replacements for search connectors.
      - Make any numerical queries into phrases (except dates)
      - Add hyphens to district docket numbers that lack them
      - Ignore tokens inside phrases
@@ -249,6 +320,12 @@ def cleanup_main_query(query_string: str) -> str:
     """
     inside_a_phrase = False
     cleaned_items = []
+
+    if check_query_for_disallowed_wildcards(query_string):
+        raise DisallowedWildcardPattern(QueryType.QUERY_STRING)
+
+    query_string = perform_special_character_replacements(query_string)
+
     for item in re.split(r'([^a-zA-Z0-9_\-^~":]+)', query_string):
         if not item:
             continue
@@ -330,8 +407,8 @@ def check_unbalanced_quotes(query: str) -> bool:
     :param query: The input query string
     :return: True if the query contains unbalanced quotes. Otherwise False
     """
-    quotes_count = query.count('"')
-    return quotes_count % 2 != 0
+    all_quotes = re.findall(r"[“”\"]", query)
+    return len(all_quotes) % 2 != 0
 
 
 def remove_last_symbol_occurrence(
@@ -382,6 +459,8 @@ def sanitize_unbalanced_quotes(query: str) -> str:
     :param query: The input query string
     :return: The sanitized query string, after removing unbalanced quotes.
     """
+    # Replace smart quotes with standard double quotes for consistency.
+    query = re.sub(r"[“”]", '"', query)
     quotes_count = query.count('"')
     while quotes_count % 2 != 0:
         query, quotes_count = remove_last_symbol_occurrence(
