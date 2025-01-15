@@ -76,11 +76,28 @@ services:
         - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
         - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
 
+  cl-tailwind-reload:
+    container_name: cl-tailwind-reload
+    build:
+      context: "${CL_BASE_DIR:-../../}"
+      dockerfile: "./docker/django/Dockerfile"
+      target: tailwind-reload
+      args:
+        BUILD_ENV: dev
+    volumes:
+      - ${CL_BASE_DIR:-../../}:/opt/courtlistener
+    networks:
+      - cl_net_overlay
+    env_file:
+      - ../../.env.dev
+    tty: true
+
   cl-django:
     container_name: cl-django
     build:
       context: "${CL_BASE_DIR:-../../}"
       dockerfile: "./docker/django/Dockerfile"
+      target: web-dev
       args:
         BUILD_ENV: dev
     command: web-dev

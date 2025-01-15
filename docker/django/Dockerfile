@@ -70,7 +70,11 @@ RUN mkdir /var/log/courtlistener \
 
 WORKDIR /opt/courtlistener
 
+FROM python-base AS tailwind-reload
+CMD python /opt/courtlistener/manage.py tailwind install --no-input  && \
+    python /opt/courtlistener/manage.py tailwind start --no-input
 
+FROM python-base as web-dev
 ENV PYTHONPATH="/opt/courtlistener"
 
 USER root
