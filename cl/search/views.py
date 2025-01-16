@@ -4,6 +4,7 @@ from urllib.parse import quote
 from asgiref.sync import async_to_sync
 from cache_memoize import cache_memoize
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db.models import Count, Sum
 from django.http import HttpRequest, HttpResponse
@@ -12,6 +13,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_POST
 from waffle.decorators import waffle_flag
 
 from cl.alerts.forms import CreateAlertForm
@@ -20,6 +22,7 @@ from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import get_only_status_facets
+from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import (
     do_es_search,
@@ -27,9 +30,11 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     store_search_query,
 )
+from cl.lib.types import AuthenticatedHttpRequest
 from cl.search.documents import OpinionClusterDocument
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion
+from cl.search.tasks import email_search_results
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
@@ -361,3 +366,13 @@ def es_search(request: HttpRequest) -> HttpResponse:
     )
 
     return render(request, template, render_dict)
+
+
+@login_required
+@ratelimiter_unsafe_5_per_d
+@require_POST
+def export_search_results(request: AuthenticatedHttpRequest) -> HttpResponse:
+    email_search_results.delay(request.user.pk, request.POST.get("query", ""))
+    # TODO: Update the frontend using Htmx to show a message indicating the
+    # export of search results is in progress.
+    return HttpResponse("It worked.")
