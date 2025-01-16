@@ -55,3 +55,8 @@ class UserTagInline(admin.StackedInline):
 class PrayerAdmin(admin.ModelAdmin):
     raw_id_fields = ("user", "recap_document")
     readonly_fields = ("date_created",)
+    list_display = (
+        "id",
+        "user",
+        "recap_document",
+    )
