@@ -291,6 +291,7 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
         connection = get_connection()
         connection.send_messages(messages)
 
+
 @dataclass
 class PrayerStats:
     prayer_count: int
@@ -298,10 +299,8 @@ class PrayerStats:
     total_cost: str
 
 
-async def get_user_prayer_history(user: User) -> (
-    PrayerStats
-):
-    
+async def get_user_prayer_history(user: User) -> PrayerStats:
+
     cache_key = f"prayer-stats-{user}"
 
     data = await cache.aget(cache_key)
