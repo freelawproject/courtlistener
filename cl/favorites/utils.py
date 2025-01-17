@@ -291,8 +291,23 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
         connection = get_connection()
         connection.send_messages(messages)
 
+@dataclass
+class PrayerStats:
+    prayer_count: int
+    distinct_count: int
+    total_cost: str
 
-async def get_user_prayer_history(user: User) -> tuple[int, float]:
+
+async def get_user_prayer_history(user: User) -> (
+    PrayerStats
+):
+    
+    cache_key = f"prayer-stats-{user}"
+
+    data = await cache.aget(cache_key)
+    if data is not None:
+        return PrayerStats(**data)
+
     filtered_list = Prayer.objects.filter(
         user=user, status=Prayer.GRANTED
     ).select_related("recap_document")
@@ -301,14 +316,17 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
 
     total_cost = await compute_prayer_total_cost(filtered_list)
 
-    return count, total_cost
+    # return count, total_cost
 
+    data = {
+        "prayer_count": count,
+        "distinct_count": "",
+        "total_cost": f"{total_cost:,.2f}",
+    }
+    one_day = 60 * 60 * 24
+    await cache.aset(cache_key, data, one_day)
 
-@dataclass
-class PrayerStats:
-    prayer_count: int
-    distinct_count: int
-    total_cost: str
+    return PrayerStats(**data)
 
 
 async def get_lifetime_prayer_stats(
