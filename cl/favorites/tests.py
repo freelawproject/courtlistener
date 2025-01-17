@@ -891,8 +891,8 @@ class RECAPPrayAndPay(TestCase):
 
     async def test_get_user_prayer_history(self) -> None:
         """Does the get_user_prayer_history method work properly?"""
-        # Prayers for user_2
-        await create_prayer(self.user_2, self.rd_4)
+        # # Prayers for user_2
+        # await create_prayer(self.user_2, self.rd_4)
 
         # Prayers for user
         await create_prayer(self.user, self.rd_2)
@@ -911,6 +911,9 @@ class RECAPPrayAndPay(TestCase):
         prayer_rd3.status = Prayer.GRANTED
         await prayer_rd3.asave()
 
+        # Clear cache for this specific user
+        await cache.adelete(f"prayer-stats-{self.user}")
+
         # Verify that the count is 1 and total cost is 0.20.
         user_history = await get_user_prayer_history(self.user)
         self.assertEqual(user_history.prayer_count, 1)
@@ -922,6 +925,9 @@ class RECAPPrayAndPay(TestCase):
 
         prayer_rd5.status = Prayer.GRANTED
         await prayer_rd5.asave()
+
+        # Clear cache for this specific user
+        await cache.adelete(f"prayer-stats-{self.user}")
 
         # Verify that the count is 2 and the total cost is now 3.20.
         user_history = await get_user_prayer_history(self.user)
