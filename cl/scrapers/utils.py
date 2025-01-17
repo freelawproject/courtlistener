@@ -11,6 +11,8 @@ from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db.models import Q
+from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
@@ -29,7 +31,78 @@ from cl.scrapers.exceptions import (
     NoDownloadUrlError,
     UnexpectedContentTypeError,
 )
-from cl.search.models import Court, Docket
+from cl.search.models import Citation, Court, Docket, OpinionCluster
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+
+def make_citation(
+    cite_str: str, cluster: OpinionCluster, court_id: str
+) -> Optional[Citation]:
+    """Create and return a citation object for the input values."""
+    citation_objs = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
+    if not citation_objs:
+        logger.error(
+            "Could not parse citation from court '%s'",
+            court_id,
+            extra=dict(
+                cite=cite_str,
+                cluster=cluster,
+                fingerprint=[f"{court_id}-no-citation-found"],
+            ),
+        )
+        return None
+    # Convert the found cite type to a valid cite type for our DB.
+    cite_type_str = citation_objs[0].all_editions[0].reporter.cite_type
+    return Citation(
+        cluster=cluster,
+        volume=citation_objs[0].groups["volume"],
+        reporter=citation_objs[0].corrected_reporter(),
+        page=citation_objs[0].groups["page"],
+        type=map_reporter_db_cite_type(cite_type_str),
+    )
+
+
+def citation_is_duplicated(citation_candidate: Citation, cite: str) -> bool:
+    """Checks if the citation is duplicated for the cluster
+
+    Following corpus_importer.utils.add_citations_to_cluster we
+    identify 2 types of duplication:
+    - exact: a citation with the same fields already exists for the cluster
+    - duplication in the same reporter: the cluster already has a citation
+        in that reporter
+
+    :param citation_candidate: the citation object
+    :param cite: citation string
+
+    :return: True if citation is duplicated, False if not
+    """
+    citation_params = {**citation_candidate.__dict__}
+    citation_params.pop("_state", "")
+    citation_params.pop("id", "")
+    cluster_id = citation_candidate.cluster.id
+
+    # Exact duplication
+    if Citation.objects.filter(**citation_params).exists():
+        logger.info(
+            "Citation '%s' already exists for cluster %s",
+            cite,
+            cluster_id,
+        )
+        return True
+
+    # Duplication in the same reporter
+    if Citation.objects.filter(
+        cluster_id=cluster_id, reporter=citation_candidate.reporter
+    ).exists():
+        logger.info(
+            "Another citation in the same reporter '%s' exists for cluster %s",
+            citation_candidate.reporter,
+            cluster_id,
+        )
+        return True
+
+    return False
 
 
 def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
