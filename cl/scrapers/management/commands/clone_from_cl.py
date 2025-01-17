@@ -151,7 +151,7 @@ def clone_opinion_cluster(
 
         cluster_path = reverse(
             "opinioncluster-detail",
-            kwargs={"version": "v3", "pk": cluster_id},
+            kwargs={"version": "v4", "pk": cluster_id},
         )
         cluster_url = f"{domain}{cluster_path}"
         cluster_datum = get_json_data(cluster_url, session)
@@ -364,7 +364,7 @@ def clone_docket(
         model = apps.get_model(object_type)
         docket_path = reverse(
             "docket-detail",
-            kwargs={"version": "v3", "pk": docket_id},
+            kwargs={"version": "v4", "pk": docket_id},
         )
         docket_url = f"{domain}{docket_path}"
         docket_data = None
@@ -555,7 +555,7 @@ def clone_docket_entries(
 
     docket_entry_path = reverse(
         "docketentry-list",
-        kwargs={"version": "v3"},
+        kwargs={"version": "v4"},
     )
 
     # Get list of docket entries using docket id
@@ -661,7 +661,7 @@ def clone_recap_documents(
                 "View cloned recap document here:",
                 reverse(
                     "recapdocument-detail",
-                    args=["v3", recap_document_data["id"]],
+                    args=["v4", recap_document_data["id"]],
                 ),
             )
 
@@ -697,7 +697,7 @@ def clone_tag(
         # Create tag
         tag_path = reverse(
             "tag-detail",
-            kwargs={"version": "v3", "pk": tag_id},
+            kwargs={"version": "v4", "pk": tag_id},
         )
         tag_url = f"{domain}{tag_path}"
         tag_data = get_json_data(tag_url, session)
@@ -714,7 +714,7 @@ def clone_tag(
 
             print(
                 "View cloned tag here:",
-                reverse("tag-detail", args=["v3", tag_id]),
+                reverse("tag-detail", args=["v4", tag_id]),
             )
 
     return created_tags
@@ -744,7 +744,7 @@ def clone_position(
             position = model.objects.get(pk=position_id, person_id=person_id)
             print(
                 "Position already exists here:",
-                reverse("position-detail", args=["v3", position.pk]),
+                reverse("position-detail", args=["v4", position.pk]),
             )
             continue
         except model.DoesNotExist:
@@ -753,7 +753,7 @@ def clone_position(
         # Create position
         position_path = reverse(
             "position-detail",
-            kwargs={"version": "v3", "pk": position_id},
+            kwargs={"version": "v4", "pk": position_id},
         )
         position_url = f"{domain}{position_path}"
         position_data = get_json_data(position_url, session)
@@ -839,7 +839,7 @@ def clone_position(
 
             print(
                 "View cloned position here:",
-                reverse("position-detail", args=["v3", position_id]),
+                reverse("position-detail", args=["v4", position_id]),
             )
 
 
@@ -870,7 +870,7 @@ def clone_person(
             person = model.objects.get(pk=person_id)
             print(
                 "Person already exists here:",
-                reverse("person-detail", args=["v3", person.pk]),
+                reverse("person-detail", args=["v4", person.pk]),
             )
             people.append(person)
             if not positions:
@@ -881,7 +881,7 @@ def clone_person(
         # Create person
         people_path = reverse(
             "person-detail",
-            kwargs={"version": "v3", "pk": person_id},
+            kwargs={"version": "v4", "pk": person_id},
         )
 
         person_url = f"{domain}{people_path}"
@@ -929,7 +929,7 @@ def clone_person(
 
             print(
                 "View cloned person here:",
-                reverse("person-detail", args=["v3", person_id]),
+                reverse("person-detail", args=["v4", person_id]),
             )
 
         if person_positions_data:
@@ -964,7 +964,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
             courts.append(ct)
             print(
                 "Court already exists here:",
-                reverse("court-detail", args=["v3", ct.pk]),
+                reverse("court-detail", args=["v4", ct.pk]),
             )
             continue
         except model.DoesNotExist:
@@ -973,7 +973,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
         # Create court
         court_path = reverse(
             "court-detail",
-            kwargs={"version": "v3", "pk": court_id},
+            kwargs={"version": "v4", "pk": court_id},
         )
         court_url = f"{domain}{court_path}"
         court_data = get_json_data(court_url, session)
@@ -1017,7 +1017,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
             courts.append(ct)
             print(
                 "View cloned court here:",
-                reverse("court-detail", args=["v3", court_id]),
+                reverse("court-detail", args=["v4", court_id]),
             )
 
     return courts
