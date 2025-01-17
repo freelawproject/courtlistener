@@ -1794,12 +1794,11 @@ def get_att_report_by_rd(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    att_report = AttachmentPage(pacer_court_id, s)
-    att_report.query(rd.pacer_doc_id)
     if is_appellate_court(pacer_court_id):
         att_report = AppellateAttachmentPage(pacer_court_id, s)
     else:
         att_report = AttachmentPage(pacer_court_id, s)
+    att_report.query(rd.pacer_doc_id)
     return att_report
 
 
