@@ -247,9 +247,10 @@ async def process_recap_pdf(pk):
 
     document_type = (
         RECAPDocument.PACER_DOCUMENT
-        if not pq.attachment_number
+        if not pq.attachment_number  # This check includes attachment_number set to None or 0
         else RECAPDocument.ATTACHMENT
     )
+    # Set attachment_number to None if it is 0
     pq.attachment_number = (
         None if not pq.attachment_number else pq.attachment_number
     )

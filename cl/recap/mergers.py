@@ -950,7 +950,7 @@ async def add_docket_entries(
         ).aexists()
         appellate_rd_att_exists = False
         if de_created is False and appellate_court_id_exists:
-            # In existing appellate entries merges. Check if the entry has at
+            # In existing appellate entry merges, check if the entry has at
             # least one attachment.
             appellate_rd_att_exists = await de.recap_documents.filter(
                 document_type=RECAPDocument.ATTACHMENT
@@ -963,18 +963,9 @@ async def add_docket_entries(
             if de_created is False and not appellate_court_id_exists:
                 get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
             if de_created is False:
-                # Try to match the RD regardless of document_type
+                # Try to match the RD regardless of the document_type.
                 del get_params["document_type"]
             rd = await RECAPDocument.objects.aget(**get_params)
-            if (
-                appellate_rd_att_exists
-                and rd.document_type == RECAPDocument.PACER_DOCUMENT
-            ):
-                # If the entry already has an attachment, it means the main document
-                # matched should be attachment #1.
-                rd.document_type = RECAPDocument.ATTACHMENT
-                rd.attachment_number = 1
-
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
             rd = None
