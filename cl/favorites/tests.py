@@ -901,8 +901,8 @@ class RECAPPrayAndPay(TestCase):
 
         # Verify that the initial prayer count and total cost are 0.
         user_history = await get_user_prayer_history(self.user)
-        self.assertEqual(user_history["prayer_count"], 0)
-        self.assertEqual(user_history["total_cost"], 0.0)
+        self.assertEqual(user_history.prayer_count, 0)
+        self.assertEqual(user_history.total_cost, 0.0)
 
         # Update `rd_3`'s page count and set `prayer_rd3`'s status to `GRANTED`
         self.rd_3.page_count = 2
@@ -913,8 +913,8 @@ class RECAPPrayAndPay(TestCase):
 
         # Verify that the count is 1 and total cost is 0.20.
         user_history = await get_user_prayer_history(self.user)
-        self.assertEqual(user_history["prayer_count"], 1)
-        self.assertEqual(user_history["total_cost"], 0.20)
+        self.assertEqual(user_history.prayer_count, 1)
+        self.assertEqual(user_history.total_cost, 0.20)
 
         # Update `rd_5`'s page count and set `prayer_rd5`'s status to `GRANTED`
         self.rd_5.page_count = 40
@@ -925,8 +925,8 @@ class RECAPPrayAndPay(TestCase):
 
         # Verify that the count is 2 and the total cost is now 3.20.
         user_history = await get_user_prayer_history(self.user)
-        self.assertEqual(user_history["prayer_count"], 2)
-        self.assertEqual(user_history["total_cost"], 3.20)
+        self.assertEqual(user_history.prayer_count, 2)
+        self.assertEqual(user_history.total_cost, 3.20)
 
     @patch("cl.favorites.utils.cache.aget")
     async def test_get_lifetime_prayer_stats(self, mock_cache_aget) -> None:
