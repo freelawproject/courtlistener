@@ -54,7 +54,11 @@ from cl.corpus_importer.tasks import (
     make_attachment_pq_object,
     update_rd_metadata,
 )
-from cl.corpus_importer.utils import is_appellate_court, mark_ia_upload_needed
+from cl.corpus_importer.utils import (
+    ais_appellate_court,
+    is_appellate_court,
+    mark_ia_upload_needed,
+)
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
@@ -763,7 +767,7 @@ async def find_subdocket_pdf_rds(
         pq.pk
     ]  # Add the original pq to the list of pqs to process
 
-    if await sync_to_async(is_appellate_court)(pq.court_id):
+    if await ais_appellate_court(pq.court_id):
         # Abort the process for appellate documents. Subdockets cannot be found
         # in appellate cases.
         return pqs_to_process_pks

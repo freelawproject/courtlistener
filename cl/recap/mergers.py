@@ -14,7 +14,7 @@ from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 
-from cl.corpus_importer.utils import is_appellate_court, mark_ia_upload_needed
+from cl.corpus_importer.utils import ais_appellate_court, mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.model_helpers import clean_docket_number, make_docket_number_core
@@ -943,9 +943,7 @@ async def add_docket_entries(
         # RDs. The check here ensures that if that happens for a particular
         # entry, we avoid creating the main RD a second+ time when we get the
         # docket sheet a second+ time.
-        appelate_court_id_exists = await sync_to_async(is_appellate_court)(
-            d.court_id
-        )
+        appelate_court_id_exists = await ais_appellate_court(d.court_id)
         if de_created is False and appelate_court_id_exists:
             appellate_rd_att_exists = await de.recap_documents.filter(
                 document_type=RECAPDocument.ATTACHMENT
@@ -1787,7 +1785,7 @@ async def merge_attachment_page_data(
             ContentFile(text.encode()),
         )
 
-    court_is_appellate = await sync_to_async(is_appellate_court)(court.pk)
+    court_is_appellate = await ais_appellate_court(court.pk)
     main_rd_to_att = False
     for attachment in attachment_dicts:
         sanity_checks = [
