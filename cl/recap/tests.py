@@ -1851,6 +1851,26 @@ class RecapAttPageFetchApiTest(TestCase):
         self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find cached cookies", self.fq.message)
 
+    def test_fetch_acms_att_page(self, mock_court_accessible) -> None:
+        rd_acms = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(docket=DocketFactory()),
+            pacer_doc_id="784459c4-e2cd-ef11-b8e9-001dd804c0b4",
+        )
+        fq_acms = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=rd_acms.pk,
+        )
+        result = do_pacer_fetch(fq_acms)
+        result.get()
+
+        fq_acms.refresh_from_db()
+        self.assertEqual(fq_acms.status, PROCESSING_STATUS.FAILED)
+        self.assertIn(
+            "ACMS attachment pages are not currently supported",
+            fq_acms.message,
+        )
+
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
     )
