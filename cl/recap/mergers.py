@@ -945,10 +945,13 @@ async def add_docket_entries(
         # RDs. The check here ensures that if that happens for a particular
         # entry, we avoid creating the main RD a second+ time when we get the
         # docket sheet a second+ time.
-        appelate_court_id_exists = await appellate_court_ids.filter(
+        appellate_court_id_exists = await appellate_court_ids.filter(
             pk=d.court_id
         ).aexists()
-        if de_created is False and appelate_court_id_exists:
+        appellate_rd_att_exists = False
+        if de_created is False and appellate_court_id_exists:
+            # In existing appellate entries merges. Check if the entry has at
+            # least one attachment.
             appellate_rd_att_exists = await de.recap_documents.filter(
                 document_type=RECAPDocument.ATTACHMENT
             ).aexists()
@@ -957,14 +960,25 @@ async def add_docket_entries(
                 params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
             get_params = deepcopy(params)
-            if de_created is False and not appelate_court_id_exists:
-                del get_params["document_type"]
+            if de_created is False and not appellate_court_id_exists:
                 get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
+            if de_created is False:
+                # Try to match the RD regardless of document_type
+                del get_params["document_type"]
             rd = await RECAPDocument.objects.aget(**get_params)
+            if (
+                appellate_rd_att_exists
+                and rd.document_type == RECAPDocument.PACER_DOCUMENT
+            ):
+                # If the entry already has an attachment, it means the main document
+                # matched should be attachment #1.
+                rd.document_type = RECAPDocument.ATTACHMENT
+                rd.attachment_number = 1
+
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
             rd = None
-            if de_created is False and not appelate_court_id_exists:
+            if de_created is False and not appellate_court_id_exists:
                 try:
                     # Check for documents with a bad pacer_doc_id
                     rd = await RECAPDocument.objects.aget(**params)

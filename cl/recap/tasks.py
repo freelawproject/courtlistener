@@ -245,10 +245,14 @@ async def process_recap_pdf(pk):
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
 
-    if pq.attachment_number is None:
-        document_type = RECAPDocument.PACER_DOCUMENT
-    else:
-        document_type = RECAPDocument.ATTACHMENT
+    document_type = (
+        RECAPDocument.PACER_DOCUMENT
+        if not pq.attachment_number
+        else RECAPDocument.ATTACHMENT
+    )
+    pq.attachment_number = (
+        None if not pq.attachment_number else pq.attachment_number
+    )
 
     logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq} ")
     try:
