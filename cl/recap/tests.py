@@ -1698,15 +1698,35 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
 class RecapPdfFetchApiTest(TestCase):
     """Can we fetch PDFs properly?"""
 
-    fixtures = ["recap_docs.json"]
-
     def setUp(self) -> None:
+        self.docket = DocketFactory(
+            case_name="United States v. Curlin",
+            case_name_short="Curlin",
+            pacer_case_id="28766",
+            source=Docket.RECAP,
+            docket_number="3:92-cr-00139-T",
+            slug="united-states-v-curlin",
+        )
+        self.de = DocketEntryWithParentsFactory(
+            docket=self.docket,
+            description=" Memorandum Opinion and Order as to Albert Evans Curlin: Clerk is directed to file a copy of this opinion in the criminal action - Petition in 3:01cv429, filed pursuant to 28:2241, is properly construed as a motion to vacate pursuant to 28:2255 and is denied for failure of pet to file it within the statutory period of limitations.  (Signed by Judge Jerry Buchmeyer on 7/12/2002) (lrl, )",
+            entry_number=1,
+        )
+        self.rd = RECAPDocumentFactory(
+            docket_entry=self.de,
+            document_number="1",
+            is_available=True,
+            is_free_on_pacer=True,
+            page_count=17,
+            pacer_doc_id="17701118263",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
         self.fq = PacerFetchQueue.objects.create(
             user=User.objects.get(username="recap"),
             request_type=REQUEST_TYPE.PDF,
-            recap_document_id=1,
+            recap_document_id=self.rd.pk,
         )
-        self.rd = self.fq.recap_document
 
     def tearDown(self) -> None:
         RECAPDocument.objects.update(is_available=True)
