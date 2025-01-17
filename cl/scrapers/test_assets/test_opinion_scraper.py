@@ -59,7 +59,7 @@ class Site(OpinionSite):
         metadata = {}
         docket_regex = r"Docket Number: (?P<docket>\d+-\d+)"
         disposition_regex = r"Disposition: (?P<disposition>\w+)"
-        citation_regex = r"(?P<volume>20\d{2}) (?P<reporter>VT) (?P<page>\d+)"
+        citation_regex = r"20\d{2} VT \d+"
         if docket_match := re.search(docket_regex, scraped_text):
             metadata["Docket"] = {
                 "docket_number": docket_match.group("docket")
@@ -71,6 +71,6 @@ class Site(OpinionSite):
             }
 
         if citation_match := re.search(citation_regex, scraped_text):
-            metadata["Citation"] = {**citation_match.groupdict(), "type": 8}
+            metadata["Citation"] = citation_match.group(0)
 
         return metadata
