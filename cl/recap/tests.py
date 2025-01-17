@@ -42,6 +42,7 @@ from cl.api.utils import (
     get_next_webhook_retry_date,
     get_webhook_deprecation_date,
 )
+from cl.corpus_importer.utils import is_appellate_court
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
@@ -87,6 +88,8 @@ from cl.recap.mergers import (
     add_docket_entries,
     add_parties_and_attorneys,
     find_docket_object,
+    get_data_from_appellate_att_report,
+    get_data_from_att_report,
     get_order_of_docket,
     merge_attachment_page_data,
     normalize_long_description,
@@ -1777,17 +1780,55 @@ class RecapPdfFetchApiTest(TestCase):
     side_effect=lambda a: True,
 )
 class RecapAttPageFetchApiTest(TestCase):
-    fixtures = ["recap_docs.json"]
 
     def setUp(self) -> None:
+        self.district_court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
+        self.district_docket = DocketFactory(
+            source=Docket.RECAP, court=self.district_court
+        )
+        self.rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.district_docket,
+            ),
+            document_number="1",
+            is_available=True,
+            is_free_on_pacer=True,
+            page_count=17,
+            pacer_doc_id="17711118263",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
         self.fq = PacerFetchQueue.objects.create(
             user=User.objects.get(username="recap"),
             request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
-            recap_document_id=1,
+            recap_document_id=self.rd.pk,
         )
-        self.rd = self.fq.recap_document
-        self.rd.pacer_doc_id = "17711118263"
-        self.rd.save()
+
+        self.appellate_court = CourtFactory(
+            id="ca1", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        self.appellate_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.appellate_court,
+            pacer_case_id=41651,
+        )
+        self.rd_appellate = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.appellate_docket, entry_number=1208699339
+            ),
+            document_number=1208699339,
+            pacer_doc_id="1208699339",
+            attachment_number=1,
+            is_available=True,
+            page_count=15,
+            document_type=RECAPDocument.ATTACHMENT,
+            ocr_status=4,
+        )
+        self.fq_appellate = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=self.rd_appellate.pk,
+        )
 
     def test_fetch_attachment_page_no_pacer_doc_id(
         self, mock_court_accessible
@@ -1814,6 +1855,10 @@ class RecapAttPageFetchApiTest(TestCase):
         "cl.recap.tasks.get_pacer_cookie_from_cache",
     )
     @mock.patch(
+        "cl.recap.tasks.get_data_from_att_report",
+        wraps=get_data_from_att_report,
+    )
+    @mock.patch(
         "cl.corpus_importer.tasks.AttachmentPage",
         new=fakes.FakeAttachmentPage,
     )
@@ -1821,13 +1866,14 @@ class RecapAttPageFetchApiTest(TestCase):
         "cl.recap.mergers.AttachmentPage", new=fakes.FakeAttachmentPage
     )
     @mock.patch(
-        "cl.corpus_importer.tasks.is_appellate_court", return_value=False
+        "cl.corpus_importer.tasks.is_appellate_court", wraps=is_appellate_court
     )
-    @mock.patch("cl.recap.tasks.is_appellate_court", return_value=False)
-    def test_fetch_att_page_all_systems_go(
+    @mock.patch("cl.recap.tasks.is_appellate_court", wraps=is_appellate_court)
+    def test_fetch_att_page_from_district_court(
         self,
-        check_court_task,
-        check_court_parser,
+        mock_court_check_task,
+        mock_court_check_parser,
+        mock_report_parser,
         mock_get_cookies,
         mock_court_accessible,
     ):
@@ -1835,8 +1881,68 @@ class RecapAttPageFetchApiTest(TestCase):
         result.get()
 
         self.fq.refresh_from_db()
+
+        # Verify court validation calls with expected court ID
+        district_court_id = self.rd.docket_entry.docket.court_id
+        mock_court_check_task.assert_called_with(district_court_id)
+        mock_court_check_parser.assert_called_with(district_court_id)
+
+        # Ensure correct parser is called exactly once (ideal scenario)
+        mock_report_parser.assert_called_once()
+        mock_report_parser.assert_called_with(ANY, district_court_id)
+
+        # Assert successful fetch status and expected message
         self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
         self.assertIn("Successfully completed fetch", self.fq.message)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_data_from_appellate_att_report",
+        wraps=get_data_from_appellate_att_report,
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.AppellateAttachmentPage",
+        new=fakes.FakeAppellateAttachmentPage,
+    )
+    @mock.patch(
+        "cl.recap.mergers.AppellateAttachmentPage",
+        new=fakes.FakeAppellateAttachmentPage,
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.is_appellate_court", wraps=is_appellate_court
+    )
+    @mock.patch("cl.recap.tasks.is_appellate_court", wraps=is_appellate_court)
+    def test_fetch_att_page_from_appellate(
+        self,
+        mock_court_check_task,
+        mock_court_check_parser,
+        mock_report_parser,
+        mock_get_cookies,
+        mock_court_accessible,
+    ):
+        result = do_pacer_fetch(self.fq_appellate)
+        result.get()
+
+        self.fq_appellate.refresh_from_db()
+
+        # Verify court validation calls with expected court ID
+        appellate_court_id = self.rd_appellate.docket_entry.docket.court_id
+        mock_court_check_task.assert_called_with(appellate_court_id)
+        mock_court_check_parser.assert_called_with(appellate_court_id)
+
+        # Ensure correct parser is called exactly once (ideal scenario)
+        mock_report_parser.assert_called_once()
+        mock_report_parser.assert_called_with(ANY, appellate_court_id)
+
+        # Assert successful fetch status and expected message
+        self.assertEqual(
+            self.fq_appellate.status, PROCESSING_STATUS.SUCCESSFUL
+        )
+        self.assertIn(
+            "Successfully completed fetch", self.fq_appellate.message
+        )
 
 
 class ProcessingQueueApiFilterTest(TestCase):
