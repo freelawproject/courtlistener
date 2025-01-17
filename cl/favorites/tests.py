@@ -902,7 +902,7 @@ class RECAPPrayAndPay(TestCase):
         # Verify that the initial prayer count and total cost are 0.
         user_history = await get_user_prayer_history(self.user)
         self.assertEqual(user_history.prayer_count, 0)
-        self.assertEqual(user_history.total_cost, 0.0)
+        self.assertEqual(user_history.total_cost, 0.00)
 
         # Update `rd_3`'s page count and set `prayer_rd3`'s status to `GRANTED`
         self.rd_3.page_count = 2
