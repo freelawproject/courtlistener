@@ -315,15 +315,13 @@ async def get_user_prayer_history(user: User) -> PrayerStats:
 
     total_cost = await compute_prayer_total_cost(filtered_list)
 
-    # return count, total_cost
-
     data = {
         "prayer_count": count,
         "distinct_count": "",
         "total_cost": f"{total_cost:,.2f}",
     }
-    one_day = 60 * 60 * 24
-    await cache.aset(cache_key, data, one_day)
+    one_minute = 60
+    await cache.aset(cache_key, data, one_minute)
 
     return PrayerStats(**data)
 
