@@ -26,7 +26,7 @@ from cl.people_db.lookup_utils import (
     lookup_judges_by_last_name_list,
 )
 from cl.people_db.models import Person
-from cl.search.models import Citation, Docket, Opinion, OpinionCluster
+from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -105,6 +105,30 @@ async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
         d.ia_date_first_change = now()
     if save_docket:
         await d.asave()
+
+
+def is_appellate_court(court_id: str) -> bool:
+    """Checks if the given court_id belongs to an appellate court.
+
+    :param court_id: The unique identifier of the court.
+
+    :return: True if the court_id corresponds to an appellate court,
+        False otherwise.
+    """
+    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    return appellate_court_ids.filter(pk=court_id).exists()
+
+
+async def ais_appellate_court(court_id: str) -> bool:
+    """Checks if the given court_id belongs to an appellate court.
+
+    :param court_id: The unique identifier of the court.
+
+    :return: True if the court_id corresponds to an appellate court,
+        False otherwise.
+    """
+    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    return await appellate_court_ids.filter(pk=court_id).aexists()
 
 
 def get_start_of_quarter(d: Optional[date] = None) -> date:
