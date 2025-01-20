@@ -1891,6 +1891,27 @@ class RecapPdfFetchApiTest(TestCase):
         )
         self.assertTrue(self.appellate_rd.is_available)
 
+    def test_avoid_purchasing_acms_document(
+        self, mock_court_accessible, mock_get_cookies
+    ):
+        rd_acms = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(docket=DocketFactory()),
+            pacer_doc_id="784459c4-e2cd-ef11-b8e9-001dd804c0b4",
+        )
+        fq_acms = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=rd_acms.pk,
+        )
+        fetch_pacer_doc_by_rd(rd_acms.pk, fq_acms.pk)
+
+        fq_acms.refresh_from_db()
+        self.assertEqual(fq_acms.status, PROCESSING_STATUS.FAILED)
+        self.assertIn(
+            "ACMS documents are not currently supported",
+            fq_acms.message,
+        )
+
 
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
