@@ -54,7 +54,11 @@ from cl.corpus_importer.tasks import (
     make_attachment_pq_object,
     update_rd_metadata,
 )
-from cl.corpus_importer.utils import mark_ia_upload_needed
+from cl.corpus_importer.utils import (
+    ais_appellate_court,
+    is_appellate_court,
+    mark_ia_upload_needed,
+)
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
@@ -763,8 +767,7 @@ async def find_subdocket_pdf_rds(
         pq.pk
     ]  # Add the original pq to the list of pqs to process
 
-    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
-    if await appellate_court_ids.filter(pk=pq.court_id).aexists():
+    if await ais_appellate_court(pq.court_id):
         # Abort the process for appellate documents. Subdockets cannot be found
         # in appellate cases.
         return pqs_to_process_pks
@@ -1992,6 +1995,11 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         mark_fq_status(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
         return
 
+    if rd.pacer_doc_id.count("-") > 1:
+        msg = "ACMS attachment pages are not currently supported"
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        return
+
     session_data = get_pacer_cookie_from_cache(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
@@ -2036,7 +2044,15 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         raise self.retry(exc=exc)
 
     text = r.response.text
-    att_data = get_data_from_att_report(text, rd.docket_entry.docket.court_id)
+    is_appellate = is_appellate_court(rd.docket_entry.docket.court_id)
+    # Determine the appropriate parser function based on court jurisdiction
+    # (appellate or district)
+    att_data_parser = (
+        get_data_from_appellate_att_report
+        if is_appellate
+        else get_data_from_att_report
+    )
+    att_data = att_data_parser(text, rd.docket_entry.docket.court_id)
 
     if att_data == {}:
         msg = "Not a valid attachment page upload"
@@ -2048,7 +2064,8 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
             rd.docket_entry.docket.court,
             rd.docket_entry.docket.pacer_case_id,
             att_data["pacer_doc_id"],
-            att_data["document_number"],
+            # Appellate attachments don't contain a document_number
+            None if is_appellate else att_data["document_number"],
             text,
             att_data["attachments"],
         )
