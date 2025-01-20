@@ -64,10 +64,10 @@ class IncrementalNewTemplateMiddleware:
     Checks waffle flag for new design and changes the old template
     with the new one if it exists.
 
-    To identify the new template we prepend "new_" to the old template name.
+    To identify the new template we prepend "v2_" to the old template name.
     Note this means if the old template_name includes a dir, like
-    "help/index.html", the new template should be in "new_help/index.html"
-    and NOT in "help/new_index.html".
+    "help/index.html", the new template should be in "v2_help/index.html"
+    and NOT in "help/v2_index.html".
 
     TODO: Remove this middleware once new design is completely rolled out.
     """
@@ -85,7 +85,7 @@ class IncrementalNewTemplateMiddleware:
         if use_new_design and isinstance(response, TemplateResponse):
             old_template = response.template_name
             if isinstance(old_template, str):
-                new_template = f"new_{old_template}"
+                new_template = f"v2_{old_template}"
                 response.template_name = [new_template, old_template]
 
         return response
