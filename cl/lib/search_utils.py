@@ -653,7 +653,7 @@ def get_headers_for_search_export(type: str) -> list[str]:
             keys = AudioDocument.__dict__["_fields"].keys()
         case SEARCH_TYPES.PARENTHETICAL:
             keys = ParentheticalGroupDocument.__dict__["_fields"].keys()
-        case SEARCH_TYPES.RECAP:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             keys = set(
                 [
                     *DocketDocument.__dict__["_fields"].keys(),
@@ -699,7 +699,11 @@ def fetch_es_results_for_csv(
 
         results = search["results"]
         match search_type:
-            case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP:
+            case (
+                SEARCH_TYPES.OPINION
+                | SEARCH_TYPES.RECAP
+                | SEARCH_TYPES.DOCKETS
+            ):
                 flat_results = []
                 for result in results.object_list:
                     parent_dict = result.to_dict()
