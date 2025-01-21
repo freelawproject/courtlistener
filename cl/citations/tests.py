@@ -2453,8 +2453,7 @@ class UnmatchedCitationTest(TransactionTestCase):
             unmatched_citations[0].year == "2019", "year was not saved"
         )
 
-    def test_2nd_signal_update(self) -> None:
-        """Can we update the status of a matched citation?"""
+        # Test signal on matching Citation created
         unmatched_citation = UnmatchedCitation.objects.first()
         Citation.objects.create(
             cluster=self.cluster,
@@ -2470,9 +2469,7 @@ class UnmatchedCitationTest(TransactionTestCase):
             "`update_unmatched_citation` was not executed on post_save signal",
         )
 
-    def test_3rd_resolution_update(self):
-        """Is UnmatchedCitation.status updated properly?"""
-        # Only 1 citation was resolved
+        # Simulate that only 1 citation was resolved
         citation_resolutions = {1: [self.eyecite_citations[0]]}
 
         should_resolve = UnmatchedCitation.objects.first()
