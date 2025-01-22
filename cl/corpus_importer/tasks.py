@@ -2005,7 +2005,7 @@ def download_pacer_pdf_by_rd(
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
-    if is_appellate_court(rd.docket_entry.docket.court_id):
+    if is_appellate_court(pacer_court_id):
         report = AppellateDocketReport(pacer_court_id, s)
         r, r_msg = report.download_pdf(
             pacer_doc_id=pacer_doc_id, pacer_case_id=pacer_case_id
