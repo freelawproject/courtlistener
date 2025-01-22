@@ -183,7 +183,6 @@ class CitationTextTest(SimpleTestCase):
             ('<script async src="//www.instagram.com/embed.js"></script>',
              '<pre class="inline">&lt;script async src=&quot;//www.instagram.com/embed.js&quot;&gt;&lt;/script&gt;</pre>'),
         ]
-
         # fmt: on
         for s, expected_html in test_pairs:
             with self.subTest(
@@ -315,24 +314,26 @@ class CitationTextTest(SimpleTestCase):
         # test the rendering of citation objects that we assert are correctly
         # matched. (No matching is performed in the previous cases.)
         # fmt: off
-
+        case_name = "Example vs. Example"
+        aria_description = f'aria-description="Citation for case: {case_name}"'
         test_pairs = [
             # Id. citation with page number ("Id., at 123, 124")
             ('asdf, Id., at 123, 124. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id="'
-             'MATCH_ID"><a href="MATCH_URL">Id., at 123, 124</a></span><pre '
-             'class="inline">. Lorem ipsum dolor sit amet</pre>'),
+             f'MATCH_ID"><a href="MATCH_URL" {aria_description}>'
+             'Id., at 123, 124</a></span><pre class="inline">. '
+             'Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation with complex page number ("Id. @ 123:1, ¶¶ 124")
             ('asdf, Id. @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id='
-             '"MATCH_ID"><a href="MATCH_URL">Id.</a></span><pre class='
+             f'"MATCH_ID"><a href="MATCH_URL" {aria_description}>Id.</a></span><pre class='
              '"inline"> @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation without page number ("Id. Something else")
             ('asdf, Id. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id="'
-             'MATCH_ID"><a href="MATCH_URL">Id.</a></span><pre class="inline">'
+             f'MATCH_ID"><a href="MATCH_URL" {aria_description}>Id.</a></span><pre class="inline">'
              ' Lorem ipsum dolor sit amet</pre>'),
         ]
 
@@ -355,7 +356,9 @@ class CitationTextTest(SimpleTestCase):
                 # to receive. Also make sure that the "matched" opinion is
                 # mocked appropriately.
                 opinion.pk = "MATCH_ID"
-                opinion.cluster = Mock(OpinionCluster(id=24601))
+                opinion.cluster = Mock(
+                    OpinionCluster(id=24601), case_name=case_name
+                )
                 opinion.cluster.get_absolute_url.return_value = "MATCH_URL"
                 citation_resolutions = {opinion: citations}
 
