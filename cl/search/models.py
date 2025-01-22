@@ -1383,6 +1383,19 @@ class RECAPDocument(
                 },
             )
 
+    def is_acms_document(self) -> bool:
+        """
+        Checks if the document is from ACMS based on the presence of hyphens
+        in the pacer_doc_id.
+
+        ACMS documents are currently the only ones using hyphens in their
+        doc_id.
+
+        :return: True if the doc_id contains more than one hyphen, False
+            otherwise.
+        """
+        return self.pacer_doc_id.count("-") > 1
+
     @property
     def pacer_url(self) -> str | None:
         """Construct a doc1 URL for any item, if we can. Else, return None."""
@@ -1391,7 +1404,7 @@ class RECAPDocument(
         court = self.docket_entry.docket.court
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
-            if self.pacer_doc_id.count("-") > 1:
+            if self.is_acms_document():
                 return (
                     f"https://{court_id}-showdoc.azurewebsites.us/docs/"
                     f"{self.docket_entry.docket.pacer_case_id}/"
