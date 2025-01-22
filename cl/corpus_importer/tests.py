@@ -2427,7 +2427,7 @@ class ScrapeIqueryPagesTest(TestCase):
             ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
                 execute=True
             ):
-                Docket.objects.create(
+                DocketFactory(
                     court=self.court_gand,
                     source=Docket.RECAP,
                     case_name="New Incoming Docket",
@@ -2460,7 +2460,7 @@ class ScrapeIqueryPagesTest(TestCase):
             ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
                 execute=True
             ):
-                Docket.objects.create(
+                DocketFactory(
                     court=self.court_gand,
                     source=Docket.RECAP,
                     docket_number="2:20-cv-00600",
@@ -2496,7 +2496,7 @@ class ScrapeIqueryPagesTest(TestCase):
             ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
                 execute=True
             ):
-                Docket.objects.create(
+                DocketFactory(
                     court=self.court_gand,
                     source=Docket.RECAP,
                     case_name="New Incoming Docket",
@@ -2530,7 +2530,7 @@ class ScrapeIqueryPagesTest(TestCase):
             ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
                 execute=True
             ):
-                Docket.objects.create(
+                DocketFactory(
                     court=self.court_ca1,
                     source=Docket.RECAP,
                     docket_number="2:20-cv-00603",
@@ -2593,7 +2593,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 # Create docket pacer_case_id 12, which is the last docket in
                 # the probe. Even though it already exists, it should trigger
                 # a sweep task.
-                Docket.objects.create(
+                DocketFactory(
                     court=self.court_txed,
                     source=Docket.RECAP,
                     case_name="New Incoming Docket 12",
