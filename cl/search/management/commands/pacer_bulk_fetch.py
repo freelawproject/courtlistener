@@ -1,16 +1,21 @@
 import logging
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 
+from celery import chain
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.management.base import CommandError
 from django.db.models import Q
+from django.utils import timezone
 
 from cl import settings
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import REQUEST_TYPE, PacerFetchQueue
-from cl.recap.tasks import build_pdf_retrieval_task_chain
+from cl.recap.tasks import fetch_pacer_doc_by_rd, mark_fq_successful
+from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, RECAPDocument
 
 logger = logging.getLogger(__name__)
@@ -21,6 +26,7 @@ class Command(VerboseCommand):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.options = None
         self.user = None
         self.recap_documents = None
         self.courts_with_docs = {}
@@ -30,13 +36,14 @@ class Command(VerboseCommand):
         self.pacer_password = None
         self.throttle = None
         self.queue_name = None
-        self.rate_limit = None
+        self.interval = None
+        self.cache_key = "pacer_bulk_fetch.docs_to_process"
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
-            "--rate-limit",
+            "--interval",
             type=float,
-            help="The maximum rate for requests, e.g. '1/m', or '10/2h' or similar. Defaults to 1/2s",
+            help="The minimum wait in secs between PACER fetches to the same court.",
         )
         parser.add_argument(
             "--min-page-count",
@@ -73,18 +80,17 @@ class Command(VerboseCommand):
                 format="%(asctime)s - %(levelname)s - %(message)s",
             )
 
-    def setup_celery(self, options) -> None:
-        """Setup Celery by setting the queue_name, rate_limit and throttle."""
-        self.queue_name = options.get("queue_name", "pacer_bulk_fetch")
-        self.rate_limit = options.get("rate_limit", "1/2s")
+    def setup_celery(self) -> None:
+        """Setup Celery by setting the queue_name and throttle."""
+        self.queue_name = self.options.get("queue_name", "pacer_bulk_fetch")
         self.throttle = CeleryThrottle(queue_name=self.queue_name)
 
-    def handle_pacer_session(self, options) -> None:
+    def handle_pacer_session(self) -> None:
         """Make sure we have an active PACER session for the user."""
-        self.pacer_username = options.get(
+        self.pacer_username = self.options.get(
             "pacer_username", settings.PACER_USERNAME
         )
-        self.pacer_password = options.get(
+        self.pacer_password = self.options.get(
             "pacer_password", settings.PACER_PASSWORD
         )
         get_or_cache_pacer_cookies(
@@ -104,16 +110,16 @@ class Command(VerboseCommand):
         except User.DoesNotExist:
             raise CommandError(f"User {username} does not exist")
 
-    def identify_documents(self, options: dict) -> None:
+    def identify_documents(self) -> None:
         """Get eligible documents grouped by court"""
         filters = [
             Q(pacer_doc_id__isnull=False),
             Q(is_available=False),
         ]
-        if options.get("min_page_count"):
-            filters.append(Q(page_count__gte=options["min_page_count"]))
-        if options.get("max_page_count"):
-            filters.append(Q(page_count__lte=options["max_page_count"]))
+        if self.options.get("min_page_count"):
+            filters.append(Q(page_count__gte=self.options["min_page_count"]))
+        if self.options.get("max_page_count"):
+            filters.append(Q(page_count__lte=self.options["max_page_count"]))
 
         self.recap_documents = (
             RECAPDocument.objects.filter(*filters)
@@ -143,90 +149,151 @@ class Command(VerboseCommand):
                 if doc["docket_entry__docket__court_id"] == court.pk
             ]
 
-    def enqueue_pacer_fetch(self, doc: dict) -> None:
-        self.throttle.maybe_wait()
+    def update_cached_docs_to_process(self, rd_pk, fq_pk):
+        """Add newly fetched RD with its FQ to cache."""
+        cached_docs = cache.get(self.cache_key)
+        if cached_docs is None:
+            cached_docs = []
+        cached_docs.append((rd_pk, fq_pk))
+        one_week = 60 * 60 * 24 * 7
+        cache.set(self.cache_key, cached_docs, timeout=one_week)
 
+    def enqueue_pacer_fetch(self, doc: dict) -> PacerFetchQueue:
+        """Actually apply the task to fetch the doc from PACER.
+
+        The ids for the fetched RD and their corresponding FQ are stored
+        in cache so we know which ones to process in a later stage of
+        this command.
+        """
+        self.throttle.maybe_wait()
+        rd_pk = doc.get("id")
         fq = PacerFetchQueue.objects.create(
             request_type=REQUEST_TYPE.PDF,
-            recap_document_id=doc.get("id"),
+            recap_document_id=rd_pk,
             user_id=self.user.pk,
         )
-        build_pdf_retrieval_task_chain(
-            fq,
-            rate_limit=self.rate_limit,
-        ).apply_async(queue=self.queue_name)
+        fetch_pacer_doc_by_rd.si(rd_pk, fq.pk).apply_async(
+            queue=self.queue_name
+        )
+        self.update_cached_docs_to_process(rd_pk, fq.pk)
         self.total_launched += 1
         logger.info(
             f"Launched download for doc {doc.get('id')} from court {doc.get('docket_entry__docket__court_id')}"
             f"\nProgress: {self.total_launched}/{len(self.recap_documents)}"
         )
+        return fq
 
-    def execute_round(
-        self, remaining_courts: dict, options: dict, is_last_round: bool
-    ) -> dict:
-        remaining_courts_copy = (
-            remaining_courts.copy()
-        )  # don't remove elements from list we're iterating over
-        court_keys = remaining_courts.keys()
-        for court_index, court_id in enumerate(court_keys):
+    def should_skip(self, fetches_in_progress: dict, court_id: str) -> bool:
+        """Determine if the court is ready to be queried again.
+
+        To hit the same court again, the last fetch queue must have
+        been completed more than `self.interval` seconds ago.
+        """
+
+        def enough_time_elapsed(date):
+            now = timezone.now()
+            return (now - date) < timedelta(seconds=self.interval)
+
+        if court_id in fetches_in_progress:
+            fetch_queue = PacerFetchQueue.objects.get(
+                id=fetches_in_progress[court_id]
+            )
+            date_completed = fetch_queue.date_completed
+            fq_in_progress = date_completed is None
+            if fq_in_progress or not enough_time_elapsed(date_completed):
+                return True
+
+        return False
+
+    def fetch_next_doc_in_court(
+        self,
+        fetches_in_progress: dict,
+        court_id: str,
+        remaining_courts: dict,
+    ) -> bool:
+        """Pop next doc in court and add fetch task to get it from PACER.
+
+        If the last FQ for the court is still in progress or was completed
+        less than `self.interval` seconds ago, we skip it and wait for
+        the next round to try the same court again.
+        """
+        should_skip = self.should_skip(fetches_in_progress, court_id)
+        if should_skip:
+            return True
+
+        if remaining_courts[court_id]:
             doc = remaining_courts[court_id].pop(0)
-
             try:
-                self.enqueue_pacer_fetch(doc)
+                fq = self.enqueue_pacer_fetch(doc)
+                fetches_in_progress[court_id] = fq.id
             except Exception as e:
                 self.total_errors += 1
                 logger.error(
-                    f"Error queuing document {doc.get("id")}: {str(e)}",
-                    exc_info=True,
+                    f"Error queuing document {doc.get('id')}: {str(e)}"
                 )
-            finally:
+
+        return False
+
+    def fetch_docs_from_pacer(self) -> None:
+        """Process documents with one fetch per court at a time"""
+        self.handle_pacer_session()
+        fetches_in_progress = {}
+        remaining_courts = self.courts_with_docs.copy()
+
+        while remaining_courts:
+            courts_at_start = len(remaining_courts)
+            skipped_courts = 0
+            for court_id in list(remaining_courts.keys()):
+                was_skipped = self.fetch_next_doc_in_court(
+                    fetches_in_progress,
+                    court_id,
+                    remaining_courts,
+                )
+                skipped_courts += int(was_skipped)
                 # If this court doesn't have any more docs, remove from dict:
-                if len(remaining_courts[court_id]) == 0:
-                    remaining_courts_copy.pop(court_id)
+                if not remaining_courts[court_id]:
+                    remaining_courts.pop(court_id)
+                    fetches_in_progress.pop(court_id, None)
 
-        return remaining_courts_copy
+            # If we had to skip all courts that we tried this round,
+            # add a small delay to avoid hammering the DB
+            if skipped_courts == courts_at_start:
+                time.sleep(self.interval)
 
-    def process_documents(self, options: dict) -> None:
-        """Process documents in round-robin fashion by court"""
-        remaining_courts = self.courts_with_docs
-        court_doc_counts = [
-            len(self.courts_with_docs[court_id])
-            for court_id in self.courts_with_docs.keys()
-        ]
-        rounds = max(court_doc_counts)
-
-        for i in range(rounds):
-            is_last_round = i == rounds - 1
-            remaining_courts = self.execute_round(
-                remaining_courts, options, is_last_round
-            )
-
-        if self.total_errors:
-            logger.error(
-                f"Finished processing with {self.total_errors} error{"s" if self.total_errors > 1 else ""}."
-            )
+    def process_docs_fetched(self):
+        """Apply tasks to process docs fetched from PACER."""
+        fetch_queues_in_cache = cache.get(self.cache_key)
+        for rd_pk, fq_pk in fetch_queues_in_cache:
+            self.throttle.maybe_wait()
+            chain(
+                extract_recap_pdf.si(rd_pk),
+                mark_fq_successful.si(fq_pk),
+            ).apply_async(queue=self.queue_name)
 
     def handle(self, *args, **options) -> None:
-        self.setup_logging(options.get("testing", False))
-        self.setup_celery(options)
+        self.options = options
+        self.setup_logging(self.options.get("testing", False))
+        self.setup_celery()
+        self.interval = self.options.get("interval", 2)
 
         logger.info("Starting pacer_bulk_fetch command")
 
         try:
             self.set_user(options.get("username", "recap"))
-            self.handle_pacer_session(options)
 
-            self.identify_documents(options)
+            self.identify_documents()
 
             logger.info(
                 f"{self.user} found {len(self.recap_documents)} documents across {len(self.courts_with_docs)} courts."
             )
 
-            self.process_documents(options)
+            self.fetch_docs_from_pacer()
 
             logger.info(
                 f"Created {self.total_launched} processing queues for a total of {len(self.recap_documents)} docs found."
             )
+
+            self.process_docs_fetched()
 
         except Exception as e:
             logger.error(f"Fatal error in command: {str(e)}", exc_info=True)
