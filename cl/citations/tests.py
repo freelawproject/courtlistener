@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
+from bs4 import BeautifulSoup
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
 from django.core.management import call_command
@@ -369,6 +370,53 @@ class CitationTextTest(SimpleTestCase):
                     expected_html,
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
+
+    def test_unsafe_case_names(self) -> None:
+        """Test unsafe characters in aria descriptions"""
+        case_names = [
+            (
+                # ampersand
+                "Farmers ' High Line Canal & Reservoir Co. v. New Hampshire Real Estate Co.",
+                "Citation for case: Farmers ' High Line Canal & Reservoir Co. v. New...",
+            ),
+            (
+                # single quote
+                "Barmore v '",
+                "Citation for case: Barmore v '",
+            ),
+            (
+                # Question mark, and double quotes
+                """Shamokin, Pa.", (Leaflet in Case) Misnamed? ',""",  # Question marks and double quotes with single quotes
+                """Citation for case: Shamokin, Pa.", (Leaflet in Case) Misnamed? ',""",
+            ),
+        ]
+        for case_name, expected_aria in case_names:
+            html_opinion = "foo v. bar, 1 U.S. 1 baz"
+            opinion = Opinion(
+                plain_text=html_opinion,
+                pk="MATCH_ID",
+                cluster=Mock(OpinionCluster(id=1234), case_name=case_name),
+            )
+            get_and_clean_opinion_text(opinion)
+            citations = get_citations(
+                opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+            )
+            opinion.cluster.get_absolute_url.return_value = "/opinion/1/foo/"
+            citation_resolutions = {opinion: citations}
+            created_html = create_cited_html(opinion, citation_resolutions)
+
+            # extract out aria description
+            soup = BeautifulSoup(created_html, "html.parser")
+            citation_link = soup.find("a", {"aria-description": True})
+            aria_description = (
+                citation_link["aria-description"] if citation_link else None
+            )
+
+            self.assertEqual(
+                aria_description,
+                expected_aria,
+                msg=f"\n{aria_description}\n\n    !=\n\n{expected_aria}",
+            )
 
 
 class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
