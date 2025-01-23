@@ -197,7 +197,7 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
 
     @sync_to_async
     def paginate_open_prayers(top_prayers, prayer_page):
-        paginator = Paginator(top_prayers, 200, orphans=10)
+        paginator = Paginator(top_prayers, 25, orphans=10)
         try:
             return paginator.page(prayer_page)
         except PageNotAnInteger:
