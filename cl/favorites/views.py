@@ -289,7 +289,7 @@ async def user_prayers_view(
 
     rd_with_prayers = await get_user_prayers(requested_user)
 
-    count, total_cost = await get_user_prayer_history(requested_user)
+    user_history = await get_user_prayer_history(requested_user)
 
     is_eligible, num_remaining = await prayer_eligible(requested_user)
 
@@ -297,8 +297,7 @@ async def user_prayers_view(
         "rd_with_prayers": rd_with_prayers,
         "requested_user": requested_user,
         "is_page_owner": is_page_owner,
-        "count": count,
-        "total_cost": total_cost,
+        "user_history": user_history,
         "is_eligible": is_eligible,
         "num_remaining": num_remaining,
         "private": False,
