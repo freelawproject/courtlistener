@@ -204,7 +204,7 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
             return paginator.page(1)
         except EmptyPage:
             return paginator.page(paginator.num_pages)
-        
+
     paginated_entries = await paginate_open_prayers(top_prayers, page)
 
     granted_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
@@ -302,8 +302,12 @@ async def user_prayers_view(
     if not is_page_owner:
         return redirect("top_prayers")
 
-    rd_with_prayers_granted = await get_user_prayers(requested_user, Prayer.GRANTED)
-    rd_with_prayers_waiting = await get_user_prayers(requested_user, Prayer.WAITING)
+    rd_with_prayers_granted = await get_user_prayers(
+        requested_user, Prayer.GRANTED
+    )
+    rd_with_prayers_waiting = await get_user_prayers(
+        requested_user, Prayer.WAITING
+    )
 
     user_history = await get_user_prayer_history(requested_user)
 

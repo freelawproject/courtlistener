@@ -164,12 +164,14 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
     return documents
 
 
-async def get_user_prayers(user: User, status: Optional[str] = None) -> QuerySet[RECAPDocument]:
+async def get_user_prayers(
+    user: User, status: Optional[str] = None
+) -> QuerySet[RECAPDocument]:
     user_prayers = Prayer.objects.filter(user=user)
-    
+
     if status is not None:
         user_prayers = user_prayers.filter(status=status)
-    
+
     user_prayer_ids = user_prayers.values("recap_document_id")
 
     documents = (
