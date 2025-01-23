@@ -271,7 +271,7 @@ def update_unmatched_citations_status(
     citing_opinion: Opinion,
 ) -> None:
     """Check if previously unmatched citations have been resolved and
-    updtes UnmatchedCitation.status accordingly
+    updates UnmatchedCitation.status accordingly
 
     We assume no new UnmatchedCitations will be created after the first run
 
@@ -283,7 +283,7 @@ def update_unmatched_citations_status(
         c.matched_text() for v in citation_resolutions.values() for c in v
     }
 
-    # the query will also try to reprocess the previous failures
+    # try to update the status of FOUND and FAILED_* UnmatchedCitations
     found_citations = UnmatchedCitation.objects.filter(
         citing_opinion=citing_opinion
     ).exclude(
@@ -293,6 +293,8 @@ def update_unmatched_citations_status(
         if found.citation_string in resolved_citations:
             found.status = UnmatchedCitation.RESOLVED
         else:
+            if found.status == UnmatchedCitation.FAILED:
+                continue
             found.status = UnmatchedCitation.FAILED
         found.save()
 
@@ -309,9 +311,24 @@ def store_unmatched_citations(
     :param opinion: the citing opinion
     :return None:
     """
-    unmatched_citations_to_store = [
-        UnmatchedCitation.create_from_eyecite(unmatched_citation, opinion)
-        for unmatched_citation in unmatched_citations
-        if isinstance(unmatched_citation, FullCaseCitation)
-    ]
-    UnmatchedCitation.objects.bulk_create(unmatched_citations_to_store)
+    unmatched_citations_to_store = []
+    seen_citations = set()
+
+    for unmatched_citation in unmatched_citations:
+        if not isinstance(unmatched_citation, FullCaseCitation):
+            continue
+
+        citation_object = UnmatchedCitation.create_from_eyecite(
+            unmatched_citation, opinion
+        )
+
+        # use to prevent Integrity error from duplicates
+        citation_str = str(citation_object)
+        if citation_str in seen_citations:
+            continue
+        seen_citations.add(citation_str)
+
+        unmatched_citations_to_store.append(citation_object)
+
+    if unmatched_citations_to_store:
+        UnmatchedCitation.objects.bulk_create(unmatched_citations_to_store)

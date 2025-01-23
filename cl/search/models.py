@@ -2941,6 +2941,10 @@ class BaseCitation(models.Model):
     class Meta:
         abstract = True
 
+    def __str__(self) -> str:
+        # Note this representation is used in the front end.
+        return "{volume} {reporter} {page}".format(**self.__dict__)
+
 
 @pghistory.track()
 class Citation(BaseCitation):
@@ -2952,10 +2956,6 @@ class Citation(BaseCitation):
         related_name="citations",
         on_delete=models.CASCADE,
     )
-
-    def __str__(self) -> str:
-        # Note this representation is used in the front end.
-        return "{volume} {reporter} {page}".format(**self.__dict__)
 
     def get_absolute_url(self) -> str:
         return self.cluster.get_absolute_url()

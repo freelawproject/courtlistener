@@ -2450,7 +2450,7 @@ class UnmatchedCitationTest(TransactionTestCase):
             "court_id was not saved",
         )
         self.assertTrue(
-            unmatched_citations[0].year == "2019", "year was not saved"
+            unmatched_citations[0].year == 2019, "year was not saved"
         )
 
         # Test signal on matching Citation created

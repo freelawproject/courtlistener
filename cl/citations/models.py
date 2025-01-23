@@ -2,7 +2,7 @@ from django.db import models
 from eyecite.models import FullCaseCitation
 
 from cl.citations.utils import map_reporter_db_cite_type
-from cl.search.models import BaseCitation, Opinion
+from cl.search.models import BaseCitation, Citation, Opinion
 
 
 class UnmatchedCitation(BaseCitation):
@@ -18,9 +18,10 @@ class UnmatchedCitation(BaseCitation):
     STATUS = (
         (
             UNMATCHED,
-            "The citation does not exist in the search_citation table."
-            " We couldn't match the citation to a cluster on the "
-            " previous citation extractor run",
+            "The citation may be unmatched if: 1. it does not exist in the "
+            "search_citation table. 2. It exists on the search_citation table,"
+            " but we couldn't match the citation to a cluster on the previous"
+            " citation extractor run",
         ),
         (
             FOUND,
@@ -36,13 +37,17 @@ class UnmatchedCitation(BaseCitation):
             "The citing Opinion.html_with_citations update "
             "failed because the citation is ambiguous",
         ),
-        (FAILED, "The citing Opinion.html_with_citations update failed"),
+        (
+            FAILED,
+            "We couldn't resolve the citation, and the citing "
+            "Opinion.html_with_citations update failed",
+        ),
     )
     citing_opinion: models.ForeignKey = models.ForeignKey(
         Opinion,
         help_text="The opinion citing this citation",
         on_delete=models.CASCADE,
-        related_name="eyecite_citations",
+        related_name="unmatched_citations",
     )
     status: models.SmallIntegerField = models.SmallIntegerField(
         help_text="Status of resolution of the initially unmatched citation",
@@ -56,8 +61,9 @@ class UnmatchedCitation(BaseCitation):
         help_text="A court_id as identified by eyecite from the opinion's "
         "context. May be useful to know where to find missing citations"
     )
-    year: models.TextField = models.TextField(
-        help_text="A year identified by eyecite from the opinion's context"
+    year: models.SmallIntegerField = models.SmallIntegerField(
+        help_text="A year identified by eyecite from the opinion's context",
+        null=True,
     )
 
     class Meta:
@@ -83,14 +89,27 @@ class UnmatchedCitation(BaseCitation):
         :param citing_opinion: the opinion which uses the citation
         """
         cite_type_str = eyecite_citation.all_editions[0].reporter.cite_type
-        return cls(
+        year = eyecite_citation.metadata.year
+        unmatched_citation = cls(
             citing_opinion=citing_opinion,
             status=cls.UNMATCHED,
             citation_string=eyecite_citation.matched_text(),
             court_id=eyecite_citation.metadata.court or "",
-            year=eyecite_citation.metadata.year or "",
+            year=int(year) if year else None,
             volume=eyecite_citation.groups["volume"],
             reporter=eyecite_citation.corrected_reporter(),
             page=eyecite_citation.groups["page"],
             type=map_reporter_db_cite_type(cite_type_str),
         )
+
+        # The citation exists in the search_citation table, but it couldn't
+        # be resolved
+        if Citation.objects.filter(
+            volume=unmatched_citation.volume,
+            reporter=unmatched_citation.reporter,
+            page=unmatched_citation.page,
+            type=unmatched_citation.type,
+        ).exists():
+            unmatched_citation.status = cls.FAILED
+
+        return unmatched_citation
