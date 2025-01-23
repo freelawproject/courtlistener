@@ -97,7 +97,6 @@ services:
     build:
       context: "${CL_BASE_DIR:-../../}"
       dockerfile: "./docker/django/Dockerfile"
-      target: web-dev
       args:
         BUILD_ENV: dev
     command: web-dev
