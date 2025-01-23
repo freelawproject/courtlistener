@@ -64,10 +64,11 @@ def generate_annotations(
             ]
         else:  # If successfully matched...
             case_name = trunc(best_case_name(opinion.cluster), 60, "...")
+            safe_case_name = html.escape(case_name)
             annotation = [
                 f'<span class="citation" data-id="{opinion.pk}">'
                 f'<a href="{opinion.cluster.get_absolute_url()}"'
-                f' aria-description="Citation for case: {case_name}"'
+                f' aria-description="Citation for case: {safe_case_name}"'
                 ">",
                 "</a></span>",
             ]

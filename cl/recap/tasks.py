@@ -656,7 +656,7 @@ async def process_recap_docket(pk):
 
 async def get_att_data_from_pq(
     pq: ProcessingQueue,
-) -> tuple[ProcessingQueue | None, dict | None, str | None]:
+) -> tuple[ProcessingQueue, dict, str | None]:
     """Extract attachment data from a ProcessingQueue object.
 
     :param pq: The ProcessingQueue object.
@@ -668,13 +668,13 @@ async def get_att_data_from_pq(
     except IOError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-        return None, None, None
+        return pq, {}, None
 
     att_data = get_data_from_att_report(text, pq.court_id)
     if not att_data:
         msg = "Not a valid attachment page upload."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
-        return None, None, None
+        return pq, {}, None
 
     if pq.pacer_case_id in ["undefined", "null"]:
         pq.pacer_case_id = att_data.get("pacer_case_id")
@@ -719,6 +719,10 @@ async def find_subdocket_att_page_rds(
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
     pq, att_data, text = await get_att_data_from_pq(pq)
+    if not att_data:
+        # Bad attachment page.
+        return []
+
     pacer_doc_id = att_data["pacer_doc_id"]
     main_rds = get_main_rds(pq.court_id, pacer_doc_id).exclude(
         docket_entry__docket__pacer_case_id=pq.pacer_case_id
@@ -816,9 +820,9 @@ async def find_subdocket_pdf_rds(
 
 async def process_recap_attachment(
     pk: int,
-    tag_names: Optional[List[str]] = None,
+    tag_names: list[str] | None = None,
     document_number: int | None = None,
-) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
+) -> tuple[int, str, list[RECAPDocument]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
     :param pk: The primary key of the processing queue item you want to work on
@@ -835,6 +839,9 @@ async def process_recap_attachment(
     logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
 
     pq, att_data, text = await get_att_data_from_pq(pq)
+    if not att_data:
+        # Bad attachment page.
+        return pq.status, pq.error_message, []
 
     if document_number is None:
         document_number = att_data["document_number"]
@@ -2691,7 +2698,6 @@ def get_and_merge_rd_attachments(
             user_pk,
             att_report_text,
         )
-
         # Attachments for multi-docket NEFs are the same for every case
         # mentioned in the notification. The only difference between them is a
         # different document_number in every case for the main document the
