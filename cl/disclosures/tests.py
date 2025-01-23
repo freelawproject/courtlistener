@@ -283,6 +283,7 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
     def tearDown(self) -> None:
         FinancialDisclosure.objects.all().delete()
         Person.objects.all().delete()
+        super().tearDown()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_disclosure_homepage(self) -> None:
