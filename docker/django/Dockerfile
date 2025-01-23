@@ -70,6 +70,7 @@ RUN mkdir /var/log/courtlistener \
 
 WORKDIR /opt/courtlistener
 
+
 ENV PYTHONPATH="/opt/courtlistener"
 
 USER root
