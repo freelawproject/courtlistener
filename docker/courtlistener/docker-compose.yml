@@ -85,7 +85,7 @@ services:
     env_file:
       - ../../.env.dev
     command: sh -c 'npm install && exec npm run dev'
-
+    tty: true
 
   cl-django:
     container_name: cl-django
