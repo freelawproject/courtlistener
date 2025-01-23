@@ -81,9 +81,10 @@ services:
     build:
       context: "${CL_BASE_DIR:-../../}"
       dockerfile: "./docker/django/Dockerfile"
-      target: tailwind-reload
       args:
         BUILD_ENV: dev
+    command: tailwind-reload
+    user: root
     volumes:
       - ${CL_BASE_DIR:-../../}:/opt/courtlistener
     networks:
