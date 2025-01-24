@@ -49,6 +49,12 @@ services:
       - ../../.env.dev
     working_dir: /opt/courtlistener/cl
     command: sh -c 'npm install && exec npx webpack --progress --watch --mode=development'
+    healthcheck:
+      test: sh -c 'ps aux | grep -v grep | grep webpack >/dev/null 2>&1 && echo 0 || echo 1'
+      interval: 5s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
 
   # Task Server
   cl-celery:
@@ -84,7 +90,10 @@ services:
       - ${CL_BASE_DIR:-../../}:/opt/courtlistener
     env_file:
       - ../../.env.dev
-    command: sh -c 'npm install && exec npm run dev'
+    command: sh -c 'npm run dev'
+    depends_on:
+      cl-webpack:
+        condition: service_healthy
     tty: true
 
   cl-django:
