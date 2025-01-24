@@ -2576,7 +2576,7 @@ class ScrapeIqueryPagesTest(TestCase):
             )
             # Probing will add 3 dockets (12, 16, 24) + 2 added for the sweep task (13,18).
             self.assertEqual(
-                dockets.count(), 5, msg="Docket number doesn't match."
+                dockets.count(), 5, msg="Docket count doesn't match."
             )
             # 7 additional PACER HTML files should be stored by now, 3 added by the
             # probing task + 4 added by the sweep task.
@@ -2589,8 +2589,22 @@ class ScrapeIqueryPagesTest(TestCase):
 
             ### Integration test probing task + sweep
             # IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED False
+            with override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False):
+                # Create docket pacer_case_id 12, which is the last docket in
+                # the probe. Even though it already exists, it should trigger
+                # a sweep task.
+                DocketFactory(
+                    court=self.court_txed,
+                    source=Docket.RECAP,
+                    case_name="New Incoming Docket 12",
+                    docket_number="2:10-cv-00602",
+                    pacer_case_id="12",
+                )
+
             dockets = Docket.objects.filter(court_id=self.court_txed.pk)
-            self.assertEqual(dockets.count(), 0)
+            self.assertEqual(
+                dockets.count(), 1, msg="Docket count doesn't match for txed."
+            )
             r = get_redis_interface("CACHE")
             # Simulate a highest_known_pacer_case_id  = 8
             r.hset("iquery:highest_known_pacer_case_id", self.court_txed.pk, 8)
@@ -2615,9 +2629,10 @@ class ScrapeIqueryPagesTest(TestCase):
                 1,
                 msg="Wrong number of sweep task called.",
             )
-            # Probing will add 3 dockets (9,10,12) + 1 added for the sweep task (11).
+            # Probing will add 3 dockets (9,10) + 1 added for the sweep task (11).
+            # Docket 12 already exists however, it should still trigger the sweep task that adds 11.
             self.assertEqual(
-                dockets.count(), 4, msg="Docket number doesn't match for txed."
+                dockets.count(), 4, msg="Docket count doesn't match for txed."
             )
         finally:
             # Ensure the signal is disconnected after the test
