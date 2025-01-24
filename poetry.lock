@@ -1023,6 +1023,22 @@ files = [
 Django = ">=2.0"
 
 [[package]]
+name = "django-browser-reload"
+version = "1.17.0"
+description = "Automatically reload your browser in development."
+optional = false
+python-versions = ">=3.9"
+groups = ["dev"]
+files = [
+    {file = "django_browser_reload-1.17.0-py3-none-any.whl", hash = "sha256:d372c12c1c5962c02279a53cac7e8a020c48f104592c637a06d0768b28d2d6be"},
+    {file = "django_browser_reload-1.17.0.tar.gz", hash = "sha256:3667939cde0eee1a6d698dbe3b78cf10b573dabc4e711fb7933f1ba91fb98da4"},
+]
+
+[package.dependencies]
+asgiref = ">=3.6"
+django = ">=4.2"
+
+[[package]]
 name = "django-cache-memoize"
 version = "0.2.0"
 description = "Django utility for a memoization decorator that uses the Django cache framework."
@@ -1379,6 +1395,25 @@ files = [
 [package.dependencies]
 django = "*"
 typing-extensions = "*"
+
+[[package]]
+name = "django-tailwind"
+version = "3.8.0"
+description = "Tailwind CSS Framework for Django projects"
+optional = false
+python-versions = ">=3.10.0,<4.0.0"
+groups = ["main", "dev"]
+files = [
+    {file = "django_tailwind-3.8.0-py3-none-any.whl", hash = "sha256:fa969c5b95d314b173fe2b2ed2cb2c03f2e2c94fdc2c01ff73a993fa159085da"},
+    {file = "django_tailwind-3.8.0.tar.gz", hash = "sha256:31c2f4a7879d685c2de0feaf0b63f246200b37337bea4d7dbafb59bc3f10c008"},
+]
+
+[package.dependencies]
+django = ">=3.2.14"
+django-browser-reload = {version = ">=1.12.1,<2.0.0", optional = true, markers = "extra == \"reload\""}
+
+[package.extras]
+reload = ["django-browser-reload (>=1.12.1,<2.0.0)"]
 
 [[package]]
 name = "django-waffle"
@@ -5939,4 +5974,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13, <3.14"
-content-hash = "12d8e71bac2171b8fe6784d6c0dab1135a33ebe74f9e0838ee799e48eab7f33a"
+content-hash = "50557c415b4d3adc116f4616ac2b2ec89ce9fbd16aef1d69a442be184966a625"
