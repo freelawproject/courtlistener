@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
+from bs4 import BeautifulSoup
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
 from django.core.management import call_command
@@ -183,7 +184,6 @@ class CitationTextTest(SimpleTestCase):
             ('<script async src="//www.instagram.com/embed.js"></script>',
              '<pre class="inline">&lt;script async src=&quot;//www.instagram.com/embed.js&quot;&gt;&lt;/script&gt;</pre>'),
         ]
-
         # fmt: on
         for s, expected_html in test_pairs:
             with self.subTest(
@@ -315,24 +315,26 @@ class CitationTextTest(SimpleTestCase):
         # test the rendering of citation objects that we assert are correctly
         # matched. (No matching is performed in the previous cases.)
         # fmt: off
-
+        case_name = "Example vs. Example"
+        aria_description = f'aria-description="Citation for case: {case_name}"'
         test_pairs = [
             # Id. citation with page number ("Id., at 123, 124")
             ('asdf, Id., at 123, 124. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id="'
-             'MATCH_ID"><a href="MATCH_URL">Id., at 123, 124</a></span><pre '
-             'class="inline">. Lorem ipsum dolor sit amet</pre>'),
+             f'MATCH_ID"><a href="MATCH_URL" {aria_description}>'
+             'Id., at 123, 124</a></span><pre class="inline">. '
+             'Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation with complex page number ("Id. @ 123:1, ¶¶ 124")
             ('asdf, Id. @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id='
-             '"MATCH_ID"><a href="MATCH_URL">Id.</a></span><pre class='
+             f'"MATCH_ID"><a href="MATCH_URL" {aria_description}>Id.</a></span><pre class='
              '"inline"> @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation without page number ("Id. Something else")
             ('asdf, Id. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id="'
-             'MATCH_ID"><a href="MATCH_URL">Id.</a></span><pre class="inline">'
+             f'MATCH_ID"><a href="MATCH_URL" {aria_description}>Id.</a></span><pre class="inline">'
              ' Lorem ipsum dolor sit amet</pre>'),
         ]
 
@@ -355,7 +357,9 @@ class CitationTextTest(SimpleTestCase):
                 # to receive. Also make sure that the "matched" opinion is
                 # mocked appropriately.
                 opinion.pk = "MATCH_ID"
-                opinion.cluster = Mock(OpinionCluster(id=24601))
+                opinion.cluster = Mock(
+                    OpinionCluster(id=24601), case_name=case_name
+                )
                 opinion.cluster.get_absolute_url.return_value = "MATCH_URL"
                 citation_resolutions = {opinion: citations}
 
@@ -366,6 +370,53 @@ class CitationTextTest(SimpleTestCase):
                     expected_html,
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
+
+    def test_unsafe_case_names(self) -> None:
+        """Test unsafe characters in aria descriptions"""
+        case_names = [
+            (
+                # ampersand
+                "Farmers ' High Line Canal & Reservoir Co. v. New Hampshire Real Estate Co.",
+                "Citation for case: Farmers ' High Line Canal & Reservoir Co. v. New...",
+            ),
+            (
+                # single quote
+                "Barmore v '",
+                "Citation for case: Barmore v '",
+            ),
+            (
+                # Question mark, and double quotes
+                """Shamokin, Pa.", (Leaflet in Case) Misnamed? ',""",  # Question marks and double quotes with single quotes
+                """Citation for case: Shamokin, Pa.", (Leaflet in Case) Misnamed? ',""",
+            ),
+        ]
+        for case_name, expected_aria in case_names:
+            html_opinion = "foo v. bar, 1 U.S. 1 baz"
+            opinion = Opinion(
+                plain_text=html_opinion,
+                pk="MATCH_ID",
+                cluster=Mock(OpinionCluster(id=1234), case_name=case_name),
+            )
+            get_and_clean_opinion_text(opinion)
+            citations = get_citations(
+                opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+            )
+            opinion.cluster.get_absolute_url.return_value = "/opinion/1/foo/"
+            citation_resolutions = {opinion: citations}
+            created_html = create_cited_html(opinion, citation_resolutions)
+
+            # extract out aria description
+            soup = BeautifulSoup(created_html, "html.parser")
+            citation_link = soup.find("a", {"aria-description": True})
+            aria_description = (
+                citation_link["aria-description"] if citation_link else None
+            )
+
+            self.assertEqual(
+                aria_description,
+                expected_aria,
+                msg=f"\n{aria_description}\n\n    !=\n\n{expected_aria}",
+            )
 
 
 class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
