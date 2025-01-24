@@ -168,7 +168,9 @@ class RecapUploadsTest(TestCase):
         cls.att_data = AppellateAttachmentPageFactory(
             attachments=[
                 AppellateAttachmentFactory(
-                    pacer_doc_id="04505578698", attachment_number=1
+                    pacer_doc_id="04505578698",
+                    attachment_number=1,
+                    description="Order entered",
                 ),
                 AppellateAttachmentFactory(
                     pacer_doc_id="04505578699", attachment_number=2
@@ -182,6 +184,7 @@ class RecapUploadsTest(TestCase):
                 DocketEntryDataFactory(
                     pacer_doc_id="04505578698",
                     document_number=1,
+                    short_description="Lorem ipsum",
                 )
             ],
         )
@@ -576,6 +579,149 @@ class RecapUploadsTest(TestCase):
             main_attachment[0].description,
             self.att_data["attachments"][0]["description"],
         )
+
+    def test_match_appellate_main_rd_with_attachments_and_no_att_data(
+        self, mock_upload
+    ):
+        """Can we match the main RECAPDocument when merging an appellate docket
+        entry from a docket sheet after a PDF upload has added attachments,
+        but before the attachment page for the entry is available?
+        """
+
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            pacer_case_id="104490",
+        )
+        # Merge docket entry #1
+        async_to_sync(add_docket_entries)(d, self.de_data["docket_entries"])
+
+        # Confirm that the main RD has been properly merged.
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+        self.assertEqual(recap_documents.count(), 1)
+        main_rd = recap_documents[0]
+        self.assertEqual(main_rd.document_type, RECAPDocument.PACER_DOCUMENT)
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Lorem ipsum")
+
+        # Upload a PDF for attachment 2 in the same entry #1.
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id=d.pacer_case_id,
+            pacer_doc_id="04505578699",
+            document_number=1,
+            attachment_number=2,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+        async_to_sync(process_recap_upload)(pq)
+
+        entry_rds = RECAPDocument.objects.filter(
+            docket_entry=main_rd.docket_entry
+        )
+        # Confirm a new RD was created by the att PDF upload.
+        self.assertEqual(entry_rds.count(), 2, msg="Wrong number of RDs.")
+
+        pq.refresh_from_db()
+        att_2_rd = pq.recap_document
+        # The new RD should be attachment #2
+        self.assertEqual(att_2_rd.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(att_2_rd.attachment_number, 2)
+
+        # Simulate a docket sheet merge containing entry #1 again:
+        de_data_2 = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    pacer_doc_id="04505578698",
+                    document_number=1,
+                    short_description="Motion",
+                )
+            ],
+        )
+
+        async_to_sync(add_docket_entries)(d, de_data_2["docket_entries"])
+        self.assertEqual(entry_rds.count(), 2, msg="Wrong number of RDs.")
+        main_rd.refresh_from_db()
+
+        # Confirm the main RD was properly matched and updated.
+        self.assertEqual(main_rd.description, "Motion")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="Wrong document type.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+
+        # Now merge the Attachment page.
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="104490",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data,
+        ):
+            # Process the appellate attachment page containing 2 attachments.
+            async_to_sync(process_recap_appellate_attachment)(pq.pk)
+
+        # Confirm that the main_rd is properly converted into an attachment.
+        self.assertEqual(recap_documents.count(), 2)
+        main_rd.refresh_from_db()
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="Wrong document type.",
+        )
+        self.assertEqual(main_rd.attachment_number, 1)
+
+    def test_avoid_merging_att_zero_on_pdf_uploads(self, mock_upload):
+        """Confirm that a RECAP PDF upload containing attachment number 0
+        matches the main RD."""
+
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            pacer_case_id="104490",
+        )
+        # Merge docket entry #1
+        async_to_sync(add_docket_entries)(d, self.de_data["docket_entries"])
+
+        # Confirm that the main RD has been properly merged.
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+        self.assertEqual(recap_documents.count(), 1)
+        main_rd = recap_documents[0]
+        self.assertEqual(main_rd.document_type, RECAPDocument.PACER_DOCUMENT)
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.is_available, False)
+
+        # Upload a PDF for attachment number 0.
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id=d.pacer_case_id,
+            pacer_doc_id="04505578698",
+            document_number=1,
+            attachment_number=0,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+        async_to_sync(process_recap_upload)(pq)
+        entry_rds = RECAPDocument.objects.filter(
+            docket_entry=main_rd.docket_entry
+        )
+        pq.refresh_from_db()
+        main_rd = pq.recap_document
+
+        # Confirm that the main RD is properly matched and that
+        # attachment_number is not set to 0.
+        self.assertEqual(entry_rds.count(), 1, msg="Wrong number of RDs.")
+        self.assertEqual(main_rd.document_type, RECAPDocument.PACER_DOCUMENT)
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.is_available, True)
 
     async def test_uploading_a_case_query_result_page(self, mock):
         """Can we upload a case query result page and have it be saved
