@@ -2330,6 +2330,9 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         cls.court_appellate = CourtFactory(
             id="ca11", jurisdiction=Court.FEDERAL_APPELLATE, in_use=True
         )
+        cls.court_federal_special = CourtFactory(
+            id="cc", jurisdiction=Court.FEDERAL_SPECIAL, in_use=True
+        )
 
     def test_simple_request_serialization(self, mock) -> None:
         """Can we serialize a simple request?"""
@@ -2363,12 +2366,12 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
     def test_recap_fetch_validate_court(self, mock):
         """Can we properly validate the court_id?"""
 
-        appellate_docket = DocketFactory(
+        non_pacer_docket = DocketFactory(
             source=Docket.RECAP,
-            court_id="ca11",
+            court_id=self.court_federal_special.pk,
         )
         # checks the provided docket id is not an appellate record
-        self.fetch_attributes["docket"] = appellate_docket.pk
+        self.fetch_attributes["docket"] = non_pacer_docket.pk
         serialized_fq = PacerFetchQueueSerializer(
             data=self.fetch_attributes,
             context={"request": self.request},
@@ -2376,15 +2379,15 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            "Invalid court id: ca11",
+            f"Invalid court id: {self.court_federal_special.pk}",
         )
 
         # checks the provided court when users send a pacer_case_id-court pair
         del self.fetch_attributes["docket"]
         self.fetch_attributes.update(
             {
-                "pacer_case_id": appellate_docket.pacer_case_id,
-                "court": appellate_docket.court_id,
+                "pacer_case_id": non_pacer_docket.pacer_case_id,
+                "court": non_pacer_docket.court_id,
             }
         )
         serialized_fq = PacerFetchQueueSerializer(
@@ -2394,14 +2397,14 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            "Invalid court id: ca11",
+            f"Invalid court id: {self.court_federal_special.pk}",
         )
 
         # checks the provided court when users send a docket_number-court pair
         del self.fetch_attributes["pacer_case_id"]
         self.fetch_attributes.update(
             {
-                "docket_number": appellate_docket.docket_number,
+                "docket_number": non_pacer_docket.docket_number,
             }
         )
         serialized_fq = PacerFetchQueueSerializer(
@@ -2411,14 +2414,14 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            "Invalid court id: ca11",
+            f"Invalid court id: {self.court_federal_special.pk}",
         )
 
     def test_recap_fetch_validate_court_of_rd(self, mock) -> None:
         """Can we validate the court when fetching a PDF?"""
         rd = RECAPDocumentFactory.create(
             docket_entry=DocketEntryWithParentsFactory(
-                docket__court=self.court_appellate
+                docket__court=self.court_federal_special
             ),
         )
 
@@ -2433,7 +2436,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            "Invalid court id: ca11",
+            f"Invalid court id: {self.court_federal_special.pk}",
         )
 
     def test_key_serialization_with_client_code(self, mock) -> None:

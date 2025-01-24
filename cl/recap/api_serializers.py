@@ -265,15 +265,12 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         # Is it a good court value?
-        valid_court_ids = (
-            Court.federal_courts.district_or_bankruptcy_pacer_courts()
-        )
+        valid_court_ids = Court.federal_courts.all_pacer_courts()
         if (
             attrs.get("court")
             or attrs.get("docket")
             or attrs.get("recap_document")
         ):
-            # this check ensures the docket is not an appellate record.
             if attrs.get("recap_document"):
                 rd = attrs["recap_document"]
                 court_id = rd.docket_entry.docket.court_id
