@@ -1912,6 +1912,27 @@ class RecapPdfFetchApiTest(TestCase):
             fq_acms.message,
         )
 
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        return_value=(None, "Unable to download PDF."),
+    )
+    def test_handle_failed_purchases(
+        self, mock_download_method, mock_court_accessible, mock_get_cookies
+    ):
+        """Can we handle failed purchases?"""
+        self.rd.is_available = False
+        self.rd.save()
+
+        self.assertFalse(self.rd.is_available)
+        fetch_pacer_doc_by_rd(self.rd.pk, self.fq.pk)
+
+        self.fq.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn(
+            "Unable to download PDF.",
+            self.fq.message,
+        )
+
 
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
