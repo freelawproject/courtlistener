@@ -6,6 +6,8 @@ from eyecite import annotate_citations, clean_text
 
 from cl.citations.match_citations import NO_MATCH_RESOURCE
 from cl.citations.types import MatchedResourceType, SupportedCitationType
+from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.string_utils import trunc
 from cl.search.models import Opinion, RECAPDocument
 
 
@@ -61,8 +63,13 @@ def generate_annotations(
                 "</span>",
             ]
         else:  # If successfully matched...
+            case_name = trunc(best_case_name(opinion.cluster), 60, "...")
+            safe_case_name = html.escape(case_name)
             annotation = [
-                f'<span class="citation" data-id="{opinion.pk}"><a href="{opinion.cluster.get_absolute_url()}">',
+                f'<span class="citation" data-id="{opinion.pk}">'
+                f'<a href="{opinion.cluster.get_absolute_url()}"'
+                f' aria-description="Citation for case: {safe_case_name}"'
+                ">",
                 "</a></span>",
             ]
         for c in citations:

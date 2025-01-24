@@ -42,6 +42,7 @@ from cl.api.utils import (
     get_next_webhook_retry_date,
     get_webhook_deprecation_date,
 )
+from cl.corpus_importer.utils import is_appellate_court
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
@@ -87,6 +88,8 @@ from cl.recap.mergers import (
     add_docket_entries,
     add_parties_and_attorneys,
     find_docket_object,
+    get_data_from_appellate_att_report,
+    get_data_from_att_report,
     get_order_of_docket,
     merge_attachment_page_data,
     normalize_long_description,
@@ -1014,6 +1017,39 @@ class RecapUploadsTest(TestCase):
             msg="The pacer_doc_id doesn't match.",
         )
 
+    def test_bad_attachment_page_upload_fails_gracefully(self, mock_upload):
+        """Confirm that a bad attachment page upload fails gracefully with the
+        appropriate status and error message.
+        """
+
+        # Create an initial PQ.
+        pq = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id="104491",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_att_report",
+            side_effect=lambda x, y: {},
+        ):
+            # Process the bad attachment page.
+            async_to_sync(process_recap_upload)(pq)
+
+        # Confirm the PQ is properly marked as failed.
+        pq.refresh_from_db()
+        self.assertEqual(
+            pq.status,
+            PROCESSING_STATUS.INVALID_CONTENT,
+            msg="The status doesn't match.",
+        )
+        self.assertEqual(
+            pq.error_message,
+            "Not a valid attachment page upload.",
+            msg="The error message doesn't match.",
+        )
+
 
 class ReplicateRecapUploadsTest(TestCase):
     """Test RECAP uploads are properly replicated to subdockets."""
@@ -1844,15 +1880,35 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
 class RecapPdfFetchApiTest(TestCase):
     """Can we fetch PDFs properly?"""
 
-    fixtures = ["recap_docs.json"]
-
     def setUp(self) -> None:
+        self.docket = DocketFactory(
+            case_name="United States v. Curlin",
+            case_name_short="Curlin",
+            pacer_case_id="28766",
+            source=Docket.RECAP,
+            docket_number="3:92-cr-00139-T",
+            slug="united-states-v-curlin",
+        )
+        self.de = DocketEntryWithParentsFactory(
+            docket=self.docket,
+            description=" Memorandum Opinion and Order as to Albert Evans Curlin: Clerk is directed to file a copy of this opinion in the criminal action - Petition in 3:01cv429, filed pursuant to 28:2241, is properly construed as a motion to vacate pursuant to 28:2255 and is denied for failure of pet to file it within the statutory period of limitations.  (Signed by Judge Jerry Buchmeyer on 7/12/2002) (lrl, )",
+            entry_number=1,
+        )
+        self.rd = RECAPDocumentFactory(
+            docket_entry=self.de,
+            document_number="1",
+            is_available=True,
+            is_free_on_pacer=True,
+            page_count=17,
+            pacer_doc_id="17701118263",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
         self.fq = PacerFetchQueue.objects.create(
             user=User.objects.get(username="recap"),
             request_type=REQUEST_TYPE.PDF,
-            recap_document_id=1,
+            recap_document_id=self.rd.pk,
         )
-        self.rd = self.fq.recap_document
 
     def tearDown(self) -> None:
         RECAPDocument.objects.update(is_available=True)
@@ -1903,17 +1959,55 @@ class RecapPdfFetchApiTest(TestCase):
     side_effect=lambda a: True,
 )
 class RecapAttPageFetchApiTest(TestCase):
-    fixtures = ["recap_docs.json"]
 
     def setUp(self) -> None:
+        self.district_court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
+        self.district_docket = DocketFactory(
+            source=Docket.RECAP, court=self.district_court
+        )
+        self.rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.district_docket,
+            ),
+            document_number="1",
+            is_available=True,
+            is_free_on_pacer=True,
+            page_count=17,
+            pacer_doc_id="17711118263",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
         self.fq = PacerFetchQueue.objects.create(
             user=User.objects.get(username="recap"),
             request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
-            recap_document_id=1,
+            recap_document_id=self.rd.pk,
         )
-        self.rd = self.fq.recap_document
-        self.rd.pacer_doc_id = "17711118263"
-        self.rd.save()
+
+        self.appellate_court = CourtFactory(
+            id="ca1", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        self.appellate_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.appellate_court,
+            pacer_case_id=41651,
+        )
+        self.rd_appellate = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.appellate_docket, entry_number=1208699339
+            ),
+            document_number=1208699339,
+            pacer_doc_id="1208699339",
+            attachment_number=1,
+            is_available=True,
+            page_count=15,
+            document_type=RECAPDocument.ATTACHMENT,
+            ocr_status=4,
+        )
+        self.fq_appellate = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=self.rd_appellate.pk,
+        )
 
     def test_fetch_attachment_page_no_pacer_doc_id(
         self, mock_court_accessible
@@ -1936,8 +2030,32 @@ class RecapAttPageFetchApiTest(TestCase):
         self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find cached cookies", self.fq.message)
 
+    def test_fetch_acms_att_page(self, mock_court_accessible) -> None:
+        rd_acms = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(docket=DocketFactory()),
+            pacer_doc_id="784459c4-e2cd-ef11-b8e9-001dd804c0b4",
+        )
+        fq_acms = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=rd_acms.pk,
+        )
+        result = do_pacer_fetch(fq_acms)
+        result.get()
+
+        fq_acms.refresh_from_db()
+        self.assertEqual(fq_acms.status, PROCESSING_STATUS.FAILED)
+        self.assertIn(
+            "ACMS attachment pages are not currently supported",
+            fq_acms.message,
+        )
+
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_data_from_att_report",
+        wraps=get_data_from_att_report,
     )
     @mock.patch(
         "cl.corpus_importer.tasks.AttachmentPage",
@@ -1946,15 +2064,84 @@ class RecapAttPageFetchApiTest(TestCase):
     @mock.patch(
         "cl.recap.mergers.AttachmentPage", new=fakes.FakeAttachmentPage
     )
-    def test_fetch_att_page_all_systems_go(
-        self, mock_get_cookies, mock_court_accessible
+    @mock.patch(
+        "cl.corpus_importer.tasks.is_appellate_court", wraps=is_appellate_court
+    )
+    @mock.patch("cl.recap.tasks.is_appellate_court", wraps=is_appellate_court)
+    def test_fetch_att_page_from_district_court(
+        self,
+        mock_court_check_task,
+        mock_court_check_parser,
+        mock_report_parser,
+        mock_get_cookies,
+        mock_court_accessible,
     ):
         result = do_pacer_fetch(self.fq)
         result.get()
 
         self.fq.refresh_from_db()
+
+        # Verify court validation calls with expected court ID
+        district_court_id = self.rd.docket_entry.docket.court_id
+        mock_court_check_task.assert_called_with(district_court_id)
+        mock_court_check_parser.assert_called_with(district_court_id)
+
+        # Ensure correct parser is called exactly once (ideal scenario)
+        mock_report_parser.assert_called_once()
+        mock_report_parser.assert_called_with(ANY, district_court_id)
+
+        # Assert successful fetch status and expected message
         self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
         self.assertIn("Successfully completed fetch", self.fq.message)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_data_from_appellate_att_report",
+        wraps=get_data_from_appellate_att_report,
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.AppellateAttachmentPage",
+        new=fakes.FakeAppellateAttachmentPage,
+    )
+    @mock.patch(
+        "cl.recap.mergers.AppellateAttachmentPage",
+        new=fakes.FakeAppellateAttachmentPage,
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.is_appellate_court", wraps=is_appellate_court
+    )
+    @mock.patch("cl.recap.tasks.is_appellate_court", wraps=is_appellate_court)
+    def test_fetch_att_page_from_appellate(
+        self,
+        mock_court_check_task,
+        mock_court_check_parser,
+        mock_report_parser,
+        mock_get_cookies,
+        mock_court_accessible,
+    ):
+        result = do_pacer_fetch(self.fq_appellate)
+        result.get()
+
+        self.fq_appellate.refresh_from_db()
+
+        # Verify court validation calls with expected court ID
+        appellate_court_id = self.rd_appellate.docket_entry.docket.court_id
+        mock_court_check_task.assert_called_with(appellate_court_id)
+        mock_court_check_parser.assert_called_with(appellate_court_id)
+
+        # Ensure correct parser is called exactly once (ideal scenario)
+        mock_report_parser.assert_called_once()
+        mock_report_parser.assert_called_with(ANY, appellate_court_id)
+
+        # Assert successful fetch status and expected message
+        self.assertEqual(
+            self.fq_appellate.status, PROCESSING_STATUS.SUCCESSFUL
+        )
+        self.assertIn(
+            "Successfully completed fetch", self.fq_appellate.message
+        )
 
 
 class ProcessingQueueApiFilterTest(TestCase):
@@ -6264,8 +6451,13 @@ class RecapEmailDocketAlerts(TestCase):
         return_value=(None, "Failed to get docket entry"),
     )
     @mock.patch("cl.recap.tasks.add_docket_entries")
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
     async def test_recap_email_sealed_entry_no_attachments(
         self,
+        mock_webhook_post,
         mock_add_docket_entries,
         mock_download_pdf_by_magic_number,
         mock_docket_entry_sealed,
@@ -6343,8 +6535,13 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch("cl.recap.tasks.get_and_merge_rd_attachments")
     @mock.patch("cl.recap.tasks.add_docket_entries")
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
     async def test_recap_email_sealed_entry_with_attachments(
         self,
+        mock_webhook_post,
         mock_add_docket_entries,
         mock_merge_rd_attachments,
         mock_download_pdf_by_magic_number,
@@ -6425,6 +6622,170 @@ class RecapEmailDocketAlerts(TestCase):
             "Could not retrieve Docket Entry",
             email_processing_queue.status_message,
         )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_attachment_page_by_url",
+        return_value="<html>Sealed document</html>",
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    async def test_recap_email_sealed_document_with_attachments(
+        self,
+        mock_webhook_post,
+        mock_get_attachment_page_by_url,
+        mock_download_pdf_by_magic_number,
+        mock_docket_entry_sealed,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+    ):
+        """This test checks whether a document with attachments that is sealed
+        on PACER is properly ingested. If the attachment page is also
+        unavailable, the attachments are not merged.
+        """
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=True,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[RECAPEmailDocketEntryDataFactory()],
+                )
+            ],
+        )
+
+        court = await sync_to_async(CourtFactory)(id="nyed", jurisdiction="FB")
+        notification_payload = {
+            "court": court.id,
+            "mail": self.data["mail"],
+            "receipt": self.data["receipt"],
+        }
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            return_value=(email_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            await self.async_client.post(
+                self.path, notification_payload, format="json"
+            )
+
+        docket_entry = email_data["dockets"][0]["docket_entries"]
+        docket_entry_query = DocketEntry.objects.filter(
+            docket__pacer_case_id=docket_entry[0]["pacer_case_id"],
+            entry_number=docket_entry[0]["document_number"],
+        )
+        self.assertEqual(await docket_entry_query.acount(), 1)
+
+        # Only the main document is merged.
+        de = await docket_entry_query.afirst()
+        self.assertEqual(await de.recap_documents.all().acount(), 1)
+
+        # An alert containing the main document sealed is sent.
+        self.assertEqual(len(mail.outbox), 1)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_attachment_page_by_url",
+        return_value="<html>Sealed document</html>",
+    )
+    async def test_recap_email_sealed_document_with_no_sealed_attachments(
+        self,
+        mock_get_attachment_page_by_url,
+        mock_webhook_post,
+        mock_download_pdf_by_magic_number,
+        mock_docket_entry_sealed,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+    ):
+        """This test checks whether a document with attachments that is sealed
+        on PACER are properly ingested when the attachment page is available.
+        """
+
+        att_data = AppellateAttachmentPageFactory(
+            attachments=[
+                AppellateAttachmentFactory(
+                    pacer_doc_id="04505578699", attachment_number=1
+                ),
+            ],
+            pacer_doc_id="04505578698",
+        )
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=True,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="04505578698"
+                        )
+                    ],
+                )
+            ],
+        )
+
+        court = await sync_to_async(CourtFactory)(id="nyed", jurisdiction="FB")
+        notification_payload = {
+            "court": court.id,
+            "mail": self.data["mail"],
+            "receipt": self.data["receipt"],
+        }
+
+        with (
+            mock.patch(
+                "cl.recap.tasks.get_data_from_att_report",
+                side_effect=lambda x, y: att_data,
+            ),
+            mock.patch(
+                "cl.recap.tasks.open_and_validate_email_notification",
+                return_value=(email_data, "HTML"),
+            ),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            await self.async_client.post(
+                self.path, notification_payload, format="json"
+            )
+
+        docket_entry = email_data["dockets"][0]["docket_entries"]
+        docket_entry_query = DocketEntry.objects.filter(
+            docket__pacer_case_id=docket_entry[0]["pacer_case_id"],
+            entry_number=docket_entry[0]["document_number"],
+        )
+        self.assertEqual(await docket_entry_query.acount(), 1)
+
+        # The main sealed document and one attachment should be ingested.
+        de = await docket_entry_query.afirst()
+        self.assertEqual(await de.recap_documents.all().acount(), 2)
+
+        # Check RDs merged.
+        main_doc = await RECAPDocument.objects.filter(
+            docket_entry=de, document_type=RECAPDocument.PACER_DOCUMENT
+        ).afirst()
+        self.assertEqual(main_doc.is_sealed, True)
+        att_doc = RECAPDocument.objects.filter(
+            docket_entry=de, document_type=RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(await att_doc.acount(), 1)
+
+        # An alert is sent.
+        self.assertEqual(len(mail.outbox), 1)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",

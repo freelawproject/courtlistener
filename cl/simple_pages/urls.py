@@ -6,6 +6,7 @@ from cl.simple_pages.views import (
     advanced_search,
     alert_help,
     broken_email_help,
+    components,
     contact,
     contact_thanks,
     contribute,
@@ -78,6 +79,7 @@ urlpatterns = [
     ),
     path("terms/v/<int:v>/", old_terms, name="old_terms"),  # type: ignore[arg-type]
     path("terms/", latest_terms, name="terms"),  # type: ignore[arg-type]
+    path("components/", components, name="components"),  # type: ignore[arg-type]
     # Robots
     path(
         "robots.txt",

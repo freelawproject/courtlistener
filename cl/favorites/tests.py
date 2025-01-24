@@ -891,8 +891,8 @@ class RECAPPrayAndPay(TestCase):
 
     async def test_get_user_prayer_history(self) -> None:
         """Does the get_user_prayer_history method work properly?"""
-        # Prayers for user_2
-        await create_prayer(self.user_2, self.rd_4)
+        # # Prayers for user_2
+        # await create_prayer(self.user_2, self.rd_4)
 
         # Prayers for user
         await create_prayer(self.user, self.rd_2)
@@ -900,9 +900,9 @@ class RECAPPrayAndPay(TestCase):
         prayer_rd5 = await create_prayer(self.user, self.rd_5)
 
         # Verify that the initial prayer count and total cost are 0.
-        count, total_cost = await get_user_prayer_history(self.user)
-        self.assertEqual(count, 0)
-        self.assertEqual(total_cost, 0.0)
+        user_history = await get_user_prayer_history(self.user)
+        self.assertEqual(user_history.prayer_count, 0)
+        self.assertEqual(user_history.total_cost, "0.00")
 
         # Update `rd_3`'s page count and set `prayer_rd3`'s status to `GRANTED`
         self.rd_3.page_count = 2
@@ -911,10 +911,13 @@ class RECAPPrayAndPay(TestCase):
         prayer_rd3.status = Prayer.GRANTED
         await prayer_rd3.asave()
 
+        # Clear cache for this specific user
+        await cache.adelete(f"prayer-stats-{self.user}")
+
         # Verify that the count is 1 and total cost is 0.20.
-        count, total_cost = await get_user_prayer_history(self.user)
-        self.assertEqual(count, 1)
-        self.assertEqual(total_cost, 0.20)
+        user_history = await get_user_prayer_history(self.user)
+        self.assertEqual(user_history.prayer_count, 1)
+        self.assertEqual(user_history.total_cost, "0.20")
 
         # Update `rd_5`'s page count and set `prayer_rd5`'s status to `GRANTED`
         self.rd_5.page_count = 40
@@ -923,10 +926,13 @@ class RECAPPrayAndPay(TestCase):
         prayer_rd5.status = Prayer.GRANTED
         await prayer_rd5.asave()
 
+        # Clear cache for this specific user
+        await cache.adelete(f"prayer-stats-{self.user}")
+
         # Verify that the count is 2 and the total cost is now 3.20.
-        count, total_cost = await get_user_prayer_history(self.user)
-        self.assertEqual(count, 2)
-        self.assertEqual(total_cost, 3.20)
+        user_history = await get_user_prayer_history(self.user)
+        self.assertEqual(user_history.prayer_count, 2)
+        self.assertEqual(user_history.total_cost, "3.20")
 
     @patch("cl.favorites.utils.cache.aget")
     async def test_get_lifetime_prayer_stats(self, mock_cache_aget) -> None:

@@ -29,6 +29,7 @@ cl/assets/media/recap_processing_queue/
 cl/assets/media/xml/
 cl/assets/static/
 cl/assets/static-global/js/react
+cl/assets/static-global/css/tailwind_styles.css
 
 # IntelliJ IDEA files
 .idea
