@@ -48,6 +48,7 @@ REST_FRAMEWORK = {
         "PeterPan": "1/hour",
         "HomerSimpson": "1/hour",
         "BruceWayne": "1/hour",
+        "mibefis809": "1/hour",
         # Unresponsive
         "court_test_account": "1/hour",
         "jmmckinnie": "1/hour",
