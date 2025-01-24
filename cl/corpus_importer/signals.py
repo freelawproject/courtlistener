@@ -119,11 +119,16 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
         # pacer_case_id)
         return None
 
-    # Only call update_latest_case_id_and_schedule_iquery_sweep if this is a
-    # new RECAP district or bankruptcy docket with pacer_case_id not added by
-    # iquery sweep tasks.
+    # Only call update_latest_case_id_and_schedule_iquery_sweep if:
+    # - The docket belongs to a RECAP district or bankruptcy court,
+    # - The docket has a pacer_case_id,
+    # - The docket was newly created (when IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True), or
+    # - The docket was created or updated by the last probe iteration from probe_iquery_pages.
+    check_probe_or_created = (
+        not getattr(instance, "avoid_trigger_signal", False) or created
+    )
     if (
-        created
+        check_probe_or_created
         and instance.pacer_case_id
         and instance.court_id
         in list(
