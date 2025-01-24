@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from unittest import mock
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import time_machine
 from asgiref.sync import sync_to_async
@@ -40,7 +40,11 @@ from cl.alerts.tasks import (
     get_docket_notes_and_tags_by_user,
     send_alert_and_webhook,
 )
-from cl.alerts.utils import InvalidDateError, percolate_es_document
+from cl.alerts.utils import (
+    InvalidDateError,
+    build_alert_email_subject,
+    percolate_es_document,
+)
 from cl.api.factories import WebhookFactory
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
@@ -734,6 +738,13 @@ class SearchAlertsWebhooksTest(
             query=f"type=o&stat_{unpublished_status}=on",
             alert_type=SEARCH_TYPES.OPINION,
         )
+        cls.search_alert_2_1 = AlertFactory(
+            user=cls.user_profile_2.user,
+            rate=Alert.DAILY,
+            name="Test Alert O Copy",
+            query=f"type=o&stat_{unpublished_status}=on",
+            alert_type=SEARCH_TYPES.OPINION,
+        )
         cls.user_profile_3 = UserProfileWithParentsFactory(
             user__email="test_3@email.com"
         )
@@ -857,7 +868,7 @@ class SearchAlertsWebhooksTest(
             len(webhooks_enabled), 3, msg="Webhooks enabled doesn't match."
         )
         search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 8, msg="Alerts doesn't match.")
+        self.assertEqual(len(search_alerts), 9, msg="Alerts doesn't match.")
 
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -880,6 +891,11 @@ class SearchAlertsWebhooksTest(
 
         # First Opinion email alert assertions search_alert
         self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            f"1 Alert have hits: {self.search_alert.name}",
+        )
+
         # Plain text assertions
         opinion_alert_content = mail.outbox[0].body
         self.assertIn("daily opinion alert", opinion_alert_content)
@@ -967,16 +983,22 @@ class SearchAlertsWebhooksTest(
         )
 
         self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
-        self.assertIn("daily opinion alert", mail.outbox[1].body)
         self.assertEqual(
-            mail.outbox[1].extra_headers["List-Unsubscribe-Post"],
-            "List-Unsubscribe=One-Click",
+            mail.outbox[1].subject,
+            f"2 Alerts have hits: {self.search_alert_2.name}, {self.search_alert_2_1.name}",
         )
-        unsubscribe_url = reverse(
-            "one_click_disable_alert", args=[self.search_alert_2.secret_key]
-        )
+        self.assertIn("daily opinion alert", mail.outbox[1].body)
+
+        params = {
+            "keys": [
+                self.search_alert_2.secret_key,
+                self.search_alert_2_1.secret_key,
+            ]
+        }
+        query_string = urlencode(params, doseq=True)
+        unsubscribe_path = reverse("disable_alert_list")
         self.assertIn(
-            unsubscribe_url,
+            f"{unsubscribe_path}{'?' if query_string else ''}{query_string}",
             mail.outbox[1].extra_headers["List-Unsubscribe"],
         )
 
@@ -1174,7 +1196,7 @@ class SearchAlertsWebhooksTest(
         webhooks_enabled = Webhook.objects.filter(enabled=True)
         self.assertEqual(len(webhooks_enabled), 3)
         search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 8)
+        self.assertEqual(len(search_alerts), 9)
 
         # (rate, events expected, number of search results expected per event)
         # The number of expected results increases with every iteration since
@@ -1294,6 +1316,19 @@ class SearchAlertsWebhooksTest(
         self.assertEqual(r.json()["count"], 1)
 
         frequency_o.cluster.delete()
+
+    def test_long_alert_subjects_truncation(self):
+        """Test long alert subjects get truncated below 935 characters."""
+        alerts_hits = []
+        for i in range(15):
+            alert: Alert = AlertFactory.create(
+                name="Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris aliquet ut."
+            )
+            alerts_hits.append((alert, "", [], 1))
+
+        subject = build_alert_email_subject(alerts_hits)
+        self.assertEqual(len(subject), 934)
+        self.assertIn("...", subject)
 
 
 class DocketAlertAPITests(APITestCase):
@@ -2238,6 +2273,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         # one for user_profile_2
         self.assertEqual(len(mail.outbox), 2)
         text_content = mail.outbox[0].body
+        self.assertEqual(
+            mail.outbox[0].subject,
+            f"1 Alert have hits: {self.search_alert.name}",
+        )
+
         self.assertIn(rt_oral_argument.case_name, text_content)
 
         # Should have the List-Unsubscribe-Post and List-Unsubscribe header
@@ -2725,6 +2765,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertIn(rt_oral_argument_1.case_name, text_content)
         self.assertIn(rt_oral_argument_2.case_name, text_content)
         self.assertIn(rt_oral_argument_3.case_name, text_content)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            f"2 Alerts have hits: {rt_oa_search_alert.name}, {rt_oa_search_alert_2.name}",
+        )
 
         # Assert html version.
         html_content = self.get_html_content_from_email(mail.outbox[0])
@@ -2795,6 +2839,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             len(mail.outbox), 2, msg="Wrong number of emails sent."
         )
         text_content = mail.outbox[1].body
+        self.assertEqual(
+            mail.outbox[1].subject,
+            f"2 Alerts have hits: {self.search_alert_3.name}, {self.search_alert_4.name}",
+        )
 
         # The right alert type template is used.
         self.assertIn("oral argument", text_content)

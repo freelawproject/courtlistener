@@ -1622,6 +1622,10 @@ class RECAPAlertsSweepIndexTest(
             msg="Wrong number of V1 webhook events.",
         )
 
+        self.assertEqual(
+            mail.outbox[0].subject,
+            f"2 Alerts have hits: {docket_only_alert.name}, {cross_object_alert.name}",
+        )
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 2)
@@ -1713,6 +1717,11 @@ class RECAPAlertsSweepIndexTest(
         )
         self.assertEqual(
             v2_webhook_event.content["webhook"]["deprecation_date"], None
+        )
+
+        self.assertEqual(
+            mail.outbox[1].subject,
+            f"1 Alert have hits: {cross_object_alert_after_update.name}",
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
