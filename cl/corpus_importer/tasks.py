@@ -2007,6 +2007,11 @@ def download_pacer_pdf_by_rd(
     )
     if is_appellate_court(pacer_court_id):
         report = AppellateDocketReport(pacer_court_id, s)
+        pacer_doc_id = (
+            pacer_doc_id
+            if not rd.attachment_number
+            else int(f"{str(pacer_doc_id)[:3]}1{str(pacer_doc_id)[4:]}")
+        )
         r, r_msg = report.download_pdf(
             pacer_doc_id=pacer_doc_id, pacer_case_id=pacer_case_id
         )
