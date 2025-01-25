@@ -1933,6 +1933,37 @@ class RecapPdfFetchApiTest(TestCase):
             self.fq.message,
         )
 
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        return_value=(
+            None,
+            "Unable to download PDF. An attachment page was returned instead.",
+        ),
+    )
+    def test_add_custom_message_for_attachment_pages(
+        self, mock_download_method, mock_court_accessible, mock_get_cookies
+    ):
+        """
+        Checks if a custom message is added when the download_pacer_pdf_by_rd
+        function returns an error indicating an attachment page was found
+        instead of a PDF.
+        """
+        self.appellate_rd.is_available = False
+        self.appellate_rd.save()
+
+        self.assertFalse(self.appellate_rd.is_available)
+        fetch_pacer_doc_by_rd(self.appellate_rd.pk, self.appellate_fq.pk)
+
+        self.appellate_fq.refresh_from_db()
+        self.assertEqual(self.appellate_fq.status, PROCESSING_STATUS.FAILED)
+
+        error_msg = (
+            "This PACER document is part of an attachment page. "
+            "Our system currently lacks the metadata for this attachment. "
+            "Please purchase the attachment page and try again."
+        )
+        self.assertEqual(error_msg, self.appellate_fq.message)
+
 
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",

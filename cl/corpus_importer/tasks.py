@@ -2217,8 +2217,13 @@ def update_rd_metadata(
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if pdf_bytes is None:
-        if r_msg:
-            # Send a specific message all the way from Juriscraper
+        if r_msg and "An attachment page was returned instead" in r_msg:
+            msg = (
+                "This PACER document is part of an attachment page. "
+                "Our system currently lacks the metadata for this attachment. "
+                "Please purchase the attachment page and try again."
+            )
+        elif r_msg:
             msg = f"{r_msg}: {court_id=}, {rd_pk=}"
         else:
             msg = (
