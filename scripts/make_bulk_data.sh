@@ -337,7 +337,7 @@ echo "Streaming ${lst[0]} to S3"
 psql \
 	--command \
 	  "set statement_timeout to 0;
-	   COPY ${lst[0]} ${lst[1]} TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, QUOTE \"\`\", FORCE_QUOTE *)" \
+	   COPY ${lst[0]} ${lst[1]} TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, ESCAPE '\\', FORCE_QUOTE *)" \
 	--quiet \
 	--host "$DB_HOST" \
 	--username "$DB_USER" \
@@ -418,7 +418,7 @@ declare -a lst="$group"
 cat >> "$OUT" <<- EOF
 echo "Loading ${lst[2]} to database"
 psql --command \
-"\COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, QUOTE \'\`\', HEADER)" \
+"\COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, ESCAPE '\\', HEADER)" \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME"
