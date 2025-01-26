@@ -51,10 +51,10 @@ services:
     command: sh -c 'npm install && exec npx webpack --progress --watch --mode=development'
     healthcheck:
       test: sh -c 'ps aux | grep -v grep | grep webpack >/dev/null 2>&1 && echo 0 || echo 1'
-      interval: 5s
-      retries: 5
-      start_period: 10s
-      timeout: 10s
+      interval: 1s
+      retries: 45
+      start_period: 1s
+      timeout: 1s
 
   # Task Server
   cl-celery:
