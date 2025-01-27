@@ -3348,7 +3348,7 @@ def build_authority_opinions_query(
             "cluster__docket_id",
             "cluster__date_filed",
         )
-        .order_by("-num_filings")
+        .order_by("-num_filings", "-total_depth")
     )
 
 
