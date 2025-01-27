@@ -1975,7 +1975,7 @@ def fetch_pacer_doc_by_rd(
 @transaction.atomic
 def fetch_attachment_page(
     self: Task, fq_pk: int
-) -> tuple[list[RECAPDocument], int | None] | None:
+) -> tuple[list[RECAPDocument], int] | None:
     """Fetch a PACER attachment page by rd_pk
 
     This is very similar to process_recap_attachment, except that it manages
@@ -2143,8 +2143,9 @@ def fetch_attachment_page(
     bind=True,
     ignore_result=True,
 )
+@transaction.atomic
 def replicate_fq_att_page_to_subdocket_rds(
-    self: Task, rds_and_pq: tuple[list[RECAPDocument], int | None]
+    self: Task, rds_and_pq: tuple[list[RECAPDocument], int] | None
 ) -> None:
     """Replicate Attachment page from a FQ to subdocket RECAPDocuments.
 
@@ -2154,25 +2155,29 @@ def replicate_fq_att_page_to_subdocket_rds(
     :return: None
     """
 
+    if not rds_and_pq:
+        # Nothing to do. Aborting the task.
+        # This is required in Celery eager mode, where self.request.chain has no effect.
+        return None
+
     main_rds, first_pq_created_id = rds_and_pq
     pqs_to_process_pks = [first_pq_created_id]
     first_pq_created = ProcessingQueue.objects.get(pk=first_pq_created_id)
     att_content = first_pq_created.filepath_local.read()
-    with transaction.atomic():
-        for main_rd in main_rds:
-            main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
-            # Create additional pqs for each subdocket case found.
-            pq_created = ProcessingQueue.objects.create(
-                uploader_id=first_pq_created.uploader_id,
-                pacer_doc_id=main_rd.pacer_doc_id,
-                pacer_case_id=main_pacer_case_id,
-                court_id=first_pq_created.court_id,
-                upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
-                filepath_local=ContentFile(
-                    att_content, name=first_pq_created.filepath_local.name
-                ),
-            )
-            pqs_to_process_pks.append(pq_created.pk)
+    for main_rd in main_rds:
+        main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
+        # Create additional pqs for each subdocket case found.
+        pq_created = ProcessingQueue.objects.create(
+            uploader_id=first_pq_created.uploader_id,
+            pacer_doc_id=main_rd.pacer_doc_id,
+            pacer_case_id=main_pacer_case_id,
+            court_id=first_pq_created.court_id,
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=ContentFile(
+                att_content, name=first_pq_created.filepath_local.name
+            ),
+        )
+        pqs_to_process_pks.append(pq_created.pk)
 
     for pq_pk in pqs_to_process_pks:
         async_to_sync(process_recap_attachment)(pq_pk)
