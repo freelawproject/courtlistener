@@ -2115,6 +2115,11 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
 
     # Logic to replicate the attachment page to sub-dockets matched by RECAPDocument
     court_id = rd.docket_entry.docket.court_id
+    if is_appellate_court(court_id):
+        # Subdocket replication for appellate courts is currently not supported.
+        self.request.chain = None
+        return []
+
     sub_docket_main_rds = list(
         get_main_rds(court_id, rd.pacer_doc_id).exclude(
             docket_entry__docket__pacer_case_id=rd.docket_entry.docket.pacer_case_id
