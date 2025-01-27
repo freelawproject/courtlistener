@@ -67,8 +67,6 @@ jobs:
           }'
       - name: Wait for Temporary Pod to Start
         run: kubectl wait pods -n ${{ env.EKS_NAMESPACE }} --for condition=Ready --timeout=90s temp-pod-${{ steps.vars.outputs.sha_short }}
-      - name: Build tailwind assets
-        run: kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- bash -c "npm install --prefix ./cl --no-input && npm run build --prefix ./cl --no-input"
       - name: Collect Static Assets
         id: collectStatic
         run: |
