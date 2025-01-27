@@ -13,7 +13,7 @@ non-profit dedicated to creating high quality open legal information.{% endblock
 {% block tab-content %}
 <div class="flex flex-column justify-content-center col-xs-12 col-md-10 col-lg-12">
   <div class="col-xs-12 col-md-10 col-lg-10">
-    {% with authorities_count=cited_opinions.num_filings %}
+    {% with authorities_count=opinions_cited.count %}
       <h3>The filings in this docket cite {{authorities_count|intcomma}} opinion{{authorities_count|pluralize}}</h3>
     {% endwith %}
     <hr>
