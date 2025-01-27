@@ -12,7 +12,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Prefetch, Q, QuerySet
 from django.db.models.aggregates import Count, Sum
 from django.db.models.functions import MD5
 from django.urls import NoReverseMatch, reverse
@@ -3321,6 +3321,10 @@ def build_authority_opinions_query(
         .prefetch_related(
             "cluster__citations",
             "citing_documents",
+            Prefetch(
+                "cluster__sub_opinions",
+                queryset=Opinion.objects.only("pk", "cluster_id"),
+            ),
         )
         .annotate(
             num_filings=Count(
