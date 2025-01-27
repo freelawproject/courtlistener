@@ -171,7 +171,10 @@ def do_pacer_fetch(fq: PacerFetchQueue):
             mark_fq_successful.si(fq.pk),
         ).apply_async()
     elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
-        result = fetch_attachment_page.apply_async(args=(fq.pk,))
+        result = chain(
+            fetch_attachment_page.si(fq.pk),
+            replicate_fq_att_page_to_subdocket_rds.s(),
+        ).apply_async()
     return result
 
 
@@ -1970,7 +1973,9 @@ def fetch_pacer_doc_by_rd(
     ignore_result=True,
 )
 @transaction.atomic
-def fetch_attachment_page(self: Task, fq_pk: int) -> None:
+def fetch_attachment_page(
+    self: Task, fq_pk: int
+) -> tuple[list[RECAPDocument], int | None] | None:
     """Fetch a PACER attachment page by rd_pk
 
     This is very similar to process_recap_attachment, except that it manages
@@ -1978,8 +1983,11 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
 
     :param self: The celery task
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
-    :return: None
+    :return: A two-tuple containing a list of RDs that require replication and
+    the PQ ID for the first RD to be replicated, or None if replication to
+    sub-dockets is not required.
     """
+
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     rd = fq.recap_document
     # Check court connectivity, if fails retry the task, hopefully, it'll be
@@ -1993,24 +2001,26 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         raise self.retry()
 
     mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
-
     if not rd.pacer_doc_id:
         msg = (
             "Unable to get attachment page: Unknown pacer_doc_id for "
             "RECAP Document object %s" % rd.pk
         )
         mark_fq_status(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
+        self.request.chain = None
         return
 
     if rd.pacer_doc_id.count("-") > 1:
         msg = "ACMS attachment pages are not currently supported"
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
         return
 
     session_data = get_pacer_cookie_from_cache(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
         return
 
     try:
@@ -2023,6 +2033,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         ]:
             if self.request.retries == self.max_retries:
                 mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+                self.request.chain = None
                 return
             logger.info(
                 f"Ran into HTTPError: {exc.response.status_code}. Retrying."
@@ -2030,11 +2041,13 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
             raise self.retry(exc=exc)
         else:
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
             return
     except requests.RequestException as exc:
         if self.request.retries == self.max_retries:
             msg = "Failed to get attachment page from network."
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
             return
         logger.info("Ran into a RequestException. Retrying.")
         raise self.retry(exc=exc)
@@ -2064,6 +2077,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
     if att_data == {}:
         msg = "Not a valid attachment page upload"
         mark_fq_status(fq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        self.request.chain = None
         return
 
     try:
@@ -2082,16 +2096,86 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
             "attachment data"
         )
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
         return
     except RECAPDocument.DoesNotExist as exc:
         msg = "Could not find docket to associate with attachment metadata"
         if self.request.retries == self.max_retries:
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
             return
         mark_fq_status(fq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
         raise self.retry(exc=exc)
     msg = "Successfully completed fetch and save."
     mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
+
+    # Logic to replicate the attachment page to sub-dockets matched by RECAPDocument
+    court_id = rd.docket_entry.docket.court_id
+    sub_docket_main_rds = list(
+        get_main_rds(court_id, rd.pacer_doc_id).exclude(
+            docket_entry__docket__pacer_case_id=rd.docket_entry.docket.pacer_case_id
+        )
+    )
+    first_sub_docket_rd = (
+        sub_docket_main_rds.pop() if sub_docket_main_rds else None
+    )
+    if first_sub_docket_rd:
+        # Create a PQ related to the first RD matched that requires replication.
+        # Use it as a container for the attachment file and metadata for the
+        # remaining cases that require replication.
+        first_pq_created = ProcessingQueue.objects.create(
+            uploader_id=fq.user_id,
+            pacer_doc_id=first_sub_docket_rd.pacer_doc_id,
+            pacer_case_id=first_sub_docket_rd.docket_entry.docket.pacer_case_id,
+            court_id=court_id,
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=ContentFile(
+                text.encode(), name="attachment_page.html"
+            ),
+        )
+        return [sub_rd for sub_rd in sub_docket_main_rds], first_pq_created.pk
+
+    self.request.chain = None
+    return None
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+)
+def replicate_fq_att_page_to_subdocket_rds(
+    self: Task, rds_and_pq: tuple[list[RECAPDocument], int | None]
+) -> None:
+    """Replicate Attachment page from a FQ to subdocket RECAPDocuments.
+
+    :param self: The celery task
+    :param rds_and_pq: A two-tuple containing a list of RDs that require
+    replication and the PQ ID for the first RD to be replicated
+    :return: None
+    """
+
+    main_rds, first_pq_created_id = rds_and_pq
+    pqs_to_process_pks = [first_pq_created_id]
+    first_pq_created = ProcessingQueue.objects.get(pk=first_pq_created_id)
+    att_content = first_pq_created.filepath_local.read()
+    with transaction.atomic():
+        for main_rd in main_rds:
+            main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
+            # Create additional pqs for each subdocket case found.
+            pq_created = ProcessingQueue.objects.create(
+                uploader_id=first_pq_created.uploader_id,
+                pacer_doc_id=main_rd.pacer_doc_id,
+                pacer_case_id=main_pacer_case_id,
+                court_id=first_pq_created.court_id,
+                upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+                filepath_local=ContentFile(
+                    att_content, name=first_pq_created.filepath_local.name
+                ),
+            )
+            pqs_to_process_pks.append(pq_created.pk)
+
+    for pq_pk in pqs_to_process_pks:
+        async_to_sync(process_recap_attachment)(pq_pk)
 
 
 def get_fq_docket_kwargs(fq):

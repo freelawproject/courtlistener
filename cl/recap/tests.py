@@ -1436,6 +1436,179 @@ class ReplicateRecapUploadsTest(TestCase):
 
                 transaction.set_rollback(True)
 
+    @mock.patch(
+        "cl.recap.tasks.get_att_report_by_rd",
+        return_value=fakes.FakeAttachmentPage,
+    )
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_court_accessible",
+        side_effect=lambda a: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    def test_replicate_subdocket_case_attachment_page_from_fq(
+        self,
+        mock_get_pacer_cookie_from_cache,
+        mock_is_pacer_court_accessible,
+        mock_get_att_report_by_rd,
+    ):
+        """Can we replicate an attachment page Fetch API purchase from a
+        subdocket case to its corresponding RD across all related dockets?
+        """
+
+        # Add the docket entry to every case.
+        async_to_sync(add_docket_entries)(
+            self.d_1, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_2, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_3, self.de_data_2["docket_entries"]
+        )
+
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )
+        d_3_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_3
+        )
+        main_d_1_rd = d_1_recap_document[0]
+        main_d_2_rd = d_2_recap_document[0]
+        main_d_3_rd = d_3_recap_document[0]
+
+        # Create FQ.
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=main_d_2_rd.pk,
+        )
+
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_att_report",
+            side_effect=lambda x, y: self.att_data_2,
+        ):
+            do_pacer_fetch(fq)
+
+        # After adding attachments, it should exist 3 RD on every docket.
+        self.assertEqual(
+            d_1_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_2.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_2_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_1.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_3_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_3.pacer_case_id}.",
+        )
+
+        main_d_1_rd.refresh_from_db()
+        main_d_2_rd.refresh_from_db()
+        main_d_3_rd.refresh_from_db()
+        self.assertEqual(
+            main_d_1_rd.pacer_doc_id,
+            self.de_data_2["docket_entries"][0]["pacer_doc_id"],
+        )
+        self.assertEqual(
+            main_d_2_rd.pacer_doc_id,
+            self.de_data_2["docket_entries"][0]["pacer_doc_id"],
+        )
+        self.assertEqual(
+            main_d_3_rd.pacer_doc_id,
+            self.de_data_2["docket_entries"][0]["pacer_doc_id"],
+        )
+
+        # Two of them should be attachments.
+        d_1_attachments = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+        d_2_attachments = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+        d_3_attachments = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_3,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+
+        self.assertEqual(
+            d_1_attachments.count(),
+            2,
+            msg=f"Didn't get the expected number of RDs Attachments for the docket with PACER case ID {self.d_1.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_2_attachments.count(),
+            2,
+            msg=f"Didn't get the expected number of RDs Attachments for the docket with PACER case ID {self.d_2.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_3_attachments.count(),
+            2,
+            msg=f"Didn't get the expected number of RDs Attachments for the docket with PACER case ID {self.d_3.pacer_case_id}.",
+        )
+
+        att_1_data = self.att_data_2["attachments"][0]
+        att_2_data = self.att_data_2["attachments"][0]
+
+        self.assertEqual(
+            d_1_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_1_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_1_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_2_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_1_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_2_data["attachment_number"],
+        )
+
+        # Assert the number of PQs created to process the additional subdocket RDs.
+        pqs_created = ProcessingQueue.objects.all()
+        self.assertEqual(pqs_created.count(), 2)
+
+        pqs_status = {pq.status for pq in pqs_created}
+        self.assertEqual(pqs_status, {PROCESSING_STATUS.SUCCESSFUL})
+
+        pqs_related_dockets = {pq.docket_id for pq in pqs_created}
+        self.assertEqual(
+            pqs_related_dockets,
+            {self.d_1.pk, self.d_3.pk},
+            msg="Docket ids didn't match.",
+        )
+        # 3 PacerHtmlFiles should have been created, one for each case.
+        att_html_created = PacerHtmlFiles.objects.all()
+        self.assertEqual(att_html_created.count(), 3)
+        related_htmls_de = {
+            html.content_object.pk for html in att_html_created
+        }
+        self.assertEqual(
+            {de.pk for de in DocketEntry.objects.all()}, related_htmls_de
+        )
+
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
 @mock.patch(
