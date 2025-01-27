@@ -12,7 +12,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.tz import tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -1056,7 +1056,15 @@ class ReplicateRecapUploadsTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.get(username="recap")
+        user_profile = UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
+        cls.user = user_profile.user
+        permissions = Permission.objects.filter(
+            codename__in=["has_recap_api_access", "has_recap_upload_access"]
+        )
+        cls.user.user_permissions.add(*permissions)
         cls.f = SimpleUploadedFile("file.txt", b"file content more content")
         cls.court = CourtFactory.create(jurisdiction="FD", in_use=True)
         cls.court_appellate = CourtFactory.create(
