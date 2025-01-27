@@ -39,6 +39,7 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
+from cl.lib.search_index_utils import get_parties_from_case_name
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
     check_for_proximity_tokens,
@@ -1202,6 +1203,89 @@ class TestElasticsearchUtils(SimpleTestCase):
                 test["input_str"]  # type: ignore
             )
             self.assertEqual(output, test["sanitized"])
+
+    def test_can_get_parties_from_case_name(self) -> None:
+        class PartiesNameTestType(TypedDict):
+            case_name: str
+            output: list[str]
+
+        tests: list[PartiesNameTestType] = [
+            {
+                "case_name": "Mendelsohn. Singh",
+                "output": [],
+            },
+            {
+                "case_name": "Cadle Co. v Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. v Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. v. Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. vs Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. vs. Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Paul Thomas Presbury, Jr. and Lisa Rae Presbury",
+                "output": ["Paul Thomas Presbury, Jr.", "Lisa Rae Presbury"],
+            },
+            {
+                "case_name": "Ma Margarita Bernal Sosa -ABOVE MED",
+                "output": [],
+            },
+            {
+                "case_name": "Jennifer Renee' Abbott and Quentin Andrew Abbott -ABOVE MED",
+                "output": ["Jennifer Renee' Abbott", "Quentin Andrew Abbott"],
+            },
+            {
+                "case_name": "Aiesha Renee -BELOW MED",
+                "output": [],
+            },
+            {
+                "case_name": "Justin Kaiser and Belinda Kaiser -BELOW MED",
+                "output": ["Justin Kaiser", "Belinda Kaiser"],
+            },
+            {
+                "case_name": "Cosmorex Ltd. (in Liquidation)",
+                "output": [],
+            },
+            {
+                "case_name": "Cowen & Co. v. Zagar (In re Zagar)",
+                "output": ["Cowen & Co.", "Zagar"],
+            },
+            {
+                "case_name": 'Advantage LLC <b><font color="red">Jointly Administered under 23-90886.</font></b>',
+                "output": [],
+            },
+            {
+                "case_name": 'Sather v. Carlson<b><font color="red">DO NOT DOCKET. CASE TRANSFERRED OUT.</font></b>',
+                "output": ["Sather", "Carlson"],
+            },
+            {
+                "case_name": 'Saucedo and Green Dream International, LLC <b> <font color="red"> Case Consolidated under 23-03142 </font> </b>',
+                "output": ["Saucedo", "Green Dream International, LLC"],
+            },
+        ]
+        for test in tests:
+            with self.subTest(
+                input=test["case_name"], msg="get parties names from case name"
+            ):
+                parties: list[str] = get_parties_from_case_name(
+                    test["case_name"]
+                )
+                self.assertEqual(
+                    parties,
+                    test["output"],
+                )
 
 
 class TestRedisUtils(SimpleTestCase):

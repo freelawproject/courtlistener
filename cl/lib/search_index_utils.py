@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 from cl.lib.date_time import midnight_pt
@@ -49,14 +50,17 @@ def get_parties_from_case_name(case_name: str) -> list[str]:
     :return: A list of parties. If no valid separator is found, returns an
     empty list.
     """
+    # Removes text enclosed in parentheses at the end of the string.
+    cleaned_case_name = re.sub(r"\s*\([^)]*\)$", "", case_name)
 
-    valid_case_name_separators = [
-        " v ",
-        " v. ",
-        " vs. ",
-        " vs ",
-    ]
+    # Removes any HTML at the end of the string.
+    cleaned_case_name = re.sub(r"\s*<.*$", "", cleaned_case_name)
+
+    # Removes text following "-BELOW" or "-ABOVE" at the end of the string.
+    cleaned_case_name = re.sub(r"\s*(-BELOW|-ABOVE).*$", "", cleaned_case_name)
+
+    valid_case_name_separators = [" v ", " v. ", " vs. ", " vs ", " and "]
     for separator in valid_case_name_separators:
         if separator in case_name:
-            return case_name.split(separator, 1)
+            return cleaned_case_name.split(separator, 1)
     return []
