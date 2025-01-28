@@ -2,6 +2,7 @@ from juriscraper.lib.exceptions import PacerLoginException
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
+from cl.corpus_importer.utils import is_appellate_court
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import (
     REQUEST_TYPE,
@@ -125,8 +126,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
         ]:
             # Appellate court dockets. Is the court valid?
-            appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
-            if not appellate_court_ids.filter(pk=attrs["court"].pk).exists():
+            if not is_appellate_court(attrs["court"].pk):
                 raise ValidationError(
                     "%s is not an appellate court ID. Did you mean to use the "
                     "upload_type for district dockets?" % attrs["court"]

@@ -56,3 +56,9 @@ class ElasticBadRequestError(APIException):
         "Elasticsearch Bad request error. Please review your query."
     )
     default_code = "bad_request"
+
+
+class DisallowedWildcardPattern(SyntaxQueryError):
+    """Query contains a disallowed wildcard pattern"""
+
+    message = "The query contains a disallowed wildcard pattern."

@@ -14,8 +14,8 @@
 {% block content %}
   <div class="col-xs-12">
     <h1 class="text-center v-offset-below-3">Community's Most Wanted PACER Documents</h1>
-    <h3 class="text-center"><b>{{ granted_stats.prayer_count|intcomma }}</b> prayers granted totaling <b>${{ granted_stats.total_cost }}</b>.</h3>
-    <h3 class="text-center"><b>{{ waiting_stats.prayer_count|intcomma }}</b> prayers pending totaling at least <b>${{ waiting_stats.total_cost }}</b>.</h3>
+    <h3 class="text-center"><b>{{ granted_stats.prayer_count|intcomma }}</b> {{ granted_stats.prayer_count|pluralize:"prayer,prayers" }} granted totaling <b>${{ granted_stats.total_cost }}</b>.</h3>
+    <h3 class="text-center"><b>{{ waiting_stats.prayer_count|intcomma }}</b> {{ waiting_stats.prayer_count|pluralize:"prayer,prayers" }} pending totaling at least <b>${{ waiting_stats.total_cost }}</b>.</h3>
   </div>
 
   <div class="col-xs-12">
@@ -38,6 +38,9 @@
               <th>Document Number</th>
               <th>Document Description</th>
               <th>Buy on Pacer</th>
+            {% if perms.favorites.change_prayer %}
+              <th>Action</th>
+            {% endif %}
             </tr>
         </thead>
         <tbody>
@@ -66,6 +69,15 @@
                 {% endif %}
                   target="_blank"
                   rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
+              {% if perms.favorites.change_prayer %}
+                <td>
+                  <div class="flex">
+                    <a href="{% url 'admin:favorites_prayer_changelist' %}?recap_document={{prayer.id}}" class="btn btn-default btn-xs">
+                      <i class="fa fa-pencil"></i>&nbsp;Edit
+                    </a>
+                  </div>
+                </td>
+              {% endif %}
             </tr>
             {% empty %}
             <tr>

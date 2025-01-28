@@ -5,6 +5,7 @@ import shutil
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
+from pyexpat import ExpatError
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
@@ -32,6 +33,7 @@ from httpx import (
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
+    AppellateAttachmentPage,
     AppellateDocketReport,
     AttachmentPage,
     CaseQuery,
@@ -44,7 +46,6 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
-from pyexpat import ExpatError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
 from requests.exceptions import (
@@ -65,6 +66,7 @@ from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    is_appellate_court,
     make_iquery_probing_key,
     mark_ia_upload_needed,
 )
@@ -1792,7 +1794,10 @@ def get_att_report_by_rd(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    att_report = AttachmentPage(pacer_court_id, s)
+    if is_appellate_court(pacer_court_id):
+        att_report = AppellateAttachmentPage(pacer_court_id, s)
+    else:
+        att_report = AttachmentPage(pacer_court_id, s)
     att_report.query(rd.pacer_doc_id)
     return att_report
 
@@ -1976,7 +1981,7 @@ def make_attachment_pq_object(
 def download_pacer_pdf_by_rd(
     rd_pk: int,
     pacer_case_id: str,
-    pacer_doc_id: int,
+    pacer_doc_id: str,
     session_data: SessionData,
     magic_number: str | None = None,
     de_seq_num: str | None = None,
@@ -2000,12 +2005,21 @@ def download_pacer_pdf_by_rd(
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
-    report = FreeOpinionReport(pacer_court_id, s)
-
-    r, r_msg = report.download_pdf(
-        pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
-    )
-
+    if is_appellate_court(pacer_court_id):
+        report = AppellateDocketReport(pacer_court_id, s)
+        pacer_doc_id = (
+            pacer_doc_id
+            if not rd.attachment_number
+            else f"{pacer_doc_id[:3]}1{pacer_doc_id[4:]}"
+        )
+        r, r_msg = report.download_pdf(
+            pacer_doc_id=pacer_doc_id, pacer_case_id=pacer_case_id
+        )
+    else:
+        report = FreeOpinionReport(pacer_court_id, s)
+        r, r_msg = report.download_pdf(
+            pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
+        )
     return r, r_msg
 
 
@@ -2203,8 +2217,13 @@ def update_rd_metadata(
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if pdf_bytes is None:
-        if r_msg:
-            # Send a specific message all the way from Juriscraper
+        if r_msg and "An attachment page was returned instead" in r_msg:
+            msg = (
+                "This PACER document is part of an attachment page. "
+                "Our system currently lacks the metadata for this attachment. "
+                "Please purchase the attachment page and try again."
+            )
+        elif r_msg:
             msg = f"{r_msg}: {court_id=}, {rd_pk=}"
         else:
             msg = (

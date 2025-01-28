@@ -54,7 +54,11 @@ from cl.corpus_importer.tasks import (
     make_attachment_pq_object,
     update_rd_metadata,
 )
-from cl.corpus_importer.utils import mark_ia_upload_needed
+from cl.corpus_importer.utils import (
+    ais_appellate_court,
+    is_appellate_court,
+    mark_ia_upload_needed,
+)
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
@@ -254,10 +258,15 @@ async def process_recap_pdf(pk):
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
 
-    if pq.attachment_number is None:
-        document_type = RECAPDocument.PACER_DOCUMENT
-    else:
-        document_type = RECAPDocument.ATTACHMENT
+    document_type = (
+        RECAPDocument.PACER_DOCUMENT
+        if not pq.attachment_number  # This check includes attachment_number set to None or 0
+        else RECAPDocument.ATTACHMENT
+    )
+    # Set attachment_number to None if it is 0
+    pq.attachment_number = (
+        None if not pq.attachment_number else pq.attachment_number
+    )
 
     logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq} ")
     try:
@@ -661,7 +670,7 @@ async def process_recap_docket(pk):
 
 async def get_att_data_from_pq(
     pq: ProcessingQueue,
-) -> tuple[ProcessingQueue | None, dict | None, str | None]:
+) -> tuple[ProcessingQueue, dict, str | None]:
     """Extract attachment data from a ProcessingQueue object.
 
     :param pq: The ProcessingQueue object.
@@ -673,13 +682,13 @@ async def get_att_data_from_pq(
     except IOError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-        return None, None, None
+        return pq, {}, None
 
     att_data = get_data_from_att_report(text, pq.court_id)
     if not att_data:
         msg = "Not a valid attachment page upload."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
-        return None, None, None
+        return pq, {}, None
 
     if pq.pacer_case_id in ["undefined", "null"]:
         pq.pacer_case_id = att_data.get("pacer_case_id")
@@ -724,6 +733,10 @@ async def find_subdocket_att_page_rds(
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
     pq, att_data, text = await get_att_data_from_pq(pq)
+    if not att_data:
+        # Bad attachment page.
+        return []
+
     pacer_doc_id = att_data["pacer_doc_id"]
     main_rds = get_main_rds(pq.court_id, pacer_doc_id).exclude(
         docket_entry__docket__pacer_case_id=pq.pacer_case_id
@@ -772,8 +785,7 @@ async def find_subdocket_pdf_rds(
         pq.pk
     ]  # Add the original pq to the list of pqs to process
 
-    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
-    if await appellate_court_ids.filter(pk=pq.court_id).aexists():
+    if await ais_appellate_court(pq.court_id):
         # Abort the process for appellate documents. Subdockets cannot be found
         # in appellate cases.
         return pqs_to_process_pks
@@ -822,9 +834,9 @@ async def find_subdocket_pdf_rds(
 
 async def process_recap_attachment(
     pk: int,
-    tag_names: Optional[List[str]] = None,
+    tag_names: list[str] | None = None,
     document_number: int | None = None,
-) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
+) -> tuple[int, str, list[RECAPDocument]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
     :param pk: The primary key of the processing queue item you want to work on
@@ -841,6 +853,9 @@ async def process_recap_attachment(
     logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
 
     pq, att_data, text = await get_att_data_from_pq(pq)
+    if not att_data:
+        # Bad attachment page.
+        return pq.status, pq.error_message, []
 
     if document_number is None:
         document_number = att_data["document_number"]
@@ -1900,6 +1915,11 @@ def fetch_pacer_doc_by_rd(
         self.request.chain = None
         return
 
+    if rd.is_acms_document():
+        msg = "ACMS documents are not currently supported"
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        return
+
     session_data = get_pacer_cookie_from_cache(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
@@ -2001,6 +2021,11 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         mark_fq_status(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
         return
 
+    if rd.is_acms_document():
+        msg = "ACMS attachment pages are not currently supported"
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        return
+
     session_data = get_pacer_cookie_from_cache(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
@@ -2045,7 +2070,15 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         raise self.retry(exc=exc)
 
     text = r.response.text
-    att_data = get_data_from_att_report(text, rd.docket_entry.docket.court_id)
+    is_appellate = is_appellate_court(rd.docket_entry.docket.court_id)
+    # Determine the appropriate parser function based on court jurisdiction
+    # (appellate or district)
+    att_data_parser = (
+        get_data_from_appellate_att_report
+        if is_appellate
+        else get_data_from_att_report
+    )
+    att_data = att_data_parser(text, rd.docket_entry.docket.court_id)
 
     if att_data == {}:
         msg = "Not a valid attachment page upload"
@@ -2057,7 +2090,8 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
             rd.docket_entry.docket.court,
             rd.docket_entry.docket.pacer_case_id,
             att_data["pacer_doc_id"],
-            att_data["document_number"],
+            # Appellate attachments don't contain a document_number
+            None if is_appellate else att_data["document_number"],
             text,
             att_data["attachments"],
         )
@@ -2683,7 +2717,6 @@ def get_and_merge_rd_attachments(
             user_pk,
             att_report_text,
         )
-
         # Attachments for multi-docket NEFs are the same for every case
         # mentioned in the notification. The only difference between them is a
         # different document_number in every case for the main document the

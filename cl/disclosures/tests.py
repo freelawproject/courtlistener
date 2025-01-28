@@ -6,6 +6,8 @@ from django.conf import settings
 from django.urls import reverse
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.disclosures.factories import (
@@ -283,10 +285,12 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
     def tearDown(self) -> None:
         FinancialDisclosure.objects.all().delete()
         Person.objects.all().delete()
+        super().tearDown()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_disclosure_homepage(self) -> None:
         """Can we load disclosure homepage?"""
+        wait = WebDriverWait(self.browser, 3)
         self.browser.get(self.live_server_url)
         dropdown = self.browser.find_element(By.ID, "navbar-fd")
         dropdown.click()
@@ -297,7 +301,9 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         self.assertIn(
             "Judicial Financial Disclosures Database", self.browser.title
         )
-        search_bar = self.browser.find_element(By.ID, "main-query-box")
+        search_bar = wait.until(
+            EC.visibility_of_element_located((By.ID, "main-query-box"))
+        )
         self.assertTrue(
             search_bar.is_displayed(), msg="React-root failed to load"
         )
@@ -305,6 +311,7 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_disclosure_search(self) -> None:
         """Can we search for judges?"""
+        wait = WebDriverWait(self.browser, 3)
         self.browser.get(self.live_server_url)
         self.browser.implicitly_wait(2)
         self.browser.find_element(By.ID, "navbar-fd").click()
@@ -314,7 +321,9 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         self.assertIn(
             "Judicial Financial Disclosures Database", self.browser.title
         )
-        search_bar = self.browser.find_element(By.ID, "id_disclosures_search")
+        search_bar = wait.until(
+            EC.visibility_of_element_located((By.ID, "main-query-box"))
+        )
         self.assertTrue(
             search_bar.is_displayed(), msg="React-root failed to load"
         )
@@ -322,6 +331,7 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         with self.assertRaises(NoSuchElementException):
             self.browser.find_element(By.CSS_SELECTOR, ".tr-results")
 
+        search_bar = self.browser.find_element(By.ID, "id_disclosures_search")
         search_bar.send_keys("Judith")
         results = self.browser.find_elements(By.CSS_SELECTOR, ".tr-results")
         self.assertEqual(len(results), 1, msg="Incorrect results displayed")
