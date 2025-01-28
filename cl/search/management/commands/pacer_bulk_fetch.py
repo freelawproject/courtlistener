@@ -41,12 +41,14 @@ class Command(VerboseCommand):
         self.courts_with_docs = {}
         self.total_launched = 0
         self.total_errors = 0
+        self.max_retries = 5
         self.pacer_username = None
         self.pacer_password = None
         self.throttle = None
         self.queue_name = None
         self.interval = None
         self.docs_to_process_cache_key = "pacer_bulk_fetch.docs_to_process"
+        self.skipped_docs_cache_key = "pacer_bulk_fetch.skipped_docs"
         self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 
     def add_arguments(self, parser) -> None:
@@ -163,6 +165,10 @@ class Command(VerboseCommand):
         """Add newly fetched RD with its FQ to cache."""
         append_value_in_cache(self.docs_to_process_cache_key, (rd_pk, fq_pk))
 
+    def update_cached_timed_out_fq(self, fq_pk):
+        """Keep track of FQ that we had to skip after too many tries."""
+        append_value_in_cache(self.skipped_docs_cache_key, fq_pk)
+
     def enqueue_pacer_fetch(self, doc: dict) -> PacerFetchQueue:
         """Actually apply the task to fetch the doc from PACER.
 
@@ -200,9 +206,16 @@ class Command(VerboseCommand):
             return (now - date) < timedelta(seconds=self.interval)
 
         if court_id in self.fetches_in_progress:
-            fetch_queue = PacerFetchQueue.objects.get(
-                id=self.fetches_in_progress[court_id][0]
-            )
+            fq_pk, retry_count = self.fetches_in_progress[court_id]
+            if retry_count >= self.max_retries:
+                # Too many retries means FQ was probably stuck and not handled gracefully, so we keep going.
+                # We remove this FQ from fetches_in_progress as we'll stop checking this one
+                self.fetches_in_progress.pop(court_id)
+                # Then we store its PK in cache to handle FQs w/too many retries later
+                self.update_cached_timed_out_fq(fq_pk)
+                return False
+
+            fetch_queue = PacerFetchQueue.objects.get(id=fq_pk)
             date_completed = fetch_queue.date_completed
             fq_in_progress = date_completed is None
             if fq_in_progress or not enough_time_elapsed(date_completed):
