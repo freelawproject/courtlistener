@@ -133,8 +133,17 @@ class Command(VerboseCommand):
         if self.options.get("max_page_count"):
             filters.append(Q(page_count__lte=self.options["max_page_count"]))
 
+        # Do not attempt to fetch docs that were already fetched:
+        cached_fetches = cache.get(self.docs_to_process_cache_key)
+        previously_fetched = [rd_pk for (rd_pk, _) in cached_fetches]
+        # Only try again with those that were timed out before:
+        cached_timed_out = cache.get(self.timed_out_docs_cache_key)
+        previously_timed_out = [rd_pk for (rd_pk, _) in cached_timed_out]
+        redundant = set(previously_fetched) - set(previously_timed_out)
         self.recap_documents = (
             RECAPDocument.objects.filter(*filters)
+            .exclude(pk__in=redundant)
+            .select_related("docket_entry__docket")
             .values(
                 "id",
                 "page_count",
