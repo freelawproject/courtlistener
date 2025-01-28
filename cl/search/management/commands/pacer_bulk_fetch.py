@@ -21,6 +21,15 @@ from cl.search.models import Court, RECAPDocument
 logger = logging.getLogger(__name__)
 
 
+def append_value_in_cache(key, value):
+    cached_docs = cache.get(key)
+    if cached_docs is None:
+        cached_docs = []
+    cached_docs.append(value)
+    one_month = 60 * 60 * 24 * 7 * 4
+    cache.set(key, cached_docs, timeout=one_month)
+
+
 class Command(VerboseCommand):
     help = "Download multiple documents from PACER with rate limiting"
 
@@ -37,6 +46,7 @@ class Command(VerboseCommand):
         self.throttle = None
         self.queue_name = None
         self.interval = None
+        self.docs_to_process_cache_key = "pacer_bulk_fetch.docs_to_process"
         self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 
     def add_arguments(self, parser) -> None:
@@ -151,12 +161,7 @@ class Command(VerboseCommand):
 
     def update_cached_docs_to_process(self, rd_pk, fq_pk):
         """Add newly fetched RD with its FQ to cache."""
-        cached_docs = cache.get(self.cache_key)
-        if cached_docs is None:
-            cached_docs = []
-        cached_docs.append((rd_pk, fq_pk))
-        one_week = 60 * 60 * 24 * 7
-        cache.set(self.cache_key, cached_docs, timeout=one_week)
+        append_value_in_cache(self.docs_to_process_cache_key, (rd_pk, fq_pk))
 
     def enqueue_pacer_fetch(self, doc: dict) -> PacerFetchQueue:
         """Actually apply the task to fetch the doc from PACER.
