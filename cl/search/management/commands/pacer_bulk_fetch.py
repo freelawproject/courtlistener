@@ -161,14 +161,6 @@ class Command(VerboseCommand):
                 if doc["docket_entry__docket__court_id"] == court.pk
             ]
 
-    def update_cached_docs_to_process(self, rd_pk, fq_pk):
-        """Add newly fetched RD with its FQ to cache."""
-        append_value_in_cache(self.docs_to_process_cache_key, (rd_pk, fq_pk))
-
-    def update_cached_timed_out_fq(self, fq_pk):
-        """Keep track of FQ that we had to skip after too many tries."""
-        append_value_in_cache(self.skipped_docs_cache_key, fq_pk)
-
     def enqueue_pacer_fetch(self, doc: dict) -> PacerFetchQueue:
         """Actually apply the task to fetch the doc from PACER.
 
@@ -186,7 +178,7 @@ class Command(VerboseCommand):
         fetch_pacer_doc_by_rd.si(rd_pk, fq.pk).apply_async(
             queue=self.queue_name
         )
-        self.update_cached_docs_to_process(rd_pk, fq.pk)
+        append_value_in_cache(self.docs_to_process_cache_key, fq.pk)
         self.total_launched += 1
         logger.info(
             f"Launched download for doc {doc.get('id')} from court {doc.get('docket_entry__docket__court_id')}"
@@ -212,7 +204,7 @@ class Command(VerboseCommand):
                 # We remove this FQ from fetches_in_progress as we'll stop checking this one
                 self.fetches_in_progress.pop(court_id)
                 # Then we store its PK in cache to handle FQs w/too many retries later
-                self.update_cached_timed_out_fq(fq_pk)
+                append_value_in_cache(self.skipped_docs_cache_key, fq_pk)
                 return False
 
             fetch_queue = PacerFetchQueue.objects.get(id=fq_pk)
