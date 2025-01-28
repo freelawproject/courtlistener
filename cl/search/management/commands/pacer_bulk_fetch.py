@@ -48,7 +48,7 @@ class Command(VerboseCommand):
         self.queue_name = None
         self.interval = None
         self.docs_to_process_cache_key = "pacer_bulk_fetch.docs_to_process"
-        self.skipped_docs_cache_key = "pacer_bulk_fetch.skipped_docs"
+        self.timed_out_docs_cache_key = "pacer_bulk_fetch.timed_out_docs"
         self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 
     def add_arguments(self, parser) -> None:
@@ -178,7 +178,7 @@ class Command(VerboseCommand):
         fetch_pacer_doc_by_rd.si(rd_pk, fq.pk).apply_async(
             queue=self.queue_name
         )
-        append_value_in_cache(self.docs_to_process_cache_key, fq.pk)
+        append_value_in_cache(self.docs_to_process_cache_key, (rd_pk, fq.pk))
         self.total_launched += 1
         logger.info(
             f"Launched download for doc {doc.get('id')} from court {doc.get('docket_entry__docket__court_id')}"
@@ -199,15 +199,18 @@ class Command(VerboseCommand):
 
         if court_id in self.fetches_in_progress:
             fq_pk, retry_count = self.fetches_in_progress[court_id]
+            fetch_queue = PacerFetchQueue.objects.get(id=fq_pk)
+            rd_pk = fetch_queue.recap_document_id
             if retry_count >= self.max_retries:
                 # Too many retries means FQ was probably stuck and not handled gracefully, so we keep going.
                 # We remove this FQ from fetches_in_progress as we'll stop checking this one
                 self.fetches_in_progress.pop(court_id)
                 # Then we store its PK in cache to handle FQs w/too many retries later
-                append_value_in_cache(self.skipped_docs_cache_key, fq_pk)
+                append_value_in_cache(
+                    self.timed_out_docs_cache_key, (rd_pk, fq_pk)
+                )
                 return False
 
-            fetch_queue = PacerFetchQueue.objects.get(id=fq_pk)
             date_completed = fetch_queue.date_completed
             fq_in_progress = date_completed is None
             if fq_in_progress or not enough_time_elapsed(date_completed):
