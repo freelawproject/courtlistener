@@ -183,7 +183,7 @@ class Command(VerboseCommand):
         )
         return fq
 
-    def should_skip(self, fetches_in_progress: dict, court_id: str) -> bool:
+    def should_skip(self, court_id: str) -> bool:
         """Determine if the court is ready to be queried again.
 
         To hit the same court again, the last fetch queue must have
@@ -194,9 +194,9 @@ class Command(VerboseCommand):
             now = timezone.now()
             return (now - date) < timedelta(seconds=self.interval)
 
-        if court_id in fetches_in_progress:
+        if court_id in self.fetches_in_progress:
             fetch_queue = PacerFetchQueue.objects.get(
-                id=fetches_in_progress[court_id]
+                id=self.fetches_in_progress[court_id][0]
             )
             date_completed = fetch_queue.date_completed
             fq_in_progress = date_completed is None
@@ -214,7 +214,6 @@ class Command(VerboseCommand):
 
     def fetch_next_doc_in_court(
         self,
-        fetches_in_progress: dict,
         court_id: str,
         remaining_courts: dict,
     ) -> bool:
@@ -224,7 +223,7 @@ class Command(VerboseCommand):
         less than `self.interval` seconds ago, we skip it and wait for
         the next round to try the same court again.
         """
-        should_skip = self.should_skip(fetches_in_progress, court_id)
+        should_skip = self.should_skip(court_id)
         if should_skip:
             return True
 
@@ -232,7 +231,7 @@ class Command(VerboseCommand):
             doc = remaining_courts[court_id].pop(0)
             try:
                 fq = self.enqueue_pacer_fetch(doc)
-                fetches_in_progress[court_id] = fq.id
+                self.update_fetches_in_progress(court_id, fq.id)
             except Exception as e:
                 self.total_errors += 1
                 logger.error(
@@ -244,7 +243,6 @@ class Command(VerboseCommand):
     def fetch_docs_from_pacer(self) -> None:
         """Process documents with one fetch per court at a time"""
         self.handle_pacer_session()
-        fetches_in_progress = {}
         remaining_courts = self.courts_with_docs.copy()
 
         while remaining_courts:
@@ -252,7 +250,6 @@ class Command(VerboseCommand):
             skipped_courts = 0
             for court_id in list(remaining_courts.keys()):
                 was_skipped = self.fetch_next_doc_in_court(
-                    fetches_in_progress,
                     court_id,
                     remaining_courts,
                 )
@@ -260,7 +257,7 @@ class Command(VerboseCommand):
                 # If this court doesn't have any more docs, remove from dict:
                 if not remaining_courts[court_id]:
                     remaining_courts.pop(court_id)
-                    fetches_in_progress.pop(court_id, None)
+                    self.fetches_in_progress.pop(court_id, None)
 
             # If we had to skip all courts that we tried this round,
             # add a small delay to avoid hammering the DB
