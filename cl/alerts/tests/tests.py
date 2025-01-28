@@ -893,7 +893,7 @@ class SearchAlertsWebhooksTest(
         self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
         self.assertEqual(
             mail.outbox[0].subject,
-            f"1 Alert have hits: {self.search_alert.name}",
+            f"1 Alert has hits: {self.search_alert.name}",
         )
 
         # Plain text assertions
@@ -2275,7 +2275,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         text_content = mail.outbox[0].body
         self.assertEqual(
             mail.outbox[0].subject,
-            f"1 Alert have hits: {self.search_alert.name}",
+            f"1 Alert has hits: {self.search_alert.name}",
         )
 
         self.assertIn(rt_oral_argument.case_name, text_content)

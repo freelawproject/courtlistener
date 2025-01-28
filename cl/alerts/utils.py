@@ -7,7 +7,6 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
-from django.template.defaultfilters import pluralize
 from elasticsearch_dsl import MultiSearch, Q, Search
 from elasticsearch_dsl.query import Query
 from elasticsearch_dsl.response import Hit, Response
@@ -741,9 +740,12 @@ def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:
     :return: A string representing the email subject line.
     """
 
-    alerts_count = len(hits)
+    alert_count = len(hits)
     alert_names_str = ", ".join(alert_hit[0].name for alert_hit in hits)
-    alert_subject = f"{alerts_count} Alert{pluralize(alerts_count)} have hits: {alert_names_str}"
+    if alert_count > 1:
+        alert_subject = f"{alert_count} Alerts have hits: {alert_names_str}"
+    else:
+        alert_subject = f"{alert_count} Alert has hits: {alert_names_str}"
     # Truncate the subject to a maximum length of 935 characters, which is
     # Gmail's allowed subject size for display and also below RFC2822  line limit specs
     return trunc(alert_subject, 935, ellipsis="...")

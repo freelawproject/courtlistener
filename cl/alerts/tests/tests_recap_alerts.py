@@ -1721,7 +1721,7 @@ class RECAPAlertsSweepIndexTest(
 
         self.assertEqual(
             mail.outbox[1].subject,
-            f"1 Alert have hits: {cross_object_alert_after_update.name}",
+            f"1 Alert has hits: {cross_object_alert_after_update.name}",
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
