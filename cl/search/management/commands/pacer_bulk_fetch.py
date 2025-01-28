@@ -13,7 +13,7 @@ from cl import settings
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
-from cl.recap.models import REQUEST_TYPE, PacerFetchQueue
+from cl.recap.models import PROCESSING_STATUS, REQUEST_TYPE, PacerFetchQueue
 from cl.recap.tasks import fetch_pacer_doc_by_rd, mark_fq_successful
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, RECAPDocument
@@ -278,14 +278,31 @@ class Command(VerboseCommand):
                 time.sleep(self.interval)
 
     def process_docs_fetched(self):
-        """Apply tasks to process docs fetched from PACER."""
-        fetch_queues_in_cache = cache.get(self.cache_key)
-        for rd_pk, fq_pk in fetch_queues_in_cache:
-            self.throttle.maybe_wait()
-            chain(
-                extract_recap_pdf.si(rd_pk),
-                mark_fq_successful.si(fq_pk),
-            ).apply_async(queue=self.queue_name)
+        """Apply tasks to process docs that were successfully fetched from PACER."""
+        cached_fetches = cache.get(self.docs_to_process_cache_key)
+        fetch_queues_to_process = [fq_pk for (_, fq_pk) in cached_fetches]
+        fetch_queues = (
+            PacerFetchQueue.objects.filter(pk__in=fetch_queues_to_process)
+            .select_related("recap_document")
+            .only(
+                "pk",
+                "status",
+                "recap_document__pk",
+                "recap_document__needs_extraction",
+                "recap_document__filepath_local",
+            )
+        )
+        for fq in fetch_queues:
+            rd = fq.recap_document
+            needs_ocr = rd.needs_extraction
+            has_pdf = rd.filepath_local is not None
+            fetch_was_successful = fq.status == PROCESSING_STATUS.SUCCESSFUL
+            if fetch_was_successful and has_pdf and needs_ocr:
+                self.throttle.maybe_wait()
+                chain(
+                    extract_recap_pdf.si(rd.pk),
+                    mark_fq_successful.si(fq.pk),
+                ).apply_async(queue=self.queue_name)
 
     def handle(self, *args, **options) -> None:
         self.options = options
