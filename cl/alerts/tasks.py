@@ -21,6 +21,7 @@ from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
     alert_hits_limit_reached,
+    build_alert_email_subject,
     fetch_all_search_alerts_results,
     has_document_alert_hit_been_triggered,
     include_recap_document_hit,
@@ -489,7 +490,6 @@ def send_search_alert_emails(
     """
 
     messages = []
-    subject = "New hits for your alerts"
     txt_template = loader.get_template("alert_email_es.txt")
     html_template = loader.get_template("alert_email_es.html")
 
@@ -498,6 +498,7 @@ def send_search_alert_emails(
         if not len(hits) > 0:
             continue
 
+        subject = build_alert_email_subject(hits)
         alert_user: UserProfile.user = User.objects.get(pk=user_id)
         context = {
             "hits": hits,
