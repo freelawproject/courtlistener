@@ -12,7 +12,8 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Prefetch, Q, QuerySet
+from django.db.models.aggregates import Count, Sum
 from django.db.models.functions import MD5
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
@@ -869,6 +870,22 @@ class Docket(AbstractDateTimeModel, DocketSources):
         The returned queryset is sorted by the depth field.
         """
         return build_authorities_query(self.authorities)
+
+    @property
+    def authority_opinions(self):
+        """Return a queryset of Opinions cited by this docket's RDs.
+
+        This is similar to the authorities property, but instead of
+        listing OpinionsCitedByRECAPDocuments, it lists Opinions.
+
+        The returned queryset is annotated with the number of filings
+        and the total depth across references, and optimized by prefetching
+        related data.
+        """
+        opinions = Opinion.objects.filter(
+            citing_documents__citing_document__docket_entry__docket_id=self.pk
+        )
+        return build_authority_opinions_query(opinions)
 
     def add_idb_source(self):
         if self.source in self.NON_IDB_SOURCES():
@@ -3301,6 +3318,51 @@ class OpinionsCitedByRECAPDocument(models.Model):
         verbose_name_plural = "Opinions cited by RECAP document"
         unique_together = ("citing_document", "cited_opinion")
         indexes = [models.Index(fields=["depth"])]
+
+
+def build_authority_opinions_query(
+    base_queryset: QuerySet[Opinion],
+) -> QuerySet[Opinion]:
+    """Annotates a queryset of Opinions and optimizes related queries.
+
+    The annotated queryset includes the number of filings (total number of
+    RECAPDocuments that cite each opinion) and the total depth (total
+    number of references across documents).
+    """
+    return (
+        base_queryset.select_related("cluster__docket__court")
+        .prefetch_related(
+            "cluster__citations",
+            "citing_documents",
+            Prefetch(
+                "cluster__sub_opinions",
+                queryset=Opinion.objects.only("pk", "cluster_id"),
+            ),
+        )
+        .annotate(
+            num_filings=Count(
+                "citing_documents__citing_document", distinct=True
+            ),
+            total_depth=Sum("citing_documents__depth"),
+        )
+        .only(
+            "cluster__id",
+            "cluster__blocked",
+            "cluster__case_name",
+            "cluster__case_name_full",
+            "cluster__case_name_short",
+            "cluster__docket_id",
+            "cluster__docket__court__full_name",
+            "cluster__docket__docket_number",
+            "cluster__docket__court_id",
+            "cluster__docket__court__citation_string",
+            "cluster__slug",
+            "cluster__citation_count",
+            "cluster__docket_id",
+            "cluster__date_filed",
+        )
+        .order_by("-num_filings", "-total_depth")
+    )
 
 
 def build_authorities_query(
