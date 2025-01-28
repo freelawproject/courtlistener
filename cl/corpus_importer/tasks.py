@@ -5,6 +5,7 @@ import shutil
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
+from pyexpat import ExpatError
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
@@ -45,7 +46,6 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
-from pyexpat import ExpatError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
 from requests.exceptions import (
