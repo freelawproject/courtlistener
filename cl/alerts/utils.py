@@ -28,6 +28,7 @@ from cl.lib.elasticsearch_utils import (
     build_join_es_filters,
     merge_highlights_into_result,
 )
+from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
 from cl.search.constants import (
     ALERTS_HL_TAG,
@@ -49,6 +50,7 @@ from cl.search.types import (
     ESDictDocument,
     ESModelClassType,
     PercolatorResponses,
+    SearchAlertHitType,
 )
 
 
@@ -726,3 +728,24 @@ def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
             )
 
     return percolator_index, es_document_index, documents_to_percolate
+
+
+def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:
+    """Build the email subject line for search alert emails.
+
+    "X Alert(s) have hits: alert_name_1, alert_name_2 ..."
+
+    :param hits: A list of search alert hits, where each hit contains the
+    alert details.
+    :return: A string representing the email subject line.
+    """
+
+    alert_count = len(hits)
+    alert_names_str = ", ".join(alert_hit[0].name for alert_hit in hits)
+    if alert_count > 1:
+        alert_subject = f"{alert_count} Alerts have hits: {alert_names_str}"
+    else:
+        alert_subject = f"{alert_count} Alert has hits: {alert_names_str}"
+    # Truncate the subject to a maximum length of 935 characters, which is
+    # Gmail's allowed subject size for display and also below RFC2822  line limit specs
+    return trunc(alert_subject, 935, ellipsis="...")
