@@ -5,7 +5,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
-from unittest.mock import ANY
+from unittest.mock import ANY, MagicMock
 
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
@@ -110,6 +110,7 @@ from cl.recap.models import (
 from cl.recap.tasks import (
     create_or_merge_from_idb_chunk,
     do_pacer_fetch,
+    download_pacer_pdf_by_rd,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
     process_recap_acms_appellate_attachment,
@@ -2157,10 +2158,6 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         )
 
 
-@mock.patch(
-    "cl.corpus_importer.tasks.FreeOpinionReport",
-    new=fakes.FakeFreeOpinionReport,
-)
 @mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -2170,7 +2167,9 @@ class RecapPdfFetchApiTest(TestCase):
     """Can we fetch PDFs properly?"""
 
     def setUp(self) -> None:
+        self.district_court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
         self.docket = DocketFactory(
+            court=self.district_court,
             case_name="United States v. Curlin",
             case_name_short="Curlin",
             pacer_case_id="28766",
@@ -2199,16 +2198,58 @@ class RecapPdfFetchApiTest(TestCase):
             recap_document_id=self.rd.pk,
         )
 
+        self.appellate_court = CourtFactory(
+            id="ca1", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        self.appellate_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.appellate_court,
+            pacer_case_id="41651",
+        )
+        self.appellate_rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.appellate_docket, entry_number=1208699339
+            ),
+            document_number=1208699339,
+            pacer_doc_id="1208699339",
+            is_available=True,
+            page_count=15,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
+        self.appellate_fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=self.appellate_rd.pk,
+        )
+
     def tearDown(self) -> None:
         RECAPDocument.objects.update(is_available=True)
         self.rd.refresh_from_db()
 
     @mock.patch(
+        "cl.corpus_importer.tasks.FreeOpinionReport",
+        new=fakes.FakeFreeOpinionReport,
+    )
+    @mock.patch(
         "cl.lib.storage.get_name_by_incrementing",
         side_effect=clobbering_get_name,
     )
-    def test_fetch_unavailable_pdf(
-        self, mock_get_cookie, mock_get_name, mock_court_accessible
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        wraps=download_pacer_pdf_by_rd,
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.is_appellate_court",
+        wraps=is_appellate_court,
+    )
+    def test_fetch_unavailable_pdf_district(
+        self,
+        mock_court_check,
+        mock_download_method,
+        mock_get_name,
+        mock_court_accessible,
+        mock_get_cookies,
     ):
         """Can we do a simple fetch of a PDF from PACER?"""
         self.rd.is_available = False
@@ -2217,12 +2258,33 @@ class RecapPdfFetchApiTest(TestCase):
         self.assertFalse(self.rd.is_available)
         result = do_pacer_fetch(self.fq)
         result.get()
+
+        # Verify that the download helper is invoked exactly once (ideal
+        # scenario) with the anticipated district record data.
+        mock_download_method.assert_called_once()
+        mock_download_method.assert_called_with(
+            self.rd.pk,
+            self.docket.pacer_case_id,
+            self.rd.pacer_doc_id,
+            ANY,
+            None,
+            de_seq_num=None,
+        )
+
+        # Verify court validation calls with expected court ID
+        court_id = self.district_court.id
+        mock_court_check.assert_called_with(court_id)
+
         self.fq.refresh_from_db()
         self.rd.refresh_from_db()
         self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
         self.assertTrue(self.rd.is_available)
 
-    def test_fetch_available_pdf(self, mock_get_cookie, mock_court_accessible):
+    @mock.patch(
+        "cl.corpus_importer.tasks.FreeOpinionReport",
+        new=fakes.FakeFreeOpinionReport,
+    )
+    def test_fetch_available_pdf(self, mock_court_accessible, mock_get_cookie):
         orig_date_modified = self.rd.date_modified
 
         response = fetch_pacer_doc_by_rd(self.rd.pk, self.fq.pk)
@@ -2240,6 +2302,179 @@ class RecapPdfFetchApiTest(TestCase):
             orig_date_modified,
             self.rd.date_modified,
             msg="rd updated even though it was available.",
+        )
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.AppellateDocketReport",
+        new=fakes.FakeFreeOpinionReport,
+    )
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        wraps=download_pacer_pdf_by_rd,
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.is_appellate_court",
+        wraps=is_appellate_court,
+    )
+    def test_fetch_unavailable_pdf_appellate(
+        self,
+        mock_court_check,
+        mock_download_method,
+        mock_get_name,
+        mock_court_accessible,
+        mock_get_cookies,
+    ):
+        """Can we do a simple fetch of a PDF from PACER?"""
+        self.appellate_rd.is_available = False
+        self.appellate_rd.save()
+
+        self.assertFalse(self.appellate_rd.is_available)
+        result = do_pacer_fetch(self.appellate_fq)
+        result.get()
+
+        # Verify that the download helper is invoked exactly once (ideal
+        # scenario) with the anticipated district record data.
+        mock_download_method.assert_called_once()
+        mock_download_method.assert_called_with(
+            self.appellate_rd.pk,
+            self.appellate_docket.pacer_case_id,
+            self.appellate_rd.pacer_doc_id,
+            ANY,
+            None,
+            de_seq_num=None,
+        )
+
+        # Verify court validation calls with expected court ID
+        court_id = self.appellate_court.id
+        mock_court_check.assert_called_with(court_id)
+
+        self.appellate_fq.refresh_from_db()
+        self.appellate_rd.refresh_from_db()
+        self.assertEqual(
+            self.appellate_fq.status, PROCESSING_STATUS.SUCCESSFUL
+        )
+        self.assertTrue(self.appellate_rd.is_available)
+
+    def test_avoid_purchasing_acms_document(
+        self, mock_court_accessible, mock_get_cookies
+    ):
+        rd_acms = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(docket=DocketFactory()),
+            pacer_doc_id="784459c4-e2cd-ef11-b8e9-001dd804c0b4",
+        )
+        fq_acms = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=rd_acms.pk,
+        )
+        fetch_pacer_doc_by_rd(rd_acms.pk, fq_acms.pk)
+
+        fq_acms.refresh_from_db()
+        self.assertEqual(fq_acms.status, PROCESSING_STATUS.FAILED)
+        self.assertIn(
+            "ACMS documents are not currently supported",
+            fq_acms.message,
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        return_value=(None, "Unable to download PDF."),
+    )
+    def test_handle_failed_purchases(
+        self, mock_download_method, mock_court_accessible, mock_get_cookies
+    ):
+        """Can we handle failed purchases?"""
+        self.rd.is_available = False
+        self.rd.save()
+
+        self.assertFalse(self.rd.is_available)
+        fetch_pacer_doc_by_rd(self.rd.pk, self.fq.pk)
+
+        self.fq.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn(
+            "Unable to download PDF.",
+            self.fq.message,
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        return_value=(
+            None,
+            "Unable to download PDF. An attachment page was returned instead.",
+        ),
+    )
+    def test_add_custom_message_for_attachment_pages(
+        self, mock_download_method, mock_court_accessible, mock_get_cookies
+    ):
+        """
+        Checks if a custom message is added when the download_pacer_pdf_by_rd
+        function returns an error indicating an attachment page was found
+        instead of a PDF.
+        """
+        self.appellate_rd.is_available = False
+        self.appellate_rd.save()
+
+        self.assertFalse(self.appellate_rd.is_available)
+        fetch_pacer_doc_by_rd(self.appellate_rd.pk, self.appellate_fq.pk)
+
+        self.appellate_fq.refresh_from_db()
+        self.assertEqual(self.appellate_fq.status, PROCESSING_STATUS.FAILED)
+
+        error_msg = (
+            "This PACER document is part of an attachment page. "
+            "Our system currently lacks the metadata for this attachment. "
+            "Please purchase the attachment page and try again."
+        )
+        self.assertEqual(error_msg, self.appellate_fq.message)
+
+    @mock.patch(
+        "cl.recap.tasks.AppellateDocketReport.download_pdf",
+        return_value=(MagicMock(content=b""), ""),
+    )
+    def test_tweaks_doc_id_for_attachment_purchases(
+        self, mock_download_method, mock_court_accessible, mock_get_cookies
+    ):
+        "Are we updating the doc_id for appellate attachment purchases?"
+        self.appellate_rd.is_available = False
+        self.appellate_rd.save()
+
+        self.assertFalse(self.appellate_rd.is_available)
+        fetch_pacer_doc_by_rd(self.appellate_rd.pk, self.appellate_fq.pk)
+
+        # Assert that the 4th digit of doc_id was not updated since it's not
+        # an attachment
+        mock_download_method.assert_called_with(
+            pacer_doc_id="1208699339", pacer_case_id="41651"
+        )
+
+        appellate_rd_attachment = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.appellate_docket, entry_number=2
+            ),
+            document_number=2,
+            attachment_number=1,
+            pacer_doc_id="01302453788",
+            is_available=False,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+
+        appellate_fq_attachment = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=appellate_rd_attachment.pk,
+        )
+
+        fetch_pacer_doc_by_rd(
+            appellate_rd_attachment.pk, appellate_fq_attachment.pk
+        )
+        # Assert that the 4th digit of doc_id was updated
+        mock_download_method.assert_called_with(
+            pacer_doc_id="01312453788", pacer_case_id="41651"
         )
 
 

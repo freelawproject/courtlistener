@@ -5,6 +5,7 @@ import shutil
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
+from pyexpat import ExpatError
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
@@ -45,7 +46,6 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
-from pyexpat import ExpatError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
 from requests.exceptions import (
@@ -1981,7 +1981,7 @@ def make_attachment_pq_object(
 def download_pacer_pdf_by_rd(
     rd_pk: int,
     pacer_case_id: str,
-    pacer_doc_id: int,
+    pacer_doc_id: str,
     session_data: SessionData,
     magic_number: str | None = None,
     de_seq_num: str | None = None,
@@ -2005,12 +2005,21 @@ def download_pacer_pdf_by_rd(
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
-    report = FreeOpinionReport(pacer_court_id, s)
-
-    r, r_msg = report.download_pdf(
-        pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
-    )
-
+    if is_appellate_court(pacer_court_id):
+        report = AppellateDocketReport(pacer_court_id, s)
+        pacer_doc_id = (
+            pacer_doc_id
+            if not rd.attachment_number
+            else f"{pacer_doc_id[:3]}1{pacer_doc_id[4:]}"
+        )
+        r, r_msg = report.download_pdf(
+            pacer_doc_id=pacer_doc_id, pacer_case_id=pacer_case_id
+        )
+    else:
+        report = FreeOpinionReport(pacer_court_id, s)
+        r, r_msg = report.download_pdf(
+            pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
+        )
     return r, r_msg
 
 
@@ -2208,8 +2217,13 @@ def update_rd_metadata(
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if pdf_bytes is None:
-        if r_msg:
-            # Send a specific message all the way from Juriscraper
+        if r_msg and "An attachment page was returned instead" in r_msg:
+            msg = (
+                "This PACER document is part of an attachment page. "
+                "Our system currently lacks the metadata for this attachment. "
+                "Please purchase the attachment page and try again."
+            )
+        elif r_msg:
             msg = f"{r_msg}: {court_id=}, {rd_pk=}"
         else:
             msg = (

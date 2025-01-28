@@ -1912,6 +1912,11 @@ def fetch_pacer_doc_by_rd(
         self.request.chain = None
         return
 
+    if rd.is_acms_document():
+        msg = "ACMS documents are not currently supported"
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        return
+
     session_data = get_pacer_cookie_from_cache(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
@@ -2014,7 +2019,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         self.request.chain = None
         return []
 
-    if rd.pacer_doc_id.count("-") > 1:
+    if rd.is_acms_document():
         msg = "ACMS attachment pages are not currently supported"
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None

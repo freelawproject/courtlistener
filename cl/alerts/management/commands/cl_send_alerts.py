@@ -15,7 +15,7 @@ from elasticsearch_dsl import Q as ES_Q
 from elasticsearch_dsl.response import Response
 
 from cl.alerts.models import Alert, RealTimeQueue
-from cl.alerts.utils import InvalidDateError
+from cl.alerts.utils import InvalidDateError, build_alert_email_subject
 from cl.api.models import WebhookEventType, WebhookVersions
 from cl.api.webhooks import send_search_alert_webhook
 from cl.lib.command_utils import VerboseCommand, logger
@@ -66,7 +66,7 @@ def get_cut_off_date(rate, d=datetime.date.today()):
 
 
 def send_alert(user_profile, hits):
-    subject = "New hits for your alerts"
+    subject = build_alert_email_subject(hits)
     txt_template = loader.get_template("alert_email_es.txt")
     html_template = loader.get_template("alert_email_es.html")
     context = {
