@@ -37,7 +37,7 @@ class Command(VerboseCommand):
         self.throttle = None
         self.queue_name = None
         self.interval = None
-        self.cache_key = "pacer_bulk_fetch.docs_to_process"
+        self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
@@ -204,6 +204,13 @@ class Command(VerboseCommand):
                 return True
 
         return False
+
+    def update_fetches_in_progress(self, court_id: str, fq_id: int):
+        court_last_fetch = self.fetches_in_progress.get(court_id, (fq_id, 0))
+        retry_count = court_last_fetch[1]
+        if fq_id == court_last_fetch[0]:
+            retry_count += 1
+        self.fetches_in_progress[court_id] = (fq_id, retry_count)
 
     def fetch_next_doc_in_court(
         self,
