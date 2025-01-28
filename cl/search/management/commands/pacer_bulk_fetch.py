@@ -82,6 +82,13 @@ class Command(VerboseCommand):
             type=str,
             help="Prevents creation of log file",
         )
+        parser.add_argument(
+            "--stage",
+            type=str,
+            choices=["fetch", "process"],
+            default="fetch",
+            help="Stage of the command to run: fetch or process",
+        )
 
     @staticmethod
     def setup_logging(testing: bool = False) -> None:
@@ -313,31 +320,56 @@ class Command(VerboseCommand):
                     mark_fq_successful.si(fq.pk),
                 ).apply_async(queue=self.queue_name)
 
+    def handle_fetch_docs(self):
+        """Run only the fetching stage."""
+        logger.info("Starting fetch stage in pacer_bulk_fetch command.")
+        try:
+            self.set_user(self.options.get("username", "recap"))
+            self.identify_documents()
+            logger.info(
+                f"{self.user} found {len(self.recap_documents)} documents "
+                f"across {len(self.courts_with_docs)} courts."
+            )
+
+            self.fetch_docs_from_pacer()
+
+            logger.info(
+                f"Created {self.total_launched} processing queues for a total "
+                f"of {len(self.recap_documents)} docs found."
+            )
+            logger.info(
+                f"The following PacerFetchQueues were retried too many times: "
+                f"{cache.get(self.timed_out_docs_cache_key)}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Fatal error in fetch stage: {str(e)}", exc_info=True
+            )
+            raise e
+
+    def handle_process_docs(self):
+        """Run only the processing stage."""
+        logger.info("Starting processing stage in pacer_bulk_fetch command.")
+        try:
+            self.process_docs_fetched()
+        except Exception as e:
+            logger.error(
+                f"Fatal error in process stage: {str(e)}", exc_info=True
+            )
+            raise e
+
     def handle(self, *args, **options) -> None:
         self.options = options
         self.setup_logging(self.options.get("testing", False))
         self.setup_celery()
         self.interval = self.options.get("interval", 2)
 
-        logger.info("Starting pacer_bulk_fetch command")
-
-        try:
-            self.set_user(options.get("username", "recap"))
-
-            self.identify_documents()
-
-            logger.info(
-                f"{self.user} found {len(self.recap_documents)} documents across {len(self.courts_with_docs)} courts."
+        stage = options.get("stage")
+        if stage == "fetch":
+            self.handle_fetch_docs()
+        elif stage == "process":
+            self.handle_process_docs()
+        else:
+            raise CommandError(
+                "Invalid stage passed to pacer_bulk_fetch command."
             )
-
-            self.fetch_docs_from_pacer()
-
-            logger.info(
-                f"Created {self.total_launched} processing queues for a total of {len(self.recap_documents)} docs found."
-            )
-
-            self.process_docs_fetched()
-
-        except Exception as e:
-            logger.error(f"Fatal error in command: {str(e)}", exc_info=True)
-            raise
