@@ -5,7 +5,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
-from unittest.mock import ANY
+from unittest.mock import ANY, MagicMock
 
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
@@ -2142,6 +2142,51 @@ class RecapPdfFetchApiTest(TestCase):
             "Please purchase the attachment page and try again."
         )
         self.assertEqual(error_msg, self.appellate_fq.message)
+
+    @mock.patch(
+        "cl.recap.tasks.AppellateDocketReport.download_pdf",
+        return_value=(MagicMock(content=b""), ""),
+    )
+    def test_tweaks_doc_id_for_attachment_purchases(
+        self, mock_download_method, mock_court_accessible, mock_get_cookies
+    ):
+        "Are we updating the doc_id for appellate attachment purchases?"
+        self.appellate_rd.is_available = False
+        self.appellate_rd.save()
+
+        self.assertFalse(self.appellate_rd.is_available)
+        fetch_pacer_doc_by_rd(self.appellate_rd.pk, self.appellate_fq.pk)
+
+        # Assert that the 4th digit of doc_id was not updated since it's not
+        # an attachment
+        mock_download_method.assert_called_with(
+            pacer_doc_id="1208699339", pacer_case_id="41651"
+        )
+
+        appellate_rd_attachment = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.appellate_docket, entry_number=2
+            ),
+            document_number=2,
+            attachment_number=1,
+            pacer_doc_id="01302453788",
+            is_available=False,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+
+        appellate_fq_attachment = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=appellate_rd_attachment.pk,
+        )
+
+        fetch_pacer_doc_by_rd(
+            appellate_rd_attachment.pk, appellate_fq_attachment.pk
+        )
+        # Assert that the 4th digit of doc_id was updated
+        mock_download_method.assert_called_with(
+            pacer_doc_id="01312453788", pacer_case_id="41651"
+        )
 
 
 @mock.patch(

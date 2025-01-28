@@ -1981,7 +1981,7 @@ def make_attachment_pq_object(
 def download_pacer_pdf_by_rd(
     rd_pk: int,
     pacer_case_id: str,
-    pacer_doc_id: int,
+    pacer_doc_id: str,
     session_data: SessionData,
     magic_number: str | None = None,
     de_seq_num: str | None = None,
@@ -2010,7 +2010,7 @@ def download_pacer_pdf_by_rd(
         pacer_doc_id = (
             pacer_doc_id
             if not rd.attachment_number
-            else int(f"{str(pacer_doc_id)[:3]}1{str(pacer_doc_id)[4:]}")
+            else f"{pacer_doc_id[:3]}1{pacer_doc_id[4:]}"
         )
         r, r_msg = report.download_pdf(
             pacer_doc_id=pacer_doc_id, pacer_case_id=pacer_case_id
