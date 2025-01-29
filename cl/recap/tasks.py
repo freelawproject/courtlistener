@@ -1999,18 +1999,21 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
 
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     rd = fq.recap_document
+    court_id = rd.docket_entry.docket.court_id
+    pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    pacer_doc_id = rd.pacer_doc_id
     # Check court connectivity, if fails retry the task, hopefully, it'll be
     # retried in a different not blocked node
-    if not is_pacer_court_accessible(rd.docket_entry.docket.court_id):
+    if not is_pacer_court_accessible(court_id):
         if self.request.retries == self.max_retries:
-            msg = f"Blocked by court: {rd.docket_entry.docket.court_id}"
+            msg = f"Blocked by court: {court_id}"
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             self.request.chain = None
             return []
         raise self.retry()
 
     mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
-    if not rd.pacer_doc_id:
+    if not pacer_doc_id:
         msg = (
             "Unable to get attachment page: Unknown pacer_doc_id for "
             "RECAP Document object %s" % rd.pk
@@ -2073,7 +2076,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         raise self.retry(exc=exc)
 
     text = r.response.text
-    is_appellate = is_appellate_court(rd.docket_entry.docket.court_id)
+    is_appellate = is_appellate_court(court_id)
     # Determine the appropriate parser function based on court jurisdiction
     # (appellate or district)
     att_data_parser = (
@@ -2081,7 +2084,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         if is_appellate
         else get_data_from_att_report
     )
-    att_data = att_data_parser(text, rd.docket_entry.docket.court_id)
+    att_data = att_data_parser(text, court_id)
 
     if att_data == {}:
         msg = "Not a valid attachment page upload"
@@ -2092,7 +2095,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
     try:
         async_to_sync(merge_attachment_page_data)(
             rd.docket_entry.docket.court,
-            rd.docket_entry.docket.pacer_case_id,
+            pacer_case_id,
             att_data["pacer_doc_id"],
             # Appellate attachments don't contain a document_number
             None if is_appellate else att_data["document_number"],
@@ -2119,15 +2122,14 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
     mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
 
     # Logic to replicate the attachment page to sub-dockets matched by RECAPDocument
-    court_id = rd.docket_entry.docket.court_id
     if is_appellate_court(court_id):
         # Subdocket replication for appellate courts is currently not supported.
         self.request.chain = None
         return []
 
     sub_docket_main_rds = list(
-        get_main_rds(court_id, rd.pacer_doc_id).exclude(
-            docket_entry__docket__pacer_case_id=rd.docket_entry.docket.pacer_case_id
+        get_main_rds(court_id, pacer_doc_id).exclude(
+            docket_entry__docket__pacer_case_id=pacer_case_id
         )
     )
     sub_docket_pqs = []
