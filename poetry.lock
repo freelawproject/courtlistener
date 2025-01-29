@@ -1023,6 +1023,22 @@ files = [
 Django = ">=2.0"
 
 [[package]]
+name = "django-browser-reload"
+version = "1.17.0"
+description = "Automatically reload your browser in development."
+optional = false
+python-versions = ">=3.9"
+groups = ["dev"]
+files = [
+    {file = "django_browser_reload-1.17.0-py3-none-any.whl", hash = "sha256:d372c12c1c5962c02279a53cac7e8a020c48f104592c637a06d0768b28d2d6be"},
+    {file = "django_browser_reload-1.17.0.tar.gz", hash = "sha256:3667939cde0eee1a6d698dbe3b78cf10b573dabc4e711fb7933f1ba91fb98da4"},
+]
+
+[package.dependencies]
+asgiref = ">=3.6"
+django = ">=4.2"
+
+[[package]]
 name = "django-cache-memoize"
 version = "0.2.0"
 description = "Django utility for a memoization decorator that uses the Django cache framework."
@@ -1381,6 +1397,25 @@ django = "*"
 typing-extensions = "*"
 
 [[package]]
+name = "django-tailwind"
+version = "3.8.0"
+description = "Tailwind CSS Framework for Django projects"
+optional = false
+python-versions = ">=3.10.0,<4.0.0"
+groups = ["main", "dev"]
+files = [
+    {file = "django_tailwind-3.8.0-py3-none-any.whl", hash = "sha256:fa969c5b95d314b173fe2b2ed2cb2c03f2e2c94fdc2c01ff73a993fa159085da"},
+    {file = "django_tailwind-3.8.0.tar.gz", hash = "sha256:31c2f4a7879d685c2de0feaf0b63f246200b37337bea4d7dbafb59bc3f10c008"},
+]
+
+[package.dependencies]
+django = ">=3.2.14"
+django-browser-reload = {version = ">=1.12.1,<2.0.0", optional = true, markers = "extra == \"reload\""}
+
+[package.extras]
+reload = ["django-browser-reload (>=1.12.1,<2.0.0)"]
+
+[[package]]
 name = "django-waffle"
 version = "4.1.0"
 description = "A feature flipper for Django."
@@ -1589,14 +1624,14 @@ files = [
 
 [[package]]
 name = "eyecite"
-version = "2.6.4"
+version = "2.6.5"
 description = "Tool for extracting legal citations from text strings."
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "eyecite-2.6.4-py3-none-any.whl", hash = "sha256:da6a100ca6c6fd05b9a6714fdcdaec8d2e5aa27fff550c9e6c41f75009bea81f"},
-    {file = "eyecite-2.6.4.tar.gz", hash = "sha256:e3a7d8d7816ee58f2966b2c571df3f97dd19746c5ea5b951b30d4d82cabd8508"},
+    {file = "eyecite-2.6.5-py3-none-any.whl", hash = "sha256:421a913960160d10e4061e6ca3146f067c17169c7f482e34bc39d7c559a24552"},
+    {file = "eyecite-2.6.5.tar.gz", hash = "sha256:e91a1bc8e2df508379490bbab088ee03133cb74eff9c784199b8b66d5714e7e8"},
 ]
 
 [package.dependencies]
@@ -2437,14 +2472,14 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.6.51"
+version = "2.6.54"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "juriscraper-2.6.51-py27-none-any.whl", hash = "sha256:e0d216104ee82b1ef1a28e09a8e099c1573dd8bb7d8d888e63bfda43d5dc3b96"},
-    {file = "juriscraper-2.6.51.tar.gz", hash = "sha256:be5e49243479b21433e05a484c322fe79c8b7f1a567d3d7e473ed0615adcaa20"},
+    {file = "juriscraper-2.6.54-py27-none-any.whl", hash = "sha256:19fda9874c586bb08725a344d98bcfe921c2ee2447907da8689e5ae74c8223ff"},
+    {file = "juriscraper-2.6.54.tar.gz", hash = "sha256:e3f0d56fd59d02203a6a3267378c5ed49a568cedc88c121734cb01dbdfce8ec0"},
 ]
 
 [package.dependencies]
@@ -4445,14 +4480,14 @@ files = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.47"
+version = "3.2.49"
 description = "Database of Court Reporters"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "reporters_db-3.2.47-py2.py3-none-any.whl", hash = "sha256:174f30b95be5c4591b44ac8b714c22648fa386387e91a982193a709456b996e3"},
-    {file = "reporters_db-3.2.47.tar.gz", hash = "sha256:88c644db3eaf1effa5dc0ac9abe80ef1b311ebea9df0dd7092c77a694b49f3f9"},
+    {file = "reporters_db-3.2.49-py2.py3-none-any.whl", hash = "sha256:12181b49eef82e20bf65ac49990cfe747868b13bf3a6e6b24e6976d036f20a12"},
+    {file = "reporters_db-3.2.49.tar.gz", hash = "sha256:dd9b507ba963331c64c3db1148385d42766e1e3c321bc4ab9dfe289b87feb5a0"},
 ]
 
 [package.dependencies]
@@ -5939,4 +5974,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13, <3.14"
-content-hash = "12d8e71bac2171b8fe6784d6c0dab1135a33ebe74f9e0838ee799e48eab7f33a"
+content-hash = "50557c415b4d3adc116f4616ac2b2ec89ce9fbd16aef1d69a442be184966a625"

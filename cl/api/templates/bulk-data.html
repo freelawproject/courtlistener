@@ -62,7 +62,7 @@
     </p>
     <blockquote>
       <code>
-        COPY public.search_opinionscited (id, depth, cited_opinion_id, citing_opinion_id) FROM 'path_to_csv_file.csv' WITH (FORMAT csv, ENCODING utf8, header);
+        COPY public.search_opinionscited (id, depth, cited_opinion_id, citing_opinion_id) FROM 'path_to_csv_file.csv' WITH (FORMAT csv, ENCODING utf8, ESCAPE '\', HEADER);
       </code>
     </blockquote>
     <p>The SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:
@@ -163,6 +163,9 @@
     </p>
 
     <h3 id="old">Release Notes</h3>
+    <p>
+      <strong>2025-01-24</strong>: Improved PostgreSQL bulk data export by defaulting to double quotes for quoting instead of backticks, resolving parsing errors. Added the <code>ESCAPE</code> option to handle embedded double quotes, ensuring reliable exports and data integrity. Updated the generated import shell script to include this option.
+    </p>
     <p>
       <strong>2024-08-07</strong>: Added <code>filepath_pdf_harvard</code> field to OpinionCluster data in bulk exports. This field contains the path to the PDF file from the Harvard Caselaw Access Project for the given case.
     </p>
