@@ -303,8 +303,9 @@ class Command(VerboseCommand):
             .only(
                 "pk",
                 "status",
-                "recap_document__pk",
-                "recap_document__needs_extraction",
+                "recap_document__id",
+                "recap_document__ocr_status",
+                "recap_document__is_available",
                 "recap_document__filepath_local",
             )
         )
