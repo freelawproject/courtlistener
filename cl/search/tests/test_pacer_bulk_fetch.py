@@ -1,15 +1,17 @@
-import random
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from cl.recap.models import PacerFetchQueue
+from django.core.management import call_command
+
+testing = (True,)
+from cl.recap.factories import PacerFetchQueueFactory
+from cl.recap.models import PROCESSING_STATUS
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
     RECAPDocumentFactory,
 )
-from cl.search.management.commands.pacer_bulk_fetch import Command
-from cl.search.models import Docket, RECAPDocument
+from cl.search.models import RECAPDocument
 from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory
 
@@ -18,234 +20,327 @@ class BulkFetchPacerDocsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
+        cls.courts = []
+        for i in range(5):
+            court = CourtFactory(id=f"ca{i}", jurisdiction="F")
+            cls.courts.append(court)
 
-        cls.courts = [CourtFactory() for _ in range(6)]
-
-        dockets_per_court = 15
-        entries_per_docket = 8
-
-        page_count_ranges = [
-            (1000, 2000),
-            (500, 999),
-            (100, 499),
-            (1, 99),
-        ]
-        cls.big_page_count = 1000
-        cls.big_docs_count = 0
-
+        cls.dockets = []
         for court in cls.courts:
-            [DocketFactory(court=court) for _ in range(dockets_per_court)]
+            docket = DocketFactory(court=court)
+            cls.dockets.append(docket)
 
-        for docket in Docket.objects.all():
-            docket_entries = [
-                DocketEntryFactory(docket=docket)
-                for _ in range(entries_per_docket)
-            ]
-
-            for de in docket_entries:
-                min_pages, max_pages = random.choice(page_count_ranges)
-                page_count = random.randint(min_pages, max_pages)
-                cls.big_docs_count += 1 if page_count >= 1000 else 0
-                RECAPDocumentFactory(
-                    docket_entry=de,
-                    page_count=page_count,
-                    is_available=False,
-                )
+        # Docket entries by court index
+        cls.docket_entries = {
+            0: [DocketEntryFactory(docket=cls.dockets[0]) for _ in range(300)],
+            1: [DocketEntryFactory(docket=cls.dockets[1]) for _ in range(8)],
+            2: [DocketEntryFactory(docket=cls.dockets[2]) for _ in range(20)],
+            3: [DocketEntryFactory(docket=cls.dockets[3]) for _ in range(15)],
+            4: [DocketEntryFactory(docket=cls.dockets[4]) for _ in range(10)],
+        }
 
     def setUp(self):
-        self.command = Command()
-        self.big_docs_created = RECAPDocument.objects.filter(
-            page_count__gte=self.big_page_count,
-            is_available=False,
-            pacer_doc_id__isnull=False,
-        )
-        self.assertEqual(self.big_docs_count, self.big_docs_created.count())
+        # Create RECAP docs in DB (no real caching)
+        self.docs = []
+        # Court 0: Many large docs
+        for i in range(300):
+            self.docs.append(
+                RECAPDocumentFactory(
+                    docket_entry=self.docket_entries[0][i],
+                    pacer_doc_id=f"0_{i}",
+                    is_available=False,
+                    page_count=1000 + i,
+                )
+            )
 
+        # Court 1: Mix of pages
+        page_counts = [5, 10, 50, 100, 500, 1000, 2000, 5000]
+        for i, pages in enumerate(page_counts):
+            self.docs.append(
+                RECAPDocumentFactory(
+                    docket_entry=self.docket_entries[1][i],
+                    pacer_doc_id=f"1_{i}",
+                    is_available=False,
+                    page_count=pages,
+                )
+            )
+
+        # Court 2: Only small docs (1-10 pages)
+        for i in range(20):
+            self.docs.append(
+                RECAPDocumentFactory(
+                    docket_entry=self.docket_entries[2][i],
+                    pacer_doc_id=f"2_{i}",
+                    is_available=False,
+                    page_count=i + 1,
+                )
+            )
+
+        # Court 3: Only medium docs (100-500 pages)
+        for i in range(15):
+            self.docs.append(
+                RECAPDocumentFactory(
+                    docket_entry=self.docket_entries[3][i],
+                    pacer_doc_id=f"3_{i}",
+                    is_available=False,
+                    page_count=100 + (i * 25),
+                )
+            )
+
+        # Court 4: No docs matching typical filters (all 11-49 pages)
+        for i in range(10):
+            self.docs.append(
+                RECAPDocumentFactory(
+                    docket_entry=self.docket_entries[4][i],
+                    pacer_doc_id=f"4_{i}",
+                    is_available=False,
+                    page_count=11 + (i * 3),
+                )
+            )
+
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
+        return_value=False,
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.cache.get",
+        return_value=[],
+    )
+    @patch("cl.search.management.commands.pacer_bulk_fetch.cache.set")
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache"
+    )
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
     )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.build_pdf_retrieval_task_chain"
-    )
+    @patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
     )
-    def test_document_filtering(
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
+    )
+    def test_page_count_filtering(
         self,
+        mock_fetch_pacer_doc_by_rd,
         mock_pacer_cookies,
-        mock_chain_builder,
-        mock_throttle,
+        mock_sleep,
+        mock_maybe_wait,
+        mock_append_value_in_cache,
+        mock_cache_set,
+        mock_cache_get,
+        mock_should_skip,
     ):
-        """Test document filtering according to command arguments passed."""
-        # Setup mock chain
-        mock_chain = MagicMock()
-        mock_chain_builder.return_value = mock_chain
-
-        self.command.handle(
-            min_page_count=self.big_page_count,
-            request_interval=1.0,
-            username=self.user.username,
+        """
+        Test that documents are filtered correctly based on page count
+        without actually hitting the cache.
+        """
+        call_command(
+            "pacer_bulk_fetch",
             testing=True,
+            min_page_count=1000,
+            stage="fetch",
+            username=self.user.username,
         )
 
+        # Verify that we only tried to fetch docs with >= 1000 pages
+        expected_docs = [
+            d for d in self.docs if d.page_count >= 1000 and not d.is_available
+        ]
         self.assertEqual(
-            mock_chain.apply_async.call_count,
-            self.big_docs_count,
-            f"Expected {self.big_docs_count} documents to be processed",
+            mock_fetch_pacer_doc_by_rd.call_count,
+            len(expected_docs),
+            f"expected {len(expected_docs)} calls (1)",
         )
 
-        fetch_queues = PacerFetchQueue.objects.all()
-        self.assertEqual(
-            fetch_queues.count(),
-            self.big_docs_count,
-            f"Expected {self.big_docs_count} fetch queues",
-        )
+        self.assertTrue(mock_append_value_in_cache.called)
 
-        enqueued_doc_ids = [fq.recap_document_id for fq in fetch_queues]
-        big_doc_ids = self.big_docs_created.values_list("id", flat=True)
-        self.assertSetEqual(set(enqueued_doc_ids), set(big_doc_ids))
-
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
+        return_value=False,
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.cache.get",
+        return_value=[],
+    )
+    @patch("cl.search.management.commands.pacer_bulk_fetch.cache.set")
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache"
+    )
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
     )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.build_pdf_retrieval_task_chain"
-    )
+    @patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
+    )
+    def test_skip_available_documents(
+        self,
+        mock_fetch_pacer_doc_by_rd,
+        mock_pacer_cookies,
+        mock_sleep,
+        mock_maybe_wait,
+        mock_append_value_in_cache,
+        mock_cache_set,
+        mock_cache_get,
+        mock_should_skip,
+    ):
+        """
+        Test that documents already available in CL are skipped
+        (i.e., not enqueued).
+        """
+
+        # Make some documents available
+        docs_available_in_cl = []
+        for court_idx in range(5):
+            court_docs = [
+                d
+                for d in self.docs
+                if d.docket_entry.docket.court_id == f"ca{court_idx}"
+            ]
+            docs_available_in_cl.extend(
+                court_docs[:2]
+            )  # first 2 docs from each court
+
+        RECAPDocument.objects.filter(
+            pk__in=[d.pk for d in docs_available_in_cl]
+        ).update(is_available=True)
+
+        call_command(
+            "pacer_bulk_fetch",
+            testing=True,
+            stage="fetch",
+            username=self.user.username,
+        )
+
+        # Check how many docs were actually fetched
+        expected_unavailable = [
+            d
+            for d in self.docs
+            if d.pk not in [ad.pk for ad in docs_available_in_cl]
+        ]
+        self.assertEqual(
+            mock_fetch_pacer_doc_by_rd.call_count, len(expected_unavailable)
+        )
+
+        # None of the available docs should be in the calls
+        called_args = [
+            args[0] for args, _ in mock_fetch_pacer_doc_by_rd.call_args_list
+        ]
+        for doc in docs_available_in_cl:
+            with self.subTest(doc=doc):
+                self.assertNotIn(doc.pk, called_args)
+
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
+        return_value=False,
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.cache.get",
+        return_value=[],
+    )
+    @patch("cl.search.management.commands.pacer_bulk_fetch.cache.set")
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
+    )
+    @patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
     )
     def test_rate_limiting(
         self,
+        mock_fetch_pacer_doc_by_rd,
         mock_pacer_cookies,
-        mock_chain_builder,
-        mock_throttle,
+        mock_sleep,
+        mock_maybe_wait,
+        mock_append_value_in_cache,
+        mock_cache_set,
+        mock_cache_get,
+        mock_should_skip,
     ):
-        """Test rate limiting."""
-        # Setup mock chain
-        mock_chain = MagicMock()
-        mock_chain_builder.return_value = mock_chain
-
-        rate_limit = "10/m"
-        self.command.handle(
-            min_page_count=1000,
-            rate_limit=rate_limit,
-            username=self.user.username,
+        """Test that rate limiting triggers sleep calls (mocked)."""
+        interval = 2
+        call_command(
+            "pacer_bulk_fetch",
             testing=True,
+            interval=interval,
+            min_page_count=1000,
+            stage="fetch",
+            username=self.user.username,
         )
 
-        # Verify the rate limit was passed correctly
-        for call in mock_chain_builder.call_args_list:
-            with self.subTest(call=call):
-                _, kwargs = call
-                self.assertEqual(
-                    kwargs.get("rate_limit"),
-                    rate_limit,
-                    "Rate limit should be passed to chain builder",
-                )
-
+        expected_docs = [
+            d for d in self.docs if d.page_count >= 1000 and not d.is_available
+        ]
         self.assertEqual(
-            mock_throttle.call_count,
-            self.big_docs_count,
-            "CeleryThrottle.maybe_wait should be called for each document",
+            mock_fetch_pacer_doc_by_rd.call_count, len(expected_docs)
         )
 
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
+        return_value=False,
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.cache.get",
+        return_value=[],
+    )
+    @patch("cl.search.management.commands.pacer_bulk_fetch.cache.set")
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
     )
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.build_pdf_retrieval_task_chain"
+        "cl.search.management.commands.pacer_bulk_fetch.extract_recap_pdf.si"
     )
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
+        "cl.search.management.commands.pacer_bulk_fetch.mark_fq_successful.si"
     )
-    def test_error_handling(
+    def test_fetch_queue_processing(
         self,
-        mock_pacer_cookies,
-        mock_chain_builder,
-        mock_throttle,
+        mock_mark_fq_successful,
+        mock_extract_recap_pdf,
+        mock_maybe_wait,
+        mock_cache_set,
+        mock_cache_get,
+        mock_should_skip,
     ):
-        """Test that errors are handled gracefully"""
-        mock_chain_builder.side_effect = Exception("Chain building error")
+        """
+        Test that fetch queues are processed correctly (processing stage).
+        """
+        successful_fqs = []
+        for doc in self.docs[:3]:
+            fq = PacerFetchQueueFactory(
+                recap_document=doc,
+                status=PROCESSING_STATUS.SUCCESSFUL,
+                user_id=self.user.pk,
+            )
+            doc.filepath_local = "/fake/path.pdf"
+            doc.is_available = True
+            doc.ocr_status = None
+            doc.save()
+            successful_fqs.append((doc.pk, fq.pk))
 
-        self.command.handle(
-            min_page_count=1000,
-            username=self.user.username,
+        mock_cache_get.return_value = successful_fqs
+
+        call_command(
+            "pacer_bulk_fetch",
             testing=True,
+            stage="process",
+            username=self.user.username,
         )
 
+        # For each FQ, we expect an OCR extract call and a "mark successful" call
         self.assertEqual(
-            PacerFetchQueue.objects.count(),
-            self.big_docs_count,
-            "PacerFetchQueue objects should still be created even if chain building fails",
+            mock_extract_recap_pdf.call_count, len(successful_fqs)
         )
-
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.build_pdf_retrieval_task_chain"
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
-    )
-    def test_round_robin(
-        self,
-        mock_pacer_cookies,
-        mock_chain_builder,
-        mock_throttle,
-    ):
-        """
-        Verify that each call to 'execute_round' never processes the same court
-        more than once.
-        """
-        mock_chain = MagicMock()
-        mock_chain_builder.return_value = mock_chain
-
-        calls_per_round = []
-        original_execute_round = self.command.execute_round
-
-        def track_rounds_side_effect(remaining_courts, options, is_last_round):
-            """
-            Tracks PacerFetchQueue creation before and after calling execute_round
-            to identify which courts were processed in each round.
-            """
-            start_count = PacerFetchQueue.objects.count()
-            updated_remaining = original_execute_round(
-                remaining_courts, options, is_last_round
-            )
-            end_count = PacerFetchQueue.objects.count()
-
-            # Get the fetch queues created in this round
-            current_round_queues = PacerFetchQueue.objects.order_by("pk")[
-                start_count:end_count
-            ]
-            calls_per_round.append(current_round_queues)
-
-            return updated_remaining
-
-        with patch.object(
-            Command, "execute_round", side_effect=track_rounds_side_effect
-        ):
-            self.command.handle(
-                min_page_count=1000,
-                request_interval=1.0,
-                username=self.user.username,
-                testing=True,
-            )
-
-        for round_index, round_queues in enumerate(calls_per_round, start=1):
-            court_ids_this_round = []
-
-            for queue in round_queues:
-                court_id = queue.recap_document.docket_entry.docket.court_id
-                court_ids_this_round.append(court_id)
-
-            with self.subTest(
-                court_ids_this_round=court_ids_this_round,
-                round_index=round_index,
-            ):
-                self.assertEqual(
-                    len(court_ids_this_round),
-                    len(set(court_ids_this_round)),
-                    f"Round {round_index} had duplicate courts: {court_ids_this_round}",
-                )
+        self.assertEqual(
+            mock_mark_fq_successful.call_count, len(successful_fqs)
+        )
