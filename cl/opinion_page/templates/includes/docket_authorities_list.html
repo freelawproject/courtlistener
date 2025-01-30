@@ -1,7 +1,7 @@
 {% load text_filters %}
 
 <ul>
-  {% for opinion in opinions_cited %}
+  {% for opinion in authorities %}
     <li>
       <a href="/?type=r&q=docket_id%3A{{ docket.pk }}%20AND%20cites%3A({{ opinion.cluster.sub_opinions.all|OR_join }})">
         {{ opinion.num_filings }} filing{{ opinion.num_filings|pluralize }}
