@@ -190,7 +190,6 @@ opinion_document_v3_v4_common_fields = {
     "snippet": lambda x: (
         x["snippet"] if x.get("snippet") else x["result"].plain_text or ""
     ),
-    "ordering_key": lambda x: x["result"].ordering_key,
 }
 
 opinion_cluster_v3_fields = opinion_cluster_v3_v4_common_fields.copy()
