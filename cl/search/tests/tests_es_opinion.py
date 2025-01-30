@@ -3111,6 +3111,45 @@ class IndexOpinionDocumentsCommandTest(
             s.count(), 6, msg="Wrong number of Opinions returned."
         )
 
+    def test_opinions_indexing_non_null_field(self):
+        """Confirm that the indexing command properly filters out instances to
+        be indexed based on the non-null field value provided as a parameter.
+        """
+
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person_2,
+            plain_text="my plain text secret word for queries",
+            cluster=self.opinion_cluster_1,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+            ordering_key=5,
+        )
+
+        # Call cl_index_parent_and_child_docs command for Opinion.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+            testing_mode=True,
+            non_null_field="ordering_key",
+        )
+
+        # Confirm 1 Opinions is indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_1.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
+
 
 class EsOpinionsIndexingTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
@@ -3285,11 +3324,16 @@ class EsOpinionsIndexingTest(
                 local_path="test/search/opinion_doc.doc",
                 per_curiam=False,
                 type="020lead",
+                ordering_key=1,
             )
 
         # Two es_save_document task should be called on creation, one for
         # opinion and one for opinion_cluster
         self.reset_and_assert_task_count(expected=2)
+
+        # Confirm the new ordering_key field is indexed upon Opinion creation.
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
 
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
@@ -3302,6 +3346,22 @@ class EsOpinionsIndexingTest(
             opinion.save()
         # One update_es_document task should be called on tracked field update.
         self.reset_and_assert_task_count(expected=1)
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            # Update the ordering_key field in the opinion record.
+            opinion.ordering_key = None
+            opinion.save()
+
+        # One update_es_document task should be called on tracked field update.
+        self.reset_and_assert_task_count(expected=1)
+        # Confirm the ordering_key has been updated.
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.ordering_key, None)
 
         # Update an opinion untracked field.
         with mock.patch(

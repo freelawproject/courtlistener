@@ -3215,6 +3215,7 @@ class Opinion(AbstractDateTimeModel):
             "html",
             "plain_text",
             "sha1",
+            "ordering_key",
         ]
     )
     ordering_key = models.IntegerField(null=True, blank=True)
