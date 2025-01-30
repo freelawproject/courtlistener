@@ -48,8 +48,15 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
             WHERE is_available=True AND page_count>0 AND ocr_status!=1
             """
         case SEARCH_TYPES.OPINION:
-            base_query = "SELECT count(*) AS exact_count FROM search_opinion"
-            filter_clause = "WHERE extracted_by_ocr != true"
+            base_query = (
+                "SELECT count(*) AS exact_count "
+                "FROM search_opinion O "
+                "INNER JOIN search_opinioncluster OC ON O.cluster_id = OC.id"
+            )
+            filter_clause = (
+                "WHERE (extracted_by_ocr != true OR OC.source LIKE %s)"
+            )
+            params.append("'%U%'")
         case SEARCH_TYPES.ORAL_ARGUMENT:
             base_query = "SELECT count(*) AS exact_count FROM audio_audio"
             filter_clause = """WHERE local_path_mp3 != '' AND
@@ -117,8 +124,15 @@ def get_custom_query(
                 "WHERE is_available=True AND page_count>0 AND ocr_status!=1"
             )
         case SEARCH_TYPES.OPINION:
-            base_query = "SELECT id from search_opinion"
-            filter_clause = "WHERE extracted_by_ocr != true"
+            base_query = (
+                "SELECT O.id "
+                "FROM search_opinion O "
+                "INNER JOIN search_opinioncluster OC ON O.cluster_id = OC.id"
+            )
+            filter_clause = (
+                "WHERE (extracted_by_ocr != true OR OC.source LIKE %s)"
+            )
+            params.append("'%U%'")
         case SEARCH_TYPES.ORAL_ARGUMENT:
             base_query = "SELECT id from audio_audio"
             filter_clause = """
@@ -151,6 +165,8 @@ def get_custom_query(
     # have an equal chance of being selected.
     if last_pk and not random_sample:
         match type:
+            case SEARCH_TYPES.OPINION:
+                base_id = "O.id"
             case SEARCH_TYPES.PEOPLE:
                 base_id = "P.id"
             case _:
@@ -240,6 +256,13 @@ class Command(VerboseCommand):
             help="Use this flag to retrieve all records from the table without"
             " applying any filters.",
         )
+        parser.add_argument(
+            "--save-ids-as-sequence",
+            action="store_true",
+            default=False,
+            help="Store IDs in manifest files as a string sequence (e.g., '1_2_3') "
+            "instead of a range (e.g., '1-3').",
+        )
 
     def handle(self, *args, **options):
         r = get_redis_interface("CACHE")
@@ -301,7 +324,10 @@ class Command(VerboseCommand):
                     extrasaction="ignore",
                 )
                 for row in batched(rows, options["lambda_record_size"]):
-                    if options["random_sample_percentage"]:
+                    if (
+                        options["random_sample_percentage"]
+                        or options["save_ids_as_sequence"]
+                    ):
                         # Create an underscore-separated file name that lambda
                         # can split and use as part of batch processing.
                         ids = [str(r[0]) for r in row]
