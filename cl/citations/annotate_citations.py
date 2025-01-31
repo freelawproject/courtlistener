@@ -70,7 +70,7 @@ def generate_annotations(
             # can't disambiguate...
             annotation = [
                 '<span class="citation multiple-matches">'
-                f'<a href="{reverse("citation_redirector", args=[citations[0].groups["reporter"], citations[0].groups["volume"]])}">',
+                f'<a href="{reverse("citation_redirector", args=[citations[0].groups["reporter"], citations[0].groups["volume"], citations[0].groups["page"]])}">',
                 "</a></span>",
             ]
         else:  # If successfully matched...
