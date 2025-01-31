@@ -465,7 +465,18 @@ def build_term_query(
         validate_query_syntax(value, QueryType.FILTER)
 
     if make_phrase:
-        return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
+        return [
+            Q(
+                "match_phrase",
+                **{
+                    field: {
+                        "query": value,
+                        "slop": slop,
+                        "analyzer": "search_analyzer_exact",
+                    }
+                },
+            )
+        ]
 
     if isinstance(value, list):
         value = list(filter(None, value))
@@ -767,7 +778,7 @@ def build_es_plain_filters(cd: CleanData) -> List:
         # Build docket number term query
         queries_list.extend(
             build_term_query(
-                "docketNumber",
+                "docketNumber.exact",
                 cd.get("docket_number", ""),
                 make_phrase=True,
                 slop=1,
@@ -2374,7 +2385,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                 ),
                 *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_term_query(
-                    "docketNumber",
+                    "docketNumber.exact",
                     cd.get("docket_number", ""),
                     make_phrase=True,
                     slop=1,
@@ -2418,7 +2429,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                     cd.get("filed_after", ""),
                 ),
                 *build_term_query(
-                    "docketNumber",
+                    "docketNumber.exact",
                     cd.get("docket_number", ""),
                     make_phrase=True,
                     slop=1,
