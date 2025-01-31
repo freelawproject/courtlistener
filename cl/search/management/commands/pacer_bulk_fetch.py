@@ -170,8 +170,9 @@ class Command(VerboseCommand):
 
         courts = (
             Court.objects.filter(
-                dockets__docket_entries__recap_documents__in=[
-                    recap_doc_id["id"] for recap_doc_id in self.recap_documents
+                id__in=[
+                    recap_doc_id["docket_entry__docket__court_id"]
+                    for recap_doc_id in self.recap_documents
                 ]
             )
             .order_by("pk")
