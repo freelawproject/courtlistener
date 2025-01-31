@@ -1,0 +1,18 @@
+{% load text_filters %}
+
+<ul>
+  {% for opinion in authorities %}
+    <li>
+      <a href="/?type=r&q=docket_id%3A{{ docket.pk }}%20AND%20cites%3A({{ opinion.cluster.sub_opinions.all|OR_join }})">
+        {{ opinion.num_filings }} filing{{ opinion.num_filings|pluralize }}
+      </a>
+      make{% if opinion.num_filings == 1 %}s{% endif %} {{ opinion.total_depth }} reference{{ opinion.total_depth|pluralize }} to
+      <a href="{{ opinion.cluster.get_absolute_url }}{% querystring %}" {% if opinion.cluster.blocked %}rel="nofollow" {% endif %}>
+        {{ opinion.cluster.caption|safe|v_wrapper }}
+      </a>
+      <br />
+      <span class="bullet-tail">{{ opinion.cluster.docket.court }}</span>
+      <span class="bullet-tail">{{ opinion.cluster.date_filed }}</span>
+    </li>
+  {% endfor %}
+</ul>
