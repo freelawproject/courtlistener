@@ -1,15 +1,20 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache as django_cache
 from django.core.management import call_command
+from django.utils import timezone
 
 from cl.recap.factories import PacerFetchQueueFactory
-from cl.recap.models import PROCESSING_STATUS
+from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
     RECAPDocumentFactory,
+)
+from cl.search.management.commands.pacer_bulk_fetch import (
+    Command,
+    append_value_in_cache,
 )
 from cl.search.models import RECAPDocument
 from cl.tests.cases import TestCase
@@ -117,7 +122,7 @@ class BulkFetchPacerDocsTest(TestCase):
     )
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache",
-        wrap=True,
+        wraps=append_value_in_cache,
     )
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
@@ -385,4 +390,245 @@ class BulkFetchPacerDocsTest(TestCase):
                 mock_fetched_cache_key.return_value,
                 mock_timed_out_cache_key.return_value,
             ]
+        )
+
+
+class PacerBulkFetchUnitTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserFactory()
+        cls.court = CourtFactory(id="ca1", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court)
+        cls.docket_entries = [
+            DocketEntryFactory(docket=cls.docket) for _ in range(5)
+        ]
+
+    def setUp(self):
+        self.command = Command()
+        self.command.user = self.user
+        self.command.options = {"testing": True}
+        self.command.interval = 2
+        self.command.total_launched = 0
+        self.command.total_errors = 0
+        self.command.throttle = MagicMock()
+
+        self.docs = []
+        for i, de in enumerate(self.docket_entries):
+            doc = RECAPDocumentFactory(
+                docket_entry=de,
+                pacer_doc_id=f"1_{i}",
+                is_available=False,
+                page_count=100 + (i * 50),
+            )
+            self.docs.append(doc)
+
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+        return_value="pacer_bulk_fetch.test_identify_documents_filtering.docs_to_process",
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+        return_value="pacer_bulk_fetch.test_identify_documents_filtering.timed_out_docs",
+    )
+    def test_identify_documents_filtering(
+        self,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
+    ):
+        """Test that identify_documents correctly filters documents based on criteria"""
+        self.command.options["min_page_count"] = 200
+        self.command.options["max_page_count"] = 300
+
+        self.command.identify_documents()
+
+        # We should only get docs with page counts between 200-300
+        expected_docs = [
+            doc.id
+            for doc in self.docs
+            if 200 <= doc.page_count <= 300 and not doc.is_available
+        ]
+        actual_docs = [doc["id"] for doc in self.command.recap_documents]
+        self.assertSetEqual(
+            set(expected_docs),
+            set(actual_docs),
+            "Should only include docs matching page count criteria",
+        )
+
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+        return_value="pacer_bulk_fetch.test_identify_documents_cache_exclusion.docs_to_process",
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+        return_value="pacer_bulk_fetch.test_identify_documents_cache_exclusion.timed_out_docs",
+    )
+    def test_identify_documents_cache_exclusion(
+        self,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
+    ):
+        """Test that identify_documents excludes previously processed documents"""
+        # Set up cache with some "previously processed" documents
+        cache_key = mock_fetched_cache_key.return_value
+        previously_processed = [(self.docs[0].pk, 1), (self.docs[1].pk, 2)]
+        django_cache.set(cache_key, previously_processed)
+
+        # But mark one as timed out, so it should be retried
+        timed_out_key = mock_timed_out_cache_key.return_value
+        timed_out = [(self.docs[1].pk, 2)]
+        django_cache.set(timed_out_key, timed_out)
+
+        self.command.identify_documents()
+
+        excluded_docs = [self.docs[0].pk]
+        actual_docs = [doc["id"] for doc in self.command.recap_documents]
+
+        self.assertNotIn(
+            excluded_docs[0],
+            actual_docs,
+            "Previously processed docs should be excluded",
+        )
+        self.assertIn(
+            self.docs[1].pk, actual_docs, "Timed out docs should be included"
+        )
+
+    def test_should_skip_court_not_in_progress(self):
+        """Test should_skip when court has no fetch in progress"""
+        self.command.fetches_in_progress = {}
+
+        result = self.command.should_skip("ca1")
+
+        self.assertFalse(
+            result, "Should not skip court with no fetch in progress"
+        )
+
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.enough_time_elapsed"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+        return_value="pacer_bulk_fetch.test_should_skip_with_time_conditions.timed_out_docs",
+    )
+    def test_should_skip_with_time_conditions(
+        self,
+        mock_timed_out_cache_key,
+        mock_enough_time,
+    ):
+        """Test should_skip under different time conditions"""
+        test_cases = [
+            {
+                "name": "recent completion",
+                "time_elapsed": False,
+                "expected_skip": True,
+            },
+            {
+                "name": "enough time passed",
+                "time_elapsed": True,
+                "expected_skip": False,
+            },
+        ]
+
+        for case in test_cases:
+            with self.subTest(case=case["name"]):
+                fq = PacerFetchQueueFactory(
+                    recap_document=self.docs[0],
+                    status=PROCESSING_STATUS.SUCCESSFUL,
+                    date_completed=timezone.now(),
+                    user=self.user,
+                )
+
+                self.command.fetches_in_progress = {"ca1": (fq.pk, 0)}
+                mock_enough_time.return_value = case["time_elapsed"]
+
+                result = self.command.should_skip("ca1")
+
+                self.assertEqual(
+                    result,
+                    case["expected_skip"],
+                    f"should_skip returned {result} for {case['name']}",
+                )
+
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+        return_value="pacer_bulk_fetch.test_fetch_next_doc_in_court.docs_to_process",
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+        return_value="pacer_bulk_fetch.test_fetch_next_doc_in_court.timed_out_docs",
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
+        return_value=False,
+    )
+    def test_fetch_next_doc_in_court(
+        self,
+        mock_should_skip,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
+        mock_fetch,
+    ):
+        """
+        Test fetch_next_doc_in_court removes a doc from the court and
+        updates fetches_in_progress.
+        """
+        court_id = "ca1"
+
+        self.command.recap_documents = [self.docs[0]]
+        remaining_courts = {court_id: [{"id": self.docs[0].pk}]}
+        original_count = len(remaining_courts[court_id])
+
+        self.command.fetch_next_doc_in_court(court_id, remaining_courts)
+
+        self.assertEqual(
+            len(remaining_courts[court_id]),
+            original_count - 1,
+            "Document should be removed from remaining_courts",
+        )
+
+        fq_pk = PacerFetchQueue.objects.get(recap_document=self.docs[0]).pk
+        mock_fetch.assert_called_once()
+        self.assertEqual(
+            self.command.fetches_in_progress[court_id][0],
+            fq_pk,
+        )
+
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+        return_value="pacer_bulk_fetch.test_fetch_docs_from_pacer_no_sleep.docs_to_process",
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
+        return_value=False,
+    )
+    @patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
+    def test_fetch_docs_from_pacer_no_sleep(
+        self,
+        mock_sleep,
+        mock_should_skip,
+        mock_pacer_cookies,
+        mock_fetch,
+        mock_cache_key,
+    ):
+        """Test fetch_docs_from_pacer when no delays are needed"""
+        self.command.courts_with_docs = {
+            "ca1": [{"id": doc.pk} for doc in self.docs[:2]]
+        }
+
+        self.command.fetch_docs_from_pacer()
+
+        mock_sleep.assert_not_called()
+
+        self.assertEqual(
+            len(self.command.fetches_in_progress),
+            0,
+            "fetches_in_progress should be empty",
         )
