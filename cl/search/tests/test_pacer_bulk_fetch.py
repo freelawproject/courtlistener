@@ -21,6 +21,11 @@ from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory
 
 
+def _clean_cache_keys(keys):
+    for key in keys:
+        django_cache.delete(key)
+
+
 class BulkFetchPacerDocsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -103,11 +108,6 @@ class BulkFetchPacerDocsTest(TestCase):
                 )
             )
 
-    @staticmethod
-    def _clean_cache_keys(keys):
-        for key in keys:
-            django_cache.delete(key)
-
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
         return_value=False,
@@ -167,7 +167,7 @@ class BulkFetchPacerDocsTest(TestCase):
         )
 
         self.assertTrue(mock_append_value_in_cache.called)
-        self._clean_cache_keys(
+        _clean_cache_keys(
             [
                 mock_fetched_cache_key.return_value,
                 mock_timed_out_cache_key.return_value,
@@ -256,7 +256,7 @@ class BulkFetchPacerDocsTest(TestCase):
             with self.subTest(doc=doc):
                 self.assertNotIn(doc.pk, called_args)
 
-        self._clean_cache_keys(
+        _clean_cache_keys(
             [
                 mock_fetched_cache_key.return_value,
                 mock_timed_out_cache_key.return_value,
@@ -313,7 +313,7 @@ class BulkFetchPacerDocsTest(TestCase):
             mock_fetch_pacer_doc_by_rd.call_count, len(expected_docs)
         )
 
-        self._clean_cache_keys(
+        _clean_cache_keys(
             [
                 mock_fetched_cache_key.return_value,
                 mock_timed_out_cache_key.return_value,
@@ -385,7 +385,7 @@ class BulkFetchPacerDocsTest(TestCase):
             mock_mark_fq_successful.call_count, len(successful_fqs)
         )
 
-        self._clean_cache_keys(
+        _clean_cache_keys(
             [
                 mock_fetched_cache_key.return_value,
                 mock_timed_out_cache_key.return_value,
@@ -492,6 +492,13 @@ class PacerBulkFetchUnitTest(TestCase):
             self.docs[1].pk, actual_docs, "Timed out docs should be included"
         )
 
+        _clean_cache_keys(
+            [
+                mock_fetched_cache_key.return_value,
+                mock_timed_out_cache_key.return_value,
+            ]
+        )
+
     def test_should_skip_court_not_in_progress(self):
         """Test should_skip when court has no fetch in progress"""
         self.command.fetches_in_progress = {}
@@ -556,17 +563,12 @@ class PacerBulkFetchUnitTest(TestCase):
         return_value="pacer_bulk_fetch.test_fetch_next_doc_in_court.docs_to_process",
     )
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
-        return_value="pacer_bulk_fetch.test_fetch_next_doc_in_court.timed_out_docs",
-    )
-    @patch(
         "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
         return_value=False,
     )
     def test_fetch_next_doc_in_court(
         self,
         mock_should_skip,
-        mock_timed_out_cache_key,
         mock_fetched_cache_key,
         mock_fetch,
     ):
@@ -594,6 +596,8 @@ class PacerBulkFetchUnitTest(TestCase):
             self.command.fetches_in_progress[court_id][0],
             fq_pk,
         )
+
+        _clean_cache_keys([mock_fetched_cache_key.return_value])
 
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
@@ -632,3 +636,5 @@ class PacerBulkFetchUnitTest(TestCase):
             0,
             "fetches_in_progress should be empty",
         )
+
+        _clean_cache_keys([mock_cache_key.return_value])
