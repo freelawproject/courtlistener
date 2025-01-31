@@ -33,7 +33,10 @@ from cl.alerts.tasks import (
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.lib.elasticsearch_utils import build_daterange_query
-from cl.lib.search_index_utils import get_parties_from_case_name
+from cl.lib.search_index_utils import (
+    get_parties_from_bankruptcy_case_name,
+    get_parties_from_case_name,
+)
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
@@ -316,8 +319,14 @@ def document_fields_to_update(
                             # parties are available.
                             if main_instance.parties.exists():
                                 continue
-                            field_value = get_parties_from_case_name(
-                                main_instance.case_name
+                            field_value = (
+                                get_parties_from_bankruptcy_case_name(
+                                    main_instance.case_name
+                                )
+                                if main_instance.court_id.endswith("b")
+                                else get_parties_from_case_name(
+                                    main_instance.case_name
+                                )
                             )
                         else:
                             field_value = getattr(related_instance, field)

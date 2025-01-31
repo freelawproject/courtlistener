@@ -5399,7 +5399,9 @@ class RECAPSearchAPIV4Test(
         """
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             d = DocketFactory(
-                case_name="Lorem Ipsum", court=self.court, source=Docket.RECAP
+                case_name="Lorem Ipsum",
+                court=self.court_2,
+                source=Docket.RECAP,
             )
             firm = AttorneyOrganizationFactory(
                 lookup_key="00kingofprussiaroadradnorkesslertopazmeltze87437",
@@ -7376,10 +7378,11 @@ class RECAPIndexingTest(
         docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
         self.assertEqual(docket_doc_no_parties.party, ["America", "Smith"])
 
-        # Test that parties are not extracted from the case_name if it does not contain
-        # a valid separator.
+        # Test that parties are not extracted from the case_name if the case
+        # originates from a district court and lacks a valid separator.
+        court_2 = CourtFactory(id="akd", jurisdiction="FD")
         docket_with_no_parties_no_separator = DocketFactory(
-            court=self.court,
+            court=court_2,
             case_name="In re: Bank Smith",
             docket_number="1:21-bk-4446",
             source=Docket.RECAP,

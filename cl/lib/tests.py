@@ -39,7 +39,7 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
-from cl.lib.search_index_utils import get_parties_from_case_name
+from cl.lib.search_index_utils import get_parties_from_bankruptcy_case_name
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
     check_for_proximity_tokens,
@@ -1204,7 +1204,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             )
             self.assertEqual(output, test["sanitized"])
 
-    def test_can_get_parties_from_case_name(self) -> None:
+    def test_can_get_parties_from_bankruptcy_case_name(self) -> None:
         class PartiesNameTestType(TypedDict):
             case_name: str
             output: list[str]
@@ -1212,7 +1212,7 @@ class TestElasticsearchUtils(SimpleTestCase):
         tests: list[PartiesNameTestType] = [
             {
                 "case_name": "Mendelsohn. Singh",
-                "output": [],
+                "output": ["Mendelsohn. Singh"],
             },
             {
                 "case_name": "Cadle Co. v Matos",
@@ -1240,7 +1240,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
             {
                 "case_name": "Ma Margarita Bernal Sosa -ABOVE MED",
-                "output": [],
+                "output": ["Ma Margarita Bernal Sosa"],
             },
             {
                 "case_name": "Jennifer Renee' Abbott and Quentin Andrew Abbott -ABOVE MED",
@@ -1248,7 +1248,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
             {
                 "case_name": "Aiesha Renee -BELOW MED",
-                "output": [],
+                "output": ["Aiesha Renee"],
             },
             {
                 "case_name": "Justin Kaiser and Belinda Kaiser -BELOW MED",
@@ -1256,7 +1256,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
             {
                 "case_name": "Cosmorex Ltd. (in Liquidation)",
-                "output": [],
+                "output": ["Cosmorex Ltd."],
             },
             {
                 "case_name": "Cowen & Co. v. Zagar (In re Zagar)",
@@ -1264,7 +1264,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
             {
                 "case_name": 'Advantage LLC <b><font color="red">Jointly Administered under 23-90886.</font></b>',
-                "output": [],
+                "output": ["Advantage LLC"],
             },
             {
                 "case_name": 'Sather v. Carlson<b><font color="red">DO NOT DOCKET. CASE TRANSFERRED OUT.</font></b>',
@@ -1279,7 +1279,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             with self.subTest(
                 input=test["case_name"], msg="get parties names from case name"
             ):
-                parties: list[str] = get_parties_from_case_name(
+                parties: list[str] = get_parties_from_bankruptcy_case_name(
                     test["case_name"]
                 )
                 self.assertEqual(
