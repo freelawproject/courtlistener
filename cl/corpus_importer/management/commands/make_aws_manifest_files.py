@@ -56,7 +56,7 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
             filter_clause = (
                 "WHERE (extracted_by_ocr != true OR OC.source LIKE %s)"
             )
-            params.append("'%U%'")
+            params.append("%U%")
         case SEARCH_TYPES.ORAL_ARGUMENT:
             base_query = "SELECT count(*) AS exact_count FROM audio_audio"
             filter_clause = """WHERE local_path_mp3 != '' AND
@@ -132,7 +132,7 @@ def get_custom_query(
             filter_clause = (
                 "WHERE (extracted_by_ocr != true OR OC.source LIKE %s)"
             )
-            params.append("'%U%'")
+            params.append("%U%")
         case SEARCH_TYPES.ORAL_ARGUMENT:
             base_query = "SELECT id from audio_audio"
             filter_clause = """
