@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 
-testing = (True,)
 from cl.recap.factories import PacerFetchQueueFactory
 from cl.recap.models import PROCESSING_STATUS
 from cl.search.factories import (
