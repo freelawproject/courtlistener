@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.core.cache import cache as django_cache
 from django.core.management import call_command
 
 from cl.recap.factories import PacerFetchQueueFactory
@@ -97,17 +98,26 @@ class BulkFetchPacerDocsTest(TestCase):
                 )
             )
 
+    @staticmethod
+    def _clean_cache_keys(keys):
+        for key in keys:
+            django_cache.delete(key)
+
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
         return_value=False,
     )
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.cache.get",
-        return_value=[],
+        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+        return_value="pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
     )
-    @patch("cl.search.management.commands.pacer_bulk_fetch.cache.set")
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache"
+        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+        return_value="pacer_bulk_fetch.test_page_count_filtering.timed_out_docs",
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache",
+        wrap=True,
     )
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
@@ -126,13 +136,12 @@ class BulkFetchPacerDocsTest(TestCase):
         mock_sleep,
         mock_maybe_wait,
         mock_append_value_in_cache,
-        mock_cache_set,
-        mock_cache_get,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
         mock_should_skip,
     ):
         """
-        Test that documents are filtered correctly based on page count
-        without actually hitting the cache.
+        Test that documents are filtered correctly based on page count.
         """
         call_command(
             "pacer_bulk_fetch",
@@ -153,16 +162,25 @@ class BulkFetchPacerDocsTest(TestCase):
         )
 
         self.assertTrue(mock_append_value_in_cache.called)
+        self._clean_cache_keys(
+            [
+                mock_fetched_cache_key.return_value,
+                mock_timed_out_cache_key.return_value,
+            ]
+        )
 
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
         return_value=False,
     )
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.cache.get",
-        return_value=[],
+        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+        return_value="pacer_bulk_fetch.test_skip_available_documents.docs_to_process",
     )
-    @patch("cl.search.management.commands.pacer_bulk_fetch.cache.set")
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+        return_value="pacer_bulk_fetch.test_skip_available_documents.timed_out_docs",
+    )
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache"
     )
@@ -183,8 +201,8 @@ class BulkFetchPacerDocsTest(TestCase):
         mock_sleep,
         mock_maybe_wait,
         mock_append_value_in_cache,
-        mock_cache_set,
-        mock_cache_get,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
         mock_should_skip,
     ):
         """
@@ -233,17 +251,24 @@ class BulkFetchPacerDocsTest(TestCase):
             with self.subTest(doc=doc):
                 self.assertNotIn(doc.pk, called_args)
 
+        self._clean_cache_keys(
+            [
+                mock_fetched_cache_key.return_value,
+                mock_timed_out_cache_key.return_value,
+            ]
+        )
+
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
         return_value=False,
     )
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.cache.get",
-        return_value=[],
+        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+        return_value="pacer_bulk_fetch.test_rate_limiting.docs_to_process",
     )
-    @patch("cl.search.management.commands.pacer_bulk_fetch.cache.set")
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache"
+        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+        return_value="pacer_bulk_fetch.test_rate_limiting.timed_out_docs",
     )
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
@@ -261,9 +286,8 @@ class BulkFetchPacerDocsTest(TestCase):
         mock_pacer_cookies,
         mock_sleep,
         mock_maybe_wait,
-        mock_append_value_in_cache,
-        mock_cache_set,
-        mock_cache_get,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
         mock_should_skip,
     ):
         """Test that rate limiting triggers sleep calls (mocked)."""
@@ -284,15 +308,25 @@ class BulkFetchPacerDocsTest(TestCase):
             mock_fetch_pacer_doc_by_rd.call_count, len(expected_docs)
         )
 
+        self._clean_cache_keys(
+            [
+                mock_fetched_cache_key.return_value,
+                mock_timed_out_cache_key.return_value,
+            ]
+        )
+
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
         return_value=False,
     )
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.cache.get",
-        return_value=[],
+        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+        return_value="pacer_bulk_fetch.test_fetch_queue_processing.docs_to_process",
     )
-    @patch("cl.search.management.commands.pacer_bulk_fetch.cache.set")
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+        return_value="pacer_bulk_fetch.test_fetch_queue_processing.timed_out_docs",
+    )
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
     )
@@ -307,8 +341,8 @@ class BulkFetchPacerDocsTest(TestCase):
         mock_mark_fq_successful,
         mock_extract_recap_pdf,
         mock_maybe_wait,
-        mock_cache_set,
-        mock_cache_get,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
         mock_should_skip,
     ):
         """
@@ -327,7 +361,7 @@ class BulkFetchPacerDocsTest(TestCase):
             doc.save()
             successful_fqs.append((doc.pk, fq.pk))
 
-        mock_cache_get.return_value = successful_fqs
+        django_cache.set(mock_fetched_cache_key.return_value, successful_fqs)
 
         call_command(
             "pacer_bulk_fetch",
@@ -338,8 +372,17 @@ class BulkFetchPacerDocsTest(TestCase):
 
         # For each FQ, we expect an OCR extract call and a "mark successful" call
         self.assertEqual(
-            mock_extract_recap_pdf.call_count, len(successful_fqs)
+            mock_extract_recap_pdf.call_count,
+            len(successful_fqs),
+            "extract_recap_pdf",
         )
         self.assertEqual(
             mock_mark_fq_successful.call_count, len(successful_fqs)
+        )
+
+        self._clean_cache_keys(
+            [
+                mock_fetched_cache_key.return_value,
+                mock_timed_out_cache_key.return_value,
+            ]
         )
