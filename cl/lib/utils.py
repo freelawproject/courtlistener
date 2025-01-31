@@ -355,14 +355,14 @@ def cleanup_main_query(query_string: str) -> str:
             potential_docket_number = item.split("docketNumber:", 1)[1]
 
             if not potential_docket_number:
-                # The docket_number is already within a phrase or ()
+                # The docket_number is wrapped in parentheses
                 cleaned_items.append(item)
             else:
                 # Improve the docket_number query by:
                 # If it's a known docket_number format, wrap it in quotes and
                 # add a ~1 slop to match slight variations like 1:21-bk-1234-ABC → 1:21-bk-1234
                 # If it's not a known docket_number format, just wrap it in
-                # parentheses to avoid syntax errors caused by : in the number.
+                # quotes to avoid syntax errors caused by : in the number.
                 slop_suffix = (
                     "~1" if is_docket_number(potential_docket_number) else ""
                 )
