@@ -211,16 +211,16 @@ class Command(VerboseCommand):
         )
         return fq
 
+    def enough_time_elapsed(self, date):
+        now = timezone.now()
+        return (now - date) < timedelta(seconds=self.interval)
+
     def should_skip(self, court_id: str) -> bool:
         """Determine if the court is ready to be queried again.
 
         To hit the same court again, the last fetch queue must have
         been completed more than `self.interval` seconds ago.
         """
-
-        def enough_time_elapsed(date):
-            now = timezone.now()
-            return (now - date) < timedelta(seconds=self.interval)
 
         if court_id in self.fetches_in_progress:
             fq_pk, retry_count = self.fetches_in_progress[court_id]
@@ -238,7 +238,7 @@ class Command(VerboseCommand):
 
             date_completed = fetch_queue.date_completed
             fq_in_progress = date_completed is None
-            if fq_in_progress or not enough_time_elapsed(date_completed):
+            if fq_in_progress or not self.enough_time_elapsed(date_completed):
                 return True
 
         return False
@@ -304,7 +304,7 @@ class Command(VerboseCommand):
 
     def process_docs_fetched(self):
         """Apply tasks to process docs that were successfully fetched from PACER."""
-        cached_fetches = cache.get(self.docs_to_process_cache_key())
+        cached_fetches = cache.get(self.docs_to_process_cache_key(), [])
         fetch_queues_to_process = [fq_pk for (_, fq_pk) in cached_fetches]
         fetch_queues = (
             PacerFetchQueue.objects.filter(pk__in=fetch_queues_to_process)
@@ -349,7 +349,7 @@ class Command(VerboseCommand):
             )
             logger.info(
                 f"The following PacerFetchQueues were retried too many times: "
-                f"{cache.get(self.timed_out_docs_cache_key())}"
+                f"{cache.get(self.timed_out_docs_cache_key(), [])}"
             )
         except Exception as e:
             logger.error(
