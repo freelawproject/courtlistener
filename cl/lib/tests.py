@@ -39,7 +39,7 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
-from cl.lib.search_index_utils import get_parties_from_bankruptcy_case_name
+from cl.lib.search_index_utils import get_parties_from_case_name_bankr
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
     check_for_proximity_tokens,
@@ -1279,7 +1279,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             with self.subTest(
                 input=test["case_name"], msg="get parties names from case name"
             ):
-                parties: list[str] = get_parties_from_bankruptcy_case_name(
+                parties: list[str] = get_parties_from_case_name_bankr(
                     test["case_name"]
                 )
                 self.assertEqual(

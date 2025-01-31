@@ -58,7 +58,7 @@ def get_parties_from_case_name(case_name: str) -> list[str]:
     return []
 
 
-def get_parties_from_bankruptcy_case_name(case_name: str) -> list[str]:
+def get_parties_from_case_name_bankr(case_name: str) -> list[str]:
     """Extracts the parties involved in a bankruptcy case from the case name.
 
     This function attempts to identify the parties by splitting the case name
