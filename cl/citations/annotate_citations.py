@@ -2,9 +2,13 @@ import html
 import re
 from typing import Dict, List
 
+from django.urls import reverse
 from eyecite import annotate_citations, clean_text
 
-from cl.citations.match_citations import NO_MATCH_RESOURCE
+from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_RESOURCE,
+    NO_MATCH_RESOURCE,
+)
 from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import trunc
@@ -61,6 +65,13 @@ def generate_annotations(
             annotation = [
                 '<span class="citation no-link">',
                 "</span>",
+            ]
+        elif opinion is MULTIPLE_MATCHES_RESOURCE:  # If multiple matches,
+            # can't disambiguate...
+            annotation = [
+                '<span class="citation multiple-matches">'
+                f'<a href="{reverse("citation_redirector", args=[citations[0].groups["reporter"], citations[0].groups["volume"]])}">',
+                "</a></span>",
             ]
         else:  # If successfully matched...
             case_name = trunc(best_case_name(opinion.cluster), 60, "...")

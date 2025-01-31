@@ -214,9 +214,9 @@ def es_search_db_for_full_citation(
                 full_citation,
                 full_citation.citing_opinion,
             )
-            return results, citation_found
-    # Give up.
-    return [], citation_found
+
+    # Return all possible results
+    return results, citation_found
 
 
 def es_get_query_citation(
