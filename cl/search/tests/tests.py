@@ -976,6 +976,14 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 "12-9238 docketNumber:1:21-bk-0021",
                 'docketNumber:"12-9238"~1 docketNumber:"1:21-bk-0021"~1',
             ),
+            (
+                'test case_name_full:"Lorem ipsum 2" test',
+                'test case_name_full:"Lorem ipsum 2" test',
+            ),
+            (
+                'docketNumber:"docket number 2"',
+                'docketNumber:"docket number 2"',
+            ),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))

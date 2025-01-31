@@ -330,8 +330,13 @@ def cleanup_main_query(query_string: str) -> str:
         if not item:
             continue
 
-        if item.startswith('"') or item.endswith('"'):
-            # Start or end of a phrase; flip whether we're inside a phrase
+        if (
+            item.startswith('"')
+            or item.endswith('"')
+            or bool(re.match(r'\w+:"[^"]', item))
+        ):
+            # Start or end of a phrase or a fielded query using quotes e.g: field:"test"
+            # flip whether we're inside a phrase
             inside_a_phrase = not inside_a_phrase
             cleaned_items.append(item)
             continue
