@@ -148,20 +148,6 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         docket = await process_recap_acms_docket(pq.pk)
 
 
-def build_pdf_retrieval_task_chain(
-    fq: PacerFetchQueue, rate_limit: str = None
-):
-    rd_pk = fq.recap_document_id
-    pacer_fetch_task = fetch_pacer_doc_by_rd.si(rd_pk, fq.pk)
-    if rate_limit:
-        pacer_fetch_task = pacer_fetch_task.set(rate_limit=rate_limit)
-    return chain(
-        pacer_fetch_task,
-        extract_recap_pdf.si(rd_pk),
-        mark_fq_successful.si(fq.pk),
-    )
-
-
 def do_pacer_fetch(fq: PacerFetchQueue):
     """Process a request made by a user to get an item from PACER.
 
@@ -178,7 +164,12 @@ def do_pacer_fetch(fq: PacerFetchQueue):
         result = c.apply_async()
     elif fq.request_type == REQUEST_TYPE.PDF:
         # Request by recap_document_id
-        result = build_pdf_retrieval_task_chain(fq).apply_async()
+        rd_pk = fq.recap_document_id
+        result = chain(
+            fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
+            extract_recap_pdf.si(rd_pk),
+            mark_fq_successful.si(fq.pk),
+        ).apply_async()
     elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
         result = fetch_attachment_page.apply_async(args=(fq.pk,))
     return result
