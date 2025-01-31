@@ -47,8 +47,6 @@ class Command(VerboseCommand):
         self.throttle = None
         self.queue_name = None
         self.interval = None
-        self.docs_to_process_cache_key = "pacer_bulk_fetch.docs_to_process"
-        self.timed_out_docs_cache_key = "pacer_bulk_fetch.timed_out_docs"
         self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 
     def add_arguments(self, parser) -> None:
@@ -89,6 +87,16 @@ class Command(VerboseCommand):
             default="fetch",
             help="Stage of the command to run: fetch or process",
         )
+
+    @staticmethod
+    def docs_to_process_cache_key():
+        """Helper method to improve testability."""
+        return "pacer_bulk_fetch.docs_to_process"
+
+    @staticmethod
+    def timed_out_docs_cache_key():
+        """Helper method to improve testability."""
+        return "pacer_bulk_fetch.timed_out_docs"
 
     @staticmethod
     def setup_logging(testing: bool = False) -> None:
@@ -141,7 +149,7 @@ class Command(VerboseCommand):
             filters.append(Q(page_count__lte=self.options["max_page_count"]))
 
         # Do not attempt to fetch docs that were already fetched:
-        cached_fetches = cache.get(self.docs_to_process_cache_key, [])
+        cached_fetches = cache.get(self.docs_to_process_cache_key(), [])
         previously_fetched = [rd_pk for (rd_pk, _) in cached_fetches]
         # Only try again with those that were timed out before:
         cached_timed_out = cache.get(self.timed_out_docs_cache_key, [])
@@ -194,7 +202,7 @@ class Command(VerboseCommand):
         fetch_pacer_doc_by_rd.si(rd_pk, fq.pk).apply_async(
             queue=self.queue_name
         )
-        append_value_in_cache(self.docs_to_process_cache_key, (rd_pk, fq.pk))
+        append_value_in_cache(self.docs_to_process_cache_key(), (rd_pk, fq.pk))
         self.total_launched += 1
         logger.info(
             f"Launched download for doc {doc.get('id')} from court {doc.get('docket_entry__docket__court_id')}"
@@ -223,7 +231,7 @@ class Command(VerboseCommand):
                 self.fetches_in_progress.pop(court_id)
                 # Then we store its PK in cache to handle FQs w/too many retries later
                 append_value_in_cache(
-                    self.timed_out_docs_cache_key, (rd_pk, fq_pk)
+                    self.timed_out_docs_cache_key(), (rd_pk, fq_pk)
                 )
                 return False
 
@@ -295,7 +303,7 @@ class Command(VerboseCommand):
 
     def process_docs_fetched(self):
         """Apply tasks to process docs that were successfully fetched from PACER."""
-        cached_fetches = cache.get(self.docs_to_process_cache_key)
+        cached_fetches = cache.get(self.docs_to_process_cache_key())
         fetch_queues_to_process = [fq_pk for (_, fq_pk) in cached_fetches]
         fetch_queues = (
             PacerFetchQueue.objects.filter(pk__in=fetch_queues_to_process)
@@ -340,7 +348,7 @@ class Command(VerboseCommand):
             )
             logger.info(
                 f"The following PacerFetchQueues were retried too many times: "
-                f"{cache.get(self.timed_out_docs_cache_key)}"
+                f"{cache.get(self.timed_out_docs_cache_key())}"
             )
         except Exception as e:
             logger.error(
