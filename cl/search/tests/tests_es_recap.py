@@ -580,6 +580,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
         self.assertIn("New File", r.content.decode())
 
+        # docket_number text query containing repeated numbers works properly
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docketNumber text query"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
         # Fielded query also works for numbers containing repeated numbers
         params = {
             "type": SEARCH_TYPES.RECAP,

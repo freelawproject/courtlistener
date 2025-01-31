@@ -345,6 +345,27 @@ def cleanup_main_query(query_string: str) -> str:
         is_date_str = re.match(
             "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", item
         )
+
+        if "docketNumber:" in item:
+            potential_docket_number = item.split("docketNumber:", 1)[1]
+
+            if not potential_docket_number:
+                # The docket_number is already within a phrase or ()
+                cleaned_items.append(item)
+            else:
+                # Improve the docket_number query by:
+                # If it's a known docket_number format, wrap it in quotes and
+                # add a ~1 slop to match slight variations like 1:21-bk-1234-ABC → 1:21-bk-1234
+                # If it's not a known docket_number format, just wrap it in
+                # parentheses to avoid syntax errors caused by : in the number.
+                slop_suffix = (
+                    "~1" if is_docket_number(potential_docket_number) else ""
+                )
+                cleaned_items.append(
+                    f'docketNumber:"{potential_docket_number}"{slop_suffix}'
+                )
+            continue
+
         if any([not_numeric, is_date_str]):
             cleaned_items.append(item)
             continue
@@ -356,7 +377,7 @@ def cleanup_main_query(query_string: str) -> str:
 
         # Some sort of number, probably a docket number or other type of number
         # Wrap in quotes to do a phrase search
-        if is_docket_number(item) and "docketNumber:" not in query_string:
+        if is_docket_number(item):
             # Confirm is a docket number and clean it. So docket_numbers with
             # suffixes can be searched: 1:21-bk-1234-ABC -> 1:21-bk-1234,
             item = clean_docket_number(item)

@@ -374,18 +374,6 @@ def build_fulltext_query(
     """
     if value:
         validate_query_syntax(value, QueryType.QUERY_STRING)
-        # In Elasticsearch, the colon (:) character is used to separate the
-        # field name and the field value in a query.
-        # To avoid parsing errors escape any colon characters in the value
-        # parameter with a backslash.
-        if "docketNumber:" in value:
-            docket_number_matches = re.findall("docketNumber:([^ ]+)", value)
-            for match in docket_number_matches:
-                replacement = match.replace(":", r"\:")
-                value = value.replace(
-                    f"docketNumber:{match}", f"docketNumber:{replacement}"
-                )
-
         # Used for the phrase query_string, no conjunctions appended.
         query_value = cleanup_main_query(value)
         # To enable the search of each term in the query across multiple fields
