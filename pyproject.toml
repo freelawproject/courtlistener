@@ -115,6 +115,7 @@ django-tailwind = "^3.8.0"
 drf-dynamic-fields = "^0.4.0"
 django-ses = {extras = ["events"], version = "^4.3.2"}
 juriscraper = "^2.6.26"
+django-components = "^0.127"
 
 
 [tool.poetry.group.dev.dependencies]
