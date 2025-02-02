@@ -69,7 +69,8 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 #####################################
 # Directories, Apps, and Middleware #
 #####################################
-INSTALL_ROOT = Path(__file__).resolve().parents[2]
+# BASE_DIR is used by Django Components, but we call it INSTALL_ROOT. Alias it.
+INSTALL_ROOT = BASE_DIR = Path(__file__).resolve().parents[2]
 STATICFILES_DIRS = (INSTALL_ROOT / "cl/assets/static-global/",)
 DEBUG = env.bool("DEBUG", default=True)
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
@@ -99,8 +100,11 @@ TEMPLATES = [
             # Don't forget to use absolute paths, not relative paths.
             str(TEMPLATE_ROOT),
         ],
-        "APP_DIRS": True,
         "OPTIONS": {
+            "builtins": [
+                # Allow django-components to work by default in templates
+                "django_components.templatetags.component_tags",
+            ],
             "context_processors": (
                 "django.contrib.messages.context_processors.messages",
                 "django.contrib.auth.context_processors.auth",
@@ -111,6 +115,16 @@ TEMPLATES = [
                 "cl.lib.context_processors.inject_email_ban_status",
             ),
             "debug": DEBUG,
+            "loaders": [(
+                "django.template.loaders.cached.Loader", [
+                    # Default Django loader
+                    "django.template.loaders.filesystem.Loader",
+                    # Including this is the same as APP_DIRS=True
+                    "django.template.loaders.app_directories.Loader",
+                    # Components loader
+                    "django_components.template_loader.Loader",
+                ]
+            )],
         },
     }
 ]
@@ -161,6 +175,7 @@ INSTALLED_APPS = [
     "django_elasticsearch_dsl",
     "pghistory",
     "pgtrigger",
+    "django_components",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",
@@ -231,7 +246,7 @@ MANAGERS = [
 LOGIN_URL = "/sign-in/"
 LOGIN_REDIRECT_URL = "/"
 
-# These remap some of the the messages constants to correspond with bootstrap
+# These remap some of the messages constants to correspond with bootstrap
 MESSAGE_TAGS = {
     message_constants.DEBUG: "alert-warning",
     message_constants.INFO: "alert-info",
