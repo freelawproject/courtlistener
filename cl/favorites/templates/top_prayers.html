@@ -89,9 +89,9 @@
     </div>
   </div>
 
-{% if docket_entries.has_other_pages %}
+{% if top_prayers.has_other_pages %}
   <div class="col-xs-12" >
-    {% include "includes/pagination.html" with page_obj=docket_entries %}
+    {% include "includes/pagination.html" with page_obj=top_prayers %}
   </div>
 {% endif %}
 {% endblock %}
