@@ -1,5 +1,6 @@
 from django_components import Component, register
 
+
 @register("h1")
 class h1(Component):
     template = """

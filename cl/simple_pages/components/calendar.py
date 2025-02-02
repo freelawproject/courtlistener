@@ -1,5 +1,6 @@
 from django_components import Component, register
 
+
 @register("calendar")
 class calendar(Component):
     template = """
