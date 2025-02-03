@@ -44,7 +44,7 @@ from cl.citations.group_parentheticals import (
 from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
-    resolve_fullcase_citation,
+    resolve_fullcase_citation, MULTIPLE_MATCHES_RESOURCE,
 )
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
@@ -503,6 +503,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # Courts
         cls.court_scotus = CourtFactory(id="scotus")
         court_ca1 = CourtFactory(id="ca1")
+        cls.court_ca5 = CourtFactory(id="ca5")
 
         # Citation 1
         cls.citation1 = CitationWithParentsFactory.create(
@@ -579,6 +580,33 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 ),
             ),
         )
+
+        cls.citation6 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1182",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Foo v. Bar",
+                date_filed=date(
+                    1997, 4, 10
+                ),
+            ),
+        )
+
+        cls.citation7 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1182",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Lorem v. Ipsum",
+                date_filed=date(
+                    1997, 4, 8
+                ),
+            ),
+        )
+
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.OPINION,
@@ -896,6 +924,16 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         ]
         results = resolve_fullcase_citation(citation)
         self.assertEqual(NO_MATCH_RESOURCE, results)
+
+    def test_citation_multiple_matches(self) -> None:
+        """Make sure that we can identify multiple matches for a single citation
+        """
+        citation_str = "114 F.3d 1182"
+        citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
+            0
+        ]
+        results = resolve_fullcase_citation(citation)
+        self.assertEqual(MULTIPLE_MATCHES_RESOURCE, results)
 
     def test_citation_increment(self) -> None:
         """Make sure that found citations update the increment on the cited
