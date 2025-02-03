@@ -2148,12 +2148,12 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
             )
         )
 
-    if sub_docket_pqs:
-        pqs_created = ProcessingQueue.objects.bulk_create(sub_docket_pqs)
-        return [pq.pk for pq in pqs_created]
-
-    self.request.chain = None
-    return []
+    if not sub_docket_pqs:
+        self.request.chain = None
+        return []
+    # Return PQ IDs to process attachment page replication for sub-dockets.
+    pqs_created = ProcessingQueue.objects.bulk_create(sub_docket_pqs)
+    return [pq.pk for pq in pqs_created]
 
 
 @app.task(
