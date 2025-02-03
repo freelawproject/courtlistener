@@ -42,9 +42,10 @@ from cl.citations.group_parentheticals import (
     get_representative_parenthetical,
 )
 from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_RESOURCE,
     NO_MATCH_RESOURCE,
     do_resolve_citations,
-    resolve_fullcase_citation, MULTIPLE_MATCHES_RESOURCE,
+    resolve_fullcase_citation,
 )
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
@@ -588,9 +589,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             cluster=OpinionClusterFactoryWithChildrenAndParents(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Foo v. Bar",
-                date_filed=date(
-                    1997, 4, 10
-                ),
+                date_filed=date(1997, 4, 10),
             ),
         )
 
@@ -601,9 +600,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             cluster=OpinionClusterFactoryWithChildrenAndParents(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Lorem v. Ipsum",
-                date_filed=date(
-                    1997, 4, 8
-                ),
+                date_filed=date(1997, 4, 8),
             ),
         )
 
@@ -926,8 +923,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         self.assertEqual(NO_MATCH_RESOURCE, results)
 
     def test_citation_multiple_matches(self) -> None:
-        """Make sure that we can identify multiple matches for a single citation
-        """
+        """Make sure that we can identify multiple matches for a single citation"""
         citation_str = "114 F.3d 1182"
         citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
             0
