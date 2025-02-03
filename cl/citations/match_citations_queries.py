@@ -244,6 +244,7 @@ def es_get_query_citation(
             missing_citations.append(citation)
 
     if len(citations) == 1 and matches and len(matches) == 1:
-        # If more than one match, don't show the tip
+        # If only one match, show the tip
         return matches[0], missing_citations
-    return matches, missing_citations
+    # No exact match, don't show the tip
+    return None, missing_citations
