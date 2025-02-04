@@ -8,6 +8,7 @@ from elasticsearch_dsl import Document as DSLDocument
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
+from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.custom_filters.templatetags.text_filters import (
     best_case_name,
     html_decode,
@@ -1253,7 +1254,7 @@ class DocketDocument(DocketBaseDocument, RECAPBaseDocument):
             # available.
             party_from_case_name = (
                 get_parties_from_case_name_bankr(instance.case_name)
-                if instance.court_id.endswith("b")
+                if is_bankruptcy_court(instance.court_id)
                 else get_parties_from_case_name(instance.case_name)
             )
             out["party"] = party_from_case_name if party_from_case_name else []

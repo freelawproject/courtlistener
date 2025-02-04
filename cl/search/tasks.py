@@ -32,6 +32,7 @@ from cl.alerts.tasks import (
 )
 from cl.audio.models import Audio
 from cl.celery_init import app
+from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.lib.elasticsearch_utils import build_daterange_query
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
@@ -323,7 +324,7 @@ def document_fields_to_update(
                                 get_parties_from_case_name_bankr(
                                     main_instance.case_name
                                 )
-                                if main_instance.court_id.endswith("b")
+                                if is_bankruptcy_court(main_instance.court_id)
                                 else get_parties_from_case_name(
                                     main_instance.case_name
                                 )
