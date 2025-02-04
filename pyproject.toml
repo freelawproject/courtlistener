@@ -81,7 +81,7 @@ django-hCaptcha = "^0.2.0"
 reporters-db = "*"
 django-waffle = "^4.1.0"
 nameparser = "^1.1.3"
-eyecite = "*"
+eyecite = {git = "https://github.com/freelawproject/eyecite.git", branch = "199-resolved-case-names-for-reference-citations"}
 scipy = "^1.14.1"
 scikit-learn = "^1.5.2"
 numpy = "^2.1.2"

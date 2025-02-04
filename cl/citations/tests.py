@@ -44,6 +44,7 @@ from cl.citations.group_parentheticals import (
 from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
+    extract_references_using_resolutions,
     resolve_fullcase_citation,
 )
 from cl.citations.score_parentheticals import parenthetical_score
@@ -418,6 +419,54 @@ class CitationTextTest(SimpleTestCase):
                 msg=f"\n{aria_description}\n\n    !=\n\n{expected_aria}",
             )
 
+    def test_resolved_case_names_for_reference_resolutions(self):
+        """Can a resolved opinion case name be used to find references?"""
+        cleaned_text = (
+            "terms of the Code. See Southgate Master Fund, LLC ex "
+            "rel. Montgomery Capital Advisors LLC v. United States, 659 F.3d 466 "
+            "...Southgate Master Fund at 126, also involved two transactions..."
+        )
+        opinion = Opinion(
+            pk=4817681,
+            cluster=Mock(
+                OpinionCluster(id=614511),
+                case_name_short="Southgate Master Fund",
+            ),
+        )
+        resolutions = {
+            opinion: [
+                case_citation(
+                    volume="659",
+                    reporter="F.3d",
+                    page="466",
+                    metadata={"plaintiff": "LLC"},
+                )
+            ]
+        }
+        new_resolutions = extract_references_using_resolutions(
+            cleaned_text, resolutions
+        )
+        self.assertTrue(
+            len(new_resolutions[opinion]) == 2,
+            "New reference citation was not resolved",
+        )
+        self.assertEqual(
+            new_resolutions[opinion][-1].matched_text(),
+            "Southgate Master Fund at 126",
+        )
+        # This resolution should be the same
+        self.assertEqual(new_resolutions[opinion][0], resolutions[opinion][0])
+
+        # Remove the ReferenceCitation from the extracted text, see if the
+        # resolutions dict remains unchanged
+        new_resolutions = extract_references_using_resolutions(
+            cleaned_text.split("...")[0], resolutions
+        )
+        self.assertEqual(
+            len(new_resolutions[opinion]), len(resolutions[opinion])
+        )
+        self.assertEqual(new_resolutions[opinion][0], resolutions[opinion][0])
+
 
 class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
     # pass
@@ -575,7 +624,24 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
-                    plain_text="America v. Maxwell, Bush v. John, Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                    plain_text=(
+                        "America v. Maxwell, Bush v. John, Blah blah "
+                        "Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf "
+                        "Qwerty v. Uiop 2 F.3d 2, 555. Also check out "
+                        "Foo, 1 U.S. at 99 (holding that crime is illegal). "
+                        "Then let's cite Qwerty, supra, at 666 (noting that "
+                        "CourtListener is a great tool and everyone should use"
+                        " it). See also Foo, supra, at 101 as well. Another "
+                        "full citation is Lorem v. Ipsum 1 U. S. 50. "
+                        "Quoting Qwerty, “something something”, "
+                        "2 F.3d 2, at 59. This case is similar to Fake, supra,"
+                        " and Qwerty supra, as well. This should resolve to "
+                        "the foregoing. Ibid. This should also convert "
+                        "appropriately, see Id., at 57. This should fail to "
+                        "resolve because the reporter and citation is "
+                        "ambiguous, 1 U. S., at 51. However, this should "
+                        "succeed, Lorem, 1 U.S., at 52."
+                    ),
                 ),
             ),
         )

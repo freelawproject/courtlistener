@@ -20,6 +20,7 @@ from cl.citations.filter_parentheticals import (
 from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
+    extract_references_using_resolutions,
 )
 from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.citations.recap_citations import store_recap_citations
@@ -154,6 +155,10 @@ def store_opinion_citations_and_update_parentheticals(
     citation_resolutions: Dict[
         MatchedResourceType, List[SupportedCitationType]
     ] = do_resolve_citations(citations, opinion)
+
+    citation_resolutions = extract_references_using_resolutions(
+        opinion.cleaned_text, citation_resolutions
+    )
 
     # Generate the citing opinion's new HTML with inline citation links
     opinion.html_with_citations = create_cited_html(
