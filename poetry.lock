@@ -1054,6 +1054,22 @@ files = [
 dev = ["black", "flake8", "therapist", "tox", "twine"]
 
 [[package]]
+name = "django-components"
+version = "0.127"
+description = "A way to create simple reusable template components in Django."
+optional = false
+python-versions = "<4.0,>=3.8"
+groups = ["main"]
+files = [
+    {file = "django_components-0.127-py3-none-any.whl", hash = "sha256:691cb4f90a0b3a325c0644507835acf71bd445a5bf84d4278db46a078d4b87fb"},
+    {file = "django_components-0.127.tar.gz", hash = "sha256:809a71fdd664c291b5516f7a21b2512afb3723156367f0eb421f548937f4e2d6"},
+]
+
+[package.dependencies]
+Django = ">=4.2"
+djc-core-html-parser = ">=1.0"
+
+[[package]]
 name = "django-cors-headers"
 version = "4.6.0"
 description = "django-cors-headers is a Django application for handling the server headers required for Cross-Origin Resource Sharing (CORS)."
@@ -1509,6 +1525,119 @@ defusedxml = ">=0.6.0"
 dev = ["Django (>=1.6)", "djangorestframework (>=2.4.3)", "flake8", "mkdocs (>=0.11.1)", "pre-commit", "pytest", "pytest-django", "tox"]
 docs = ["mkdocs (>=0.11.1)"]
 tests = ["Django (>=1.6)", "djangorestframework (>=2.4.3)", "flake8", "pytest", "pytest-django"]
+
+[[package]]
+name = "djc-core-html-parser"
+version = "1.0.1"
+description = "HTML parser used by django-components written in Rust."
+optional = false
+python-versions = "<4.0,>=3.8"
+groups = ["main"]
+files = [
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5e1734563259140cdb2df98be964d9e1732809ac656fb1fee9be2d18a6f9efc4"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:848152791e338a594103c84a8f9dfb233e6a6b9a8ca3e81438a08e574f5e2043"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:0716d6cf1208ae1f9f0f5b3bf12c3f619c17fd996a4ecd529255b42b650fb6dd"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:6e7be5a313d72607b2add0ac3cc88815bd8c174e8f132ccd4db0da7db7cd3f47"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:daecaac2ac6d4f0fcdbac7b02945771addb2b63b4072ea506c7fd3ef60313e97"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:e9ab4438bf94858262b515c5bb96002c9843ebf0cb8c020dfb95d1772f7fc8a2"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:24487359bf1e7b2bdca711dc4a79b25f82465e8b89b7972696efbeacb79a06f6"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-musllinux_1_2_armv7l.whl", hash = "sha256:bcf2278b8bcbba0a6cdfbe425a945cf851a14ebf06c7360ad96e427be013c992"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-musllinux_1_2_i686.whl", hash = "sha256:68627cbf750238884e4b0c64c611db7ded16f45de09d6c32d8de1968f8157ee5"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:8dfa8ce018ab58f63a0c99f9b26770b21bc26e86172dc1bca2437fbd2b8eed59"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-win32.whl", hash = "sha256:53995a23e94602024522339d7732a68e1644ac75c0218f0164fff38327c34c43"},
+    {file = "djc_core_html_parser-1.0.1-cp310-cp310-win_amd64.whl", hash = "sha256:f64b4812d9351de9cc56107b29d1d117689d2319c5f4f4feed29b79be1c35ab5"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:b88bc2800a0bc0520757b05138331325b8f403d94fd67215adbca97568e80be2"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:4c59b53418a48f8eb6d9478b3e76bc0658f02f08bfa7650856514698fe478c9f"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:63af0744bb5eeee949ebd1b7d8b556de2f5f683963c0baf8c908795e30fd9005"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:3b97dc3f1d3d42bb08b3f6361528434e45663bb5d30e8f8bef44946fb0cd54b0"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:0164c291944df92603fe2b6b1c9ee9b780c11e93903d43d320ed9296eb24b3c4"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:68e296bde22e05b9801091257a51652ae657b4d1222618255277950303bab4ea"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:523e2a29d5068c50d304b1df1d85522aa669ba95df34d7eae51c53c948d06b35"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:9e083c41922991e0d087c46a4434ac503bebfc8f6516fa967a3cc92c668a2f6d"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:19de5e024cb1573c41e9fd17c50812c1f0b4f6facba35c935f790b49687d454e"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-musllinux_1_2_armv7l.whl", hash = "sha256:d344d0cfa8bf4bcb8f9bbd74348a45d3d4374d5d46acf35a3b5cd648c6e81dfa"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-musllinux_1_2_i686.whl", hash = "sha256:1313c9044e840696ddb2c20e12c3cb15cb42f07f19df8ccc0fd7a3c1e19a0155"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:a0229a9a94aff7eb1fe42d724e3a82f67dd542c57bb2199860fe906c2db4cdc2"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-win32.whl", hash = "sha256:e1a319701bda3126ee241a74ef54dcee3b42e0564ad74e94720f1e57d17fc187"},
+    {file = "djc_core_html_parser-1.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:78da291f0198f303369e67b337d094f4926bb05b25d5f88aa60fa9cc706dad3e"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:73ab53d384ab2cec73e93c71007470e1bcb55fc5049e6e69072e2c7e4806b4b7"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:9271392aea7209aa6a5d0a1f63382aba1fa4099484223093261c709e3122aae9"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b658c93e541f8cfe328d407fb152fd47b6f13d6c227f12494d381162ca5243cc"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:3f29b60e3ce3d2b7f249c94bcf53bcd5d87ce32f7fa0dd20ab3fd92683cc1b00"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:0d2cc9fcbf29b3c8107488705c72618fbe2436a4d841de86028ae9b9118a5f32"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:ba10df57b1ff8fa1499bbcd52155add40f6af98ea30f4f2de21de2db9e1b35b7"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dfe7767d4beec3e3ccee4f0fb5e4c153b3a3c95f73c29ed64f8988c8aa726c58"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:678ef0ccecbfee2aa513d09c7983c933ea89016b5932361fea2113565b455b7d"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:35b25962a14f0075ecf4a71949bde15d78532068ffda28022bf22fbec0403f6c"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-musllinux_1_2_armv7l.whl", hash = "sha256:08bbe410f53da76741e471f4e27adf6c6f48cc67e7c5cf0797884db6689bcd24"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:e029a96a019b61cee3ac3e91ffccfb28c19ebc27e31305e723ed801dd5779f39"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:393ce3de0acb274ad095e3be6b013cea664a3781c6d2536daef6512aad5a6f13"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-win32.whl", hash = "sha256:a53a88a40abbf39de0a1ed8b6f252c52143aaadcb5548e9505b0c68fccc32d9c"},
+    {file = "djc_core_html_parser-1.0.1-cp312-cp312-win_amd64.whl", hash = "sha256:6182725a4e24bb3b9c7848c1902ad4d7785256332e03235c40d6392cb64a18a1"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:bbb68a531ade22e5c69fbc02a420981fe7b6242ff57bc2929f21ffc99e9630d2"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:ab9fedd36605a13c52d0c19eb45c554099ba3568d528fed9f6a3466f8a1bcc40"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b6dc8bd4605dfa66e5ac13e024ae55d6e7c2b8c0321616802db9aa1b2e2966d1"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:1b2a8ef6127477236b3b263beafca6b78f3ed5e0ddbc5e6f44bda44ffed3b77f"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:68d1490085148813d7fd35a5131014784424089153e1bd2f1551f517971393ea"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:f5da7c09e0d8f3d35c905ee06664dc047979c7b800f3c6a0550a057bca1ac464"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4e7efdaa4fa6d0ed4128c9b8b586cac8b12e9e7b40c2104a43bef761d126a147"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:2b5f11ac3c01168bc7b95f1ec3fbe4dae3173861c24d2ceab5d7488d7c06ba87"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:cfa484e664f266c506d595518d4e052b47b58e32ba1429b9133909e0a14d56be"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-musllinux_1_2_armv7l.whl", hash = "sha256:82947fb70fe7c0e4b798a28a04278870d4e997d971e7493911713a73ea7ddd9e"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-musllinux_1_2_i686.whl", hash = "sha256:f4a7c7a7f26c5d429434cfd991feca947efdac7558dc66bbe12cb30f9fc0c554"},
+    {file = "djc_core_html_parser-1.0.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:5042d6a2ecf53eab29fa8f6f5093a0000cc74a367f5c110fc663577aee3bf85c"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:cb85e529b43a72335134b8088751d87fd34076d61b5e401464a337841c701dec"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:6cd443afff7352c45ddadcb2d77f3bc6a935320b6af09b8e5ea8ac3a00e67b6d"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:469a1c63f3532f3789e01c41830773913b4bb191a71fdb48f066ade14c8cfe1c"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:b603bc2f15666f35d18e01aa4ace86b2f9443c3b3f0cf29c9f495f51e8a6115a"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b54b9bf3927a2a5da739fd183ffd9b6cce431bf686d428333310a41cba000d73"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:f6d09e8c1c8d1660f2d216dc4de2abbd56273bd6421ead9dcb3dea1ebcc03ce8"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-musllinux_1_2_aarch64.whl", hash = "sha256:566b5107cffb74a3a52a771274b946dfeb76ae2ddc9e0bb9e20a3e184059e3f9"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-musllinux_1_2_armv7l.whl", hash = "sha256:7080f0199f6e0903c285e3cac8c6bbf9b9958aa9abe653f94790da5c7ea738f8"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-musllinux_1_2_i686.whl", hash = "sha256:9bfba7f2d99de3cca8a7c9cf7fc600eeb1228c558e37f3b1420b37ec2e897707"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-musllinux_1_2_x86_64.whl", hash = "sha256:b2f90944ea20c089a2ec9601f6f53bc713ff1b42985e3875711a4900e04c38c8"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-win32.whl", hash = "sha256:8ee179464eefdf79d12f82a518a6362f4f72fdedbcb42b9c89fd55b6cfedaae7"},
+    {file = "djc_core_html_parser-1.0.1-cp38-cp38-win_amd64.whl", hash = "sha256:1976aca9748c8b1999c50bf9470e35a9ac4e718b0bfe52618d274f1747167b0b"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:2c1c768c7127e934b12d82a7bf9633ecb1233796d87352560557d7269ac9ce23"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:4329c45505d9e1e8686262fca6a88d2377b8782c28acef3f7e0887a855093c6c"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:58842bbff1593e01582a9cd7da31aca78eab362ea7a7d79e6b1f1228c55847aa"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:30d957998d60b70435065ee5552742e1f8daabd4eb5c4da812a6f7537294476e"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cbea42749b4381c062fb3c964d500afaf1540e54c29d538bbe271b754f9d579a"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:522e2a8626ab8943b575a49a3ad6e1c95ed6c3aebc6a33e974104ccdac315b81"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-musllinux_1_2_aarch64.whl", hash = "sha256:e5c7bb8c0287b5fbaf4b4a1645020d7adc769ce384483c219cc8305499618d58"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-musllinux_1_2_armv7l.whl", hash = "sha256:9b5c1d5965acfb5c65f1f13bdf5427319880cced232a44dcf2156206efe1fa4a"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-musllinux_1_2_i686.whl", hash = "sha256:0a61309ff0019814af7b7fc019b6d55a44a599ff64c564789caf660e030429f5"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:a1d571bd7b7fcd077c8c08a89e4f92d9716a3d6ec0a7804fbd8fa3b88d98c843"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-win32.whl", hash = "sha256:7a700259a5f73451ef2587db3b18817a90200945f9354cec705a5fb5fd4ec57c"},
+    {file = "djc_core_html_parser-1.0.1-cp39-cp39-win_amd64.whl", hash = "sha256:cb40037df77cb652454796092f13d5238f3274b10dcc630fdc4304812dda9d16"},
+    {file = "djc_core_html_parser-1.0.1-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5ed313d5547abdc4ceb5269734e51ad42408c87d57d8a1a86f25615d670f819c"},
+    {file = "djc_core_html_parser-1.0.1-pp310-pypy310_pp73-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:437df8f55081b9dda1f7ab9e26d164f5deffe0c19695013677402c34a9d91011"},
+    {file = "djc_core_html_parser-1.0.1-pp310-pypy310_pp73-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:92175884b4386c17de4547ea9805524f5c9cd5bbaaf8b2749ce426de0e7d9eb8"},
+    {file = "djc_core_html_parser-1.0.1-pp310-pypy310_pp73-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:4ebce02fcf33ced96ac14003d08f3ce9d5d24273c9e74b4319b4897b3e9cf533"},
+    {file = "djc_core_html_parser-1.0.1-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:460eed6a7e814020ecce011e1724d1809072c40c16cb958bed1656b848fe58d1"},
+    {file = "djc_core_html_parser-1.0.1-pp310-pypy310_pp73-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:c40fe2b522a941f2bd7e8fdf8e5c830ecce55a369727879df749886410a47781"},
+    {file = "djc_core_html_parser-1.0.1-pp310-pypy310_pp73-musllinux_1_2_aarch64.whl", hash = "sha256:efdc4c00c6a4d8bcaba0d29cad60b28a6e4cfe4a4d8fc10c477cd1bf4d658088"},
+    {file = "djc_core_html_parser-1.0.1-pp310-pypy310_pp73-musllinux_1_2_armv7l.whl", hash = "sha256:37ccfc1d390c013c4ba41da1df03f9783476a08da45466d28371ccb793447bac"},
+    {file = "djc_core_html_parser-1.0.1-pp310-pypy310_pp73-musllinux_1_2_i686.whl", hash = "sha256:62c792229d69a85723887acee758bc7d46ccc0d0dc9cdc3a8164afa04d3eeea6"},
+    {file = "djc_core_html_parser-1.0.1-pp310-pypy310_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:4729592aaeaf70abe122de2a7e491ea7d0b22bd4b7798b154c6e2b71edf97cab"},
+    {file = "djc_core_html_parser-1.0.1-pp38-pypy38_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:28679b80313626f1bbbe84a815adae55390f0d44ab2249d7993d1eaa6f99c867"},
+    {file = "djc_core_html_parser-1.0.1-pp38-pypy38_pp73-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:7c47b1b907b815576f21a249b539c7ac494d7f2cda296df417a9a0edefa068ef"},
+    {file = "djc_core_html_parser-1.0.1-pp38-pypy38_pp73-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:8ca76e6b39e859fb2bd305d666d727f678e7894ed0c4aaace9cd94bda1aaa055"},
+    {file = "djc_core_html_parser-1.0.1-pp38-pypy38_pp73-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:a67c2e9a0f90c32b599f40386a49e4b98dabf62cc982a28c71c19d95eb53f5f7"},
+    {file = "djc_core_html_parser-1.0.1-pp38-pypy38_pp73-musllinux_1_2_aarch64.whl", hash = "sha256:773253abfe08ca3dd2eabed974fe444a9fc6728b760eea92324885f27b51a0b2"},
+    {file = "djc_core_html_parser-1.0.1-pp38-pypy38_pp73-musllinux_1_2_armv7l.whl", hash = "sha256:2a0b70dcd92db4a306a3cb64f374d4cce3351a1408f45dc6c483848a3a270709"},
+    {file = "djc_core_html_parser-1.0.1-pp38-pypy38_pp73-musllinux_1_2_i686.whl", hash = "sha256:6e3a90e5af77e67e2a3740242a9d3aa9dff0d8a0066711b9da16669c53c3b980"},
+    {file = "djc_core_html_parser-1.0.1-pp38-pypy38_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:3388c0e3915d4bb4b3d0011ab74b6843006fb8ce4514403a90bb036699f21f1e"},
+    {file = "djc_core_html_parser-1.0.1-pp39-pypy39_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f51bffb947cf3ca6d505edde45ab5454514f5903c34a7f30fac2ad8d7e156f19"},
+    {file = "djc_core_html_parser-1.0.1-pp39-pypy39_pp73-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:876d319eeccda5b64ce909b421e52703e7cd7f94d6d4b681fdf2272371b2f270"},
+    {file = "djc_core_html_parser-1.0.1-pp39-pypy39_pp73-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:bc7dbd9d82a53d3fe97567ceb6bbff15aac8e99daec13698c4016371667af0f1"},
+    {file = "djc_core_html_parser-1.0.1-pp39-pypy39_pp73-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:aaa87b4e5e2592ef2bc5ec527123e1cda1b52adf00897a3f1606dc2a9bc6ad27"},
+    {file = "djc_core_html_parser-1.0.1-pp39-pypy39_pp73-musllinux_1_2_aarch64.whl", hash = "sha256:1844aab7eaafd989c1daebcbdb13a04ee76820758223148ea96bdd3ab7c86649"},
+    {file = "djc_core_html_parser-1.0.1-pp39-pypy39_pp73-musllinux_1_2_armv7l.whl", hash = "sha256:0134deb1ca7b575029430cbb47096ee7f448968379fcd27a90b16eba12baa19e"},
+    {file = "djc_core_html_parser-1.0.1-pp39-pypy39_pp73-musllinux_1_2_i686.whl", hash = "sha256:952b65586b9dd2be41cb4616b42bdcf5a2e12bcf99dcc3d5faeb395cf8efb98b"},
+    {file = "djc_core_html_parser-1.0.1-pp39-pypy39_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:1cffafcbd0273f647ba7029b60b3b78d3ba24d50efd0e7e29b870425e1172753"},
+    {file = "djc_core_html_parser-1.0.1.tar.gz", hash = "sha256:d625b078b763171535eaa3a19070b33cbbba1d867623ea61cd8ba093cb538ada"},
+]
 
 [[package]]
 name = "docopt"
@@ -5974,4 +6103,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13, <3.14"
-content-hash = "50557c415b4d3adc116f4616ac2b2ec89ce9fbd16aef1d69a442be184966a625"
+content-hash = "beb1f13d1931240192ddd69e5ccb38040aaa1aa60358466c8a119f170d7eddc4"
