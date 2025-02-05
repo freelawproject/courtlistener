@@ -3,8 +3,10 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, TypeVar
 
+import nh3
 import pghistory
 import pytz
+import tiktoken
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
 from django.contrib.auth.models import User
@@ -3231,6 +3233,56 @@ class Opinion(AbstractDateTimeModel):
     def siblings(self) -> QuerySet:
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
+
+    @property
+    def clean_text(self) -> str:
+        """
+        Extracts and cleans the opinion text.
+
+        This function attempts to retrieve the opinion text from various source
+        fields within the Opinion object, prioritizing HTML formats with citations
+        over plain text. The supported source fields are:
+
+            - html_with_citations (preferred)
+            - html_columbia
+            - html_lawbox
+            - xml_harvard
+            - html_anon_2020
+            - html
+
+        If no HTML text is found, the function falls back to the plain_text field.
+
+        The retrieved text is then cleaned using the `nh3.clean`. This cleaning
+        process removes all HTML tags while preserving the content.
+
+        Returns:
+            str: The cleaned opinion text without any HTML tags.
+        """
+        text = None
+        if self.html_with_citations:
+            text = self.html_with_citations
+        elif self.html_columbia:
+            text = self.html_columbia
+        elif self.html_lawbox:
+            text = self.html_lawbox
+        elif self.xml_harvard:
+            text = self.xml_harvard
+        elif self.html_anon_2020:
+            text = self.html_anon_2020
+        elif self.html:
+            text = self.html
+
+        if not text:
+            return self.plain_text
+
+        return nh3.clean(text, tags=set())
+
+    @property
+    def token_count(self) -> int:
+        """Returns the number of tokens in this opinion text."""
+        encoding = tiktoken.get_encoding("cl100k_base")
+        num_tokens = len(encoding.encode(self.clean_text))
+        return num_tokens
 
     def __str__(self) -> str:
         try:
