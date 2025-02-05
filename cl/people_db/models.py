@@ -69,6 +69,7 @@ class Person(AbstractDateTimeModel):
         ("ro", "Roman Catholic"),
         ("me", "Methodist"),
         ("pe", "Presbyterian"),
+        ("un", "Unitarian"),
     )
     race = models.ManyToManyField(
         "Race",
@@ -343,6 +344,7 @@ class Position(AbstractDateTimeModel):
     CHIEF_JUSTICE = "c-jus"
     CHIEF_SPECIAL_MASTER = "c-spec-m"
     CHIEF_ADMINISTRATIVE_JUSTICE = "c-admin-jus"
+    CHIEF_SPECIAL_TRIAL_JUDGE = "c-spec-tr-jud"
     PRESIDING_JUDGE = "pres-jud"
     PRESIDING_JUSTICE = "pres-jus"
     SUPERVISING_JUDGE = "sup-jud"
@@ -434,6 +436,7 @@ class Position(AbstractDateTimeModel):
                 (CHIEF_JUSTICE, "Chief Justice"),
                 (CHIEF_SPECIAL_MASTER, "Chief Special Master"),
                 (CHIEF_ADMINISTRATIVE_JUSTICE, "Chief Administrative Justice"),
+                (CHIEF_SPECIAL_TRIAL_JUDGE, "Chief Special Trial Judge"),
                 (PRESIDING_JUDGE, "Presiding Judge"),
                 (PRESIDING_JUSTICE, "Presiding Justice"),
                 (SUPERVISING_JUDGE, "Supervising Judge"),
