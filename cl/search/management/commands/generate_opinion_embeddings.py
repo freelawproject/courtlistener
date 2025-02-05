@@ -55,12 +55,6 @@ class Command(VerboseCommand):
             default="batch1",
             help="which celery queue for uploading to S3 (default to 'batch1')",
         )
-        parser.add_argument(
-            "--upload-queue",
-            type=str,
-            default="batch1",
-            help="which celery queue for uploading to S3 (default to 'batch1')",
-        )
 
     def handle(self, *args, **options):
         embedding_queue = options["embedding_queue"]
