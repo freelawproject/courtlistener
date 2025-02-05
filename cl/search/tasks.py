@@ -1,14 +1,18 @@
+import json
 import logging
+import os
 from datetime import date
 from importlib import import_module
 from random import randint
 from typing import Any, Generator
 
+import requests
 from celery import Task
 from celery.canvas import chain
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.files.base import ContentFile
 from django.db.models import Prefetch, QuerySet
 from elasticsearch.exceptions import (
     ApiError,
@@ -34,6 +38,7 @@ from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.lib.elasticsearch_utils import build_daterange_query
 from cl.lib.search_index_utils import get_parties_from_case_name
+from cl.lib.storage import AWSMediaStorage
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
@@ -1564,3 +1569,87 @@ def remove_documents_by_query(
         es_document._index.refresh()
 
     return response
+
+
+def inception_batch_request(
+    batch: list[dict],
+) -> list[dict]:
+    inception_batch_url = ""
+    response = requests.post(
+        inception_batch_url,
+        json=json.dumps(batch),
+    )
+    return response.json()
+
+
+@app.task()
+def create_opinion_text_embeddings(
+    batch: list[int],
+    upload_queue,
+    database,
+    bucket: str = None,
+) -> None:
+    """Get embeddings for Opinion texts from inception."""
+    opinions = Opinion.objects.filter(id__in=batch).using(database)
+
+    opinions_to_vectorize = [
+        {"id": opinion.pk, "text": opinion.clean_text} for opinion in opinions
+    ]
+    embeddings = inception_batch_request(opinions_to_vectorize)
+
+    save_embeddings.si(
+        embeddings,
+        bucket,
+    ).apply_async(queue=upload_queue)
+
+
+@app.task()
+def save_embeddings(
+    embeddings: list[dict],
+    bucket: str = None,
+    directory: str = "opinions",
+) -> None:
+    """Save embeddings to S3.
+
+    The embeddings list is the response from a batch request to the
+    inception microservice, which has the following structure:
+
+    [
+        {
+            'id': 1,
+            'embeddings': [
+                {
+                    'chunk_number': 1,
+                    'chunk': 'search_document: First test document',
+                    'embedding': [-0.01209942298567295...]
+                },
+                {
+                    'chunk_number': 2,
+                    'chunk': 'search_document: First test document',
+                    'embedding': [-1.01200886298552476...]
+                },
+            ]
+        },
+        {
+            'id': 2,
+            'embeddings': [
+                {
+                    'chunk_number': 1,
+                    'chunk': 'search_document: Second test document',
+                    'embedding': [0.07617326825857162...]
+                },
+            ]
+        },
+    ]
+    """
+    storage = AWSMediaStorage()
+    if bucket:
+        storage.bucket_name = bucket
+
+    for embedding_record in embeddings:
+        opinion_id = embedding_record["id"]
+
+        file_contents = json.dumps(embedding_record)
+        file_path = os.path.join("embeddings", directory, f"{opinion_id}.json")
+
+        storage.save(file_path, ContentFile(file_contents))
