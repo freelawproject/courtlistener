@@ -68,7 +68,7 @@ class Person(AbstractDateTimeModel):
         ("ep", "Episcopalian"),
         ("ro", "Roman Catholic"),
         ("me", "Methodist"),
-        ("pr", "Presbyterian"),
+        ("pe", "Presbyterian"),
     )
     race = models.ManyToManyField(
         "Race",
