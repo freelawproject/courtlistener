@@ -1274,6 +1274,34 @@ class TestElasticsearchUtils(SimpleTestCase):
                 "case_name": 'Saucedo and Green Dream International, LLC <b> <font color="red"> Case Consolidated under 23-03142 </font> </b>',
                 "output": ["Saucedo", "Green Dream International, LLC"],
             },
+            {
+                "case_name": "In re: Matter of Nicholas M. Wajda",
+                "output": [],
+            },
+            {
+                "case_name": "In re Matter of Proof of Claim Replacement Filings",
+                "output": [],
+            },
+            {
+                "case_name": "In re T.H.",
+                "output": [],
+            },
+            {
+                "case_name": "In Re: Dempsey Clay Ward",
+                "output": [],
+            },
+            {
+                "case_name": "In re: Receivership of Horses and Equipment v. Gabriel",
+                "output": [],
+            },
+            {
+                "case_name": "In Re: Appearances of Attorney James G. ORourke in Pending Bankruptcy Cases",
+                "output": [],
+            },
+            {
+                "case_name": "In the matter of Attorney Rodney D. Shepherd",
+                "output": [],
+            },
         ]
         for test in tests:
             with self.subTest(

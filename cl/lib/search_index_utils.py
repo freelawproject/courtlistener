@@ -66,14 +66,20 @@ def get_parties_from_case_name_bankr(case_name: str) -> list[str]:
     remove extraneous information like court designations in parentheses,
     trailing HTML, and text related to "BELOW" or "ABOVE" designations.
 
-    Args:
-        case_name: The bankruptcy case name string.
+    If the case name begins with "in re" or "in the matter of", an empty list
+    is returned, as these typically don't contain party information in the
+    standard format.
 
-    Returns:
-        A list of strings, where each string represents a party involved
-        in the case.  If no recognized separator is found, the function
-        returns a list containing the cleaned case name as a single element.
+    :param case_name: The bankruptcy case name string.
+    :return: A list of strings, where each string represents a party involved
+    in the case. If no recognized separator is found, the function returns
+    a list containing the cleaned case name as a single element.
     """
+    # Handle cases beginning with "in re" or "in the matter of".
+    # These usually don't contain party information in the expected format.
+    if re.match(r"^(in re|in the matter of)", case_name, re.IGNORECASE):
+        return []
+
     # Removes text enclosed in parentheses at the end of the string.
     cleaned_case_name = re.sub(r"\s*\([^)]*\)$", "", case_name)
 
