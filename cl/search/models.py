@@ -14,9 +14,18 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
-from django.db.models import Prefetch, Q, QuerySet
+from django.db.models import (
+    Case,
+    CharField,
+    F,
+    Prefetch,
+    Q,
+    QuerySet,
+    Value,
+    When,
+)
 from django.db.models.aggregates import Count, Sum
-from django.db.models.functions import MD5
+from django.db.models.functions import MD5, Coalesce, NullIf
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.encoding import force_str
@@ -3046,6 +3055,66 @@ def sort_cites(c):
         return 8
 
 
+OPINION_TEXT_SOURCE_FIELDS = [
+    "html_with_citations",
+    "html_columbia",
+    "html_lawbox",
+    "xml_harvard",
+    "html_anon_2020",
+    "html",
+]
+
+
+class OpinionQuerySet(models.QuerySet):
+    def with_best_text(self):
+        """Annotates an Opinion QuerySet with best_text and best_text_source.
+
+        To determine the best text, we get the first non-empty value from
+        various source fields, prioritizing HTML formats with citations
+        over plain text.
+
+        The best_text_source is a CharField that indicates
+        the name of the field from which the best_text was retrieved.
+
+        The supported source fields are:
+            - html_with_citations (preferred)
+            - html_columbia
+            - html_lawbox
+            - xml_harvard
+            - html_anon_2020
+            - html
+        """
+        source_fields = OPINION_TEXT_SOURCE_FIELDS
+        # To populate best_text we get the first non-empty value
+        # from the list of possible text sources:
+        coalesce_args = [
+            NullIf(F(field), Value("")) for field in source_fields
+        ]
+        # And we fall back to plain_text if all of the above are empty:
+        coalesce_args.append(F("plain_text"))
+
+        # We use When clauses to determine the name of the field that was used
+        # as the source for the best text:
+        when_clauses = [
+            When(
+                Q(**{f"{field}__isnull": False}) & ~Q(**{field: ""}),
+                then=Value(field),
+            )
+            for field in source_fields
+        ]
+
+        deferred_fields = source_fields + ["plain_text"]
+
+        return self.defer(*deferred_fields).annotate(
+            best_text=Coalesce(*coalesce_args, output_field=CharField()),
+            best_text_source=Case(
+                *when_clauses,
+                default=Value("plain_text"),
+                output_field=CharField(),
+            ),
+        )
+
+
 @pghistory.track()
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
@@ -3220,6 +3289,8 @@ class Opinion(AbstractDateTimeModel):
         ]
     )
     ordering_key = models.IntegerField(null=True, blank=True)
+
+    objects = OpinionQuerySet.as_manager()
 
     class Meta:
         constraints = [
