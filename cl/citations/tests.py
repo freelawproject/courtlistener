@@ -46,12 +46,14 @@ from cl.citations.match_citations import (
     do_resolve_citations,
     resolve_fullcase_citation,
 )
+from cl.citations.match_citations_queries import es_search_db_for_full_citation
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_recap_citations,
 )
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
+from cl.search.documents import OpinionDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -59,7 +61,7 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionWithChildrenFactory,
-    RECAPDocumentFactory,
+    RECAPDocumentFactory, OpinionClusterFactoryMultipleOpinions,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -69,7 +71,7 @@ from cl.search.models import (
     OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
-    RECAPDocument,
+    RECAPDocument, Citation,
 )
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
@@ -579,6 +581,52 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 ),
             ),
         )
+
+        # Citation 6
+        cls.citation6 = CitationWithParentsFactory.create(
+            volume="8",
+            reporter="Wheat.",
+            page="543",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(),
+                case_name="Johnson & Graham's Lessee v. McIntosh",
+                date_filed=date(1823, 2, 28),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    html="""<p>Its vast extent offered an <a class="page-label" data-label="573" href="#573" id="573">*573</a> ample field to the ambition and enterprise of all</p>""",
+                ),
+            ),
+        )
+
+        # Cluster with citation
+        lead = """<p>Sample text</p>"""
+        concurrence = """<p>Sample text that includes a pincite <a class="page-label" data-label="745" href="#745" id="745">*745</a></p>"""
+
+        cls.cluster1 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(),
+            sub_opinions__data=[
+                {
+                    "type": "020lead",
+                    "html": lead,
+                    "author_str": "Foo",
+                },
+                {
+                    "type": "030concurrence",
+                    "html": concurrence,
+                    "author_str": "Bar",
+                },
+            ],
+        )
+
+        cls.cluster1_citation1 = Citation.objects.create(
+            cluster=cls.cluster1,
+            volume=9,
+            reporter="Pet.",
+            page=711,
+            type=Citation.SCOTUS_EARLY,
+        )
+
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.OPINION,
@@ -997,6 +1045,50 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ).count(),
             1,
         )
+
+    def test_find_pincites(self):
+        """Can we find pincites in opinions to link them later? """
+        pincite1 = case_citation(
+            volume="8",
+            reporter="Wheat.",
+            page="573",
+        )
+        result, citation_found = es_search_db_for_full_citation(pincite1)
+
+        # Validate correct return type of es_search_db_for_full_citation
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(citation_found, bool)
+
+        # Validate that we found a match
+        self.assertTrue(
+            citation_found,
+            msg="Something went wrong when finding the pincite.",
+        )
+
+        # Validate correct result type
+        self.assertIsInstance(result[0], OpinionDocument)
+
+        # Validate that we matched the pincite to the correct cluster
+        self.assertEqual(result[0]["cluster_id"], self.citation6.cluster.id)
+
+        # Can we match the pincite when we have multiple opinions?
+        pincite2 = case_citation(
+            volume="9",
+            reporter="Pet.",
+            page="745",
+        )
+        result, citation_found = es_search_db_for_full_citation(pincite2)
+
+        # Find the second opinion
+        concurrence_opinion = Opinion.objects.get(cluster=self.cluster1, type="030concurrence")
+
+        # Verify that we found a match
+        self.assertEqual(citation_found, True)
+        # Verify that the result is from the correct opinion
+        self.assertEqual(result[0]["id"], concurrence_opinion.pk, "Matched in the wrong opinion.")
+        # Verify the correct matched cluster
+        self.assertEqual(result[0]["cluster_id"], self.cluster1.pk, "Matched wront cluster")
+
 
 
 class CitationFeedTest(

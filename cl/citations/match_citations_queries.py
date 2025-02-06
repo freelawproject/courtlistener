@@ -267,13 +267,13 @@ def es_search_db_for_full_citation(
                 if len(filtered_results) == 1 and f"*{full_citation.groups["page"]}" in filtered_results[0]["text"]:
                     # Check if the page number is in the opinion text, currently
                     # we only look for this format: *page_number
-                    return [filtered_results[0]], citation_found
+                    return [filtered_results[0]], True
                 for result in filtered_results:
                     # We could have clusters with multiple opinions, we need
                     # to check if the page number is in any of the opinions
                     if f"*{full_citation.groups['page']}" in result["text"]:
                         # We found the page number in the opinion content
-                        return [result], citation_found
+                        return [result], True
 
     # Give up.
     return [], citation_found
