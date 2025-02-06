@@ -29,6 +29,7 @@ from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
 from cl.lib.elasticsearch_utils import simplify_estimated_count
+from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import AudioTestCase, CourtTestCase, PeopleTestCase
@@ -64,7 +65,6 @@ from cl.search.factories import (
 )
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
-    log_last_document_indexed,
 )
 from cl.search.management.commands.cl_remove_content_from_es import (
     compose_redis_key_remove_content,
