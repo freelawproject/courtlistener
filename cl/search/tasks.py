@@ -1607,6 +1607,7 @@ def create_opinion_text_embeddings(
 def save_embeddings(
     embeddings: list[dict],
     directory: str = "opinions",
+    npl_model_name: str = "nomic-ai/modernbert-embed-base",
 ) -> None:
     """Save embeddings to S3.
 
@@ -1640,13 +1641,24 @@ def save_embeddings(
             ]
         },
     ]
+
+    Each object uploaded to S3 is a JSON file containing one of the items
+    in the previous list.
+
+    For example, if uploading a batch of opinion embeddings, each file will
+    be stored at embeddings/opinions/nomic-ai/{opinion_id}.json
     """
     storage = AWSMediaStorage()
 
     for embedding_record in embeddings:
-        opinion_id = embedding_record["id"]
+        record_id = embedding_record["id"]
 
         file_contents = json.dumps(embedding_record)
-        file_path = os.path.join("embeddings", directory, f"{opinion_id}.json")
+        file_path = os.path.join(
+            "embeddings",
+            directory,
+            npl_model_name,
+            f"{record_id}.json",
+        )
 
         storage.save(file_path, ContentFile(file_contents))
