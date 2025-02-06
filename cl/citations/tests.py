@@ -59,19 +59,21 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionClusterFactoryMultipleOpinions,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionWithChildrenFactory,
-    RECAPDocumentFactory, OpinionClusterFactoryMultipleOpinions,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
+    Citation,
     Opinion,
     OpinionCluster,
     OpinionsCited,
     OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
-    RECAPDocument, Citation,
+    RECAPDocument,
 )
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
@@ -1047,7 +1049,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         )
 
     def test_find_pincites(self):
-        """Can we find pincites in opinions to link them later? """
+        """Can we find pincites in opinions to link them later?"""
         pincite1 = case_citation(
             volume="8",
             reporter="Wheat.",
@@ -1080,15 +1082,22 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         result, citation_found = es_search_db_for_full_citation(pincite2)
 
         # Find the second opinion
-        concurrence_opinion = Opinion.objects.get(cluster=self.cluster1, type="030concurrence")
+        concurrence_opinion = Opinion.objects.get(
+            cluster=self.cluster1, type="030concurrence"
+        )
 
         # Verify that we found a match
         self.assertEqual(citation_found, True)
         # Verify that the result is from the correct opinion
-        self.assertEqual(result[0]["id"], concurrence_opinion.pk, "Matched in the wrong opinion.")
+        self.assertEqual(
+            result[0]["id"],
+            concurrence_opinion.pk,
+            "Matched in the wrong opinion.",
+        )
         # Verify the correct matched cluster
-        self.assertEqual(result[0]["cluster_id"], self.cluster1.pk, "Matched wront cluster")
-
+        self.assertEqual(
+            result[0]["cluster_id"], self.cluster1.pk, "Matched wront cluster"
+        )
 
 
 class CitationFeedTest(
