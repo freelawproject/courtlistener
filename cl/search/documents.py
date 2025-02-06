@@ -70,8 +70,19 @@ class ParentheticalGroupDocument(Document):
         attr="representative.describing_opinion.cluster.slug"
     )
     docket_id = fields.IntegerField(attr="opinion.cluster.docket_id")
-    docketNumber = fields.KeywordField(
-        attr="opinion.cluster.docket.docket_number"
+    docketNumber = fields.TextField(
+        attr="opinion.cluster.docket.docket_number",
+        analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
+        fields={
+            "exact": fields.TextField(
+                attr="opinion.cluster.docket.docket_number",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
+        },
+        search_analyzer="search_analyzer",
     )
     judge = fields.TextField(
         attr="opinion.cluster.judges",

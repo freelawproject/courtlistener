@@ -27,6 +27,7 @@ from cl.lib.elasticsearch_utils import (
     set_results_highlights,
     simplify_estimated_count,
 )
+from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
@@ -69,7 +70,6 @@ from cl.search.factories import (
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     compose_redis_key,
     get_last_parent_document_id_processed,
-    log_last_document_indexed,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -539,12 +539,73 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "description")
 
-    async def test_docket_number_filter(self) -> None:
+    def test_docket_number_filter(self) -> None:
         """Confirm docket_number filter works properly"""
+
+        # Regular docket_number filtering.
         params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
-        await self._test_article_count(params, 1, "docket_number")
+        async_to_sync(self._test_article_count)(params, 1, "docket_number")
+
+        # Filter by case by docket_number containing repeated numbers like: 1:21-bk-0021
+        with self.captureOnCommitCallbacks(execute=True):
+            entry = DocketEntryWithParentsFactory(
+                docket__docket_number="1:21-bk-0021",
+                docket__court=self.court,
+                docket__source=Docket.RECAP,
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
+
+        params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-0021"}
+        r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # docket_number filter works properly combined with child document fields
+        with self.captureOnCommitCallbacks(execute=True):
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="1",
+                is_available=False,
+                page_count=5,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "docket_number": "1:21-bk-0021",
+            "document_number": 1,
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docket_number and document_number"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+        self.assertIn("New File", r.content.decode())
+
+        # docket_number text query containing repeated numbers works properly
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docketNumber text query"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # Fielded query also works for numbers containing repeated numbers
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "docketNumber:1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docketNumber fielded query"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # Remove factories to prevent affecting other tests.
+        entry.docket.delete()
 
     async def test_attachment_number_filter(self) -> None:
         """Confirm attachment number filter works properly"""
@@ -5755,6 +5816,8 @@ class IndexDocketRECAPDocumentsCommandTest(
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
     def setUp(self):
+        self.factory = RequestFactory()
+        self.site = admin.site
         self.rebuild_index("search.Docket")
         self.court = CourtFactory(id="canb", jurisdiction="FB")
         # Non-recap Docket
@@ -5868,7 +5931,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.assertEqual(last_values["last_document_id"], 2001)
 
         last_document_id = get_last_parent_document_id_processed(
-            SEARCH_TYPES.RECAP
+            compose_redis_key(SEARCH_TYPES.RECAP)
         )
         self.assertEqual(last_document_id, 2001)
 
@@ -6064,6 +6127,93 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.assertEqual(1, parent_count)
         child_count = len(article[0].xpath(".//h4"))
         self.assertEqual(2, child_count)
+
+    @mock.patch("cl.search.admin.delete_from_ia")
+    @mock.patch("cl.search.admin.invalidate_cloudfront")
+    def test_re_index_recap_documents_sealed(
+        self, mock_delete_from_ia, mock_invalidate_cloudfront
+    ):
+        """Test cl_re_index_rds_sealed to confirm that it properly re-indexes
+        sealed RECAPDocuments from the provided start_date."""
+
+        rd_1 = RECAPDocumentFactory(
+            docket_entry=self.de,
+            document_number="1",
+            attachment_number=3,
+            document_type=RECAPDocument.ATTACHMENT,
+            is_sealed=False,
+            filepath_local="test.pdf",
+            plain_text="Lorem Ipsum dolor",
+        )
+        rd_2 = RECAPDocumentFactory(
+            docket_entry=self.de_1,
+            document_number="2",
+            attachment_number=4,
+            is_sealed=False,
+            filepath_local="test.pdf",
+            document_type=RECAPDocument.ATTACHMENT,
+            plain_text="Lorem Ipsum dolor not sealed",
+        )
+
+        # Call cl_index_parent_and_child_docs command for RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+        )
+
+        # RECAPDocuments should be indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 5, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        es_rd_1 = ESRECAPDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(es_rd_1.plain_text, rd_1.plain_text)
+        self.assertEqual(es_rd_1.filepath_local, rd_1.filepath_local)
+
+        es_rd_2 = ESRECAPDocument.get(id=ES_CHILD_ID(rd_2.pk).RECAP)
+        self.assertEqual(es_rd_2.plain_text, rd_2.plain_text)
+        self.assertEqual(es_rd_2.filepath_local, rd_2.filepath_local)
+
+        # Call seal_documents action.
+        recap_admin = RECAPDocumentAdmin(RECAPDocument, self.site)
+        recap_admin.message_user = mock.Mock()
+        url = reverse("admin:search_recapdocument_changelist")
+        request = self.factory.post(url)
+        queryset = RECAPDocument.objects.filter(pk__in=[rd_1.pk])
+        mock_date = now().replace(day=15, hour=0)
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_documents"
+        ), time_machine.travel(mock_date, tick=False):
+            recap_admin.seal_documents(request, queryset)
+
+        recap_admin.message_user.assert_called_once_with(
+            request,
+            "Successfully sealed and removed 1 document(s).",
+        )
+
+        # Re-index RDs sealed documents.
+        rd_1.refresh_from_db()
+        with time_machine.travel(mock_date, tick=False):
+            call_command(
+                "cl_re_index_rds_sealed",
+                queue="celery",
+                start_date=rd_1.date_modified,
+                testing_mode=True,
+            )
+
+        # Confirm that only the sealed document "rd_1" was cleaned in ES.
+        es_rd_1 = ESRECAPDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(es_rd_1.plain_text, "")
+        self.assertEqual(es_rd_1.filepath_local, None)
+
+        es_rd_2 = ESRECAPDocument.get(id=ES_CHILD_ID(rd_2.pk).RECAP)
+        self.assertEqual(es_rd_2.plain_text, rd_2.plain_text)
+        self.assertEqual(es_rd_2.filepath_local, rd_2.filepath_local)
 
 
 class RECAPIndexingTest(
