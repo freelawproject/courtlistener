@@ -1589,7 +1589,9 @@ def create_opinion_text_embeddings(
     database,
 ) -> None:
     """Get embeddings for Opinion texts from inception."""
-    opinions = Opinion.objects.filter(id__in=batch).using(database)
+    opinions = (
+        Opinion.objects.filter(id__in=batch).with_best_text().using(database)
+    )
 
     opinions_to_vectorize = [
         {"id": opinion.pk, "text": opinion.clean_text} for opinion in opinions
