@@ -36,9 +36,7 @@ def fetch_citations(search_query: Search, fields=None) -> list[Hit]:
     citation_hits = []
     search_query = search_query.sort("id")
     # Only retrieve fields required for the lookup.
-    search_query = search_query.source(
-        includes=fields
-    )
+    search_query = search_query.source(includes=fields)
     # Citation resolution aims for a single match. Setting up a size of 2 is
     # enough to determine if there is more than one match.
     search_query = search_query.extra(size=2)
@@ -223,14 +221,20 @@ def es_search_db_for_full_citation(
         # We didn't get an exact match on the volume/reporter/page. Perhaps
         # it's a pincite. Find closest citations filtering by volume and
         # reporter and excluding self cites.
-        partial_citation_str = " ".join([full_citation.groups["volume"], full_citation.groups["reporter"]])
-        filters = [Q(
-            "match_phrase",
-            **{"citation.exact": partial_citation_str},
-        )]
+        partial_citation_str = " ".join(
+            [full_citation.groups["volume"], full_citation.groups["reporter"]]
+        )
+        filters = [
+            Q(
+                "match_phrase",
+                **{"citation.exact": partial_citation_str},
+            )
+        ]
         query = Q("bool", must_not=must_not, filter=filters)
         citations_query = search_query.query(query)
-        results = fetch_citations(citations_query, fields=["id", "cluster_id", "citation", "text"])
+        results = fetch_citations(
+            citations_query, fields=["id", "cluster_id", "citation", "text"]
+        )
         closest_opinion_clusters = []
 
         # Create a temporal item and add it to the values list (cluster_id,
@@ -241,10 +245,16 @@ def es_search_db_for_full_citation(
         for result in results:
             # Get the citations from OpinionDocument that matched the partial
             # citation
-            valid_citations = [get_citations(citation)[0] for citation in result["citation"] if partial_citation_str in citation and get_citations(citation)]
+            valid_citations = [
+                get_citations(citation)[0]
+                for citation in result["citation"]
+                if partial_citation_str in citation and get_citations(citation)
+            ]
 
             for valid_citation in valid_citations:
-                closest_opinion_clusters.append((result["cluster_id"], valid_citation.groups["page"]))
+                closest_opinion_clusters.append(
+                    (result["cluster_id"], valid_citation.groups["page"])
+                )
 
         if len(closest_opinion_clusters) > 1:
             # Order by page number
@@ -258,13 +268,23 @@ def es_search_db_for_full_citation(
                 # if the position is greater than 0, then the previous item in
                 # the list is the closest citation, we get the cluster id of the
                 # previous item
-                possible_cluster_id_matched = sort_possible_matches[citation_item_position - 1][0]
+                possible_cluster_id_matched = sort_possible_matches[
+                    citation_item_position - 1
+                ][0]
 
                 # We filter the results list to get the possible match
                 # OpinionDocument
-                filtered_results = [hit for hit in results if hit.cluster_id == possible_cluster_id_matched]
+                filtered_results = [
+                    hit
+                    for hit in results
+                    if hit.cluster_id == possible_cluster_id_matched
+                ]
 
-                if len(filtered_results) == 1 and f"*{full_citation.groups["page"]}" in filtered_results[0]["text"]:
+                if (
+                    len(filtered_results) == 1
+                    and f"*{full_citation.groups["page"]}"
+                    in filtered_results[0]["text"]
+                ):
                     # Check if the page number is in the opinion text, currently
                     # we only look for this format: *page_number
                     return [filtered_results[0]], citation_found
