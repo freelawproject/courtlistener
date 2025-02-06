@@ -2497,7 +2497,7 @@ class UnmatchedCitationTest(TransactionTestCase):
             "Incorrect number of citations saved",
         )
         self.assertTrue(
-            unmatched_citations[-1].court_id == "texapp",
+            unmatched_citations[-1].court_id == "tex",
             "court_id was not saved",
         )
         self.assertTrue(
