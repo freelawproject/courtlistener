@@ -60,7 +60,10 @@ def resolve_fullcase_citation(
         if len(db_search_results) == 1:
             result_id = db_search_results[0]["id"]
             try:
-                return Opinion.objects.get(pk=result_id)
+                opinion = Opinion.objects.get(pk=result_id)
+                if hasattr(db_search_results[0], "pincite_used"):
+                    opinion.pincite_used = db_search_results[0].pincite_used
+                return opinion
             except (Opinion.DoesNotExist, Opinion.MultipleObjectsReturned):
                 pass
 

@@ -287,12 +287,20 @@ def es_search_db_for_full_citation(
                 ):
                     # Check if the page number is in the opinion text, currently
                     # we only look for this format: *page_number
+                    # We add a temporary extra attribute to know that we got
+                    # the match using a pin cite
+                    filtered_results[0].pincite_used = full_citation.groups[
+                        "page"
+                    ]
                     return [filtered_results[0]], True
                 for result in filtered_results:
                     # We could have clusters with multiple opinions, we need
                     # to check if the page number is in any of the opinions
                     if f"*{full_citation.groups['page']}" in result["text"]:
                         # We found the page number in the opinion content
+                        filtered_results[0].pincite_used = (
+                            full_citation.groups["page"]
+                        )
                         return [result], True
 
     # Give up.
