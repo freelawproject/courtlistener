@@ -62,7 +62,11 @@ class Command(VerboseCommand):
         batch_size = options["batch_size"]
         min_opinion_size = options["min_opinion_size"]
 
-        opinions = Opinion.objects.all()
+        opinions = (
+            Opinion.objects.filter(id__gte=options["start_id"])
+            .with_best_text()
+            .iterator()
+        )
 
         current_batch: list[int] = []
         current_batch_size = 0
