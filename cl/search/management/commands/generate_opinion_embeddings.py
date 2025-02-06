@@ -48,12 +48,19 @@ class Command(VerboseCommand):
             default="batch1",
             help="which celery queue for uploading to S3 (default to 'batch1')",
         )
+        parser.add_argument(
+            "--min-opinion-size",
+            type=int,
+            default=100,
+            help="Only vectorize opinions with this number of tokens or more.",
+        )
 
     def handle(self, *args, **options):
         embedding_queue = options["embedding_queue"]
         upload_queue = options["upload_queue"]
         database = options["database"]
         batch_size = options["batch_size"]
+        min_opinion_size = options["min_opinion_size"]
 
         opinions = Opinion.objects.all()
 
@@ -62,6 +69,8 @@ class Command(VerboseCommand):
 
         for opinion in opinions:
             token_count = opinion.token_count
+            if token_count < min_opinion_size:
+                continue
             current_batch_size += token_count
             current_batch.append(opinion.id)
             if current_batch_size >= batch_size:
