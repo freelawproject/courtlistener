@@ -5,6 +5,8 @@ from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
 from eyecite import get_citations
+from eyecite.find import find_reference_citations_from_markup
+from eyecite.helpers import filter_citations
 from eyecite.models import CitationBase
 from eyecite.tokenizers import HyperscanTokenizer
 
@@ -148,6 +150,13 @@ def store_opinion_citations_and_update_parentheticals(
     # If no citations are found, then there is nothing else to do for now.
     if not citations:
         return
+
+    if opinion.source_is_html:
+        references = find_reference_citations_from_markup(
+            opinion.source_text, opinion.cleaned_text, citations
+        )
+        if references:
+            citations = filter_citations(citations + references)
 
     # Resolve all those different citation objects to Opinion objects,
     # using a variety of heuristics.
