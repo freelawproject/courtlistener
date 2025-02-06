@@ -3308,45 +3308,26 @@ class Opinion(AbstractDateTimeModel):
     @property
     def clean_text(self) -> str:
         """
-        Extracts and cleans the opinion text.
-
-        This function attempts to retrieve the opinion text from various source
-        fields within the Opinion object, prioritizing HTML formats with citations
-        over plain text. The supported source fields are:
-
-            - html_with_citations (preferred)
-            - html_columbia
-            - html_lawbox
-            - xml_harvard
-            - html_anon_2020
-            - html
-
-        If no HTML text is found, the function falls back to the plain_text field.
+        Returns the cleaned opinion text by using the annotated `best_text`
+        if it exists; otherwise, it falls back to computing the value in Python.
 
         The retrieved text is then cleaned using the `nh3.clean`. This cleaning
         process removes all HTML tags while preserving the content.
 
-        Returns:
-            str: The cleaned opinion text without any HTML tags.
+        The annotated field `best_text` is added when calling the QuerySet
+        using with_best_text like so:
+        Opinion.objects.filter(something_here=foo).with_best_text()
         """
-        text = None
-        if self.html_with_citations:
-            text = self.html_with_citations
-        elif self.html_columbia:
-            text = self.html_columbia
-        elif self.html_lawbox:
-            text = self.html_lawbox
-        elif self.xml_harvard:
-            text = self.xml_harvard
-        elif self.html_anon_2020:
-            text = self.html_anon_2020
-        elif self.html:
-            text = self.html
+        computed = getattr(self, "best_text", None)
+        if computed:
+            return nh3.clean(computed, tags=set())
 
-        if not text:
-            return self.plain_text
+        for field in OPINION_TEXT_SOURCE_FIELDS:
+            value = getattr(self, field, None)
+            if value and value.strip():
+                return nh3.clean(value, tags=set())
 
-        return nh3.clean(text, tags=set())
+        return nh3.clean(self.plain_text, tags=set())
 
     @property
     def token_count(self) -> int:
