@@ -948,6 +948,42 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 "b*ra*e b*rav*",
                 "b?ra?e b?rav*",
             ),
+            (
+                "Lorem docketNumber:1:21-bk-0021 test",
+                'Lorem docketNumber:"1:21-bk-0021"~1 test',
+            ),
+            (
+                "Lorem docketNumber:1:21-bk-0021 AND docketNumber:1:21-bk-0022",
+                'Lorem docketNumber:"1:21-bk-0021"~1 AND docketNumber:"1:21-bk-0022"~1',
+            ),
+            (
+                "Lorem docketNumber:1:21:0021 test",
+                'Lorem docketNumber:"1:21:0021" test',
+            ),
+            (
+                "docketNumber:(ASBCA No. 59126)",
+                'docketNumber:(ASBCA No. "59126")',
+            ),
+            (
+                'docketNumber:"1:21-bk-0021" test',
+                'docketNumber:"1:21-bk-0021" test',
+            ),
+            (
+                "docketNumber:1:21-bk-0021-ABC test",
+                'docketNumber:"1:21-bk-0021-ABC"~1 test',
+            ),
+            (
+                "12-9238 docketNumber:1:21-bk-0021",
+                'docketNumber:"12-9238"~1 docketNumber:"1:21-bk-0021"~1',
+            ),
+            (
+                'test case_name_full:"Lorem ipsum 2" test',
+                'test case_name_full:"Lorem ipsum 2" test',
+            ),
+            (
+                'docketNumber:"docket number 2"',
+                'docketNumber:"docket number 2"',
+            ),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))

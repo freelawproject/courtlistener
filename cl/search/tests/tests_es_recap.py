@@ -535,12 +535,73 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "description")
 
-    async def test_docket_number_filter(self) -> None:
+    def test_docket_number_filter(self) -> None:
         """Confirm docket_number filter works properly"""
+
+        # Regular docket_number filtering.
         params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
-        await self._test_article_count(params, 1, "docket_number")
+        async_to_sync(self._test_article_count)(params, 1, "docket_number")
+
+        # Filter by case by docket_number containing repeated numbers like: 1:21-bk-0021
+        with self.captureOnCommitCallbacks(execute=True):
+            entry = DocketEntryWithParentsFactory(
+                docket__docket_number="1:21-bk-0021",
+                docket__court=self.court,
+                docket__source=Docket.RECAP,
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
+
+        params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-0021"}
+        r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # docket_number filter works properly combined with child document fields
+        with self.captureOnCommitCallbacks(execute=True):
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="1",
+                is_available=False,
+                page_count=5,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "docket_number": "1:21-bk-0021",
+            "document_number": 1,
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docket_number and document_number"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+        self.assertIn("New File", r.content.decode())
+
+        # docket_number text query containing repeated numbers works properly
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docketNumber text query"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # Fielded query also works for numbers containing repeated numbers
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "docketNumber:1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docketNumber fielded query"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # Remove factories to prevent affecting other tests.
+        entry.docket.delete()
 
     async def test_attachment_number_filter(self) -> None:
         """Confirm attachment number filter works properly"""

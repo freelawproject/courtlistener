@@ -1258,6 +1258,45 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         )
         self.assertIn("SEC", r.content.decode())
 
+        # Filter by docket_number containing repeated numbers like: 1:21-bk-0021
+        with mock.patch(
+            "cl.lib.es_signal_processor.allow_es_audio_indexing",
+            side_effect=lambda x, y: True,
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory.create(
+                docket_number="1:21-bk-0021",
+                court_id=self.court_1.pk,
+                date_argued=datetime.date(2013, 8, 14),
+            )
+            AudioFactory.create(
+                case_name="Lorem Ipsum",
+                docket_id=docket.pk,
+                duration=420,
+                local_path_original_file="test/audio/ander_v._leo.mp3",
+                local_path_mp3=self.filepath_local,
+                sha1="a49ada009774496ac01fb49818837e2296705c97",
+                stt_status=Audio.STT_COMPLETE,
+            )
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "docket_number": "1:21-bk-0021",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertEqual(
+            self.get_article_count(r),
+            1,
+            msg="Did not get expected number of results when filtering by "
+            "docket number. Expected %s, but got %s." % (expected, actual),
+        )
+        self.assertIn("Lorem Ipsum", r.content.decode())
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # Remove factories to prevent affecting other tests.
+        docket.delete()
+
     def test_oa_jurisdiction_filtering(self) -> None:
         """Filter by court"""
         search_params = {
