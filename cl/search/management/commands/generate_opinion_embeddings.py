@@ -8,13 +8,11 @@ def send_batch(
     embedding_queue: str,
     upload_queue: str,
     database: str,
-    bucket_name: str,
 ) -> None:
     create_opinion_text_embeddings.si(
         batch,
         upload_queue,
         database,
-        bucket_name,
     ).apply_async(queue=embedding_queue)
 
 
@@ -27,11 +25,6 @@ class Command(VerboseCommand):
             type=str,
             default="default",
             help="Let the user decide which DB name to use (default to 'default')",
-        )
-        parser.add_argument(
-            "--bucket-name",
-            type=str,
-            help="Name of the bucket where embeddings will be stored.",
         )
         parser.add_argument(
             "--batch-size",
@@ -60,7 +53,6 @@ class Command(VerboseCommand):
         embedding_queue = options["embedding_queue"]
         upload_queue = options["upload_queue"]
         database = options["database"]
-        bucket_name = options["bucket_name"]
         batch_size = options["batch_size"]
 
         opinions = Opinion.objects.all()
@@ -78,7 +70,6 @@ class Command(VerboseCommand):
                     embedding_queue,
                     upload_queue,
                     database,
-                    bucket_name,
                 )
                 current_batch = []
                 current_batch_size = 0

@@ -1587,7 +1587,6 @@ def create_opinion_text_embeddings(
     batch: list[int],
     upload_queue,
     database,
-    bucket: str = None,
 ) -> None:
     """Get embeddings for Opinion texts from inception."""
     opinions = Opinion.objects.filter(id__in=batch).using(database)
@@ -1599,14 +1598,12 @@ def create_opinion_text_embeddings(
 
     save_embeddings.si(
         embeddings,
-        bucket,
     ).apply_async(queue=upload_queue)
 
 
 @app.task()
 def save_embeddings(
     embeddings: list[dict],
-    bucket: str = None,
     directory: str = "opinions",
 ) -> None:
     """Save embeddings to S3.
@@ -1643,8 +1640,6 @@ def save_embeddings(
     ]
     """
     storage = AWSMediaStorage()
-    if bucket:
-        storage.bucket_name = bucket
 
     for embedding_record in embeddings:
         opinion_id = embedding_record["id"]
