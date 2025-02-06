@@ -24,7 +24,7 @@ class Command(VerboseCommand):
             "--database",
             type=str,
             default="default",
-            help="Let the user decide which DB name to use (default to 'default')",
+            help="Let the user decide which DB name to use",
         )
         parser.add_argument(
             "--batch-size",
@@ -35,7 +35,7 @@ class Command(VerboseCommand):
             "--start-id",
             type=int,
             default=0,
-            help="Which opinion ID should we start with, in case it crashes? (default to 0)",
+            help="Which opinion ID should we start with, in case it crashes?",
         )
         parser.add_argument(
             "--embedding-queue",
@@ -46,7 +46,7 @@ class Command(VerboseCommand):
             "--upload-queue",
             type=str,
             default="batch1",
-            help="which celery queue for uploading to S3 (default to 'batch1')",
+            help="which celery queue to use for uploading to S3",
         )
         parser.add_argument(
             "--min-opinion-size",
