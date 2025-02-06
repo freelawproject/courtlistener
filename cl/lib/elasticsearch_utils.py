@@ -374,18 +374,6 @@ def build_fulltext_query(
     """
     if value:
         validate_query_syntax(value, QueryType.QUERY_STRING)
-        # In Elasticsearch, the colon (:) character is used to separate the
-        # field name and the field value in a query.
-        # To avoid parsing errors escape any colon characters in the value
-        # parameter with a backslash.
-        if "docketNumber:" in value:
-            docket_number_matches = re.findall("docketNumber:([^ ]+)", value)
-            for match in docket_number_matches:
-                replacement = match.replace(":", r"\:")
-                value = value.replace(
-                    f"docketNumber:{match}", f"docketNumber:{replacement}"
-                )
-
         # Used for the phrase query_string, no conjunctions appended.
         query_value = cleanup_main_query(value)
         # To enable the search of each term in the query across multiple fields
@@ -465,7 +453,18 @@ def build_term_query(
         validate_query_syntax(value, QueryType.FILTER)
 
     if make_phrase:
-        return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
+        return [
+            Q(
+                "match_phrase",
+                **{
+                    field: {
+                        "query": value,
+                        "slop": slop,
+                        "analyzer": "search_analyzer_exact",
+                    }
+                },
+            )
+        ]
 
     if isinstance(value, list):
         value = list(filter(None, value))
@@ -767,7 +766,7 @@ def build_es_plain_filters(cd: CleanData) -> List:
         # Build docket number term query
         queries_list.extend(
             build_term_query(
-                "docketNumber",
+                "docketNumber.exact",
                 cd.get("docket_number", ""),
                 make_phrase=True,
                 slop=1,
@@ -2374,7 +2373,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                 ),
                 *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_term_query(
-                    "docketNumber",
+                    "docketNumber.exact",
                     cd.get("docket_number", ""),
                     make_phrase=True,
                     slop=1,
@@ -2418,7 +2417,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                     cd.get("filed_after", ""),
                 ),
                 *build_term_query(
-                    "docketNumber",
+                    "docketNumber.exact",
                     cd.get("docket_number", ""),
                     make_phrase=True,
                     slop=1,
