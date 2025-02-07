@@ -1302,6 +1302,26 @@ class TestElasticsearchUtils(SimpleTestCase):
                 "case_name": "In the matter of Attorney Rodney D. Shepherd",
                 "output": [],
             },
+            {
+                "case_name": "Rochester Drug Cooperative, Inc. - Adversary Proceeding",
+                "output": ["Rochester Drug Cooperative, Inc."],
+            },
+            {
+                "case_name": "Ronald W. Howland, Jr and Marilee R Howland - Adversary Proceeding",
+                "output": ["Ronald W. Howland, Jr", "Marilee R Howland"],
+            },
+            {
+                "case_name": "Derrick D. Thomas v Kacy L. Thomas - Adversary Proceeding",
+                "output": ["Derrick D. Thomas", "Kacy L. Thomas"],
+            },
+            {
+                "case_name": "Unknown Case Title",
+                "output": [],
+            },
+            {
+                "case_name": "Unknown Case Title - Adversary Proceeding",
+                "output": [],
+            },
         ]
         for test in tests:
             with self.subTest(

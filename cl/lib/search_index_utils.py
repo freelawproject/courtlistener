@@ -77,7 +77,11 @@ def get_parties_from_case_name_bankr(case_name: str) -> list[str]:
     """
     # Handle cases beginning with "in re" or "in the matter of".
     # These usually don't contain party information in the expected format.
-    if re.match(r"^(in re|in the matter of)", case_name, re.IGNORECASE):
+    if re.match(
+        r"^(in re|in the matter of|unknown case title)",
+        case_name,
+        re.IGNORECASE,
+    ):
         return []
 
     # Removes text enclosed in parentheses at the end of the string.
@@ -88,6 +92,11 @@ def get_parties_from_case_name_bankr(case_name: str) -> list[str]:
 
     # Removes text following "-BELOW" or "-ABOVE" at the end of the string.
     cleaned_case_name = re.sub(r"\s*(-BELOW|-ABOVE).*$", "", cleaned_case_name)
+
+    # Removes text following "- Adversary Proceeding" at the end of the string.
+    cleaned_case_name = re.sub(
+        r"\s*- Adversary Proceeding.*$", "", cleaned_case_name
+    )
 
     case_name_separators = VALID_CASE_NAME_SEPARATORS.copy()
     case_name_separators.append(" and ")
