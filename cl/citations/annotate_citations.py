@@ -3,6 +3,7 @@ import re
 from typing import Dict, List
 
 from eyecite import annotate_citations, clean_text
+from eyecite.models import FullCaseCitation
 
 from cl.citations.match_citations import NO_MATCH_RESOURCE
 from cl.citations.types import MatchedResourceType, SupportedCitationType
@@ -45,6 +46,106 @@ def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
         document.source_is_html = False
 
 
+def calculate_absolute_span(
+    cite_end: int, pin_cite_start: int, pin_cite_text: str
+) -> tuple[int, int]:
+    """Calculate the absolute start and end positions of a pin cite in the
+    plain text.
+
+    :param cite_end: The end position of the citation in the plain text.
+    :param pin_cite_start: The relative start position of the pin cite within
+    the substring.
+    :param pin_cite_text: The text of the pin cite.
+    :return: A tuple containing the absolute start and end positions of the pin
+    cite. Example: (start, end)
+    """
+    absolute_pin_cite_start = cite_end + pin_cite_start
+    absolute_pin_cite_end = absolute_pin_cite_start + len(pin_cite_text)
+    return absolute_pin_cite_start, absolute_pin_cite_end
+
+
+def generate_pin_cite_annotation(
+    opinion: Opinion, pin_cite_number: str, case_name: str
+) -> list[str]:
+    """Generate the HTML annotation for a pin cite.
+
+    :param opinion: The opinion object matched to the pin cite.
+    :param pin_cite_number: The pin cite number extracted from the text.
+    :param case_name: The name of the case, truncated and sanitized for use in
+    HTML.
+    :return: A list of strings representing the HTML annotation.
+
+    Example: ['<span class="citation pin-cite">...</span>']
+    """
+    safe_case_name = html.escape(case_name)
+    return [
+        f'<span class="citation pin-cite" data-id="{opinion.pk}">'
+        f'<a href="{opinion.cluster.get_absolute_url()}#{pin_cite_number}"'
+        f' aria-description="Citation for case: {safe_case_name}"'
+        ">",
+        "</a></span>",
+    ]
+
+
+def get_pin_cite_annotation(
+    citation: FullCaseCitation, plain_text: str, opinion: Opinion
+) -> list[tuple[int, int] | str]:
+    """Calculate the pin cite span and generate the annotation for a given
+    citation
+
+    This function calculates the span of a pin cite within the plain text of
+    an opinion and generates an HTML annotation for the pin cite. The
+    annotation includes a link to the specific pin cite location in the opinion.
+
+    :param citation: The citation object containing the pin cite and its
+    metadata.
+    :param plain_text: The plain text of the opinion where the citation was
+    found.
+    :param opinion: The opinion object matched to the pin cite.
+    :return: A list containing the pin cite span (start and end indices) and
+    the HTML annotation.
+
+    Example: [(start, end), '<span class="citation pin-cite">...</span>']
+    """
+    PIN_CITE_NUMBER_PATTERN = r"\d+"
+    MAX_PIN_CITE_SEARCH_LENGTH = 100
+
+    # Calculate the pin cite span manually since it's not directly available
+    cite_start, cite_end = citation.span()
+    pin_cite_text = citation.metadata.pin_cite
+
+    # Extract a substring from the opinion text starting at the end of the
+    # citation
+    text_after_citation = plain_text[
+        cite_end : cite_end + MAX_PIN_CITE_SEARCH_LENGTH
+    ]
+    pin_cite_start = text_after_citation.find(pin_cite_text)
+
+    # Calculate the absolute start and end positions of the pin cite in the
+    # plain text
+    absolute_pin_cite_start, absolute_pin_cite_end = calculate_absolute_span(
+        cite_end, pin_cite_start, pin_cite_text
+    )
+
+    # Extract the first sequence of digits from the pin cite (e.g.,
+    # "144" from "144-145, n. 6")
+    pin_cite_number_match = re.search(
+        PIN_CITE_NUMBER_PATTERN,
+        plain_text[absolute_pin_cite_start:absolute_pin_cite_end],
+    )
+
+    # Generate the annotation only if the pin cite contains a valid number
+    case_name = trunc(best_case_name(opinion.cluster), 60, "...")
+    safe_case_name = html.escape(case_name)
+    pin_cite_annotation = generate_pin_cite_annotation(
+        opinion, pin_cite_number_match.group(), safe_case_name
+    )
+
+    return [
+        (absolute_pin_cite_start, absolute_pin_cite_end)
+    ] + pin_cite_annotation
+
+
 def generate_annotations(
     citation_resolutions: Dict[
         MatchedResourceType, List[SupportedCitationType]
@@ -85,60 +186,20 @@ def generate_annotations(
         for c in citations:
             annotations.append([c.span()] + annotation)
 
-            if isinstance(opinion, Opinion):
+            if isinstance(opinion, Opinion) and isinstance(
+                c, FullCaseCitation
+            ):
                 # We only want to annotate citations with a corresponding
                 # match, we do this here because not all citations may have a
                 # pin cite in the FullCaseCitation metadata
                 try:
                     if c.metadata.pin_cite:
-                        # We don't have span for pincite, so we need to
-                        # calculate it manually based on the citation span
-                        cite_start, cite_end = c.span()
-                        target_pin_cite = c.metadata.pin_cite
-                        # We get a partial string from the original opinion
-                        # starting from the end of citation to the end of
-                        # citation plus 100
-                        partial_string = plain_text[cite_end : cite_end + 100]
-                        pin_cite_start = partial_string.find(target_pin_cite)
-                        # Then we calculate the absolute span for the pincite
-                        absolute_pin_cite_start = cite_end + pin_cite_start
-                        absolute_pin_cite_end = absolute_pin_cite_start + len(
-                            target_pin_cite
-                        )
 
-                        # We get the first sequence of digits in case the
-                        # pincite is a range or it has non sequence numbers.
-                        # e.g. in "144-145, n. 6" we extract the 144
-                        extract_pincite = re.search(
-                            r"\d+",
-                            plain_text[
-                                absolute_pin_cite_start:absolute_pin_cite_end
-                            ],
+                        pin_cite_annotation = get_pin_cite_annotation(
+                            c, plain_text, opinion
                         )
+                        annotations.append(pin_cite_annotation)
 
-                        if extract_pincite:
-                            # We only annotate the pincite if we are sure
-                            # that it is a number
-                            case_name = trunc(
-                                best_case_name(opinion.cluster), 60, "..."
-                            )
-                            safe_case_name = html.escape(case_name)
-                            pincite_annotation = [
-                                f'<span class="citation pin-cite" data-id="{opinion.pk}">'
-                                f'<a href="{opinion.cluster.get_absolute_url()}#{extract_pincite.group()}"'
-                                f' aria-description="Citation for case: {safe_case_name}"'
-                                ">",
-                                "</a></span>",
-                            ]
-                            annotations.append(
-                                [
-                                    (
-                                        absolute_pin_cite_start,
-                                        absolute_pin_cite_end,
-                                    )
-                                ]
-                                + pincite_annotation
-                            )
                 except Exception as e:
                     print("Error: ", e)
     return annotations
