@@ -89,7 +89,7 @@ def generate_pin_cite_annotation(
 
 def get_pin_cite_annotation(
     citation: FullCaseCitation, plain_text: str, opinion: Opinion
-) -> list[tuple[int, int] | str]:
+) -> list[tuple[int, int] | str] | None:
     """Calculate the pin cite span and generate the annotation for a given
     citation
 
@@ -139,13 +139,16 @@ def get_pin_cite_annotation(
     # Generate the annotation only if the pin cite contains a valid number
     case_name = trunc(best_case_name(opinion.cluster), 60, "...")
     safe_case_name = html.escape(case_name)
-    pin_cite_annotation = generate_pin_cite_annotation(
-        opinion, pin_cite_number_match.group(), safe_case_name
-    )
+    if pin_cite_number_match is not None:
+        pin_cite_annotation = generate_pin_cite_annotation(
+            opinion, pin_cite_number_match.group(), safe_case_name
+        )
 
-    return [
-        (absolute_pin_cite_start, absolute_pin_cite_end)
-    ] + pin_cite_annotation
+        return [
+            (absolute_pin_cite_start, absolute_pin_cite_end)
+        ] + pin_cite_annotation
+
+    return None
 
 
 def generate_annotations(
@@ -198,7 +201,8 @@ def generate_annotations(
                     pin_cite_annotation = get_pin_cite_annotation(
                         c, plain_text, opinion
                     )
-                    annotations.append(pin_cite_annotation)
+                    if pin_cite_annotation:
+                        annotations.append(pin_cite_annotation)
 
     return annotations
 
