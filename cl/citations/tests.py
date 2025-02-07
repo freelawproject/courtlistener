@@ -601,6 +601,42 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ),
         )
 
+        cls.citation7 = CitationWithParentsFactory.create(
+            volume="334",
+            reporter="U.S.",
+            page="131",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                date_filed=date(1948, 5, 3),
+                docket=DocketFactory(court=cls.court_scotus),
+                case_name="United States v. Paramount Pictures, Inc.",
+            ),
+        )
+
+        cls.citation8 = CitationWithParentsFactory.create(
+            volume="346",
+            reporter="U.S.",
+            page="537",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(),
+                case_name="Theatre Enterprises v. Paramount Film Distributing Corp.",
+                date_filed=date(1954, 1, 11),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    xml_harvard="""<p>“Runs are successive exhibitions of a
+                    feature in a given area, first-run being the first
+                    exhibition in that area, second-run being the next
+                    subsequent, and so on . . . United States v. Paramount
+                    Pictures, Inc., 334 U. S. 131, 144-145, n. 6 (
+                    1948).</p><p>“A clearance is the period of time, usually
+                    stipulated in license contracts, which must elapse
+                    between runs of the same feature within a particular area
+                    or in specified theatres.” United States v. Paramount
+                    Pictures, Inc., 334 U. S. 131, 144, n. 6 (1948).</p>""",
+                ),
+            ),
+        )
+
         # Cluster with citation
         lead = """<p>Sample text</p>"""
         concurrence = """<p>Sample text that includes a pincite <a class="page-label" data-label="745" href="#745" id="745">*745</a></p>"""
@@ -1098,6 +1134,31 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         self.assertEqual(
             result[0]["cluster_id"], self.cluster1.pk, "Matched wront cluster"
         )
+
+        # Verify that we can annotate pin cites correctly
+        opinion = Opinion.objects.get(cluster=self.citation8.cluster)
+        get_and_clean_opinion_text(opinion)
+        # Extract the citations from the opinion's text
+        citations = get_citations(
+            opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+        )
+        citation_resolutions = do_resolve_citations(citations, opinion)
+
+        matched_opinion = Opinion.objects.get(cluster=self.citation7.cluster)
+
+        # Generate the citing opinion's new HTML with inline citation links
+        new_html = create_cited_html(opinion, citation_resolutions)
+
+        main_citation = f"""<span class="citation" data-id="{matched_opinion.pk}"><a href="/opinion/{self.citation7.cluster.pk}/united-states-v-paramount-pictures-inc/" aria-description="Citation for case: United States v. Paramount Pictures, Inc.">334 U. S. 131</a></span>"""
+        pincite_1 = f"""<span class="citation pin-cite" data-id="{matched_opinion.pk}"><a href="/opinion/{self.citation7.cluster.pk}/united-states-v-paramount-pictures-inc/#144" aria-description="Citation for case: United States v. Paramount Pictures, Inc.">144-145, n. 6</a></span>"""
+        pincite_2 = f""" <span class="citation pin-cite" data-id="{matched_opinion.pk}"><a href="/opinion/{self.citation7.cluster.pk}/united-states-v-paramount-pictures-inc/#144" aria-description="Citation for case: United States v. Paramount Pictures, Inc.">144, n. 6</a></span> (1948).</p>"""
+
+        # Verify that a citation without pin cite matches
+        self.assertIn(main_citation, new_html)
+        # Verify that a citation with pin cite with single page number matches
+        self.assertIn(pincite_1, new_html)
+        # Verify that a citation with pin cite with page range matches
+        self.assertIn(pincite_2, new_html)
 
 
 class CitationFeedTest(
