@@ -29,6 +29,10 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
+from cl.lib.search_index_utils import (
+    get_parties_from_case_name,
+    get_parties_from_case_name_bankr,
+)
 from cl.lib.test_helpers import (
     RECAPSearchTestCase,
     rd_type_v4_api_keys,
@@ -5460,7 +5464,9 @@ class RECAPSearchAPIV4Test(
         """
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             d = DocketFactory(
-                case_name="Lorem Ipsum", court=self.court, source=Docket.RECAP
+                case_name="Lorem Ipsum",
+                court=self.court_2,
+                source=Docket.RECAP,
             )
             firm = AttorneyOrganizationFactory(
                 lookup_key="00kingofprussiaroadradnorkesslertopazmeltze87437",
@@ -7467,15 +7473,58 @@ class RECAPIndexingTest(
             {firm.name, firm_2.name, firm_2_1.name, firm_1_2.name},
         )
 
+    @mock.patch(
+        "cl.search.documents.get_parties_from_case_name_bankr",
+        wraps=get_parties_from_case_name_bankr,
+    )
+    @mock.patch(
+        "cl.search.tasks.get_parties_from_case_name_bankr",
+        wraps=get_parties_from_case_name_bankr,
+    )
+    def test_index_party_from_bankr_case_name(
+        self, mock_party_parser_task, mock_party_parser_document
+    ):
+        """Confirm that the party field is populated by splitting the case_name
+        of a bankruptcy case when a valid separator is present.
+        """
+        docket_with_no_parties = DocketFactory(
+            court=self.court,
+            case_name="Lorem v. Dolor",
+            docket_number="1:21-bk-4444",
+            source=Docket.RECAP,
+        )
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+        # Assert party on initial indexing.
+        self.assertEqual(docket_doc_no_parties.party, ["Lorem", "Dolor"])
+        mock_party_parser_document.assert_called_once()
+
+        # Modify the docket case_name. Assert that parties are updated if the
+        # docket does not contain normalized parties.
+        docket_with_no_parties.case_name = "America v. Smith"
+        docket_with_no_parties.save()
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+        self.assertEqual(docket_doc_no_parties.party, ["America", "Smith"])
+        mock_party_parser_task.assert_called_once()
+
+        docket_with_no_parties.delete()
+
+    @mock.patch(
+        "cl.search.documents.get_parties_from_case_name",
+        wraps=get_parties_from_case_name,
+    )
+    @mock.patch(
+        "cl.search.tasks.get_parties_from_case_name",
+        wraps=get_parties_from_case_name,
+    )
     def test_index_party_from_case_name_when_parties_are_not_available(
-        self,
+        self, mock_party_parser_task, mock_party_parser_document
     ) -> None:
         """Confirm that the party field is populated by splitting the case_name
         when a valid separator is present.
         """
-
+        district_court = CourtFactory(id="akd", jurisdiction="FD")
         docket_with_parties = DocketFactory(
-            court=self.court,
+            court=district_court,
             case_name="Lorem v. Dolor",
             docket_number="1:21-bk-4444",
             source=Docket.RECAP,
@@ -7498,8 +7547,9 @@ class RECAPIndexingTest(
             docket=docket_with_parties,
         )
         index_docket_parties_in_es.delay(docket_with_parties.pk)
+        mock_party_parser_document.reset_mock()
         docket_with_no_parties = DocketFactory(
-            court=self.court,
+            court=district_court,
             case_name="Bank v. Smith",
             docket_number="1:21-bk-4445",
             source=Docket.RECAP,
@@ -7511,13 +7561,16 @@ class RECAPIndexingTest(
         # Assert party on initial indexing.
         self.assertEqual(docket_doc_parties.party, ["Mary Williams Corp."])
         self.assertEqual(docket_doc_no_parties.party, ["Bank", "Smith"])
+        mock_party_parser_document.assert_called_once()
 
         # Modify the docket case_name. Assert that parties are not overwritten
-        # in a docket with normalized parties.
+        # in a docket with normalized parties and also check the helper to
+        # parse parties is not called.
         docket_with_parties.case_name = "Lorem v. Ipsum"
         docket_with_parties.save()
         docket_doc_parties = DocketDocument.get(docket_with_parties.pk)
         self.assertEqual(docket_doc_parties.party, ["Mary Williams Corp."])
+        mock_party_parser_task.assert_not_called()
 
         # Modify the docket case_name. Assert that parties are updated if the
         # docket does not contain normalized parties.
@@ -7525,11 +7578,12 @@ class RECAPIndexingTest(
         docket_with_no_parties.save()
         docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
         self.assertEqual(docket_doc_no_parties.party, ["America", "Smith"])
+        mock_party_parser_task.assert_called_once()
 
-        # Test that parties are not extracted from the case_name if it does not contain
-        # a valid separator.
+        # Test that parties are not extracted from the case_name if the case
+        # originates from a district court and lacks a valid separator.
         docket_with_no_parties_no_separator = DocketFactory(
-            court=self.court,
+            court=district_court,
             case_name="In re: Bank Smith",
             docket_number="1:21-bk-4446",
             source=Docket.RECAP,

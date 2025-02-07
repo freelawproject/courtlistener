@@ -39,6 +39,7 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
+from cl.lib.search_index_utils import get_parties_from_case_name_bankr
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
     check_for_proximity_tokens,
@@ -1202,6 +1203,137 @@ class TestElasticsearchUtils(SimpleTestCase):
                 test["input_str"]  # type: ignore
             )
             self.assertEqual(output, test["sanitized"])
+
+    def test_can_get_parties_from_bankruptcy_case_name(self) -> None:
+        class PartiesNameTestType(TypedDict):
+            case_name: str
+            output: list[str]
+
+        tests: list[PartiesNameTestType] = [
+            {
+                "case_name": "Mendelsohn. Singh",
+                "output": ["Mendelsohn. Singh"],
+            },
+            {
+                "case_name": "Cadle Co. v Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. v Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. v. Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. vs Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. vs. Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Paul Thomas Presbury, Jr. and Lisa Rae Presbury",
+                "output": ["Paul Thomas Presbury, Jr.", "Lisa Rae Presbury"],
+            },
+            {
+                "case_name": "Ma Margarita Bernal Sosa -ABOVE MED",
+                "output": ["Ma Margarita Bernal Sosa"],
+            },
+            {
+                "case_name": "Jennifer Renee' Abbott and Quentin Andrew Abbott -ABOVE MED",
+                "output": ["Jennifer Renee' Abbott", "Quentin Andrew Abbott"],
+            },
+            {
+                "case_name": "Aiesha Renee -BELOW MED",
+                "output": ["Aiesha Renee"],
+            },
+            {
+                "case_name": "Justin Kaiser and Belinda Kaiser -BELOW MED",
+                "output": ["Justin Kaiser", "Belinda Kaiser"],
+            },
+            {
+                "case_name": "Cosmorex Ltd. (in Liquidation)",
+                "output": ["Cosmorex Ltd."],
+            },
+            {
+                "case_name": "Cowen & Co. v. Zagar (In re Zagar)",
+                "output": ["Cowen & Co.", "Zagar"],
+            },
+            {
+                "case_name": 'Advantage LLC <b><font color="red">Jointly Administered under 23-90886.</font></b>',
+                "output": ["Advantage LLC"],
+            },
+            {
+                "case_name": 'Sather v. Carlson<b><font color="red">DO NOT DOCKET. CASE TRANSFERRED OUT.</font></b>',
+                "output": ["Sather", "Carlson"],
+            },
+            {
+                "case_name": 'Saucedo and Green Dream International, LLC <b> <font color="red"> Case Consolidated under 23-03142 </font> </b>',
+                "output": ["Saucedo", "Green Dream International, LLC"],
+            },
+            {
+                "case_name": "In re: Matter of Nicholas M. Wajda",
+                "output": [],
+            },
+            {
+                "case_name": "In re Matter of Proof of Claim Replacement Filings",
+                "output": [],
+            },
+            {
+                "case_name": "In re T.H.",
+                "output": [],
+            },
+            {
+                "case_name": "In Re: Dempsey Clay Ward",
+                "output": [],
+            },
+            {
+                "case_name": "In re: Receivership of Horses and Equipment v. Gabriel",
+                "output": [],
+            },
+            {
+                "case_name": "In Re: Appearances of Attorney James G. ORourke in Pending Bankruptcy Cases",
+                "output": [],
+            },
+            {
+                "case_name": "In the matter of Attorney Rodney D. Shepherd",
+                "output": [],
+            },
+            {
+                "case_name": "Rochester Drug Cooperative, Inc. - Adversary Proceeding",
+                "output": ["Rochester Drug Cooperative, Inc."],
+            },
+            {
+                "case_name": "Ronald W. Howland, Jr and Marilee R Howland - Adversary Proceeding",
+                "output": ["Ronald W. Howland, Jr", "Marilee R Howland"],
+            },
+            {
+                "case_name": "Derrick D. Thomas v Kacy L. Thomas - Adversary Proceeding",
+                "output": ["Derrick D. Thomas", "Kacy L. Thomas"],
+            },
+            {
+                "case_name": "Unknown Case Title",
+                "output": [],
+            },
+            {
+                "case_name": "Unknown Case Title - Adversary Proceeding",
+                "output": [],
+            },
+        ]
+        for test in tests:
+            with self.subTest(
+                input=test["case_name"], msg="get parties names from case name"
+            ):
+                parties: list[str] = get_parties_from_case_name_bankr(
+                    test["case_name"]
+                )
+                self.assertEqual(
+                    parties,
+                    test["output"],
+                )
 
 
 class TestRedisUtils(SimpleTestCase):
