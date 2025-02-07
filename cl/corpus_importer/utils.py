@@ -107,6 +107,23 @@ async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
         await d.asave()
 
 
+def is_bankruptcy_court(court_id: str) -> bool:
+    """Checks if a given court ID corresponds to a bankruptcy court.
+
+    This function queries the database to determine if the provided court
+    ID is associated with a federal bankruptcy court.
+
+    Args:
+        court_id: The ID of the court to check (string).
+
+    Returns:
+        True if the court ID corresponds to a bankruptcy court, False otherwise
+        (boolean).
+    """
+    bankr_court_ids = Court.federal_courts.bankruptcy_pacer_courts()
+    return bankr_court_ids.filter(pk=court_id).exists()
+
+
 def is_appellate_court(court_id: str) -> bool:
     """Checks if the given court_id belongs to an appellate court.
 
