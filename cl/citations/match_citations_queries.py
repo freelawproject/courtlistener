@@ -219,7 +219,7 @@ def es_search_db_for_full_citation(
             return results, citation_found
     else:
         # We didn't get an exact match on the volume/reporter/page. Perhaps
-        # it's a pincite. Find closest citations filtering by volume and
+        # it's a pin cite. Find closest citations filtering by volume and
         # reporter and excluding self cites.
         partial_citation_str = " ".join(
             [full_citation.groups["volume"], full_citation.groups["reporter"]]
@@ -289,7 +289,7 @@ def es_search_db_for_full_citation(
                     # we only look for this format: *page_number
                     # We add a temporary extra attribute to know that we got
                     # the match using a pin cite
-                    filtered_results[0].pincite_used = full_citation.groups[
+                    filtered_results[0].page_pin_cite = full_citation.groups[
                         "page"
                     ]
                     return [filtered_results[0]], True
@@ -298,7 +298,7 @@ def es_search_db_for_full_citation(
                     # to check if the page number is in any of the opinions
                     if f"*{full_citation.groups['page']}" in result["text"]:
                         # We found the page number in the opinion content
-                        filtered_results[0].pincite_used = (
+                        filtered_results[0].page_pin_cite = (
                             full_citation.groups["page"]
                         )
                         return [result], True

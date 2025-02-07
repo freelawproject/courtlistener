@@ -46,7 +46,7 @@ def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
         document.source_is_html = False
 
 
-def calculate_absolute_span(
+def calculate_pin_cite_absolute_span(
     cite_end: int, pin_cite_start: int, pin_cite_text: str
 ) -> tuple[int, int]:
     """Calculate the absolute start and end positions of a pin cite in the
@@ -123,8 +123,10 @@ def get_pin_cite_annotation(
 
     # Calculate the absolute start and end positions of the pin cite in the
     # plain text
-    absolute_pin_cite_start, absolute_pin_cite_end = calculate_absolute_span(
-        cite_end, pin_cite_start, pin_cite_text
+    absolute_pin_cite_start, absolute_pin_cite_end = (
+        calculate_pin_cite_absolute_span(
+            cite_end, pin_cite_start, pin_cite_text
+        )
     )
 
     # Extract the first sequence of digits from the pin cite (e.g.,
@@ -168,17 +170,17 @@ def generate_annotations(
         else:  # If successfully matched...
             case_name = trunc(best_case_name(opinion.cluster), 60, "...")
             safe_case_name = html.escape(case_name)
-            # Get the pincite if we used one to match it with an opinion.
-            # This is for a special pincite like "8 Wheat. 574" which points
+            # Get the pin cite if we used one to match it with an opinion.
+            # This is for a special pin cite like "8 Wheat. 574" which points
             # to "8 Wheat. 543"
-            pincite = (
-                f"#{opinion.pincite_used}"
-                if hasattr(opinion, "pincite_used")
+            pin_cite = (
+                f"#{opinion.page_pin_cite}"
+                if hasattr(opinion, "page_pin_cite")
                 else ""
             )
             annotation = [
                 f'<span class="citation" data-id="{opinion.pk}">'
-                f'<a href="{opinion.cluster.get_absolute_url()}{pincite}"'
+                f'<a href="{opinion.cluster.get_absolute_url()}{pin_cite}"'
                 f' aria-description="Citation for case: {safe_case_name}"'
                 ">",
                 "</a></span>",
@@ -192,16 +194,12 @@ def generate_annotations(
                 # We only want to annotate citations with a corresponding
                 # match, we do this here because not all citations may have a
                 # pin cite in the FullCaseCitation metadata
-                try:
-                    if c.metadata.pin_cite:
+                if c.metadata.pin_cite:
+                    pin_cite_annotation = get_pin_cite_annotation(
+                        c, plain_text, opinion
+                    )
+                    annotations.append(pin_cite_annotation)
 
-                        pin_cite_annotation = get_pin_cite_annotation(
-                            c, plain_text, opinion
-                        )
-                        annotations.append(pin_cite_annotation)
-
-                except Exception as e:
-                    print("Error: ", e)
     return annotations
 
 
