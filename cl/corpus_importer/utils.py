@@ -1212,3 +1212,15 @@ class CycleChecker:
             # when self.court_counts[court_id] != self.current_iteration
             self.prev_iteration_courts.add(court_id)
             return True
+
+
+def is_long_appellate_document_number(
+    document_number: str | int | None,
+) -> bool:
+    """Check whether this docket_number is longer than 9 digits, indicating that it
+    comes from a court that doesn't use regular numbering.
+
+    :param document_number: The document number
+    :return: A boolean indicating whether this is a long appellate document number.
+    """
+    return isinstance(document_number, str) and len(document_number) >= 9
