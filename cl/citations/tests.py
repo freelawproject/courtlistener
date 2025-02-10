@@ -604,6 +604,22 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ),
         )
 
+        cls.citation8 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="John v. Doe",
+                date_filed=date(1997, 4, 9),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    html="""<p>Lorem ipsum, 114 F.3d 1182</p>""",
+                ),
+            ),
+        )
+
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.OPINION,
@@ -930,6 +946,18 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         ]
         results = resolve_fullcase_citation(citation)
         self.assertEqual(MULTIPLE_MATCHES_RESOURCE, results)
+
+        # Verify if the annotated citation is correct
+        opinion = self.citation8.cluster.sub_opinions.all().first()
+        get_and_clean_opinion_text(opinion)
+        citations = get_citations(
+            opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+        )
+        citation_resolutions = do_resolve_citations(citations, opinion)
+        new_html = create_cited_html(opinion, citation_resolutions)
+
+        expected_citation_annotation = """<p>Lorem ipsum, <span class="citation multiple-matches"><a href="/c/F.3d/114/1182/">114 F.3d 1182</a></span></p>"""
+        self.assertIn(expected_citation_annotation, new_html)
 
     def test_citation_increment(self) -> None:
         """Make sure that found citations update the increment on the cited

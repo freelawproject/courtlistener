@@ -66,11 +66,18 @@ def generate_annotations(
                 '<span class="citation no-link">',
                 "</span>",
             ]
-        elif opinion is MULTIPLE_MATCHES_RESOURCE:  # If multiple matches,
-            # can't disambiguate...
+        elif opinion is MULTIPLE_MATCHES_RESOURCE:
+            # Multiple matches, can't disambiguate, link citation to citation
+            # lookup page
+            citation_groups = citations[0].groups
+            citation_dict = {
+                "reporter": citation_groups.get("reporter"),
+                "volume": citation_groups.get("volume", None),
+                "page": citation_groups.get("page", None),
+            }
             annotation = [
                 '<span class="citation multiple-matches">'
-                f'<a href="{reverse("citation_redirector", args=[citations[0].groups["reporter"], citations[0].groups["volume"], citations[0].groups["page"]])}">',
+                f'<a href="{reverse("citation_redirector", kwargs=citation_dict)}">',
                 "</a></span>",
             ]
         else:  # If successfully matched...
