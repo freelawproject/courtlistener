@@ -57,6 +57,7 @@ from cl.corpus_importer.tasks import (
 from cl.corpus_importer.utils import (
     ais_appellate_court,
     is_appellate_court,
+    is_long_appellate_document_number,
     mark_ia_upload_needed,
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
@@ -251,7 +252,7 @@ async def process_recap_pdf(pk):
     """Save a RECAP PDF to the database."""
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-
+    court_id = pq.court_id
     document_type = (
         RECAPDocument.PACER_DOCUMENT
         if not pq.attachment_number  # This check includes attachment_number set to None or 0
@@ -284,7 +285,7 @@ async def process_recap_pdf(pk):
         while True:
             try:
                 d = await Docket.objects.aget(
-                    pacer_case_id=pq.pacer_case_id, court_id=pq.court_id
+                    pacer_case_id=pq.pacer_case_id, court_id=court_id
                 )
             except Docket.DoesNotExist:
                 # No Docket and no RECAPDocument. Do a retry. Hopefully
@@ -376,7 +377,13 @@ async def process_recap_pdf(pk):
     # BigIntegerField in ProcessingQueue. To prevent the ES signal
     # processor fields tracker from detecting it as a value change, it should
     # be converted to a string.
-    rd.document_number = str(pq.document_number)
+    # Avoid updating the document_number from the PQ if this upload belongs
+    # to a court that doesn't use regular numbering. See issue:
+    # https://github.com/freelawproject/courtlistener/issues/2877
+    if ais_appellate_court(court_id) and not is_long_appellate_document_number(
+        rd.document_number
+    ):
+        rd.document_number = str(pq.document_number)
     # We update attachment_number and document_type in case the
     # RECAPDocument didn't have the actual document yet.
     rd.attachment_number = pq.attachment_number
