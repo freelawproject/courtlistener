@@ -14,11 +14,9 @@ from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import build_es_base_query
+from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.documents import DocketDocument
-from cl.search.management.commands.cl_index_parent_and_child_docs import (
-    log_last_document_indexed,
-)
 from cl.search.models import SEARCH_TYPES, Court, Docket
 from cl.search.tasks import index_dockets_in_bulk
 
