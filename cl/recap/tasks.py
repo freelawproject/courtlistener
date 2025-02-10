@@ -2004,7 +2004,7 @@ def fetch_pacer_doc_by_rd(
             )
         )
 
-    if sub_docket_pqs:
+    if sub_docket_pqs and not is_appellate_court(court_id):
         pqs_created = ProcessingQueue.objects.bulk_create(sub_docket_pqs)
         replicate_fq_pdf_to_subdocket_rds.delay([pq.pk for pq in pqs_created])
 
