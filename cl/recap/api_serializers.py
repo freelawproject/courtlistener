@@ -264,6 +264,33 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, attrs):
+        # Validates the input attributes, ensuring the request has all required
+        # elements.
+        match attrs["request_type"]:
+            case REQUEST_TYPE.DOCKET:
+                # Validation for docket requests.  Requires at least one of
+                # docket ID, docket number/court pair, or PACER case ID.
+                if not any(
+                    [
+                        attrs.get("docket"),
+                        attrs.get("docket_number"),
+                        attrs.get("pacer_case_id"),
+                    ]
+                ):
+                    raise ValidationError(
+                        "For docket requests, please provide one of the "
+                        "following: a docket ID ('docket'), a docket number "
+                        "('docket_number') and court pair, or a PACER case ID "
+                        "('pacer_case_id') and court pair."
+                    )
+            case REQUEST_TYPE.PDF | REQUEST_TYPE.ATTACHMENT_PAGE:
+                # Attachment page and PDF validation
+                if not attrs.get("recap_document"):
+                    raise ValidationError(
+                        "recap_document is a required field for attachment page "
+                        "and PDF fetches."
+                    )
+
         # Is it a good court value?
         valid_court_ids = Court.federal_courts.all_pacer_courts()
         if (
@@ -314,17 +341,6 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 "parties, you must also request showing parties and counsel "
                 "generally."
             )
-
-        # Attachment page and PDF validation
-        if attrs["request_type"] in [
-            REQUEST_TYPE.PDF,
-            REQUEST_TYPE.ATTACHMENT_PAGE,
-        ]:
-            if not attrs.get("recap_document"):
-                raise ValidationError(
-                    "recap_document is a required field for attachment page "
-                    "and PDF fetches."
-                )
 
         # PDF validations
         if attrs["request_type"] == REQUEST_TYPE.PDF:

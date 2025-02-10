@@ -2315,13 +2315,6 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
     @classmethod
     def setUp(cls) -> None:
         cls.user = UserWithChildProfileFactory.create()
-        cls.fetch_attributes = {
-            "user": cls.user,
-            "docket_id": 1,
-            "request_type": REQUEST_TYPE.DOCKET,
-            "pacer_username": "johncofey",
-            "pacer_password": "mrjangles",
-        }
         cls.request = RequestFactory().request()
         cls.request.user = cls.user
         cls.court = CourtFactory(
@@ -2333,6 +2326,17 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         cls.court_federal_special = CourtFactory(
             id="cc", jurisdiction=Court.FEDERAL_SPECIAL, in_use=True
         )
+        cls.docket = DocketFactory(
+            source=Docket.RECAP,
+            court_id=cls.court.pk,
+        )
+        cls.fetch_attributes = {
+            "user": cls.user,
+            "docket": cls.docket.id,
+            "request_type": REQUEST_TYPE.DOCKET,
+            "pacer_username": "johncofey",
+            "pacer_password": "mrjangles",
+        }
 
     def test_simple_request_serialization(self, mock) -> None:
         """Can we serialize a simple request?"""
@@ -2347,12 +2351,35 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
 
         serialized_fq.save()
 
+    def test_check_required_fields_for_docket_purchase(self, mock):
+        """do we correctly identify invalid docket requests?"""
+
+        del self.fetch_attributes["docket"]  # Remove a required field
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        self.assertFalse(
+            serialized_fq.is_valid(),
+            msg=f"Serializer should be invalid due to missing 'docket' field.",
+        )
+
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "For docket requests, please provide one of the following: a "
+                "docket ID ('docket'), a docket number ('docket_number') and court "
+                "pair, or a PACER case ID ('pacer_case_id') and court pair."
+            ),
+            msg="Error message does not match expected format.",
+        )
+
     def test_recap_fetch_validate_pacer_case_id(self, mock):
         """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
         self.fetch_attributes.update(
             {"pacer_case_id": "12-2334", "court": "canb"}
         )
-        del self.fetch_attributes["docket_id"]
+        del self.fetch_attributes["docket"]
         serialized_fq = PacerFetchQueueSerializer(
             data=self.fetch_attributes,
             context={"request": self.request},
@@ -2370,7 +2397,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
             source=Docket.RECAP,
             court_id=self.court_federal_special.pk,
         )
-        # checks the provided docket id is not an appellate record
+        # checks the court_id when users send just the docket_id
         self.fetch_attributes["docket"] = non_pacer_docket.pk
         serialized_fq = PacerFetchQueueSerializer(
             data=self.fetch_attributes,
@@ -2425,7 +2452,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
             ),
         )
 
-        del self.fetch_attributes["docket_id"]
+        del self.fetch_attributes["docket"]
         self.fetch_attributes["request_type"] = REQUEST_TYPE.PDF
         self.fetch_attributes["recap_document"] = rd.pk
 
