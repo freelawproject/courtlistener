@@ -1,6 +1,8 @@
+from celery import chain
+
 from cl.lib.command_utils import VerboseCommand
 from cl.search.models import Opinion
-from cl.search.tasks import create_opinion_text_embeddings
+from cl.search.tasks import create_opinion_text_embeddings, save_embeddings
 
 
 def send_batch(
@@ -9,11 +11,12 @@ def send_batch(
     upload_queue: str,
     database: str,
 ) -> None:
-    create_opinion_text_embeddings.si(
-        batch,
-        upload_queue,
-        database,
-    ).apply_async(queue=embedding_queue)
+    chain(
+        create_opinion_text_embeddings.si(batch, database).set(
+            queue=embedding_queue
+        ),
+        save_embeddings.si().set(queue=upload_queue),
+    ).apply_async()
 
 
 class Command(VerboseCommand):

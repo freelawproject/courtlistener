@@ -1585,9 +1585,8 @@ def inception_batch_request(
 @app.task()
 def create_opinion_text_embeddings(
     batch: list[int],
-    upload_queue,
     database,
-) -> None:
+) -> list[dict]:
     """Get embeddings for Opinion texts from inception."""
     opinions = (
         Opinion.objects.filter(id__in=batch).with_best_text().using(database)
@@ -1598,9 +1597,7 @@ def create_opinion_text_embeddings(
     ]
     embeddings = inception_batch_request(opinions_to_vectorize)
 
-    save_embeddings.si(
-        embeddings,
-    ).apply_async(queue=upload_queue)
+    return embeddings
 
 
 @app.task()
