@@ -3,11 +3,14 @@ from typing import Dict, Iterable, List, Optional, no_type_check
 
 from elasticsearch_dsl.response import Hit
 from eyecite import resolve_citations
+from eyecite.find import extract_reference_citations
+from eyecite.helpers import filter_citations
 from eyecite.models import (
     CitationBase,
     FullCaseCitation,
     FullJournalCitation,
     FullLawCitation,
+    ReferenceCitation,
     Resource,
     ShortCaseCitation,
     SupraCitation,
@@ -140,4 +143,84 @@ def do_resolve_citations(
         resolve_full_citation=resolve_fullcase_citation,
         resolve_shortcase_citation=resolve_shortcase_citation,
         resolve_supra_citation=resolve_supra_citation,
+    )
+
+
+def extract_references_using_resolutions(
+    opinion_text: str,
+    resolutions: Dict[MatchedResourceType, List[SupportedCitationType]],
+) -> Dict[MatchedResourceType, List[SupportedCitationType]]:
+    """Use database case names to find new references for resolved full cites
+
+    Will only re-resolve ReferenceCitations, if any new are found by using
+    either the opinion.cluster.case_name_short or opinion.cluster.case_name
+
+    :param opinion_text: the opinion's cleaned text
+    :param resolutions: the resolutions dictionary
+    :return: If no new references are found, return the input `resolutions`
+        If new references are found, update only the reference resolutions
+    """
+    new_references = []
+    # Mapper to reuse previous resolutions
+    citation_to_resolution = {}
+    # plain citations list
+    citations = []
+
+    for resolved_opinion, resolved_citations in resolutions.items():
+        for citation in resolved_citations:
+            citation_to_resolution[citation] = resolved_opinion
+            citations.append(citation)
+
+            if resolved_opinion == NO_MATCH_RESOURCE:
+                continue
+            if not isinstance(citation, FullCaseCitation):
+                continue
+
+            # update metadata for use in reference citation matching
+            cluster = resolved_opinion.cluster
+
+            citation.metadata.resolved_case_name = cluster.case_name
+
+            # if the case_name_short has a value already identified, it's not
+            # worth to repeat the extraction and resolution
+            if cluster.case_name_short not in [
+                citation.metadata.plaintiff,
+                citation.metadata.defendant,
+            ]:
+                citation.metadata.resolved_case_name_short = (
+                    cluster.case_name_short
+                )
+
+            if not (
+                citation.metadata.resolved_case_name
+                or citation.metadata.resolved_case_name_short
+            ):
+                # no new metadata to use, skip
+                continue
+
+            # try to extract new references, keep the ones that were found
+            # using the resolved values
+            for reference in extract_reference_citations(
+                citation, opinion_text
+            ):
+                if (
+                    reference.metadata.resolved_case_name
+                    or reference.metadata.resolved_case_name_short
+                ):
+                    new_references.append(reference)
+
+    if not new_references:
+        return resolutions
+
+    # this will ensure the new references do not overlap the old ones, and
+    # that all citations are in order of appeareance
+    filtered_citations = filter_citations(citations + new_references)
+
+    # re-do the resolutions loop for reference and id citations only
+    # all the other values come from previous resolution round
+    return resolve_citations(
+        filtered_citations,
+        resolve_full_citation=lambda c: citation_to_resolution[c],
+        resolve_shortcase_citation=lambda c, _: citation_to_resolution[c],
+        resolve_supra_citation=lambda c, _: citation_to_resolution[c],
     )

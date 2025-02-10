@@ -1627,20 +1627,24 @@ name = "eyecite"
 version = "2.6.5"
 description = "Tool for extracting legal citations from text strings."
 optional = false
-python-versions = "<4.0,>=3.10"
+python-versions = ">=3.10,<4.0"
 groups = ["main"]
-files = [
-    {file = "eyecite-2.6.5-py3-none-any.whl", hash = "sha256:421a913960160d10e4061e6ca3146f067c17169c7f482e34bc39d7c559a24552"},
-    {file = "eyecite-2.6.5.tar.gz", hash = "sha256:e91a1bc8e2df508379490bbab088ee03133cb74eff9c784199b8b66d5714e7e8"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 courts-db = ">=0.10.9"
 fast-diff-match-patch = ">=2.0.0"
 lxml = ">=4.6.3"
-pyahocorasick = ">=1.2"
+pyahocorasick = ">= 1.2"
 regex = ">=2020.1.8"
 reporters-db = ">=3.2.38"
+
+[package.source]
+type = "git"
+url = "https://github.com/freelawproject/eyecite.git"
+reference = "199-resolved-case-names-for-reference-citations"
+resolved_reference = "edb124fb2be968f0ea982c613abc21327f1b87e6"
 
 [[package]]
 name = "factory-boy"
@@ -5974,4 +5978,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13, <3.14"
-content-hash = "50557c415b4d3adc116f4616ac2b2ec89ce9fbd16aef1d69a442be184966a625"
+content-hash = "66b723447ff47831901a8578c450aef5457ae4272b7690690b34470027813c17"
