@@ -67,6 +67,7 @@ from cl.corpus_importer.utils import (
     compute_blocked_court_wait,
     compute_next_binary_probe,
     is_appellate_court,
+    is_long_appellate_document_number,
     make_iquery_probing_key,
     mark_ia_upload_needed,
 )
@@ -2124,7 +2125,7 @@ def get_document_number_for_appellate(
     if not len(document_number_split) == 1:
         document_number = document_number_split[0]
 
-    if len(document_number) > 9:
+    if is_long_appellate_document_number(document_number):
         # If the number is really big, it's probably a court that uses
         # pacer_doc_id instead of regular docket entry numbering.
         # Force the fourth-digit to 0:
