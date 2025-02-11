@@ -2469,6 +2469,24 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
             "PACER case ID can not contain a single (-); that looks like a docket number.",
         )
 
+    def test_appellate_docket_fetch_validations(self, mock):
+        self.fetch_attributes.update(
+            {"pacer_case_id": "122334", "court": self.court_appellate.pk}
+        )
+        del self.fetch_attributes["docket"]
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Purchases of appellate dockets using a PACER case ID are not "
+                "currently supported."
+            ),
+        )
+
     def test_recap_fetch_validate_court(self, mock):
         """Can we properly validate the court_id?"""
 

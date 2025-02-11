@@ -314,6 +314,19 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 "Cannot use 'docket_number' parameter "
                 "without 'court' parameter."
             )
+
+        if (
+            attrs.get("pacer_case_id")
+            and is_appellate_court(attrs.get("court").pk)
+            and not attrs.get("docket_number")
+        ):
+            # The user is trying to purchase an appellate docket using only the
+            # PACER case ID, which is not supported.
+            raise ValidationError(
+                "Purchases of appellate dockets using a PACER case ID are not "
+                "currently supported."
+            )
+
         if attrs.get("show_terminated_parties") and not attrs.get(
             "show_parties_and_counsel"
         ):
