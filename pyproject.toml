@@ -110,7 +110,7 @@ openai = "^1.58.1"
 seal-rookery = "^2.2.5"
 types-pytz = "^2024.2.0.20241003"
 psycopg = {version = "3.2.3", extras = ["binary", "pool"]}
-boto3 = "^1.35.44"
+boto3 = "^1.36.17"
 django-tailwind = "^3.8.0"
 drf-dynamic-fields = "^0.4.0"
 django-ses = {extras = ["events"], version = "^4.3.2"}
