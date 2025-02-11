@@ -124,6 +124,7 @@ from cl.recap.tasks import (
     process_recap_upload,
     process_recap_zip,
 )
+from cl.recap.utils import get_court_id_from_fetch_queue
 from cl.recap_rss.tasks import merge_rss_feed_contents
 from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.search.factories import (
@@ -152,6 +153,84 @@ from cl.users.factories import (
     UserProfileWithParentsFactory,
     UserWithChildProfileFactory,
 )
+
+
+class RecapUtilsTest(TestCase):
+
+    def setUp(self) -> None:
+        self.court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
+        self.docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.district_court,
+            docket_number="23-4567",
+            pacer_case_id="104490",
+        )
+        self.rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.docket,
+            ),
+            document_number="1",
+            is_available=True,
+            is_free_on_pacer=True,
+            page_count=17,
+            pacer_doc_id="17711118263",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
+
+    def test_can_get_court_from_docket_fetch(self):
+        """Can we retrieve the court ID from fetch queue to buy Dockets?"""
+        # Fetch queue with a Docket object.
+        fq_docket = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.DOCKET,
+            docket=self.docket,
+        )
+        self.assertEqual(
+            get_court_id_from_fetch_queue(fq_docket), self.court.pk
+        )
+
+        # Fetch queue with Court and docket_number.
+        fq_court_docket_number_pair = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.DOCKET,
+            court=self.court,
+            docket_number=self.docket.docket_number,
+        )
+        self.assertEqual(
+            get_court_id_from_fetch_queue(fq_court_docket_number_pair),
+            self.court.pk,
+        )
+
+        # Fetch queue with Court and pacer_case_id pair.
+        fq_court_pacer_case_id_pair = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.DOCKET,
+            court=self.court,
+            pacer_case_id=self.docket.pacer_case_id,
+        )
+        self.assertEqual(
+            get_court_id_from_fetch_queue(fq_court_pacer_case_id_pair),
+            self.court.pk,
+        )
+
+    def test_can_get_court_from_attachment_fetch(self):
+        """Can we retrieve the court ID from a queue to purchase Att. pages?"""
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=self.rd.pk,
+        )
+        self.assertEqual(get_court_id_from_fetch_queue(fq), self.court.pk)
+
+    def test_can_get_court_from_pdf_fetch(self):
+        """Can we retrieve the court ID from a queue to purchase PDFs?"""
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=self.rd.pk,
+        )
+        self.assertEqual(get_court_id_from_fetch_queue(fq), self.court.pk)
 
 
 @mock.patch("cl.recap.views.process_recap_upload")
