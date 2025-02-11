@@ -100,6 +100,7 @@ from cl.recap.models import (
     PacerHtmlFiles,
     ProcessingQueue,
 )
+from cl.recap.utils import get_court_id_from_fetch_queue
 from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import index_docket_parties_in_es
@@ -159,10 +160,17 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     result = None
     if fq.request_type == REQUEST_TYPE.DOCKET:
         # Request by docket_id
-        c = chain(
-            fetch_docket.si(fq.pk),
-            mark_fq_successful.si(fq.pk),
-        )
+        court_id = get_court_id_from_fetch_queue(fq)
+        if is_appellate_court(court_id):
+            c = chain(
+                fetch_appellate_docket.si(fq.pk),
+                mark_fq_successful.si(fq.pk),
+            )
+        else:
+            c = chain(
+                fetch_docket.si(fq.pk),
+                mark_fq_successful.si(fq.pk),
+            )
         result = c.apply_async()
     elif fq.request_type == REQUEST_TYPE.PDF:
         # Request by recap_document_id

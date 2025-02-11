@@ -111,6 +111,7 @@ from cl.recap.tasks import (
     create_or_merge_from_idb_chunk,
     do_pacer_fetch,
     download_pacer_pdf_by_rd,
+    fetch_appellate_docket,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
     process_recap_acms_appellate_attachment,
@@ -2312,6 +2313,15 @@ class RecapDocketFetchApiTest(TestCase):
         cls.docket_alert = DocketAlertFactory(
             docket=cls.docket, user=cls.user_profile.user
         )
+        cls.appellate_court = CourtFactory(
+            id="ca1", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        cls.appellate_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.appellate_court,
+            docket_number=fakes.DOCKET_NUMBER,
+            case_name=fakes.CASE_NAME,
+        )
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -2365,6 +2375,75 @@ class RecapDocketFetchApiTest(TestCase):
         result.get()
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(rds.count(), 1)
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.AppellateDocketReport",
+        new=fakes.FakeAppellateDocketReport,
+    )
+    @mock.patch(
+        "cl.recap.tasks.fetch_appellate_docket", wraps=fetch_appellate_docket
+    )
+    def test_fetch_appellate_docket_by_docket_id(
+        self,
+        mock_fetch_appellate_docket,
+        mock_court_accessible,
+        mock_cookies,
+    ):
+        # Create a PacerFetchQueue entry for an appellate docket request.
+        fq = PacerFetchQueue.objects.create(
+            user=self.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            docket_id=self.appellate_docket.pk,
+        )
+        result = do_pacer_fetch(fq)
+        result.get()
+
+        # Refresh the fetch queue entry from the database to get the updated
+        # status.
+        fq.refresh_from_db()
+        # Assert that the fetch queue entry was successfully processed.
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+        # Assert that the fetch_appellate_docket task was called once with the
+        # correct fetch queue ID.
+        mock_fetch_appellate_docket.si.assert_called_once_with(fq.pk)
+
+        # Assert that a RECAPDocument was created.
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(rds.count(), 1)
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.AppellateDocketReport",
+        new=fakes.FakeAppellateDocketReport,
+    )
+    @mock.patch(
+        "cl.recap.tasks.fetch_appellate_docket", wraps=fetch_appellate_docket
+    )
+    def test_fetch_appellate_docket_by_docket_number(
+        self, mock_fetch_appellate_docket, mock_court_accessible, mock_cookies
+    ) -> None:
+        fq = PacerFetchQueue.objects.create(
+            user=self.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.appellate_court.pk,
+            docket_number=self.appellate_docket.docket_number,
+        )
+        result = do_pacer_fetch(fq)
+        result.get()
+
+        # Refresh the fetch queue entry from the database to get the updated
+        # status.
+        fq.refresh_from_db()
+        self.assertEqual(fq.docket, self.appellate_docket)
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+        # Assert that the fetch_appellate_docket task was called once with the
+        # correct fetch queue ID.
+        mock_fetch_appellate_docket.si.assert_called_once_with(fq.pk)
+
+        # Assert that a RECAPDocument was created.
         rds = RECAPDocument.objects.all()
         self.assertEqual(rds.count(), 1)
 
