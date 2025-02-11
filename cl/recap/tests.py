@@ -161,7 +161,7 @@ class RecapUtilsTest(TestCase):
         self.court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
         self.docket = DocketFactory(
             source=Docket.RECAP,
-            court=self.district_court,
+            court=self.court,
             docket_number="23-4567",
             pacer_case_id="104490",
         )
@@ -2485,7 +2485,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            f"Invalid court id: {self.court_federal_special.pk}",
+            f"Purchases from court {self.court_federal_special.pk} are not supported.",
         )
 
         # checks the provided court when users send a pacer_case_id-court pair
@@ -2542,7 +2542,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            f"Invalid court id: {self.court_federal_special.pk}",
+            f"Purchases from court {self.court_federal_special.pk} are not supported.",
         )
 
     def test_key_serialization_with_client_code(self, mock) -> None:

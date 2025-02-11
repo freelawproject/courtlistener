@@ -12,6 +12,7 @@ from cl.recap.models import (
     PacerFetchQueue,
     ProcessingQueue,
 )
+from cl.recap.utils import get_court_id_from_fetch_queue
 from cl.search.models import Court, Docket, RECAPDocument
 
 
@@ -291,25 +292,6 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                         "and PDF fetches."
                     )
 
-        # Is it a good court value?
-        valid_court_ids = Court.federal_courts.all_pacer_courts()
-        if (
-            attrs.get("court")
-            or attrs.get("docket")
-            or attrs.get("recap_document")
-        ):
-            if attrs.get("recap_document"):
-                rd = attrs["recap_document"]
-                court_id = rd.docket_entry.docket.court_id
-            else:
-                court_id = (
-                    attrs["court"].pk
-                    if attrs.get("court")
-                    else attrs["docket"].court_id
-                )
-            if not valid_court_ids.filter(pk=court_id).exists():
-                raise ValidationError(f"Invalid court id: {court_id}")
-
         # Docket validations
         if attrs.get("pacer_case_id") and not attrs.get("court"):
             # If a pacer_case_id is included, is a court also?
@@ -341,6 +323,18 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 "parties, you must also request showing parties and counsel "
                 "generally."
             )
+
+        # Is it a good court value?
+        valid_court_ids = Court.federal_courts.all_pacer_courts()
+        court_id = get_court_id_from_fetch_queue(attrs)
+        if not valid_court_ids.filter(pk=court_id).exists():
+            if attrs.get("court"):
+                error_message = (f"Invalid court id: {court_id}",)
+            else:
+                error_message = (
+                    f"Purchases from court {court_id} are not supported"
+                )
+            raise ValidationError(error_message)
 
         # PDF validations
         if attrs["request_type"] == REQUEST_TYPE.PDF:
