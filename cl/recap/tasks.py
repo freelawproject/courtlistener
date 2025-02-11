@@ -47,6 +47,7 @@ from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
     download_pdf_by_magic_number,
+    get_appellate_docket_by_docket_number,
     get_att_report_by_rd,
     get_document_number_for_appellate,
     is_docket_entry_sealed,
@@ -2243,6 +2244,26 @@ def get_fq_docket_kwargs(fq):
     }
 
 
+def get_fq_appellate_docket_kwargs(fq: PacerFetchQueue):
+    """Gather the kwargs for the Juriscraper AppellateDocketReport from the fq
+    object
+
+    :param fq: The PacerFetchQueue object
+    :return: A dict of the kwargs we can send to the DocketReport
+    """
+    return {
+        "show_docket_entries": True,
+        "show_orig_docket": True,
+        "show_prior_cases": True,
+        "show_associated_cases": fq.show_list_of_member_cases,
+        "show_panel_info": True,
+        "show_party_atty_info": fq.show_parties_and_counsel,
+        "show_caption": True,
+        "date_start": fq.de_date_start,
+        "date_end": fq.de_date_end,
+    }
+
+
 def fetch_pacer_case_id_and_title(s, fq, court_id):
     """Use PACER's hidden API to learn the pacer_case_id of a case
 
@@ -2298,6 +2319,89 @@ def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
     }
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(PacerLoginException, RedisConnectionError),
+    max_retries=5,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
+def fetch_appellate_docket(self, fq_pk):
+    """Fetches an appellate docket from PACER using the docket number
+    associated with the provided Fetch Queue record to attempt the purchase.
+
+    :param fq_pk: The PK of the Fetch Queue to update.
+    :return: None
+    """
+    fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    court_id = fq.court_id or getattr(fq.docket, "court_id", None)
+
+    # Check court connectivity, if fails retry the task, hopefully, it'll be
+    # retried in a different not blocked node
+    if not is_pacer_court_accessible(court_id):
+        if self.request.retries == self.max_retries:
+            msg = f"Blocked by court: {court_id}"
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        raise self.retry()
+
+    async_to_sync(mark_pq_status)(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+
+    session_data = get_pacer_cookie_from_cache(fq.user_id)
+    if session_data is None:
+        msg = f"Cookie cache expired before task could run for user: {fq.user_id}"
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return None
+
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
+
+    docket_number = fq.docket_number or getattr(
+        fq.docket, "docket_number", None
+    )
+    start_time = now()
+    try:
+        result = get_appellate_docket_by_docket_number(
+            docket_number=docket_number,
+            court_id=map_cl_to_pacer_id(court_id),
+            session_data=s,
+            **get_fq_appellate_docket_kwargs(fq),
+        )
+    except (requests.RequestException, ReadTimeoutError) as exc:
+        msg = "Network error while purchasing docket for fq: %s."
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        mark_fq_status(
+            fq, f"{msg}Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
+        raise self.retry(exc=exc)
+    except ParsingException:
+        msg = "Unable to purchase docket for fq: %s."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return None
+
+    content_updated = result["content_updated"]
+    d_pk = result["docket_pk"]
+    if content_updated:
+        newly_enqueued = enqueue_docket_alert(d_pk)
+        if newly_enqueued:
+            send_alert_and_webhook(d_pk, start_time)
+
+    # Link docket to fq if not previously linked
+    if not fq.docket_id:
+        fq.docket_id = d_pk
+        fq.save()
+
+    return result
 
 
 @app.task(
