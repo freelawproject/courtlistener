@@ -1196,18 +1196,18 @@ files = [
 
 [[package]]
 name = "django-permissions-policy"
-version = "4.22.0"
-description = "Set the draft security HTTP header Permissions-Policy (previously Feature-Policy) on your Django app."
+version = "4.25.0"
+description = "Set the Permissions-Policy HTTP header on your Django app."
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "django_permissions_policy-4.22.0-py3-none-any.whl", hash = "sha256:b8b9034f2e1b59a8ab5b701cb4000f5b3bff1445bc56347c94b3fa4e20794618"},
-    {file = "django_permissions_policy-4.22.0.tar.gz", hash = "sha256:a65aeeeca0673f8820b1d94490677f1f8a4c0bf28253e189142fc7b175e131dd"},
+    {file = "django_permissions_policy-4.25.0-py3-none-any.whl", hash = "sha256:083a411c31964dd06c9aec4058147dda46bc1c3e04a799cbae7603578d979944"},
+    {file = "django_permissions_policy-4.25.0.tar.gz", hash = "sha256:2757397fb6299e187ef146809a047b636584e7431527255615752db6dc2e94f7"},
 ]
 
 [package.dependencies]
 asgiref = ">=3.6"
-django = ">=3.2"
+django = ">=4.2"
 
 [[package]]
 name = "django-pghistory"
@@ -5729,4 +5729,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.13, <3.14"
-content-hash = "50557c415b4d3adc116f4616ac2b2ec89ce9fbd16aef1d69a442be184966a625"
+content-hash = "cae62558b9d702868529929575404cbbbfe5907016b32f6db11266e5dd76e8ef"
