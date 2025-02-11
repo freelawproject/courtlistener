@@ -1440,16 +1440,6 @@ docs = ["mkdocs (>=0.11.1)"]
 tests = ["Django (>=1.6)", "djangorestframework (>=2.4.3)", "flake8", "pytest", "pytest-django"]
 
 [[package]]
-name = "docopt"
-version = "0.6.2"
-description = "Pythonic argument parser, that will make you smile"
-optional = false
-python-versions = "*"
-files = [
-    {file = "docopt-0.6.2.tar.gz", hash = "sha256:49b3a825280bd66b3aa83585ef59c4a8c82f2c8a522dbe754a8bc8d08c85c491"},
-]
-
-[[package]]
 name = "drf-dynamic-fields"
 version = "0.4.0"
 description = "Dynamically return subset of Django REST Framework serializer fields"
@@ -2090,29 +2080,27 @@ files = [
 
 [[package]]
 name = "internetarchive"
-version = "4.1.0"
+version = "5.2.0"
 description = "A Python interface to archive.org."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.9"
 files = [
-    {file = "internetarchive-4.1.0-py3-none-any.whl", hash = "sha256:0a0e30ade737f7be971b31c38b8c856867a316c5b1d646f055b2b1946aa9cb00"},
-    {file = "internetarchive-4.1.0.tar.gz", hash = "sha256:467188386218d2c77815ca798a51dd18310b326841113bb462b24ea9a71beedc"},
+    {file = "internetarchive-5.2.0-py3-none-any.whl", hash = "sha256:e8c46cc9a0ec7ba072970e6af90897a5e20db39ecb914b63ebdf95634ab57799"},
+    {file = "internetarchive-5.2.0.tar.gz", hash = "sha256:73aaffdb1e91bcb5ef4721822c92f5f3667e46c0721b93efee070de8ab6223e7"},
 ]
 
 [package.dependencies]
-docopt = ">=0.6.0,<0.7.0"
 jsonpatch = ">=0.4"
 requests = ">=2.25.0,<3.0.0"
-schema = ">=0.4.0"
 tqdm = ">=4.0.0"
 urllib3 = ">=1.26.0"
 
 [package.extras]
-all = ["black", "mypy", "pre-commit", "pytest", "pytest (==7.1.2)", "responses (==0.20.0)", "ruff (==0.0.269)", "safety", "setuptools", "tqdm-stubs (>=0.2.0)", "types-colorama", "types-docopt (>=0.6.10,<0.7.0)", "types-jsonpatch (>=0.1.0a0)", "types-pygments", "types-requests (>=2.25.0,<3.0.0)", "types-setuptools", "types-ujson (>=4.2.0)", "types-urllib3 (>=1.26.0)"]
+all = ["black", "mypy", "pre-commit", "pytest", "pytest (==7.1.2)", "responses (==0.20.0)", "ruff (==0.8.5)", "safety", "setuptools", "tqdm-stubs (>=0.2.0)", "types-colorama", "types-jsonpatch (>=0.1.0a0)", "types-pygments", "types-requests (>=2.25.0,<3.0.0)", "types-setuptools", "types-ujson (>=4.2.0)", "types-urllib3 (>=1.26.0)"]
 dev = ["black", "mypy", "pre-commit", "pytest", "safety", "setuptools"]
 docs = ["alabaster (==0.7.12)", "docutils (<0.18)", "sphinx (==4.5.0)", "sphinx-autodoc-typehints (==1.18.1)"]
-test = ["pytest (==7.1.2)", "responses (==0.20.0)", "ruff (==0.0.269)"]
-types = ["tqdm-stubs (>=0.2.0)", "types-colorama", "types-docopt (>=0.6.10,<0.7.0)", "types-jsonpatch (>=0.1.0a0)", "types-pygments", "types-requests (>=2.25.0,<3.0.0)", "types-setuptools", "types-ujson (>=4.2.0)", "types-urllib3 (>=1.26.0)"]
+test = ["pytest (==7.1.2)", "responses (==0.20.0)", "ruff (==0.8.5)"]
+types = ["tqdm-stubs (>=0.2.0)", "types-colorama", "types-jsonpatch (>=0.1.0a0)", "types-pygments", "types-requests (>=2.25.0,<3.0.0)", "types-setuptools", "types-ujson (>=4.2.0)", "types-urllib3 (>=1.26.0)"]
 
 [[package]]
 name = "ipaddress"
@@ -4362,17 +4350,6 @@ botocore = ">=1.33.2,<2.0a.0"
 crt = ["botocore[crt] (>=1.33.2,<2.0a.0)"]
 
 [[package]]
-name = "schema"
-version = "0.7.7"
-description = "Simple data validation library"
-optional = false
-python-versions = "*"
-files = [
-    {file = "schema-0.7.7-py2.py3-none-any.whl", hash = "sha256:5d976a5b50f36e74e2157b47097b60002bd4d42e65425fcc9c9befadb4255dde"},
-    {file = "schema-0.7.7.tar.gz", hash = "sha256:7da553abd2958a19dc2547c388cde53398b39196175a9be59ea1caf5ab0a1807"},
-]
-
-[[package]]
 name = "scikit-learn"
 version = "1.5.2"
 description = "A set of python modules for machine learning and data mining"
@@ -5729,4 +5706,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.13, <3.14"
-content-hash = "50557c415b4d3adc116f4616ac2b2ec89ce9fbd16aef1d69a442be184966a625"
+content-hash = "c9c1b77b68a2bc8419ba799fe2af82f83919da9eebfabda6e9c68e0b654be806"
