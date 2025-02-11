@@ -2081,6 +2081,123 @@ class ReplicateRecapUploadsTest(TestCase):
         att_html_created = PacerHtmlFiles.objects.all()
         self.assertEqual(att_html_created.count(), 1)
 
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_court_accessible",
+        side_effect=lambda a: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
+            MockResponse(
+                200,
+                b"pdf content",
+            ),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+    )
+    @mock.patch("cl.scrapers.tasks.extract_recap_pdf_base")
+    def test_replicate_subdocket_pdf_from_fq(
+        self,
+        mock_extract,
+        mock_get_pacer_cookie_from_cache,
+        mock_download_pacer_pdf_by_rd,
+        mock_court_accessible,
+    ):
+        """Can we replicate a PDF document from a fetch request to subdockets?"""
+
+        # Add the docket entry to every case.
+        dockets = [self.d_1, self.d_2, self.d_3]
+        for d in dockets:
+            async_to_sync(add_docket_entries)(
+                d, self.de_data_2["docket_entries"]
+            )
+
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )
+        d_3_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_3
+        )
+
+        main_d_1_rd = d_1_recap_document[0]
+        main_d_2_rd = d_2_recap_document[0]
+        main_d_3_rd = d_3_recap_document[0]
+
+        self.assertFalse(main_d_1_rd.is_available)
+        self.assertFalse(main_d_2_rd.is_available)
+        self.assertFalse(main_d_3_rd.is_available)
+
+        # Create an initial FQ.
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=main_d_2_rd.pk,
+        )
+
+        do_pacer_fetch(fq)
+
+        main_d_1_rd.refresh_from_db()
+        main_d_2_rd.refresh_from_db()
+        main_d_3_rd.refresh_from_db()
+
+        self.assertTrue(
+            main_d_2_rd.is_available,
+            msg="is_available value doesn't match 1",
+        )
+
+        self.assertTrue(
+            main_d_1_rd.is_available,
+            msg="is_available value doesn't match 2",
+        )
+        self.assertTrue(
+            main_d_3_rd.is_available,
+            msg="is_available value doesn't match 3",
+        )
+
+        self.assertTrue(main_d_1_rd.filepath_local)
+        self.assertTrue(main_d_2_rd.filepath_local)
+        self.assertTrue(main_d_3_rd.filepath_local)
+
+        # Assert the number of PQs created to process the additional subdocket RDs.
+        pqs_created = ProcessingQueue.objects.all()
+        self.assertEqual(
+            pqs_created.count(),
+            2,
+            msg="The number of PQs doesn't match.",
+        )
+
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        pqs_status = {pq.status for pq in pqs_created}
+        self.assertEqual(pqs_status, {PROCESSING_STATUS.SUCCESSFUL})
+
+        pqs_related_dockets = {pq.docket_id for pq in pqs_created}
+        self.assertEqual(
+            pqs_related_dockets,
+            {self.d_1.pk, self.d_3.pk},
+        )
+        pqs_related_docket_entries = {pq.docket_entry_id for pq in pqs_created}
+        self.assertEqual(
+            pqs_related_docket_entries,
+            {
+                main_d_1_rd.docket_entry.pk,
+                main_d_3_rd.docket_entry.pk,
+            },
+        )
+        pqs_related_rds = {pq.recap_document_id for pq in pqs_created}
+        self.assertEqual(
+            pqs_related_rds,
+            {main_d_1_rd.pk, main_d_3_rd.pk},
+        )
+        # Confirm that the 3 PDFs have been extracted.
+        self.assertEqual(mock_extract.call_count, 3)
+
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
 @mock.patch(
@@ -2452,8 +2569,10 @@ class RecapPdfFetchApiTest(TestCase):
         "cl.corpus_importer.tasks.is_appellate_court",
         wraps=is_appellate_court,
     )
+    @mock.patch("cl.scrapers.tasks.extract_recap_pdf_base")
     def test_fetch_unavailable_pdf_district(
         self,
+        mock_extract,
         mock_court_check,
         mock_download_method,
         mock_get_name,
@@ -2488,6 +2607,7 @@ class RecapPdfFetchApiTest(TestCase):
         self.rd.refresh_from_db()
         self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
         self.assertTrue(self.rd.is_available)
+        mock_extract.assert_called_once()
 
     @mock.patch(
         "cl.corpus_importer.tasks.FreeOpinionReport",

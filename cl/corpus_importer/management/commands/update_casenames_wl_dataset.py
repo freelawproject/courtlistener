@@ -52,7 +52,8 @@ DATE_FORMATS = (
 
 
 def tokenize_case_name(case_name: str) -> set[str]:
-    """Tokenizes case name and removes single-character words except for letters with periods.
+    """Tokenizes case name and removes single-character words except for
+    letters with periods.
 
     :param case_name: case name to tokenize
     :return: list of words
@@ -70,9 +71,9 @@ def tokenize_case_name(case_name: str) -> set[str]:
 def check_case_names_match(west_case_name: str, cl_case_name: str) -> bool:
     """Compare two case name and decide whether they are the same or not
 
-    Tokenize each string, capturing both words and abbreviations with periods and
-    convert all words to lowercase for case-insensitive matching and check if there is
-    an overlap between case names
+    Tokenize each string, capturing both words and abbreviations with periods
+    and convert all words to lowercase for case-insensitive matching and check
+    if there is an overlap between case names
 
     :param west_case_name: case name from csv
     :param cl_case_name: case name from cluster
@@ -129,14 +130,16 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
     """Validate citations with Eyecite.
 
     :param citation_strings: List of citation strings to validate.
-    :return: List of validated citation dictionaries with volume, reporter, and page.
+    :return: List of validated citation dictionaries with volume, reporter, and
+    page.
     """
     validated_citations = []
 
     for cite_str in citation_strings:
         # Get citations from the string
 
-        # We find all the citations that could match a cluster to update the case name
+        # We find all the citations that could match a cluster to update the
+        # case name
         found_cites = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
         if not found_cites:
             logger.info("Unable to parse %s", cite_str)
@@ -176,8 +179,8 @@ def query_possible_matches(
 ) -> QuerySet[Citation]:
     """Find matches for row data
 
-    It will remove duplicates, it could happen if we already have both citations, if we
-    have multiple matches, these must be unique
+    It will remove duplicates, it could happen if we already have both
+    citations, if we have multiple matches, these must be unique
 
     :param valid_citations: list of FullCaseCitation objects
     :param docket_number: cleaned docket number from row
@@ -206,11 +209,13 @@ def query_possible_matches(
 def update_matched_case_name(
     matched_cluster: OpinionCluster, west_case_name: str
 ) -> tuple[bool, bool]:
-    """Update case name of matched cluster and related docket if empty any of them
+    """Update case name of matched cluster and related docket if empty any of
+    them
 
     :param matched_cluster: OpinionCluster object
     :param west_case_name: case name from csv row
-    :return: tuple with boolean values if cluster and related docket case name updated
+    :return: tuple with boolean values if cluster and related docket case name
+    updated
     """
     cluster_case_name_updated = False
     docket_case_name_updated = False
@@ -259,7 +264,14 @@ def process_csv(
     # Generate rows to skip, excluding the header row
     skip_rows = list(range(1, start_row)) if start_row else None
 
-    df = pd.read_csv(filepath, skiprows=skip_rows, nrows=limit).dropna()
+    try:
+        df = pd.read_csv(filepath, skiprows=skip_rows, nrows=limit).dropna()
+    except UnicodeDecodeError:
+        # Some files can include western european characters that can't be
+        # decoded using utf-8 (like all kind of accents, cedille, eszett, etc)
+        df = pd.read_csv(
+            filepath, skiprows=skip_rows, nrows=limit, encoding="ISO-8859-1"
+        ).dropna()
 
     # Reset the index to start from 0 (needed if we pass skip_rows param)
     df.reset_index(drop=True, inplace=True)
@@ -386,7 +398,8 @@ def process_csv(
                     )
                     total_citations_added += 1
 
-            # Wait between each processed row to avoid sending to many indexing tasks
+            # Wait between each processed row to avoid sending to many
+            # indexing tasks
             time.sleep(delay)
 
     logger.info("Clusters updated: %s", total_clusters_updated)
@@ -395,12 +408,16 @@ def process_csv(
 
 
 class Command(BaseCommand):
-    help = "Match and compare case details from a CSV file with existing records in the database."
+    help = (
+        "Match and compare case details from a CSV file with existing "
+        "records in the database."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--filepath",
             type=str,
+            nargs="+",
             required=True,
             help="Path to the CSV file to process.",
         )
@@ -408,7 +425,8 @@ class Command(BaseCommand):
             "--delay",
             type=float,
             default=0.1,
-            help="How long to wait to update each opinion cluster (in seconds, allows floating numbers).",
+            help="How long to wait to update each opinion cluster (in "
+            "seconds, allows floating numbers).",
         )
         parser.add_argument(
             "--dry-run",
@@ -430,15 +448,17 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        filepath = options["filepath"]
+        files = options["filepath"]
         delay = options["delay"]
         dry_run = options["dry_run"]
         limit = options["limit"]
         start_row = options["start_row"]
 
-        if not filepath:
+        if not files:
             raise CommandError(
-                "Filepath is required. Use --filepath to specify the CSV file location."
+                "Filepath is required. Use --filepath to specify the CSV file "
+                "location."
             )
 
-        process_csv(filepath, delay, dry_run, limit, start_row)
+        for filepath in files:
+            process_csv(filepath, delay, dry_run, limit, start_row)
