@@ -14,7 +14,11 @@ from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 
-from cl.corpus_importer.utils import ais_appellate_court, mark_ia_upload_needed
+from cl.corpus_importer.utils import (
+    ais_appellate_court,
+    is_long_appellate_document_number,
+    mark_ia_upload_needed,
+)
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.model_helpers import clean_docket_number, make_docket_number_core
@@ -1846,6 +1850,16 @@ async def merge_attachment_page_data(
                     doc_id_params.pop("attachment_number", None)
                     del doc_id_params["document_type"]
                     doc_id_params["pacer_doc_id"] = attachment["pacer_doc_id"]
+                    if (
+                        court_is_appellate
+                        and is_long_appellate_document_number(document_number)
+                    ):
+                        # If this attachment page belongs to an appellate court
+                        # that doesn't use regular numbers, fallback to matching
+                        # the RD while omitting the document_number since it was likely scrambled
+                        # due to the bug described in:
+                        # https://github.com/freelawproject/courtlistener/issues/2877
+                        del doc_id_params["document_number"]
                     rd = await RECAPDocument.objects.aget(**doc_id_params)
                     if attachment["attachment_number"] == 0:
                         try:
@@ -1896,6 +1910,14 @@ async def merge_attachment_page_data(
             rd.description = attachment["description"]
         if attachment["pacer_doc_id"]:
             rd.pacer_doc_id = attachment["pacer_doc_id"]
+
+        if court_is_appellate and is_long_appellate_document_number(
+            document_number
+        ):
+            # If this attachment page belongs to an appellate court
+            # that doesn't use regular numbers, assign it from the pacer_doc_id
+            # to fix possible scrambled document_numbers.
+            rd.document_number = pacer_doc_id
 
         # Only set page_count and file_size if they're blank, in case
         # we got the real value by measuring.
