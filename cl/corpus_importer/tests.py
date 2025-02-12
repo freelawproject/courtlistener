@@ -92,6 +92,7 @@ from cl.people_db.lookup_utils import (
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.scrapers.models import PACERFreeDocumentRow
+from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -2810,6 +2811,93 @@ class ScrapeIqueryPagesTest(TestCase):
             f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
         )
         self.assertEqual(int(court_empty_attempts), 0)
+
+    @patch(
+        "cl.scrapers.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    def test_prevent_update_docket_info_iquery_from_triggering_sweeps(
+        self, mock_cookies
+    ):
+        """Confirm that update_latest_case_id_and_schedule_iquery_sweep is not
+        called by update_docket_info_iquery task.
+        """
+        # Connect handle_update_latest_case_id_and_schedule_iquery_sweep signal
+        # with a unique dispatch_uid for this test
+        test_dispatch_uid = (
+            "test_2_handle_update_latest_case_id_and_schedule_iquery_sweep"
+        )
+        post_save.connect(
+            handle_update_latest_case_id_and_schedule_iquery_sweep,
+            sender=Docket,
+            dispatch_uid=test_dispatch_uid,
+        )
+
+        with override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False):
+            docket_gand = DocketFactory(
+                court=self.court_gand,
+                source=Docket.RECAP,
+                case_name="GAND Docket",
+                docket_number="2:20-cv-00609",
+                pacer_case_id="8",
+            )
+
+            docket_cand = DocketFactory(
+                court=self.court_cand,
+                source=Docket.RECAP,
+                case_name="CAND Docket",
+                docket_number="2:20-cv-00606",
+                pacer_case_id="16",
+            )
+        try:
+            r = get_redis_interface("CACHE")
+            r.hset("iquery:highest_known_pacer_case_id", self.court_gand.pk, 5)
+            # Test case with IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
+            with override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
+            ), patch(
+                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                    *args, **kwargs
+                ),
+            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
+                execute=True
+            ), patch(
+                "cl.scrapers.tasks.get_or_cache_pacer_cookies"
+            ):
+                update_docket_info_iquery.apply_async(
+                    args=(docket_gand.pk, docket_gand.court_id)
+                )
+
+            # update_latest_case_id_and_schedule_iquery_sweep shouldn't be called.
+            self.assertEqual(mock_iquery_sweep.call_count, 0)
+
+            # Test case with IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
+            with override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
+            ), patch(
+                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                    *args, **kwargs
+                ),
+            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
+                execute=True
+            ), patch(
+                "cl.scrapers.tasks.get_or_cache_pacer_cookies"
+            ):
+                update_docket_info_iquery.apply_async(
+                    args=(docket_cand.pk, docket_cand.court_id)
+                )
+
+            # update_latest_case_id_and_schedule_iquery_sweep shouldn't be called.
+            self.assertEqual(mock_iquery_sweep.call_count, 0)
+        finally:
+            # Ensure the signal is disconnected after the test
+            post_save.disconnect(
+                handle_update_latest_case_id_and_schedule_iquery_sweep,
+                sender=Docket,
+                dispatch_uid=test_dispatch_uid,
+            )
 
 
 class WestCitationImportTest(TestCase):
