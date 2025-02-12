@@ -340,6 +340,34 @@ class CitationTextTest(SimpleTestCase):
              '<pre class="inline">asdf, </pre><span class="citation" data-id="'
              f'MATCH_ID"><a href="MATCH_URL" {aria_description}>Id.</a></span><pre class="inline">'
              ' Lorem ipsum dolor sit amet</pre>'),
+
+            # Annotate citation but also pin cite
+            ("""A clearance is the period of time, usually
+                                stipulated in license contracts, which must elapse
+                                between runs of the same feature within a particular area
+                                or in specified theatres.” United States v. Paramount
+                                Pictures, Inc., 334 U. S. 131, 144, n. 6 (1948).""",
+             f"""<pre class="inline">A clearance is the period of time, usually
+                                stipulated in license contracts, which must elapse
+                                between runs of the same feature within a particular area
+                                or in specified theatres.” United States v. Paramount
+                                Pictures, Inc., </pre><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" {aria_description}>334 U. S. 131</a></span><pre class="inline">, </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>144, n. 6</a></span><pre class="inline"> (1948).</pre>"""),
+
+            # Annotate citation but also pin cite with page range,
+            # we annotate using first page in pin cite
+            ("""Runs are successive exhibitions of a
+                    feature in a given area, first-run being the first
+                    exhibition in that area, second-run being the next
+                    subsequent, and so on . . . United States v. Paramount
+                    Pictures, Inc., 334 U. S. 131, 144-145, n. 6 (
+                    1948).""",
+             f"""<pre class="inline">Runs are successive exhibitions of a
+                    feature in a given area, first-run being the first
+                    exhibition in that area, second-run being the next
+                    subsequent, and so on . . . United States v. Paramount
+                    Pictures, Inc., </pre><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" {aria_description}>334 U. S. 131</a></span><pre class="inline">, </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>144-145, n. 6</a></span><pre class="inline"> (
+                    1948).</pre>"""),
+
         ]
 
         # fmt: on
@@ -597,42 +625,6 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
                     html="""<p>Its vast extent offered an <a class="page-label" data-label="573" href="#573" id="573">*573</a> ample field to the ambition and enterprise of all</p>""",
-                ),
-            ),
-        )
-
-        cls.citation7 = CitationWithParentsFactory.create(
-            volume="334",
-            reporter="U.S.",
-            page="131",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                date_filed=date(1948, 5, 3),
-                docket=DocketFactory(court=cls.court_scotus),
-                case_name="United States v. Paramount Pictures, Inc.",
-            ),
-        )
-
-        cls.citation8 = CitationWithParentsFactory.create(
-            volume="346",
-            reporter="U.S.",
-            page="537",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(),
-                case_name="Theatre Enterprises v. Paramount Film Distributing Corp.",
-                date_filed=date(1954, 1, 11),
-                sub_opinions=RelatedFactory(
-                    OpinionWithChildrenFactory,
-                    factory_related_name="cluster",
-                    xml_harvard="""<p>“Runs are successive exhibitions of a
-                    feature in a given area, first-run being the first
-                    exhibition in that area, second-run being the next
-                    subsequent, and so on . . . United States v. Paramount
-                    Pictures, Inc., 334 U. S. 131, 144-145, n. 6 (
-                    1948).</p><p>“A clearance is the period of time, usually
-                    stipulated in license contracts, which must elapse
-                    between runs of the same feature within a particular area
-                    or in specified theatres.” United States v. Paramount
-                    Pictures, Inc., 334 U. S. 131, 144, n. 6 (1948).</p>""",
                 ),
             ),
         )
@@ -1084,14 +1076,14 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             1,
         )
 
-    def test_find_pincites(self):
-        """Can we find pincites in opinions to link them later?"""
-        pincite1 = case_citation(
+    def test_find_pin_cites(self):
+        """Can we find pin cites in opinions to link them later?"""
+        pin_cite_1 = case_citation(
             volume="8",
             reporter="Wheat.",
             page="573",
         )
-        result, citation_found = es_search_db_for_full_citation(pincite1)
+        result, citation_found = es_search_db_for_full_citation(pin_cite_1)
 
         # Validate correct return type of es_search_db_for_full_citation
         self.assertIsInstance(result, list)
@@ -1100,22 +1092,22 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # Validate that we found a match
         self.assertTrue(
             citation_found,
-            msg="Something went wrong when finding the pincite.",
+            msg="Something went wrong when finding the pin cite.",
         )
 
         # Validate correct result type
         self.assertIsInstance(result[0], OpinionDocument)
 
-        # Validate that we matched the pincite to the correct cluster
+        # Validate that we matched the pin cite to the correct cluster
         self.assertEqual(result[0]["cluster_id"], self.citation6.cluster.id)
 
-        # Can we match the pincite when we have multiple opinions?
-        pincite2 = case_citation(
+        # Can we match the pin cite when we have multiple opinions in a cluster?
+        pin_cite_2 = case_citation(
             volume="9",
             reporter="Pet.",
             page="745",
         )
-        result, citation_found = es_search_db_for_full_citation(pincite2)
+        result, citation_found = es_search_db_for_full_citation(pin_cite_2)
 
         # Find the second opinion
         concurrence_opinion = Opinion.objects.get(
@@ -1132,33 +1124,8 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         )
         # Verify the correct matched cluster
         self.assertEqual(
-            result[0]["cluster_id"], self.cluster1.pk, "Matched wront cluster"
+            result[0]["cluster_id"], self.cluster1.pk, "Matched wrong cluster"
         )
-
-        # Verify that we can annotate pin cites correctly
-        opinion = Opinion.objects.get(cluster=self.citation8.cluster)
-        get_and_clean_opinion_text(opinion)
-        # Extract the citations from the opinion's text
-        citations = get_citations(
-            opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
-        )
-        citation_resolutions = do_resolve_citations(citations, opinion)
-
-        matched_opinion = Opinion.objects.get(cluster=self.citation7.cluster)
-
-        # Generate the citing opinion's new HTML with inline citation links
-        new_html = create_cited_html(opinion, citation_resolutions)
-
-        main_citation = f"""<span class="citation" data-id="{matched_opinion.pk}"><a href="/opinion/{self.citation7.cluster.pk}/united-states-v-paramount-pictures-inc/" aria-description="Citation for case: United States v. Paramount Pictures, Inc.">334 U. S. 131</a></span>"""
-        pincite_1 = f"""<span class="citation pin-cite" data-id="{matched_opinion.pk}"><a href="/opinion/{self.citation7.cluster.pk}/united-states-v-paramount-pictures-inc/#144" aria-description="Citation for case: United States v. Paramount Pictures, Inc.">144-145, n. 6</a></span>"""
-        pincite_2 = f""" <span class="citation pin-cite" data-id="{matched_opinion.pk}"><a href="/opinion/{self.citation7.cluster.pk}/united-states-v-paramount-pictures-inc/#144" aria-description="Citation for case: United States v. Paramount Pictures, Inc.">144, n. 6</a></span> (1948).</p>"""
-
-        # Verify that a citation without pin cite matches
-        self.assertIn(main_citation, new_html)
-        # Verify that a citation with pin cite with single page number matches
-        self.assertIn(pincite_1, new_html)
-        # Verify that a citation with pin cite with page range matches
-        self.assertIn(pincite_2, new_html)
 
 
 class CitationFeedTest(
