@@ -2948,7 +2948,7 @@ class ScrapeIqueryPagesTest(TestCase):
         docket_ids = get_docket_ids_missing_info(5)
         self.assertEqual(
             set(docket_ids),
-            {d_1.pk},
+            {d_1.pk, d_2.pk},
             msg="Wrong IDs returned by get_docket_ids_missing_info",
         )
 
