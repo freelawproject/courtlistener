@@ -317,14 +317,14 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
         if (
             attrs.get("pacer_case_id")
-            and is_appellate_court(attrs.get("court").pk)
             and not attrs.get("docket_number")
+            and is_appellate_court(attrs.get("court").pk)
         ):
             # The user is trying to purchase an appellate docket using only the
             # PACER case ID, which is not supported.
             raise ValidationError(
                 "Purchases of appellate dockets using a PACER case ID are not "
-                "currently supported."
+                "currently supported. Please use the docket number instead."
             )
 
         if attrs.get("show_terminated_parties") and not attrs.get(

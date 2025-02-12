@@ -2562,7 +2562,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
             serialized_fq.errors["non_field_errors"][0],
             (
                 "Purchases of appellate dockets using a PACER case ID are not "
-                "currently supported."
+                "currently supported. Please use the docket number instead."
             ),
         )
 
