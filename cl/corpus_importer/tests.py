@@ -1,26 +1,23 @@
 import json
-import os
-import time
-from datetime import date, datetime, timezone
-from pathlib import Path
-from queue import Queue
-from random import randint
-from unittest.mock import MagicMock, call, patch
+from datetime import date, datetime, timedelta
+from unittest.mock import call, patch
 
 import eyecite
 import pytest
-from asgiref.sync import async_to_sync
+import time_machine
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
 from django.test import override_settings
-from django.utils.timezone import make_aware, now
+from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
 
+from cl.alerts.factories import DocketAlertFactory
+from cl.alerts.models import DocketAlert
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
     CaseBodyFactory,
@@ -90,6 +87,11 @@ from cl.people_db.lookup_utils import (
     find_just_name,
 )
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
+from cl.recap.management.commands.pacer_iquery_scraper import (
+    get_docket_ids_docket_alerts,
+    get_docket_ids_missing_info,
+    get_docket_ids_week_ago_no_case_name,
+)
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.search.factories import (
@@ -113,6 +115,7 @@ from cl.search.models import (
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
+from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -2810,6 +2813,70 @@ class ScrapeIqueryPagesTest(TestCase):
             f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
         )
         self.assertEqual(int(court_empty_attempts), 0)
+
+    def test_pacer_iquery_scraper_queries(self, mock_cookies):
+        """Test pacer_iquery_scraper command queries."""
+
+        d_1 = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_canb,
+            pacer_case_id="12345",
+            date_filed=None,
+            date_terminated=None,
+            case_name="",
+        )
+        d_2 = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_canb,
+            pacer_case_id="12346",
+            date_filed=None,
+            date_terminated=date(2018, 11, 4),
+            case_name="",
+        )
+        two_weeks_ago = now() - timedelta(days=14)
+        with time_machine.travel(two_weeks_ago, tick=False):
+            d_3 = DocketFactory(
+                source=Docket.RECAP,
+                court=self.court_canb,
+                pacer_case_id="12346",
+                date_filed=date(2018, 11, 4),
+                date_terminated=None,
+                case_name="",
+            )
+
+        user_profile = UserProfileWithParentsFactory()
+        DocketAlertFactory(
+            docket=d_2,
+            user=user_profile.user,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        DocketAlertFactory(
+            docket=d_3,
+            user=user_profile.user,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+
+        # Confirm queries return the expected docket IDs
+        docket_ids = get_docket_ids_missing_info(5)
+        self.assertEqual(
+            set(docket_ids),
+            {d_1.pk},
+            msg="Wrong IDs returned by get_docket_ids_missing_info",
+        )
+
+        docket_ids_alerts = get_docket_ids_docket_alerts()
+        self.assertEqual(
+            set(docket_ids_alerts),
+            {d_3.pk},
+            msg="Wrong IDs returned by get_docket_ids_docket_alerts",
+        )
+
+        docket_ids_no_case_name = get_docket_ids_week_ago_no_case_name()
+        self.assertEqual(
+            set(docket_ids_no_case_name),
+            {d_1.pk, d_2.pk},
+            msg="Wrong IDs returned by get_docket_ids_week_ago_no_case_name",
+        )
 
 
 class WestCitationImportTest(TestCase):
