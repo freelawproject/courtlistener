@@ -443,4 +443,5 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
         report.response.text,
         d,
         tag_names=None,
+        avoid_trigger_signal=True,
     )
