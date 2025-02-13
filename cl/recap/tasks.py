@@ -2439,6 +2439,18 @@ def fetch_appellate_docket(self, fq_pk):
             fq, f"{msg}Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
         )
         raise self.retry(exc=exc)
+    except PacerLoginException as exc:
+        msg = (
+            f"PacerLoginException while getting pacer_case_id for fq: {fq_pk}."
+        )
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        mark_fq_status(
+            fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
+        raise self.retry(exc=exc)
     except ParsingException:
         msg = "Unable to purchase docket for fq: %s."
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
