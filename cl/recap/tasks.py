@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 from zipfile import ZipFile
 
 import requests
@@ -47,7 +47,6 @@ from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
     download_pdf_by_magic_number,
-    get_appellate_docket_by_docket_number,
     get_att_report_by_rd,
     get_document_number_for_appellate,
     is_docket_entry_sealed,
@@ -2290,21 +2289,22 @@ def fetch_pacer_case_id_and_title(s, fq, court_id):
     return {}
 
 
-def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
-    """Download the docket from PACER and merge it into CL
+def create_or_update_docket_data_from_fetch(
+    fq: PacerFetchQueue,
+    court_id: str,
+    pacer_case_id: str,
+    report: DocketReport | AppellateDocketReport,
+    docket_data: dict[str, Any],
+) -> dict[str, str | bool]:
+    """Creates or updates docket data in the database from fetched data.
 
-    :param session: A PacerSession object to work with
-    :param court_id: The CL ID of the court
-    :param pacer_case_id: The pacer_case_id of the docket, if known
-    :param fq: The PacerFetchQueue object
+    :param fq: The PacerFetchQueue record associated with this fetch.
+    :param court_id: The CL ID of the court.
+    :param pacer_case_id: The pacer_case_id of the docket
+    :param report: The BaseDocketReport object containing the fetched data.
+    :param docket_data: A dictionary containing the parsed docket data.
     :return: a dict with information about the docket and the new data
     """
-    report = DocketReport(map_cl_to_pacer_id(court_id), session)
-    report.query(pacer_case_id, **get_fq_docket_kwargs(fq))
-
-    docket_data = report.data
-    if not docket_data:
-        raise ParsingException("No data found in docket report.")
     if fq.docket_id:
         d = Docket.objects.get(pk=fq.docket_id)
     else:
@@ -2323,6 +2323,57 @@ def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
     }
+
+
+def fetch_docket_by_pacer_case_id(
+    session: SessionData,
+    court_id: str,
+    pacer_case_id: str,
+    fq: PacerFetchQueue,
+) -> dict[str, int | bool]:
+    """Download the docket from PACER and merge it into CL
+
+    :param session: A PacerSession object to work with
+    :param court_id: The CL ID of the court
+    :param pacer_case_id: The pacer_case_id of the docket, if known
+    :param fq: The PacerFetchQueue object
+    :return: a dict with information about the docket and the new data
+    """
+    report = DocketReport(map_cl_to_pacer_id(court_id), session)
+    report.query(pacer_case_id, **get_fq_docket_kwargs(fq))
+
+    docket_data = report.data
+    if not docket_data:
+        raise ParsingException("No data found in docket report.")
+    return create_or_update_docket_data_from_fetch(
+        fq, court_id, pacer_case_id, report, docket_data
+    )
+
+
+def purchase_appellate_docket_by_docket_number(
+    session: SessionData,
+    court_id: str,
+    docket_number: str,
+    fq: PacerFetchQueue,
+    **kwargs,
+) -> dict[str, int | bool]:
+    """Purchases and processes an appellate docket from PACER by docket number.
+
+    :param session: A PacerSession object to work with
+    :param court_id: The CL ID of the court
+    :param docket_number: The docket number of the appellate case.
+    :param fq: The PacerFetchQueue object
+    :return: a dict with information about the docket and the new data
+    """
+    report = AppellateDocketReport(map_cl_to_pacer_id(court_id), session)
+    report.query(docket_number, **kwargs)
+
+    docket_data = report.data
+    if not docket_data:
+        raise ParsingException("No data found in docket report.")
+    return create_or_update_docket_data_from_fetch(
+        fq, court_id, None, report, docket_data
+    )
 
 
 @app.task(
@@ -2371,10 +2422,11 @@ def fetch_appellate_docket(self, fq_pk):
     )
     start_time = now()
     try:
-        result = get_appellate_docket_by_docket_number(
+        result = purchase_appellate_docket_by_docket_number(
+            session=s,
+            court_id=court_id,
             docket_number=docket_number,
-            court_id=map_cl_to_pacer_id(court_id),
-            session_data=s,
+            fq=fq,
             **get_fq_appellate_docket_kwargs(fq),
         )
     except (requests.RequestException, ReadTimeoutError) as exc:

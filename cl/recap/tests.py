@@ -2379,7 +2379,7 @@ class RecapDocketFetchApiTest(TestCase):
         self.assertEqual(rds.count(), 1)
 
     @mock.patch(
-        "cl.corpus_importer.tasks.AppellateDocketReport",
+        "cl.recap.tasks.AppellateDocketReport",
         new=fakes.FakeAppellateDocketReport,
     )
     @mock.patch(
@@ -2415,7 +2415,7 @@ class RecapDocketFetchApiTest(TestCase):
         self.assertEqual(rds.count(), 1)
 
     @mock.patch(
-        "cl.corpus_importer.tasks.AppellateDocketReport",
+        "cl.recap.tasks.AppellateDocketReport",
         new=fakes.FakeAppellateDocketReport,
     )
     @mock.patch(
