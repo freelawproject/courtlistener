@@ -1,7 +1,6 @@
 import random
 import re
 from datetime import datetime, timedelta
-from typing import Set
 
 import pytz
 import requests
@@ -11,14 +10,18 @@ from requests import RequestException
 from simplejson import JSONDecodeError
 
 from cl.alerts.models import DocketAlert
-from cl.favorites.models import DocketTag, Note
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.models import Court, Docket
 
 
-def get_docket_ids_missing_info(num_to_get: int) -> Set[int]:
+def get_docket_ids_missing_info(num_to_get: int) -> set[int]:
+    """Retrieve a set of docket IDs for RECAP dockets where date_filed is null.
+
+    :param num_to_get: Number of docket IDs to retrieve.
+    :return: A set of docket IDs matching the query.
+    """
     return set(
         Docket.objects.filter(
             date_filed__isnull=True,
@@ -34,7 +37,47 @@ def get_docket_ids_missing_info(num_to_get: int) -> Set[int]:
     )
 
 
-def get_docket_ids() -> Set[int]:
+def get_docket_ids_docket_alerts() -> set[int]:
+    """Retrieve a set of docket IDs for active subscription docket alerts
+    related to non-terminated dockets.
+
+    :return: A set of docket IDs matching the query.
+    """
+
+    return set(
+        DocketAlert.objects.filter(
+            alert_type=DocketAlert.SUBSCRIPTION, docket__date_terminated=None
+        )
+        .select_related("docket")
+        .distinct("docket")
+        .values_list("docket_id", flat=True)
+    )
+
+
+def get_docket_ids_week_ago_no_case_name() -> set[int]:
+    """Retrieve a set of RECAP docket IDs created or modified within the
+    last week with an empty case name.
+
+    :return: A set of docket IDs matching the criteria.
+    """
+    one_week_ago = datetime.today() - timedelta(days=7)
+    return set(
+        Docket.objects.filter(
+            Q(date_created__gt=one_week_ago)
+            | Q(date_modified__gt=one_week_ago),
+            case_name="",
+            source__in=Docket.RECAP_SOURCES(),
+            court__jurisdiction__in=[
+                Court.FEDERAL_DISTRICT,
+                Court.FEDERAL_BANKRUPTCY,
+            ],
+        )
+        .exclude(pacer_case_id=None)
+        .values_list("pk", flat=True)
+    )
+
+
+def get_docket_ids() -> set[int]:
     """Get docket IDs to update via iquery
 
     :return: docket IDs for which we should crawl iquery
@@ -103,42 +146,11 @@ def get_docket_ids() -> Set[int]:
                 if match := re.search(r"^/docket/([0-9]+)/", url):
                     docket_ids.add(match.group(1))
 
-    # Add in docket IDs that have docket alerts, tags, or notes
-    docket_ids.update(
-        DocketAlert.objects.values_list("docket", flat=True)
-        .filter(alert_type=DocketAlert.SUBSCRIPTION)
-        .distinct("docket")
-    )
-    one_year_ago = datetime.today() - timedelta(days=365)
-    docket_ids.update(
-        Note.objects.exclude(docket_id=None)
-        .filter(
-            Q(date_created__gt=one_year_ago)
-            | Q(date_modified__gt=one_year_ago)
-        )
-        .distinct("docket_id")
-        .values_list("docket_id", flat=True)
-    )
-    docket_ids.update(
-        DocketTag.objects.distinct("docket_id").values_list(
-            "docket_id", flat=True
-        )
-    )
-    one_week_ago = datetime.today() - timedelta(days=7)
-    docket_ids.update(
-        Docket.objects.filter(
-            Q(date_created__gt=one_week_ago)
-            | Q(date_modified__gt=one_week_ago),
-            case_name="",
-            source__in=Docket.RECAP_SOURCES(),
-            court__jurisdiction__in=[
-                Court.FEDERAL_DISTRICT,
-                Court.FEDERAL_BANKRUPTCY,
-            ],
-        )
-        .exclude(pacer_case_id=None)
-        .values_list("pk", flat=True)
-    )
+    # Add docket IDs that have docket alerts and have not been terminated.
+    docket_ids.update(get_docket_ids_docket_alerts())
+
+    # Dockets with no case_name created or modified last week.
+    docket_ids.update(get_docket_ids_week_ago_no_case_name())
     return docket_ids
 
 
