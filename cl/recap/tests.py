@@ -2566,6 +2566,75 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
             ),
         )
 
+    def test_appellate_docket_validate_de_number_filter(self, mock):
+        appellate_docket = DocketFactory(
+            court=self.court_appellate, docket_number="25-1001"
+        )
+
+        # Test case 1: Filtering by de_number_start and send docket_id.
+        self.fetch_attributes["docket"] = appellate_docket.pk
+        self.fetch_attributes.update({"de_number_start": "2"})
+
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Docket entry filtering by number is not supported for "
+                "appellate courts. Use date range filtering with "
+                "'de_date_start' and 'de_date_end' instead."
+            ),
+        )
+
+        # Test case 2: Filtering by de_number_end and send
+        # docket_number-court pair.
+        del self.fetch_attributes["docket"]
+        del self.fetch_attributes["de_number_start"]
+        self.fetch_attributes.update(
+            {
+                "de_number_end": "20",
+                "docket_number": appellate_docket.docket_number,
+                "court": self.court_appellate.pk,
+            }
+        )
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Docket entry filtering by number is not supported for "
+                "appellate courts. Use date range filtering with "
+                "'de_date_start' and 'de_date_end' instead."
+            ),
+        )
+
+        # Test case 3: Filtering by both de_number_start and de_number_end
+        # sending docket_id.
+        del self.fetch_attributes["docket_number"]
+        del self.fetch_attributes["court"]
+        self.fetch_attributes.update(
+            {"docket": appellate_docket.pk, "de_number_start": 2}
+        )
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Docket entry filtering by number is not supported for "
+                "appellate courts. Use date range filtering with "
+                "'de_date_start' and 'de_date_end' instead."
+            ),
+        )
+
     def test_recap_fetch_validate_court(self, mock):
         """Can we properly validate the court_id?"""
 

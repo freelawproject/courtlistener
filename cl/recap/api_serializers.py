@@ -327,6 +327,16 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 "currently supported. Please use the docket number instead."
             )
 
+        court_id = get_court_id_from_fetch_queue(attrs)
+        if (
+            attrs.get("de_number_end") or attrs.get("de_number_start")
+        ) and is_appellate_court(court_id):
+            raise ValidationError(
+                "Docket entry filtering by number is not supported for "
+                "appellate courts. Use date range filtering with "
+                "'de_date_start' and 'de_date_end' instead."
+            )
+
         if attrs.get("show_terminated_parties") and not attrs.get(
             "show_parties_and_counsel"
         ):
@@ -339,7 +349,6 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
         # Is it a good court value?
         valid_court_ids = Court.federal_courts.all_pacer_courts()
-        court_id = get_court_id_from_fetch_queue(attrs)
         if not valid_court_ids.filter(pk=court_id).exists():
             if attrs.get("court"):
                 error_message = (f"Invalid court id: {court_id}",)
