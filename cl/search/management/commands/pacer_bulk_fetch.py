@@ -1,7 +1,6 @@
-import logging
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from celery import chain
 from django.contrib.auth.models import User
@@ -12,14 +11,12 @@ from django.utils import timezone
 
 from cl import settings
 from cl.lib.celery_utils import CeleryThrottle
-from cl.lib.command_utils import VerboseCommand
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import PROCESSING_STATUS, REQUEST_TYPE, PacerFetchQueue
 from cl.recap.tasks import fetch_pacer_doc_by_rd, mark_fq_successful
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, RECAPDocument
-
-logger = logging.getLogger(__name__)
 
 
 def append_value_in_cache(key, value):
@@ -38,10 +35,9 @@ class Command(VerboseCommand):
         super().__init__(*args, **kwargs)
         self.options = None
         self.user = None
-        self.recap_documents = None
+        self.recap_documents = []
         self.courts_with_docs = {}
         self.total_launched = 0
-        self.total_errors = 0
         self.max_retries = 5
         self.pacer_username = os.environ.get(
             "PACER_USERNAME", settings.PACER_USERNAME
@@ -64,7 +60,6 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--min-page-count",
             type=int,
-            required=True,
             help="Get docs with this number of pages or more",
         )
         parser.add_argument(
@@ -107,15 +102,6 @@ class Command(VerboseCommand):
     def timed_out_docs_cache_key():
         """Helper method to improve testability."""
         return "pacer_bulk_fetch.timed_out_docs"
-
-    @staticmethod
-    def setup_logging(testing: bool = False) -> None:
-        if not testing:
-            logging.basicConfig(
-                filename=f'pacer_bulk_fetch_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log',
-                level=logging.INFO,
-                format="%(asctime)s - %(levelname)s - %(message)s",
-            )
 
     def setup_celery(self) -> None:
         """Setup Celery by setting the queue_name and throttle."""
@@ -258,14 +244,8 @@ class Command(VerboseCommand):
 
         if remaining_courts[court_id]:
             doc = remaining_courts[court_id].pop(0)
-            try:
-                fq = self.enqueue_pacer_fetch(doc)
-                self.update_fetches_in_progress(court_id, fq.id)
-            except Exception as e:
-                self.total_errors += 1
-                logger.error(
-                    f"Error queuing document {doc.get('id')}: {str(e)}"
-                )
+            fq = self.enqueue_pacer_fetch(doc)
+            self.update_fetches_in_progress(court_id, fq.id)
 
         return False
 
@@ -360,11 +340,14 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options) -> None:
         self.options = options
-        self.setup_logging(self.options.get("testing", False))
         self.setup_celery()
         self.interval = self.options["interval"]
-
         stage = options["stage"]
+        if stage == "fetch" and options.get("min_page_count") is None:
+            raise CommandError(
+                "--min-page-count is required for --stage 'fetch'."
+            )
+
         if stage == "fetch":
             self.handle_fetch_docs()
         elif stage == "process":

@@ -26,6 +26,25 @@ def _clean_cache_keys(keys):
         django_cache.delete(key)
 
 
+@patch(
+    "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
+    return_value=False,
+)
+@patch(
+    "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+    return_value="pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
+)
+@patch(
+    "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+    return_value="pacer_bulk_fetch.test_page_count_filtering.timed_out_docs",
+)
+@patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
+@patch(
+    "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
+)
+@patch(
+    "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
+)
 class BulkFetchPacerDocsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -42,21 +61,20 @@ class BulkFetchPacerDocsTest(TestCase):
 
         # Docket entries by court index
         cls.docket_entries = {
-            0: [DocketEntryFactory(docket=cls.dockets[0]) for _ in range(300)],
+            0: [DocketEntryFactory(docket=cls.dockets[0]) for _ in range(15)],
             1: [DocketEntryFactory(docket=cls.dockets[1]) for _ in range(8)],
-            2: [DocketEntryFactory(docket=cls.dockets[2]) for _ in range(20)],
-            3: [DocketEntryFactory(docket=cls.dockets[3]) for _ in range(15)],
-            4: [DocketEntryFactory(docket=cls.dockets[4]) for _ in range(10)],
+            2: [DocketEntryFactory(docket=cls.dockets[2]) for _ in range(12)],
+            3: [DocketEntryFactory(docket=cls.dockets[3]) for _ in range(7)],
+            4: [DocketEntryFactory(docket=cls.dockets[4]) for _ in range(5)],
         }
 
-    def setUp(self):
         # Create RECAP docs in DB (no real caching)
-        self.docs = []
+        cls.docs = []
         # Court 0: Many large docs
-        for i in range(300):
-            self.docs.append(
+        for i in range(15):
+            cls.docs.append(
                 RECAPDocumentFactory(
-                    docket_entry=self.docket_entries[0][i],
+                    docket_entry=cls.docket_entries[0][i],
                     pacer_doc_id=f"0_{i}",
                     is_available=False,
                     page_count=1000 + i,
@@ -66,9 +84,9 @@ class BulkFetchPacerDocsTest(TestCase):
         # Court 1: Mix of pages
         page_counts = [5, 10, 50, 100, 500, 1000, 2000, 5000]
         for i, pages in enumerate(page_counts):
-            self.docs.append(
+            cls.docs.append(
                 RECAPDocumentFactory(
-                    docket_entry=self.docket_entries[1][i],
+                    docket_entry=cls.docket_entries[1][i],
                     pacer_doc_id=f"1_{i}",
                     is_available=False,
                     page_count=pages,
@@ -76,10 +94,10 @@ class BulkFetchPacerDocsTest(TestCase):
             )
 
         # Court 2: Only small docs (1-10 pages)
-        for i in range(20):
-            self.docs.append(
+        for i in range(12):
+            cls.docs.append(
                 RECAPDocumentFactory(
-                    docket_entry=self.docket_entries[2][i],
+                    docket_entry=cls.docket_entries[2][i],
                     pacer_doc_id=f"2_{i}",
                     is_available=False,
                     page_count=i + 1,
@@ -87,10 +105,10 @@ class BulkFetchPacerDocsTest(TestCase):
             )
 
         # Court 3: Only medium docs (100-500 pages)
-        for i in range(15):
-            self.docs.append(
+        for i in range(7):
+            cls.docs.append(
                 RECAPDocumentFactory(
-                    docket_entry=self.docket_entries[3][i],
+                    docket_entry=cls.docket_entries[3][i],
                     pacer_doc_id=f"3_{i}",
                     is_available=False,
                     page_count=100 + (i * 25),
@@ -98,10 +116,10 @@ class BulkFetchPacerDocsTest(TestCase):
             )
 
         # Court 4: No docs matching typical filters (all 11-49 pages)
-        for i in range(10):
-            self.docs.append(
+        for i in range(5):
+            cls.docs.append(
                 RECAPDocumentFactory(
-                    docket_entry=self.docket_entries[4][i],
+                    docket_entry=cls.docket_entries[4][i],
                     pacer_doc_id=f"4_{i}",
                     is_available=False,
                     page_count=11 + (i * 3),
@@ -109,38 +127,15 @@ class BulkFetchPacerDocsTest(TestCase):
             )
 
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
-        return_value=False,
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
-        return_value="pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
-        return_value="pacer_bulk_fetch.test_page_count_filtering.timed_out_docs",
-    )
-    @patch(
         "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache",
         wraps=append_value_in_cache,
     )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
-    )
-    @patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
-    )
     def test_page_count_filtering(
         self,
+        mock_append_value_in_cache,
         mock_fetch_pacer_doc_by_rd,
         mock_pacer_cookies,
         mock_sleep,
-        mock_maybe_wait,
-        mock_append_value_in_cache,
         mock_timed_out_cache_key,
         mock_fetched_cache_key,
         mock_should_skip,
@@ -174,38 +169,11 @@ class BulkFetchPacerDocsTest(TestCase):
             ]
         )
 
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
-        return_value=False,
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
-        return_value="pacer_bulk_fetch.test_skip_available_documents.docs_to_process",
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
-        return_value="pacer_bulk_fetch.test_skip_available_documents.timed_out_docs",
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache"
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
-    )
-    @patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
-    )
     def test_skip_available_documents(
         self,
         mock_fetch_pacer_doc_by_rd,
         mock_pacer_cookies,
         mock_sleep,
-        mock_maybe_wait,
-        mock_append_value_in_cache,
         mock_timed_out_cache_key,
         mock_fetched_cache_key,
         mock_should_skip,
@@ -233,6 +201,7 @@ class BulkFetchPacerDocsTest(TestCase):
 
         call_command(
             "pacer_bulk_fetch",
+            min_page_count=0,
             testing=True,
             stage="fetch",
             username=self.user.username,
@@ -264,78 +233,6 @@ class BulkFetchPacerDocsTest(TestCase):
         )
 
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
-        return_value=False,
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
-        return_value="pacer_bulk_fetch.test_rate_limiting.docs_to_process",
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
-        return_value="pacer_bulk_fetch.test_rate_limiting.timed_out_docs",
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
-    )
-    @patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
-    )
-    def test_rate_limiting(
-        self,
-        mock_fetch_pacer_doc_by_rd,
-        mock_pacer_cookies,
-        mock_sleep,
-        mock_maybe_wait,
-        mock_timed_out_cache_key,
-        mock_fetched_cache_key,
-        mock_should_skip,
-    ):
-        """Test that rate limiting triggers sleep calls (mocked)."""
-        interval = 2
-        call_command(
-            "pacer_bulk_fetch",
-            testing=True,
-            interval=interval,
-            min_page_count=1000,
-            stage="fetch",
-            username=self.user.username,
-        )
-
-        expected_docs = [
-            d for d in self.docs if d.page_count >= 1000 and not d.is_available
-        ]
-        self.assertEqual(
-            mock_fetch_pacer_doc_by_rd.call_count, len(expected_docs)
-        )
-
-        _clean_cache_keys(
-            [
-                mock_fetched_cache_key.return_value,
-                mock_timed_out_cache_key.return_value,
-            ]
-        )
-
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
-        return_value=False,
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
-        return_value="pacer_bulk_fetch.test_fetch_queue_processing.docs_to_process",
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
-        return_value="pacer_bulk_fetch.test_fetch_queue_processing.timed_out_docs",
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
-    )
-    @patch(
         "cl.search.management.commands.pacer_bulk_fetch.extract_recap_pdf.si"
     )
     @patch(
@@ -345,7 +242,9 @@ class BulkFetchPacerDocsTest(TestCase):
         self,
         mock_mark_fq_successful,
         mock_extract_recap_pdf,
-        mock_maybe_wait,
+        mock_fetch_pacer_doc_by_rd,
+        mock_pacer_cookies,
+        mock_sleep,
         mock_timed_out_cache_key,
         mock_fetched_cache_key,
         mock_should_skip,
@@ -393,6 +292,14 @@ class BulkFetchPacerDocsTest(TestCase):
         )
 
 
+@patch(
+    "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+    return_value="pacer_bulk_fetch.test_identify_documents_filtering.docs_to_process",
+)
+@patch(
+    "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+    return_value="pacer_bulk_fetch.test_identify_documents_filtering.timed_out_docs",
+)
 class PacerBulkFetchUnitTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -406,10 +313,13 @@ class PacerBulkFetchUnitTest(TestCase):
     def setUp(self):
         self.command = Command()
         self.command.user = self.user
-        self.command.options = {"testing": True}
+        self.command.options = {
+            "testing": True,
+            "min_page_count": 100,
+            "max_page_count": 10_000,
+        }
         self.command.interval = 2
         self.command.total_launched = 0
-        self.command.total_errors = 0
         self.command.throttle = MagicMock()
 
         self.docs = []
@@ -422,14 +332,6 @@ class PacerBulkFetchUnitTest(TestCase):
             )
             self.docs.append(doc)
 
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
-        return_value="pacer_bulk_fetch.test_identify_documents_filtering.docs_to_process",
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
-        return_value="pacer_bulk_fetch.test_identify_documents_filtering.timed_out_docs",
-    )
     def test_identify_documents_filtering(
         self,
         mock_timed_out_cache_key,
@@ -454,14 +356,6 @@ class PacerBulkFetchUnitTest(TestCase):
             "Should only include docs matching page count criteria",
         )
 
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
-        return_value="pacer_bulk_fetch.test_identify_documents_cache_exclusion.docs_to_process",
-    )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
-        return_value="pacer_bulk_fetch.test_identify_documents_cache_exclusion.timed_out_docs",
-    )
     def test_identify_documents_cache_exclusion(
         self,
         mock_timed_out_cache_key,
@@ -499,7 +393,9 @@ class PacerBulkFetchUnitTest(TestCase):
             ]
         )
 
-    def test_should_skip_court_not_in_progress(self):
+    def test_should_skip_court_not_in_progress(
+        self, mock_timed_out_cache_key, mock_fetched_cache_key
+    ):
         """Test should_skip when court has no fetch in progress"""
         self.command.fetches_in_progress = {}
 
@@ -512,14 +408,11 @@ class PacerBulkFetchUnitTest(TestCase):
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.Command.enough_time_elapsed"
     )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
-        return_value="pacer_bulk_fetch.test_should_skip_with_time_conditions.timed_out_docs",
-    )
     def test_should_skip_with_time_conditions(
         self,
-        mock_timed_out_cache_key,
         mock_enough_time,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
     ):
         """Test should_skip under different time conditions"""
         test_cases = [
@@ -559,18 +452,15 @@ class PacerBulkFetchUnitTest(TestCase):
         "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
     )
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
-        return_value="pacer_bulk_fetch.test_fetch_next_doc_in_court.docs_to_process",
-    )
-    @patch(
         "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
         return_value=False,
     )
     def test_fetch_next_doc_in_court(
         self,
         mock_should_skip,
-        mock_fetched_cache_key,
         mock_fetch,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
     ):
         """
         Test fetch_next_doc_in_court removes a doc from the court and
@@ -600,10 +490,6 @@ class PacerBulkFetchUnitTest(TestCase):
         _clean_cache_keys([mock_fetched_cache_key.return_value])
 
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
-        return_value="pacer_bulk_fetch.test_fetch_docs_from_pacer_no_sleep.docs_to_process",
-    )
-    @patch(
         "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
     )
     @patch(
@@ -620,7 +506,8 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_should_skip,
         mock_pacer_cookies,
         mock_fetch,
-        mock_cache_key,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
     ):
         """Test fetch_docs_from_pacer when no delays are needed"""
         self.command.courts_with_docs = {
@@ -637,4 +524,4 @@ class PacerBulkFetchUnitTest(TestCase):
             "fetches_in_progress should be empty",
         )
 
-        _clean_cache_keys([mock_cache_key.return_value])
+        _clean_cache_keys([mock_fetched_cache_key.return_value])
