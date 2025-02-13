@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from datetime import datetime, timedelta
 
@@ -42,8 +43,12 @@ class Command(VerboseCommand):
         self.total_launched = 0
         self.total_errors = 0
         self.max_retries = 5
-        self.pacer_username = None
-        self.pacer_password = None
+        self.pacer_username = os.environ.get(
+            "PACER_USERNAME", settings.PACER_USERNAME
+        )
+        self.pacer_password = os.environ.get(
+            "PACER_PASSWORD", settings.PACER_PASSWORD
+        )
         self.throttle = None
         self.queue_name = None
         self.interval = None
@@ -53,11 +58,13 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--interval",
             type=float,
+            default=2,
             help="The minimum wait in secs between PACER fetches to the same court.",
         )
         parser.add_argument(
             "--min-page-count",
             type=int,
+            required=True,
             help="Get docs with this number of pages or more",
         )
         parser.add_argument(
@@ -68,11 +75,13 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--username",
             type=str,
+            default="recap",
             help="Username to associate with the processing queues (defaults to 'recap')",
         )
         parser.add_argument(
             "--queue-name",
             type=str,
+            default="batch0",
             help="Celery queue name used for processing tasks",
         )
         parser.add_argument(
@@ -84,7 +93,7 @@ class Command(VerboseCommand):
             "--stage",
             type=str,
             choices=["fetch", "process"],
-            default="fetch",
+            required=True,
             help="Stage of the command to run: fetch or process",
         )
 
@@ -109,42 +118,25 @@ class Command(VerboseCommand):
 
     def setup_celery(self) -> None:
         """Setup Celery by setting the queue_name and throttle."""
-        self.queue_name = self.options.get("queue_name", "pacer_bulk_fetch")
+        self.queue_name = self.options["queue_name"]
         self.throttle = CeleryThrottle(queue_name=self.queue_name)
 
     def handle_pacer_session(self) -> None:
         """Make sure we have an active PACER session for the user."""
-        self.pacer_username = self.options.get(
-            "pacer_username", settings.PACER_USERNAME
-        )
-        self.pacer_password = self.options.get(
-            "pacer_password", settings.PACER_PASSWORD
-        )
         get_or_cache_pacer_cookies(
             self.user.pk,
             username=self.pacer_username,
             password=self.pacer_password,
         )
 
-    def set_user(self, username: str) -> None:
-        """Get user or raise CommandError"""
-        if not username:
-            raise CommandError(
-                "No username provided, cannot create PacerFetchQueues."
-            )
-        try:
-            self.user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            raise CommandError(f"User {username} does not exist")
-
     def identify_documents(self) -> None:
         """Get eligible documents grouped by court"""
         filters = [
             Q(pacer_doc_id__isnull=False),
             Q(is_available=False),
+            Q(page_count__gte=self.options["min_page_count"]),
         ]
-        if self.options.get("min_page_count"):
-            filters.append(Q(page_count__gte=self.options["min_page_count"]))
+
         if self.options.get("max_page_count"):
             filters.append(Q(page_count__lte=self.options["max_page_count"]))
 
@@ -333,29 +325,23 @@ class Command(VerboseCommand):
     def handle_fetch_docs(self):
         """Run only the fetching stage."""
         logger.info("Starting fetch stage in pacer_bulk_fetch command.")
-        try:
-            self.set_user(self.options.get("username", "recap"))
-            self.identify_documents()
-            logger.info(
-                f"{self.user} found {len(self.recap_documents)} documents "
-                f"across {len(self.courts_with_docs)} courts."
-            )
+        self.user = User.objects.get(username=self.options["username"])
+        self.identify_documents()
+        logger.info(
+            f"{self.user} found {len(self.recap_documents)} documents "
+            f"across {len(self.courts_with_docs)} courts."
+        )
 
-            self.fetch_docs_from_pacer()
+        self.fetch_docs_from_pacer()
 
-            logger.info(
-                f"Created {self.total_launched} processing queues for a total "
-                f"of {len(self.recap_documents)} docs found."
-            )
-            logger.info(
-                f"The following PacerFetchQueues were retried too many times: "
-                f"{cache.get(self.timed_out_docs_cache_key(), [])}"
-            )
-        except Exception as e:
-            logger.error(
-                f"Fatal error in fetch stage: {str(e)}", exc_info=True
-            )
-            raise e
+        logger.info(
+            f"Created {self.total_launched} processing queues for a total "
+            f"of {len(self.recap_documents)} docs found."
+        )
+        logger.info(
+            f"The following PacerFetchQueues were retried too many times: "
+            f"{cache.get(self.timed_out_docs_cache_key(), [])}"
+        )
 
     def handle_process_docs(self):
         """Run only the processing stage."""
@@ -372,9 +358,9 @@ class Command(VerboseCommand):
         self.options = options
         self.setup_logging(self.options.get("testing", False))
         self.setup_celery()
-        self.interval = self.options.get("interval", 2)
+        self.interval = self.options["interval"]
 
-        stage = options.get("stage")
+        stage = options["stage"]
         if stage == "fetch":
             self.handle_fetch_docs()
         elif stage == "process":
