@@ -342,31 +342,13 @@ class CitationTextTest(SimpleTestCase):
              ' Lorem ipsum dolor sit amet</pre>'),
 
             # Annotate citation but also pin cite
-            ("""A clearance is the period of time, usually
-                                stipulated in license contracts, which must elapse
-                                between runs of the same feature within a particular area
-                                or in specified theatres.” United States v. Paramount
-                                Pictures, Inc., 334 U. S. 131, 144, n. 6 (1948).""",
-             f"""<pre class="inline">A clearance is the period of time, usually
-                                stipulated in license contracts, which must elapse
-                                between runs of the same feature within a particular area
-                                or in specified theatres.” United States v. Paramount
-                                Pictures, Inc., </pre><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" {aria_description}>334 U. S. 131</a></span><pre class="inline">, </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>144, n. 6</a></span><pre class="inline"> (1948).</pre>"""),
+            ('United States v. Paramount Pictures, Inc., 334 U. S. 131, 144, n. 6 (1948).',
+             f'<pre class="inline">United States v. Paramount Pictures, Inc., </pre><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" {aria_description}>334 U. S. 131</a></span><pre class="inline">, </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>144, n. 6</a></span><pre class="inline"> (1948).</pre>'),
 
             # Annotate citation but also pin cite with page range,
             # we annotate using first page in pin cite
-            ("""Runs are successive exhibitions of a
-                    feature in a given area, first-run being the first
-                    exhibition in that area, second-run being the next
-                    subsequent, and so on . . . United States v. Paramount
-                    Pictures, Inc., 334 U. S. 131, 144-145, n. 6 (
-                    1948).""",
-             f"""<pre class="inline">Runs are successive exhibitions of a
-                    feature in a given area, first-run being the first
-                    exhibition in that area, second-run being the next
-                    subsequent, and so on . . . United States v. Paramount
-                    Pictures, Inc., </pre><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" {aria_description}>334 U. S. 131</a></span><pre class="inline">, </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>144-145, n. 6</a></span><pre class="inline"> (
-                    1948).</pre>"""),
+            ('United States v. Paramount Pictures, Inc., 334 U. S. 131, 144-145, n. 6 (1948).',
+             f'<pre class="inline">United States v. Paramount Pictures, Inc., </pre><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" {aria_description}>334 U. S. 131</a></span><pre class="inline">, </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>144-145, n. 6</a></span><pre class="inline"> (1948).</pre>'),
 
         ]
 
@@ -624,26 +606,26 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
-                    html="""<p>Its vast extent offered an <a class="page-label" data-label="573" href="#573" id="573">*573</a> ample field to the ambition and enterprise of all</p>""",
+                    plain_text="Its vast extent offered an *573 ample field to the ambition and enterprise of all",
                 ),
             ),
         )
 
         # Cluster with citation
-        lead = """<p>Sample text</p>"""
-        concurrence = """<p>Sample text that includes a pincite <a class="page-label" data-label="745" href="#745" id="745">*745</a></p>"""
+        lead = "Sample text"
+        concurrence = "Sample text that includes a pin cite *745"
 
         cls.cluster1 = OpinionClusterFactoryMultipleOpinions(
             docket=DocketFactory(),
             sub_opinions__data=[
                 {
                     "type": "020lead",
-                    "html": lead,
+                    "plain_text": lead,
                     "author_str": "Foo",
                 },
                 {
                     "type": "030concurrence",
-                    "html": concurrence,
+                    "plain_text": concurrence,
                     "author_str": "Bar",
                 },
             ],
