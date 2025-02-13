@@ -132,6 +132,103 @@ def es_case_name_query(
     return new_response
 
 
+def es_search_db_for_partial_citation(
+    full_citation: FullCaseCitation,
+) -> tuple[list[Hit], bool]:
+    """Searches for partial citations in the database using Elasticsearch.
+
+    :param full_citation: Citation containing volume, reporter, and page.
+    :return: A list of matching opinion documents and a flag indicating if a
+    pin cite match was found.
+    """
+    if not hasattr(full_citation, "citing_opinion"):
+        full_citation.citing_opinion = None
+
+    search_query = OpinionDocument.search()
+
+    # Exclude self-citations
+    must_not = (
+        [Q("match", id=full_citation.citing_opinion.pk)]
+        if full_citation.citing_opinion
+        else []
+    )
+
+    partial_citation_str = (
+        f"{full_citation.groups['volume']} {full_citation.groups['reporter']}"
+    )
+    query = Q(
+        "bool",
+        must_not=must_not,
+        filter=[
+            Q("match_phrase", **{"citation.exact": partial_citation_str}),
+            Q("match", cluster_child="opinion"),
+        ],
+    )
+
+    citations_query = search_query.query(query)
+    results = fetch_citations(
+        citations_query, fields=["id", "cluster_id", "citation", "text"]
+    )
+    # Create a temporal item and add it to the values list (cluster_id, page)
+    closest_opinion_clusters = [(0, full_citation.groups["page"])]
+
+    for result in results:
+        # Get the citations from OpinionDocument that matched the partial
+        # citation
+        valid_citations = [
+            get_citations(citation)[0]
+            for citation in result["citation"]
+            if partial_citation_str in citation and get_citations(citation)
+        ]
+
+        for valid_citation in valid_citations:
+            closest_opinion_clusters.append(
+                (result["cluster_id"], valid_citation.groups["page"])
+            )
+
+    if len(closest_opinion_clusters) > 1:
+        # Order by page number
+        sort_possible_matches = natsort.natsorted(
+            closest_opinion_clusters, key=lambda item: item[1]
+        )
+        # Find te index of the temporal item
+        citation_item_position = sort_possible_matches.index(
+            (0, full_citation.groups["page"])
+        )
+
+        if citation_item_position > 0:
+            # if the position is greater than 0, then the previous item in
+            # the list is the closest citation, we get the cluster id of the
+            # previous item
+            possible_cluster_id_matched = sort_possible_matches[
+                citation_item_position - 1
+            ][0]
+
+            # We filter the results list to get the possible match
+            # OpinionDocument
+            filtered_results = [
+                hit
+                for hit in results
+                if hit.cluster_id == possible_cluster_id_matched
+            ]
+
+            # Check if the page number is in the opinion text, currently
+            # we only look for this format: *page_number
+            # We add a temporary extra attribute to know that we got
+            # the match using a pin cite
+            for result in filtered_results:
+                # We could have clusters with multiple opinions, we need
+                # to check if the page number is in any of the opinions
+                if f"*{full_citation.groups['page']}" in result["text"]:
+                    # We found the page number in the opinion content
+                    filtered_results[0].page_pin_cite = full_citation.groups[
+                        "page"
+                    ]
+                    return [result], True
+
+    return [], False
+
+
 def es_search_db_for_full_citation(
     full_citation: FullCaseCitation, query_citation: bool = False
 ) -> tuple[list[Hit], bool]:
@@ -217,91 +314,6 @@ def es_search_db_for_full_citation(
                 full_citation.citing_opinion,
             )
             return results, citation_found
-    else:
-        # We didn't get an exact match on the volume/reporter/page. Perhaps
-        # it's a pin cite. Find closest citations filtering by volume and
-        # reporter and excluding self cites.
-        partial_citation_str = " ".join(
-            [full_citation.groups["volume"], full_citation.groups["reporter"]]
-        )
-        filters = [
-            Q(
-                "match_phrase",
-                **{"citation.exact": partial_citation_str},
-            )
-        ]
-        query = Q("bool", must_not=must_not, filter=filters)
-        citations_query = search_query.query(query)
-        results = fetch_citations(
-            citations_query, fields=["id", "cluster_id", "citation", "text"]
-        )
-        closest_opinion_clusters = []
-
-        # Create a temporal item and add it to the values list (cluster_id,
-        # page)
-        citation_item = (0, full_citation.groups["page"])
-        closest_opinion_clusters.append(citation_item)
-
-        for result in results:
-            # Get the citations from OpinionDocument that matched the partial
-            # citation
-            valid_citations = [
-                get_citations(citation)[0]
-                for citation in result["citation"]
-                if partial_citation_str in citation and get_citations(citation)
-            ]
-
-            for valid_citation in valid_citations:
-                closest_opinion_clusters.append(
-                    (result["cluster_id"], valid_citation.groups["page"])
-                )
-
-        if len(closest_opinion_clusters) > 1:
-            # Order by page number
-            sort_possible_matches = natsort.natsorted(
-                closest_opinion_clusters, key=lambda item: item[1]
-            )
-            # Find te index of the temporal item
-            citation_item_position = sort_possible_matches.index(citation_item)
-
-            if citation_item_position > 0:
-                # if the position is greater than 0, then the previous item in
-                # the list is the closest citation, we get the cluster id of the
-                # previous item
-                possible_cluster_id_matched = sort_possible_matches[
-                    citation_item_position - 1
-                ][0]
-
-                # We filter the results list to get the possible match
-                # OpinionDocument
-                filtered_results = [
-                    hit
-                    for hit in results
-                    if hit.cluster_id == possible_cluster_id_matched
-                ]
-
-                if (
-                    len(filtered_results) == 1
-                    and f"*{full_citation.groups["page"]}"
-                    in filtered_results[0]["text"]
-                ):
-                    # Check if the page number is in the opinion text, currently
-                    # we only look for this format: *page_number
-                    # We add a temporary extra attribute to know that we got
-                    # the match using a pin cite
-                    filtered_results[0].page_pin_cite = full_citation.groups[
-                        "page"
-                    ]
-                    return [filtered_results[0]], True
-                for result in filtered_results:
-                    # We could have clusters with multiple opinions, we need
-                    # to check if the page number is in any of the opinions
-                    if f"*{full_citation.groups['page']}" in result["text"]:
-                        # We found the page number in the opinion content
-                        filtered_results[0].page_pin_cite = (
-                            full_citation.groups["page"]
-                        )
-                        return [result], True
 
     # Give up.
     return [], citation_found

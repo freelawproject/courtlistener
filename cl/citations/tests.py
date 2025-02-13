@@ -46,7 +46,10 @@ from cl.citations.match_citations import (
     do_resolve_citations,
     resolve_fullcase_citation,
 )
-from cl.citations.match_citations_queries import es_search_db_for_full_citation
+from cl.citations.match_citations_queries import (
+    es_search_db_for_full_citation,
+    es_search_db_for_partial_citation,
+)
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
@@ -1071,7 +1074,18 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         self.assertIsInstance(result, list)
         self.assertIsInstance(citation_found, bool)
 
-        # Validate that we found a match
+        # Validate that we couldn't found a match with the full citation,
+        # maybe is a pin cite?
+        self.assertFalse(
+            citation_found,
+            msg="You shouldn't get any result.",
+        )
+
+        # Run a partial lookup
+        result, citation_found = es_search_db_for_partial_citation(pin_cite_1)
+
+        # Validate that found a match with the full citation containing a pin
+        # cite
         self.assertTrue(
             citation_found,
             msg="Something went wrong when finding the pin cite.",
@@ -1089,7 +1103,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             reporter="Pet.",
             page="745",
         )
-        result, citation_found = es_search_db_for_full_citation(pin_cite_2)
+        result, citation_found = es_search_db_for_partial_citation(pin_cite_2)
 
         # Find the second opinion
         concurrence_opinion = Opinion.objects.get(
