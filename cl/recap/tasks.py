@@ -161,16 +161,12 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     if fq.request_type == REQUEST_TYPE.DOCKET:
         # Request by docket_id
         court_id = get_court_id_from_fetch_queue(fq)
-        if is_appellate_court(court_id):
-            c = chain(
-                fetch_appellate_docket.si(fq.pk),
-                mark_fq_successful.si(fq.pk),
-            )
-        else:
-            c = chain(
-                fetch_docket.si(fq.pk),
-                mark_fq_successful.si(fq.pk),
-            )
+        c = (
+            chain(fetch_appellate_docket.si(fq.pk))
+            if is_appellate_court(court_id)
+            else chain(fetch_docket.si(fq.pk))
+        )
+        c = c | mark_fq_successful.si(fq.pk)
         result = c.apply_async()
     elif fq.request_type == REQUEST_TYPE.PDF:
         # Request by recap_document_id
