@@ -70,6 +70,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--max-page-count",
             type=int,
+            default=10_000,
             help="Get docs with this number of pages or less",
         )
         parser.add_argument(
@@ -135,10 +136,8 @@ class Command(VerboseCommand):
             Q(pacer_doc_id__isnull=False),
             Q(is_available=False),
             Q(page_count__gte=self.options["min_page_count"]),
+            Q(page_count__lte=self.options["max_page_count"]),
         ]
-
-        if self.options.get("max_page_count"):
-            filters.append(Q(page_count__lte=self.options["max_page_count"]))
 
         # Do not attempt to fetch docs that were already fetched:
         cached_fetches = cache.get(self.docs_to_process_cache_key(), [])
@@ -146,10 +145,10 @@ class Command(VerboseCommand):
         # Only try again with those that were timed out before:
         cached_timed_out = cache.get(self.timed_out_docs_cache_key(), [])
         previously_timed_out = [rd_pk for (rd_pk, _) in cached_timed_out]
-        redundant = set(previously_fetched) - set(previously_timed_out)
+        ids_to_skip = set(previously_fetched) - set(previously_timed_out)
         self.recap_documents = (
             RECAPDocument.objects.filter(*filters)
-            .exclude(pk__in=redundant)
+            .exclude(pk__in=ids_to_skip)
             .select_related("docket_entry__docket")
             .values(
                 "id",
@@ -294,8 +293,9 @@ class Command(VerboseCommand):
             if skipped_courts == courts_at_start:
                 time.sleep(self.interval)
 
-    def process_docs_fetched(self):
+    def handle_process_docs(self):
         """Apply tasks to process docs that were successfully fetched from PACER."""
+        logger.info("Starting processing stage in pacer_bulk_fetch command.")
         cached_fetches = cache.get(self.docs_to_process_cache_key(), [])
         fetch_queues_to_process = [fq_pk for (_, fq_pk) in cached_fetches]
         fetch_queues = (
@@ -310,6 +310,8 @@ class Command(VerboseCommand):
                 "recap_document__filepath_local",
             )
         )
+        total_fq_queues = fetch_queues.count()
+        processed_count = 0
         for fq in fetch_queues:
             rd = fq.recap_document
             needs_ocr = rd.needs_extraction
@@ -321,6 +323,19 @@ class Command(VerboseCommand):
                     extract_recap_pdf.si(rd.pk),
                     mark_fq_successful.si(fq.pk),
                 ).apply_async(queue=self.queue_name)
+
+                processed_count += 1
+                logger.info(
+                    "Processed %d/%d (%.0f%%), last document scheduled: %d",
+                    processed_count,
+                    total_fq_queues,
+                    (
+                        (processed_count / total_fq_queues) * 100
+                        if total_fq_queues
+                        else 0
+                    ),
+                    rd.pk,
+                )
 
     def handle_fetch_docs(self):
         """Run only the fetching stage."""
@@ -342,17 +357,6 @@ class Command(VerboseCommand):
             f"The following PacerFetchQueues were retried too many times: "
             f"{cache.get(self.timed_out_docs_cache_key(), [])}"
         )
-
-    def handle_process_docs(self):
-        """Run only the processing stage."""
-        logger.info("Starting processing stage in pacer_bulk_fetch command.")
-        try:
-            self.process_docs_fetched()
-        except Exception as e:
-            logger.error(
-                f"Fatal error in process stage: {str(e)}", exc_info=True
-            )
-            raise e
 
     def handle(self, *args, **options) -> None:
         self.options = options
