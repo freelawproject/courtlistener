@@ -1,6 +1,7 @@
 import os
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import Any
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -184,103 +185,108 @@ class Command(VerboseCommand):
         )
         return fq
 
-    def enough_time_elapsed(self, date):
-        now = timezone.now()
-        return (now - date) > timedelta(seconds=self.interval)
+    def enough_time_elapsed(self, date_completed: datetime) -> bool:
+        """Check if enough time has elapsed since task has been completed.
 
-    def should_skip(self, court_id: str, remaining_courts) -> bool:
+        :param date_completed: The date_completed to compare against the
+        current time.
+        :return: True if the difference between now and the given date exceeds
+        the defined interval, otherwise False.
+        """
+        now = timezone.now()
+        return (now - date_completed) > timedelta(seconds=self.interval)
+
+    def should_skip(
+        self, court_id: str, remaining_courts: dict[str, list[dict[str, Any]]]
+    ) -> bool:
         """Determine if the court is ready to be queried again.
 
         To hit the same court again, the last fetch queue must have
         been completed more than `self.interval` seconds ago.
         """
-        if court_id in self.fetches_in_progress:
-            fq_pk, retry_count = self.fetches_in_progress[court_id]
-            fetch_queue = PacerFetchQueue.objects.get(id=fq_pk)
-            fq_failed = fetch_queue.status in [
-                PROCESSING_STATUS.FAILED,
-                PROCESSING_STATUS.INVALID_CONTENT,
-                PROCESSING_STATUS.NEEDS_INFO,
-            ]
-            rd_pk = fetch_queue.recap_document_id
+        fetch_in_progress_court = self.fetches_in_progress.get(court_id)
+        if not fetch_in_progress_court:
+            return False
 
-            if retry_count >= self.max_retries or fq_failed:
-                # Too many retries means FQ was probably stuck and not handled gracefully, so we keep going.
-                # We remove this FQ from fetches_in_progress as we'll stop checking this one
-                self.fetches_in_progress.pop(court_id)
-                if remaining_courts and not remaining_courts.get(court_id):
-                    # If this is the last document in the court, remove it from
-                    # remaining_courts as well.
-                    remaining_courts.pop(court_id)
-                # Then we store its PK in cache to handle FQs w/too many retries later
-                append_value_in_cache(
-                    self.failed_docs_cache_key(), (rd_pk, fq_pk)
-                )
-                return False
+        fq_pk, retry_count = fetch_in_progress_court
+        fetch_queue = PacerFetchQueue.objects.get(id=fq_pk)
+        fq_failed = fetch_queue.status in [
+            PROCESSING_STATUS.FAILED,
+            PROCESSING_STATUS.INVALID_CONTENT,
+            PROCESSING_STATUS.NEEDS_INFO,
+        ]
+        rd_pk = fetch_queue.recap_document_id
+        if retry_count >= self.max_retries or fq_failed:
+            # Either exceeded max retries or the fetch is explicitly failed.
+            # Remove this from fetches_in_progress.
+            self.fetches_in_progress.pop(court_id, None)
+            # Also if this is the last document in the court, remove it from
+            # remaining_courts as well.
+            if not remaining_courts.get(court_id):
+                remaining_courts.pop(court_id, None)
+            # Then we store its PK in failed_docs cache to handle later.
+            append_value_in_cache(self.failed_docs_cache_key(), (rd_pk, fq_pk))
+            return False
 
-            date_completed = fetch_queue.date_completed
-            fq_in_progress = date_completed is None
-            if fq_in_progress:
-                retry_count += 1
-                self.fetches_in_progress[court_id] = (fq_pk, retry_count)
-                return True
+        date_completed = fetch_queue.date_completed
+        # If the fetch is still in progress, update retry count and skip.
+        if date_completed is None:
+            self.fetches_in_progress[court_id] = (fq_pk, retry_count + 1)
+            return True
 
-            if not self.enough_time_elapsed(date_completed):
-                return True
+        if not self.enough_time_elapsed(date_completed):
+            #  IF FQ has been completed but not enough time has elapsed, wait
+            #  by skipping it for now.
+            return True
+
         return False
-
-    def update_fetches_in_progress(self, court_id: str, fq_id: int):
-        court_last_fetch = self.fetches_in_progress.get(court_id, (fq_id, 0))
-        retry_count = court_last_fetch[1]
-        if fq_id == court_last_fetch[0]:
-            retry_count += 1
-        self.fetches_in_progress[court_id] = (fq_id, retry_count)
 
     def fetch_next_doc_in_court(
         self,
         court_id: str,
-        remaining_courts: dict,
-    ) -> bool:
+        remaining_courts: dict[str, list[dict[str, Any]]],
+    ) -> None:
         """Pop next doc in court and add fetch task to get it from PACER.
 
         If the last FQ for the court is still in progress or was completed
         less than `self.interval` seconds ago, we skip it and wait for
         the next round to try the same court again.
         """
-        should_skip = self.should_skip(court_id, remaining_courts)
-        if should_skip:
-            return True
-
-        if remaining_courts and remaining_courts.get(court_id):
+        if remaining_courts.get(court_id):
             doc = remaining_courts[court_id].pop(0)
             fq = self.enqueue_pacer_fetch(doc)
-            self.update_fetches_in_progress(court_id, fq.id)
+            self.fetches_in_progress[court_id] = (fq.pk, 0)
 
-        return False
+    def cleanup_finished_court(
+        self, court_id: str, remaining_courts: dict[str, list[dict[str, Any]]]
+    ) -> None:
+        """Remove a court from remaining_courts and fetches_in_progress
+        if no documents remain and its last FQ task has completed.
+        """
+        fetch_in_progress = self.fetches_in_progress.get(court_id)
+        if not remaining_courts.get(court_id) and fetch_in_progress:
+            fq_pk, _ = fetch_in_progress
+            fetch_queue = PacerFetchQueue.objects.get(id=fq_pk)
+            # Only clean up if the FQ is completed
+            if fetch_queue.date_completed:
+                remaining_courts.pop(court_id, None)
+                self.fetches_in_progress.pop(court_id, None)
 
     def fetch_docs_from_pacer(self) -> None:
         """Process documents with one fetch per court at a time"""
         self.handle_pacer_session()
         remaining_courts = self.courts_with_docs.copy()
-
         while remaining_courts:
             courts_at_start = len(remaining_courts)
             skipped_courts = 0
             for court_id in list(remaining_courts.keys()):
-                was_skipped = self.fetch_next_doc_in_court(
-                    court_id,
-                    remaining_courts,
-                )
-                skipped_courts += int(was_skipped)
-                # If this court doesn't have any more docs, remove from dict:
-                if remaining_courts and not remaining_courts.get(court_id):
-                    if self.fetches_in_progress.get(court_id):
-                        fq_pk, retry_count = self.fetches_in_progress[court_id]
-                        fetch_queue = PacerFetchQueue.objects.get(id=fq_pk)
-                        date_completed = fetch_queue.date_completed
-                        if date_completed:
-                            remaining_courts.pop(court_id)
-                            self.fetches_in_progress.pop(court_id, None)
+                if self.should_skip(court_id, remaining_courts):
+                    skipped_courts += 1
+                else:
+                    self.fetch_next_doc_in_court(court_id, remaining_courts)
+
+                # If this court doesn't have any more docs, remove from dicts:
+                self.cleanup_finished_court(court_id, remaining_courts)
 
             # If we had to skip all courts that we tried this round,
             # add a small delay to avoid hammering the DB

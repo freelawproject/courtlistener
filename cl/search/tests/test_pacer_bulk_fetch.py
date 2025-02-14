@@ -477,7 +477,7 @@ class PacerBulkFetchUnitTest(TestCase):
         self.command.courts_with_docs = {
             "ca1": [{"id": doc.pk} for doc in self.docs[:2]]
         }
-
+        self.command.max_retries = 0
         self.command.fetch_docs_from_pacer()
 
         mock_sleep.assert_not_called()
@@ -487,6 +487,7 @@ class PacerBulkFetchUnitTest(TestCase):
             0,
             "fetches_in_progress should be empty",
         )
+        self.command.max_retries = 1
 
 
 @patch(
