@@ -272,11 +272,11 @@ class BulkFetchPacerDocsTest(TestCase):
 
 @patch(
     "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
-    return_value="pacer_bulk_fetch.test_identify_documents_filtering.docs_to_process",
+    return_value="pacer_bulk_fetch.test_identify_documents_filtering.docs_to_process_2",
 )
 @patch(
     "cl.search.management.commands.pacer_bulk_fetch.Command.failed_docs_cache_key",
-    return_value="pacer_bulk_fetch.test_identify_documents_filtering.failed_docs",
+    return_value="pacer_bulk_fetch.test_identify_documents_filtering.failed_docs_2",
 )
 class PacerBulkFetchUnitTest(TestCase):
     @classmethod
@@ -314,8 +314,8 @@ class PacerBulkFetchUnitTest(TestCase):
     def tearDown(self):
         _clean_cache_keys(
             [
-                "pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
-                "pacer_bulk_fetch.test_page_count_filtering.failed_docs",
+                "pacer_bulk_fetch.test_page_count_filtering.docs_to_process_2",
+                "pacer_bulk_fetch.test_page_count_filtering.failed_docs_2",
             ]
         )
 
@@ -528,11 +528,11 @@ class PacerBulkFetchUnitTest(TestCase):
 
 @patch(
     "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
-    return_value="pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
+    return_value="pacer_bulk_fetch.test_page_count_filtering.docs_to_process_3",
 )
 @patch(
     "cl.search.management.commands.pacer_bulk_fetch.Command.failed_docs_cache_key",
-    return_value="pacer_bulk_fetch.test_page_count_filtering.failed_docs",
+    return_value="pacer_bulk_fetch.test_page_count_filtering.failed_docs_3",
 )
 @patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
 @patch(
@@ -585,8 +585,8 @@ class BulkFetchPacerIntegrationTest(TestCase):
     def tearDown(self):
         _clean_cache_keys(
             [
-                "pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
-                "pacer_bulk_fetch.test_page_count_filtering.failed_docs",
+                "pacer_bulk_fetch.test_page_count_filtering.docs_to_process_3",
+                "pacer_bulk_fetch.test_page_count_filtering.failed_docs_3",
             ]
         )
 
