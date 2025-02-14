@@ -2430,7 +2430,7 @@ def fetch_appellate_docket(self, fq_pk):
             **get_fq_appellate_docket_kwargs(fq),
         )
     except (requests.RequestException, ReadTimeoutError) as exc:
-        msg = "Network error while purchasing docket for fq: %s."
+        msg = f"Network error while purchasing docket for fq: {fq_pk}."
         if self.request.retries == self.max_retries:
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             self.request.chain = None
@@ -2452,7 +2452,7 @@ def fetch_appellate_docket(self, fq_pk):
         )
         raise self.retry(exc=exc)
     except ParsingException:
-        msg = "Unable to purchase docket for fq: %s."
+        msg = f"Unable to purchase docket for fq: {fq_pk}."
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return None
