@@ -327,20 +327,20 @@ class CitationTextTest(SimpleTestCase):
         test_pairs = [
             # Id. citation with page number ("Id., at 123, 124")
             ('asdf, Id., at 123, 124. Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf, </pre><span class="citation" data-id="'
-             f'MATCH_ID"><a href="MATCH_URL" {aria_description}>'
+             '<pre class="inline">asdf, </pre><span class="citation id-citation" data-id="'
+             f'MATCH_ID"><a href="MATCH_URL#123" {aria_description}>'
              'Id., at 123, 124</a></span><pre class="inline">. '
              'Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation with complex page number ("Id. @ 123:1, ¶¶ 124")
             ('asdf, Id. @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf, </pre><span class="citation" data-id='
+             '<pre class="inline">asdf, </pre><span class="citation id-citation" data-id='
              f'"MATCH_ID"><a href="MATCH_URL" {aria_description}>Id.</a></span><pre class='
              '"inline"> @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation without page number ("Id. Something else")
             ('asdf, Id. Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf, </pre><span class="citation" data-id="'
+             '<pre class="inline">asdf, </pre><span class="citation id-citation" data-id="'
              f'MATCH_ID"><a href="MATCH_URL" {aria_description}>Id.</a></span><pre class="inline">'
              ' Lorem ipsum dolor sit amet</pre>'),
 
@@ -352,6 +352,11 @@ class CitationTextTest(SimpleTestCase):
             # we annotate using first page in pin cite
             ('United States v. Paramount Pictures, Inc., 334 U. S. 131, 144-145, n. 6 (1948).',
              f'<pre class="inline">United States v. Paramount Pictures, Inc., </pre><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" {aria_description}>334 U. S. 131</a></span><pre class="inline">, </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>144-145, n. 6</a></span><pre class="inline"> (1948).</pre>'),
+
+            # Dummy text to annotate these citations types: FullCaseCitation,
+            # ShortCaseCitation, SupraCitation and IdCitation
+            ('In Strong v. Waterman, the court held that a trustee must act in good faith and in the best interest of the beneficiaries. 11 Paige 607. It further clarified that a trustee’s discretion remains subject to judicial review. 11 Paige at 611. This principle had been previously established. Supra, at 609. The court reaffirmed this rule. Id. at 609.',
+            f'<pre class="inline">In Strong v. Waterman, the court held that a trustee must act in good faith and in the best interest of the beneficiaries. </pre><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" aria-description="Citation for case: Example vs. Example">11 Paige 607</a></span><pre class="inline">. It further clarified that a trustee’s discretion remains subject to judicial review. </pre><span class="citation short-case-citation" data-id="MATCH_ID"><a href="MATCH_URL#611" aria-description="Citation for case: Example vs. Example">11 Paige at 611</a></span><pre class="inline">. This principle had been previously established. </pre><span class="citation supra-citation" data-id="MATCH_ID"><a href="MATCH_URL#609" aria-description="Citation for case: Example vs. Example">Supra, at 609</a></span><pre class="inline">. The court reaffirmed this rule. </pre><span class="citation id-citation" data-id="MATCH_ID"><a href="MATCH_URL#609" aria-description="Citation for case: Example vs. Example">Id. at 609</a></span><pre class="inline">.</pre>'),
 
         ]
 
