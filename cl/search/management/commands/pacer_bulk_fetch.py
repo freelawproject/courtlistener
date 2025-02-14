@@ -139,7 +139,8 @@ class Command(VerboseCommand):
                 "docket_entry__docket__court_id",
                 "pacer_doc_id",
             )
-            .order_by("-page_count")
+            .order_by("pacer_doc_id")
+            .distinct("pacer_doc_id")
         )
 
         courts = (

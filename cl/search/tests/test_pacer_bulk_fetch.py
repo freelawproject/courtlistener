@@ -305,7 +305,7 @@ class PacerBulkFetchUnitTest(TestCase):
         for i, de in enumerate(self.docket_entries):
             doc = RECAPDocumentFactory(
                 docket_entry=de,
-                pacer_doc_id=f"1_{i}",
+                pacer_doc_id=f"1{i}",
                 is_available=False,
                 page_count=100 + (i * 50),
             )
@@ -341,6 +341,42 @@ class PacerBulkFetchUnitTest(TestCase):
             set(expected_docs),
             set(actual_docs),
             "Should only include docs matching page count criteria",
+        )
+
+    def test_identify_documents_exclude_subdockets(
+        self,
+        mock_failed_docs_cache_key,
+        mock_fetched_cache_key,
+    ):
+        """Test that identify_documents correctly filters subdockets"""
+
+        self.command.options["min_page_count"] = 200
+        self.command.options["max_page_count"] = 300
+        docket_2 = DocketFactory(court=self.court)
+        docket_entries = [
+            DocketEntryFactory(docket=docket_2) for _ in range(5)
+        ]
+        for i, de in enumerate(docket_entries):
+            RECAPDocumentFactory(
+                docket_entry=de,
+                pacer_doc_id=f"1{i}",
+                is_available=False,
+                page_count=100 + (i * 50),
+            )
+
+        self.command.identify_documents()
+
+        # We should only get docs with page counts between 200-300 for different
+        # pacer_doc_ids in order to exclude subdocket cases.
+        expected_docs = [
+            doc.id
+            for doc in self.docs
+            if 200 <= doc.page_count <= 300 and not doc.is_available
+        ]
+        self.assertEqual(
+            len(expected_docs),
+            len(self.command.recap_documents),
+            "Expected docs didn't match.",
         )
 
     def test_identify_documents_cache_exclusion(
