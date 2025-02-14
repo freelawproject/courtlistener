@@ -2292,7 +2292,7 @@ def fetch_pacer_case_id_and_title(s, fq, court_id):
 def create_or_update_docket_data_from_fetch(
     fq: PacerFetchQueue,
     court_id: str,
-    pacer_case_id: str,
+    pacer_case_id: str | None,
     report: DocketReport | AppellateDocketReport,
     docket_data: dict[str, Any],
 ) -> dict[str, str | bool]:
@@ -2300,7 +2300,7 @@ def create_or_update_docket_data_from_fetch(
 
     :param fq: The PacerFetchQueue record associated with this fetch.
     :param court_id: The CL ID of the court.
-    :param pacer_case_id: The pacer_case_id of the docket
+    :param pacer_case_id: The pacer_case_id of the docket, if known.
     :param report: The BaseDocketReport object containing the fetched data.
     :param docket_data: A dictionary containing the parsed docket data.
     :return: a dict with information about the docket and the new data
