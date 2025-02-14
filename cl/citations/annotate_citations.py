@@ -266,11 +266,11 @@ def generate_annotations(
                     if c.metadata.pin_cite:
                         # Case 2: We could have a pin cite before the regular
                         # citation, only annotate the pin cite text
-                        annotation = get_pin_cite_annotation(
+                        pin_cite_annotation = get_pin_cite_annotation(
                             c, plain_text, opinion
                         )
-                        if annotation:
-                            annotations.append(annotation)
+                        if pin_cite_annotation:
+                            annotations.append(pin_cite_annotation)
 
     return annotations
 
