@@ -1,5 +1,7 @@
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
+import time_machine
 from django.core.cache import cache as django_cache
 from django.core.management import call_command
 from django.utils import timezone
@@ -18,6 +20,7 @@ from cl.search.management.commands.pacer_bulk_fetch import (
 )
 from cl.search.models import RECAPDocument
 from cl.tests.cases import TestCase
+from cl.tests.utils import MockResponse
 from cl.users.factories import UserFactory
 
 
@@ -43,7 +46,7 @@ def _clean_cache_keys(keys):
     "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
 )
 @patch(
-    "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
+    "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd_and_mark_fq_completed.si"
 )
 class BulkFetchPacerDocsTest(TestCase):
     @classmethod
@@ -126,6 +129,14 @@ class BulkFetchPacerDocsTest(TestCase):
                 )
             )
 
+    def tearDown(self):
+        _clean_cache_keys(
+            [
+                "pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
+                "pacer_bulk_fetch.test_page_count_filtering.timed_out_docs",
+            ]
+        )
+
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.append_value_in_cache",
         wraps=append_value_in_cache,
@@ -162,12 +173,6 @@ class BulkFetchPacerDocsTest(TestCase):
         )
 
         self.assertTrue(mock_append_value_in_cache.called)
-        _clean_cache_keys(
-            [
-                mock_fetched_cache_key.return_value,
-                mock_timed_out_cache_key.return_value,
-            ]
-        )
 
     def test_skip_available_documents(
         self,
@@ -225,22 +230,11 @@ class BulkFetchPacerDocsTest(TestCase):
             with self.subTest(doc=doc):
                 self.assertNotIn(doc.pk, called_args)
 
-        _clean_cache_keys(
-            [
-                mock_fetched_cache_key.return_value,
-                mock_timed_out_cache_key.return_value,
-            ]
-        )
-
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.extract_recap_pdf.si"
     )
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.mark_fq_successful.si"
-    )
     def test_fetch_queue_processing(
         self,
-        mock_mark_fq_successful,
         mock_extract_recap_pdf,
         mock_fetch_pacer_doc_by_rd,
         mock_pacer_cookies,
@@ -279,16 +273,6 @@ class BulkFetchPacerDocsTest(TestCase):
             mock_extract_recap_pdf.call_count,
             len(successful_fqs),
             "extract_recap_pdf",
-        )
-        self.assertEqual(
-            mock_mark_fq_successful.call_count, len(successful_fqs)
-        )
-
-        _clean_cache_keys(
-            [
-                mock_fetched_cache_key.return_value,
-                mock_timed_out_cache_key.return_value,
-            ]
         )
 
 
@@ -331,6 +315,14 @@ class PacerBulkFetchUnitTest(TestCase):
                 page_count=100 + (i * 50),
             )
             self.docs.append(doc)
+
+    def tearDown(self):
+        _clean_cache_keys(
+            [
+                "pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
+                "pacer_bulk_fetch.test_page_count_filtering.timed_out_docs",
+            ]
+        )
 
     def test_identify_documents_filtering(
         self,
@@ -386,13 +378,6 @@ class PacerBulkFetchUnitTest(TestCase):
             self.docs[1].pk, actual_docs, "Timed out docs should be included"
         )
 
-        _clean_cache_keys(
-            [
-                mock_fetched_cache_key.return_value,
-                mock_timed_out_cache_key.return_value,
-            ]
-        )
-
     def test_should_skip_court_not_in_progress(
         self, mock_timed_out_cache_key, mock_fetched_cache_key
     ):
@@ -405,12 +390,8 @@ class PacerBulkFetchUnitTest(TestCase):
             result, "Should not skip court with no fetch in progress"
         )
 
-    @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.enough_time_elapsed"
-    )
     def test_should_skip_with_time_conditions(
         self,
-        mock_enough_time,
         mock_timed_out_cache_key,
         mock_fetched_cache_key,
     ):
@@ -418,29 +399,32 @@ class PacerBulkFetchUnitTest(TestCase):
         test_cases = [
             {
                 "name": "recent completion",
-                "time_elapsed": False,
+                "time_elapsed": 1,
                 "expected_skip": True,
             },
             {
                 "name": "enough time passed",
-                "time_elapsed": True,
+                "time_elapsed": self.command.interval + 1,
                 "expected_skip": False,
             },
         ]
 
+        current_time = timezone.now()
         for case in test_cases:
             with self.subTest(case=case["name"]):
                 fq = PacerFetchQueueFactory(
                     recap_document=self.docs[0],
                     status=PROCESSING_STATUS.SUCCESSFUL,
-                    date_completed=timezone.now(),
+                    date_completed=current_time,
                     user=self.user,
                 )
-
                 self.command.fetches_in_progress = {"ca1": (fq.pk, 0)}
-                mock_enough_time.return_value = case["time_elapsed"]
 
-                result = self.command.should_skip("ca1")
+                with time_machine.travel(
+                    current_time + timedelta(seconds=case["time_elapsed"]),
+                    tick=False,
+                ):
+                    result = self.command.should_skip("ca1")
 
                 self.assertEqual(
                     result,
@@ -449,7 +433,7 @@ class PacerBulkFetchUnitTest(TestCase):
                 )
 
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
+        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd_and_mark_fq_completed.si"
     )
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.Command.should_skip",
@@ -487,10 +471,8 @@ class PacerBulkFetchUnitTest(TestCase):
             fq_pk,
         )
 
-        _clean_cache_keys([mock_fetched_cache_key.return_value])
-
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd.si"
+        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd_and_mark_fq_completed.si"
     )
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
@@ -524,4 +506,159 @@ class PacerBulkFetchUnitTest(TestCase):
             "fetches_in_progress should be empty",
         )
 
-        _clean_cache_keys([mock_fetched_cache_key.return_value])
+
+@patch(
+    "cl.search.management.commands.pacer_bulk_fetch.Command.docs_to_process_cache_key",
+    return_value="pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
+)
+@patch(
+    "cl.search.management.commands.pacer_bulk_fetch.Command.timed_out_docs_cache_key",
+    return_value="pacer_bulk_fetch.test_page_count_filtering.timed_out_docs",
+)
+@patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
+@patch("cl.recap.tasks.get_pacer_cookie_from_cache")
+@patch(
+    "cl.recap.tasks.is_pacer_court_accessible",
+    side_effect=lambda a: True,
+)
+class BulkFetchPacerIntegrationTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserFactory()
+        cls.courts = []
+        court = CourtFactory(id="ca1", jurisdiction="F")
+        cls.docket_1 = DocketFactory(court=court)
+        cls.docket_2 = DocketFactory(court=court)
+        cls.docket_3 = DocketFactory(court=court)
+
+        de_1 = DocketEntryFactory(docket=cls.docket_1)
+        de_2 = DocketEntryFactory(docket=cls.docket_2)
+        de_3 = DocketEntryFactory(docket=cls.docket_2)
+
+        # Create RECAP docs in DB (no real caching)
+        des = [de_1, de_2]
+        cls.rds_to_retrieve = []
+        for i, de in enumerate(des):
+            cls.rds_to_retrieve.append(
+                RECAPDocumentFactory(
+                    docket_entry=de,
+                    pacer_doc_id=f"0{i}",
+                    is_available=False,
+                    page_count=1000 + i,
+                )
+            )
+
+        RECAPDocumentFactory(
+            docket_entry=de_3,
+            pacer_doc_id=f"1234",
+            is_available=False,
+            page_count=100,
+        )
+
+    def tearDown(self):
+        _clean_cache_keys(
+            [
+                "pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
+                "pacer_bulk_fetch.test_page_count_filtering.timed_out_docs",
+            ]
+        )
+
+    @patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
+            MockResponse(
+                200,
+                b"binary content",
+            ),
+            "OK",
+        ),
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.Command.enough_time_elapsed",
+        return_value=True,
+    )
+    def test_pacer_bulk_fetch_integration(
+        self,
+        mock_enough_time_elapsed,
+        mock_download_pacer_pdf_by_rd,
+        mock_is_pacer_court_accessible,
+        mock_pacer_cookies,
+        mock_sleep,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
+    ):
+        """pacer_bulk_fetch command integration test"""
+
+        all_rds = RECAPDocument.objects.all()
+        self.assertEqual(
+            set(
+                status
+                for status in all_rds.values_list("is_available", flat=True)
+            ),
+            {False},
+        )
+        call_command(
+            "pacer_bulk_fetch",
+            testing=True,
+            min_page_count=1000,
+            stage="fetch",
+            username=self.user.username,
+        )
+
+        rds_purchased = RECAPDocument.objects.filter(is_available=True)
+        self.assertEqual(rds_purchased.count(), 2)
+        self.assertEqual(
+            set(
+                status
+                for status in rds_purchased.values_list(
+                    "is_available", flat=True
+                )
+            ),
+            {True},
+        )
+
+    @patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
+            MockResponse(
+                200,
+                None,
+            ),
+            "OK",
+        ),
+    )
+    def test_abort_fqs_after_retries(
+        self,
+        mock_download_pacer_pdf_by_rd,
+        mock_is_pacer_court_accessible,
+        mock_pacer_cookies,
+        mock_sleep,
+        mock_timed_out_cache_key,
+        mock_fetched_cache_key,
+    ):
+        """pacer_bulk_fetch command integration log max retried docs"""
+
+        all_rds = RECAPDocument.objects.all()
+        self.assertEqual(
+            set(
+                status
+                for status in all_rds.values_list("is_available", flat=True)
+            ),
+            {False},
+        )
+        call_command(
+            "pacer_bulk_fetch",
+            testing=True,
+            min_page_count=1000,
+            stage="fetch",
+            username=self.user.username,
+        )
+
+        rds_purchased = RECAPDocument.objects.filter(is_available=True)
+        self.assertEqual(rds_purchased.count(), 0)
+        cached_timed_out = django_cache.get(
+            mock_timed_out_cache_key.return_value, []
+        )
+
+        rds_timed_out = set(rd_fq_pair[0] for rd_fq_pair in cached_timed_out)
+        self.assertEqual(rds_timed_out, {rd.pk for rd in self.rds_to_retrieve})

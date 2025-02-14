@@ -2,7 +2,6 @@ import os
 import time
 from datetime import timedelta
 
-from celery import chain
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.management.base import CommandError
@@ -14,7 +13,7 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import PROCESSING_STATUS, REQUEST_TYPE, PacerFetchQueue
-from cl.recap.tasks import fetch_pacer_doc_by_rd, mark_fq_successful
+from cl.recap.tasks import fetch_pacer_doc_by_rd_and_mark_fq_completed
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, RECAPDocument
 
@@ -177,9 +176,9 @@ class Command(VerboseCommand):
             recap_document_id=rd_pk,
             user_id=self.user.pk,
         )
-        fetch_pacer_doc_by_rd.si(rd_pk, fq.pk).apply_async(
-            queue=self.queue_name
-        )
+        fetch_pacer_doc_by_rd_and_mark_fq_completed.si(
+            rd_pk, fq.pk
+        ).apply_async(queue=self.queue_name)
         append_value_in_cache(self.docs_to_process_cache_key(), (rd_pk, fq.pk))
         self.total_launched += 1
         logger.info(
@@ -190,7 +189,7 @@ class Command(VerboseCommand):
 
     def enough_time_elapsed(self, date):
         now = timezone.now()
-        return (now - date) < timedelta(seconds=self.interval)
+        return (now - date) > timedelta(seconds=self.interval)
 
     def should_skip(self, court_id: str) -> bool:
         """Determine if the court is ready to be queried again.
@@ -198,7 +197,6 @@ class Command(VerboseCommand):
         To hit the same court again, the last fetch queue must have
         been completed more than `self.interval` seconds ago.
         """
-
         if court_id in self.fetches_in_progress:
             fq_pk, retry_count = self.fetches_in_progress[court_id]
             fetch_queue = PacerFetchQueue.objects.get(id=fq_pk)
@@ -215,9 +213,13 @@ class Command(VerboseCommand):
 
             date_completed = fetch_queue.date_completed
             fq_in_progress = date_completed is None
-            if fq_in_progress or not self.enough_time_elapsed(date_completed):
+            if fq_in_progress:
+                retry_count += 1
+                self.fetches_in_progress[court_id] = (fq_pk, retry_count)
                 return True
 
+            if not self.enough_time_elapsed(date_completed):
+                return True
         return False
 
     def update_fetches_in_progress(self, court_id: str, fq_id: int):
@@ -241,7 +243,6 @@ class Command(VerboseCommand):
         should_skip = self.should_skip(court_id)
         if should_skip:
             return True
-
         if remaining_courts[court_id]:
             doc = remaining_courts[court_id].pop(0)
             fq = self.enqueue_pacer_fetch(doc)
@@ -275,7 +276,6 @@ class Command(VerboseCommand):
 
     def handle_process_docs(self):
         """Apply tasks to process docs that were successfully fetched from PACER."""
-        logger.info("Starting processing stage in pacer_bulk_fetch command.")
         cached_fetches = cache.get(self.docs_to_process_cache_key(), [])
         fetch_queues_to_process = [fq_pk for (_, fq_pk) in cached_fetches]
         fetch_queues = (
@@ -299,11 +299,7 @@ class Command(VerboseCommand):
             fetch_was_successful = fq.status == PROCESSING_STATUS.SUCCESSFUL
             if fetch_was_successful and has_pdf and needs_ocr:
                 self.throttle.maybe_wait()
-                chain(
-                    extract_recap_pdf.si(rd.pk),
-                    mark_fq_successful.si(fq.pk),
-                ).apply_async(queue=self.queue_name)
-
+                extract_recap_pdf.si(rd.pk).apply_async(queue=self.queue_name)
                 processed_count += 1
                 logger.info(
                     "Processed %d/%d (%.0f%%), last document scheduled: %d",

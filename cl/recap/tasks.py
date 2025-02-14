@@ -1850,16 +1850,7 @@ def update_docket_from_hidden_api(data):
         d.delete()
 
 
-@app.task(
-    bind=True,
-    autoretry_for=(RedisConnectionError, PacerLoginException),
-    max_retries=5,
-    interval_start=5,
-    interval_step=5,
-    ignore_result=True,
-)
-@transaction.atomic
-def fetch_pacer_doc_by_rd(
+def fetch_pacer_doc_by_rd_base(
     self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
 ) -> Optional[int]:
     """Fetch a PACER PDF by rd_pk
@@ -1867,6 +1858,7 @@ def fetch_pacer_doc_by_rd(
     This is very similar to get_pacer_doc_by_rd, except that it manages
     status as it proceeds and it gets the cookie info from redis.
 
+    :param self: The celery task.
     :param rd_pk: The PK of the RECAP Document to get.
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
     :param magic_number: The magic number to fetch PACER documents for free
@@ -1887,13 +1879,11 @@ def fetch_pacer_doc_by_rd(
         raise self.retry()
 
     mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
-
     if rd.is_available:
         msg = "PDF already marked as 'is_available'. Doing nothing."
         mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
         self.request.chain = None
         return
-
     if not rd.pacer_doc_id:
         msg = (
             "Missing 'pacer_doc_id' attribute. Without this attribute we "
@@ -1969,6 +1959,62 @@ def fetch_pacer_doc_by_rd(
         return
 
     return rd.pk
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(RedisConnectionError, PacerLoginException),
+    max_retries=5,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
+@transaction.atomic
+def fetch_pacer_doc_by_rd(
+    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
+) -> Optional[int]:
+    """Celery task wrapper for fetch_pacer_doc_by_rd_base
+
+    :param self: The celery task.
+    :param rd_pk: The PK of the RECAP Document to get.
+    :param fq_pk: The PK of the RECAP Fetch Queue to update.
+    :param magic_number: The magic number to fetch PACER documents for free
+    this is an optional field, only used by RECAP Email documents
+    :return: The RECAPDocument PK
+    """
+    return fetch_pacer_doc_by_rd_base(self, rd_pk, fq_pk, magic_number)
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(RedisConnectionError, PacerLoginException),
+    max_retries=5,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
+@transaction.atomic
+def fetch_pacer_doc_by_rd_and_mark_fq_completed(
+    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
+) -> None:
+    """Celery task wrapper for fetch_pacer_doc_by_rd_base, which also marks
+    the FQ as completed if the fetch is successful.
+
+    :param self: The celery task.
+    :param rd_pk: The PK of the RECAP Document to get.
+    :param fq_pk: The PK of the RECAP Fetch Queue to update.
+    :param magic_number: The magic number to fetch PACER documents for free
+    this is an optional field, only used by RECAP Email documents
+    :return: None
+    """
+    rd_pk = fetch_pacer_doc_by_rd_base(self, rd_pk, fq_pk, magic_number)
+    if rd_pk:
+        # Mark the FQ as completed if the RD pk is returned, since in any other
+        # case, fetch_pacer_doc_by_rd_base will return None.
+        fq = PacerFetchQueue.objects.get(pk=fq_pk)
+        msg = "Successfully completed fetch and save."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
+    return None
 
 
 @app.task(
