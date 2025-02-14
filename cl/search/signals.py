@@ -425,6 +425,7 @@ o_field_mapping = {
                 "html": ["text"],
                 "plain_text": ["text"],
                 "sha1": ["sha1"],
+                "ordering_key": ["ordering_key"],
             },
         },
     },

@@ -302,6 +302,13 @@ class Command(VerboseCommand):
             action="store_true",
             help="Use this flag to only index documents missing in the index.",
         )
+        parser.add_argument(
+            "--non-null-field",
+            type=str,
+            required=False,
+            choices=["ordering_key"],
+            help="Include only documents where this field is not Null.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -323,6 +330,7 @@ class Command(VerboseCommand):
             )
         start_date: date | None = options.get("start_date", None)
         end_date: date | None = options.get("end_date", None)
+        non_null_field: str | None = options.get("non_null_field", None)
 
         es_document = None
         match search_type:
@@ -374,8 +382,13 @@ class Command(VerboseCommand):
 
             case SEARCH_TYPES.OPINION:
                 if document_type == "child":
+                    filters = {"pk__gte": pk_offset}
+                    # If non_null_field is not None use it as a filter
+                    if non_null_field:
+                        filters[f"{non_null_field}__isnull"] = False
+
                     queryset = (
-                        Opinion.objects.filter(pk__gte=pk_offset)
+                        Opinion.objects.filter(**filters)
                         .order_by("pk")
                         .values_list("pk", "cluster_id")
                     )
