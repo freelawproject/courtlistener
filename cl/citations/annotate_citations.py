@@ -69,29 +69,6 @@ def calculate_pin_cite_absolute_span(
     return absolute_pin_cite_start, absolute_pin_cite_end
 
 
-def generate_pin_cite_annotation(
-    opinion: Opinion, pin_cite_number: str, case_name: str
-) -> list[str]:
-    """Generate the HTML annotation for a pin cite.
-
-    :param opinion: The opinion object matched to the pin cite.
-    :param pin_cite_number: The pin cite number extracted from the text.
-    :param case_name: The name of the case, truncated and sanitized for use in
-    HTML.
-    :return: A list of strings representing the HTML annotation.
-
-    Example: ['<span class="citation pin-cite">...</span>']
-    """
-    safe_case_name = html.escape(case_name)
-    return [
-        f'<span class="citation pin-cite" data-id="{opinion.pk}">'
-        f'<a href="{opinion.cluster.get_absolute_url()}#{pin_cite_number}"'
-        f' aria-description="Citation for case: {safe_case_name}"'
-        ">",
-        "</a></span>",
-    ]
-
-
 def get_pin_cite_annotation(
     citation: FullCaseCitation, plain_text: str, opinion: Opinion
 ) -> list[tuple[int, int] | str] | None:
@@ -142,11 +119,9 @@ def get_pin_cite_annotation(
     )
 
     # Generate the annotation only if the pin cite contains a valid number
-    case_name = trunc(best_case_name(opinion.cluster), 60, "...")
-    safe_case_name = html.escape(case_name)
     if pin_cite_number_match is not None:
-        pin_cite_annotation = generate_pin_cite_annotation(
-            opinion, pin_cite_number_match.group(), safe_case_name
+        pin_cite_annotation = generate_annotation(
+            opinion, "pin-cite", pin_cite_number_match.group()
         )
 
         return [
@@ -264,8 +239,9 @@ def generate_annotations(
                         annotations.append([c.span()] + annotation)
 
                     if c.metadata.pin_cite:
-                        # Case 2: We could have a pin cite before the regular
-                        # citation, only annotate the pin cite text
+                        # Case 2: We could have a pin cite after the
+                        # FullCaseCitation, annotate the pin cite text
+                        # e.g. "144, n. 6" in "334 U. S. 131, 144, n. 6"
                         pin_cite_annotation = get_pin_cite_annotation(
                             c, plain_text, opinion
                         )
