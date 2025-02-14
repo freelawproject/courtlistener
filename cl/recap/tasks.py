@@ -2036,7 +2036,7 @@ def fetch_pacer_doc_by_rd(
 )
 @transaction.atomic
 def fetch_pacer_doc_by_rd_and_mark_fq_completed(
-    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
+    self, rd_pk: int, fq_pk: int, magic_number: str | None = None
 ) -> None:
     """Celery task wrapper for fetch_pacer_doc_by_rd_base, which also marks
     the FQ as completed if the fetch is successful.
