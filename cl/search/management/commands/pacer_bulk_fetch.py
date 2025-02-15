@@ -140,7 +140,9 @@ class Command(VerboseCommand):
                 "pacer_doc_id",
             )
             .order_by("pacer_doc_id")
-            .distinct("pacer_doc_id")
+            .distinct(
+                "pacer_doc_id"
+            )  # Exclude duplicate documents for subdockets
         )
 
         courts = (
@@ -154,12 +156,14 @@ class Command(VerboseCommand):
             .distinct()
         )
 
-        for court in courts:
-            self.courts_with_docs[court.pk] = [
+        self.courts_with_docs = {
+            court.pk: [
                 doc
                 for doc in self.recap_documents
                 if doc["docket_entry__docket__court_id"] == court.pk
             ]
+            for court in courts
+        }
 
     def enqueue_pacer_fetch(self, doc: dict) -> PacerFetchQueue:
         """Actually apply the task to fetch the doc from PACER.
@@ -181,8 +185,12 @@ class Command(VerboseCommand):
         append_value_in_cache(self.docs_to_process_cache_key(), (rd_pk, fq.pk))
         self.total_launched += 1
         logger.info(
-            f"Launched download for doc {doc.get('id')} from court {doc.get('docket_entry__docket__court_id')}"
-            f"\nProgress: {self.total_launched}/{len(self.recap_documents)}"
+            "Launched download for doc %s from court %s",
+            doc.get("id"),
+            doc.get("docket_entry__docket__court_id"),
+        )
+        logger.info(
+            "Progress: %s/%s", self.total_launched, len(self.recap_documents)
         )
         return fq
 
@@ -339,19 +347,22 @@ class Command(VerboseCommand):
         self.user = User.objects.get(username=self.options["username"])
         self.identify_documents()
         logger.info(
-            f"{self.user} found {len(self.recap_documents)} documents "
-            f"across {len(self.courts_with_docs)} courts."
+            "%s found %s documents across %s courts.",
+            self.user,
+            len(self.recap_documents),
+            len(self.courts_with_docs),
         )
 
         self.fetch_docs_from_pacer()
 
         logger.info(
-            f"Created {self.total_launched} processing queues for a total "
-            f"of {len(self.recap_documents)} docs found."
+            "Created %s processing queues for a total of %s docs found.",
+            self.total_launched,
+            len(self.recap_documents),
         )
         logger.info(
-            f"The following PacerFetchQueues did not complete successfully: "
-            f"{cache.get(self.failed_docs_cache_key(), [])}"
+            "The following PacerFetchQueues did not complete successfully: %s",
+            cache.get(self.failed_docs_cache_key(), []),
         )
 
     def handle(self, *args, **options) -> None:
