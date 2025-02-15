@@ -38,7 +38,7 @@ class Command(VerboseCommand):
         self.recap_documents = []
         self.courts_with_docs = {}
         self.total_launched = 0
-        self.max_retries = 5
+        self.max_retries = 6
         self.pacer_username = os.environ.get(
             "PACER_USERNAME", settings.PACER_USERNAME
         )
@@ -48,14 +48,21 @@ class Command(VerboseCommand):
         self.throttle = None
         self.queue_name = None
         self.interval = None
+        self.long_wait = None
         self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
             "--interval",
-            type=float,
-            default=2,
+            type=int,
+            default=5,
             help="The minimum wait in secs between PACER fetches to the same court.",
+        )
+        parser.add_argument(
+            "--long-wait",
+            type=int,
+            default=60,
+            help="Time in seconds to wait before checking again if an FQ has been completed.",
         )
         parser.add_argument(
             "--min-page-count",
@@ -207,15 +214,18 @@ class Command(VerboseCommand):
 
     def should_skip(
         self, court_id: str, remaining_courts: dict[str, list[dict[str, Any]]]
-    ) -> bool:
+    ) -> tuple[bool, bool]:
         """Determine if the court is ready to be queried again.
 
         To hit the same court again, the last fetch queue must have
         been completed more than `self.interval` seconds ago.
+
+        :return: A two-tuple containing True if the court is ready to be queried again,
+        False otherwise, and whether a long wait is needed.
         """
         fetch_in_progress_court = self.fetches_in_progress.get(court_id)
         if not fetch_in_progress_court:
-            return False
+            return False, False
 
         fq_pk, retry_count = fetch_in_progress_court
         fetch_queue = PacerFetchQueue.objects.get(id=fq_pk)
@@ -235,20 +245,38 @@ class Command(VerboseCommand):
                 remaining_courts.pop(court_id, None)
             # Then we store its PK in failed_docs cache to handle later.
             append_value_in_cache(self.failed_docs_cache_key(), (rd_pk, fq_pk))
-            return False
+            logger.info(
+                "Court %s: retry_count=%s, fq_failed=%s - removing from fetches_in_progress.",
+                court_id,
+                retry_count,
+                fq_failed,
+            )
+            return False, False
 
         date_completed = fetch_queue.date_completed
         # If the fetch is still in progress, update retry count and skip.
         if date_completed is None:
-            self.fetches_in_progress[court_id] = (fq_pk, retry_count + 1)
-            return True
+            new_retry_count = retry_count + 1
+            self.fetches_in_progress[court_id] = (fq_pk, new_retry_count)
+            logger.info(
+                "Court %s: fetch still in progress. Incrementing retry_count to %d.",
+                court_id,
+                new_retry_count,
+            )
+            # Perform a long wait. Tasks haven't been completed and are being retried.
+            return True, True
 
         if not self.enough_time_elapsed(date_completed):
             #  IF FQ has been completed but not enough time has elapsed, wait
             #  by skipping it for now.
-            return True
+            logger.info(
+                "Court %s: fetch completed at %s, but waiting for the interval to elapse; skipping for now.",
+                court_id,
+                date_completed,
+            )
+            return True, False
 
-        return False
+        return False, False
 
     def fetch_next_doc_in_court(
         self,
@@ -286,10 +314,13 @@ class Command(VerboseCommand):
         self.handle_pacer_session()
         remaining_courts = self.courts_with_docs.copy()
         while remaining_courts:
-            courts_at_start = len(remaining_courts)
             skipped_courts = 0
+            long_wait = False
             for court_id in list(remaining_courts.keys()):
-                if self.should_skip(court_id, remaining_courts):
+                should_skip, long_wait = self.should_skip(
+                    court_id, remaining_courts
+                )
+                if should_skip:
                     skipped_courts += 1
                 else:
                     self.fetch_next_doc_in_court(court_id, remaining_courts)
@@ -297,10 +328,18 @@ class Command(VerboseCommand):
                 # If this court doesn't have any more docs, remove from dicts:
                 self.cleanup_finished_court(court_id, remaining_courts)
 
-            # If we had to skip all courts that we tried this round,
-            # add a small delay to avoid hammering the DB
-            if skipped_courts == courts_at_start:
-                time.sleep(self.interval)
+            # If any court had to be skipped, wait for some time before starting
+            # a new iteration to allow tasks to be completed or retried.
+            if skipped_courts:
+                wait = self.interval if not long_wait else self.long_wait
+                logger.info(
+                    "%s courts were skipped. long_wait: %s - "
+                    "Waiting for: %s",
+                    skipped_courts,
+                    long_wait,
+                    wait,
+                )
+                time.sleep(wait)
 
     def handle_process_docs(self):
         """Apply tasks to process docs that were successfully fetched from PACER."""
@@ -369,6 +408,7 @@ class Command(VerboseCommand):
         self.options = options
         self.setup_celery()
         self.interval = self.options["interval"]
+        self.long_wait = self.options["long_wait"]
         if self.options.get("testing"):
             self.max_retries = 1
 

@@ -412,10 +412,10 @@ class PacerBulkFetchUnitTest(TestCase):
         """Test should_skip when court has no fetch in progress"""
         self.command.fetches_in_progress = {}
 
-        result = self.command.should_skip("ca1", {})
+        should_skip, _ = self.command.should_skip("ca1", {})
 
         self.assertFalse(
-            result, "Should not skip court with no fetch in progress"
+            should_skip, "Should not skip court with no fetch in progress"
         )
 
     def test_should_skip_with_time_conditions(
@@ -452,12 +452,12 @@ class PacerBulkFetchUnitTest(TestCase):
                     current_time + timedelta(seconds=case["time_elapsed"]),
                     tick=False,
                 ):
-                    result = self.command.should_skip("ca1", {})
+                    should_skip, _ = self.command.should_skip("ca1", {})
 
                 self.assertEqual(
-                    result,
+                    should_skip,
                     case["expected_skip"],
-                    f"should_skip returned {result} for {case['name']}",
+                    f"should_skip returned {should_skip} for {case['name']}",
                 )
 
     @patch(
