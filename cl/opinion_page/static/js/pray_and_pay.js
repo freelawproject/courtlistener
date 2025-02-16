@@ -39,6 +39,9 @@ function updatePrayerButton(button, lock = false) {
 document.addEventListener('htmx:beforeRequest', function (event) {
   // Before sending the request, update the button's appearance and counter to
   // provide instant feedback.
+
+  showTutorialModal(); 
+
   let form = event.detail.elt;
   let button = form.querySelector('button');
   updatePrayerButton(button);
@@ -79,3 +82,16 @@ document.addEventListener('htmx:oobBeforeSwap', function (event) {
 document.addEventListener('htmx:oobAfterSwap', function (event) {
   $('[data-toggle="tooltip"]').tooltip();
 });
+
+//////////////////////////////////////////////
+// Tutorial Modal Cookie Handling (NEW)
+//////////////////////////////////////////////
+function showTutorialModal() {
+  if (!document.cookie.includes('seen_tutorial=true')) {
+    $('#tutorialModal').modal('show');
+    let date = new Date();
+    date.setTime(date.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    let expires = '; expires=' + date.toGMTString();
+    document.cookie = 'seen_tutorial=true' + expires + '; samesite=lax; path=/';
+  }
+}
