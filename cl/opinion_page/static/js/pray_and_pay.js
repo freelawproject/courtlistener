@@ -40,7 +40,7 @@ document.addEventListener('htmx:beforeRequest', function (event) {
   // Before sending the request, update the button's appearance and counter to
   // provide instant feedback.
 
-  showTutorialModal(); 
+  showTutorialModal();
 
   let form = event.detail.elt;
   let button = form.querySelector('button');
