@@ -1396,12 +1396,12 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
             ),
             (
                 "Animal and Plant Health Inspection Service",
-                "89 FR 106981"
+                "89 FR 106981",
                 "https://www.federalregister.gov/citation-89-FR-106981",
             ),
             (
                 "Animal and Plant Health Inspection Service",
-                "89 Fed. Reg. 106,981"
+                "89 Fed. Reg. 106,981",
                 "https://www.federalregister.gov/citation-89-FR-106,981",
             ),
             (
