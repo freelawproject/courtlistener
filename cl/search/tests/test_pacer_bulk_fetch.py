@@ -623,7 +623,9 @@ class PacerBulkFetchUnitTest(TestCase):
 
 
 def mock_is_retry_interval_elapsed(date_created, retry_count, time_start):
-
+    """Mock method to simulate elapsed time for is_retry_interval_elapsed,
+    considering an initial_backoff_time of 2.
+    """
     retry_map = {
         0: 3,
         1: 5,
@@ -744,6 +746,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
         call_command(
             "pacer_bulk_fetch",
             min_page_count=1000,
+            initial_backoff_time=2,
             stage="fetch",
             username=self.user.username,
         )
@@ -804,6 +807,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
         call_command(
             "pacer_bulk_fetch",
             min_page_count=1000,
+            initial_backoff_time=2,
             stage="fetch",
             username=self.user.username,
         )
@@ -870,6 +874,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
         call_command(
             "pacer_bulk_fetch",
             min_page_count=1000,
+            initial_backoff_time=2,
             stage="fetch",
             username=self.user.username,
         )
@@ -944,6 +949,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
                 "pacer_bulk_fetch",
                 min_page_count=1000,
                 interval=2,
+                initial_backoff_time=2,
                 stage="fetch",
                 username=self.user.username,
             )

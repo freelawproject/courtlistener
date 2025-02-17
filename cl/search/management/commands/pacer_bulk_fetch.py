@@ -76,11 +76,17 @@ def is_retry_interval_elapsed(
     :param date_created: The datetime when the FQ was created.
     :param retry_count: The number of retry attempts already made.
     :param time_start: The base time interval for the exponential backoff.
-    :return: True if the required time has elapsed since date_created, otherwise False.
+    :return: A two tuple, a bool True if the required time has elapsed since
+    date_created, otherwise False. An integer representing the next_time_to_wait
     """
 
     exponential_backoff = int(pow(time_start, retry_count + 1))
     prev_exponential_backoff = int(pow(time_start, retry_count))
+    # exponential_backoff is the time in seconds used to compare against the
+    # FQ's date_created, and it represents the maximum total time we want to
+    # wait before an FQ completes all its retry attempts.
+    # Therefore, the next_time_to_wait for a new iteration is calculated as the
+    # difference between the previous backoff time and the current one.
     next_time_to_wait = (exponential_backoff - prev_exponential_backoff) + 1
     return (
         enough_time_elapsed(date_created, exponential_backoff),
@@ -117,23 +123,23 @@ class Command(VerboseCommand):
         self.throttle = None
         self.queue_name = None
         self.interval = None
-        self.initial_backoff_time = 2
-        self.long_wait = None
-        self.max_fq_wait = 3600  # 1 hour.
+        self.initial_backoff_time = None
+        self.max_fq_wait = 3600  # 1 hour. Maximum wait time for an FQ to be completed to prevent a deadlock
         self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
             "--interval",
             type=int,
-            default=5,
+            default=2,
             help="The minimum wait in secs between PACER fetches to the same court.",
         )
         parser.add_argument(
-            "--long-wait",
-            type=int,
-            default=60,
-            help="Time in seconds to wait before checking again if an FQ has been completed.",
+            "--initial-backoff-time",
+            type=float,
+            default=2.85,
+            help="Initial wait time (in seconds) for the exponential backoff "
+            "policy before rechecking if an FQ has been completed.",
         )
         parser.add_argument(
             "--min-page-count",
@@ -559,7 +565,7 @@ class Command(VerboseCommand):
         self.options = options
         self.setup_celery()
         self.interval = self.options["interval"]
-        self.long_wait = self.options["long_wait"]
+        self.initial_backoff_time = self.options["initial_backoff_time"]
         if self.options.get("testing"):
             self.max_retries = 1
             self.max_fq_wait = 0.001
