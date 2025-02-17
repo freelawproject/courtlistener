@@ -1395,6 +1395,16 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                 "https://www.federalregister.gov/citation/89-FR-34,620",
             ),
             (
+                "Animal and Plant Health Inspection Service",
+                "89 FR 106981"
+                "https://www.federalregister.gov/citation-89-FR-106981"
+            ),
+            (
+                "Animal and Plant Health Inspection Service",
+                "89 Fed. Reg. 106,981"
+                "https://www.federalregister.gov/citation-89-FR-106,981"
+            ),
+            (
                 "Environmental Protection Agency",
                 "EPA-HQ-OW-2020-0005",
                 "https://www.regulations.gov/docket/EPA-HQ-OW-2020-0005",
