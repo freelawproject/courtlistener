@@ -5,6 +5,7 @@ import time_machine
 from django.core.cache import cache as django_cache
 from django.core.management import call_command
 from django.utils import timezone
+from django.utils.timezone import now
 from requests import HTTPError
 
 from cl.recap.factories import PacerFetchQueueFactory
@@ -18,6 +19,7 @@ from cl.search.factories import (
 from cl.search.management.commands.pacer_bulk_fetch import (
     Command,
     append_value_in_cache,
+    is_retry_interval_elapsed,
 )
 from cl.search.models import RECAPDocument
 from cl.tests.cases import TestCase
@@ -412,10 +414,11 @@ class PacerBulkFetchUnitTest(TestCase):
         """Test should_skip when court has no fetch in progress"""
         self.command.fetches_in_progress = {}
 
-        should_skip, _ = self.command.should_skip("ca1", {})
+        skip_status = self.command.should_skip("ca1")
 
         self.assertFalse(
-            should_skip, "Should not skip court with no fetch in progress"
+            skip_status.should_skip,
+            "Should not skip court with no fetch in progress",
         )
 
     def test_should_skip_with_time_conditions(
@@ -452,12 +455,12 @@ class PacerBulkFetchUnitTest(TestCase):
                     current_time + timedelta(seconds=case["time_elapsed"]),
                     tick=False,
                 ):
-                    should_skip, _ = self.command.should_skip("ca1", {})
+                    skip_status = self.command.should_skip("ca1")
 
                 self.assertEqual(
-                    should_skip,
+                    skip_status.should_skip,
                     case["expected_skip"],
-                    f"should_skip returned {should_skip} for {case['name']}",
+                    f"should_skip returned {skip_status.should_skip} for {case['name']}",
                 )
 
     @patch(
@@ -501,7 +504,7 @@ class PacerBulkFetchUnitTest(TestCase):
         "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
     )
     @patch("cl.search.management.commands.pacer_bulk_fetch.time.sleep")
-    def test_fetch_docs_from_pacer_no_sleep(
+    def test_fetch_docs_from_pacer_sleep(
         self,
         mock_sleep,
         mock_pacer_cookies,
@@ -516,7 +519,7 @@ class PacerBulkFetchUnitTest(TestCase):
         self.command.max_retries = 0
         self.command.fetch_docs_from_pacer()
 
-        mock_sleep.assert_not_called()
+        mock_sleep.assert_called()
 
         self.assertEqual(
             len(self.command.fetches_in_progress),
@@ -524,6 +527,117 @@ class PacerBulkFetchUnitTest(TestCase):
             "fetches_in_progress should be empty",
         )
         self.command.max_retries = 1
+
+    def test_is_retry_interval_elapsed(
+        self,
+        mock_failed_docs_cache_key,
+        mock_fetched_cache_key,
+    ):
+        """Test fetch_docs_from_pacer when no delays are needed"""
+        self.command.interval = 2
+
+        test_cases = [
+            {
+                "retry_count": 0,
+                "exponential_backoff": 2,
+                "seconds_elapsed": 3,
+                "interval_elapsed": True,
+            },
+            {
+                "retry_count": 0,
+                "exponential_backoff": 2,
+                "seconds_elapsed": 1,
+                "interval_elapsed": False,
+            },
+            {
+                "retry_count": 1,
+                "exponential_backoff": 3,
+                "seconds_elapsed": 5,
+                "interval_elapsed": True,
+            },
+            {
+                "retry_count": 2,
+                "exponential_backoff": 5,
+                "seconds_elapsed": 9,
+                "interval_elapsed": True,
+            },
+            {
+                "retry_count": 2,
+                "exponential_backoff": 5,
+                "seconds_elapsed": 8,
+                "interval_elapsed": False,
+            },
+            {
+                "retry_count": 3,
+                "exponential_backoff": 9,
+                "seconds_elapsed": 17,
+                "interval_elapsed": True,
+            },
+            {
+                "retry_count": 4,
+                "exponential_backoff": 17,
+                "seconds_elapsed": 33,
+                "interval_elapsed": True,
+            },
+            {
+                "retry_count": 5,
+                "exponential_backoff": 33,
+                "seconds_elapsed": 65,
+                "interval_elapsed": True,
+            },
+            {
+                "retry_count": 5,
+                "exponential_backoff": 33,
+                "seconds_elapsed": 62,
+                "interval_elapsed": False,
+            },
+        ]
+
+        date_created = now()
+        for test_case in test_cases:
+            with (
+                self.subTest(test_case=test_case),
+                time_machine.travel(
+                    date_created
+                    + timedelta(seconds=test_case["seconds_elapsed"]),
+                    tick=False,
+                ),
+            ):
+                interval_elapsed, exponential_backoff = (
+                    is_retry_interval_elapsed(
+                        date_created, test_case["retry_count"], 2
+                    )
+                )
+
+                self.assertEqual(
+                    exponential_backoff,
+                    test_case["exponential_backoff"],
+                    "The exponential_backoff didn't match",
+                )
+
+                self.assertEqual(
+                    interval_elapsed,
+                    test_case["interval_elapsed"],
+                    "The retry interval elapsed didn't match",
+                )
+
+
+def mock_is_retry_interval_elapsed(date_created, retry_count, time_start):
+
+    retry_map = {
+        0: 3,
+        1: 5,
+        2: 9,
+        3: 17,
+        4: 33,
+        5: 65,
+    }
+
+    with time_machine.travel(
+        date_created + timedelta(seconds=retry_map[retry_count]),
+        tick=False,
+    ):
+        return is_retry_interval_elapsed(date_created, retry_count, time_start)
 
 
 @patch(
@@ -548,12 +662,12 @@ class BulkFetchPacerIntegrationTest(TestCase):
     def setUpTestData(cls):
         cls.user = UserFactory()
         cls.courts = []
-        ca1 = CourtFactory(id="ca1", jurisdiction="F")
-        ca2 = CourtFactory(id="ca2", jurisdiction="F")
-        cls.docket_1 = DocketFactory(court=ca1)
-        cls.docket_2 = DocketFactory(court=ca1)
-        cls.docket_3 = DocketFactory(court=ca2)
-        cls.docket_4 = DocketFactory(court=ca2)
+        cls.ca1 = CourtFactory(id="ca1", jurisdiction="F")
+        cls.ca2 = CourtFactory(id="ca2", jurisdiction="F")
+        cls.docket_1 = DocketFactory(court=cls.ca1)
+        cls.docket_2 = DocketFactory(court=cls.ca1)
+        cls.docket_3 = DocketFactory(court=cls.ca2)
+        cls.docket_4 = DocketFactory(court=cls.ca2)
 
         de_1 = DocketEntryFactory(docket=cls.docket_1)
         de_2 = DocketEntryFactory(docket=cls.docket_2)
@@ -601,7 +715,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
         ),
     )
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.Command.enough_time_elapsed",
+        "cl.search.management.commands.pacer_bulk_fetch.enough_time_elapsed",
         return_value=True,
     )
     def test_pacer_bulk_fetch_integration(
@@ -664,7 +778,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
         "cl.recap.tasks.download_pacer_pdf_by_rd",
         side_effect=HTTPError("Failed to connect."),
     )
-    def test_abort_fqs_after_retries(
+    def test_abort_fqs_after_error(
         self,
         mock_download_pacer_pdf_by_rd,
         mock_is_pacer_court_accessible,
@@ -693,10 +807,6 @@ class BulkFetchPacerIntegrationTest(TestCase):
             stage="fetch",
             username=self.user.username,
         )
-
-        # No rds_to_retrieve IDs should be available.
-        rds_purchased = RECAPDocument.objects.filter(is_available=True)
-        self.assertEqual(rds_purchased.count(), 0)
 
         # All rds_to_retrieve IDs should be in cached_failed_docs.
         cached_failed_docs = django_cache.get(
@@ -796,3 +906,82 @@ class BulkFetchPacerIntegrationTest(TestCase):
         for fq in failed_fqs:
             with self.subTest(fq=fq):
                 self.assertIn("Document is sealed", fq.message)
+
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd_and_mark_fq_completed.si"
+    )
+    @patch("cl.search.management.commands.pacer_bulk_fetch.logger")
+    def test_abort_fqs_after_retries(
+        self,
+        mock_logger,
+        mock_mock_fetch_pacer_doc_by_rd,
+        mock_is_pacer_court_accessible,
+        mock_pacer_cookies,
+        mock_get_or_cache_pacer_cookies,
+        mock_sleep,
+        mock_failed_docs_cache_key,
+        mock_fetched_cache_key,
+    ):
+        """Test pacer_bulk_fetch command aborting mechanism.
+        FQs that run out of retries are aborted and added to the
+        failed_docs set in Redis.
+        """
+
+        all_rds = RECAPDocument.objects.all()
+        self.assertEqual(
+            set(
+                status
+                for status in all_rds.values_list("is_available", flat=True)
+            ),
+            {False},
+        )
+
+        with patch(
+            "cl.search.management.commands.pacer_bulk_fetch.is_retry_interval_elapsed",
+            side_effect=mock_is_retry_interval_elapsed,
+        ):
+            call_command(
+                "pacer_bulk_fetch",
+                min_page_count=1000,
+                interval=2,
+                stage="fetch",
+                username=self.user.username,
+            )
+
+        for rd in self.rds_to_retrieve:
+            with self.subTest(rd=rd):
+                mock_logger.info.assert_any_call(
+                    "Max retries reached for RD %s from Court %s. Retry count: %s, fq_failed: %s – removing from fetches_in_progress.",
+                    rd.pk,
+                    rd.docket_entry.docket.court_id,
+                    6,
+                    False,
+                )
+                mock_logger.info.assert_any_call(
+                    "%s courts were skipped. Waiting for: %s seconds.",
+                    2,
+                    33,
+                )
+
+        # All rds_to_retrieve IDs should be in cached_failed_docs.
+        cached_failed_docs = django_cache.get(
+            mock_failed_docs_cache_key.return_value, []
+        )
+        rds_failed_docs = set(
+            rd_fq_pair[0] for rd_fq_pair in cached_failed_docs
+        )
+        self.assertEqual(
+            rds_failed_docs, {rd.pk for rd in self.rds_to_retrieve}
+        )
+
+        # All rds_to_retrieve IDs should be in docs_to_process.
+        cached_fetched = django_cache.get(
+            mock_fetched_cache_key.return_value, []
+        )
+        rds_fetched = set(rd_fq_pair[0] for rd_fq_pair in cached_fetched)
+        self.assertEqual(rds_fetched, {rd.pk for rd in self.rds_to_retrieve})
+
+        # Confirm that the related FQs remained in ENQUEUED status.
+        failed_fqs = PacerFetchQueue.objects.all()
+        fq_status = set(fq.status for fq in failed_fqs)
+        self.assertEqual(fq_status, {PROCESSING_STATUS.ENQUEUED})
