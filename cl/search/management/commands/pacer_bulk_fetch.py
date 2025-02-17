@@ -377,9 +377,13 @@ class Command(VerboseCommand):
         :param remaining_courts: A dictionary mapping court IDs to lists of pending fetch attempts.
         :return: None or the corresponding exponential_backoff computed in seconds.
         """
-        fq_pk, retry_count = self.fetches_in_progress.get(court_id)
         fetch_queue = skip_status.fetch_queue
-        rd_pk = fetch_queue.recap_document_id if fetch_queue else None
+        fetch_in_progress_court = self.fetches_in_progress.get(court_id)
+        if fetch_queue is None or fetch_in_progress_court is None:
+            return None
+        fq_pk, retry_count = fetch_in_progress_court
+        rd_pk = fetch_queue.recap_document_id
+        fq_date_created = fetch_queue.date_created
         match skip_status.reason:
             case SkipReason.MAX_RETRIES | SkipReason.FAILED:
                 # Either exceeded max retries or the fetch is explicitly failed.
@@ -405,7 +409,6 @@ class Command(VerboseCommand):
             case SkipReason.FETCH_IN_PROGRESS:
                 # As a safeguard: If the FQ hasn't been processed within max_fq_wait,
                 # stop waiting to prevent a deadlock for the current court.
-                fq_date_created = fetch_queue.date_created
                 if enough_time_elapsed(fq_date_created, self.max_fq_wait):
                     self.fetches_in_progress[court_id] = (
                         fq_pk,
@@ -413,7 +416,7 @@ class Command(VerboseCommand):
                     )
                     logger.info(
                         "Stale FQ %s - Court %s Aborting it.",
-                        fetch_queue.pk,
+                        fq_pk,
                         court_id,
                     )
                     return None
@@ -447,6 +450,8 @@ class Command(VerboseCommand):
                     fetch_queue.date_completed,
                 )
                 return None
+
+        return None
 
     def fetch_docs_from_pacer(self) -> None:
         """Process documents with one fetch per court at a time"""
