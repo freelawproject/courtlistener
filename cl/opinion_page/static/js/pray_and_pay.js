@@ -88,7 +88,7 @@ function showTutorialModal() {
   if (!document.cookie.includes('seen_tutorial=true')) {
     $('#tutorialModal').modal('show');
     let date = new Date();
-    date.setTime(date.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    date.setTime(date.getTime() + 399 * 24 * 60 * 60 * 1000); // 399 days
     let expires = '; expires=' + date.toGMTString();
     document.cookie = 'seen_tutorial=true' + expires + '; samesite=lax; path=/';
   }
