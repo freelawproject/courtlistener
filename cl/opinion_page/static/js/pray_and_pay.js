@@ -39,9 +39,6 @@ function updatePrayerButton(button, lock = false) {
 document.addEventListener('htmx:beforeRequest', function (event) {
   // Before sending the request, update the button's appearance and counter to
   // provide instant feedback.
-
-  showTutorialModal();
-
   let form = event.detail.elt;
   let button = form.querySelector('button');
   updatePrayerButton(button);
@@ -50,8 +47,8 @@ document.addEventListener('htmx:beforeRequest', function (event) {
 document.addEventListener('htmx:afterRequest', function (event) {
   // If the request was successful, don't update the button as it will be
   // updated by another HTMX event.
+  showTutorialModal();
   if (event.detail.successful) return;
-  console.log(event.detail.successful);
   // If there was an error, revert the changes made to the button and counter.
   let form = event.detail.elt;
   let button = form.querySelector('button');
@@ -87,6 +84,7 @@ document.addEventListener('htmx:oobAfterSwap', function (event) {
 // Tutorial Modal Cookie Handling (NEW)
 //////////////////////////////////////////////
 function showTutorialModal() {
+  if (!$('#tutorialModal').length) return;
   if (!document.cookie.includes('seen_tutorial=true')) {
     $('#tutorialModal').modal('show');
     let date = new Date();

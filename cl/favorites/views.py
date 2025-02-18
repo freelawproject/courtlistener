@@ -27,7 +27,6 @@ from cl.favorites.utils import (
     get_user_prayers,
     prayer_eligible,
 )
-from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
 from cl.search.models import RECAPDocument
