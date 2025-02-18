@@ -615,7 +615,45 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
-                    html="""<p>Lorem ipsum, 114 F.3d 1182</p>""",
+                    plain_text="""Lorem ipsum, 114 F.3d 1182""",
+                ),
+            ),
+        )
+
+        cls.citation9 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1181",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Lorem v. Ipsum",
+                date_filed=date(1997, 4, 8),
+            ),
+        )
+
+        cls.citation10 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1181",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Lorem v. Ipsum",
+                date_filed=date(1997, 4, 8),
+            ),
+        )
+
+        cls.citation11 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Foo v. Bar",
+                date_filed=date(1997, 4, 9),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="""Lorem ipsum, 114 F.3d 1182, consectetur adipiscing elit, 114 F.3d 1181""",
                 ),
             ),
         )
@@ -956,7 +994,20 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         citation_resolutions = do_resolve_citations(citations, opinion)
         new_html = create_cited_html(opinion, citation_resolutions)
 
-        expected_citation_annotation = """<p>Lorem ipsum, <span class="citation multiple-matches"><a href="/c/F.3d/114/1182/">114 F.3d 1182</a></span></p>"""
+        expected_citation_annotation = '<pre class="inline">Lorem ipsum, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1182/">114 F.3d 1182</a></span><pre class="inline"></pre>'
+        self.assertIn(expected_citation_annotation, new_html, msg="Failed!!")
+
+        # Verify if we can annotate multiple citations that can't be
+        # disambiguated
+        opinion = self.citation11.cluster.sub_opinions.all().first()
+        get_and_clean_opinion_text(opinion)
+        citations = get_citations(
+            opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+        )
+        self.assertEqual(len(citations), 2)
+        citation_resolutions = do_resolve_citations(citations, opinion)
+        new_html = create_cited_html(opinion, citation_resolutions)
+        expected_citation_annotation = '<pre class="inline">Lorem ipsum, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1182/">114 F.3d 1182</a></span><pre class="inline">, consectetur adipiscing elit, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1181/">114 F.3d 1181</a></span><pre class="inline"></pre>'
         self.assertIn(expected_citation_annotation, new_html)
 
     def test_citation_increment(self) -> None:
