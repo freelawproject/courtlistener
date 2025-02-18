@@ -1549,15 +1549,9 @@ files = [
 courts-db = ">=0.10.9"
 fast-diff-match-patch = ">=2.0.0"
 lxml = ">=4.6.3"
-pyahocorasick = ">= 1.2"
+pyahocorasick = ">=1.2"
 regex = ">=2020.1.8"
 reporters-db = ">=3.2.38"
-
-[package.source]
-type = "git"
-url = "https://github.com/freelawproject/eyecite.git"
-reference = "198-find-name-only-reference-citations"
-resolved_reference = "d8eb198cc3310cbeec95f229fc615fa9462f9c9e"
 
 [[package]]
 name = "factory-boy"
