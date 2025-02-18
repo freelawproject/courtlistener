@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -165,7 +164,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
 
 
 async def get_user_prayers(
-    user: User, status: Optional[str] = None
+    user: User, status: str | None = None
 ) -> QuerySet[RECAPDocument]:
     user_prayers = Prayer.objects.filter(user=user)
 
