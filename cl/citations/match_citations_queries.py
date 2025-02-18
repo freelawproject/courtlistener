@@ -215,10 +215,9 @@ def es_search_db_for_full_citation(
                 full_citation,
                 full_citation.citing_opinion,
             )
-            return results, citation_found
 
-    # Give up.
-    return [], citation_found
+    # Return all possible results
+    return results, citation_found
 
 
 def es_get_query_citation(
@@ -246,6 +245,7 @@ def es_get_query_citation(
             missing_citations.append(citation)
 
     if len(citations) == 1 and matches and len(matches) == 1:
-        # If more than one match, don't show the tip
+        # If only one match, show the tip
         return matches[0], missing_citations
-    return matches, missing_citations
+    # No exact match, don't show the tip
+    return None, missing_citations

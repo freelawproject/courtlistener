@@ -380,9 +380,9 @@ async def process_recap_pdf(pk):
     # Avoid updating the document_number from the PQ if this upload belongs
     # to a court that doesn't use regular numbering. See issue:
     # https://github.com/freelawproject/courtlistener/issues/2877
-    if ais_appellate_court(court_id) and not is_long_appellate_document_number(
-        rd.document_number
-    ):
+    if not await ais_appellate_court(
+        court_id
+    ) or not is_long_appellate_document_number(rd.document_number):
         rd.document_number = str(pq.document_number)
     # We update attachment_number and document_type in case the
     # RECAPDocument didn't have the actual document yet.

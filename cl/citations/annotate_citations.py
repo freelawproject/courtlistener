@@ -2,10 +2,14 @@ import html
 import re
 from typing import Dict, List, Optional
 
+from django.urls import reverse
 from eyecite import annotate_citations, clean_text
 from eyecite.models import IdCitation, ShortCaseCitation, SupraCitation
 
-from cl.citations.match_citations import NO_MATCH_RESOURCE
+from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_RESOURCE,
+    NO_MATCH_RESOURCE,
+)
 from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import trunc
@@ -102,6 +106,8 @@ def generate_annotations(
     :param plain_text: The cleaned text containing the citations.
     :return The new HTML containing citations
     """
+    from cl.opinion_page.views import make_citation_url_dict
+
     annotations: List[List] = []
     for opinion, citations in citation_resolutions.items():
         if opinion is NO_MATCH_RESOURCE:
@@ -112,42 +118,53 @@ def generate_annotations(
             ]
             # Annotate all unmatched citations
             annotations.extend([[c.span()] + annotation for c in citations])
-            continue
+        elif opinion is MULTIPLE_MATCHES_RESOURCE:
+            # Multiple matches, can't disambiguate
+            for c in citations:
+                # Annotate all citations can't be disambiguated to citation
+                # lookup page
+                kwargs = make_citation_url_dict(**c.groups)
+                citation_url = reverse("citation_redirector", kwargs=kwargs)
+                annotation = [
+                    '<span class="citation multiple-matches">'
+                    f'<a href="{html.escape(citation_url)}">',
+                    "</a></span>",
+                ]
+                annotations.append([c.span()] + annotation)
+        else:
+            # Successfully matched citation
+            for c in citations:
+                # TODO add ReferenceCitation
+                if isinstance(c, (SupraCitation, IdCitation, ShortCaseCitation)):
+                    # Generate extra class name based on object type
+                    class_name = re.sub(
+                        r"(?<!^)([A-Z])", r"-\1", c.__class__.__name__
+                    ).lower()
+                    if c.metadata.pin_cite:
+                        annotation = generate_annotation(
+                            opinion, class_name, c.metadata.pin_cite
+                        )
+                    else:
+                        # We can have these citations types without a pin cite
+                        annotation = generate_annotation(opinion, class_name)
 
-        # If successfully matched, annotate citations based on its type
-        for c in citations:
-            # TODO add ReferenceCitation
-            if isinstance(c, (SupraCitation, IdCitation, ShortCaseCitation)):
-                # Generate extra class name based on object type
-                class_name = re.sub(
-                    r"(?<!^)([A-Z])", r"-\1", c.__class__.__name__
-                ).lower()
-                if c.metadata.pin_cite:
+                # Handle FullCaseCitation cases
+                elif c.metadata.pin_cite:
+                    # Case 1: FullCaseCitation with pin cite
+                    # e.g. "334 U. S. 131, 144, n. 6"
                     annotation = generate_annotation(
-                        opinion, class_name, c.metadata.pin_cite
+                        opinion,
+                        extra_class="pin-cite",
+                        pin_cite=c.metadata.pin_cite,
                     )
+                    annotations.append([c.full_span()] + annotation)
+
                 else:
-                    # We can have these citations types without a pin cite
-                    annotation = generate_annotation(opinion, class_name)
+                    # Case 2: FullCaseCitation without pin cite
+                    # e.g. "334 U. S. 131"
+                    annotation = generate_annotation(opinion)
 
-            # Handle FullCaseCitation cases
-            elif c.metadata.pin_cite:
-                # Case 1: FullCaseCitation with pin cite
-                # e.g. "334 U. S. 131, 144, n. 6"
-                annotation = generate_annotation(
-                    opinion,
-                    extra_class="pin-cite",
-                    pin_cite=c.metadata.pin_cite,
-                )
-                annotations.append([c.full_span()] + annotation)
-
-            else:
-                # Case 2: FullCaseCitation without pin cite
-                # e.g. "334 U. S. 131"
-                annotation = generate_annotation(opinion)
-
-            annotations.append([c.span()] + annotation)
-
+                annotations.append([c.span()] + annotation)
     return annotations
 
 

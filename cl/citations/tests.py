@@ -42,6 +42,7 @@ from cl.citations.group_parentheticals import (
     get_representative_parenthetical,
 )
 from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_RESOURCE,
     NO_MATCH_RESOURCE,
     do_resolve_citations,
     resolve_fullcase_citation,
@@ -527,6 +528,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # Courts
         cls.court_scotus = CourtFactory(id="scotus")
         court_ca1 = CourtFactory(id="ca1")
+        cls.court_ca5 = CourtFactory(id="ca5")
 
         # Citation 1
         cls.citation1 = CitationWithParentsFactory.create(
@@ -600,6 +602,83 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
                     plain_text="America v. Maxwell, Bush v. John, Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                ),
+            ),
+        )
+
+
+        cls.citation6 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1182",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Foo v. Bar",
+                date_filed=date(1997, 4, 10),
+            ),
+        )
+
+        cls.citation7 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1182",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Lorem v. Ipsum",
+                date_filed=date(1997, 4, 8),
+            ),
+        )
+
+        cls.citation8 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="John v. Doe",
+                date_filed=date(1997, 4, 9),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="""Lorem ipsum, 114 F.3d 1182""",
+                ),
+            ),
+        )
+
+        cls.citation9 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1181",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Lorem v. Ipsum",
+                date_filed=date(1997, 4, 8),
+            ),
+        )
+
+        cls.citation10 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1181",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Lorem v. Ipsum",
+                date_filed=date(1997, 4, 8),
+            ),
+        )
+
+        cls.citation11 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Foo v. Bar",
+                date_filed=date(1997, 4, 9),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="""Lorem ipsum, 114 F.3d 1182, consectetur adipiscing elit, 114 F.3d 1181""",
                 ),
             ),
         )
@@ -921,6 +1000,40 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         ]
         results = resolve_fullcase_citation(citation)
         self.assertEqual(NO_MATCH_RESOURCE, results)
+
+    def test_citation_multiple_matches(self) -> None:
+        """Make sure that we can identify multiple matches for a single citation"""
+        citation_str = "114 F.3d 1182"
+        citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
+            0
+        ]
+        results = resolve_fullcase_citation(citation)
+        self.assertEqual(MULTIPLE_MATCHES_RESOURCE, results)
+
+        # Verify if the annotated citation is correct
+        opinion = self.citation8.cluster.sub_opinions.all().first()
+        get_and_clean_opinion_text(opinion)
+        citations = get_citations(
+            opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+        )
+        citation_resolutions = do_resolve_citations(citations, opinion)
+        new_html = create_cited_html(opinion, citation_resolutions)
+
+        expected_citation_annotation = '<pre class="inline">Lorem ipsum, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1182/">114 F.3d 1182</a></span><pre class="inline"></pre>'
+        self.assertIn(expected_citation_annotation, new_html, msg="Failed!!")
+
+        # Verify if we can annotate multiple citations that can't be
+        # disambiguated
+        opinion = self.citation11.cluster.sub_opinions.all().first()
+        get_and_clean_opinion_text(opinion)
+        citations = get_citations(
+            opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+        )
+        self.assertEqual(len(citations), 2)
+        citation_resolutions = do_resolve_citations(citations, opinion)
+        new_html = create_cited_html(opinion, citation_resolutions)
+        expected_citation_annotation = '<pre class="inline">Lorem ipsum, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1182/">114 F.3d 1182</a></span><pre class="inline">, consectetur adipiscing elit, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1181/">114 F.3d 1181</a></span><pre class="inline"></pre>'
+        self.assertIn(expected_citation_annotation, new_html)
 
     def test_citation_increment(self) -> None:
         """Make sure that found citations update the increment on the cited
