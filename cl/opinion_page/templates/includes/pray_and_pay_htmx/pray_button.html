@@ -15,27 +15,6 @@
       <i class="fa fa-lg fa-exclamation-circle red" aria-hidden="true"></i>
     </span>
     {% endif %}
-    {% if first_prayer %}
-      <div class="modal fade" id="tutorialModal" tabindex="-1" role="dialog" aria-labelledby="tutorialModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-          <div class="modal-content">
-            <div class="modal-header">
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-              </button>
-              <h4 class="modal-title" id="tutorialModalLabel">Congratulations on making your first document request!</h5>
-            </div>
-            <div class="modal-body">
-              <p>By clicking 🙏, you requested that this document be purchased for everyone to read. It will show up on a <a href="{% url "top_prayers" %}">leaderboard</a> for the community to crowdsource.</p>
-              <p><a href="{% url "pray_and_pay_help" %}">Learn more about the Pray and Pay project.</a></p>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-primary" data-dismiss="modal">Got it!</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    {% endif %}
   </form>
 {% else %}
   <button
