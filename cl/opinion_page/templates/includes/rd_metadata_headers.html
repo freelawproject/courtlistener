@@ -33,7 +33,7 @@
 <p class="bottom">
   <span class="meta-data-header">Uploaded:</span>
   <span class="meta-data-value">
-      {{ rd.date_upload|date:"F jS, Y" }}
+      {{ rd.date_upload|timezone:timezone|date:"F jS, Y, P e" }}
   </span>
 </p>
 {% endif %}
