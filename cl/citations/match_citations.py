@@ -15,10 +15,7 @@ from eyecite.models import (
 from eyecite.test_factories import case_citation
 from eyecite.utils import strip_punct
 
-from cl.citations.match_citations_queries import (
-    es_search_db_for_full_citation,
-    es_search_db_for_partial_citation,
-)
+from cl.citations.match_citations_queries import es_search_db_for_full_citation
 from cl.citations.types import (
     MatchedResourceType,
     ResolvedFullCites,
@@ -58,25 +55,12 @@ def resolve_fullcase_citation(
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
         db_search_results: list[Hit]
-        # Look for matches using full citation
         db_search_results, _ = es_search_db_for_full_citation(full_citation)
-        if len(db_search_results) == 0:
-            # We didn't get an exact match on the volume/reporter/page.
-            # Perhaps it's a pin cite. Find closest citations filtering by
-            # volume and reporter and excluding self cites. e.g. 8 Wheat. 574
-            # points to 8 Wheat. 543
-            db_search_results, _ = es_search_db_for_partial_citation(
-                full_citation
-            )
-
         # If there is one search result, try to return it
         if len(db_search_results) == 1:
             result_id = db_search_results[0]["id"]
             try:
-                opinion = Opinion.objects.get(pk=result_id)
-                if hasattr(db_search_results[0], "page_pin_cite"):
-                    opinion.page_pin_cite = db_search_results[0].page_pin_cite
-                return opinion
+                return Opinion.objects.get(pk=result_id)
             except (Opinion.DoesNotExist, Opinion.MultipleObjectsReturned):
                 pass
 
