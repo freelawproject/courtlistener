@@ -6740,6 +6740,10 @@ class RECAPIndexingTest(
                 response, 0, i, bank_data.trustee_str, "trustee_str"
             )
 
+        rd_absolute_url = ESRECAPDocument.get(
+            id=ES_CHILD_ID(rd_created_pks[0]).RECAP
+        ).absolute_url
+
         # Update some docket fields.
         de.docket.case_name = "America vs Doe Enterprise"
         de.docket.docket_number = "21-45632"
@@ -6830,6 +6834,13 @@ class RECAPIndexingTest(
             self._compare_response_child_value(
                 response, 0, i, de.docket.pacer_case_id, "pacer_case_id"
             )
+
+        # Confirm that the RD absolute_url didn’t change after the docket case
+        # name was changed.
+        rd_absolute_url_after = ESRECAPDocument.get(
+            id=ES_CHILD_ID(rd_created_pks[0]).RECAP
+        ).absolute_url
+        self.assertEqual(rd_absolute_url, rd_absolute_url_after)
 
         # Update judge name.
         judge.name_first = "William"
