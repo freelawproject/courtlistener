@@ -365,7 +365,6 @@ recap_document_field_mapping = {
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
                 "pacer_case_id": ["pacer_case_id"],
-                "slug": ["absolute_url"],
             }
         },
         Person: {
