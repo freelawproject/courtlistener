@@ -59,6 +59,8 @@ def generate_annotations(
     :param citation_resolutions: A map of lists of citations in the opinion
     :return The new HTML containing citations
     """
+    from cl.opinion_page.views import make_citation_url_dict
+
     annotations: List[List] = []
     for opinion, citations in citation_resolutions.items():
         if opinion is NO_MATCH_RESOURCE:  # If unsuccessfully matched...
@@ -70,8 +72,6 @@ def generate_annotations(
             annotations.extend([[c.span()] + annotation for c in citations])
         elif opinion is MULTIPLE_MATCHES_RESOURCE:
             # Multiple matches, can't disambiguate
-            from cl.opinion_page.views import make_citation_url_dict
-
             for c in citations:
                 # Annotate all citations can't be disambiguated to citation
                 # lookup page
