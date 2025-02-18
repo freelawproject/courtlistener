@@ -75,12 +75,7 @@ def generate_annotations(
             for c in citations:
                 # Annotate all citations can't be disambiguated to citation
                 # lookup page
-                citation_dict = {
-                    "reporter": c.groups.get("reporter"),
-                    "volume": c.groups.get("volume", None),
-                    "page": c.groups.get("page", None),
-                }
-                kwargs = make_citation_url_dict(**citation_dict)
+                kwargs = make_citation_url_dict(**c.groups)
                 citation_url = reverse("citation_redirector", kwargs=kwargs)
                 annotation = [
                     '<span class="citation multiple-matches">'
