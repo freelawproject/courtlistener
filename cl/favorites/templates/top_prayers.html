@@ -13,20 +13,22 @@
 
 {% block content %}
 
-  <ul class="nav navbar-nav navbar-right">
-    {% include 'includes/remind_me_modal.html' %}
-    <li class="hidden-xs">
-      <a href="#" class="donate" data-toggle="modal" data-target="#remindMeModal">
-        <i class="fa fa-heart-o"></i>&nbsp;Remind Me to Help
-      </a>
-    </li>
-    <li>
-      <a href={% if user.is_authenticated %}"{% url 'user_prayers' user.username %}"{% else %}"{% url 'sign-in' %}?next={% url 'top_prayers' %}"{% endif %}><div class="fa gray fa-fw">
-        {% include "includes/hand-holding-heart.svg" %}
-      </div> Your Prayers</a>
-    </li>
-    <li><a href="{% url "pray_and_pay_help" %}">Learn More</a></li>
-  </ul>
+  <div class="col-xs-12">
+    <ul class="nav navbar-nav navbar-right">
+      {% include 'includes/remind_me_modal.html' %}
+      <li class="hidden-xs">
+        <a href="#" class="donate" data-toggle="modal" data-target="#remindMeModal">
+          <i class="fa fa-heart-o"></i>&nbsp;Remind Me to Help
+        </a>
+      </li>
+      <li>
+        <a href={% if user.is_authenticated %}"{% url 'user_prayers' user.username %}"{% else %}"{% url 'sign-in' %}?next={% url 'top_prayers' %}"{% endif %}><div class="fa gray fa-fw">
+          {% include "includes/hand-holding-heart.svg" %}
+        </div> Your Prayers</a>
+      </li>
+      <li><a href="{% url "pray_and_pay_help" %}">Learn More</a></li>
+    </ul>
+  </div>
 
 
   <div class="col-xs-12">
