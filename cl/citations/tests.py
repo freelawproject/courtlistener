@@ -346,12 +346,12 @@ class CitationTextTest(SimpleTestCase):
 
             # Annotate citation but also pin cite
             ('United States v. Paramount Pictures, Inc., 334 U. S. 131, 144, n. 6 (1948).',
-             f'<pre class="inline">United States v. Paramount Pictures, Inc., </pre><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" {aria_description}>334 U. S. 131</a></span><pre class="inline">, </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>144, n. 6</a></span><pre class="inline"> (1948).</pre>'),
+             f'<pre class="inline">United </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>States v. Paramount Pictures, Inc., 334 U. S. 131, 144, n. 6 (1948)</a></span><pre class="inline">.</pre>'),
 
             # Annotate citation but also pin cite with page range,
             # we annotate using first page in pin cite
             ('United States v. Paramount Pictures, Inc., 334 U. S. 131, 144-145, n. 6 (1948).',
-             f'<pre class="inline">United States v. Paramount Pictures, Inc., </pre><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" {aria_description}>334 U. S. 131</a></span><pre class="inline">, </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>144-145, n. 6</a></span><pre class="inline"> (1948).</pre>'),
+             f'<pre class="inline">United </pre><span class="citation pin-cite" data-id="MATCH_ID"><a href="MATCH_URL#144" {aria_description}>States v. Paramount Pictures, Inc., 334 U. S. 131, 144-145, n. 6 (1948)</a></span><pre class="inline">.</pre>'),
 
             # Dummy text to annotate these citations types: FullCaseCitation,
             # ShortCaseCitation, SupraCitation and IdCitation
