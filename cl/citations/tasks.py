@@ -18,6 +18,7 @@ from cl.citations.filter_parentheticals import (
     is_parenthetical_descriptive,
 )
 from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_RESOURCE,
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
@@ -170,6 +171,9 @@ def store_opinion_citations_and_update_parentheticals(
 
     # Put apart the unmatched citations
     unmatched_citations = citation_resolutions.pop(NO_MATCH_RESOURCE, [])
+
+    # Delete citations with multiple matches
+    citation_resolutions.pop(MULTIPLE_MATCHES_RESOURCE, None)
 
     # Increase the citation count for the cluster of each matched opinion
     # if that cluster has not already been cited by this opinion. First,
