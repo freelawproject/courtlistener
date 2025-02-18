@@ -142,21 +142,20 @@ def store_opinion_citations_and_update_parentheticals(
     # Memoize parsed versions of the opinion's text
     get_and_clean_opinion_text(opinion)
 
+    # if the source has marked up text, pass it so it can be used to find
+    # ReferenceCitations
+    markup_args = {}
+    if opinion.source_is_html:
+        markup_args = {"markup_text": opinion.source_text}
+
     # Extract the citations from the opinion's text
     citations: List[CitationBase] = get_citations(
-        opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+        opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER, **markup_args
     )
 
     # If no citations are found, then there is nothing else to do for now.
     if not citations:
         return
-
-    if opinion.source_is_html:
-        references = find_reference_citations_from_markup(
-            opinion.source_text, opinion.cleaned_text, citations
-        )
-        if references:
-            citations = filter_citations(citations + references)
 
     # Resolve all those different citation objects to Opinion objects,
     # using a variety of heuristics.
