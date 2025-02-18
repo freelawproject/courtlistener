@@ -8,6 +8,7 @@ from elasticsearch_dsl import Document as DSLDocument
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
+from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.custom_filters.templatetags.text_filters import (
     best_case_name,
     html_decode,
@@ -15,7 +16,11 @@ from cl.custom_filters.templatetags.text_filters import (
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
-from cl.lib.search_index_utils import get_parties_from_case_name, null_map
+from cl.lib.search_index_utils import (
+    get_parties_from_case_name,
+    get_parties_from_case_name_bankr,
+    null_map,
+)
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import (
     Attorney,
@@ -1258,8 +1263,10 @@ class DocketDocument(DocketBaseDocument, RECAPBaseDocument):
         if not out["party"]:
             # Get party from docket case_name if no normalized parties are
             # available.
-            party_from_case_name = get_parties_from_case_name(
-                instance.case_name
+            party_from_case_name = (
+                get_parties_from_case_name_bankr(instance.case_name)
+                if is_bankruptcy_court(instance.court_id)
+                else get_parties_from_case_name(instance.case_name)
             )
             out["party"] = party_from_case_name if party_from_case_name else []
 

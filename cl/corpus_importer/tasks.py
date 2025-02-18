@@ -67,6 +67,7 @@ from cl.corpus_importer.utils import (
     compute_blocked_court_wait,
     compute_next_binary_probe,
     is_appellate_court,
+    is_long_appellate_document_number,
     make_iquery_probing_key,
     mark_ia_upload_needed,
 )
@@ -1236,7 +1237,7 @@ def make_docket_by_iquery_base(
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = False,
 ) -> int | None:
     """
     Using the iquery endpoint, create or update a docket
@@ -1248,7 +1249,7 @@ def make_docket_by_iquery_base(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep: Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None if failed, else the ID of the created/updated docket
@@ -1301,7 +1302,7 @@ def make_docket_by_iquery_base(
         report_text,
         d,
         tag_names,
-        avoid_trigger_signal=avoid_trigger_signal,
+        skip_iquery_sweep=skip_iquery_sweep,
     )
 
 
@@ -1321,7 +1322,7 @@ def make_docket_by_iquery(
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = True,
 ) -> int | None:
     """
     make_docket_by_iquery_base wrapper without throttling for its use in bulk
@@ -1335,7 +1336,7 @@ def make_docket_by_iquery(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal:  Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep:  Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None if failed, else the ID of the created/updated docket
@@ -1348,7 +1349,7 @@ def make_docket_by_iquery(
         using,
         tag_names,
         log_results_redis,
-        avoid_trigger_signal,
+        skip_iquery_sweep,
     )
 
 
@@ -1368,7 +1369,7 @@ def make_docket_by_iquery_sweep(
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = False,
 ) -> int | None:
     """
      make_docket_by_iquery_base wrapper with court throttling for its use in
@@ -1381,7 +1382,7 @@ def make_docket_by_iquery_sweep(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep: Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None if failed, else the ID of the created/updated docket
@@ -1394,7 +1395,7 @@ def make_docket_by_iquery_sweep(
         using,
         tag_names,
         log_results_redis,
-        avoid_trigger_signal,
+        skip_iquery_sweep,
     )
 
 
@@ -1553,19 +1554,19 @@ def probe_iquery_pages(
 
     # Process all the reports retrieved during the probing.
     # Avoid triggering the iQuery sweep signal except for the latest hit.
-    avoid_trigger_signal = True
+    skip_iquery_sweep = True
     for index, report_content in enumerate(reports_data):
         pacer_case_id, report_data, report_text = report_content
         if index == len(reports_data) - 1:
             # Only trigger the sweep signal on the last hit.
-            avoid_trigger_signal = False
+            skip_iquery_sweep = False
         try:
             process_case_query_report(
                 court_id,
                 pacer_case_id=pacer_case_id,
                 report_data=report_data,
                 report_text=report_text,
-                avoid_trigger_signal=avoid_trigger_signal,
+                skip_iquery_sweep=skip_iquery_sweep,
             )
         except IntegrityError:
             # Individual IntegrityError retries failed for the report. Log the
@@ -2124,7 +2125,7 @@ def get_document_number_for_appellate(
     if not len(document_number_split) == 1:
         document_number = document_number_split[0]
 
-    if len(document_number) > 9:
+    if is_long_appellate_document_number(document_number):
         # If the number is really big, it's probably a court that uses
         # pacer_doc_id instead of regular docket entry numbering.
         # Force the fourth-digit to 0:
