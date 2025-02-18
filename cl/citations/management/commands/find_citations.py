@@ -6,6 +6,7 @@ from django.core.management import CommandError
 from django.core.management.base import CommandParser
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 
+from cl.citations.models import UnmatchedCitation
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
@@ -128,6 +129,9 @@ class Command(VerboseCommand):
             query = query.filter(date_modified__gte=options["modified_after"])
         if options.get("all"):
             query = Opinion.objects.all()
+            sys.stdout.write("Deleting all UnmatchedCitation rows")
+            UnmatchedCitation.objects.all().delete()
+
         self.count = query.count()
         self.average_per_s = 0.0
         self.timings: List[float] = []
