@@ -47,10 +47,13 @@ from cl.citations.match_citations import (
     do_resolve_citations,
     resolve_fullcase_citation,
 )
+from cl.citations.models import UnmatchedCitation
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_recap_citations,
+    store_unmatched_citations,
+    update_unmatched_citations_status,
 )
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
 from cl.search.factories import (
@@ -64,6 +67,7 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
+    Citation,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -72,7 +76,12 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
-from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.tests.cases import (
+    ESIndexTestCase,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -2562,3 +2571,93 @@ class CitationLookUpApiTest(
             # times the allowed number of citations.
             expected_time = test_date + timedelta(minutes=3)
             self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+
+class UnmatchedCitationTest(TransactionTestCase):
+    """Test UnmatchedCitation model and related logic"""
+
+    # this will produce 4 citations: 3 FullCase and 1 Id
+    plain_text = """
+    petition. 62 Tex. Sup. Ct. J. 313 (Jan. 18, 2019). II. Appraisal and the
+    TPPCA Although presented in... inference and resolving any doubts in the
+    nonmovants favor. E.g., Frost Natl Bank v. Fernandez, 315 S.W.3d 494, 508
+    (Tex. 2010) (citation omitted); Valence Operating Co. v. Dorsett,
+    164 S.W.3d 656, 661 (Tex. 2005) (citation omitted). When both parties move
+    for summary judgment on the same issue,... does not alter the fact that
+    State Farm complied with the Insurance Code . . . . Id. Likewise, we hold
+    in this case that State Farm's invocation'
+    """
+    eyecite_citations = get_citations(
+        plain_text, tokenizer=HYPERSCAN_TOKENIZER
+    )
+    cluster = None
+    opinion = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cluster = OpinionClusterFactoryWithChildrenAndParents()
+        cls.opinion = cls.cluster.sub_opinions.first()
+        UnmatchedCitation.objects.all().delete()
+
+    def test_1st_creation(self) -> None:
+        """Can we save unmatched citations?"""
+        store_unmatched_citations(self.eyecite_citations, self.opinion)
+        unmatched_citations = list(
+            UnmatchedCitation.objects.filter(citing_opinion=self.opinion).all()
+        )
+        self.assertTrue(
+            len(unmatched_citations) == 3,
+            "Incorrect number of citations saved",
+        )
+        self.assertTrue(
+            unmatched_citations[-1].court_id == "tex",
+            "court_id was not saved",
+        )
+        self.assertTrue(
+            unmatched_citations[0].year == 2019, "year was not saved"
+        )
+
+        # Test signal on matching Citation created
+        unmatched_citation = UnmatchedCitation.objects.first()
+        Citation.objects.create(
+            cluster=self.cluster,
+            reporter=unmatched_citation.reporter,
+            volume=unmatched_citation.volume,
+            page=unmatched_citation.page,
+            type=unmatched_citation.type,
+        )
+
+        unmatched_citation.refresh_from_db()
+        self.assertTrue(
+            unmatched_citation.status == UnmatchedCitation.FOUND,
+            "`update_unmatched_citation` was not executed on post_save signal",
+        )
+
+        # Simulate that only 1 citation was resolved
+        citation_resolutions = {1: [self.eyecite_citations[0]]}
+
+        should_resolve = UnmatchedCitation.objects.first()
+        should_not_resolve = UnmatchedCitation.objects.last()
+        should_not_resolve.status = UnmatchedCitation.FOUND
+        should_not_resolve.save()
+
+        found_count = UnmatchedCitation.objects.filter(
+            status=UnmatchedCitation.FOUND
+        ).count()
+        self.assertTrue(
+            found_count == 2,
+            f"There should be 2 found UnmatchedCitations, there are {found_count}",
+        )
+
+        update_unmatched_citations_status(citation_resolutions, self.opinion)
+        should_resolve.refresh_from_db()
+        should_not_resolve.refresh_from_db()
+
+        self.assertTrue(
+            should_resolve.status == UnmatchedCitation.RESOLVED,
+            f"UnmatchedCitation.status should be UnmatchedCitation.RESOLVED, is {should_resolve.status}",
+        )
+        self.assertTrue(
+            should_not_resolve.status == UnmatchedCitation.FAILED,
+            f"UnmatchedCitation.status should be UnmatchedCitation.FAILED is {should_not_resolve.status}",
+        )
