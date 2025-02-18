@@ -606,7 +606,6 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ),
         )
 
-
         cls.citation6 = CitationWithParentsFactory.create(
             volume="114",
             reporter="F.3d",

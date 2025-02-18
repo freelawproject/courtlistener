@@ -135,7 +135,9 @@ def generate_annotations(
             # Successfully matched citation
             for c in citations:
                 # TODO add ReferenceCitation
-                if isinstance(c, (SupraCitation, IdCitation, ShortCaseCitation)):
+                if isinstance(
+                    c, (SupraCitation, IdCitation, ShortCaseCitation)
+                ):
                     # Generate extra class name based on object type
                     class_name = re.sub(
                         r"(?<!^)([A-Z])", r"-\1", c.__class__.__name__
