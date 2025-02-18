@@ -5,8 +5,6 @@ from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
 from eyecite import get_citations
-from eyecite.find import find_reference_citations_from_markup
-from eyecite.helpers import filter_citations
 from eyecite.models import CitationBase
 from eyecite.tokenizers import HyperscanTokenizer
 
