@@ -176,9 +176,10 @@ def es_search_db_for_partial_citation(
         # Get the citations from OpinionDocument that matched the partial
         # citation
         valid_citations = [
-            get_citations(citation)[0]
+            citation_result[0]
             for citation in result["citation"]
-            if partial_citation_str in citation and get_citations(citation)
+            if partial_citation_str in citation
+            and (citation_result := get_citations(citation)) is not None
         ]
 
         for valid_citation in valid_citations:

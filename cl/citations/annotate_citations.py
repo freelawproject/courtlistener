@@ -116,6 +116,7 @@ def generate_annotations(
         else:
             # If successfully matched, annotate citations based on its type
             for c in citations:
+                annotation = []
                 # TODO add ReferenceCitation
                 if isinstance(
                     c, (SupraCitation, IdCitation, ShortCaseCitation)
@@ -132,38 +133,47 @@ def generate_annotations(
                         # We can have these citations types without a pin cite
                         annotation = generate_annotation(opinion, class_name)
 
-                    annotations.append([c.span()] + annotation)
                 else:
                     # It is a FullCaseCitation, we have three possible cases
-                    # 1) A regular citation without pin cite
+                    # 1) A regular FullCaseCitation without pin cite
                     # 2) A citation with pin cite in metadata
                     # 3) A pin cite specified in page
-                    if hasattr(opinion, "page_pin_cite"):
-                        # Case 3: Get the pin cite if we used one to match it
-                        # with an opinion. This is for a special pin cite
-                        # like "8 Wheat. 574" which points to "8 Wheat. 543"
-                        annotation = generate_annotation(
-                            opinion,
-                            extra_class="pin-cite",
-                            pin_cite=opinion.page_pin_cite,
-                        )
-                        annotations.append([c.span()] + annotation)
-                    else:
-                        # Case 1: This is a regular full case citation
+
+                    if (
+                        not getattr(opinion, "page_pin_cite", None)
+                        and not c.metadata.pin_cite
+                    ):
+                        # Case 1: This is a FullCaseCitation without pin cite
                         annotation = generate_annotation(opinion)
-                        annotations.append([c.span()] + annotation)
 
                     if c.metadata.pin_cite:
                         # Case 2: We could have a pin cite after the
                         # FullCaseCitation, annotate the pin cite text
                         # e.g. "144, n. 6" in "334 U. S. 131, 144, n. 6"
-
                         annotation = generate_annotation(
                             opinion,
                             extra_class="pin-cite",
                             pin_cite=c.metadata.pin_cite,
                         )
                         annotations.append([c.full_span()] + annotation)
+
+                    if hasattr(opinion, "page_pin_cite"):
+                        # Case 3: Handle special pin cite references. This
+                        # handles cases where the citation refers to a
+                        # specific page in the opinion. For example,
+                        # a citation like "8 Wheat. 574" points to "8 Wheat.
+                        # 543", because page 574 corresponds to a case
+                        # related to the citation on page 543. page_pin_cite
+                        # attribute is being added in
+                        # resolve_fullcase_citation() function
+                        annotation = generate_annotation(
+                            opinion,
+                            extra_class="pin-cite",
+                            pin_cite=opinion.page_pin_cite,
+                        )
+
+                if annotation:
+                    annotations.append([c.span()] + annotation)
 
     return annotations
 
