@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import IntegrityError
 from django.http import (
     Http404,
@@ -26,7 +27,6 @@ from cl.favorites.utils import (
     get_user_prayers,
     prayer_eligible,
 )
-from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
 from cl.search.models import RECAPDocument
@@ -186,17 +186,30 @@ async def view_tags(request, username):
     )
 
 
-@cache_page_ignore_params(30)  # Cache for 30 seconds
 async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
 
     top_prayers = await get_top_prayers()
 
+    page = request.GET.get("page", 1)
+
+    @sync_to_async
+    def paginate_open_prayers(top_prayers, prayer_page):
+        paginator = Paginator(top_prayers, 25, orphans=10)
+        try:
+            return paginator.page(prayer_page)
+        except PageNotAnInteger:
+            return paginator.page(1)
+        except EmptyPage:
+            return paginator.page(paginator.num_pages)
+
+    paginated_entries = await paginate_open_prayers(top_prayers, page)
+
     granted_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
     waiting_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
 
     context = {
-        "top_prayers": top_prayers,
+        "top_prayers": paginated_entries,
         "private": False,
         "granted_stats": granted_stats,
         "waiting_stats": waiting_stats,
@@ -287,14 +300,20 @@ async def user_prayers_view(
     if not is_page_owner:
         return redirect("top_prayers")
 
-    rd_with_prayers = await get_user_prayers(requested_user)
+    rd_with_prayers_granted = await get_user_prayers(
+        requested_user, Prayer.GRANTED
+    )
+    rd_with_prayers_waiting = await get_user_prayers(
+        requested_user, Prayer.WAITING
+    )
 
     user_history = await get_user_prayer_history(requested_user)
 
     is_eligible, num_remaining = await prayer_eligible(requested_user)
 
     context = {
-        "rd_with_prayers": rd_with_prayers,
+        "rd_with_prayers_granted": rd_with_prayers_granted,
+        "rd_with_prayers_waiting": rd_with_prayers_waiting,
         "requested_user": requested_user,
         "is_page_owner": is_page_owner,
         "user_history": user_history,
