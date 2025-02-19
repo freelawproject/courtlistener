@@ -168,7 +168,10 @@ def generate_annotations(
                         extra_class="pin-cite",
                         pin_cite=c.metadata.pin_cite,
                     )
-                    span = c.full_span()
+                    # We want to annotate where the citation starts from(
+                    # using span()) to where the pin cite ends(using
+                    # full_span())
+                    span = (c.span()[0], c.full_span()[1])
                 else:
                     # Case 2: FullCaseCitation without pin cite
                     # e.g. "334 U. S. 131"
