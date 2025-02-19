@@ -82,7 +82,11 @@ class IncrementalNewTemplateMiddleware:
     def process_template_response(self, request, response):
         use_new_design = flag_is_active(request, "use_new_design")
 
-        if use_new_design and isinstance(response, TemplateResponse):
+        if (
+            use_new_design
+            and isinstance(response, TemplateResponse)
+            and not response.is_rendered
+        ):
             old_template = response.template_name
             if isinstance(old_template, str):
                 new_template = f"v2_{old_template}"
