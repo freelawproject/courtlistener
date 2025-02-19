@@ -8129,6 +8129,22 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             document_number="2",
         )
 
+        cls.docket_3 = DocketFactory(
+            court=cls.court,
+            case_name="Ipsum Dolor Test",
+            case_name_short="",
+            case_name_full="",
+            date_filed=datetime.date(2025, 9, 16),
+            docket_number="45-bk-2630",
+            source=Docket.RECAP,
+        )
+        cls.rd_3 = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_3,
+            ),
+            document_number="3",
+        )
+
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.RECAP,
@@ -8176,14 +8192,6 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
         self.docket_2.refresh_from_db()
         current_slug_2 = self.docket_2.slug
 
-        # # Trigger 2 different PGH events for self.docket_1
-        self.docket_1.docket_number = "46-bk-2633"
-        self.docket_1.save()
-        self.docket_1.source = Docket.RECAP_AND_SCRAPER
-        self.docket_1.save()
-        self.docket_1.refresh_from_db()
-        current_slug_1 = self.docket_1.slug
-
         # 2 out of 4 PGH events for self.docket_2 should match when filtering
         # events for the current slug.
         cut_off_date = self.old_date + datetime.timedelta(days=10)
@@ -8193,6 +8201,14 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(docket_2_events_count_by_slug, 2)
 
+        # # Trigger 2 different PGH events for self.docket_1
+        self.docket_1.docket_number = "46-bk-2633"
+        self.docket_1.save()
+        self.docket_1.source = Docket.RECAP_AND_SCRAPER
+        self.docket_1.save()
+        self.docket_1.refresh_from_db()
+        current_slug_1 = self.docket_1.slug
+
         # 2 out of 2 PGH events for self.docket_1 should match when filtering
         # events for the current slug.
         docket_1_events_count_by_slug = get_docket_events_count_by_slug(
@@ -8200,7 +8216,15 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(docket_1_events_count_by_slug, 2)
 
-    def test_fix_broken_recap_document_links(self) -> None:
+        # Confirm there are not events for self.docket_3
+        current_slug_3 = self.docket_3.slug
+        docket_3_events_count_by_slug = get_docket_events_count_by_slug(
+            cut_off_date, self.docket_3.pk, current_slug_3
+        )
+        self.assertEqual(docket_3_events_count_by_slug, 0)
+
+    @mock.patch("cl.search.management.commands.fix_rd_broken_links.logger")
+    def test_fix_broken_recap_document_links(self, mock_logger) -> None:
         """Confirm fix_rd_broken_links properly fixes broken RECAPDocuments
         links.
         """
@@ -8227,10 +8251,9 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             start_date=cut_off_date.date(),
             testing_mode=True,
         )
-
-        # Confirm broken links are fixed after the command runs.
-        es_rd_1 = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_1.pk).RECAP)
-        self.assertEqual(es_rd_1.absolute_url, self.rd_1.get_absolute_url())
-
+        mock_logger.info.assert_any_call(
+            "Processing chunk: %s", [self.docket_2.pk]
+        )
+        # Confirm rd_2 absolute_url is fixed after the command runs
         es_rd_2 = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_2.pk).RECAP)
         self.assertEqual(es_rd_2.absolute_url, self.rd_2.get_absolute_url())
