@@ -7,6 +7,7 @@ from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.citations.annotate_citations import get_and_clean_opinion_text
 from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_RESOURCE,
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
@@ -47,6 +48,9 @@ def store_recap_citations(document: RECAPDocument) -> None:
 
     # Delete the unmatched citations
     citation_resolutions.pop(NO_MATCH_RESOURCE, None)
+
+    # Delete multiple matches citations
+    citation_resolutions.pop(MULTIPLE_MATCHES_RESOURCE, None)
 
     with transaction.atomic():
         # delete existing citation entries
