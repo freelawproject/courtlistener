@@ -2576,7 +2576,10 @@ class CitationLookUpApiTest(
 class UnmatchedCitationTest(TransactionTestCase):
     """Test UnmatchedCitation model and related logic"""
 
-    # this will produce 4 citations: 3 FullCase and 1 Id
+    # this will produce 6 citations: 5 FullCase and 1 Id
+    # last 2 should be ignored:
+    # the Thompsom cite is a known eyecite bug
+    # the last cite has a null page and would cause an error when storing
     plain_text = """
     petition. 62 Tex. Sup. Ct. J. 313 (Jan. 18, 2019). II. Appraisal and the
     TPPCA Although presented in... inference and resolving any doubts in the
@@ -2585,7 +2588,9 @@ class UnmatchedCitationTest(TransactionTestCase):
     164 S.W.3d 656, 661 (Tex. 2005) (citation omitted). When both parties move
     for summary judgment on the same issue,... does not alter the fact that
     State Farm complied with the Insurance Code . . . . Id. Likewise, we hold
-    in this case that State Farm's invocation'
+    in this case that State Farm's invocation...
+    United States v. Thompson, 281 F.3d 1088, 1090 (10th Cir. 2002).
+    182 A.3d ____________________________________________
     """
     eyecite_citations = get_citations(
         plain_text, tokenizer=HYPERSCAN_TOKENIZER
