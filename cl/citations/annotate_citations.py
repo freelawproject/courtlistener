@@ -4,7 +4,12 @@ from typing import Dict, List, Optional
 
 from django.urls import reverse
 from eyecite import annotate_citations, clean_text
-from eyecite.models import IdCitation, ShortCaseCitation, SupraCitation
+from eyecite.models import (
+    IdCitation,
+    ReferenceCitation,
+    ShortCaseCitation,
+    SupraCitation,
+)
 
 from cl.citations.match_citations import (
     MULTIPLE_MATCHES_RESOURCE,
@@ -98,12 +103,10 @@ def generate_annotations(
     citation_resolutions: Dict[
         MatchedResourceType, List[SupportedCitationType]
     ],
-    plain_text: str,
 ) -> List[List]:
     """Generate the string annotations to insert into the opinion text
 
     :param citation_resolutions: A map of lists of citations in the opinion
-    :param plain_text: The cleaned text containing the citations.
     :return The new HTML containing citations
     """
     from cl.opinion_page.views import make_citation_url_dict
@@ -134,9 +137,15 @@ def generate_annotations(
         else:
             # Successfully matched citation
             for c in citations:
-                # TODO add ReferenceCitation
+                span = c.span()
                 if isinstance(
-                    c, (SupraCitation, IdCitation, ShortCaseCitation)
+                    c,
+                    (
+                        SupraCitation,
+                        IdCitation,
+                        ShortCaseCitation,
+                        ReferenceCitation,
+                    ),
                 ):
                     # Generate extra class name based on object type
                     class_name = re.sub(
@@ -159,14 +168,13 @@ def generate_annotations(
                         extra_class="pin-cite",
                         pin_cite=c.metadata.pin_cite,
                     )
-                    annotations.append([c.full_span()] + annotation)
-
+                    span = c.full_span()
                 else:
                     # Case 2: FullCaseCitation without pin cite
                     # e.g. "334 U. S. 131"
                     annotation = generate_annotation(opinion)
 
-                annotations.append([c.span()] + annotation)
+                annotations.append([span] + annotation)
     return annotations
 
 
@@ -186,9 +194,7 @@ def create_cited_html(
     if opinion.source_is_html:  # If opinion was originally HTML...
         new_html = annotate_citations(
             plain_text=opinion.cleaned_text,
-            annotations=generate_annotations(
-                citation_resolutions, opinion.cleaned_text
-            ),
+            annotations=generate_annotations(citation_resolutions),
             source_text=opinion.source_text,
             unbalanced_tags="skip",  # Don't risk overwriting existing tags
         )
@@ -197,9 +203,7 @@ def create_cited_html(
             plain_text=opinion.cleaned_text,
             annotations=[
                 [a[0], f"</pre>{a[1]}", f'{a[2]}<pre class="inline">']
-                for a in generate_annotations(
-                    citation_resolutions, opinion.cleaned_text
-                )
+                for a in generate_annotations(citation_resolutions)
             ],
             source_text=f'<pre class="inline">{html.escape(opinion.source_text)}</pre>',
         )

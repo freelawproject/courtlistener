@@ -21,21 +21,20 @@ from cl.search.models import Opinion
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
-def fetch_citations(search_query: Search, fields=None) -> list[Hit]:
+def fetch_citations(search_query: Search) -> list[Hit]:
     """Fetches citation matches from Elasticsearch based on the provided
     search query.
 
     :param search_query: The Elasticsearch DSL Search object.
-    :param fields: fields to return
     :return: A list of ES Hits objects.
     """
 
-    if fields is None:
-        fields = ["id", "caseName", "absolute_url", "dateFiled"]
     citation_hits = []
     search_query = search_query.sort("id")
     # Only retrieve fields required for the lookup.
-    search_query = search_query.source(includes=fields)
+    search_query = search_query.source(
+        includes=["id", "caseName", "absolute_url", "dateFiled"]
+    )
     # Citation resolution aims for a single match. Setting up a size of 2 is
     # enough to determine if there is more than one match.
     search_query = search_query.extra(size=2)
