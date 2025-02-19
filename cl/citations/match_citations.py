@@ -28,6 +28,11 @@ DEBUG = True
 
 
 NO_MATCH_RESOURCE = Resource(case_citation(source_text="UNMATCHED_CITATION"))
+MULTIPLE_MATCHES_RESOURCE = Resource(
+    case_citation(
+        source_text="MULTIPLE_MATCHES", page="999999", volume="999999"
+    )
+)
 
 
 def filter_by_matching_antecedent(
@@ -56,6 +61,11 @@ def resolve_fullcase_citation(
     if type(full_citation) is FullCaseCitation:
         db_search_results: list[Hit]
         db_search_results, _ = es_search_db_for_full_citation(full_citation)
+        # If there is more than one result, return a placeholder with the
+        # citation with multiple results
+        if len(db_search_results) > 1:
+            return MULTIPLE_MATCHES_RESOURCE
+
         # If there is one search result, try to return it
         if len(db_search_results) == 1:
             result_id = db_search_results[0]["id"]
