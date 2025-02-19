@@ -163,11 +163,18 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
     return documents
 
 
-async def get_user_prayers(user: User) -> QuerySet[RECAPDocument]:
-    user_prayers = Prayer.objects.filter(user=user).values("recap_document_id")
+async def get_user_prayers(
+    user: User, status: str | None = None
+) -> QuerySet[RECAPDocument]:
+    user_prayers = Prayer.objects.filter(user=user)
+
+    if status is not None:
+        user_prayers = user_prayers.filter(status=status)
+
+    user_prayer_ids = user_prayers.values("recap_document_id")
 
     documents = (
-        RECAPDocument.objects.filter(id__in=Subquery(user_prayers))
+        RECAPDocument.objects.filter(id__in=Subquery(user_prayer_ids))
         .select_related(
             "docket_entry",
             "docket_entry__docket",
