@@ -309,15 +309,41 @@ async def user_prayers_view(
 
     user_history = await get_user_prayer_history(requested_user)
 
-    is_eligible, num_remaining = await prayer_eligible(requested_user)
+    _, num_remaining = await prayer_eligible(requested_user)
+
+    waiting_page = request.GET.get("waiting", 1)
+
+    @sync_to_async
+    def paginate_waiting_prayers(waiting_prayers, prayer_page):
+        paginator = Paginator(waiting_prayers, 25, orphans=10)
+        try:
+            return paginator.page(prayer_page)
+        except PageNotAnInteger:
+            return paginator.page(1)
+        except EmptyPage:
+            return paginator.page(paginator.num_pages)
+        
+    granted_page = request.GET.get("granted", 1)
+
+    @sync_to_async
+    def paginate_granted_prayers(granted_page, prayer_page):
+        paginator = Paginator(granted_page, 25, orphans=10)
+        try:
+            return paginator.page(prayer_page)
+        except PageNotAnInteger:
+            return paginator.page(1)
+        except EmptyPage:
+            return paginator.page(paginator.num_pages)
+    
+    paginated_entries_waiting = await paginate_waiting_prayers(rd_with_prayers_waiting, waiting_page)
+    paginated_entries_granted = await paginate_granted_prayers(rd_with_prayers_granted, granted_page)
 
     context = {
-        "rd_with_prayers_granted": rd_with_prayers_granted,
-        "rd_with_prayers_waiting": rd_with_prayers_waiting,
+        "rd_with_prayers_granted": paginated_entries_granted,
+        "rd_with_prayers_waiting": paginated_entries_waiting,
         "requested_user": requested_user,
         "is_page_owner": is_page_owner,
         "user_history": user_history,
-        "is_eligible": is_eligible,
         "num_remaining": num_remaining,
         "private": False,
     }

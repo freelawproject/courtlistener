@@ -12,6 +12,24 @@
 {% block og_description %}CourtListener lets you request the purchase of legal documents. View the documents requested by {{ requested_user }}.{% endblock %}
 
 {% block content %}
+
+  <div class="col-xs-12">
+    <ul class="prayer-top-buttons nav navbar-nav navbar-right">
+      {% include 'includes/remind_me_modal.html' %}
+      <li class="hidden-xs">
+        <a href="#" class="donate" data-toggle="modal" data-target="#remindMeModal">
+          <i class="fa fa-heart-o"></i>&nbsp;Remind Me to Help
+        </a>
+      </li>
+      <li>
+        <a href="{% url "top_prayers" %}"><div class="fa gray fa-fw">
+          {% include "includes/hand-holding-heart.svg" %}
+        </div> Leaderboard</a>
+      </li>
+      <li><a href="{% url "pray_and_pay_help" %}">Learn More</a></li>
+    </ul>
+  </div>
+
   <div class="col-xs-12">
     <h1 class="text-center v-offset-below-3">{% if is_page_owner %}Your PACER Document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %}</h1>
     {% if is_page_owner %}<h3 class="text-center"><b>{{ user_history.prayer_count|intcomma }}</b> {{ user_history.prayer_count|pluralize:"prayer,prayers" }} granted totaling <b>${{ user_history.total_cost }}</b> (<b>{{ num_remaining }}</b> remaining today).</h3>{% endif %}
@@ -122,6 +140,12 @@
     </div>
   </div>
 
+  {% if rd_with_prayers_waiting.has_other_pages %}
+  <div class="col-xs-12" >
+    {% include "includes/pagination.html" with page_obj=rd_with_prayers_waiting %}
+  </div>
+  {% endif %}
+
   {% if rd_with_prayers_granted %}
     <div class="col-xs-12" id="prayer_list_granted" hx-swap-oob="true">
       <div class="table-responsive">
@@ -201,7 +225,15 @@
         </table>
       </div>
     </div>
+
+    {% if rd_with_prayers_granted.has_other_pages %}
+    <div class="col-xs-12" >
+      {% include "includes/pagination.html" with page_obj=rd_with_prayers_granted %}
+    </div>
+    {% endif %}
+
   {% endif %}
+
 {% endblock %}
 
 {% block footer-scripts %}
