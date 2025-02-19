@@ -1,3 +1,4 @@
+import logging
 from http.client import ResponseNotReady
 from typing import Dict, List, Set, Tuple
 
@@ -27,6 +28,7 @@ from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.types import MatchedResourceType, SupportedCitationType
+from cl.citations.utils import get_markup_kwargs
 from cl.search.models import (
     Opinion,
     OpinionCluster,
@@ -35,6 +37,8 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.tasks import index_related_cites_fields
+
+logger = logging.getLogger()
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
@@ -144,8 +148,12 @@ def store_opinion_citations_and_update_parentheticals(
     get_and_clean_opinion_text(opinion)
 
     # Extract the citations from the opinion's text
+    # If the source has marked up text, pass it so it can be used to find
+    # ReferenceCitations. This is handled by `get_markup_kwargs`
     citations: List[CitationBase] = get_citations(
-        opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+        opinion.cleaned_text,
+        tokenizer=HYPERSCAN_TOKENIZER,
+        **get_markup_kwargs(opinion),
     )
 
     # If no citations are found, then there is nothing else to do for now.
@@ -320,6 +328,20 @@ def store_unmatched_citations(
 
     for unmatched_citation in unmatched_citations:
         if not isinstance(unmatched_citation, FullCaseCitation):
+            continue
+
+        # handle bugs in eyecite that make it return FullCitations with null
+        # values in required fields
+        groups = unmatched_citation.groups
+        if (
+            not groups.get("reporter")
+            or not groups.get("volume")
+            or not groups.get("page")
+        ):
+            logger.error(
+                "Unexpected null value in FullCaseCitation %s",
+                unmatched_citation,
+            )
             continue
 
         citation_object = UnmatchedCitation.create_from_eyecite(
