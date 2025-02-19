@@ -1837,3 +1837,7 @@ rect.series-segment {
 .gap-2 {
   gap: 0.5rem
 }
+
+.prayer-top-buttons > li > a {
+  padding: 10px 15px !important;
+}
