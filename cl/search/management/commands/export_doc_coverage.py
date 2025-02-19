@@ -1,11 +1,13 @@
+from pathlib import Path
+
+import pandas as pd
 from django.db.models import Count, Q
 from elasticsearch_dsl import Search
-import pandas as pd
-from pathlib import Path
 from tqdm import tqdm
+
 from cl.lib.command_utils import BaseCommand, logger
-from cl.search.models import Docket
 from cl.search.documents import DocketDocument
+from cl.search.models import Docket
 
 
 class Command(BaseCommand):
