@@ -1,3 +1,4 @@
+import logging
 from http.client import ResponseNotReady
 from typing import Dict, List, Set, Tuple
 
@@ -36,6 +37,8 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.tasks import index_related_cites_fields
+
+logger = logging.getLogger()
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
@@ -325,6 +328,20 @@ def store_unmatched_citations(
 
     for unmatched_citation in unmatched_citations:
         if not isinstance(unmatched_citation, FullCaseCitation):
+            continue
+
+        # handle bugs in eyecite that make it return FullCitations with null
+        # values in required fields
+        groups = unmatched_citation.groups
+        if (
+            not groups.get("reporter")
+            or not groups.get("volume")
+            or not groups.get("page")
+        ):
+            logger.error(
+                "Unexpected null value in FullCaseCitation %s",
+                unmatched_citation,
+            )
             continue
 
         citation_object = UnmatchedCitation.create_from_eyecite(
