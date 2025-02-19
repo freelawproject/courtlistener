@@ -44,6 +44,15 @@ class FakeDocketReport:
         }
 
 
+class FakeAppellateDocketReport(FakeDocketReport):
+
+    @property
+    def data(self):
+        data = super(FakeAppellateDocketReport, self).data
+        data["court_id"] = "ca1"
+        return data
+
+
 class FakePossibleCaseNumberApi:
     def __init__(self, *args, **kwargs):
         pass
