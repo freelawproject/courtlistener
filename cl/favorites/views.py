@@ -322,7 +322,7 @@ async def user_prayers_view(
             return paginator.page(1)
         except EmptyPage:
             return paginator.page(paginator.num_pages)
-        
+
     granted_page = request.GET.get("granted", 1)
 
     @sync_to_async
@@ -334,9 +334,13 @@ async def user_prayers_view(
             return paginator.page(1)
         except EmptyPage:
             return paginator.page(paginator.num_pages)
-    
-    paginated_entries_waiting = await paginate_waiting_prayers(rd_with_prayers_waiting, waiting_page)
-    paginated_entries_granted = await paginate_granted_prayers(rd_with_prayers_granted, granted_page)
+
+    paginated_entries_waiting = await paginate_waiting_prayers(
+        rd_with_prayers_waiting, waiting_page
+    )
+    paginated_entries_granted = await paginate_granted_prayers(
+        rd_with_prayers_granted, granted_page
+    )
 
     context = {
         "rd_with_prayers_granted": paginated_entries_granted,
