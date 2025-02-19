@@ -1,10 +1,11 @@
 import html
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from django.urls import reverse
 from eyecite import annotate_citations, clean_text
 from eyecite.models import (
+    FullCaseCitation,
     IdCitation,
     ReferenceCitation,
     ShortCaseCitation,
@@ -19,6 +20,14 @@ from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import trunc
 from cl.search.models import Opinion, RECAPDocument
+
+CitationType = Union[
+    SupraCitation,
+    IdCitation,
+    ShortCaseCitation,
+    ReferenceCitation,
+    FullCaseCitation,
+]
 
 
 def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
@@ -99,14 +108,46 @@ def generate_annotation(
     return annotation
 
 
+def calculate_pin_cite_span(
+    citation: CitationType, plain_text: str
+) -> tuple[int, int]:
+    """Calculate the absolute start and end positions of a pin cite in the
+    plain text.
+    :param citation: A citation object containing metadata, including the pin cite text
+    :param plain_text: The full text where the citation and pin cite are located
+    the substring.
+    :return: A tuple containing the absolute start and end positions of the pin
+    cite. Example: (start, end)
+    """
+
+    MAX_PIN_CITE_SEARCH_LENGTH = 100
+
+    # Calculate the pin cite span manually since it's not directly available
+    cite_start, cite_end = citation.span()
+    pin_cite_text = citation.metadata.pin_cite
+
+    # Extract a substring from the opinion text starting at the end of the
+    # citation
+    text_after_citation = plain_text[
+        cite_end : cite_end + MAX_PIN_CITE_SEARCH_LENGTH
+    ]
+    pin_cite_start = text_after_citation.find(pin_cite_text)
+
+    absolute_pin_cite_start = cite_end + pin_cite_start
+    absolute_pin_cite_end = absolute_pin_cite_start + len(pin_cite_text)
+    return cite_start, absolute_pin_cite_end
+
+
 def generate_annotations(
     citation_resolutions: Dict[
         MatchedResourceType, List[SupportedCitationType]
     ],
+    plain_text: str,
 ) -> List[List]:
     """Generate the string annotations to insert into the opinion text
 
     :param citation_resolutions: A map of lists of citations in the opinion
+    :param plain_text: The cleaned text containing the citations.
     :return The new HTML containing citations
     """
     from cl.opinion_page.views import make_citation_url_dict
@@ -126,13 +167,21 @@ def generate_annotations(
             for c in citations:
                 # Annotate all citations can't be disambiguated to citation
                 # lookup page
-                kwargs = make_citation_url_dict(**c.groups)
-                citation_url = reverse("citation_redirector", kwargs=kwargs)
-                annotation = [
-                    '<span class="citation multiple-matches">'
-                    f'<a href="{html.escape(citation_url)}">',
-                    "</a></span>",
-                ]
+                if hasattr(c, "groups") and c.groups:
+                    kwargs = make_citation_url_dict(**c.groups)
+                    citation_url = reverse(
+                        "citation_redirector", kwargs=kwargs
+                    )
+                    annotation = [
+                        '<span class="citation multiple-matches">'
+                        f'<a href="{html.escape(citation_url)}">',
+                        "</a></span>",
+                    ]
+                else:
+                    annotation = [
+                        '<span class="citation multiple-matches no-link">',
+                        "</span>",
+                    ]
                 annotations.append([c.span()] + annotation)
         else:
             # Successfully matched citation
@@ -168,10 +217,8 @@ def generate_annotations(
                         extra_class="pin-cite",
                         pin_cite=c.metadata.pin_cite,
                     )
-                    # We want to annotate where the citation starts from(
-                    # using span()) to where the pin cite ends(using
-                    # full_span())
-                    span = (c.span()[0], c.full_span()[1])
+                    # Calculate the span to annotate the pin cite
+                    span = calculate_pin_cite_span(c, plain_text)
                 else:
                     # Case 2: FullCaseCitation without pin cite
                     # e.g. "334 U. S. 131"
@@ -197,7 +244,10 @@ def create_cited_html(
     if opinion.source_is_html:  # If opinion was originally HTML...
         new_html = annotate_citations(
             plain_text=opinion.cleaned_text,
-            annotations=generate_annotations(citation_resolutions),
+            annotations=generate_annotations(
+                citation_resolutions,
+                plain_text=opinion.cleaned_text,
+            ),
             source_text=opinion.source_text,
             unbalanced_tags="skip",  # Don't risk overwriting existing tags
         )
@@ -206,7 +256,10 @@ def create_cited_html(
             plain_text=opinion.cleaned_text,
             annotations=[
                 [a[0], f"</pre>{a[1]}", f'{a[2]}<pre class="inline">']
-                for a in generate_annotations(citation_resolutions)
+                for a in generate_annotations(
+                    citation_resolutions,
+                    plain_text=opinion.cleaned_text,
+                )
             ],
             source_text=f'<pre class="inline">{html.escape(opinion.source_text)}</pre>',
         )
