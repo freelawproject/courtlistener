@@ -151,3 +151,20 @@ def filter_out_non_case_law_and_non_valid_citations(
         and c.groups.get("volume", None)
         and c.groups.get("page", None)
     ]
+
+
+def get_markup_kwargs(opinion) -> dict:
+    """Prepare markup kwargs for `get_citations`
+
+    This is done outside `get_citations` because the specific opinion
+    attributes used are set in Courtlistener, not in eyecite.
+
+    This is a convenience function to save a few lines
+
+    :param opinion: the opinion that has been processed by
+        `get_and_clean_opinion_text`
+    :return: a dictionary with kwargs for `get_citations`
+    """
+    if opinion.source_is_html:
+        return {"markup_text": opinion.source_text}
+    return {}
