@@ -10,15 +10,13 @@ from cl.lib.indexing_utils import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Docket, DocketEvent
 from cl.search.tasks import index_parent_and_child_docs
-from cl.search.models import (
-    Docket,
-    DocketEvent,
-)
 
 
-def get_docket_events_to_check(cut_off_date:datetime, pk_offset:int)->QuerySet:
+def get_docket_events_to_check(
+    cut_off_date: datetime, pk_offset: int
+) -> QuerySet:
     """Retrieve docket events that need verification for broken links.
 
     :param cut_off_date: The cutoff date to filter docket events.
@@ -37,7 +35,10 @@ def get_docket_events_to_check(cut_off_date:datetime, pk_offset:int)->QuerySet:
         .order_by("id")
     )
 
-def get_docket_events_count_by_slug(cut_off_date:datetime, docket_id:int, slug:str)->QuerySet:
+
+def get_docket_events_count_by_slug(
+    cut_off_date: datetime, docket_id: int, slug: str
+) -> QuerySet:
     """Count docket events matching a given docket ID and slug after a cutoff date.
 
     :param cut_off_date: The cutoff date to filter docket events.
@@ -50,7 +51,6 @@ def get_docket_events_count_by_slug(cut_off_date:datetime, docket_id:int, slug:s
         slug=slug,
         id=docket_id,
     ).count()
-
 
 
 def compose_redis_key() -> str:
@@ -102,8 +102,7 @@ class Command(VerboseCommand):
             "update.",
         )
 
-
-    def fix_broken_recap_document_links(self, cut_off_date:datetime)->None:
+    def fix_broken_recap_document_links(self, cut_off_date: datetime) -> None:
         """Fix broken RECAP document links by re-indexing affected dockets.
 
         :param cut_off_date: The cutoff date to filter docket events.
@@ -116,14 +115,20 @@ class Command(VerboseCommand):
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue)
 
-        events_count_per_docket = get_docket_events_to_check(cut_off_date, self.pk_offset)
+        events_count_per_docket = get_docket_events_to_check(
+            cut_off_date, self.pk_offset
+        )
         for docket_event_count in events_count_per_docket.iterator():
             docket_id = docket_event_count["id"]
-            current_docket = Docket.objects.filter(pk=docket_id).values_list("slug", flat=True)
+            current_docket = Docket.objects.filter(pk=docket_id).values_list(
+                "slug", flat=True
+            )
             if not current_docket.exists():
                 continue
 
-            docket_slug_events_count = get_docket_events_count_by_slug(cut_off_date, docket_id, current_docket.first())
+            docket_slug_events_count = get_docket_events_count_by_slug(
+                cut_off_date, docket_id, current_docket.first()
+            )
             if docket_event_count["total_events"] != docket_slug_events_count:
                 chunk.append(docket_id)
                 processed_count += 1
@@ -131,23 +136,25 @@ class Command(VerboseCommand):
                 # Process the chunk.
                 if len(chunk) >= chunk_size:
                     throttle.maybe_wait()
-                    self.stdout.write("Processing chunk: {}".format(chunk))
+                    self.stdout.write(f"Processing chunk: {chunk}")
                     index_parent_and_child_docs.si(
                         chunk,
                         SEARCH_TYPES.RECAP,
                         testing_mode=testing_mode,
                     ).set(queue=queue).apply_async()
                     self.stdout.write(
-                        "Processed {} items so far.".format(processed_count))
+                        f"Processed {processed_count} items so far."
+                    )
                     if processed_count % 1000 == 0:
-                        log_last_document_indexed(docket_id,
-                                                  compose_redis_key())
+                        log_last_document_indexed(
+                            docket_id, compose_redis_key()
+                        )
                     chunk = []
 
             # Process any remaining docket_ids in the final chunk.
             if chunk:
                 throttle.maybe_wait()
-                self.stdout.write("Processing final chunk: {}".format(chunk))
+                self.stdout.write(f"Processing final chunk: {chunk}")
                 index_parent_and_child_docs.si(
                     chunk,
                     SEARCH_TYPES.RECAP,
@@ -157,8 +164,6 @@ class Command(VerboseCommand):
             self.stdout.write(
                 f"Successfully fixed {processed_count} items from pk {self.pk_offset}."
             )
-
-
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
