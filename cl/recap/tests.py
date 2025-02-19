@@ -240,7 +240,9 @@ class RecapUploadsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         CourtFactory(id="canb", jurisdiction="FB")
-        cls.court = CourtFactory.create(jurisdiction="FD", in_use=True)
+        cls.court = CourtFactory.create(
+            id="nysd", jurisdiction="FD", in_use=True
+        )
         cls.court_appellate = CourtFactory(
             id="ca9", jurisdiction="F", in_use=True
         )
@@ -912,8 +914,16 @@ class RecapUploadsTest(TestCase):
             docket_entry=de_1,
             document_type=RECAPDocument.ATTACHMENT,
             pacer_doc_id="00804759951",
-            document_number="1",
+            document_number="00804759951",
             attachment_number=2,
+            description="",
+        )
+        att_3 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            pacer_doc_id="00804759952",
+            document_number="3",
+            attachment_number=None,
             description="",
         )
 
@@ -930,7 +940,7 @@ class RecapUploadsTest(TestCase):
         )
         # Upload a PDF for att_1
         pq_2 = ProcessingQueue.objects.create(
-            court=self.court_appellate,
+            court=self.court,
             uploader=self.user,
             pacer_case_id=de_1.docket.pacer_case_id,
             pacer_doc_id="00804759951",
@@ -939,10 +949,24 @@ class RecapUploadsTest(TestCase):
             upload_type=UPLOAD_TYPE.PDF,
             filepath_local=self.f,
         )
+        # Upload a PDF for att_3
+        pq_3 = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id=de_1.docket.pacer_case_id,
+            pacer_doc_id="00804759952",
+            document_number=4,
+            attachment_number=None,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+
         async_to_sync(process_recap_upload)(pq)
         async_to_sync(process_recap_upload)(pq_2)
-        att_2.refresh_from_db()
+        async_to_sync(process_recap_upload)(pq_3)
         att_1.refresh_from_db()
+        att_2.refresh_from_db()
+        att_3.refresh_from_db()
 
         # Confirm RD metadata is properly updated.
         self.assertEqual(att_1.document_type, RECAPDocument.ATTACHMENT)
@@ -950,8 +974,12 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(att_1.document_number, str(pq.document_number))
 
         self.assertEqual(att_2.document_type, RECAPDocument.ATTACHMENT)
-        self.assertEqual(att_2.attachment_number, pq.attachment_number)
-        self.assertEqual(att_2.document_number, str(pq.document_number))
+        self.assertEqual(att_2.attachment_number, pq_2.attachment_number)
+        self.assertEqual(att_2.document_number, str(pq_2.document_number))
+
+        self.assertEqual(att_3.document_type, RECAPDocument.PACER_DOCUMENT)
+        self.assertEqual(att_3.attachment_number, pq_3.attachment_number)
+        self.assertEqual(att_3.document_number, str(pq_3.document_number))
 
     def test_fix_scrambled_document_number_during_attachment_merge(
         self, mock_upload

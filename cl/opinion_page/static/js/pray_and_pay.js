@@ -47,8 +47,8 @@ document.addEventListener('htmx:beforeRequest', function (event) {
 document.addEventListener('htmx:afterRequest', function (event) {
   // If the request was successful, don't update the button as it will be
   // updated by another HTMX event.
+  showTutorialModal();
   if (event.detail.successful) return;
-  console.log(event.detail.successful);
   // If there was an error, revert the changes made to the button and counter.
   let form = event.detail.elt;
   let button = form.querySelector('button');
@@ -79,3 +79,17 @@ document.addEventListener('htmx:oobBeforeSwap', function (event) {
 document.addEventListener('htmx:oobAfterSwap', function (event) {
   $('[data-toggle="tooltip"]').tooltip();
 });
+
+//////////////////////////////////////////////
+// Tutorial Modal Cookie Handling (NEW)
+//////////////////////////////////////////////
+function showTutorialModal() {
+  if (!$('#tutorialModal').length) return;
+  if (!document.cookie.includes('seen_tutorial=true')) {
+    $('#tutorialModal').modal('show');
+    let date = new Date();
+    date.setTime(date.getTime() + 399 * 24 * 60 * 60 * 1000); // 399 days
+    let expires = '; expires=' + date.toGMTString();
+    document.cookie = 'seen_tutorial=true' + expires + '; samesite=lax; path=/';
+  }
+}
