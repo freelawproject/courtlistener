@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import List, Tuple
+from unittest import mock
 from unittest.mock import Mock, patch
 
 import time_machine
@@ -55,6 +56,7 @@ from cl.citations.tasks import (
     store_unmatched_citations,
     update_unmatched_citations_status,
 )
+from cl.citations.utils import get_markup_kwargs
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -203,9 +205,19 @@ class CitationTextTest(SimpleTestCase):
             ):
                 opinion = Opinion(plain_text=s)
                 get_and_clean_opinion_text(opinion)
-                citations = get_citations(
-                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
-                )
+
+                # take advantage of this test to double check that
+                # `find_reference_citations_from_markup` is not being called
+                # with plain text input
+                with mock.patch(
+                    "eyecite.find.find_reference_citations_from_markup"
+                ) as mock_func:
+                    citations = get_citations(
+                        opinion.cleaned_text,
+                        tokenizer=HYPERSCAN_TOKENIZER,
+                        **get_markup_kwargs(opinion),
+                    )
+                    mock_func.assert_not_called()
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
@@ -249,6 +261,13 @@ class CitationTextTest(SimpleTestCase):
              '<div><p>possess any peculiar knowledge of the mere policy of '
              'public measures." <i><span class="citation no-link">Ibid.'
              '</span></i> Gerry of Massachusetts like</p></div>'),
+
+            # test that reference extraction from HTML is working
+            ('<div>In Jones v. Smith, 1 U.S. 1 ... . As said in <em>Jones</em>'
+             '...</div>',
+             '<div>In Jones v. Smith, <span class="citation no-link">1 U.S. 1'
+             '</span> ... . As said in <em><span class="citation no-link">'
+             'Jones</span></em>...</div>'),
         ]
 
         # fmt: on
@@ -261,7 +280,9 @@ class CitationTextTest(SimpleTestCase):
                 opinion = Opinion(html=s)
                 get_and_clean_opinion_text(opinion)
                 citations = get_citations(
-                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                    opinion.cleaned_text,
+                    tokenizer=HYPERSCAN_TOKENIZER,
+                    **get_markup_kwargs(opinion),
                 )
 
                 # Stub out fake output from do_resolve_citations(), since the
@@ -2594,7 +2615,10 @@ class CitationLookUpApiTest(
 class UnmatchedCitationTest(TransactionTestCase):
     """Test UnmatchedCitation model and related logic"""
 
-    # this will produce 4 citations: 3 FullCase and 1 Id
+    # this will produce 6 citations: 5 FullCase and 1 Id
+    # last 2 should be ignored:
+    # the Thompsom cite is a known eyecite bug
+    # the last cite has a null page and would cause an error when storing
     plain_text = """
     petition. 62 Tex. Sup. Ct. J. 313 (Jan. 18, 2019). II. Appraisal and the
     TPPCA Although presented in... inference and resolving any doubts in the
@@ -2603,7 +2627,9 @@ class UnmatchedCitationTest(TransactionTestCase):
     164 S.W.3d 656, 661 (Tex. 2005) (citation omitted). When both parties move
     for summary judgment on the same issue,... does not alter the fact that
     State Farm complied with the Insurance Code . . . . Id. Likewise, we hold
-    in this case that State Farm's invocation'
+    in this case that State Farm's invocation...
+    United States v. Thompson, 281 F.3d 1088, 1090 (10th Cir. 2002).
+    182 A.3d ____________________________________________
     """
     eyecite_citations = get_citations(
         plain_text, tokenizer=HYPERSCAN_TOKENIZER
