@@ -28,6 +28,7 @@ from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.types import MatchedResourceType, SupportedCitationType
+from cl.citations.utils import get_markup_kwargs
 from cl.search.models import (
     Opinion,
     OpinionCluster,
@@ -147,8 +148,12 @@ def store_opinion_citations_and_update_parentheticals(
     get_and_clean_opinion_text(opinion)
 
     # Extract the citations from the opinion's text
+    # If the source has marked up text, pass it so it can be used to find
+    # ReferenceCitations. This is handled by `get_markup_kwargs`
     citations: List[CitationBase] = get_citations(
-        opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+        opinion.cleaned_text,
+        tokenizer=HYPERSCAN_TOKENIZER,
+        **get_markup_kwargs(opinion),
     )
 
     # If no citations are found, then there is nothing else to do for now.
