@@ -1617,14 +1617,14 @@ files = [
 
 [[package]]
 name = "eyecite"
-version = "2.6.8"
+version = "2.6.9"
 description = "Tool for extracting legal citations from text strings."
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "eyecite-2.6.8-py3-none-any.whl", hash = "sha256:76bcba6790f1dc8604cfc31b0a5316867eddac11342d11acb024dd03459a8660"},
-    {file = "eyecite-2.6.8.tar.gz", hash = "sha256:93de7a0a3b24834afd5f571a53335dc056046e0451edb9da2320c95eda951c4d"},
+    {file = "eyecite-2.6.9-py3-none-any.whl", hash = "sha256:85f8998e1f22106a11c25ac28904f8e4cb3c0ca66e056a0e20d68339f2467e3e"},
+    {file = "eyecite-2.6.9.tar.gz", hash = "sha256:e5382cf22a2a7f0004e7ceb4096c53005bd8443055753c79ad0bece38a76c901"},
 ]
 
 [package.dependencies]
