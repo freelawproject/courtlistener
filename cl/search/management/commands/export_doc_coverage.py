@@ -1,4 +1,6 @@
+from datetime import datetime
 from pathlib import Path
+import time
 
 import pandas as pd
 from django.db.models import Count, Q
@@ -38,6 +40,18 @@ class Command(BaseCommand):
             action="store_true",
             help="Overwrite the output file if it exists",
         )
+        parser.add_argument(
+            "--sleep",
+            type=float,
+            default=0.0,
+            help="Seconds to sleep betweeen batches",
+        )
+        parser.add_argument(
+            "--max-es-buckets",
+            type=float,
+            default=500_000,
+            help="Max number of cases per year to aggregate with ES approach",
+        )
 
     def handle(self, *args, **options):
         out_path = Path(options["out_path"])
@@ -51,22 +65,33 @@ class Command(BaseCommand):
         handler = self.handle_psql if options["psql"] else self.handle_es
 
         min_year = Docket.objects.earliest("date_filed").date_filed.year
-        max_year = Docket.objects.latest("date_filed").date_filed.year
+        max_year = datetime.now().year
+        years = list(range(min_year, max_year + 1))
 
         logger.info(f"Processing dockets from {min_year} to {max_year}...")
-        for year in tqdm(
-            range(min_year, max_year + 1), desc="Processing by years"
-        ):
-            data = handler(year)
+        for year in tqdm(years, desc="Processing by years"):
+            start = datetime.now()
+            data = handler(year, **options)
             if len(data):
                 data = pd.DataFrame(data)
                 if out_path.exists():
                     data.to_csv(out_path, mode="a", index=False, header=False)
                 else:
                     data.to_csv(out_path, index=False)
+
+            pct = (years.index(year) + 1) * 100 / len(years)
+            elapsed = (datetime.now() - start).total_seconds()
+            logger.info(
+                f"Processed {year}. {pct:.2f}% done. Took {elapsed:.2f} seconds."
+            )
+
+            if options["sleep"] > 0 and pct < 100:
+                logger.info(f"Sleeping for {options['sleep']} seconds...")
+                time.sleep(options["sleep"])
+
         logger.info(f"Done! Saved to {out_path}")
 
-    def handle_psql(self, year: int):
+    def handle_psql(self, year: int, **options: dict):
         # Prep filters
         is_document = Q(
             docket_entries__recap_documents__document_type__isnull=False
@@ -76,7 +101,9 @@ class Command(BaseCommand):
         is_rss_document = Q(docket_entries__description="")
 
         # Run query
-        dockets = Docket.objects.filter(date_filed__year=year)
+        dockets = Docket.objects.filter(
+            date_filed__year=year, source__in=Docket.RECAP_SOURCES()
+        )
         dockets = dockets.annotate(
             num_documents=Count(
                 "docket_entries__recap_documents", filter=is_document
@@ -107,7 +134,7 @@ class Command(BaseCommand):
             "num_main_rss_documents",
         )
 
-    def handle_es(self, year: int):
+    def handle_es(self, year: int, **options: dict):
         s = Search(index=DocketDocument._index._name)
 
         # Prep filters
@@ -127,16 +154,16 @@ class Command(BaseCommand):
         s = s.query("bool", filter={"exists": {"field": "document_type"}})
 
         s.aggs.bucket(
-            "dockets", "terms", field="docket_id", size=1_000_000
+            "dockets", "terms", field="docket_id", size=options["max_es_buckets"]
         ).metric(
-            "num_main_documents", "filter", filter=is_main_document
+            "num_main_documents", "filter", filter=is_main_document,
         ).metric(
             "num_available", "filter", filter=is_available
         ).metric(
             "num_main_available", "filter", filter=is_main_available
         )
 
-        s = s.extra(size=0)
+        s = s.extra(size=0, track_total_hits=False)
         response = s.execute()
 
         data = []
