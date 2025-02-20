@@ -48,6 +48,7 @@ from cl.lib.search_utils import (
     fetch_es_results_for_csv,
     get_headers_for_search_export,
 )
+from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
@@ -407,7 +408,10 @@ def email_search_results(user_id: int, query: str):
         )
         csvwriter.writeheader()
         for row in search_results:
-            csvwriter.writerow(row)
+            clean_dict = {
+                camel_to_snake(key): value for key, value in row.items()
+            }
+            csvwriter.writerow(clean_dict)
 
         csv_content: str = output.getvalue()
 
