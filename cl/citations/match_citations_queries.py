@@ -201,6 +201,14 @@ def es_search_db_for_full_citation(
     query = Q("bool", must_not=must_not, filter=filters)
     citations_query = search_query.query(query)
     results = fetch_citations(citations_query)
+
+    # Deduplicate results using absolute_url
+    unique_clusters = {}
+    for result in results:
+        if result.absolute_url not in unique_clusters:
+            unique_clusters[result.absolute_url] = result
+    results = list(unique_clusters.values())
+
     citation_found = True if len(results) > 0 else False
     if len(results) == 1:
         return results, citation_found

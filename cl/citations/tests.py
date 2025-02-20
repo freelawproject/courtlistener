@@ -352,7 +352,7 @@ class CitationTextTest(SimpleTestCase):
             # Id. citation with page number ("Id., at 123, 124")
             ('asdf, Id., at 123, 124. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id="'
-             f'MATCH_ID"><a href="MATCH_URL" {aria_description}>'
+             f'MATCH_ID"><a href="MATCH_URL#123" {aria_description}>'
              'Id., at 123, 124</a></span><pre class="inline">. '
              'Lorem ipsum dolor sit amet</pre>'),
 
