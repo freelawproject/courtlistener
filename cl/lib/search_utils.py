@@ -648,31 +648,23 @@ def get_headers_for_search_export(type: str) -> list[str]:
     """
     match type:
         case SEARCH_TYPES.PEOPLE:
-            keys = PersonDocument.__dict__["_fields"].keys()
+            keys = PersonDocument.get_csv_headers()
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            keys = AudioDocument.__dict__["_fields"].keys()
+            keys = AudioDocument.get_csv_headers()
         case SEARCH_TYPES.PARENTHETICAL:
-            keys = ParentheticalGroupDocument.__dict__["_fields"].keys()
+            keys = ParentheticalGroupDocument.get_csv_headers()
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            keys = set(
-                [
-                    *DocketDocument.__dict__["_fields"].keys(),
-                    *ESRECAPDocument.__dict__["_fields"].keys(),
-                ]
+            keys = (
+                DocketDocument.get_csv_headers()
+                + ESRECAPDocument.get_csv_headers()
             )
         case SEARCH_TYPES.OPINION:
-            keys = set(
-                [
-                    *OpinionClusterDocument.__dict__["_fields"].keys(),
-                    *OpinionDocument.__dict__["_fields"].keys(),
-                ]
+            keys = (
+                OpinionClusterDocument.get_csv_headers()
+                + OpinionDocument.get_csv_headers()
             )
 
-    return [
-        key
-        for key in keys
-        if key not in ("person_child", "docket_child", "cluster_child")
-    ]
+    return keys
 
 
 def fetch_es_results_for_csv(
