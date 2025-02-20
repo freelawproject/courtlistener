@@ -27,6 +27,7 @@ from cl.recap.models import (
     PROCESSING_STATUS,
     UPLOAD_TYPE,
     EmailProcessingQueue,
+    PacerFetchQueue,
     ProcessingQueue,
 )
 from cl.recap.tasks import get_and_copy_recap_attachment_docs
@@ -138,7 +139,7 @@ class RecapEmailDocketAlerts(TestCase):
         cls.user_profile_2 = UserProfileWithParentsFactory()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_nda = CourtFactory(id="ca9", jurisdiction="F")
-        cls.court_nyed = CourtFactory(id="nyed", jurisdiction="FB")
+        cls.court_nyed = CourtFactory(id="nyed", jurisdiction="FD")
         cls.court_jpml = CourtFactory(id="jpml", jurisdiction="FS")
         cls.webhook = WebhookFactory(
             user=cls.user_profile.user,
@@ -2520,6 +2521,99 @@ class RecapEmailDocketAlerts(TestCase):
 
         # A DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 2)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    async def test_recap_email_avoid_fetching_short_doc_id_docs(
+        self,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
+        mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
+    ):
+        """Can we avoid fetching the PDF and attachment page for bankruptcy
+        emails with a bad short pacer_doc_id while still merging the entries
+        and sending alerts?
+        """
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=True,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="0340", document_number="1"
+                        )
+                    ],
+                ),
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="0340", document_number="1"
+                        )
+                    ],
+                ),
+            ],
+        )
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (
+                email_data,
+                "HTML",
+            ),
+        ):
+            # Trigger a new nda recap.email notification from canb
+            await self.async_client.post(self.path, self.data, format="json")
+
+        # Confirm entries were properly merged.
+        dockets = Docket.objects.all()
+        self.assertEqual(await dockets.acount(), 2)
+        docket_entries = DocketEntry.objects.all()
+        # Two docket entries should be merged. One for each docket.
+        self.assertEqual(await docket_entries.acount(), 2)
+        recap_documents = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        # There are two RECAP documents, one for each docket.
+        self.assertEqual(await recap_documents.acount(), 2)
+        async for rd in recap_documents:
+            # The RD shouldn't be sealed. Since the retrieval is aborted for this document.
+            self.assertEqual(
+                rd.is_sealed, None, msg="Document shouldn't be sealed."
+            )
+            # The pacer_doc_id is merged as is.
+            self.assertEqual(rd.pacer_doc_id, "0340")
+            # The remaining metadata should be in place.
+            self.assertEqual(rd.document_number, "1")
+            self.assertEqual(rd.docket_entry.entry_number, 1)
+
+        # DocketAlerts should trigger normally.
+        self.assertEqual(len(mail.outbox), 2, msg="e4")
+
+        # Only one PQ should be created, and it should be marked as failed with
+        # a custom message for this case.
+        pqs = ProcessingQueue.objects.all()
+        self.assertEqual(await pqs.acount(), 1)
+        epq = await pqs.afirst()
+        self.assertEqual(epq.status, PROCESSING_STATUS.FAILED)
+        self.assertEqual(
+            epq.error_message,
+            "Invalid short pacer_doc_id for bankruptcy court.",
+        )
+
+        # No FQs should be created for copying the PDF.
+        fqs = PacerFetchQueue.objects.all()
+        self.assertEqual(await fqs.acount(), 0)
 
 
 class GetAndCopyRecapAttachments(TestCase):
