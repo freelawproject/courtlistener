@@ -76,17 +76,17 @@ def generate_annotations(
             for c in citations:
                 # Annotate all citations can't be disambiguated to citation
                 # lookup page
-                if c.groups:
-                    kwargs = make_citation_url_dict(**c.groups)
-                    citation_url = reverse(
-                        "citation_redirector", kwargs=kwargs
-                    )
-                    annotation = [
-                        '<span class="citation multiple-matches">'
-                        f'<a href="{html.escape(citation_url)}">',
-                        "</a></span>",
-                    ]
-                    annotations.append([c.span()] + annotation)
+                if not (c.groups and c.groups.get("reporter")):
+                    continue
+
+                kwargs = make_citation_url_dict(**c.groups)
+                citation_url = reverse("citation_redirector", kwargs=kwargs)
+                annotation = [
+                    '<span class="citation multiple-matches">'
+                    f'<a href="{html.escape(citation_url)}">',
+                    "</a></span>",
+                ]
+                annotations.append([c.span()] + annotation)
         else:
             # Successfully matched citations
             for citation in citations:
@@ -97,9 +97,8 @@ def generate_annotations(
                 # if multiple pages - link to first e.g. 122-123, add #122
                 if citation.metadata.pin_cite:
                     match = re.search(r"\d+", citation.metadata.pin_cite)
-                    page = match.group() if match else None
-                    if page:
-                        opinion_url = f"{opinion_url}#{page}"
+                    if match:
+                        opinion_url = f"{opinion_url}#{match.group()}"
                 annotation = [
                     f'<span class="citation" data-id="{opinion.pk}">'
                     f'<a href="{opinion_url}"'
@@ -107,12 +106,9 @@ def generate_annotations(
                     ">",
                     "</a></span>",
                 ]
-                if isinstance(citation, IdCitation) or isinstance(
-                    citation, SupraCitation
-                ):
-                    # for ID and Supra citations use full case citation to
+                if isinstance(citation, (IdCitation, SupraCitation)):
+                    # for ID and Supra citations use full span to
                     # to avoid unbalanced html
-
                     span_start, span_end = citation.full_span()
                     annotation_span = (span_start, span_end)
                 else:

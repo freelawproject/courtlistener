@@ -202,7 +202,9 @@ def es_search_db_for_full_citation(
     citations_query = search_query.query(query)
     results = fetch_citations(citations_query)
 
-    # Deduplicate results using absolute_url
+    # Deduplicate results using absolute_url. This will be useful when a
+    # citation points to a single cluster with multiple opinions. This will
+    # prefer the first opinion as ordered on the ES index
     unique_clusters = {}
     for result in results:
         if result.absolute_url not in unique_clusters:
