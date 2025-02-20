@@ -1,6 +1,6 @@
+import time
 from datetime import datetime
 from pathlib import Path
-import time
 
 import pandas as pd
 from django.db.models import Count, Q
@@ -154,9 +154,14 @@ class Command(BaseCommand):
         s = s.query("bool", filter={"exists": {"field": "document_type"}})
 
         s.aggs.bucket(
-            "dockets", "terms", field="docket_id", size=options["max_es_buckets"]
+            "dockets",
+            "terms",
+            field="docket_id",
+            size=options["max_es_buckets"],
         ).metric(
-            "num_main_documents", "filter", filter=is_main_document,
+            "num_main_documents",
+            "filter",
+            filter=is_main_document,
         ).metric(
             "num_available", "filter", filter=is_available
         ).metric(
