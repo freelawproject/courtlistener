@@ -1,26 +1,23 @@
 import json
-import os
-import time
-from datetime import date, datetime, timezone
-from pathlib import Path
-from queue import Queue
-from random import randint
-from unittest.mock import MagicMock, call, patch
+from datetime import date, datetime, timedelta
+from unittest.mock import call, patch
 
 import eyecite
 import pytest
-from asgiref.sync import async_to_sync
+import time_machine
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
 from django.test import override_settings
-from django.utils.timezone import make_aware, now
+from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
 
+from cl.alerts.factories import DocketAlertFactory
+from cl.alerts.models import DocketAlert
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
     CaseBodyFactory,
@@ -90,8 +87,14 @@ from cl.people_db.lookup_utils import (
     find_just_name,
 )
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
+from cl.recap.management.commands.pacer_iquery_scraper import (
+    get_docket_ids_docket_alerts,
+    get_docket_ids_missing_info,
+    get_docket_ids_week_ago_no_case_name,
+)
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.scrapers.models import PACERFreeDocumentRow
+from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -113,6 +116,7 @@ from cl.search.models import (
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
+from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -2576,7 +2580,7 @@ class ScrapeIqueryPagesTest(TestCase):
             )
             # Probing will add 3 dockets (12, 16, 24) + 2 added for the sweep task (13,18).
             self.assertEqual(
-                dockets.count(), 5, msg="Docket number doesn't match."
+                dockets.count(), 5, msg="Docket count doesn't match."
             )
             # 7 additional PACER HTML files should be stored by now, 3 added by the
             # probing task + 4 added by the sweep task.
@@ -2589,8 +2593,22 @@ class ScrapeIqueryPagesTest(TestCase):
 
             ### Integration test probing task + sweep
             # IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED False
+            with override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False):
+                # Create docket pacer_case_id 12, which is the last docket in
+                # the probe. Even though it already exists, it should trigger
+                # a sweep task.
+                DocketFactory(
+                    court=self.court_txed,
+                    source=Docket.RECAP,
+                    case_name="New Incoming Docket 12",
+                    docket_number="2:10-cv-00602",
+                    pacer_case_id="12",
+                )
+
             dockets = Docket.objects.filter(court_id=self.court_txed.pk)
-            self.assertEqual(dockets.count(), 0)
+            self.assertEqual(
+                dockets.count(), 1, msg="Docket count doesn't match for txed."
+            )
             r = get_redis_interface("CACHE")
             # Simulate a highest_known_pacer_case_id  = 8
             r.hset("iquery:highest_known_pacer_case_id", self.court_txed.pk, 8)
@@ -2615,9 +2633,10 @@ class ScrapeIqueryPagesTest(TestCase):
                 1,
                 msg="Wrong number of sweep task called.",
             )
-            # Probing will add 3 dockets (9,10,12) + 1 added for the sweep task (11).
+            # Probing will add 3 dockets (9,10) + 1 added for the sweep task (11).
+            # Docket 12 already exists however, it should still trigger the sweep task that adds 11.
             self.assertEqual(
-                dockets.count(), 4, msg="Docket number doesn't match for txed."
+                dockets.count(), 4, msg="Docket count doesn't match for txed."
             )
         finally:
             # Ensure the signal is disconnected after the test
@@ -2795,6 +2814,157 @@ class ScrapeIqueryPagesTest(TestCase):
             f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
         )
         self.assertEqual(int(court_empty_attempts), 0)
+
+    @patch(
+        "cl.scrapers.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    def test_prevent_update_docket_info_iquery_from_triggering_sweeps(
+        self, mock_cookies
+    ):
+        """Confirm that update_latest_case_id_and_schedule_iquery_sweep is not
+        called by update_docket_info_iquery task.
+        """
+        # Connect handle_update_latest_case_id_and_schedule_iquery_sweep signal
+        # with a unique dispatch_uid for this test
+        test_dispatch_uid = (
+            "test_2_handle_update_latest_case_id_and_schedule_iquery_sweep"
+        )
+        post_save.connect(
+            handle_update_latest_case_id_and_schedule_iquery_sweep,
+            sender=Docket,
+            dispatch_uid=test_dispatch_uid,
+        )
+
+        with override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False):
+            docket_gand = DocketFactory(
+                court=self.court_gand,
+                source=Docket.RECAP,
+                case_name="GAND Docket",
+                docket_number="2:20-cv-00609",
+                pacer_case_id="8",
+            )
+
+            docket_cand = DocketFactory(
+                court=self.court_cand,
+                source=Docket.RECAP,
+                case_name="CAND Docket",
+                docket_number="2:20-cv-00606",
+                pacer_case_id="16",
+            )
+        try:
+            r = get_redis_interface("CACHE")
+            r.hset("iquery:highest_known_pacer_case_id", self.court_gand.pk, 5)
+            # Test case with IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
+            with override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
+            ), patch(
+                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                    *args, **kwargs
+                ),
+            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
+                execute=True
+            ), patch(
+                "cl.scrapers.tasks.get_or_cache_pacer_cookies"
+            ):
+                update_docket_info_iquery.apply_async(
+                    args=(docket_gand.pk, docket_gand.court_id)
+                )
+
+            # update_latest_case_id_and_schedule_iquery_sweep shouldn't be called.
+            self.assertEqual(mock_iquery_sweep.call_count, 0)
+
+            # Test case with IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
+            with override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
+            ), patch(
+                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                    *args, **kwargs
+                ),
+            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
+                execute=True
+            ), patch(
+                "cl.scrapers.tasks.get_or_cache_pacer_cookies"
+            ):
+                update_docket_info_iquery.apply_async(
+                    args=(docket_cand.pk, docket_cand.court_id)
+                )
+
+            # update_latest_case_id_and_schedule_iquery_sweep shouldn't be called.
+            self.assertEqual(mock_iquery_sweep.call_count, 0)
+        finally:
+            # Ensure the signal is disconnected after the test
+            post_save.disconnect(
+                handle_update_latest_case_id_and_schedule_iquery_sweep,
+                sender=Docket,
+                dispatch_uid=test_dispatch_uid,
+            )
+
+    def test_pacer_iquery_scraper_queries(self, mock_cookies):
+        """Test pacer_iquery_scraper command queries."""
+
+        d_1 = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_canb,
+            pacer_case_id="12345",
+            date_filed=None,
+            date_terminated=None,
+            case_name="",
+        )
+        d_2 = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_canb,
+            pacer_case_id="12346",
+            date_filed=None,
+            date_terminated=date(2018, 11, 4),
+            case_name="",
+        )
+        two_weeks_ago = now() - timedelta(days=14)
+        with time_machine.travel(two_weeks_ago, tick=False):
+            d_3 = DocketFactory(
+                source=Docket.RECAP,
+                court=self.court_canb,
+                pacer_case_id="12346",
+                date_filed=date(2018, 11, 4),
+                date_terminated=None,
+                case_name="",
+            )
+
+        user_profile = UserProfileWithParentsFactory()
+        DocketAlertFactory(
+            docket=d_2,
+            user=user_profile.user,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        DocketAlertFactory(
+            docket=d_3,
+            user=user_profile.user,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+
+        # Confirm queries return the expected docket IDs
+        docket_ids = get_docket_ids_missing_info(5)
+        self.assertEqual(
+            set(docket_ids),
+            {d_1.pk, d_2.pk},
+            msg="Wrong IDs returned by get_docket_ids_missing_info",
+        )
+
+        docket_ids_alerts = get_docket_ids_docket_alerts()
+        self.assertEqual(
+            set(docket_ids_alerts),
+            {d_3.pk},
+            msg="Wrong IDs returned by get_docket_ids_docket_alerts",
+        )
+
+        docket_ids_no_case_name = get_docket_ids_week_ago_no_case_name()
+        self.assertEqual(
+            set(docket_ids_no_case_name),
+            {d_1.pk, d_2.pk},
+            msg="Wrong IDs returned by get_docket_ids_week_ago_no_case_name",
+        )
 
 
 class WestCitationImportTest(TestCase):

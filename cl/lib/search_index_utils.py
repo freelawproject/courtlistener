@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 from cl.lib.date_time import midnight_pt
@@ -40,6 +41,8 @@ null_map = dict.fromkeys(
     list(range(0, 10)) + list(range(11, 13)) + list(range(14, 32))
 )
 
+VALID_CASE_NAME_SEPARATORS = [" v ", " v. ", " vs. ", " vs "]
+
 
 def get_parties_from_case_name(case_name: str) -> list[str]:
     """Extracts the parties from case_name by splitting on common case_name
@@ -49,14 +52,55 @@ def get_parties_from_case_name(case_name: str) -> list[str]:
     :return: A list of parties. If no valid separator is found, returns an
     empty list.
     """
-
-    valid_case_name_separators = [
-        " v ",
-        " v. ",
-        " vs. ",
-        " vs ",
-    ]
-    for separator in valid_case_name_separators:
+    for separator in VALID_CASE_NAME_SEPARATORS:
         if separator in case_name:
             return case_name.split(separator, 1)
     return []
+
+
+def get_parties_from_case_name_bankr(case_name: str) -> list[str]:
+    """Extracts the parties involved in a bankruptcy case from the case name.
+
+    This function attempts to identify the parties by splitting the case name
+    string based on common separators. It also performs some cleanup to
+    remove extraneous information like court designations in parentheses,
+    trailing HTML, and text related to "BELOW" or "ABOVE" designations.
+
+    If the case name begins with "in re" or "in the matter of", an empty list
+    is returned, as these typically don't contain party information in the
+    standard format.
+
+    :param case_name: The bankruptcy case name string.
+    :return: A list of strings, where each string represents a party involved
+    in the case. If no recognized separator is found, the function returns
+    a list containing the cleaned case name as a single element.
+    """
+    # Handle cases beginning with "in re" or "in the matter of".
+    # These usually don't contain party information in the expected format.
+    if re.match(
+        r"^(in re|in the matter of|unknown case title)",
+        case_name,
+        re.IGNORECASE,
+    ):
+        return []
+
+    # Removes text enclosed in parentheses at the end of the string.
+    cleaned_case_name = re.sub(r"\s*\([^)]*\)$", "", case_name)
+
+    # Removes any HTML at the end of the string.
+    cleaned_case_name = re.sub(r"\s*<.*$", "", cleaned_case_name)
+
+    # Removes text following "-BELOW" or "-ABOVE" at the end of the string.
+    cleaned_case_name = re.sub(r"\s*(-BELOW|-ABOVE).*$", "", cleaned_case_name)
+
+    # Removes text following "- Adversary Proceeding" at the end of the string.
+    cleaned_case_name = re.sub(
+        r"\s*- Adversary Proceeding.*$", "", cleaned_case_name
+    )
+
+    case_name_separators = VALID_CASE_NAME_SEPARATORS.copy()
+    case_name_separators.append(" and ")
+    for separator in case_name_separators:
+        if separator in case_name:
+            return cleaned_case_name.split(separator, 1)
+    return [cleaned_case_name]

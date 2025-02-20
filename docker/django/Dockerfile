@@ -57,6 +57,7 @@ COPY . /opt/courtlistener
 WORKDIR /opt/courtlistener/cl
 RUN npm install
 RUN npx webpack --mode=production --no-devtool
+RUN npm run build --no-input
 
 WORKDIR /opt
 

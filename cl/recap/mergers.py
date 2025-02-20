@@ -14,7 +14,11 @@ from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 
-from cl.corpus_importer.utils import ais_appellate_court, mark_ia_upload_needed
+from cl.corpus_importer.utils import (
+    ais_appellate_court,
+    is_long_appellate_document_number,
+    mark_ia_upload_needed,
+)
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.model_helpers import clean_docket_number, make_docket_number_core
@@ -943,8 +947,12 @@ async def add_docket_entries(
         # RDs. The check here ensures that if that happens for a particular
         # entry, we avoid creating the main RD a second+ time when we get the
         # docket sheet a second+ time.
-        appelate_court_id_exists = await ais_appellate_court(d.court_id)
-        if de_created is False and appelate_court_id_exists:
+
+        appellate_court_id_exists = await ais_appellate_court(d.court_id)
+        appellate_rd_att_exists = False
+        if de_created is False and appellate_court_id_exists:
+            # In existing appellate entry merges, check if the entry has at
+            # least one attachment.
             appellate_rd_att_exists = await de.recap_documents.filter(
                 document_type=RECAPDocument.ATTACHMENT
             ).aexists()
@@ -953,14 +961,16 @@ async def add_docket_entries(
                 params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
             get_params = deepcopy(params)
-            if de_created is False and not appelate_court_id_exists:
-                del get_params["document_type"]
+            if de_created is False and not appellate_court_id_exists:
                 get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
+            if de_created is False:
+                # Try to match the RD regardless of the document_type.
+                del get_params["document_type"]
             rd = await RECAPDocument.objects.aget(**get_params)
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
             rd = None
-            if de_created is False and not appelate_court_id_exists:
+            if de_created is False and not appellate_court_id_exists:
                 try:
                     # Check for documents with a bad pacer_doc_id
                     rd = await RECAPDocument.objects.aget(**params)
@@ -1840,6 +1850,16 @@ async def merge_attachment_page_data(
                     doc_id_params.pop("attachment_number", None)
                     del doc_id_params["document_type"]
                     doc_id_params["pacer_doc_id"] = attachment["pacer_doc_id"]
+                    if (
+                        court_is_appellate
+                        and is_long_appellate_document_number(document_number)
+                    ):
+                        # If this attachment page belongs to an appellate court
+                        # that doesn't use regular numbers, fallback to matching
+                        # the RD while omitting the document_number since it was likely scrambled
+                        # due to the bug described in:
+                        # https://github.com/freelawproject/courtlistener/issues/2877
+                        del doc_id_params["document_number"]
                     rd = await RECAPDocument.objects.aget(**doc_id_params)
                     if attachment["attachment_number"] == 0:
                         try:
@@ -1891,6 +1911,14 @@ async def merge_attachment_page_data(
         if attachment["pacer_doc_id"]:
             rd.pacer_doc_id = attachment["pacer_doc_id"]
 
+        if court_is_appellate and is_long_appellate_document_number(
+            document_number
+        ):
+            # If this attachment page belongs to an appellate court
+            # that doesn't use regular numbers, assign it from the pacer_doc_id
+            # to fix possible scrambled document_numbers.
+            rd.document_number = pacer_doc_id
+
         # Only set page_count and file_size if they're blank, in case
         # we got the real value by measuring.
         if rd.page_count is None and attachment.get("page_count", None):
@@ -1923,7 +1951,7 @@ def save_iquery_to_docket(
     iquery_text: str,
     d: Docket,
     tag_names: Optional[List[str]],
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
 
@@ -1932,13 +1960,13 @@ def save_iquery_to_docket(
     :param iquery_text: The HTML text data from a successful iquery response
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
-    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep: Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: The pk of the docket if successful. Else, None.
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
-    d.avoid_trigger_signal = avoid_trigger_signal
+    d.skip_iquery_sweep = skip_iquery_sweep
     try:
         d.save()
         add_bankruptcy_data_to_docket(d, iquery_data)
@@ -2010,7 +2038,7 @@ def process_case_query_report(
     pacer_case_id: int,
     report_data: dict[str, Any],
     report_text: str,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = False,
 ) -> None:
     """Process the case query report from probe_iquery_pages task.
     Find and update/store the docket accordingly. This method is able to retry
@@ -2020,7 +2048,7 @@ def process_case_query_report(
     :param pacer_case_id: The internal PACER case ID number
     :param report_data: A dictionary containing report data.
     :param report_text: The HTML text data from a successful iquery response
-    :param avoid_trigger_signal:  Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep:  Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None
@@ -2037,7 +2065,7 @@ def process_case_query_report(
     d.pacer_case_id = pacer_case_id
     d.add_recap_source()
     d = async_to_sync(update_docket_metadata)(d, report_data)
-    d.avoid_trigger_signal = avoid_trigger_signal
+    d.skip_iquery_sweep = skip_iquery_sweep
     d.save()
     add_bankruptcy_data_to_docket(d, report_data)
     logger.info(

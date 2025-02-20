@@ -542,7 +542,7 @@ async def docket_authorities(
             # Needed to show/hide parties tab.
             "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
-            "authorities": docket.authorities_with_data,
+            "authorities": docket.authority_opinions.distinct(),
         }
     )
     return TemplateResponse(request, "docket_authorities.html", context)

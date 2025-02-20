@@ -5,14 +5,14 @@ from datetime import date, datetime, time, timedelta, timezone
 from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
-from unittest.mock import ANY
+from unittest.mock import ANY, MagicMock
 
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.tz import tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -110,6 +110,7 @@ from cl.recap.models import (
 from cl.recap.tasks import (
     create_or_merge_from_idb_chunk,
     do_pacer_fetch,
+    download_pacer_pdf_by_rd,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
     process_recap_acms_appellate_attachment,
@@ -160,7 +161,9 @@ class RecapUploadsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         CourtFactory(id="canb", jurisdiction="FB")
-        cls.court = CourtFactory.create(jurisdiction="FD", in_use=True)
+        cls.court = CourtFactory.create(
+            id="nysd", jurisdiction="FD", in_use=True
+        )
         cls.court_appellate = CourtFactory(
             id="ca9", jurisdiction="F", in_use=True
         )
@@ -168,7 +171,9 @@ class RecapUploadsTest(TestCase):
         cls.att_data = AppellateAttachmentPageFactory(
             attachments=[
                 AppellateAttachmentFactory(
-                    pacer_doc_id="04505578698", attachment_number=1
+                    pacer_doc_id="04505578698",
+                    attachment_number=1,
+                    description="Order entered",
                 ),
                 AppellateAttachmentFactory(
                     pacer_doc_id="04505578699", attachment_number=2
@@ -182,6 +187,7 @@ class RecapUploadsTest(TestCase):
                 DocketEntryDataFactory(
                     pacer_doc_id="04505578698",
                     document_number=1,
+                    short_description="Lorem ipsum",
                 )
             ],
         )
@@ -577,6 +583,384 @@ class RecapUploadsTest(TestCase):
             self.att_data["attachments"][0]["description"],
         )
 
+    def test_match_appellate_main_rd_with_attachments_and_no_att_data(
+        self, mock_upload
+    ):
+        """Can we match the main RECAPDocument when merging an appellate docket
+        entry from a docket sheet after a PDF upload has added attachments,
+        but before the attachment page for the entry is available?
+        """
+
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            pacer_case_id="104490",
+        )
+        # Merge docket entry #1
+        async_to_sync(add_docket_entries)(d, self.de_data["docket_entries"])
+
+        # Confirm that the main RD has been properly merged.
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+        self.assertEqual(recap_documents.count(), 1)
+        main_rd = recap_documents[0]
+        self.assertEqual(main_rd.document_type, RECAPDocument.PACER_DOCUMENT)
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Lorem ipsum")
+
+        # Upload a PDF for attachment 2 in the same entry #1.
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id=d.pacer_case_id,
+            pacer_doc_id="04505578699",
+            document_number=1,
+            attachment_number=2,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+        async_to_sync(process_recap_upload)(pq)
+
+        entry_rds = RECAPDocument.objects.filter(
+            docket_entry=main_rd.docket_entry
+        )
+        # Confirm a new RD was created by the att PDF upload.
+        self.assertEqual(entry_rds.count(), 2, msg="Wrong number of RDs.")
+
+        pq.refresh_from_db()
+        att_2_rd = pq.recap_document
+        # The new RD should be attachment #2
+        self.assertEqual(att_2_rd.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(att_2_rd.attachment_number, 2)
+
+        # Simulate a docket sheet merge containing entry #1 again:
+        de_data_2 = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    pacer_doc_id="04505578698",
+                    document_number=1,
+                    short_description="Motion",
+                )
+            ],
+        )
+
+        async_to_sync(add_docket_entries)(d, de_data_2["docket_entries"])
+        self.assertEqual(entry_rds.count(), 2, msg="Wrong number of RDs.")
+        main_rd.refresh_from_db()
+
+        # Confirm the main RD was properly matched and updated.
+        self.assertEqual(main_rd.description, "Motion")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="Wrong document type.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+
+        # Now merge the Attachment page.
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="104490",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data,
+        ):
+            # Process the appellate attachment page containing 2 attachments.
+            async_to_sync(process_recap_appellate_attachment)(pq.pk)
+
+        # Confirm that the main_rd is properly converted into an attachment.
+        self.assertEqual(recap_documents.count(), 2)
+        main_rd.refresh_from_db()
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="Wrong document type.",
+        )
+        self.assertEqual(main_rd.attachment_number, 1)
+
+    def test_avoid_merging_att_zero_on_pdf_uploads(self, mock_upload):
+        """Confirm that a RECAP PDF upload containing attachment number 0
+        matches the main RD."""
+
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            pacer_case_id="104490",
+        )
+        # Merge docket entry #1
+        async_to_sync(add_docket_entries)(d, self.de_data["docket_entries"])
+
+        # Confirm that the main RD has been properly merged.
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+        self.assertEqual(recap_documents.count(), 1)
+        main_rd = recap_documents[0]
+        self.assertEqual(main_rd.document_type, RECAPDocument.PACER_DOCUMENT)
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.is_available, False)
+
+        # Upload a PDF for attachment number 0.
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id=d.pacer_case_id,
+            pacer_doc_id="04505578698",
+            document_number=1,
+            attachment_number=0,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+        async_to_sync(process_recap_upload)(pq)
+        entry_rds = RECAPDocument.objects.filter(
+            docket_entry=main_rd.docket_entry
+        )
+        pq.refresh_from_db()
+        main_rd = pq.recap_document
+
+        # Confirm that the main RD is properly matched and that
+        # attachment_number is not set to 0.
+        self.assertEqual(entry_rds.count(), 1, msg="Wrong number of RDs.")
+        self.assertEqual(main_rd.document_type, RECAPDocument.PACER_DOCUMENT)
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.is_available, True)
+
+    def test_avoid_updating_doc_num_on_appellate_pdf_uploads(
+        self, mock_upload
+    ):
+        """Confirm that a RECAP PDF upload from an appellate court that doesn't
+        use regular numbers. We avoid updating the document_number from the PQ.
+        """
+
+        de = DocketEntryWithParentsFactory(
+            docket__court=self.court_appellate,
+            entry_number=4505578698,
+            docket__source=Docket.RECAP,
+            docket__pacer_case_id="104490",
+        )
+        att_1 = RECAPDocumentFactory(
+            docket_entry=de,
+            document_type=RECAPDocument.ATTACHMENT,
+            pacer_doc_id="04505578698",
+            document_number="04505578698",
+            attachment_number=3,
+            description="",
+        )
+        att_2 = RECAPDocumentFactory(
+            docket_entry=de,
+            document_type=RECAPDocument.ATTACHMENT,
+            pacer_doc_id="04505578699",
+            document_number="04505578698",
+            attachment_number=4,
+            description="",
+        )
+
+        # Upload a PDF for att_1
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id=de.docket.pacer_case_id,
+            pacer_doc_id="04505578698",
+            document_number=4515578698,
+            attachment_number=3,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+        async_to_sync(process_recap_upload)(pq)
+        entry_rds = RECAPDocument.objects.filter(docket_entry=de)
+        pq.refresh_from_db()
+        att_1.refresh_from_db()
+
+        self.assertEqual(entry_rds.count(), 2, msg="Wrong number of RDs.")
+        self.assertEqual(att_1.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(att_1.attachment_number, 3)
+        self.assertEqual(att_1.document_number, "04505578698")
+        self.assertEqual(att_1.is_available, True)
+
+        # Now merge the Attachment page.
+        pq_2 = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="104490",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data,
+        ):
+            # Process the appellate attachment page containing 2 attachments.
+            async_to_sync(process_recap_appellate_attachment)(pq_2.pk)
+
+        att_1.refresh_from_db()
+        att_2.refresh_from_db()
+        self.assertEqual(entry_rds.count(), 2, msg="Wrong number of RDs.")
+        self.assertEqual(att_1.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(att_1.attachment_number, 1)
+        self.assertEqual(att_1.document_number, "04505578698")
+
+        self.assertEqual(att_2.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(att_2.attachment_number, 2)
+        self.assertEqual(att_2.document_number, "04505578698")
+
+    def test_update_doc_num_on_regular_pdf_uploads(self, mock_upload):
+        """Confirm that on RECAP PDF uploads containing regular document_number.
+        document_number is being updated from the PQ.
+        """
+
+        # Appellate entry
+        de = DocketEntryWithParentsFactory(
+            docket__court=self.court_appellate,
+            entry_number=1,
+            docket__source=Docket.RECAP,
+            docket__pacer_case_id="104490",
+        )
+        # District entry
+        de_1 = DocketEntryWithParentsFactory(
+            docket__court=self.court,
+            entry_number=1,
+            docket__source=Docket.RECAP,
+            docket__pacer_case_id="104491",
+        )
+        att_1 = RECAPDocumentFactory(
+            docket_entry=de,
+            document_type=RECAPDocument.ATTACHMENT,
+            pacer_doc_id="00804759950",
+            document_number="1",
+            attachment_number=2,
+            description="",
+        )
+        att_2 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            document_type=RECAPDocument.ATTACHMENT,
+            pacer_doc_id="00804759951",
+            document_number="00804759951",
+            attachment_number=2,
+            description="",
+        )
+        att_3 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            pacer_doc_id="00804759952",
+            document_number="3",
+            attachment_number=None,
+            description="",
+        )
+
+        # Upload a PDF for att_2
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id=de.docket.pacer_case_id,
+            pacer_doc_id="00804759950",
+            document_number=2,
+            attachment_number=2,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+        # Upload a PDF for att_1
+        pq_2 = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id=de_1.docket.pacer_case_id,
+            pacer_doc_id="00804759951",
+            document_number=2,
+            attachment_number=2,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+        # Upload a PDF for att_3
+        pq_3 = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id=de_1.docket.pacer_case_id,
+            pacer_doc_id="00804759952",
+            document_number=4,
+            attachment_number=None,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+
+        async_to_sync(process_recap_upload)(pq)
+        async_to_sync(process_recap_upload)(pq_2)
+        async_to_sync(process_recap_upload)(pq_3)
+        att_1.refresh_from_db()
+        att_2.refresh_from_db()
+        att_3.refresh_from_db()
+
+        # Confirm RD metadata is properly updated.
+        self.assertEqual(att_1.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(att_1.attachment_number, pq.attachment_number)
+        self.assertEqual(att_1.document_number, str(pq.document_number))
+
+        self.assertEqual(att_2.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(att_2.attachment_number, pq_2.attachment_number)
+        self.assertEqual(att_2.document_number, str(pq_2.document_number))
+
+        self.assertEqual(att_3.document_type, RECAPDocument.PACER_DOCUMENT)
+        self.assertEqual(att_3.attachment_number, pq_3.attachment_number)
+        self.assertEqual(att_3.document_number, str(pq_3.document_number))
+
+    def test_fix_scrambled_document_number_during_attachment_merge(
+        self, mock_upload
+    ):
+        """Confirm a RD document with a wrong document_number is matched and
+        fixed during an attachment page merge.
+        """
+
+        de = DocketEntryWithParentsFactory(
+            docket__court=self.court_appellate,
+            entry_number=4505578698,
+            docket__source=Docket.RECAP,
+            docket__pacer_case_id="104490",
+        )
+        att_1 = RECAPDocumentFactory(
+            docket_entry=de,
+            document_type=RECAPDocument.ATTACHMENT,
+            pacer_doc_id="04505578698",
+            document_number="4515578698",
+            attachment_number=3,
+            description="",
+        )
+        att_2 = RECAPDocumentFactory(
+            docket_entry=de,
+            document_type=RECAPDocument.ATTACHMENT,
+            pacer_doc_id="04505578699",
+            document_number="4515578699",
+            attachment_number=4,
+            description="",
+        )
+
+        # Now merge the Attachment page.
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="104490",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data,
+        ):
+            # Process the appellate attachment page containing 2 attachments.
+            async_to_sync(process_recap_appellate_attachment)(pq.pk)
+
+        entry_rds = RECAPDocument.objects.filter(docket_entry=de)
+        att_1.refresh_from_db()
+        att_2.refresh_from_db()
+
+        # document numbers should be fixed after the attachment page is merged.
+        self.assertEqual(att_2.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(att_2.attachment_number, 2)
+        self.assertEqual(att_2.document_number, "04505578698")
+
+        self.assertEqual(entry_rds.count(), 2, msg="Wrong number of RDs.")
+        self.assertEqual(att_1.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(att_1.attachment_number, 1)
+        self.assertEqual(att_1.document_number, "04505578698")
+
     async def test_uploading_a_case_query_result_page(self, mock):
         """Can we upload a case query result page and have it be saved
         correctly?
@@ -871,15 +1255,59 @@ class RecapUploadsTest(TestCase):
             msg="The pacer_doc_id doesn't match.",
         )
 
+    def test_bad_attachment_page_upload_fails_gracefully(self, mock_upload):
+        """Confirm that a bad attachment page upload fails gracefully with the
+        appropriate status and error message.
+        """
+
+        # Create an initial PQ.
+        pq = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id="104491",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_att_report",
+            side_effect=lambda x, y: {},
+        ):
+            # Process the bad attachment page.
+            async_to_sync(process_recap_upload)(pq)
+
+        # Confirm the PQ is properly marked as failed.
+        pq.refresh_from_db()
+        self.assertEqual(
+            pq.status,
+            PROCESSING_STATUS.INVALID_CONTENT,
+            msg="The status doesn't match.",
+        )
+        self.assertEqual(
+            pq.error_message,
+            "Not a valid attachment page upload.",
+            msg="The error message doesn't match.",
+        )
+
 
 class ReplicateRecapUploadsTest(TestCase):
     """Test RECAP uploads are properly replicated to subdockets."""
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.get(username="recap")
+        user_profile = UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
+        cls.user = user_profile.user
+        permissions = Permission.objects.filter(
+            codename__in=["has_recap_api_access", "has_recap_upload_access"]
+        )
+        cls.user.user_permissions.add(*permissions)
         cls.f = SimpleUploadedFile("file.txt", b"file content more content")
         cls.court = CourtFactory.create(jurisdiction="FD", in_use=True)
+        cls.court_appellate = CourtFactory.create(
+            jurisdiction="F", in_use=True
+        )
         cls.att_data_2 = AppellateAttachmentPageFactory(
             attachments=[
                 AppellateAttachmentFactory(
@@ -919,6 +1347,25 @@ class ReplicateRecapUploadsTest(TestCase):
             docket_number="23-4567",
             court=cls.court,
             pacer_case_id="104492",
+        )
+
+        cls.d_1_a = DocketFactory(
+            source=Docket.RECAP,
+            docket_number="23-4568",
+            court=cls.court_appellate,
+            pacer_case_id="105490",
+        )
+        cls.d_2_a = DocketFactory(
+            source=Docket.RECAP,
+            docket_number="23-4568",
+            court=cls.court_appellate,
+            pacer_case_id="105491",
+        )
+        cls.d_3_a = DocketFactory(
+            source=Docket.RECAP,
+            docket_number="23-4568",
+            court=cls.court_appellate,
+            pacer_case_id="105492",
         )
 
     def test_processing_subdocket_case_attachment_page(self):
@@ -1403,6 +1850,382 @@ class ReplicateRecapUploadsTest(TestCase):
 
                 transaction.set_rollback(True)
 
+    @mock.patch(
+        "cl.recap.tasks.get_att_report_by_rd",
+        return_value=fakes.FakeAttachmentPage,
+    )
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_court_accessible",
+        side_effect=lambda a: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    def test_replicate_subdocket_case_attachment_page_from_fq(
+        self,
+        mock_get_pacer_cookie_from_cache,
+        mock_is_pacer_court_accessible,
+        mock_get_att_report_by_rd,
+    ):
+        """Can we replicate an attachment page Fetch API purchase from a
+        subdocket case to its corresponding RD across all related dockets?
+        """
+
+        # Add the docket entry to every case.
+        async_to_sync(add_docket_entries)(
+            self.d_1, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_2, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_3, self.de_data_2["docket_entries"]
+        )
+
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )
+        d_3_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_3
+        )
+        main_d_1_rd = d_1_recap_document[0]
+        main_d_2_rd = d_2_recap_document[0]
+        main_d_3_rd = d_3_recap_document[0]
+
+        # Create FQ.
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=main_d_2_rd.pk,
+        )
+
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_att_report",
+            side_effect=lambda x, y: self.att_data_2,
+        ):
+            do_pacer_fetch(fq)
+
+        # After adding attachments, it should exist 3 RD on every docket.
+        self.assertEqual(
+            d_1_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_2.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_2_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_1.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_3_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_3.pacer_case_id}.",
+        )
+
+        main_d_1_rd.refresh_from_db()
+        main_d_2_rd.refresh_from_db()
+        main_d_3_rd.refresh_from_db()
+        self.assertEqual(
+            main_d_1_rd.pacer_doc_id,
+            self.de_data_2["docket_entries"][0]["pacer_doc_id"],
+        )
+        self.assertEqual(
+            main_d_2_rd.pacer_doc_id,
+            self.de_data_2["docket_entries"][0]["pacer_doc_id"],
+        )
+        self.assertEqual(
+            main_d_3_rd.pacer_doc_id,
+            self.de_data_2["docket_entries"][0]["pacer_doc_id"],
+        )
+
+        # Two of them should be attachments.
+        d_1_attachments = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+        d_2_attachments = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+        d_3_attachments = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_3,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+
+        self.assertEqual(
+            d_1_attachments.count(),
+            2,
+            msg=f"Didn't get the expected number of RDs Attachments for the docket with PACER case ID {self.d_1.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_2_attachments.count(),
+            2,
+            msg=f"Didn't get the expected number of RDs Attachments for the docket with PACER case ID {self.d_2.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_3_attachments.count(),
+            2,
+            msg=f"Didn't get the expected number of RDs Attachments for the docket with PACER case ID {self.d_3.pacer_case_id}.",
+        )
+
+        att_1_data = self.att_data_2["attachments"][0]
+        att_2_data = self.att_data_2["attachments"][0]
+
+        self.assertEqual(
+            d_1_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_1_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_1_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_2_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_1_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_2_data["attachment_number"],
+        )
+
+        # Assert the number of PQs created to process the additional subdocket RDs.
+        pqs_created = ProcessingQueue.objects.all()
+        self.assertEqual(pqs_created.count(), 2)
+
+        pqs_status = {pq.status for pq in pqs_created}
+        self.assertEqual(pqs_status, {PROCESSING_STATUS.SUCCESSFUL})
+
+        pqs_related_dockets = {pq.docket_id for pq in pqs_created}
+        self.assertEqual(
+            pqs_related_dockets,
+            {self.d_1.pk, self.d_3.pk},
+            msg="Docket ids didn't match.",
+        )
+        # 3 PacerHtmlFiles should have been created, one for each case.
+        att_html_created = PacerHtmlFiles.objects.all()
+        self.assertEqual(att_html_created.count(), 3)
+        related_htmls_de = {
+            html.content_object.pk for html in att_html_created
+        }
+        self.assertEqual(
+            {de.pk for de in DocketEntry.objects.all()}, related_htmls_de
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.get_att_report_by_rd",
+        return_value=fakes.FakeAttachmentPage,
+    )
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_court_accessible",
+        side_effect=lambda a: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    def test_avoid_appellate_replication_for_subdocket_attachment_page_fq(
+        self,
+        mock_get_pacer_cookie_from_cache,
+        mock_is_pacer_court_accessible,
+        mock_get_att_report_by_rd,
+    ):
+        """Attachment page replication is currently not supported for appellate
+        subdockets.
+        """
+        # Add the docket entry to every case.
+        async_to_sync(add_docket_entries)(
+            self.d_1_a, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_2_a, self.de_data_2["docket_entries"]
+        )
+
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1_a
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2_a
+        )
+        main_d_2_rd = d_2_recap_document[0]
+
+        # Create FQ.
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=main_d_2_rd.pk,
+        )
+
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data_2,
+        ):
+            do_pacer_fetch(fq)
+
+        # After adding attachments, it should exist 3 RD in main_d_2_rd and 1 RD
+        # in the other cases.
+        self.assertEqual(
+            d_1_recap_document.count(),
+            1,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_2.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_2_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_1.pacer_case_id}.",
+        )
+
+        main_d_2_rd.refresh_from_db()
+        self.assertEqual(
+            main_d_2_rd.pacer_doc_id,
+            self.de_data_2["docket_entries"][0]["pacer_doc_id"],
+        )
+        d_2_attachments = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2_a,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+        self.assertEqual(
+            d_2_attachments.count(),
+            2,
+            msg=f"Didn't get the expected number of RDs Attachments for the docket with PACER case ID {self.d_2.pacer_case_id}.",
+        )
+
+        # No additional PQs created.
+        pqs_created = ProcessingQueue.objects.all()
+        self.assertEqual(pqs_created.count(), 0)
+
+        # 1 PacerHtmlFiles should have been created for the FQ request.
+        att_html_created = PacerHtmlFiles.objects.all()
+        self.assertEqual(att_html_created.count(), 1)
+
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_court_accessible",
+        side_effect=lambda a: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
+            MockResponse(
+                200,
+                b"pdf content",
+            ),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+    )
+    @mock.patch("cl.scrapers.tasks.extract_recap_pdf_base")
+    def test_replicate_subdocket_pdf_from_fq(
+        self,
+        mock_extract,
+        mock_get_pacer_cookie_from_cache,
+        mock_download_pacer_pdf_by_rd,
+        mock_court_accessible,
+    ):
+        """Can we replicate a PDF document from a fetch request to subdockets?"""
+
+        # Add the docket entry to every case.
+        dockets = [self.d_1, self.d_2, self.d_3]
+        for d in dockets:
+            async_to_sync(add_docket_entries)(
+                d, self.de_data_2["docket_entries"]
+            )
+
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )
+        d_3_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_3
+        )
+
+        main_d_1_rd = d_1_recap_document[0]
+        main_d_2_rd = d_2_recap_document[0]
+        main_d_3_rd = d_3_recap_document[0]
+
+        self.assertFalse(main_d_1_rd.is_available)
+        self.assertFalse(main_d_2_rd.is_available)
+        self.assertFalse(main_d_3_rd.is_available)
+
+        # Create an initial FQ.
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=main_d_2_rd.pk,
+        )
+
+        do_pacer_fetch(fq)
+
+        main_d_1_rd.refresh_from_db()
+        main_d_2_rd.refresh_from_db()
+        main_d_3_rd.refresh_from_db()
+
+        self.assertTrue(
+            main_d_2_rd.is_available,
+            msg="is_available value doesn't match 1",
+        )
+
+        self.assertTrue(
+            main_d_1_rd.is_available,
+            msg="is_available value doesn't match 2",
+        )
+        self.assertTrue(
+            main_d_3_rd.is_available,
+            msg="is_available value doesn't match 3",
+        )
+
+        self.assertTrue(main_d_1_rd.filepath_local)
+        self.assertTrue(main_d_2_rd.filepath_local)
+        self.assertTrue(main_d_3_rd.filepath_local)
+
+        # Assert the number of PQs created to process the additional subdocket RDs.
+        pqs_created = ProcessingQueue.objects.all()
+        self.assertEqual(
+            pqs_created.count(),
+            2,
+            msg="The number of PQs doesn't match.",
+        )
+
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        pqs_status = {pq.status for pq in pqs_created}
+        self.assertEqual(pqs_status, {PROCESSING_STATUS.SUCCESSFUL})
+
+        pqs_related_dockets = {pq.docket_id for pq in pqs_created}
+        self.assertEqual(
+            pqs_related_dockets,
+            {self.d_1.pk, self.d_3.pk},
+        )
+        pqs_related_docket_entries = {pq.docket_entry_id for pq in pqs_created}
+        self.assertEqual(
+            pqs_related_docket_entries,
+            {
+                main_d_1_rd.docket_entry.pk,
+                main_d_3_rd.docket_entry.pk,
+            },
+        )
+        pqs_related_rds = {pq.recap_document_id for pq in pqs_created}
+        self.assertEqual(
+            pqs_related_rds,
+            {main_d_1_rd.pk, main_d_3_rd.pk},
+        )
+        # Confirm that the 3 PDFs have been extracted.
+        self.assertEqual(mock_extract.call_count, 3)
+
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
 @mock.patch(
@@ -1689,10 +2512,6 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         )
 
 
-@mock.patch(
-    "cl.corpus_importer.tasks.FreeOpinionReport",
-    new=fakes.FakeFreeOpinionReport,
-)
 @mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -1702,7 +2521,9 @@ class RecapPdfFetchApiTest(TestCase):
     """Can we fetch PDFs properly?"""
 
     def setUp(self) -> None:
+        self.district_court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
         self.docket = DocketFactory(
+            court=self.district_court,
             case_name="United States v. Curlin",
             case_name_short="Curlin",
             pacer_case_id="28766",
@@ -1731,16 +2552,60 @@ class RecapPdfFetchApiTest(TestCase):
             recap_document_id=self.rd.pk,
         )
 
+        self.appellate_court = CourtFactory(
+            id="ca1", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        self.appellate_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.appellate_court,
+            pacer_case_id="41651",
+        )
+        self.appellate_rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.appellate_docket, entry_number=1208699339
+            ),
+            document_number=1208699339,
+            pacer_doc_id="1208699339",
+            is_available=True,
+            page_count=15,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
+        self.appellate_fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=self.appellate_rd.pk,
+        )
+
     def tearDown(self) -> None:
         RECAPDocument.objects.update(is_available=True)
         self.rd.refresh_from_db()
 
     @mock.patch(
+        "cl.corpus_importer.tasks.FreeOpinionReport",
+        new=fakes.FakeFreeOpinionReport,
+    )
+    @mock.patch(
         "cl.lib.storage.get_name_by_incrementing",
         side_effect=clobbering_get_name,
     )
-    def test_fetch_unavailable_pdf(
-        self, mock_get_cookie, mock_get_name, mock_court_accessible
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        wraps=download_pacer_pdf_by_rd,
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.is_appellate_court",
+        wraps=is_appellate_court,
+    )
+    @mock.patch("cl.scrapers.tasks.extract_recap_pdf_base")
+    def test_fetch_unavailable_pdf_district(
+        self,
+        mock_extract,
+        mock_court_check,
+        mock_download_method,
+        mock_get_name,
+        mock_court_accessible,
+        mock_get_cookies,
     ):
         """Can we do a simple fetch of a PDF from PACER?"""
         self.rd.is_available = False
@@ -1749,12 +2614,34 @@ class RecapPdfFetchApiTest(TestCase):
         self.assertFalse(self.rd.is_available)
         result = do_pacer_fetch(self.fq)
         result.get()
+
+        # Verify that the download helper is invoked exactly once (ideal
+        # scenario) with the anticipated district record data.
+        mock_download_method.assert_called_once()
+        mock_download_method.assert_called_with(
+            self.rd.pk,
+            self.docket.pacer_case_id,
+            self.rd.pacer_doc_id,
+            ANY,
+            None,
+            de_seq_num=None,
+        )
+
+        # Verify court validation calls with expected court ID
+        court_id = self.district_court.id
+        mock_court_check.assert_called_with(court_id)
+
         self.fq.refresh_from_db()
         self.rd.refresh_from_db()
         self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
         self.assertTrue(self.rd.is_available)
+        mock_extract.assert_called_once()
 
-    def test_fetch_available_pdf(self, mock_get_cookie, mock_court_accessible):
+    @mock.patch(
+        "cl.corpus_importer.tasks.FreeOpinionReport",
+        new=fakes.FakeFreeOpinionReport,
+    )
+    def test_fetch_available_pdf(self, mock_court_accessible, mock_get_cookie):
         orig_date_modified = self.rd.date_modified
 
         response = fetch_pacer_doc_by_rd(self.rd.pk, self.fq.pk)
@@ -1772,6 +2659,179 @@ class RecapPdfFetchApiTest(TestCase):
             orig_date_modified,
             self.rd.date_modified,
             msg="rd updated even though it was available.",
+        )
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.AppellateDocketReport",
+        new=fakes.FakeFreeOpinionReport,
+    )
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        wraps=download_pacer_pdf_by_rd,
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.is_appellate_court",
+        wraps=is_appellate_court,
+    )
+    def test_fetch_unavailable_pdf_appellate(
+        self,
+        mock_court_check,
+        mock_download_method,
+        mock_get_name,
+        mock_court_accessible,
+        mock_get_cookies,
+    ):
+        """Can we do a simple fetch of a PDF from PACER?"""
+        self.appellate_rd.is_available = False
+        self.appellate_rd.save()
+
+        self.assertFalse(self.appellate_rd.is_available)
+        result = do_pacer_fetch(self.appellate_fq)
+        result.get()
+
+        # Verify that the download helper is invoked exactly once (ideal
+        # scenario) with the anticipated district record data.
+        mock_download_method.assert_called_once()
+        mock_download_method.assert_called_with(
+            self.appellate_rd.pk,
+            self.appellate_docket.pacer_case_id,
+            self.appellate_rd.pacer_doc_id,
+            ANY,
+            None,
+            de_seq_num=None,
+        )
+
+        # Verify court validation calls with expected court ID
+        court_id = self.appellate_court.id
+        mock_court_check.assert_called_with(court_id)
+
+        self.appellate_fq.refresh_from_db()
+        self.appellate_rd.refresh_from_db()
+        self.assertEqual(
+            self.appellate_fq.status, PROCESSING_STATUS.SUCCESSFUL
+        )
+        self.assertTrue(self.appellate_rd.is_available)
+
+    def test_avoid_purchasing_acms_document(
+        self, mock_court_accessible, mock_get_cookies
+    ):
+        rd_acms = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(docket=DocketFactory()),
+            pacer_doc_id="784459c4-e2cd-ef11-b8e9-001dd804c0b4",
+        )
+        fq_acms = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=rd_acms.pk,
+        )
+        fetch_pacer_doc_by_rd(rd_acms.pk, fq_acms.pk)
+
+        fq_acms.refresh_from_db()
+        self.assertEqual(fq_acms.status, PROCESSING_STATUS.FAILED)
+        self.assertIn(
+            "ACMS documents are not currently supported",
+            fq_acms.message,
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        return_value=(None, "Unable to download PDF."),
+    )
+    def test_handle_failed_purchases(
+        self, mock_download_method, mock_court_accessible, mock_get_cookies
+    ):
+        """Can we handle failed purchases?"""
+        self.rd.is_available = False
+        self.rd.save()
+
+        self.assertFalse(self.rd.is_available)
+        fetch_pacer_doc_by_rd(self.rd.pk, self.fq.pk)
+
+        self.fq.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn(
+            "Unable to download PDF.",
+            self.fq.message,
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        return_value=(
+            None,
+            "Unable to download PDF. An attachment page was returned instead.",
+        ),
+    )
+    def test_add_custom_message_for_attachment_pages(
+        self, mock_download_method, mock_court_accessible, mock_get_cookies
+    ):
+        """
+        Checks if a custom message is added when the download_pacer_pdf_by_rd
+        function returns an error indicating an attachment page was found
+        instead of a PDF.
+        """
+        self.appellate_rd.is_available = False
+        self.appellate_rd.save()
+
+        self.assertFalse(self.appellate_rd.is_available)
+        fetch_pacer_doc_by_rd(self.appellate_rd.pk, self.appellate_fq.pk)
+
+        self.appellate_fq.refresh_from_db()
+        self.assertEqual(self.appellate_fq.status, PROCESSING_STATUS.FAILED)
+
+        error_msg = (
+            "This PACER document is part of an attachment page. "
+            "Our system currently lacks the metadata for this attachment. "
+            "Please purchase the attachment page and try again."
+        )
+        self.assertEqual(error_msg, self.appellate_fq.message)
+
+    @mock.patch(
+        "cl.recap.tasks.AppellateDocketReport.download_pdf",
+        return_value=(MagicMock(content=b""), ""),
+    )
+    def test_tweaks_doc_id_for_attachment_purchases(
+        self, mock_download_method, mock_court_accessible, mock_get_cookies
+    ):
+        "Are we updating the doc_id for appellate attachment purchases?"
+        self.appellate_rd.is_available = False
+        self.appellate_rd.save()
+
+        self.assertFalse(self.appellate_rd.is_available)
+        fetch_pacer_doc_by_rd(self.appellate_rd.pk, self.appellate_fq.pk)
+
+        # Assert that the 4th digit of doc_id was not updated since it's not
+        # an attachment
+        mock_download_method.assert_called_with(
+            pacer_doc_id="1208699339", pacer_case_id="41651"
+        )
+
+        appellate_rd_attachment = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.appellate_docket, entry_number=2
+            ),
+            document_number=2,
+            attachment_number=1,
+            pacer_doc_id="01302453788",
+            is_available=False,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+
+        appellate_fq_attachment = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=appellate_rd_attachment.pk,
+        )
+
+        fetch_pacer_doc_by_rd(
+            appellate_rd_attachment.pk, appellate_fq_attachment.pk
+        )
+        # Assert that the 4th digit of doc_id was updated
+        mock_download_method.assert_called_with(
+            pacer_doc_id="01312453788", pacer_case_id="41651"
         )
 
 
@@ -6272,8 +7332,13 @@ class RecapEmailDocketAlerts(TestCase):
         return_value=(None, "Failed to get docket entry"),
     )
     @mock.patch("cl.recap.tasks.add_docket_entries")
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
     async def test_recap_email_sealed_entry_no_attachments(
         self,
+        mock_webhook_post,
         mock_add_docket_entries,
         mock_download_pdf_by_magic_number,
         mock_docket_entry_sealed,
@@ -6351,8 +7416,13 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch("cl.recap.tasks.get_and_merge_rd_attachments")
     @mock.patch("cl.recap.tasks.add_docket_entries")
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
     async def test_recap_email_sealed_entry_with_attachments(
         self,
+        mock_webhook_post,
         mock_add_docket_entries,
         mock_merge_rd_attachments,
         mock_download_pdf_by_magic_number,
@@ -6433,6 +7503,170 @@ class RecapEmailDocketAlerts(TestCase):
             "Could not retrieve Docket Entry",
             email_processing_queue.status_message,
         )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_attachment_page_by_url",
+        return_value="<html>Sealed document</html>",
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    async def test_recap_email_sealed_document_with_attachments(
+        self,
+        mock_webhook_post,
+        mock_get_attachment_page_by_url,
+        mock_download_pdf_by_magic_number,
+        mock_docket_entry_sealed,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+    ):
+        """This test checks whether a document with attachments that is sealed
+        on PACER is properly ingested. If the attachment page is also
+        unavailable, the attachments are not merged.
+        """
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=True,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[RECAPEmailDocketEntryDataFactory()],
+                )
+            ],
+        )
+
+        court = await sync_to_async(CourtFactory)(id="nyed", jurisdiction="FB")
+        notification_payload = {
+            "court": court.id,
+            "mail": self.data["mail"],
+            "receipt": self.data["receipt"],
+        }
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            return_value=(email_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            await self.async_client.post(
+                self.path, notification_payload, format="json"
+            )
+
+        docket_entry = email_data["dockets"][0]["docket_entries"]
+        docket_entry_query = DocketEntry.objects.filter(
+            docket__pacer_case_id=docket_entry[0]["pacer_case_id"],
+            entry_number=docket_entry[0]["document_number"],
+        )
+        self.assertEqual(await docket_entry_query.acount(), 1)
+
+        # Only the main document is merged.
+        de = await docket_entry_query.afirst()
+        self.assertEqual(await de.recap_documents.all().acount(), 1)
+
+        # An alert containing the main document sealed is sent.
+        self.assertEqual(len(mail.outbox), 1)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_attachment_page_by_url",
+        return_value="<html>Sealed document</html>",
+    )
+    async def test_recap_email_sealed_document_with_no_sealed_attachments(
+        self,
+        mock_get_attachment_page_by_url,
+        mock_webhook_post,
+        mock_download_pdf_by_magic_number,
+        mock_docket_entry_sealed,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+    ):
+        """This test checks whether a document with attachments that is sealed
+        on PACER are properly ingested when the attachment page is available.
+        """
+
+        att_data = AppellateAttachmentPageFactory(
+            attachments=[
+                AppellateAttachmentFactory(
+                    pacer_doc_id="04505578699", attachment_number=1
+                ),
+            ],
+            pacer_doc_id="04505578698",
+        )
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=True,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="04505578698"
+                        )
+                    ],
+                )
+            ],
+        )
+
+        court = await sync_to_async(CourtFactory)(id="nyed", jurisdiction="FB")
+        notification_payload = {
+            "court": court.id,
+            "mail": self.data["mail"],
+            "receipt": self.data["receipt"],
+        }
+
+        with (
+            mock.patch(
+                "cl.recap.tasks.get_data_from_att_report",
+                side_effect=lambda x, y: att_data,
+            ),
+            mock.patch(
+                "cl.recap.tasks.open_and_validate_email_notification",
+                return_value=(email_data, "HTML"),
+            ),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            await self.async_client.post(
+                self.path, notification_payload, format="json"
+            )
+
+        docket_entry = email_data["dockets"][0]["docket_entries"]
+        docket_entry_query = DocketEntry.objects.filter(
+            docket__pacer_case_id=docket_entry[0]["pacer_case_id"],
+            entry_number=docket_entry[0]["document_number"],
+        )
+        self.assertEqual(await docket_entry_query.acount(), 1)
+
+        # The main sealed document and one attachment should be ingested.
+        de = await docket_entry_query.afirst()
+        self.assertEqual(await de.recap_documents.all().acount(), 2)
+
+        # Check RDs merged.
+        main_doc = await RECAPDocument.objects.filter(
+            docket_entry=de, document_type=RECAPDocument.PACER_DOCUMENT
+        ).afirst()
+        self.assertEqual(main_doc.is_sealed, True)
+        att_doc = RECAPDocument.objects.filter(
+            docket_entry=de, document_type=RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(await att_doc.acount(), 1)
+
+        # An alert is sent.
+        self.assertEqual(len(mail.outbox), 1)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",

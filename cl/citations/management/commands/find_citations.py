@@ -4,7 +4,9 @@ from typing import Iterable, List, cast
 
 from django.core.management import CommandError
 from django.core.management.base import CommandParser
+from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 
+from cl.citations.models import UnmatchedCitation
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
@@ -12,7 +14,7 @@ from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.types import OptionsType
-from cl.search.models import Opinion
+from cl.search.models import Courthouse, Opinion
 
 
 class Command(VerboseCommand):
@@ -54,6 +56,11 @@ class Command(VerboseCommand):
             "Opinion objects to update.",
         )
         parser.add_argument(
+            "--state",
+            choices=[key[0] for key in USPS_CHOICES + OBSOLETE_STATES],
+            help="State abbreviation E.g. NY, MA, CA.",
+        )
+        parser.add_argument(
             "--all",
             action="store_true",
             default=False,
@@ -82,18 +89,28 @@ class Command(VerboseCommand):
                 options.get("filed_after") is None,
                 options.get("filed_before") is None,
                 options.get("modified_after") is None,
+                options.get("state") is not None,
                 options.get("all") is False,
             ]
         )
         if both_list_and_endpoints or no_option:
             raise CommandError(
                 "Please specify either a list of documents, a "
-                "range of ids, a range of dates, or "
+                "range of ids, a range of dates, a state or "
                 "everything."
             )
 
         # Use query chaining to build the query
         query = Opinion.objects.all().order_by("pk")
+        if options.get("state"):
+            court_ids = Courthouse.objects.filter(
+                state=options["state"]
+            ).values_list("court", flat=True)
+            if not court_ids:
+                raise CommandError(
+                    f"No courts associated with {options['state']}"
+                )
+            query = query.filter(cluster__docket__court__in=court_ids)
         if options.get("doc_id"):
             query = query.filter(pk__in=options["doc_id"])
         if options.get("end_id"):
@@ -112,6 +129,9 @@ class Command(VerboseCommand):
             query = query.filter(date_modified__gte=options["modified_after"])
         if options.get("all"):
             query = Opinion.objects.all()
+            sys.stdout.write("Deleting all UnmatchedCitation rows")
+            UnmatchedCitation.objects.all().delete()
+
         self.count = query.count()
         self.average_per_s = 0.0
         self.timings: List[float] = []

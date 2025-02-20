@@ -2,9 +2,13 @@ import html
 import re
 from typing import Dict, List
 
+from django.urls import reverse
 from eyecite import annotate_citations, clean_text
 
-from cl.citations.match_citations import NO_MATCH_RESOURCE
+from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_RESOURCE,
+    NO_MATCH_RESOURCE,
+)
 from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import trunc
@@ -55,6 +59,8 @@ def generate_annotations(
     :param citation_resolutions: A map of lists of citations in the opinion
     :return The new HTML containing citations
     """
+    from cl.opinion_page.views import make_citation_url_dict
+
     annotations: List[List] = []
     for opinion, citations in citation_resolutions.items():
         if opinion is NO_MATCH_RESOURCE:  # If unsuccessfully matched...
@@ -62,17 +68,35 @@ def generate_annotations(
                 '<span class="citation no-link">',
                 "</span>",
             ]
-        else:  # If successfully matched...
+            # Annotate all unmatched citations
+            annotations.extend([[c.span()] + annotation for c in citations])
+        elif opinion is MULTIPLE_MATCHES_RESOURCE:
+            # Multiple matches, can't disambiguate
+            for c in citations:
+                # Annotate all citations can't be disambiguated to citation
+                # lookup page
+                kwargs = make_citation_url_dict(**c.groups)
+                citation_url = reverse("citation_redirector", kwargs=kwargs)
+                annotation = [
+                    '<span class="citation multiple-matches">'
+                    f'<a href="{html.escape(citation_url)}">',
+                    "</a></span>",
+                ]
+                annotations.append([c.span()] + annotation)
+        else:
+            # Successfully matched citation
             case_name = trunc(best_case_name(opinion.cluster), 60, "...")
+            safe_case_name = html.escape(case_name)
+            opinion_url = html.escape(opinion.cluster.get_absolute_url())
             annotation = [
                 f'<span class="citation" data-id="{opinion.pk}">'
-                f'<a href="{opinion.cluster.get_absolute_url()}"'
-                f' aria-description="Citation for case: {case_name}"'
+                f'<a href="{opinion_url}"'
+                f' aria-description="Citation for case: {safe_case_name}"'
                 ">",
                 "</a></span>",
             ]
-        for c in citations:
-            annotations.append([c.span()] + annotation)
+            # Annotate all matched citations for the resource
+            annotations.extend([[c.span()] + annotation for c in citations])
     return annotations
 
 

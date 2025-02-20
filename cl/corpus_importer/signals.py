@@ -72,7 +72,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
             # Schedule the next task with a 1-second countdown increment
             make_docket_by_iquery_sweep.apply_async(
                 args=(court_id, iquery_pacer_case_id_current),
-                kwargs={"avoid_trigger_signal": True},
+                kwargs={"skip_iquery_sweep": True},
                 countdown=task_scheduled_countdown,
                 queue=settings.CELERY_IQUERY_QUEUE,
             )
@@ -105,25 +105,30 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
     """
 
     if not settings.IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED and getattr(
-        instance, "avoid_trigger_signal", True
+        instance, "skip_iquery_sweep", True
     ):
         # If the signal is disabled for uploads in general and the instance
-        # doesn't have avoid_trigger_signal set, abort it. This is a Docket
+        # doesn't have skip_iquery_sweep set, abort it. This is a Docket
         # created by an upload or another RECAP source different from the
         # iquery probe daemon.
         return None
 
-    if getattr(instance, "avoid_trigger_signal", False):
+    if getattr(instance, "skip_iquery_sweep", False):
         # This is an instance added by the probe_iquery_pages task
         # or the iquery sweep scraper that should be ignored (no the highest
         # pacer_case_id)
         return None
 
-    # Only call update_latest_case_id_and_schedule_iquery_sweep if this is a
-    # new RECAP district or bankruptcy docket with pacer_case_id not added by
-    # iquery sweep tasks.
+    # Only call update_latest_case_id_and_schedule_iquery_sweep if:
+    # - The docket belongs to a RECAP district or bankruptcy court,
+    # - The docket has a pacer_case_id,
+    # - The docket was newly created (when IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True), or
+    # - The docket was created or updated by the last probe iteration from probe_iquery_pages.
+    check_probe_or_created = (
+        not getattr(instance, "skip_iquery_sweep", False) or created
+    )
     if (
-        created
+        check_probe_or_created
         and instance.pacer_case_id
         and instance.court_id
         in list(
