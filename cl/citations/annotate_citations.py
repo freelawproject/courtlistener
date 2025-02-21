@@ -109,10 +109,10 @@ def generate_annotations(
                 if isinstance(citation, (IdCitation, SupraCitation)):
                     # for ID and Supra citations use full span to
                     # to avoid unbalanced html
-                    span_start, span_end = citation.full_span()
-                    annotation_span = (span_start, span_end)
+                    annotation_span = citation.full_span()
                 else:
                     annotation_span = citation.span_with_pincite()
+
                 annotations.append([annotation_span] + annotation)
     return annotations
 

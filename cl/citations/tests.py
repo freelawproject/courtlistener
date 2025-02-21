@@ -308,14 +308,14 @@ class CitationTextTest(SimpleTestCase):
         aria_description = f'aria-description="Citation for case: {case_name}"'
         test_pairs = [
             # full span helps with unbalanced tags issue in supra citation
-            ('<p id="b775-6">In <em>Twombly, supra, </em>at 553-554, the Court found it...</p>',
-             '<span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#553" '
-             f'aria-description="{aria_description}"> '
+            ('Something. In <em>Twombly, supra, </em>at 553-554, the Court found it...</p>',
+             'Something. In <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#553" '
+             f'{aria_description}>'
              '<em>Twombly, supra, </em>at 553-554</a></span>, the Court found it...</p>'),
 
             # Pincited reference
             ('See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>403 U. S. 388 (1971). '
-             ' The legal issue there was whether a <em>Bivens </em> at 122 action can be employed... ',
+             ' The legal issue there was whether a <em>Bivens </em> at 122 action can be employed...',
 
              'See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>'
              '<span class="citation" data-id="MATCH_ID">'
@@ -325,12 +325,20 @@ class CitationTextTest(SimpleTestCase):
              '<em>Bivens </em> at 122</a></span> action can be employed...'
             ),
 
-            # Pincited full citation
+            # Pincited full citation, pincite before citation nucleus
+            # We would want it not to capture the year "(2010)", but it requires
+            # a fix in eyecite and span_with_pincite()
             (
-                "<em>Nobelman </em>at 332, 113 S.Ct. 2106 (2010)",
-                f'<span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#332" {aria_description}>'
-                '<em>Nobelman </em>at 332, 113 S.Ct. 2106'
-                '</a></span> (2010)'
+                "something Something; In <em>Nobelman </em>at 332, 113 S.Ct. 2106 (2010); Something else",
+                f'something Something; In <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#332" {aria_description}>'
+                '<em>Nobelman </em>at 332, 113 S.Ct. 2106 (2010)'
+                '</a></span>; Something else'
+            ),
+            # Pincited full citation, pincite after nucleus
+            (
+                "Something. Jones v. Smith, 2023 CO 11 at 322 (Colo. 2012). Something else...",
+                f'Something. Jones v. Smith, <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#322" {aria_description}>'
+                '2023 CO 11 at 322</a></span> (Colo. 2012). Something else...'
             ),
             # Pincited ShortCase Citation
             (
@@ -366,10 +374,6 @@ class CitationTextTest(SimpleTestCase):
                 citation_resolutions = {opinion: citations}
 
                 created_html = create_cited_html(opinion, citation_resolutions)
-                # if created_html != expected_html:
-                #     import logging
-                #     logger = logging.getLogger()
-                #     logger.error()
 
                 self.assertEqual(
                     created_html,
