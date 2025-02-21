@@ -3,6 +3,7 @@ from typing import Any
 from django.forms.models import model_to_dict
 
 from cl.recap.models import PacerFetchQueue
+from cl.search.models import Docket
 
 
 def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
@@ -29,8 +30,17 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
     attrs = model_to_dict(fq) if is_fetch_queue else fq
 
     if attrs.get("recap_document"):
-        rd = fq.recap_document if is_fetch_queue else attrs["recap_document"]
-        court_id = rd.docket_entry.docket.court_id
+        rd_id = (
+            fq.recap_document.pk
+            if is_fetch_queue
+            else attrs["recap_document"].pk
+        )
+        docket = (
+            Docket.objects.filter(docket_entries__recap_documents__id=rd_id)
+            .only("court_id")
+            .first()
+        )
+        court_id = docket.court_id
     elif attrs.get("docket"):
         court_id = (
             fq.docket.court_id if is_fetch_queue else attrs["docket"].court_id
