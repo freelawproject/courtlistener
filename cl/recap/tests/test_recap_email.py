@@ -2523,10 +2523,6 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 2)
 
     @mock.patch(
-        "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
-    )
-    @mock.patch(
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
@@ -2537,7 +2533,6 @@ class RecapEmailDocketAlerts(TestCase):
         mock_cookies,
         mock_pacer_court_accessible,
         mock_docket_entry_sealed,
-        mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
         """Can we avoid fetching the PDF and attachment page for bankruptcy
@@ -2592,13 +2587,15 @@ class RecapEmailDocketAlerts(TestCase):
                 rd.is_sealed, None, msg="Document shouldn't be sealed."
             )
             # The pacer_doc_id is merged as is.
-            self.assertEqual(rd.pacer_doc_id, "0340")
+            self.assertEqual(rd.pacer_doc_id, "")
             # The remaining metadata should be in place.
             self.assertEqual(rd.document_number, "1")
             self.assertEqual(rd.docket_entry.entry_number, 1)
 
         # DocketAlerts should trigger normally.
-        self.assertEqual(len(mail.outbox), 2, msg="e4")
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Wrong number of alerts triggered."
+        )
 
         # Only one PQ should be created, and it should be marked as failed with
         # a custom message for this case.

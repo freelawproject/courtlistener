@@ -2999,6 +2999,11 @@ def process_recap_email(
                 continue
 
             # Add docket entries for each docket
+            if bankr_short_doc_id:
+                # We don't want bad bankruptcy short pacer_doc_ids.
+                # Set it to None
+                for de in docket_data["docket_entries"]:
+                    de["pacer_doc_id"] = None
             (
                 (des_returned, rds_updated),
                 rds_created,
