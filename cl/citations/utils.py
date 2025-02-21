@@ -71,7 +71,7 @@ def get_years_from_reporter(
         if hasattr(edition_guess.start, "year"):
             start_year = edition_guess.start.year
         if hasattr(edition_guess.end, "year"):
-            start_year = edition_guess.end.year
+            end_year = edition_guess.end.year
     return start_year, end_year
 
 
