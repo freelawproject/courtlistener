@@ -1295,6 +1295,10 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="Yeates",
             page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                # Yeates was published from 1791 to 1808
+                date_filed=date(1800, 1, 1),
+            ),
         )
 
         # Citation 2 - citing opinion
