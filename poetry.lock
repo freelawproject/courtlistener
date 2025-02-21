@@ -1617,14 +1617,14 @@ files = [
 
 [[package]]
 name = "eyecite"
-version = "2.6.8"
+version = "2.6.10"
 description = "Tool for extracting legal citations from text strings."
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "eyecite-2.6.8-py3-none-any.whl", hash = "sha256:76bcba6790f1dc8604cfc31b0a5316867eddac11342d11acb024dd03459a8660"},
-    {file = "eyecite-2.6.8.tar.gz", hash = "sha256:93de7a0a3b24834afd5f571a53335dc056046e0451edb9da2320c95eda951c4d"},
+    {file = "eyecite-2.6.10-py3-none-any.whl", hash = "sha256:9ce2008a7ea150f64f583c3ff59837a566da1b96501fb0850e51429f95be88ec"},
+    {file = "eyecite-2.6.10.tar.gz", hash = "sha256:bb518249312610254cc70a013c825b10987ada7a40f53b719ae405b712996b56"},
 ]
 
 [package.dependencies]
@@ -1633,7 +1633,7 @@ fast-diff-match-patch = ">=2.0.0"
 lxml = ">=4.6.3"
 pyahocorasick = ">=1.2"
 regex = ">=2020.1.8"
-reporters-db = ">=3.2.52"
+reporters-db = ">=3.2.53"
 
 [[package]]
 name = "factory-boy"
@@ -4469,14 +4469,14 @@ files = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.52"
+version = "3.2.53"
 description = "Database of Court Reporters"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "reporters_db-3.2.52-py2.py3-none-any.whl", hash = "sha256:69b6c0c40c6432d33240dc45b5c33e43f032833b8c1400ec8f3fc72b66de28f5"},
-    {file = "reporters_db-3.2.52.tar.gz", hash = "sha256:f51d4a91d8b028bfcbd79239c297ca48cc2183d9b61976c230e1c2c93c89071e"},
+    {file = "reporters_db-3.2.53-py2.py3-none-any.whl", hash = "sha256:71ad91ada8a25b92622ac45a27706bc30fbfd2681ef26b65830b07bb9e303a18"},
+    {file = "reporters_db-3.2.53.tar.gz", hash = "sha256:81082e1f0e6e454dc737f34029553357133a4928cda4c20b86f39f1f3b82904f"},
 ]
 
 [package.dependencies]
