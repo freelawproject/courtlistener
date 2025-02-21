@@ -1617,14 +1617,14 @@ files = [
 
 [[package]]
 name = "eyecite"
-version = "2.6.7"
+version = "2.6.11"
 description = "Tool for extracting legal citations from text strings."
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "eyecite-2.6.7-py3-none-any.whl", hash = "sha256:dee03bd90a303b8d8646cb01742d6e102c45b05b781354be50f2530fdbed6efe"},
-    {file = "eyecite-2.6.7.tar.gz", hash = "sha256:3d5b8a5b64279ef27f245a86487ff14b279ab1ddb3388eae1157e47d0015e1f7"},
+    {file = "eyecite-2.6.11-py3-none-any.whl", hash = "sha256:ff7b3dad3df523d03c8bb82312d9bb680d77e8f3606d0ad871a093c5f3862095"},
+    {file = "eyecite-2.6.11.tar.gz", hash = "sha256:2b9cf2a8f3cb5e1f438b2f832c43b281991f6cdd9b9aff9bb9fbc294a672edd4"},
 ]
 
 [package.dependencies]
@@ -1633,7 +1633,7 @@ fast-diff-match-patch = ">=2.0.0"
 lxml = ">=4.6.3"
 pyahocorasick = ">=1.2"
 regex = ">=2020.1.8"
-reporters-db = ">=3.2.52"
+reporters-db = ">=3.2.53"
 
 [[package]]
 name = "factory-boy"
@@ -2463,14 +2463,14 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.6.55"
+version = "2.6.56"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "juriscraper-2.6.55-py27-none-any.whl", hash = "sha256:55ee3882e4cff4dc48c7c53252d48d9473fb65f32d83abc9fa4d71473f4fbec6"},
-    {file = "juriscraper-2.6.55.tar.gz", hash = "sha256:9127eb580f151463bec3e1cdd6542f65dce6a39a299b00c2aad5de355e021775"},
+    {file = "juriscraper-2.6.56-py27-none-any.whl", hash = "sha256:e087b2977600436c35bd62e8a7c9bb95650da92567736d2d373ccf00c98ee43e"},
+    {file = "juriscraper-2.6.56.tar.gz", hash = "sha256:0ec0c24b9cabf05ef5a0c1d933ac7ae342d4223382d18cbd1ecc04861a21c5f3"},
 ]
 
 [package.dependencies]
@@ -4469,14 +4469,14 @@ files = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.52"
+version = "3.2.53"
 description = "Database of Court Reporters"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "reporters_db-3.2.52-py2.py3-none-any.whl", hash = "sha256:69b6c0c40c6432d33240dc45b5c33e43f032833b8c1400ec8f3fc72b66de28f5"},
-    {file = "reporters_db-3.2.52.tar.gz", hash = "sha256:f51d4a91d8b028bfcbd79239c297ca48cc2183d9b61976c230e1c2c93c89071e"},
+    {file = "reporters_db-3.2.53-py2.py3-none-any.whl", hash = "sha256:71ad91ada8a25b92622ac45a27706bc30fbfd2681ef26b65830b07bb9e303a18"},
+    {file = "reporters_db-3.2.53.tar.gz", hash = "sha256:81082e1f0e6e454dc737f34029553357133a4928cda4c20b86f39f1f3b82904f"},
 ]
 
 [package.dependencies]
