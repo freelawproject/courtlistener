@@ -172,7 +172,7 @@ def es_search_db_for_full_citation(
             full_citation.citing_opinion is not None
             and full_citation.citing_opinion.cluster.date_filed
         ):
-            end_year = min(
+            end_year = max(
                 end_year,
                 full_citation.citing_opinion.cluster.date_filed.year,
             )
