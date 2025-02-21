@@ -46,12 +46,6 @@ class Command(BaseCommand):
             default=0.0,
             help="Seconds to sleep betweeen batches",
         )
-        parser.add_argument(
-            "--max-es-buckets",
-            type=float,
-            default=500_000,
-            help="Max number of cases per year to aggregate with ES approach",
-        )
 
     def handle(self, *args, **options):
         out_path = Path(options["out_path"])
@@ -71,7 +65,7 @@ class Command(BaseCommand):
         logger.info(f"Processing dockets from {min_year} to {max_year}...")
         for year in tqdm(years, desc="Processing by years"):
             start = datetime.now()
-            data = handler(year, **options)
+            data = handler(year)
             if len(data):
                 data = pd.DataFrame(data)
                 if out_path.exists():
@@ -91,7 +85,7 @@ class Command(BaseCommand):
 
         logger.info(f"Done! Saved to {out_path}")
 
-    def handle_psql(self, year: int, **options: dict):
+    def handle_psql(self, year: int):
         # Prep filters
         is_document = Q(
             docket_entries__recap_documents__document_type__isnull=False
@@ -134,54 +128,120 @@ class Command(BaseCommand):
             "num_main_rss_documents",
         )
 
-    def handle_es(self, year: int, **options: dict):
-        s = Search(index=DocketDocument._index._name)
+    def handle_es(self, year: int):
 
-        # Prep filters
-        is_main_document = {
-            "bool": {"must_not": {"exists": {"field": "attachment_number"}}}
-        }
-        is_available = {"term": {"is_available": True}}
-        is_main_available = {
-            "bool": {"must": [is_main_document, is_available]}
-        }
+        def get_composite_query(after=None):
+            query = {
+                "size": 0,
+                "track_total_hits": False,
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "bool": {
+                                    "filter": {
+                                        "exists": {"field": "document_type"}
+                                    }
+                                }
+                            },
+                            {
+                                "range": {
+                                    "dateFiled": {
+                                        "gte": f"{year}-01-01",
+                                        "lt": f"{year+1}-01-01",
+                                    }
+                                }
+                            },
+                        ]
+                    }
+                },
+                "aggs": {
+                    "dockets": {
+                        "composite": {
+                            "size": 10000,
+                            "sources": [
+                                {
+                                    "docket_id": {
+                                        "terms": {"field": "docket_id"}
+                                    }
+                                }
+                            ],
+                        },
+                        "aggs": {
+                            "total_docs": {
+                                "value_count": {"field": "docket_id"}
+                            },
+                            "num_main_documents": {
+                                "filter": {
+                                    "bool": {
+                                        "must_not": {
+                                            "exists": {
+                                                "field": "attachment_number"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "num_available": {
+                                "filter": {"term": {"is_available": True}}
+                            },
+                            "num_main_available": {
+                                "filter": {
+                                    "bool": {
+                                        "must": [
+                                            {
+                                                "bool": {
+                                                    "must_not": {
+                                                        "exists": {
+                                                            "field": "attachment_number"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {"term": {"is_available": True}},
+                                        ]
+                                    }
+                                }
+                            },
+                        },
+                    }
+                },
+            }
 
-        # Run query
-        s = s.query(
-            "range",
-            dateFiled={"gte": f"{year}-01-01", "lt": f"{year+1}-01-01"},
-        )
-        s = s.query("bool", filter={"exists": {"field": "document_type"}})
+            if after:
+                query["aggs"]["dockets"]["composite"]["after"] = after
+            return query
 
-        s.aggs.bucket(
-            "dockets",
-            "terms",
-            field="docket_id",
-            size=options["max_es_buckets"],
-        ).metric(
-            "num_main_documents",
-            "filter",
-            filter=is_main_document,
-        ).metric(
-            "num_available", "filter", filter=is_available
-        ).metric(
-            "num_main_available", "filter", filter=is_main_available
-        )
-
-        s = s.extra(size=0, track_total_hits=False)
-        response = s.execute()
-
+        after = None
         data = []
-        for bucket in response.aggregations.dockets.buckets:
-            total_docs = bucket.doc_count
-            data.append(
-                {
-                    "id": bucket.key,
-                    "num_documents": total_docs,
-                    "num_main_documents": bucket.num_main_documents.doc_count,
-                    "num_available": bucket.num_available.doc_count,
-                    "num_main_available": bucket.num_main_available.doc_count,
-                }
-            )
 
+        while True:
+            query = get_composite_query(after)
+
+            s = Search(index=DocketDocument._index._name)
+            s = s.update_from_dict(query)
+            response = s.execute()
+            buckets = response["aggregations"]["dockets"]["buckets"]
+
+            if not buckets:
+                break
+
+            for bucket in buckets:
+                data.append(
+                    {
+                        "id": bucket.key.docket_id,
+                        "num_documents": bucket.doc_count,
+                        "num_main_documents": bucket.num_main_documents.doc_count,
+                        "num_available": bucket.num_available.doc_count,
+                        "num_main_available": bucket.num_main_available.doc_count,
+                    }
+                )
+
+            after = response.aggregations.dockets.after_key
+
+            if not after:
+                break
+            logger.info(
+                f"Adding data for year {year} ({len(data)} total so far)"
+            )
         return data
