@@ -298,6 +298,86 @@ class CitationTextTest(SimpleTestCase):
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
 
+    def test_pincite_annotation(self) -> None:
+        """Can we render matched citation objects as HTML?"""
+        # This test case is similar to the above tests, except it tests our
+        # ability to annotate citations in unbalanced html tags and adds a test
+        # for reference cite. (No matching is performed in the previous cases.)
+        # fmt: off
+        case_name = "Example vs. Example"
+        aria_description = f'aria-description="Citation for case: {case_name}"'
+        test_pairs = [
+            # full span helps with unbalanced tags issue in supra citation
+            ('Something. In <em>Twombly, supra, </em>at 553-554, the Court found it...</p>',
+             'Something. In <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#553" '
+             f'{aria_description}>'
+             '<em>Twombly, supra, </em>at 553-554</a></span>, the Court found it...</p>'),
+
+            # Pincited reference
+            ('See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>403 U. S. 388 (1971). '
+             ' The legal issue there was whether a <em>Bivens </em> at 122 action can be employed...',
+
+             'See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>'
+             '<span class="citation" data-id="MATCH_ID">'
+             f'<a href="MATCH_URL" {aria_description}>403 U. S. 388</a></span> (1971).  '
+             'The legal issue there was whether a <span class="citation" data-id="MATCH_ID">'
+             f'<a href="MATCH_URL#122" {aria_description}>'
+             '<em>Bivens </em> at 122</a></span> action can be employed...'
+            ),
+            # pin cite before citation with S.Ct.
+            (
+                "something Something; In <em>Nobelman </em>at 332, 113 S.Ct. 2106 (2010); Something else",
+                f'something Something; In <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#332" {aria_description}>'
+                '<em>Nobelman </em>at 332, 113 S.Ct. 2106'
+                '</a></span> (2010); Something else'
+            ),
+            # Pincited full citation, pincite after nucleus
+            (
+                "Something. Jones v. Smith, 2023 CO 11 at 322 (Colo. 2012). Something else...",
+                f'Something. Jones v. Smith, <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#322" {aria_description}>'
+                '2023 CO 11 at 322</a></span> (Colo. 2012). Something else...'
+            ),
+            # Pincited ShortCase Citation
+            (
+                "See also <em>Wilkie, </em>551 U. S., at 549-550. That",
+                'See also <em>Wilkie, </em><span class="citation" data-id="MATCH_ID">'
+                f'<a href="MATCH_URL#549" {aria_description}>551 U. S., at 549-550</a></span>. That'
+            )
+        ]
+
+        # fmt: on
+        for s, expected_html in test_pairs:
+            with self.subTest(
+                f"Testing object to HTML rendering for {s}...",
+                s=s,
+                expected_html=expected_html,
+            ):
+                opinion = Opinion(html=s)
+                get_and_clean_opinion_text(opinion)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
+
+                # Stub out fake output from do_resolve_citations(), since the
+                # purpose of this test is not to test that. We just need
+                # something that looks like what create_cited_html() expects
+                # to receive. Also make sure that the "matched" opinion is
+                # mocked appropriately.
+                opinion.pk = "MATCH_ID"
+                opinion.cluster = Mock(
+                    OpinionCluster(id=24601), case_name=case_name
+                )
+                opinion.cluster.get_absolute_url.return_value = "MATCH_URL"
+                citation_resolutions = {opinion: citations}
+
+                created_html = create_cited_html(opinion, citation_resolutions)
+
+                self.assertEqual(
+                    created_html,
+                    expected_html,
+                    msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
+                )
+
     def test_make_html_from_harvard_xml(self) -> None:
         """Can we convert the XML of an opinion into modified HTML?"""
         # fmt: off
@@ -352,7 +432,7 @@ class CitationTextTest(SimpleTestCase):
             # Id. citation with page number ("Id., at 123, 124")
             ('asdf, Id., at 123, 124. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id="'
-             f'MATCH_ID"><a href="MATCH_URL" {aria_description}>'
+             f'MATCH_ID"><a href="MATCH_URL#123" {aria_description}>'
              'Id., at 123, 124</a></span><pre class="inline">. '
              'Lorem ipsum dolor sit amet</pre>'),
 
