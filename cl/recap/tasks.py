@@ -57,6 +57,7 @@ from cl.corpus_importer.tasks import (
 from cl.corpus_importer.utils import (
     ais_appellate_court,
     is_appellate_court,
+    is_bankruptcy_court,
     is_long_appellate_document_number,
     mark_ia_upload_needed,
 )
@@ -380,9 +381,9 @@ async def process_recap_pdf(pk):
     # Avoid updating the document_number from the PQ if this upload belongs
     # to a court that doesn't use regular numbering. See issue:
     # https://github.com/freelawproject/courtlistener/issues/2877
-    if ais_appellate_court(court_id) and not is_long_appellate_document_number(
-        rd.document_number
-    ):
+    if not await ais_appellate_court(
+        court_id
+    ) or not is_long_appellate_document_number(rd.document_number):
         rd.document_number = str(pq.document_number)
     # We update attachment_number and document_type in case the
     # RECAPDocument didn't have the actual document yet.
@@ -2631,6 +2632,26 @@ def save_pacer_doc_from_pq(
     return rd.pk
 
 
+def is_short_bankr_doc_id(pacer_doc_id: str | None, court_id: str) -> bool:
+    """Check if the given pacer_doc_id is considered "short" in a bankruptcy
+    court. This type of pacer_doc_id appears in bankruptcy NEFs, possibly when
+    the document is sealed or unavailable at the time the email is delivered.
+    We should avoid fetching these kinds of unavailable documents or
+    attachment pages.
+
+    :param pacer_doc_id: The pacer_doc_id.
+    :param court_id: The court ID.
+    :return: True if the document ID is 4 characters and belongs to a
+    bankruptcy court, otherwise False.
+    """
+
+    return (
+        pacer_doc_id is not None
+        and len(pacer_doc_id) == 4
+        and is_bankruptcy_court(court_id)
+    )
+
+
 def download_pacer_pdf_and_save_to_pq(
     court_id: str,
     session_data: SessionData,
@@ -2642,6 +2663,7 @@ def download_pacer_pdf_and_save_to_pq(
     appellate: bool,
     attachment_number: int = None,
     de_seq_num: str | None = None,
+    is_bankr_short_doc_id: bool = False,
 ) -> ProcessingQueue:
     """Try to download a PACER document from the notification via the magic
     link and store it in a ProcessingQueue object. So it can be copied to every
@@ -2666,13 +2688,14 @@ def download_pacer_pdf_and_save_to_pq(
      request belongs to an attachment document.
     :param de_seq_num: The sequential number assigned by the PACER system to
      identify the docket entry within a case.
+    :param is_bankr_short_doc_id: A boolean indicating whether the pacer_doc_id
+     is a bad short bankruptcy doc ID.
     :return: The ProcessingQueue object that's created or returned if existed.
     """
 
     # If pacer_doc_id is None, probably a minute entry, set it to ""
     if pacer_doc_id is None:
         pacer_doc_id = ""
-
     with transaction.atomic():
         (
             pq,
@@ -2685,7 +2708,7 @@ def download_pacer_pdf_and_save_to_pq(
             upload_type=UPLOAD_TYPE.PDF,
             date_created__gt=cutoff_date,
         )
-        if created and magic_number:
+        if created and magic_number and not is_bankr_short_doc_id:
             response, r_msg = download_pdf_by_magic_number(
                 court_id,
                 pacer_doc_id,
@@ -2707,6 +2730,8 @@ def download_pacer_pdf_and_save_to_pq(
                 pq.save()
                 return pq
 
+        if is_bankr_short_doc_id:
+            r_msg = "Invalid short pacer_doc_id for bankruptcy court."
         if not magic_number:
             r_msg = "No magic number available to download the document."
         if created:
@@ -2918,7 +2943,6 @@ def process_recap_email(
     :return: An optional list to pass to the next task with recap documents pks
      that were downloaded
     """
-
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     async_to_sync(mark_pq_status)(
         epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message"
@@ -2954,11 +2978,13 @@ def process_recap_email(
     cookies_data = get_or_cache_pacer_cookies(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
+    court_id = epq.court_id
     appellate = data["appellate"]
+    bankr_short_doc_id = is_short_bankr_doc_id(pacer_doc_id, court_id)
     # Try to download and store the main pacer document into a PQ object for
     # its future processing.
     pq = download_pacer_pdf_and_save_to_pq(
-        epq.court_id,
+        court_id,
         cookies_data,
         epq.date_created,
         magic_number,
@@ -2967,10 +2993,13 @@ def process_recap_email(
         user_pk,
         appellate,
         de_seq_num=pacer_seq_no,
+        is_bankr_short_doc_id=bankr_short_doc_id,
     )
     is_potentially_sealed_entry = (
         is_docket_entry_sealed(epq.court_id, pacer_case_id, pacer_doc_id)
-        if pq.status == PROCESSING_STATUS.FAILED and not appellate
+        if pq.status == PROCESSING_STATUS.FAILED
+        and not appellate
+        and not bankr_short_doc_id
         else False
     )
     if appellate:
@@ -3017,6 +3046,11 @@ def process_recap_email(
                 continue
 
             # Add docket entries for each docket
+            if bankr_short_doc_id:
+                # We don't want bad bankruptcy short pacer_doc_ids.
+                # Set it to None
+                for de in docket_data["docket_entries"]:
+                    de["pacer_doc_id"] = None
             (
                 (des_returned, rds_updated),
                 rds_created,
@@ -3032,6 +3066,12 @@ def process_recap_email(
                 content_updated=content_updated,
             )
             dockets_updated.append(d_updated)
+
+            if bankr_short_doc_id:
+                # Avoid storing the main PDF for bad bankruptcy short pacer_doc_ids
+                # since there is no document to copy.
+                continue
+
             for rd in rds_created:
                 # Download and store the main PACER document and then
                 # assign/copy it to each corresponding RECAPDocument.
@@ -3049,9 +3089,12 @@ def process_recap_email(
 
         # Get NEF attachments and merge them.
         all_attachment_rds = []
+        # Avoid fetching and merging attachments for sealed docket entries and
+        # main documents with bad bankruptcy short pacer_doc_ids.
         if (
             data["contains_attachments"] is True
             and not is_potentially_sealed_entry
+            and not bankr_short_doc_id
         ):
             all_attachment_rds = get_and_merge_rd_attachments(
                 document_url,
@@ -3096,7 +3139,11 @@ def process_recap_email(
         all_updated_rds += docket_updated.rds_updated
 
     if not is_potentially_sealed_entry:
-        rds_to_extract = all_attachment_rds + all_created_rds
+        rds_to_extract = (
+            all_attachment_rds + all_created_rds
+            if not bankr_short_doc_id
+            else []
+        )
         rds_updated_or_created = (
             all_attachment_rds + all_created_rds + all_updated_rds
         )
@@ -3110,11 +3157,13 @@ def process_recap_email(
         status = PROCESSING_STATUS.SUCCESSFUL
     else:
         rds_to_extract = []
-        self.request.chain = None
         msg = "Could not retrieve Docket Entry"
         status = PROCESSING_STATUS.FAILED
 
     async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
+
+    if not rds_to_extract:
+        self.request.chain = None
     return [rd.pk for rd in rds_to_extract]
 
 
