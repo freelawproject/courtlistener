@@ -157,7 +157,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
                 )
             )
         )
-        .order_by("-geometric_mean")[:50]
+        .order_by("-geometric_mean")
     )
 
     return documents
