@@ -8107,6 +8107,12 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             ).last()
             old_docket_event.pgh_created_at = cls.old_docket.date_modified
             old_docket_event.save()
+            cls.rd_old = RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(
+                    docket=cls.old_docket,
+                ),
+                document_number="1",
+            )
 
         cls.docket_1 = DocketFactory(
             court=cls.court,
@@ -8156,6 +8162,16 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             document_number="3",
         )
 
+        cls.docket_4 = DocketFactory(
+            court=cls.court,
+            case_name="Ipsum to Ignore",
+            case_name_short="",
+            case_name_full="",
+            date_filed=datetime.date(2025, 9, 16),
+            docket_number="45-bk-2639",
+            source=Docket.RECAP,
+        )
+
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.RECAP,
@@ -8190,12 +8206,22 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
         self.docket_1.docket_number = "46-bk-2633"
         self.docket_1.save()
 
+        # The slug changed, but it should be ignored since the docket
+        # doesn't have any entries.
+        self.docket_4.case_name = "Changed Ipsum dolor"
+        self.docket_4.save()
+
         cut_off_date = self.old_date + datetime.timedelta(days=10)
         # self.old_docket event's should be ignored for this cut_off_date
         dockets_and_slug_count = get_docket_events_and_slug_count(
             cut_off_date, pk_offset=0
         )
 
+        self.assertEqual(
+            dockets_and_slug_count.count(),
+            3,
+            msg="Wrong number of dockets returned.",
+        )
         expected_results = {
             self.docket_1.pk: {
                 "slug_count": 1,  # slug didn't change

@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from django.conf import settings
-from django.db.models import Count, F, OuterRef, Q, QuerySet, Subquery
+from django.db.models import Count, Exists, F, OuterRef, Q, QuerySet, Subquery
 
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
@@ -10,7 +10,7 @@ from cl.lib.indexing_utils import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.search.models import SEARCH_TYPES, Docket, DocketEvent
+from cl.search.models import SEARCH_TYPES, Docket, DocketEntry, DocketEvent
 from cl.search.tasks import index_parent_and_child_docs
 
 
@@ -28,16 +28,28 @@ def get_docket_events_and_slug_count(
     DocketEvent table.
     """
 
-    docket_ids_subquery = Docket.objects.filter(
-        pk__gte=pk_offset,
-        date_modified__gte=cut_off_date,
-        source__in=Docket.RECAP_SOURCES(),
-    ).values_list("id", flat=True)
+    # Exclude dockets with no entries.
+    docket_has_entries_subquery = DocketEntry.objects.filter(
+        docket=OuterRef("id")
+    ).values("id")[:1]
 
+    docket_ids_subquery = (
+        Docket.objects.filter(
+            pk__gte=pk_offset,
+            date_modified__gte=cut_off_date,
+            source__in=Docket.RECAP_SOURCES(),
+        )
+        .annotate(has_entries=Exists(docket_has_entries_subquery))
+        .filter(has_entries=True)
+        .values_list("id", flat=True)
+    )
+
+    # Get the current slug in the Docket table.
     docket_slug_subquery = Docket.objects.filter(
         id=OuterRef("pgh_obj_id")
     ).values("slug")[:1]
 
+    # Get the latest slug in the DocketEvent table.
     last_docket_event_slug_subquery = (
         DocketEvent.objects.filter(
             pgh_obj_id=OuterRef("pgh_obj_id"),
