@@ -4,6 +4,7 @@ from typing import Dict, List
 
 from django.urls import reverse
 from eyecite import annotate_citations, clean_text
+from eyecite.models import IdCitation, SupraCitation
 
 from cl.citations.match_citations import (
     MULTIPLE_MATCHES_RESOURCE,
@@ -75,6 +76,9 @@ def generate_annotations(
             for c in citations:
                 # Annotate all citations can't be disambiguated to citation
                 # lookup page
+                if not (c.groups and c.groups.get("reporter")):
+                    continue
+
                 kwargs = make_citation_url_dict(**c.groups)
                 citation_url = reverse("citation_redirector", kwargs=kwargs)
                 annotation = [
@@ -84,19 +88,32 @@ def generate_annotations(
                 ]
                 annotations.append([c.span()] + annotation)
         else:
-            # Successfully matched citation
-            case_name = trunc(best_case_name(opinion.cluster), 60, "...")
-            safe_case_name = html.escape(case_name)
-            opinion_url = html.escape(opinion.cluster.get_absolute_url())
-            annotation = [
-                f'<span class="citation" data-id="{opinion.pk}">'
-                f'<a href="{opinion_url}"'
-                f' aria-description="Citation for case: {safe_case_name}"'
-                ">",
-                "</a></span>",
-            ]
-            # Annotate all matched citations for the resource
-            annotations.extend([[c.span()] + annotation for c in citations])
+            # Successfully matched citations
+            for citation in citations:
+                opinion_url = html.escape(opinion.cluster.get_absolute_url())
+                case_name = trunc(best_case_name(opinion.cluster), 60, "...")
+                safe_case_name = html.escape(case_name)
+                # if pin cite exists - add page to url if number
+                # if multiple pages - link to first e.g. 122-123, add #122
+                if citation.metadata.pin_cite:
+                    match = re.search(r"\d+", citation.metadata.pin_cite)
+                    if match:
+                        opinion_url = f"{opinion_url}#{match.group()}"
+                annotation = [
+                    f'<span class="citation" data-id="{opinion.pk}">'
+                    f'<a href="{opinion_url}"'
+                    f' aria-description="Citation for case: {safe_case_name}"'
+                    ">",
+                    "</a></span>",
+                ]
+                if isinstance(citation, (IdCitation, SupraCitation)):
+                    # for ID and Supra citations use full span to
+                    # to avoid unbalanced html
+                    annotation_span = citation.full_span()
+                else:
+                    annotation_span = citation.span_with_pincite()
+
+                annotations.append([annotation_span] + annotation)
     return annotations
 
 
