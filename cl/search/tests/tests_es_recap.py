@@ -73,8 +73,8 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_last_parent_document_id_processed,
 )
 from cl.search.management.commands.fix_rd_broken_links import (
-    get_docket_events_count_by_slug,
-    get_docket_events_to_check,
+    get_docket_events_and_slug_count,
+    get_dockets_to_fix,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -8153,75 +8153,80 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             testing_mode=True,
         )
 
-    def test_get_docket_events_to_check(self) -> None:
-        """Confirm get_docket_events_to_check can effectively ignore PGH events
-        before the provided cut_off_date
+    def test_get_docket_events_and_docket_to_fix(self) -> None:
+        """Confirm that get_docket_events_and_slug_count can effectively
+        retrieve the slug count for dockets that match the cut_off_date and
+        ensure that their related slugs are properly annotated.
+
+        Also, confirm that get_dockets_to_fix correctly filters out dockets
+        that need to be fixed based on the slug count and the slugs in the
+        Docket and DocketEvent tables.
         """
 
+        # Change slug with two different values.
         self.docket_2.case_name = "Dolor Ipsum"
         self.docket_2.save()
-
-        self.docket_1.docket_number = "46-bk-2633"
-        self.docket_1.save()
-
-        cut_off_date = self.old_date + datetime.timedelta(days=10)
-        # self.old_docket event's should be ignored for this cut_off_date
-        dockets_to_check = get_docket_events_to_check(
-            cut_off_date, pk_offset=0
-        )
-        dockets_to_check_ids = set(docket["id"] for docket in dockets_to_check)
-        self.assertEqual(
-            {self.docket_1.pk, self.docket_2.pk}, dockets_to_check_ids
-        )
-
-    def test_get_docket_events_count_by_slug(self) -> None:
-        """Confirm get_docket_events_count_by_slug properly filter out docket
-        event counts by slug.
-        """
-
-        # Trigger 4 different PGH events for self.docket_2
-        self.docket_2.case_name = "Dolor Ipsum"
-        self.docket_2.save()
-        self.docket_2.case_name = "Ipsum Dolor"
-        self.docket_2.docket_number = "47-bk-2633"
-        self.docket_2.save()
+        d2_last_slug_in_event_table = self.docket_2.slug
         self.docket_2.case_name = "Dolor Ipsum 2"
         self.docket_2.save()
-        self.docket_2.case_name = "Ipsum Dolor"
-        self.docket_2.save()
-        self.docket_2.refresh_from_db()
-        current_slug_2 = self.docket_2.slug
 
-        # 2 out of 4 PGH events for self.docket_2 should match when filtering
-        # events for the current slug.
-        cut_off_date = self.old_date + datetime.timedelta(days=10)
-        # self.old_docket event's should be ignored for this cut_off_date
-        docket_2_events_count_by_slug = get_docket_events_count_by_slug(
-            cut_off_date, self.docket_2.pk, current_slug_2
-        )
-        self.assertEqual(docket_2_events_count_by_slug, 2)
+        # Change slug only one time.
+        d3_last_slug_in_event_table = self.docket_3.slug
+        self.docket_3.case_name = "Test Ipsum dolor"
+        self.docket_3.save()
 
-        # # Trigger 2 different PGH events for self.docket_1
+        # Slug didn't change.
         self.docket_1.docket_number = "46-bk-2633"
         self.docket_1.save()
-        self.docket_1.source = Docket.RECAP_AND_SCRAPER
-        self.docket_1.save()
-        self.docket_1.refresh_from_db()
-        current_slug_1 = self.docket_1.slug
 
-        # 2 out of 2 PGH events for self.docket_1 should match when filtering
-        # events for the current slug.
-        docket_1_events_count_by_slug = get_docket_events_count_by_slug(
-            cut_off_date, self.docket_1.pk, current_slug_1
+        cut_off_date = self.old_date + datetime.timedelta(days=10)
+        # self.old_docket event's should be ignored for this cut_off_date
+        dockets_and_slug_count = get_docket_events_and_slug_count(
+            cut_off_date, pk_offset=0
         )
-        self.assertEqual(docket_1_events_count_by_slug, 2)
 
-        # Confirm there are not events for self.docket_3
-        current_slug_3 = self.docket_3.slug
-        docket_3_events_count_by_slug = get_docket_events_count_by_slug(
-            cut_off_date, self.docket_3.pk, current_slug_3
-        )
-        self.assertEqual(docket_3_events_count_by_slug, 0)
+        expected_results = {
+            self.docket_1.pk: {
+                "slug_count": 1,  # slug didn't change
+                "event_table_slug": self.docket_1.slug,
+                "docket_table_slug": self.docket_1.slug,
+            },
+            self.docket_2.pk: {
+                "slug_count": 2,  # slug changed twice, final value is not in the event table.
+                "event_table_slug": d2_last_slug_in_event_table,
+                "docket_table_slug": self.docket_2.slug,
+            },
+            self.docket_3.pk: {
+                "slug_count": 1,  # slug changed once, final value is not in the event table.
+                "event_table_slug": d3_last_slug_in_event_table,
+                "docket_table_slug": self.docket_3.slug,
+            },
+        }
+        for docket in dockets_and_slug_count:
+            with self.subTest(docket=docket):
+                self.assertEqual(
+                    expected_results[docket["pgh_obj_id"]]["slug_count"],
+                    docket["slug_count"],
+                    msg="Slug count didn't match.",
+                )
+                self.assertEqual(
+                    expected_results[docket["pgh_obj_id"]]["event_table_slug"],
+                    docket["event_table_slug"],
+                    msg="Event table slug didn't match.",
+                )
+                self.assertEqual(
+                    expected_results[docket["pgh_obj_id"]][
+                        "docket_table_slug"
+                    ],
+                    docket["docket_table_slug"],
+                    msg="Docket table slug didn't match.",
+                )
+
+        # Now get_dockets_to_fix to filter out dockets that require re-indexing.
+        dockets_to_fix = get_dockets_to_fix(cut_off_date, pk_offset=0)
+        self.assertEqual(2, dockets_to_fix.count())
+        dockets_to_fix = set(docket["pgh_obj_id"] for docket in dockets_to_fix)
+        self.assertEqual({self.docket_2.pk, self.docket_3.pk}, dockets_to_fix)
 
     @mock.patch("cl.search.management.commands.fix_rd_broken_links.logger")
     def test_fix_broken_recap_document_links(self, mock_logger) -> None:

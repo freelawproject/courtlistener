@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from django.conf import settings
-from django.db.models import Count, QuerySet, Subquery
+from django.db.models import Count, F, OuterRef, Q, QuerySet, Subquery
 
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
@@ -14,49 +14,80 @@ from cl.search.models import SEARCH_TYPES, Docket, DocketEvent
 from cl.search.tasks import index_parent_and_child_docs
 
 
-def get_docket_events_to_check(
-    cut_off_date: datetime, pk_offset: int
+def get_docket_events_and_slug_count(
+    cut_off_date: datetime,
+    pk_offset: int,
 ) -> QuerySet:
-    """Retrieve docket events that need verification for broken links.
+    """Retrieve docket events that need verification for broken links and their
+     slug count.
 
-    :param cut_off_date: The cutoff date to filter docket events.
-    :param pk_offset: The minimum ID value to consider.
-    :return: A queryset of docket events annotated with their total event count.
+    :param cut_off_date: The cutoff date for filtering docket events.
+    :param pk_offset: The minimum Docket ID value to consider for auto-resume.
+    :return: A queryset of docket events annotated with their slug count,
+    the current slug from the Docket table, and the latest slug in the
+    DocketEvent table.
     """
 
-    # Get dockets that changed after cut_off_date using the Docket table for
-    # better performance. The date_modified column in the Docket table has an
-    # index, whereas the DocketEvent table does not have an index for date_modified
     docket_ids_subquery = Docket.objects.filter(
         pk__gte=pk_offset,
         date_modified__gte=cut_off_date,
         source__in=Docket.RECAP_SOURCES(),
     ).values_list("id", flat=True)
+
+    docket_slug_subquery = Docket.objects.filter(
+        id=OuterRef("pgh_obj_id")
+    ).values("slug")[:1]
+
+    last_docket_event_slug_subquery = (
+        DocketEvent.objects.filter(
+            pgh_obj_id=OuterRef("pgh_obj_id"),
+            pgh_created_at__gte=cut_off_date,
+        )
+        .order_by("-pgh_id")
+        .values("slug")[:1]
+    )
+
     return (
         DocketEvent.objects.filter(
             pgh_obj_id__in=Subquery(docket_ids_subquery),
+            pgh_created_at__gte=cut_off_date,
         )
-        .values("id")
-        .annotate(total_events=Count("id"))
-        .order_by("id")
+        .values("pgh_obj_id")
+        .annotate(
+            slug_count=Count("slug", distinct=True),
+            event_table_slug=Subquery(last_docket_event_slug_subquery),
+            docket_table_slug=Subquery(docket_slug_subquery),
+        )
     )
 
 
-def get_docket_events_count_by_slug(
-    cut_off_date: datetime, docket_id: int, slug: str
+def get_dockets_to_fix(
+    cut_off_date: datetime,
+    pk_offset: int,
 ) -> QuerySet:
-    """Count docket events matching a given docket ID and slug after a cutoff date.
+    """Retrieve dockets that require fixing due to broken links by filtering
+    docket events based on their slug count to identify cases where the slugs
+    are inconsistent or multiple unique slugs exist.
 
-    :param cut_off_date: The cutoff date to filter docket events.
-    :param docket_id: The ID of the docket to check.
-    :param slug: The slug associated with the docket.
-    :return: The count of matching docket events.
+    :param cut_off_date: The cutoff date for filtering docket events.
+    :param pk_offset: The minimum ID value to consider.
+    :return: A queryset of docket events that need to be fixed.
     """
-    return DocketEvent.objects.filter(
-        pgh_obj_id=docket_id,
-        pgh_created_at__gte=cut_off_date,
-        slug=slug,
-    ).count()
+
+    docket_events_and_slug_count = get_docket_events_and_slug_count(
+        cut_off_date, pk_offset
+    )
+
+    # If the slug count is greater than 1, it indicates that the slug has changed,
+    # so the related docket needs to be fixed. If the slug count is 1, an additional
+    # check is required: if the slug in the event table differs from the current
+    # slug in the docket table, the docket should also be fixed.
+    # This ensures that changes in the slug, which are not yet reflected in the
+    # DocketEvent table, are still detected and fixed.
+    return docket_events_and_slug_count.filter(
+        Q(slug_count__gt=1)
+        | (Q(slug_count=1) & ~Q(event_table_slug=F("docket_table_slug")))
+    )
 
 
 def compose_redis_key() -> str:
@@ -112,66 +143,47 @@ class Command(VerboseCommand):
             "update.",
         )
 
-    def get_count_or_process_chunks(
-        self, cut_off_date: datetime, count: int = None
-    ) -> int | None:
-        """Get the count or process broken RECAPDocuments links
-        by re-indexing affected dockets.
+    def get_and_fix_dockets(self, cut_off_date: datetime) -> int:
+        """Get the dockets with broken RECAPDocument links and fix them by
+        re-indexing the affected dockets and their RDs.
 
         :param cut_off_date: The cutoff date to filter docket events.
-        :param count: Optional: the total number of dockets affected to be
-        fixed, or None if it should be computed.
-        :return: None
+        :return: The number of dockets affected.
         """
 
         chunk = []
         affected_dockets = 0
-        events_count_per_docket = get_docket_events_to_check(
+        dockets_to_fix_queryset = get_dockets_to_fix(
             cut_off_date, self.pk_offset
         )
-        for docket_event_count in events_count_per_docket.iterator():
-            docket_id = docket_event_count["id"]
-            current_docket_slug = Docket.objects.filter(
-                pk=docket_id
-            ).values_list("slug", flat=True)
-            if not current_docket_slug.exists():
-                continue
+        count = dockets_to_fix_queryset.count()
+        for docket_to_fix in dockets_to_fix_queryset.iterator():
+            docket_id = docket_to_fix["pgh_obj_id"]
+            chunk.append(docket_id)
+            last_item = count == affected_dockets
+            if affected_dockets % self.chunk_size == 0 or last_item:
+                self.throttle.maybe_wait()
+                index_parent_and_child_docs.si(
+                    chunk,
+                    SEARCH_TYPES.RECAP,
+                    testing_mode=self.testing_mode,
+                ).set(queue=self.queue).apply_async()
+                if self.testing_mode:
+                    logger.info("Processing chunk: %s", chunk)
 
-            docket_slug_events_count = get_docket_events_count_by_slug(
-                cut_off_date, docket_id, current_docket_slug.first()
-            )
-            if docket_event_count["total_events"] != docket_slug_events_count:
-                affected_dockets += 1
-                if count is not None:
-                    # If the count is provided, process the dockets to be fixed
-                    # at this stage.
-                    chunk.append(docket_id)
-                    last_item = count == affected_dockets
-                    if affected_dockets % self.chunk_size == 0 or last_item:
-                        self.throttle.maybe_wait()
-                        index_parent_and_child_docs.si(
-                            chunk,
-                            SEARCH_TYPES.RECAP,
-                            testing_mode=self.testing_mode,
-                        ).set(queue=self.queue).apply_async()
-                        if self.testing_mode:
-                            logger.info("Processing chunk: %s", chunk)
+                chunk = []
+                logger.info(
+                    "Processed %d/%d (%.0f%%), last PK fixed: %s",
+                    affected_dockets,
+                    count,
+                    (affected_dockets * 100.0) / count,
+                    docket_id,
+                )
+                if not affected_dockets % 1000:
+                    # Log every 1000 documents processed.
+                    log_last_document_indexed(docket_id, compose_redis_key())
 
-                        chunk = []
-                        logger.info(
-                            "Processed %d/%d (%.0f%%), last PK fixed: %s",
-                            affected_dockets,
-                            count,
-                            (affected_dockets * 100.0) / count,
-                            docket_id,
-                        )
-                        if not affected_dockets % 1000:
-                            # Log every 1000 documents processed.
-                            log_last_document_indexed(
-                                docket_id, compose_redis_key()
-                            )
-
-        return affected_dockets
+        return count
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -189,17 +201,7 @@ class Command(VerboseCommand):
                 f"Auto-resume enabled starting indexing from ID: {self.pk_offset}."
             )
         start_date: datetime = options["start_date"]
-        # Due to the complexity of the queries, this is a two-step process.
-        # First, get the total number of dockets affected by the broken links issue.
-        affected_dockets = self.get_count_or_process_chunks(start_date)
-        logger.info(
-            "Count of dockets to be fixed: %d.",
-            affected_dockets,
-        )
-        # As the second stage, use this count to process the affected docket
-        # chunks and log the task progress.
-        self.get_count_or_process_chunks(start_date, affected_dockets)
-
+        affected_dockets = self.get_and_fix_dockets(start_date)
         logger.info(
             "Successfully fixed %d items from pk %s.",
             affected_dockets,
