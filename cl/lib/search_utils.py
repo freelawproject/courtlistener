@@ -699,11 +699,11 @@ def fetch_es_results_for_csv(
                 flat_results = []
                 for result in results.object_list:
                     parent_dict = result.to_dict()
-                    child_docs = parent_dict.pop("child_docs")
+                    child_docs = parent_dict.get("child_docs")
                     if child_docs:
                         flat_results.extend(
                             [
-                                parent_dict | doc["_source"].to_dict()
+                                doc["_source"].to_dict() | parent_dict
                                 for doc in child_docs
                             ]
                         )
