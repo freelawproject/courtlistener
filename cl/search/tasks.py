@@ -417,7 +417,10 @@ def email_search_results(user_id: int, query: str):
 
     # Prepare email content
     txt_template = loader.get_template("search_results_email.txt")
-    email_context = {"username": user.username}
+    email_context = {
+        "username": user.username,
+        "query_link": f"https://www.courtlistener.com/?{query}",
+    }
 
     # Create email object
     message = EmailMessage(

@@ -2,6 +2,8 @@ Hi {{username}},
 
 Your requested search results are attached as a CSV file.
 
+You can review the query that generated these results here: {{query_link|safe}}
+
 Please review the data carefully.
 
 If you have any questions or need further assistance, please don't hesitate to contact us.
