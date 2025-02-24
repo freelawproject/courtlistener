@@ -114,6 +114,33 @@ class ParentheticalGroupDocument(Document):
         fields = ["score"]
         ignore_signals = True
 
+    @classmethod
+    def get_csv_headers(cls) -> list[str]:
+        return [
+            "author_id",
+            "citation",
+            "cite_count",
+            "cites",
+            "cluster_id",
+            "docket_id",
+            "court_id",
+            "docket_number",
+            "case_name",
+            "date_filed",
+            "describing_opinion_cluster_id",
+            "describing_opinion_cluster_slug",
+            "judge",
+            "lexis_cite",
+            "neutral_cite",
+            "opinion_cluster_slug",
+            "opinion_extracted_by_ocr",
+            "panel_ids",
+            "representative_score",
+            "representative_text",
+            "status",
+            "suit_nature",
+        ]
+
     def prepare_citation(self, instance):
         return [str(cite) for cite in instance.opinion.cluster.citations.all()]
 
@@ -297,6 +324,37 @@ class AudioDocument(AudioDocumentBase):
     class Django:
         model = Audio
         ignore_signals = True
+
+    @classmethod
+    def get_csv_headers(cls) -> list[str]:
+        return [
+            "id",
+            "duration",
+            "download_url",
+            "judge",
+            "local_path",
+            "pacer_case_id",
+            "absolute_url",
+            "case_name",
+            "case_name_full",
+            "docket_id",
+            "docket_number",
+            "docket_slug",
+            "court_id",
+            "court_citation_string",
+            "file_size_mp3",
+            "panel_ids",
+            "sha1",
+            "source",
+            "text",
+            "date_argued",
+            "date_argued_text",
+            "date_reargued",
+            "date_reargued_text",
+            "date_reargument_denied",
+            "date_reargument_denied_text",
+            "date_created",
+        ]
 
     def prepare_absolute_url(self, instance):
         return instance.get_absolute_url()
@@ -799,6 +857,31 @@ class PersonDocument(PersonBaseDocument):
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
     absolute_url = fields.KeywordField()
 
+    @classmethod
+    def get_csv_headers(cls) -> list[str]:
+        return [
+            "id",
+            "name",
+            "name_reverse",
+            "absolute_url",
+            "gender",
+            "religion",
+            "alias",
+            "races",
+            "political_affiliation",
+            "fjc_id",
+            "dob",
+            "dob_city",
+            "dob_state",
+            "dob_state_id",
+            "date_granularity_dob",
+            "dod",
+            "date_granularity_dod",
+            "aba_rating",
+            "school",
+            "date_created",
+        ]
+
     def prepare_person_child(self, instance):
         return "person"
 
@@ -1059,6 +1142,24 @@ class ESRECAPDocument(RECAPBaseDocument, ESRECAPBaseDocument):
         model = RECAPDocument
         ignore_signals = True
 
+    @classmethod
+    def get_csv_headers(cls) -> list[str]:
+        return [
+            "docket_entry_id",
+            "docket_entry_description",
+            "docket_entry_number",
+            "docket_entry_date_filed",
+            "rd_description",
+            "pacer_doc_id",
+            "rd_plain_text",
+            "rd_attachment_number",
+            "rd_is_available",
+            "rd_page_count",
+            "filepath_local",
+            "absolute_url",
+            "cites",
+        ]
+
     def prepare_document_number(self, instance):
         return instance.document_number or None
 
@@ -1214,6 +1315,41 @@ class DocketBaseDocument(DSLDocument):
 
 @recap_index.document
 class DocketDocument(DocketBaseDocument, RECAPBaseDocument):
+
+    @classmethod
+    def get_csv_headers(cls) -> list[str]:
+        return [
+            "docket_id",
+            "docket_number",
+            "docket_slug",
+            "docket_absolute_url",
+            "court_id",
+            "court",
+            "court_citation_string",
+            "case_name",
+            "case_name_full",
+            "suit_nature",
+            "cause",
+            "jury_demand",
+            "jurisdiction_type",
+            "date_argued",
+            "date_filed",
+            "date_terminated",
+            "assigned_to",
+            "assigned_to_id",
+            "referred_to",
+            "referred_to_id",
+            "chapter",
+            "trustee_str",
+            "date_created",
+            "pacer_case_id",
+            "party_id",
+            "party",
+            "attorney_id",
+            "attorney",
+            "firm_id",
+            "firm",
+        ]
 
     def prepare_caseName(self, instance):
         return best_case_name(instance)
@@ -1656,6 +1792,23 @@ class OpinionDocument(OpinionBaseDocument):
         model = Opinion
         ignore_signals = True
 
+    @classmethod
+    def get_csv_headers(cls) -> list[str]:
+        return [
+            "id",
+            "author_id",
+            "type",
+            "per_curiam",
+            "type_text",
+            "download_url",
+            "local_path",
+            "text",
+            "sha1",
+            "cites",
+            "joined_by_ids",
+            "date_created",
+        ]
+
     def prepare_absolute_url(self, instance):
         return instance.cluster.get_absolute_url()
 
@@ -1855,6 +2008,42 @@ class OpinionClusterDocument(OpinionBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
+
+    @classmethod
+    def get_csv_headers(cls) -> list[str]:
+        return [
+            "court_exact",
+            "non_participating_judge_ids",
+            "source",
+            "absolute_url",
+            "cluster_id",
+            "docket_id",
+            "docket_number",
+            "case_name",
+            "case_name_full",
+            "date_filed",
+            "date_argued",
+            "date_reargued",
+            "date_reargument_denied",
+            "court_id",
+            "court",
+            "court_citation_string",
+            "judge",
+            "panel_names",
+            "attorney",
+            "suit_nature",
+            "citation",
+            "status",
+            "procedural_history",
+            "posture",
+            "syllabus",
+            "scdb_id",
+            "sibling_ids",
+            "panel_ids",
+            "neutral_cite",
+            "lexis_cite",
+            "cite_count",
+        ]
 
     def prepare_non_participating_judge_ids(self, instance):
         return list(
