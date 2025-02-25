@@ -31,7 +31,7 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
 
     if attrs.get("recap_document"):
         rd_id = (
-            fq.recap_document.pk
+            fq.recap_document_id
             if is_fetch_queue
             else attrs["recap_document"].pk
         )
