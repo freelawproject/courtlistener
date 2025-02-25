@@ -68,21 +68,23 @@ def resolve_fullcase_citation(
 
         if len(db_search_results) == 0:
             # If no citation is found use get_clusters_from_citation as a backup
-            clusters, _count = async_to_sync(get_clusters_from_citation_str)(
-                **full_citation.groups
-            )
-            if _count == 1:
-                # return the first item by ordering key
-                opinion = (
-                    clusters[0]
-                    .sub_opinions.all()
-                    .order_by("ordering_key")
-                    .first()
-                )
-                return opinion
-            if _count > 2:
-                # if two or more remain return multiple matches
-                return MULTIPLE_MATCHES_RESOURCE
+            volume = full_citation.groups.get("volume", None)
+            reporter = full_citation.groups.get("reporter", None)
+            page = full_citation.groups.get("page", None)
+            if (
+                volume is not None
+                and reporter is not None
+                and page is not None
+            ):
+                clusters, _count = async_to_sync(
+                    get_clusters_from_citation_str
+                )(volume=volume, reporter=reporter, page=page)
+                if _count == 1:
+                    # return the first item by ordering key
+                    return clusters[0].ordered_opinions.first()
+                elif _count >= 2:
+                    # if two or more remain return multiple matches
+                    return MULTIPLE_MATCHES_RESOURCE
 
         if len(db_search_results) > 1:
             return MULTIPLE_MATCHES_RESOURCE
