@@ -698,7 +698,7 @@ def fetch_es_results_for_csv(
             ):
                 flat_results = []
                 for result in results.object_list:
-                    parent_dict = result.to_dict()
+                    parent_dict = result.to_dict(skip_empty=False)
                     child_docs = parent_dict.get("child_docs")
                     if child_docs:
                         flat_results.extend(
@@ -711,7 +711,8 @@ def fetch_es_results_for_csv(
                         flat_results.extend([parent_dict])
             case _:
                 flat_results = [
-                    result.to_dict() for result in results.object_list
+                    result.to_dict(skip_empty=False)
+                    for result in results.object_list
                 ]
 
         csv_rows.extend(flat_results)
