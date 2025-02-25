@@ -88,6 +88,9 @@
     </h1>
     {% include "includes/notes_modal.html" %}
     {% include "includes/docket_alerts_modal.html" %}
+    {% flag "pray-and-pay" %}
+      {% include "includes/first_prayer_modal.html" %}
+    {% endflag %}
 
     <h2>{{ docket.court }}</h2>
 
@@ -493,7 +496,7 @@
         </li>
         {% endif %}
 
-        {% if authorities %}
+        {% if docket.authority_count %}
         <li class="{% block nav-authorities %}inactive{% endblock %}"
             role="presentation">
           <a href="{% url "docket_authorities" docket_id=docket.pk slug=docket.slug %}">Authorities

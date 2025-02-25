@@ -201,6 +201,16 @@ def es_search_db_for_full_citation(
     query = Q("bool", must_not=must_not, filter=filters)
     citations_query = search_query.query(query)
     results = fetch_citations(citations_query)
+
+    # Deduplicate results using absolute_url. This will be useful when a
+    # citation points to a single cluster with multiple opinions. This will
+    # prefer the first opinion as ordered on the ES index
+    unique_clusters = {}
+    for result in results:
+        if result.absolute_url not in unique_clusters:
+            unique_clusters[result.absolute_url] = result
+    results = list(unique_clusters.values())
+
     citation_found = True if len(results) > 0 else False
     if len(results) == 1:
         return results, citation_found
@@ -214,9 +224,9 @@ def es_search_db_for_full_citation(
                 full_citation,
                 full_citation.citing_opinion,
             )
-            return results, citation_found
-    # Give up.
-    return [], citation_found
+
+    # Return all possible results
+    return results, citation_found
 
 
 def es_get_query_citation(
@@ -244,6 +254,7 @@ def es_get_query_citation(
             missing_citations.append(citation)
 
     if len(citations) == 1 and matches and len(matches) == 1:
-        # If more than one match, don't show the tip
+        # If only one match, show the tip
         return matches[0], missing_citations
-    return matches, missing_citations
+    # No exact match, don't show the tip
+    return None, missing_citations
