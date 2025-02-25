@@ -109,6 +109,7 @@ from cl.recap.tasks import (
     create_or_merge_from_idb_chunk,
     do_pacer_fetch,
     download_pacer_pdf_by_rd,
+    fetch_appellate_docket,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
     process_recap_acms_appellate_attachment,
@@ -122,6 +123,7 @@ from cl.recap.tasks import (
     process_recap_upload,
     process_recap_zip,
 )
+from cl.recap.utils import get_court_id_from_fetch_queue
 from cl.recap_rss.tasks import merge_rss_feed_contents
 from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.search.factories import (
@@ -150,6 +152,84 @@ from cl.users.factories import (
     UserProfileWithParentsFactory,
     UserWithChildProfileFactory,
 )
+
+
+class RecapUtilsTest(TestCase):
+
+    def setUp(self) -> None:
+        self.court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
+        self.docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            docket_number="23-4567",
+            pacer_case_id="104490",
+        )
+        self.rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.docket,
+            ),
+            document_number="1",
+            is_available=True,
+            is_free_on_pacer=True,
+            page_count=17,
+            pacer_doc_id="17711118263",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
+
+    def test_can_get_court_from_docket_fetch(self):
+        """Can we retrieve the court ID from fetch queue to buy Dockets?"""
+        # Fetch queue with a Docket object.
+        fq_docket = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.DOCKET,
+            docket=self.docket,
+        )
+        self.assertEqual(
+            get_court_id_from_fetch_queue(fq_docket), self.court.pk
+        )
+
+        # Fetch queue with Court and docket_number.
+        fq_court_docket_number_pair = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.DOCKET,
+            court=self.court,
+            docket_number=self.docket.docket_number,
+        )
+        self.assertEqual(
+            get_court_id_from_fetch_queue(fq_court_docket_number_pair),
+            self.court.pk,
+        )
+
+        # Fetch queue with Court and pacer_case_id pair.
+        fq_court_pacer_case_id_pair = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.DOCKET,
+            court=self.court,
+            pacer_case_id=self.docket.pacer_case_id,
+        )
+        self.assertEqual(
+            get_court_id_from_fetch_queue(fq_court_pacer_case_id_pair),
+            self.court.pk,
+        )
+
+    def test_can_get_court_from_attachment_fetch(self):
+        """Can we retrieve the court ID from a queue to purchase Att. pages?"""
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=self.rd.pk,
+        )
+        self.assertEqual(get_court_id_from_fetch_queue(fq), self.court.pk)
+
+    def test_can_get_court_from_pdf_fetch(self):
+        """Can we retrieve the court ID from a queue to purchase PDFs?"""
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=self.rd.pk,
+        )
+        self.assertEqual(get_court_id_from_fetch_queue(fq), self.court.pk)
 
 
 @mock.patch("cl.recap.views.process_recap_upload")
@@ -2259,6 +2339,15 @@ class RecapDocketFetchApiTest(TestCase):
         cls.docket_alert = DocketAlertFactory(
             docket=cls.docket, user=cls.user_profile.user
         )
+        cls.appellate_court = CourtFactory(
+            id="ca1", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        cls.appellate_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.appellate_court,
+            docket_number=fakes.DOCKET_NUMBER,
+            case_name=fakes.CASE_NAME,
+        )
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -2315,6 +2404,75 @@ class RecapDocketFetchApiTest(TestCase):
         rds = RECAPDocument.objects.all()
         self.assertEqual(rds.count(), 1)
 
+    @mock.patch(
+        "cl.recap.tasks.AppellateDocketReport",
+        new=fakes.FakeAppellateDocketReport,
+    )
+    @mock.patch(
+        "cl.recap.tasks.fetch_appellate_docket", wraps=fetch_appellate_docket
+    )
+    def test_fetch_appellate_docket_by_docket_id(
+        self,
+        mock_fetch_appellate_docket,
+        mock_court_accessible,
+        mock_cookies,
+    ):
+        # Create a PacerFetchQueue entry for an appellate docket request.
+        fq = PacerFetchQueue.objects.create(
+            user=self.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            docket_id=self.appellate_docket.pk,
+        )
+        result = do_pacer_fetch(fq)
+        result.get()
+
+        # Refresh the fetch queue entry from the database to get the updated
+        # status.
+        fq.refresh_from_db()
+        # Assert that the fetch queue entry was successfully processed.
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+        # Assert that the fetch_appellate_docket task was called once with the
+        # correct fetch queue ID.
+        mock_fetch_appellate_docket.si.assert_called_once_with(fq.pk)
+
+        # Assert that a RECAPDocument was created.
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(rds.count(), 1)
+
+    @mock.patch(
+        "cl.recap.tasks.AppellateDocketReport",
+        new=fakes.FakeAppellateDocketReport,
+    )
+    @mock.patch(
+        "cl.recap.tasks.fetch_appellate_docket", wraps=fetch_appellate_docket
+    )
+    def test_fetch_appellate_docket_by_docket_number(
+        self, mock_fetch_appellate_docket, mock_court_accessible, mock_cookies
+    ) -> None:
+        fq = PacerFetchQueue.objects.create(
+            user=self.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.appellate_court.pk,
+            docket_number=self.appellate_docket.docket_number,
+        )
+        result = do_pacer_fetch(fq)
+        result.get()
+
+        # Refresh the fetch queue entry from the database to get the updated
+        # status.
+        fq.refresh_from_db()
+        self.assertEqual(fq.docket, self.appellate_docket)
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+        # Assert that the fetch_appellate_docket task was called once with the
+        # correct fetch queue ID.
+        mock_fetch_appellate_docket.si.assert_called_once_with(fq.pk)
+
+        # Assert that a RECAPDocument was created.
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(rds.count(), 1)
+
     def test_fetch_docket_send_alert(
         self, mock_court_accessible, mock_cookies
     ) -> None:
@@ -2341,13 +2499,6 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
     @classmethod
     def setUp(cls) -> None:
         cls.user = UserWithChildProfileFactory.create()
-        cls.fetch_attributes = {
-            "user": cls.user,
-            "docket_id": 1,
-            "request_type": REQUEST_TYPE.DOCKET,
-            "pacer_username": "johncofey",
-            "pacer_password": "mrjangles",
-        }
         cls.request = RequestFactory().request()
         cls.request.user = cls.user
         cls.court = CourtFactory(
@@ -2356,6 +2507,20 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         cls.court_appellate = CourtFactory(
             id="ca11", jurisdiction=Court.FEDERAL_APPELLATE, in_use=True
         )
+        cls.court_federal_special = CourtFactory(
+            id="cc", jurisdiction=Court.FEDERAL_SPECIAL, in_use=True
+        )
+        cls.docket = DocketFactory(
+            source=Docket.RECAP,
+            court_id=cls.court.pk,
+        )
+        cls.fetch_attributes = {
+            "user": cls.user,
+            "docket": cls.docket.id,
+            "request_type": REQUEST_TYPE.DOCKET,
+            "pacer_username": "johncofey",
+            "pacer_password": "mrjangles",
+        }
 
     def test_simple_request_serialization(self, mock) -> None:
         """Can we serialize a simple request?"""
@@ -2370,12 +2535,35 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
 
         serialized_fq.save()
 
+    def test_check_required_fields_for_docket_purchase(self, mock):
+        """do we correctly identify invalid docket requests?"""
+
+        del self.fetch_attributes["docket"]  # Remove a required field
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        self.assertFalse(
+            serialized_fq.is_valid(),
+            msg=f"Serializer should be invalid due to missing 'docket' field.",
+        )
+
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "For docket requests, please provide one of the following: a "
+                "docket ID ('docket'), a docket number ('docket_number') and court "
+                "pair, or a PACER case ID ('pacer_case_id') and court pair."
+            ),
+            msg="Error message does not match expected format.",
+        )
+
     def test_recap_fetch_validate_pacer_case_id(self, mock):
         """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
         self.fetch_attributes.update(
             {"pacer_case_id": "12-2334", "court": "canb"}
         )
-        del self.fetch_attributes["docket_id"]
+        del self.fetch_attributes["docket"]
         serialized_fq = PacerFetchQueueSerializer(
             data=self.fetch_attributes,
             context={"request": self.request},
@@ -2386,15 +2574,102 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
             "PACER case ID can not contain a single (-); that looks like a docket number.",
         )
 
+    def test_appellate_docket_fetch_validations(self, mock):
+        self.fetch_attributes.update(
+            {"pacer_case_id": "122334", "court": self.court_appellate.pk}
+        )
+        del self.fetch_attributes["docket"]
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Purchases of appellate dockets using a PACER case ID are not "
+                "currently supported. Please use the docket number instead."
+            ),
+        )
+
+    def test_appellate_docket_validate_de_number_filter(self, mock):
+        appellate_docket = DocketFactory(
+            court=self.court_appellate, docket_number="25-1001"
+        )
+
+        # Test case 1: Filtering by de_number_start and send docket_id.
+        self.fetch_attributes["docket"] = appellate_docket.pk
+        self.fetch_attributes.update({"de_number_start": "2"})
+
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Docket entry filtering by number is not supported for "
+                "appellate courts. Use date range filtering with "
+                "'de_date_start' and 'de_date_end' instead."
+            ),
+        )
+
+        # Test case 2: Filtering by de_number_end and send
+        # docket_number-court pair.
+        del self.fetch_attributes["docket"]
+        del self.fetch_attributes["de_number_start"]
+        self.fetch_attributes.update(
+            {
+                "de_number_end": "20",
+                "docket_number": appellate_docket.docket_number,
+                "court": self.court_appellate.pk,
+            }
+        )
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Docket entry filtering by number is not supported for "
+                "appellate courts. Use date range filtering with "
+                "'de_date_start' and 'de_date_end' instead."
+            ),
+        )
+
+        # Test case 3: Filtering by both de_number_start and de_number_end
+        # sending docket_id.
+        del self.fetch_attributes["docket_number"]
+        del self.fetch_attributes["court"]
+        self.fetch_attributes.update(
+            {"docket": appellate_docket.pk, "de_number_start": 2}
+        )
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Docket entry filtering by number is not supported for "
+                "appellate courts. Use date range filtering with "
+                "'de_date_start' and 'de_date_end' instead."
+            ),
+        )
+
     def test_recap_fetch_validate_court(self, mock):
         """Can we properly validate the court_id?"""
 
-        appellate_docket = DocketFactory(
+        non_pacer_docket = DocketFactory(
             source=Docket.RECAP,
-            court_id="ca11",
+            court_id=self.court_federal_special.pk,
         )
-        # checks the provided docket id is not an appellate record
-        self.fetch_attributes["docket"] = appellate_docket.pk
+        # checks the court_id when users send just the docket_id
+        self.fetch_attributes["docket"] = non_pacer_docket.pk
         serialized_fq = PacerFetchQueueSerializer(
             data=self.fetch_attributes,
             context={"request": self.request},
@@ -2402,15 +2677,15 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            "Invalid court id: ca11",
+            f"Purchases from court {self.court_federal_special.pk} are not supported.",
         )
 
         # checks the provided court when users send a pacer_case_id-court pair
         del self.fetch_attributes["docket"]
         self.fetch_attributes.update(
             {
-                "pacer_case_id": appellate_docket.pacer_case_id,
-                "court": appellate_docket.court_id,
+                "pacer_case_id": non_pacer_docket.pacer_case_id,
+                "court": non_pacer_docket.court_id,
             }
         )
         serialized_fq = PacerFetchQueueSerializer(
@@ -2420,14 +2695,14 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            "Invalid court id: ca11",
+            f"Invalid court id: {self.court_federal_special.pk}",
         )
 
         # checks the provided court when users send a docket_number-court pair
         del self.fetch_attributes["pacer_case_id"]
         self.fetch_attributes.update(
             {
-                "docket_number": appellate_docket.docket_number,
+                "docket_number": non_pacer_docket.docket_number,
             }
         )
         serialized_fq = PacerFetchQueueSerializer(
@@ -2437,18 +2712,18 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            "Invalid court id: ca11",
+            f"Invalid court id: {self.court_federal_special.pk}",
         )
 
     def test_recap_fetch_validate_court_of_rd(self, mock) -> None:
         """Can we validate the court when fetching a PDF?"""
         rd = RECAPDocumentFactory.create(
             docket_entry=DocketEntryWithParentsFactory(
-                docket__court=self.court_appellate
+                docket__court=self.court_federal_special
             ),
         )
 
-        del self.fetch_attributes["docket_id"]
+        del self.fetch_attributes["docket"]
         self.fetch_attributes["request_type"] = REQUEST_TYPE.PDF
         self.fetch_attributes["recap_document"] = rd.pk
 
@@ -2459,7 +2734,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            "Invalid court id: ca11",
+            f"Purchases from court {self.court_federal_special.pk} are not supported.",
         )
 
     def test_key_serialization_with_client_code(self, mock) -> None:
