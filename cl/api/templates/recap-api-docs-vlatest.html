@@ -175,7 +175,7 @@
   <ol>
     <li><p>Provide the <code>request_type</code> of <code>1</code> for dockets.</p></li>
     <li>
-      <p>Indicate the docket you want by either a CourtListener <code>docket</code> ID, a <code>pacer_case_id</code>-<code>court</code> pair or a <code>docket_number</code>-<code>court</code> pair:</p>
+      <p>Indicate the docket you want by either a CourtListener <code>docket</code> ID, a <code>docket_number</code>-<code>court</code> pair or a <code>pacer_case_id</code>-<code>court</code> pair (for district court dockets only):</p>
       <ul>
         <li><p><code>pacer_case_id</code> is the internal ID in the PACER system.</p></li>
         <li><p><code>docket_number</code> is the visible docket number humans use to refer to the case.</p></li>
@@ -186,7 +186,7 @@
       </ul>
     </li>
     <li>
-      <p>As when buying dockets from PACER directly, you can choose to buy only some docket entries, omit parties, do a date range query, etc. To see how to use these options map to the API, place an HTTP <code>OPTIONS</code> request.
+      <p>As when buying dockets from PACER directly, you can choose to buy only some docket entries (available for district court dockets only), omit parties, do a date range query, etc. To see how to use these options map to the API, place an HTTP <code>OPTIONS</code> request.
       </p>
     </li>
   </ol>

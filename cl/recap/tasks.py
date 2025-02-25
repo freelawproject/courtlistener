@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 from zipfile import ZipFile
 
 import requests
@@ -100,6 +100,7 @@ from cl.recap.models import (
     PacerHtmlFiles,
     ProcessingQueue,
 )
+from cl.recap.utils import get_court_id_from_fetch_queue
 from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import index_docket_parties_in_es
@@ -159,10 +160,13 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     result = None
     if fq.request_type == REQUEST_TYPE.DOCKET:
         # Request by docket_id
-        c = chain(
-            fetch_docket.si(fq.pk),
-            mark_fq_successful.si(fq.pk),
+        court_id = get_court_id_from_fetch_queue(fq)
+        c = (
+            chain(fetch_appellate_docket.si(fq.pk))
+            if is_appellate_court(court_id)
+            else chain(fetch_docket.si(fq.pk))
         )
+        c = c | mark_fq_successful.si(fq.pk)
         result = c.apply_async()
     elif fq.request_type == REQUEST_TYPE.PDF:
         # Request by recap_document_id
@@ -2291,6 +2295,26 @@ def get_fq_docket_kwargs(fq):
     }
 
 
+def get_fq_appellate_docket_kwargs(fq: PacerFetchQueue):
+    """Gather the kwargs for the Juriscraper AppellateDocketReport from the fq
+    object
+
+    :param fq: The PacerFetchQueue object
+    :return: A dict of the kwargs we can send to the DocketReport
+    """
+    return {
+        "show_docket_entries": True,
+        "show_orig_docket": True,
+        "show_prior_cases": True,
+        "show_associated_cases": fq.show_list_of_member_cases,
+        "show_panel_info": True,
+        "show_party_atty_info": fq.show_parties_and_counsel,
+        "show_caption": True,
+        "date_start": fq.de_date_start,
+        "date_end": fq.de_date_end,
+    }
+
+
 def fetch_pacer_case_id_and_title(s, fq, court_id):
     """Use PACER's hidden API to learn the pacer_case_id of a case
 
@@ -2313,21 +2337,22 @@ def fetch_pacer_case_id_and_title(s, fq, court_id):
     return {}
 
 
-def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
-    """Download the docket from PACER and merge it into CL
+def create_or_update_docket_data_from_fetch(
+    fq: PacerFetchQueue,
+    court_id: str,
+    pacer_case_id: str | None,
+    report: DocketReport | AppellateDocketReport,
+    docket_data: dict[str, Any],
+) -> dict[str, str | bool]:
+    """Creates or updates docket data in the database from fetched data.
 
-    :param session: A PacerSession object to work with
-    :param court_id: The CL ID of the court
-    :param pacer_case_id: The pacer_case_id of the docket, if known
-    :param fq: The PacerFetchQueue object
+    :param fq: The PacerFetchQueue record associated with this fetch.
+    :param court_id: The CL ID of the court.
+    :param pacer_case_id: The pacer_case_id of the docket, if known.
+    :param report: The BaseDocketReport object containing the fetched data.
+    :param docket_data: A dictionary containing the parsed docket data.
     :return: a dict with information about the docket and the new data
     """
-    report = DocketReport(map_cl_to_pacer_id(court_id), session)
-    report.query(pacer_case_id, **get_fq_docket_kwargs(fq))
-
-    docket_data = report.data
-    if not docket_data:
-        raise ParsingException("No data found in docket report.")
     if fq.docket_id:
         d = Docket.objects.get(pk=fq.docket_id)
     else:
@@ -2346,6 +2371,153 @@ def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
     }
+
+
+def fetch_docket_by_pacer_case_id(
+    session: SessionData,
+    court_id: str,
+    pacer_case_id: str,
+    fq: PacerFetchQueue,
+) -> dict[str, int | bool]:
+    """Download the docket from PACER and merge it into CL
+
+    :param session: A PacerSession object to work with
+    :param court_id: The CL ID of the court
+    :param pacer_case_id: The pacer_case_id of the docket, if known
+    :param fq: The PacerFetchQueue object
+    :return: a dict with information about the docket and the new data
+    """
+    report = DocketReport(map_cl_to_pacer_id(court_id), session)
+    report.query(pacer_case_id, **get_fq_docket_kwargs(fq))
+
+    docket_data = report.data
+    if not docket_data:
+        raise ParsingException("No data found in docket report.")
+    return create_or_update_docket_data_from_fetch(
+        fq, court_id, pacer_case_id, report, docket_data
+    )
+
+
+def purchase_appellate_docket_by_docket_number(
+    session: SessionData,
+    court_id: str,
+    docket_number: str,
+    fq: PacerFetchQueue,
+    **kwargs,
+) -> dict[str, int | bool]:
+    """Purchases and processes an appellate docket from PACER by docket number.
+
+    :param session: A PacerSession object to work with
+    :param court_id: The CL ID of the court
+    :param docket_number: The docket number of the appellate case.
+    :param fq: The PacerFetchQueue object
+    :return: a dict with information about the docket and the new data
+    """
+    report = AppellateDocketReport(map_cl_to_pacer_id(court_id), session)
+    report.query(docket_number, **kwargs)
+
+    docket_data = report.data
+    if not docket_data:
+        raise ParsingException("No data found in docket report.")
+    return create_or_update_docket_data_from_fetch(
+        fq, court_id, None, report, docket_data
+    )
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(PacerLoginException, RedisConnectionError),
+    max_retries=5,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
+def fetch_appellate_docket(self, fq_pk):
+    """Fetches an appellate docket from PACER using the docket number
+    associated with the provided Fetch Queue record to attempt the purchase.
+
+    :param fq_pk: The PK of the Fetch Queue to update.
+    :return: None
+    """
+    fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    court_id = fq.court_id or getattr(fq.docket, "court_id", None)
+
+    # Check court connectivity, if fails retry the task, hopefully, it'll be
+    # retried in a different not blocked node
+    if not is_pacer_court_accessible(court_id):
+        if self.request.retries == self.max_retries:
+            msg = f"Blocked by court: {court_id}"
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        raise self.retry()
+
+    async_to_sync(mark_pq_status)(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+
+    session_data = get_pacer_cookie_from_cache(fq.user_id)
+    if session_data is None:
+        msg = f"Cookie cache expired before task could run for user: {fq.user_id}"
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return None
+
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
+
+    docket_number = fq.docket_number or getattr(
+        fq.docket, "docket_number", None
+    )
+    start_time = now()
+    try:
+        result = purchase_appellate_docket_by_docket_number(
+            session=s,
+            court_id=court_id,
+            docket_number=docket_number,
+            fq=fq,
+            **get_fq_appellate_docket_kwargs(fq),
+        )
+    except (requests.RequestException, ReadTimeoutError) as exc:
+        msg = f"Network error while purchasing docket for fq: {fq_pk}."
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        mark_fq_status(
+            fq, f"{msg}Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
+        raise self.retry(exc=exc)
+    except PacerLoginException as exc:
+        msg = (
+            f"PacerLoginException while getting pacer_case_id for fq: {fq_pk}."
+        )
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        mark_fq_status(
+            fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
+        raise self.retry(exc=exc)
+    except ParsingException:
+        msg = f"Unable to purchase docket for fq: {fq_pk}."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return None
+
+    content_updated = result["content_updated"]
+    d_pk = result["docket_pk"]
+    if content_updated:
+        newly_enqueued = enqueue_docket_alert(d_pk)
+        if newly_enqueued:
+            send_alert_and_webhook(d_pk, start_time)
+
+    # Link docket to fq if not previously linked
+    if not fq.docket_id:
+        fq.docket_id = d_pk
+        fq.save()
+
+    return result
 
 
 @app.task(
