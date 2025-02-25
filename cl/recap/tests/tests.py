@@ -109,6 +109,7 @@ from cl.recap.tasks import (
     create_or_merge_from_idb_chunk,
     do_pacer_fetch,
     download_pacer_pdf_by_rd,
+    fetch_appellate_docket,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
     process_recap_acms_appellate_attachment,
@@ -2338,6 +2339,15 @@ class RecapDocketFetchApiTest(TestCase):
         cls.docket_alert = DocketAlertFactory(
             docket=cls.docket, user=cls.user_profile.user
         )
+        cls.appellate_court = CourtFactory(
+            id="ca1", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        cls.appellate_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.appellate_court,
+            docket_number=fakes.DOCKET_NUMBER,
+            case_name=fakes.CASE_NAME,
+        )
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -2391,6 +2401,75 @@ class RecapDocketFetchApiTest(TestCase):
         result.get()
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(rds.count(), 1)
+
+    @mock.patch(
+        "cl.recap.tasks.AppellateDocketReport",
+        new=fakes.FakeAppellateDocketReport,
+    )
+    @mock.patch(
+        "cl.recap.tasks.fetch_appellate_docket", wraps=fetch_appellate_docket
+    )
+    def test_fetch_appellate_docket_by_docket_id(
+        self,
+        mock_fetch_appellate_docket,
+        mock_court_accessible,
+        mock_cookies,
+    ):
+        # Create a PacerFetchQueue entry for an appellate docket request.
+        fq = PacerFetchQueue.objects.create(
+            user=self.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            docket_id=self.appellate_docket.pk,
+        )
+        result = do_pacer_fetch(fq)
+        result.get()
+
+        # Refresh the fetch queue entry from the database to get the updated
+        # status.
+        fq.refresh_from_db()
+        # Assert that the fetch queue entry was successfully processed.
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+        # Assert that the fetch_appellate_docket task was called once with the
+        # correct fetch queue ID.
+        mock_fetch_appellate_docket.si.assert_called_once_with(fq.pk)
+
+        # Assert that a RECAPDocument was created.
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(rds.count(), 1)
+
+    @mock.patch(
+        "cl.recap.tasks.AppellateDocketReport",
+        new=fakes.FakeAppellateDocketReport,
+    )
+    @mock.patch(
+        "cl.recap.tasks.fetch_appellate_docket", wraps=fetch_appellate_docket
+    )
+    def test_fetch_appellate_docket_by_docket_number(
+        self, mock_fetch_appellate_docket, mock_court_accessible, mock_cookies
+    ) -> None:
+        fq = PacerFetchQueue.objects.create(
+            user=self.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.appellate_court.pk,
+            docket_number=self.appellate_docket.docket_number,
+        )
+        result = do_pacer_fetch(fq)
+        result.get()
+
+        # Refresh the fetch queue entry from the database to get the updated
+        # status.
+        fq.refresh_from_db()
+        self.assertEqual(fq.docket, self.appellate_docket)
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+        # Assert that the fetch_appellate_docket task was called once with the
+        # correct fetch queue ID.
+        mock_fetch_appellate_docket.si.assert_called_once_with(fq.pk)
+
+        # Assert that a RECAPDocument was created.
         rds = RECAPDocument.objects.all()
         self.assertEqual(rds.count(), 1)
 
@@ -2493,6 +2572,93 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
             "PACER case ID can not contain a single (-); that looks like a docket number.",
+        )
+
+    def test_appellate_docket_fetch_validations(self, mock):
+        self.fetch_attributes.update(
+            {"pacer_case_id": "122334", "court": self.court_appellate.pk}
+        )
+        del self.fetch_attributes["docket"]
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Purchases of appellate dockets using a PACER case ID are not "
+                "currently supported. Please use the docket number instead."
+            ),
+        )
+
+    def test_appellate_docket_validate_de_number_filter(self, mock):
+        appellate_docket = DocketFactory(
+            court=self.court_appellate, docket_number="25-1001"
+        )
+
+        # Test case 1: Filtering by de_number_start and send docket_id.
+        self.fetch_attributes["docket"] = appellate_docket.pk
+        self.fetch_attributes.update({"de_number_start": "2"})
+
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Docket entry filtering by number is not supported for "
+                "appellate courts. Use date range filtering with "
+                "'de_date_start' and 'de_date_end' instead."
+            ),
+        )
+
+        # Test case 2: Filtering by de_number_end and send
+        # docket_number-court pair.
+        del self.fetch_attributes["docket"]
+        del self.fetch_attributes["de_number_start"]
+        self.fetch_attributes.update(
+            {
+                "de_number_end": "20",
+                "docket_number": appellate_docket.docket_number,
+                "court": self.court_appellate.pk,
+            }
+        )
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Docket entry filtering by number is not supported for "
+                "appellate courts. Use date range filtering with "
+                "'de_date_start' and 'de_date_end' instead."
+            ),
+        )
+
+        # Test case 3: Filtering by both de_number_start and de_number_end
+        # sending docket_id.
+        del self.fetch_attributes["docket_number"]
+        del self.fetch_attributes["court"]
+        self.fetch_attributes.update(
+            {"docket": appellate_docket.pk, "de_number_start": 2}
+        )
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertEqual(
+            serialized_fq.errors["non_field_errors"][0],
+            (
+                "Docket entry filtering by number is not supported for "
+                "appellate courts. Use date range filtering with "
+                "'de_date_start' and 'de_date_end' instead."
+            ),
         )
 
     def test_recap_fetch_validate_court(self, mock):
