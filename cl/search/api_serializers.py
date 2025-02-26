@@ -564,6 +564,7 @@ class OpinionDocumentESResultSerializer(ChildMetaMixin, DocumentSerializer):
             "local_path",
             "sha1",
             "cites",
+            "ordering_key",
         )
 
 
