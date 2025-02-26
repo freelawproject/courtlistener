@@ -30,9 +30,17 @@ from cl.recap.models import (
     PacerFetchQueue,
     ProcessingQueue,
 )
-from cl.recap.tasks import get_and_copy_recap_attachment_docs
+from cl.recap.tasks import (
+    get_and_copy_recap_attachment_docs,
+    set_rd_sealed_status,
+)
 from cl.recap.tests.tests import mock_bucket_open
-from cl.search.factories import CourtFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketEntryFactory,
+    DocketFactory,
+    RECAPDocumentFactory,
+)
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.tests.cases import TestCase
 from cl.tests.utils import AsyncAPIClient, MockResponse
@@ -2216,7 +2224,7 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(None, "Failed to get docket entry"),
     )
-    @mock.patch("cl.recap.tasks.get_and_merge_rd_attachments")
+    @mock.patch("cl.recap.tasks.fetch_attachment_data")
     @mock.patch("cl.recap.tasks.add_docket_entries")
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -2226,7 +2234,7 @@ class RecapEmailDocketAlerts(TestCase):
         self,
         mock_webhook_post,
         mock_add_docket_entries,
-        mock_merge_rd_attachments,
+        mock_fetch_attachment_data,
         mock_download_pdf_by_magic_number,
         mock_docket_entry_sealed,
         mock_enqueue_alert,
@@ -2277,7 +2285,7 @@ class RecapEmailDocketAlerts(TestCase):
 
         # the process_recap_email task returns before trying to add a new entry
         mock_add_docket_entries.assert_not_called()
-        mock_merge_rd_attachments.assert_not_called()
+        mock_fetch_attachment_data.assert_not_called()
 
         # check we didn't create a docket entry
         docket_entry_query = DocketEntry.objects.filter(
@@ -3108,3 +3116,736 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         recap_document_first = await recap_document.afirst()
         self.assertEqual(recap_document_first.document_number, "148")
         self.assertEqual(recap_document_first.docket_entry.entry_number, 148)
+
+
+def mock_method_set_rd_sealed_status(
+    rd: RECAPDocument, magic_number: str | None, potentially_sealed: bool
+) -> None:
+    if rd.document_type == RECAPDocument.PACER_DOCUMENT:
+        set_rd_sealed_status(rd, magic_number, potentially_sealed=True)
+        return
+    return set_rd_sealed_status(rd, magic_number, potentially_sealed)
+
+
+@mock.patch("cl.recap.tasks.enqueue_docket_alert", return_value=True)
+@mock.patch(
+    "cl.recap.tasks.RecapEmailSESStorage.open",
+    side_effect=mock_bucket_open,
+)
+@mock.patch(
+    "cl.recap.tasks.get_or_cache_pacer_cookies",
+    side_effect=lambda x, y, z: (None, None),
+)
+@mock.patch(
+    "cl.recap.tasks.is_pacer_court_accessible",
+    side_effect=lambda a: True,
+)
+@mock.patch(
+    "cl.recap.tasks.is_docket_entry_sealed",
+    return_value=False,
+)
+class RecapEmailContentReplication(TestCase):
+    """Test recap email docket alerts"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
+
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
+        with (
+            open(
+                test_dir / "recap_mail_custom_receipt_multi_nef_jpml.json",
+                encoding="utf-8",
+            ) as file_jpml,
+        ):
+            recap_mail_receipt_multi_nef_jpml = json.load(file_jpml)
+
+        cls.data_multi_canb = {
+            "court": cls.court_canb.id,
+            "mail": recap_mail_receipt_multi_nef_jpml["mail"],
+            "receipt": recap_mail_receipt_multi_nef_jpml["receipt"],
+        }
+
+    def setUp(self) -> None:
+        self.async_client = AsyncAPIClient()
+        self.user = User.objects.get(username="recap-email")
+        token = f"Token {self.user.auth_token.key}"
+        self.async_client.credentials(HTTP_AUTHORIZATION=token)
+        self.path = "/api/rest/v3/recap-email/"
+
+        recipient_user = self.user_profile
+        recipient_user.user.email = "testing_1@mail.com"
+        recipient_user.user.password = make_password("password")
+        recipient_user.user.save()
+        recipient_user.recap_email = "testing_1@recap.email"
+        recipient_user.auto_subscribe = True
+        recipient_user.save()
+        self.recipient_user = recipient_user
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e: (
+            MockResponse(200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.recap.tasks.requests.get",
+        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+    )
+    async def test_nef_subdocket_replication_no_att(
+        self,
+        mock_att_request,
+        mock_download_pdf,
+        mock_cookie,
+        mock_docket_entry_sealed,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_bucket_open,
+        mock_enqueue_alert,
+    ):
+        """Confirm the main PDF and the related attachment data and attachment
+        PDF are properly replicated from a multi-nef notification to subdockets.
+        """
+        # Create two Subdockets and RDs no mentioned in the email notification.
+        de_1 = await sync_to_async(DocketEntryFactory)(
+            docket=await sync_to_async(DocketFactory)(
+                court=self.court_canb,
+                case_name="Subdocket 1",
+                docket_number="1:20-cv-01296",
+                pacer_case_id="1309089",
+            ),
+            entry_number=18,
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de_1,
+            pacer_doc_id="85001321035",
+            document_number="18",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="85001321035",
+                            document_number="1",
+                            pacer_case_id="1309088",
+                        )
+                    ],
+                )
+            ],
+        )
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (
+                email_data,
+                "HTML",
+            ),
+        ):
+            # Trigger a multi-nef recap.email notification from testing_1@recap.email
+            await self.async_client.post(
+                self.path, self.data_multi_canb, format="json"
+            )
+
+        email_processing = EmailProcessingQueue.objects.all()
+        # Confirm EPQ values.
+        self.assertEqual(await email_processing.acount(), 1)
+        email_processing_first = await email_processing.afirst()
+        self.assertEqual(
+            email_processing_first.status, PROCESSING_STATUS.SUCCESSFUL
+        )
+
+        # 2 dockets, 1 mentioned in the notification and 1 that is not
+        dockets = Docket.objects.all()
+        self.assertEqual(
+            await dockets.acount(), 2, msg="Wrong number of Dockets."
+        )
+        # 4 docket entries, two mentioned in the notification and two that are not
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(
+            await docket_entries.acount(),
+            2,
+            msg="Wrong number of DocketEntries.",
+        )
+        # 2 RDs.
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(
+            await recap_documents.acount(),
+            2,
+            msg="Wrong number of RECAPDocuments.",
+        )
+        # Every RECAPDocument should have a file stored at this point.
+        rd = await recap_documents.afirst()
+        self.assertTrue(rd.filepath_local)
+        self.assertTrue(rd.is_available)
+        self.assertEqual(rd.pacer_doc_id, "85001321035")
+
+        # 3 DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 1)
+
+        all_pqs_created = ProcessingQueue.objects.all().order_by("pk")
+        self.assertEqual(
+            await all_pqs_created.acount(),
+            2,
+            msg="Wrong number of ProcessingQueues.",
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e: (
+            MockResponse(200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.recap.tasks.requests.get",
+        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+    )
+    async def test_multi_nef_subdocket_replication(
+        self,
+        mock_att_request,
+        mock_download_pdf,
+        mock_cookie,
+        mock_docket_entry_sealed,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_bucket_open,
+        mock_enqueue_alert,
+    ):
+        """Confirm the main PDF and the related attachment data and attachment
+        PDF are properly replicated from a multi-nef notification to subdockets.
+        """
+
+        # Create two Subdockets and RDs no mentioned in the email notification.
+        de_1 = await sync_to_async(DocketEntryFactory)(
+            docket=await sync_to_async(DocketFactory)(
+                court=self.court_canb,
+                case_name="Subdocket 1",
+                docket_number="1:20-cv-01296",
+                pacer_case_id="1309089",
+            ),
+            entry_number=18,
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de_1,
+            pacer_doc_id="85001321035",
+            document_number="18",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        de_2 = await sync_to_async(DocketEntryFactory)(
+            docket=await sync_to_async(DocketFactory)(
+                court=self.court_canb,
+                case_name="Subdocket 2",
+                docket_number="1:20-cv-01296",
+                pacer_case_id="1309090",
+            ),
+            entry_number=18,
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de_2,
+            pacer_doc_id="85001321035",
+            document_number="18",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=True,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="85001321035",
+                            document_number="1",
+                            pacer_case_id="1309088",
+                        )
+                    ],
+                ),
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="85001321035",
+                            document_number="2",
+                            pacer_case_id="1309087",
+                        )
+                    ],
+                ),
+            ],
+        )
+        att_data = AppellateAttachmentPageFactory(
+            attachments=[
+                AppellateAttachmentFactory(
+                    pacer_doc_id="85001321036", attachment_number=1
+                ),
+                AppellateAttachmentFactory(
+                    pacer_doc_id="85001321037", attachment_number=2
+                ),
+            ],
+            pacer_doc_id="85001321035",
+            document_number="1",
+        )
+
+        with (
+            mock.patch(
+                "cl.recap.tasks.open_and_validate_email_notification",
+                side_effect=lambda x, y: (
+                    email_data,
+                    "HTML",
+                ),
+            ),
+            mock.patch(
+                "cl.recap.tasks.get_data_from_att_report",
+                side_effect=lambda x, y: att_data,
+            ),
+        ):
+            # Trigger a multi-nef recap.email notification from testing_1@recap.email
+            await self.async_client.post(
+                self.path, self.data_multi_canb, format="json"
+            )
+
+        email_processing = EmailProcessingQueue.objects.all()
+        # Confirm EPQ values.
+        self.assertEqual(await email_processing.acount(), 1)
+        email_processing_first = await email_processing.afirst()
+        self.assertEqual(
+            email_processing_first.status, PROCESSING_STATUS.SUCCESSFUL
+        )
+
+        # 4 dockets, two mentioned in the notification and two that are not
+        dockets = Docket.objects.all()
+        self.assertEqual(
+            await dockets.acount(), 4, msg="Wrong number of Dockets."
+        )
+        # 4 docket entries, two mentioned in the notification and two that are not
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(
+            await docket_entries.acount(),
+            4,
+            msg="Wrong number of DocketEntries.",
+        )
+        # 8 RDs in total, 4 mentioned in the notification and 4 that are not.
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(
+            await recap_documents.acount(),
+            12,
+            msg="Wrong number of RECAPDocuments.",
+        )
+        # 4 Main RDs.
+        main_recap_documents = RECAPDocument.objects.filter(
+            document_type=RECAPDocument.PACER_DOCUMENT
+        )
+        self.assertEqual(
+            await main_recap_documents.acount(),
+            4,
+            msg="Wrong number of main RECAPDocuments.",
+        )
+        # 4 Attachment RDs.
+        att_recap_documents = RECAPDocument.objects.filter(
+            document_type=RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            await att_recap_documents.acount(),
+            8,
+            msg="Wrong number of attachment RECAPDocuments.",
+        )
+
+        all_pqs_created = ProcessingQueue.objects.all().order_by("pk")
+        self.assertEqual(
+            await all_pqs_created.acount(),
+            13,
+            msg="Wrong number of ProcessingQueues.",
+        )
+
+        # 5 PQs related to the main document:
+        # One for storing the main PDF from the notification.
+        # Two for storing the attachment page from the notification.
+        # Two for replicating the main PDF to two subdockets.
+        # Two for replicating the attachment page to two subdockets.
+        main_pqs_created = ProcessingQueue.objects.filter(
+            pacer_doc_id="85001321035"
+        )
+        self.assertEqual(
+            await main_pqs_created.acount(),
+            7,
+            msg="Wrong number of ProcessingQueues.",
+        )
+
+        # 3 PQs related to PDF attachments:
+        # One for storing the att PDF from the notification.
+        # Two for replicating the att PDF to two subdockets.
+        att_pqs_created = ProcessingQueue.objects.filter(
+            pacer_doc_id="85001321036"
+        )
+        self.assertEqual(
+            await att_pqs_created.acount(),
+            3,
+            msg="Wrong number of ProcessingQueues.",
+        )
+
+        async for rd in recap_documents:
+            # Every RECAPDocument should have a file stored at this point.
+            self.assertTrue(rd.filepath_local)
+            self.assertTrue(rd.is_available)
+            if not rd.attachment_number:
+                # Check that every main RECAPDocument has the main pacer_doc_id
+                self.assertEqual(rd.pacer_doc_id, "85001321035")
+            if rd.attachment_number == 1:
+                # Check that every attachment RECAPDocument has the attachment
+                # pacer_doc_id
+                self.assertEqual(rd.pacer_doc_id, "85001321036")
+
+        # 3 DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 2)
+
+        # Additional notifications should not trigger content replication.
+        with (
+            mock.patch(
+                "cl.recap.tasks.open_and_validate_email_notification",
+                side_effect=lambda x, y: (
+                    email_data,
+                    "HTML",
+                ),
+            ),
+            mock.patch(
+                "cl.recap.tasks.get_data_from_att_report",
+                side_effect=lambda x, y: att_data,
+            ),
+            mock.patch(
+                "cl.recap.tasks.replicate_recap_email_to_subdockets"
+            ) as mock_replication,
+        ):
+            # Trigger the recap.email notification again for the same user.
+            await self.async_client.post(
+                self.path, self.data_multi_canb, format="json"
+            )
+
+        # Subdockets replication shouldn't be called.
+        mock_replication.assert_not_called()
+
+        # No new recap documents should be added.
+        self.assertEqual(len(recap_documents), 12)
+
+        all_pqs_created = ProcessingQueue.objects.all().order_by("pk")
+        # 4 Additional Pks. 1 for the main PDF, 1 for the att PDF and
+        # two att pages
+        self.assertEqual(
+            await all_pqs_created.acount(),
+            18,
+            "Wrong number of main PQS created.",
+        )
+        # No new docket alert or webhooks should be triggered.
+        self.assertEqual(len(mail.outbox), 2, msg="Wrong number of Alerts")
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e: (
+            MockResponse(200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.recap.tasks.requests.get",
+        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+    )
+    async def test_avoid_triggering_replication_for_minute_entries(
+        self,
+        mock_att_request,
+        mock_download_pdf,
+        mock_cookie,
+        mock_docket_entry_sealed,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_bucket_open,
+        mock_enqueue_alert,
+    ):
+        """Confirm the main PDF and the related attachment data and attachment
+        PDF are properly replicated from a multi-nef notification to subdockets.
+        """
+
+        minute_entry_data = RECAPEmailDocketEntryDataFactory(
+            pacer_magic_num=None,
+            document_number=None,
+            document_url=None,
+            pacer_doc_id=None,
+            pacer_seq_no=None,
+            pacer_case_id="12345",
+        )
+
+        minute_entry_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[minute_entry_data],
+                )
+            ],
+        )
+
+        with (
+            mock.patch(
+                "cl.recap.tasks.open_and_validate_email_notification",
+                side_effect=lambda x, y: (
+                    minute_entry_data,
+                    "HTML",
+                ),
+            ),
+            mock.patch(
+                "cl.recap.tasks.replicate_recap_email_to_subdockets"
+            ) as mock_replication,
+        ):
+            # Trigger a minute-entry recap.email notification from testing_1@recap.email
+            await self.async_client.post(
+                self.path, self.data_multi_canb, format="json"
+            )
+
+        # Subdockets replication shouldn't be called.
+        mock_replication.assert_not_called()
+
+        email_processing = EmailProcessingQueue.objects.all()
+        # Confirm EPQ values.
+        self.assertEqual(await email_processing.acount(), 1)
+        email_processing_first = await email_processing.afirst()
+        self.assertEqual(
+            email_processing_first.status, PROCESSING_STATUS.SUCCESSFUL
+        )
+
+        dockets = Docket.objects.all()
+        self.assertEqual(
+            await dockets.acount(), 1, msg="Wrong number of Dockets."
+        )
+        # 1 docket etnry
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(
+            await docket_entries.acount(),
+            1,
+            msg="Wrong number of DocketEntries.",
+        )
+        # 1 RD.
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(
+            await recap_documents.acount(),
+            1,
+            msg="Wrong number of RECAPDocuments.",
+        )
+        # 1 DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 1)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_attachment_page_by_url",
+        return_value="<html>Sealed document</html>",
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    async def test_avoid_replication_seal_document_and_sealed_attachments(
+        self,
+        mock_webhook_post,
+        mock_get_attachment_page_by_url,
+        mock_download_pdf_by_magic_number,
+        mock_docket_entry_sealed,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+    ):
+        """This test checks whether a document with attachments that is sealed
+        and the attachment page is also unavailable no replication is triggered.
+        """
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=True,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[RECAPEmailDocketEntryDataFactory()],
+                )
+            ],
+        )
+        with (
+            mock.patch(
+                "cl.recap.tasks.open_and_validate_email_notification",
+                return_value=(email_data, "HTML"),
+            ),
+            mock.patch(
+                "cl.recap.tasks.replicate_recap_email_to_subdockets"
+            ) as mock_replication,
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            await self.async_client.post(
+                self.path, self.data_multi_canb, format="json"
+            )
+
+        # Subdockets replication shouldn't be called.
+        mock_replication.assert_not_called()
+
+        docket_entry = email_data["dockets"][0]["docket_entries"]
+        docket_entry_query = DocketEntry.objects.filter(
+            docket__pacer_case_id=docket_entry[0]["pacer_case_id"],
+            entry_number=docket_entry[0]["document_number"],
+        )
+        self.assertEqual(await docket_entry_query.acount(), 1)
+
+        # Only the main document is merged.
+        de = await docket_entry_query.afirst()
+        self.assertEqual(await de.recap_documents.all().acount(), 1)
+
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(
+            await recap_documents.acount(),
+            1,
+            msg="Wrong number of RECAPDocuments.",
+        )
+
+        # An alert containing the main document sealed is sent.
+        self.assertEqual(len(mail.outbox), 1)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e: (
+            MockResponse(200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_attachment_page_by_url",
+        return_value="<html>Sealed document</html>",
+    )
+    @mock.patch(
+        "cl.recap.tasks.set_rd_sealed_status",
+        side_effect=mock_method_set_rd_sealed_status,
+    )
+    async def test_avoid_replication_sealed_document_with_no_sealed_attachments(
+        self,
+        mock_set_rd_sealed_status,
+        mock_get_attachment_page_by_url,
+        mock_webhook_post,
+        mock_download_pdf_by_magic_number,
+        mock_docket_entry_sealed,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+    ):
+        """This test checks whether a document with attachments that is sealed
+        on PACER are properly ingested when the attachment page is available.
+        """
+
+        de_1 = await sync_to_async(DocketEntryFactory)(
+            docket=await sync_to_async(DocketFactory)(
+                court=self.court_canb,
+                case_name="Subdocket 1",
+                docket_number="1:20-cv-01296",
+                pacer_case_id="1309089",
+            ),
+            entry_number=1,
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de_1,
+            pacer_doc_id="04505578698",
+            document_number="1",
+            is_sealed=True,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        att_data = AppellateAttachmentPageFactory(
+            attachments=[
+                AppellateAttachmentFactory(
+                    pacer_doc_id="04505578699", attachment_number=1
+                ),
+            ],
+            pacer_doc_id="04505578698",
+            document_number="1",
+        )
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=True,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="04505578698",
+                            pacer_case_id="1309088",
+                            document_number="1",
+                        )
+                    ],
+                )
+            ],
+        )
+
+        with (
+            mock.patch(
+                "cl.recap.tasks.get_data_from_att_report",
+                side_effect=lambda x, y: att_data,
+            ),
+            mock.patch(
+                "cl.recap.tasks.open_and_validate_email_notification",
+                return_value=(email_data, "HTML"),
+            ),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            await self.async_client.post(
+                self.path, self.data_multi_canb, format="json"
+            )
+
+        dockets = Docket.objects.all()
+        self.assertEqual(
+            await dockets.acount(), 2, msg="Wrong number of Dockets."
+        )
+
+        docket_entry_query = DocketEntry.objects.all()
+        self.assertEqual(
+            await docket_entry_query.acount(),
+            2,
+            msg="Wrong number of Docket entries.",
+        )
+
+        # The main sealed document and one attachment should be ingested.
+        all_rds = RECAPDocument.objects.all()
+        self.assertEqual(await all_rds.acount(), 4)
+
+        # Check RDs merged.
+        main_rds = RECAPDocument.objects.filter(
+            document_type=RECAPDocument.PACER_DOCUMENT
+        )
+        async for rd in main_rds:
+            self.assertEqual(rd.is_sealed, True, msg="Document is not sealed.")
+
+        att_doc = RECAPDocument.objects.filter(
+            document_type=RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            await att_doc.acount(), 2, msg="Wrong number of Attachments."
+        )
+
+        async for att_rd in att_doc:
+            self.assertTrue(att_rd.filepath_local)
+            self.assertTrue(att_rd.is_available)
+
+        # An alert is sent.
+        self.assertEqual(len(mail.outbox), 1)
