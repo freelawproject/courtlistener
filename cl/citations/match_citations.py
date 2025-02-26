@@ -73,12 +73,22 @@ def resolve_fullcase_citation(
             page = full_citation.groups.get("page", None)
             if (
                 volume is not None
+                and volume.isdigit() == True
                 and reporter is not None
                 and page is not None
             ):
                 clusters, _count = async_to_sync(
                     get_clusters_from_citation_str
                 )(volume=volume, reporter=reporter, page=page)
+
+                # exclude self links
+                clusters = [
+                    cluster
+                    for cluster in clusters
+                    if cluster.id != full_citation.citing_opinion.cluster.pk
+                ]
+                _count = len(clusters)
+
                 if _count == 1:
                     # return the first item by ordering key
                     return clusters[0].ordered_opinions.first()
