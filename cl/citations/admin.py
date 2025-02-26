@@ -1,7 +1,8 @@
 from admin_cursor_paginator import CursorPaginatorAdmin
+from django.contrib import admin
 
 from cl.citations.models import UnmatchedCitation
-from django.contrib import admin
+
 
 @admin.register(UnmatchedCitation)
 class UnmatchedCitationAdmin(CursorPaginatorAdmin):
