@@ -82,16 +82,14 @@ def resolve_fullcase_citation(
                 )(volume=volume, reporter=reporter, page=page)
 
                 # exclude self links
-                clusters = [
-                    cluster
-                    for cluster in clusters
-                    if (
-                        full_citation.citing_opinion is not None
-                        and cluster.id
+                if getattr(full_citation, "citing_opinion", False):
+                    clusters = [
+                        cluster
+                        for cluster in clusters
+                        if cluster.id
                         != full_citation.citing_opinion.cluster.pk
-                    )
-                ]
-                _count = len(clusters)
+                    ]
+                    _count = len(clusters)
 
                 if _count == 1:
                     # return the first item by ordering key
