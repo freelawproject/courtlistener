@@ -69,7 +69,7 @@ def resolve_fullcase_citation(
         if len(db_search_results) == 0:
             # If no citation is found use get_clusters_from_citation as a backup
             volume = full_citation.groups.get("volume", None)
-            reporter = full_citation.groups.get("reporter", None)
+            reporter = full_citation.corrected_reporter()
             page = full_citation.groups.get("page", None)
             if (
                 volume is not None
