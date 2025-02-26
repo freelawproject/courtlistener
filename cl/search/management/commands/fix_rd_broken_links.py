@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 
 from django.conf import settings
@@ -114,6 +115,7 @@ class Command(VerboseCommand):
         self.testing_mode = None
         self.queue = None
         self.chunk_size = None
+        self.interval = None
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -147,6 +149,12 @@ class Command(VerboseCommand):
             required=True,
             help="Start date in ISO-8601 format for a range of documents to "
             "update.",
+        )
+        parser.add_argument(
+            "--interval",
+            type=float,
+            default=0.5,
+            help="Wait before scheduling a new chunk, in seconds.",
         )
 
     def get_and_fix_dockets(self, cut_off_date: datetime) -> int:
@@ -186,6 +194,10 @@ class Command(VerboseCommand):
                     (affected_dockets * 100.0) / count,
                     docket_id,
                 )
+                if not self.testing_mode:
+                    # Does not wait between chunks in testing mode.
+                    time.sleep(self.interval)
+
                 if not affected_dockets % 1000:
                     # Log every 1000 documents processed.
                     log_last_document_indexed(docket_id, compose_redis_key())
@@ -199,6 +211,7 @@ class Command(VerboseCommand):
         self.testing_mode = self.options["testing_mode"]
         self.chunk_size = self.options["chunk_size"]
         self.throttle = CeleryThrottle(queue_name=self.queue)
+        self.interval = self.options["interval"]
         auto_resume = options["auto_resume"]
         if auto_resume:
             self.pk_offset = get_last_parent_document_id_processed(
