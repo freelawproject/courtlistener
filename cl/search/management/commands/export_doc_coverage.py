@@ -59,13 +59,23 @@ class Command(BaseCommand):
         handler = self.handle_psql if options["psql"] else self.handle_es
 
         min_year = Docket.objects.earliest("date_filed").date_filed.year
-        max_year = datetime.now().year
-        years = list(range(min_year, max_year + 1))
+        max_date = datetime.now()
 
-        logger.info(f"Processing dockets from {min_year} to {max_year}...")
-        for year in tqdm(years, desc="Processing by years"):
+        date_ranges = []
+        current = datetime(min_year, 1, 1)
+        while current <= max_date:
+            date_ranges.append((current.year, current.month))
+            if current.month == 12:
+                current = datetime(current.year + 1, 1, 1)
+            else:
+                current = datetime(current.year, current.month + 1, 1)
+
+        logger.info(
+            f"Processing dockets from {min_year}-01 to {max_date.year}-{max_date.month}..."
+        )
+        for year, month in tqdm(date_ranges, desc="Processing by year-month"):
             start = datetime.now()
-            data = handler(year)
+            data = handler(year, month, options)
             if len(data):
                 data = pd.DataFrame(data)
                 if out_path.exists():
@@ -73,10 +83,12 @@ class Command(BaseCommand):
                 else:
                     data.to_csv(out_path, index=False)
 
-            pct = (years.index(year) + 1) * 100 / len(years)
+            pct = (
+                (date_ranges.index((year, month)) + 1) * 100 / len(date_ranges)
+            )
             elapsed = (datetime.now() - start).total_seconds()
             logger.info(
-                f"Processed {year}. {pct:.2f}% done. Took {elapsed:.2f} seconds."
+                f"Processed {year}-{month:02d}. {pct:.2f}% done. Took {elapsed:.2f} seconds."
             )
 
             if options["sleep"] > 0 and pct < 100:
@@ -85,7 +97,7 @@ class Command(BaseCommand):
 
         logger.info(f"Done! Saved to {out_path}")
 
-    def handle_psql(self, year: int):
+    def handle_psql(self, year: int, month: int, options: dict):
         # Prep filters
         is_document = Q(
             docket_entries__recap_documents__document_type__isnull=False
@@ -96,7 +108,9 @@ class Command(BaseCommand):
 
         # Run query
         dockets = Docket.objects.filter(
-            date_filed__year=year, source__in=Docket.RECAP_SOURCES()
+            date_filed__year=year,
+            date_filed__month=month,
+            source__in=Docket.RECAP_SOURCES(),
         )
         dockets = dockets.annotate(
             num_documents=Count(
@@ -128,9 +142,15 @@ class Command(BaseCommand):
             "num_main_rss_documents",
         )
 
-    def handle_es(self, year: int):
+    def handle_es(self, year: int, month: int, options: dict):
 
         def get_composite_query(after=None):
+            next_month = month + 1
+            next_year = year
+            if next_month > 12:
+                next_month = 1
+                next_year = year + 1
+
             query = {
                 "size": 0,
                 "track_total_hits": False,
@@ -138,17 +158,13 @@ class Command(BaseCommand):
                     "bool": {
                         "must": [
                             {
-                                "bool": {
-                                    "filter": {
-                                        "exists": {"field": "document_type"}
-                                    }
-                                }
+                                "match": {"docket_child": "recap_document"},
                             },
                             {
                                 "range": {
                                     "dateFiled": {
-                                        "gte": f"{year}-01-01",
-                                        "lt": f"{year+1}-01-01",
+                                        "gte": f"{year}-{month:02d}-01",
+                                        "lt": f"{next_year}-{next_month:02d}-01",
                                     }
                                 }
                             },
@@ -168,9 +184,6 @@ class Command(BaseCommand):
                             ],
                         },
                         "aggs": {
-                            "total_docs": {
-                                "value_count": {"field": "docket_id"}
-                            },
                             "num_main_documents": {
                                 "filter": {
                                     "bool": {
@@ -242,6 +255,9 @@ class Command(BaseCommand):
             if not after:
                 break
             logger.info(
-                f"Adding data for year {year} ({len(data)} total so far)"
+                f"Adding data for {year}-{month:02d} ({len(data)} total so far)"
             )
+
+            if options["sleep"] > 0:
+                time.sleep(options["sleep"])
         return data
