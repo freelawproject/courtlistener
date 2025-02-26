@@ -516,7 +516,7 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
     """
     # Simple pattern for Federal Register citations
     fr_match = re.search(
-        r"(\d{1,3})\s*(?:FR|Fed\.?\s*Reg\.?)\s*(\d{1,5}(?:,\d{3})*)",
+        r"(\d{1,3})\s*(?:FR|Fed\.?\s*Reg\.?)\s*(\d{1,6}(?:,\d{3})*)",
         og_docket_number,
     )
 
