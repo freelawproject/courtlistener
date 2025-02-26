@@ -29,6 +29,7 @@ from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
 from cl.lib.elasticsearch_utils import simplify_estimated_count
+from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import AudioTestCase, CourtTestCase, PeopleTestCase
@@ -64,7 +65,6 @@ from cl.search.factories import (
 )
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
-    log_last_document_indexed,
 )
 from cl.search.management.commands.cl_remove_content_from_es import (
     compose_redis_key_remove_content,
@@ -947,6 +947,42 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             (
                 "b*ra*e b*rav*",
                 "b?ra?e b?rav*",
+            ),
+            (
+                "Lorem docketNumber:1:21-bk-0021 test",
+                'Lorem docketNumber:"1:21-bk-0021"~1 test',
+            ),
+            (
+                "Lorem docketNumber:1:21-bk-0021 AND docketNumber:1:21-bk-0022",
+                'Lorem docketNumber:"1:21-bk-0021"~1 AND docketNumber:"1:21-bk-0022"~1',
+            ),
+            (
+                "Lorem docketNumber:1:21:0021 test",
+                'Lorem docketNumber:"1:21:0021" test',
+            ),
+            (
+                "docketNumber:(ASBCA No. 59126)",
+                'docketNumber:(ASBCA No. "59126")',
+            ),
+            (
+                'docketNumber:"1:21-bk-0021" test',
+                'docketNumber:"1:21-bk-0021" test',
+            ),
+            (
+                "docketNumber:1:21-bk-0021-ABC test",
+                'docketNumber:"1:21-bk-0021-ABC"~1 test',
+            ),
+            (
+                "12-9238 docketNumber:1:21-bk-0021",
+                'docketNumber:"12-9238"~1 docketNumber:"1:21-bk-0021"~1',
+            ),
+            (
+                'test case_name_full:"Lorem ipsum 2" test',
+                'test case_name_full:"Lorem ipsum 2" test',
+            ),
+            (
+                'docketNumber:"docket number 2"',
+                'docketNumber:"docket number 2"',
             ),
         )
         for q, a in q_a:

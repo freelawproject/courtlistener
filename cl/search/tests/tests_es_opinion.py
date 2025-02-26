@@ -1481,15 +1481,54 @@ class OpinionsESSearchTest(
         r = await self._test_article_count(search_params, 1, "filed_range")
         self.assertIn("Honda", r.content.decode())
 
-    async def test_can_filter_using_a_docket_number(self) -> None:
+    def test_can_filter_using_a_docket_number(self) -> None:
         """Can we query by docket number?"""
+
+        # Regular docket_number filtering.
         search_params = {"q": "*", "docket_number": "2"}
 
         # Frontend
-        r = await self._test_article_count(search_params, 1, "docket_number")
+        r = async_to_sync(self._test_article_count)(
+            search_params, 1, "docket_number"
+        )
         self.assertIn(
             "Honda", r.content.decode(), "Result not found by docket number!"
         )
+
+        # Filter by case by docket_number containing repeated numbers like: 1:21-bk-0021
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory(
+                case_name="Strickland v. Lorem.",
+                docket=DocketFactory(
+                    court=self.court_1, docket_number="1:21-bk-0021"
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "docket_number": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # docket_number filter works properly combined with child document fields
+        with self.captureOnCommitCallbacks(execute=True):
+            OpinionFactory.create(cluster=cluster, plain_text="Lorem Ipsum")
+
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Lorem Ipsum",
+            "docket_number": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docket_number and text"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+        self.assertIn("Lorem Ipsum", r.content.decode())
+
+        # Remove factories to prevent affecting other tests.
+        cluster.delete()
 
     async def test_can_filter_by_citation_number(self) -> None:
         """Can we query by citation number?"""

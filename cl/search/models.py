@@ -1,7 +1,7 @@
 import logging
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Tuple, TypeVar
+from typing import Dict, List, Tuple, TypeVar
 
 import pghistory
 import pytz
@@ -15,7 +15,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import Prefetch, Q, QuerySet
 from django.db.models.aggregates import Count, Sum
 from django.db.models.functions import MD5
-from django.urls import NoReverseMatch, reverse
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.functional import cached_property
@@ -29,7 +29,6 @@ from model_utils import FieldTracker
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
-from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     CSVExportMixin,
     linkify_orig_docket_number,
@@ -38,7 +37,6 @@ from cl.lib.model_helpers import (
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
-from cl.lib.search_index_utils import InvalidDocumentError
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.search.docket_sources import DocketSources
@@ -2910,8 +2908,7 @@ class OpinionClusterNonParticipatingJudges(
         proxy = True
 
 
-@pghistory.track()
-class Citation(models.Model):
+class BaseCitation(models.Model):
     """A simple class to hold citations."""
 
     FEDERAL = 1
@@ -2951,12 +2948,6 @@ class Citation(models.Model):
             "72 Soc.Sec.Rep.Serv. 318)",
         ),
     )
-    cluster = models.ForeignKey(
-        OpinionCluster,
-        help_text="The cluster that the citation applies to",
-        related_name="citations",
-        on_delete=models.CASCADE,
-    )
     volume = models.SmallIntegerField(help_text="The volume of the reporter")
     reporter = models.TextField(
         help_text="The abbreviation for the reporter",
@@ -2977,9 +2968,24 @@ class Citation(models.Model):
         help_text="The type of citation that this is.", choices=CITATION_TYPES
     )
 
+    class Meta:
+        abstract = True
+
     def __str__(self) -> str:
         # Note this representation is used in the front end.
         return "{volume} {reporter} {page}".format(**self.__dict__)
+
+
+@pghistory.track()
+class Citation(BaseCitation):
+    """A citation to an OpinionCluster"""
+
+    cluster = models.ForeignKey(
+        OpinionCluster,
+        help_text="The cluster that the citation applies to",
+        related_name="citations",
+        on_delete=models.CASCADE,
+    )
 
     def get_absolute_url(self) -> str:
         return self.cluster.get_absolute_url()
