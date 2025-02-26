@@ -166,6 +166,7 @@ class Command(VerboseCommand):
         for docket_to_fix in dockets_to_fix_queryset.iterator():
             docket_id = docket_to_fix["pgh_obj_id"]
             chunk.append(docket_id)
+            affected_dockets +=1
             last_item = count == affected_dockets
             if affected_dockets % self.chunk_size == 0 or last_item:
                 self.throttle.maybe_wait()
