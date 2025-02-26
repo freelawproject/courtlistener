@@ -768,6 +768,21 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ),
         )
 
+        cls.citation12 = CitationWithParentsFactory.create(
+            volume="8",
+            reporter="Barb.",
+            page="415",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                case_name="Shaffer v. Lee",
+                date_filed=date(1850, 4, 9),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    xml_harvard="""Lorem ipsum,*415 114 F.3d 1182, consectetur *416 adipiscing elit, 114 F.3d 1181""",
+                ),
+            ),
+        )
+
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.OPINION,
@@ -1085,6 +1100,24 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         ]
         results = resolve_fullcase_citation(citation)
         self.assertEqual(NO_MATCH_RESOURCE, results)
+
+    def test_citation_resolve_with_corrected_reporter(self) -> None:
+        """Resolve to corrected reporter"""
+        cite_str = "8 B. 415"
+        citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
+        citation.citing_opinion = Opinion.objects.all()[0]
+        results = resolve_fullcase_citation(citation)
+        opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        self.assertEqual(results.pk, opinion12.pk, msg=results)
+
+    def test_citation_resolve_to_pincite(self) -> None:
+        """Resolve to corrected reporter and pin cite inside xml harvard?"""
+        cite_str = "8 B. 416"
+        citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
+        citation.citing_opinion = Opinion.objects.all()[0]
+        results = resolve_fullcase_citation(citation)
+        opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        self.assertEqual(results.pk, opinion12.pk, msg=results)
 
     def test_citation_multiple_matches(self) -> None:
         """Make sure that we can identify multiple matches for a single citation"""
