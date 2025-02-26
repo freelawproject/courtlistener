@@ -1,7 +1,16 @@
 from datetime import datetime
 
 from django.conf import settings
-from django.db.models import Count, Exists, F, OuterRef, Q, QuerySet, Subquery
+from django.db.models import (
+    Count,
+    Exists,
+    F,
+    Max,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+)
 
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
@@ -44,21 +53,6 @@ def get_docket_events_and_slug_count(
         .values_list("id", flat=True)
     )
 
-    # Get the current slug in the Docket table.
-    docket_slug_subquery = Docket.objects.filter(
-        id=OuterRef("pgh_obj_id")
-    ).values("slug")[:1]
-
-    # Get the latest slug in the DocketEvent table.
-    last_docket_event_slug_subquery = (
-        DocketEvent.objects.filter(
-            pgh_obj_id=OuterRef("pgh_obj_id"),
-            pgh_created_at__gte=cut_off_date,
-        )
-        .order_by("-pgh_id")
-        .values("slug")[:1]
-    )
-
     return (
         DocketEvent.objects.filter(
             pgh_obj_id__in=Subquery(docket_ids_subquery),
@@ -67,8 +61,8 @@ def get_docket_events_and_slug_count(
         .values("pgh_obj_id")
         .annotate(
             slug_count=Count("slug", distinct=True),
-            event_table_slug=Subquery(last_docket_event_slug_subquery),
-            docket_table_slug=Subquery(docket_slug_subquery),
+            event_table_slug=Max("slug"),
+            docket_table_slug=Max("pgh_obj__slug"),
         )
     )
 

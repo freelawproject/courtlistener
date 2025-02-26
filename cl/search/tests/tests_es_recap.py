@@ -8229,9 +8229,9 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
                 "docket_table_slug": self.docket_1.slug,
             },
             self.docket_2.pk: {
-                "slug_count": 2,  # slug changed twice, final value is not in the event table.
-                "event_table_slug": d2_last_slug_in_event_table,
-                "docket_table_slug": self.docket_2.slug,
+                "slug_count": 2,  # slug changed twice, we don't need to compare slugs.
+                "event_table_slug": None,
+                "docket_table_slug": None,
             },
             self.docket_3.pk: {
                 "slug_count": 1,  # slug changed once, final value is not in the event table.
@@ -8246,18 +8246,23 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
                     docket["slug_count"],
                     msg="Slug count didn't match.",
                 )
-                self.assertEqual(
-                    expected_results[docket["pgh_obj_id"]]["event_table_slug"],
-                    docket["event_table_slug"],
-                    msg="Event table slug didn't match.",
-                )
-                self.assertEqual(
-                    expected_results[docket["pgh_obj_id"]][
-                        "docket_table_slug"
-                    ],
-                    docket["docket_table_slug"],
-                    msg="Docket table slug didn't match.",
-                )
+                if docket["slug_count"] == 1:
+                    # We only need to compare slugs if the slug_count in the
+                    # event table is equal to 1.
+                    self.assertEqual(
+                        expected_results[docket["pgh_obj_id"]][
+                            "event_table_slug"
+                        ],
+                        docket["event_table_slug"],
+                        msg="Event table slug didn't match.",
+                    )
+                    self.assertEqual(
+                        expected_results[docket["pgh_obj_id"]][
+                            "docket_table_slug"
+                        ],
+                        docket["docket_table_slug"],
+                        msg="Docket table slug didn't match.",
+                    )
 
         # Now get_dockets_to_fix to filter out dockets that require re-indexing.
         dockets_to_fix = get_dockets_to_fix(cut_off_date, pk_offset=0)
