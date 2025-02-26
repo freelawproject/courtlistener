@@ -185,6 +185,9 @@ class Command(VerboseCommand):
                 ).set(queue=self.queue).apply_async()
                 if self.testing_mode:
                     logger.info("Processing chunk: %s", chunk)
+                else:
+                    # Does not wait between chunks in testing mode.
+                    time.sleep(self.interval)
 
                 chunk = []
                 logger.info(
@@ -194,9 +197,6 @@ class Command(VerboseCommand):
                     (affected_dockets * 100.0) / count,
                     docket_id,
                 )
-                if not self.testing_mode:
-                    # Does not wait between chunks in testing mode.
-                    time.sleep(self.interval)
 
                 if not affected_dockets % 1000:
                     # Log every 1000 documents processed.
