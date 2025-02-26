@@ -68,12 +68,12 @@ def resolve_fullcase_citation(
 
         if len(db_search_results) == 0:
             # If no citation is found use get_clusters_from_citation as a backup
-            volume = full_citation.groups.get("volume", None)
+            volume = full_citation.groups.get("volume")
             reporter = full_citation.corrected_reporter()
-            page = full_citation.groups.get("page", None)
+            page = full_citation.corrected_page()
             if (
                 volume is not None
-                and volume.isdigit() == True
+                and volume.isdigit()
                 and reporter is not None
                 and page is not None
             ):
@@ -85,7 +85,11 @@ def resolve_fullcase_citation(
                 clusters = [
                     cluster
                     for cluster in clusters
-                    if cluster.id != full_citation.citing_opinion.cluster.pk
+                    if (
+                        full_citation.citing_opinion is not None
+                        and cluster.id
+                        != full_citation.citing_opinion.cluster.pk
+                    )
                 ]
                 _count = len(clusters)
 
