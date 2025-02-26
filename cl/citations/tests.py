@@ -324,15 +324,12 @@ class CitationTextTest(SimpleTestCase):
              f'<a href="MATCH_URL#122" {aria_description}>'
              '<em>Bivens </em> at 122</a></span> action can be employed...'
             ),
-
-            # Pincited full citation, pincite before citation nucleus
-            # We would want it not to capture the year "(2010)", but it requires
-            # a fix in eyecite and span_with_pincite()
+            # pin cite before citation with S.Ct.
             (
                 "something Something; In <em>Nobelman </em>at 332, 113 S.Ct. 2106 (2010); Something else",
                 f'something Something; In <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#332" {aria_description}>'
-                '<em>Nobelman </em>at 332, 113 S.Ct. 2106 (2010)'
-                '</a></span>; Something else'
+                '<em>Nobelman </em>at 332, 113 S.Ct. 2106'
+                '</a></span> (2010); Something else'
             ),
             # Pincited full citation, pincite after nucleus
             (
@@ -1298,6 +1295,10 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="Yeates",
             page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                # Yeates was published from 1791 to 1808
+                date_filed=date(1800, 1, 1),
+            ),
         )
 
         # Citation 2 - citing opinion

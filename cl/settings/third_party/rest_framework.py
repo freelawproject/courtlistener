@@ -28,6 +28,12 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Sock puppets
+        "kokonag227": "1/hour",
+        "dedadi7242": "1/hour",
+        "texoya9545": "1/hour",
+        "nedah94680": "1/hour",
+        "robowiy352": "1/hour",
         # Multiple accounts
         "my_yancy_lost": "1/hour",
         "theworky_1980": "1/hour",
@@ -61,6 +67,7 @@ REST_FRAMEWORK = {
         "BruceWayne": "1/hour",
         "mibefis809": "1/hour",
         # Unresponsive
+        "AlirezaMirrokni": "1/hour",
         "court_test_account": "1/hour",
         "jmmckinnie": "1/hour",
         "projecttesting": "1/hour",
