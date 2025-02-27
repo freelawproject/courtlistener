@@ -1228,7 +1228,6 @@ class ESRECAPDocument(
             "cites",
         ]
 
-
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
         transformations = {

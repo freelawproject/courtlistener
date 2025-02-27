@@ -1,6 +1,7 @@
 import logging
 import pickle
 import re
+from collections.abc import Callable
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
 from urllib.parse import parse_qs, urlencode
 
@@ -639,32 +640,57 @@ def do_es_search(
     }
 
 
-def get_headers_for_search_export(type: str) -> list[str]:
-    """Creates a list of headers suitable for CSV export of search results.
+def get_headers_and_transformations_for_search_export(
+    type: str,
+) -> tuple[list[str], dict[str, Callable[..., Any]]]:
+    """
+    Retrieves CSV headers and data transformation functions for a given search
+    type.
+
+    This function determines the appropriate CSV headers and data transformation
+    functions based on the specified Elasticsearch search type. It combines
+    headers and transformations from relevant document classes to generate a
+    comprehensive set for CSV export.
 
     :param type: The type of Elasticsearch search to be performed. Valid values
         are defined in the `SEARCH_TYPES` enum.
-    :return: A list of strings representing the CSV headers.
+    :return:  A tuple containing:
+        - A list of strings representing the CSV headers.
+        - A dictionary where keys are field names and values are callable functions
+          that define the data transformations.
     """
     match type:
         case SEARCH_TYPES.PEOPLE:
             keys = PersonDocument.get_csv_headers()
+            transformations = PersonDocument.get_csv_transformations()
         case SEARCH_TYPES.ORAL_ARGUMENT:
             keys = AudioDocument.get_csv_headers()
+            transformations = AudioDocument.get_csv_transformations()
         case SEARCH_TYPES.PARENTHETICAL:
             keys = ParentheticalGroupDocument.get_csv_headers()
+            transformations = (
+                ParentheticalGroupDocument.get_csv_transformations()
+            )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             keys = (
                 DocketDocument.get_csv_headers()
                 + ESRECAPDocument.get_csv_headers()
+            )
+            transformations = (
+                DocketDocument.get_csv_transformations()
+                | ESRECAPDocument.get_csv_transformations()
             )
         case SEARCH_TYPES.OPINION:
             keys = (
                 OpinionClusterDocument.get_csv_headers()
                 + OpinionDocument.get_csv_headers()
             )
+            transformations = (
+                OpinionClusterDocument.get_csv_transformations()
+                | OpinionDocument.get_csv_transformations()
+            )
 
-    return keys
+    return keys, transformations
 
 
 def fetch_es_results_for_csv(

@@ -46,7 +46,7 @@ from cl.lib.search_index_utils import (
 )
 from cl.lib.search_utils import (
     fetch_es_results_for_csv,
-    get_headers_for_search_export,
+    get_headers_and_transformations_for_search_export,
 )
 from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
@@ -393,8 +393,11 @@ def email_search_results(user_id: int, query: str):
     if not search_results:
         return
 
-    # Get the headers for the CSV file based on the search type
-    csv_headers = get_headers_for_search_export(cd["type"])
+    # Get the headers and basic transformation for the CSV file based on the
+    # search type
+    csv_headers, csv_transformations = (
+        get_headers_and_transformations_for_search_export(cd["type"])
+    )
 
     # Create the CSV content and store in a StringIO object
     csv_content = None
@@ -408,6 +411,9 @@ def email_search_results(user_id: int, query: str):
         )
         csvwriter.writeheader()
         for row in search_results:
+            for key, function in csv_transformations.items():
+                row[key] = function(row[key] if key in row else row)
+
             clean_dict = {
                 camel_to_snake(key): value for key, value in row.items()
             }
