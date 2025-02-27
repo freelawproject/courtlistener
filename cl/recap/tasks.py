@@ -102,8 +102,8 @@ from cl.recap.models import (
 from cl.recap.utils import (
     find_subdocket_atts_rds_from_data,
     find_subdocket_pdf_rds_from_data,
+    get_court_id_from_fetch_queue,
     get_main_rds,
-    get_court_id_from_fetch_queue
 )
 from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument

@@ -4,7 +4,7 @@ from django.core.files.base import ContentFile
 from django.db.models import QuerySet
 from django.forms.models import model_to_dict
 
-from cl.recap.models import UPLOAD_TYPE, ProcessingQueue, PacerFetchQueue
+from cl.recap.models import UPLOAD_TYPE, PacerFetchQueue, ProcessingQueue
 from cl.search.models import Docket, RECAPDocument
 
 
@@ -24,17 +24,14 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
     PacerFetchQueue.
     :return: The court ID as a string.
     """
-    # Check if the input is a PacerFetchQueue object or a dictionary.
-    is_fetch_queue = isinstance(fq, PacerFetchQueue)
 
     # Convert PacerFetchQueue to dictionary if necessary.  This allows us to
     # handle both types consistently.
-    attrs = model_to_dict(fq) if is_fetch_queue else fq
-
+    attrs = model_to_dict(fq) if isinstance(fq, PacerFetchQueue) else fq
     if attrs.get("recap_document"):
         rd_id = (
             fq.recap_document_id
-            if is_fetch_queue
+            if isinstance(fq, PacerFetchQueue)
             else attrs["recap_document"].pk
         )
         docket = (
@@ -45,10 +42,16 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
         court_id = docket.court_id
     elif attrs.get("docket"):
         court_id = (
-            fq.docket.court_id if is_fetch_queue else attrs["docket"].court_id
+            fq.docket.court_id
+            if isinstance(fq, PacerFetchQueue)
+            else attrs["docket"].court_id
         )
     else:
-        court_id = fq.court_id if is_fetch_queue else attrs["court"].pk
+        court_id = (
+            fq.court_id
+            if isinstance(fq, PacerFetchQueue)
+            else attrs["court"].pk
+        )
 
     return court_id
 
