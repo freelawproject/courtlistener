@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from typing import Dict, Iterable, List, Optional, no_type_check
 
+from asgiref.sync import async_to_sync, sync_to_async
 from elasticsearch_dsl.response import Hit
 from eyecite import resolve_citations
 from eyecite.models import (
@@ -23,6 +24,7 @@ from cl.citations.types import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.search.models import Opinion, RECAPDocument
+from cl.search.selectors import get_clusters_from_citation_str
 
 DEBUG = True
 
@@ -63,6 +65,39 @@ def resolve_fullcase_citation(
         db_search_results, _ = es_search_db_for_full_citation(full_citation)
         # If there is more than one result, return a placeholder with the
         # citation with multiple results
+
+        if len(db_search_results) == 0:
+            # If no citation is found use get_clusters_from_citation as a backup
+            volume = full_citation.groups.get("volume")
+            reporter = full_citation.corrected_reporter()
+            page = full_citation.corrected_page()
+            if (
+                volume is not None
+                and volume.isdigit()
+                and reporter is not None
+                and page is not None
+            ):
+                clusters, _count = async_to_sync(
+                    get_clusters_from_citation_str
+                )(volume=volume, reporter=reporter, page=page)
+
+                # exclude self links
+                if getattr(full_citation, "citing_opinion", False):
+                    clusters = [
+                        cluster
+                        for cluster in clusters
+                        if cluster.id
+                        != full_citation.citing_opinion.cluster.pk
+                    ]
+                    _count = len(clusters)
+
+                if _count == 1:
+                    # return the first item by ordering key
+                    return clusters[0].ordered_opinions.first()
+                elif _count >= 2:
+                    # if two or more remain return multiple matches
+                    return MULTIPLE_MATCHES_RESOURCE
+
         if len(db_search_results) > 1:
             return MULTIPLE_MATCHES_RESOURCE
 

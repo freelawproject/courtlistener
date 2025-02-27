@@ -334,9 +334,10 @@ def store_unmatched_citations(
         # values in required fields
         groups = unmatched_citation.groups
         if (
-            not groups.get("reporter")
-            or not groups.get("volume")
-            or not groups.get("page")
+            not groups.get("reporter", None)
+            or not groups.get("volume", None)
+            or not groups.get("volume").isdigit()
+            or not groups.get("page", None)
         ):
             logger.error(
                 "Unexpected null value in FullCaseCitation %s",
