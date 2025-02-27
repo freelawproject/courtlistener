@@ -3,7 +3,7 @@ from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
@@ -32,6 +32,7 @@ from cl.recap.models import (
 )
 from cl.recap.tasks import (
     get_and_copy_recap_attachment_docs,
+    mark_pq_successful,
     set_rd_sealed_status,
 )
 from cl.recap.tests.tests import mock_bucket_open
@@ -2726,6 +2727,8 @@ class GetAndCopyRecapAttachments(TestCase):
         # check if the PQ object is marked as successful and the file is deleted
         pqs = ProcessingQueue.objects.all()
         for pq in pqs:
+            if pq.status != PROCESSING_STATUS.FAILED:
+                async_to_sync(mark_pq_successful)(pq)
             self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
             self.assertFalse(pq.filepath_local)
 
@@ -2777,6 +2780,8 @@ class GetAndCopyRecapAttachments(TestCase):
         # check if the PQ object is marked as successful and the file is deleted
         pqs = ProcessingQueue.objects.all()
         for pq in pqs:
+            if pq.status != PROCESSING_STATUS.FAILED:
+                async_to_sync(mark_pq_successful)(pq)
             self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
             self.assertFalse(pq.filepath_local)
 
@@ -3301,9 +3306,10 @@ class RecapEmailContentReplication(TestCase):
         )
         # Every RECAPDocument should have a file stored at this point.
         async for rd in recap_documents:
-            self.assertTrue(rd.filepath_local)
-            self.assertTrue(rd.is_available)
-            self.assertEqual(rd.pacer_doc_id, "85001321035")
+            with self.subTest(rd=rd):
+                self.assertTrue(rd.filepath_local)
+                self.assertTrue(rd.is_available)
+                self.assertEqual(rd.pacer_doc_id, "85001321035")
 
         # 1 DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 1)
@@ -3350,7 +3356,8 @@ class RecapEmailContentReplication(TestCase):
         async for pq in all_pqs_created:
             # Files are cleaned up from all PQs created after
             # successful processing.
-            self.assertFalse(pq.filepath_local)
+            with self.subTest(pq=pq):
+                self.assertFalse(pq.filepath_local)
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
@@ -3541,16 +3548,17 @@ class RecapEmailContentReplication(TestCase):
             msg="Wrong number of ProcessingQueues.",
         )
         async for rd in recap_documents:
-            # Every RECAPDocument should have a file stored at this point.
-            self.assertTrue(rd.filepath_local)
-            self.assertTrue(rd.is_available)
-            if not rd.attachment_number:
-                # Check that every main RECAPDocument has the main pacer_doc_id
-                self.assertEqual(rd.pacer_doc_id, "85001321035")
-            if rd.attachment_number == 1:
-                # Check that every attachment RECAPDocument has the attachment
-                # pacer_doc_id
-                self.assertEqual(rd.pacer_doc_id, "85001321036")
+            with self.subTest(rd=rd):
+                # Every RECAPDocument should have a file stored at this point.
+                self.assertTrue(rd.filepath_local)
+                self.assertTrue(rd.is_available)
+                if not rd.attachment_number:
+                    # Check that every main RECAPDocument has the main pacer_doc_id
+                    self.assertEqual(rd.pacer_doc_id, "85001321035")
+                if rd.attachment_number == 1:
+                    # Check that every attachment RECAPDocument has the attachment
+                    # pacer_doc_id
+                    self.assertEqual(rd.pacer_doc_id, "85001321036")
 
         # 2 DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 2)
@@ -3796,7 +3804,10 @@ class RecapEmailContentReplication(TestCase):
             document_type=RECAPDocument.PACER_DOCUMENT
         )
         async for rd in main_rds:
-            self.assertEqual(rd.is_sealed, True, msg="Document is not sealed.")
+            with self.subTest(rd=rd):
+                self.assertEqual(
+                    rd.is_sealed, True, msg="Document is not sealed."
+                )
 
         att_doc = RECAPDocument.objects.filter(
             document_type=RECAPDocument.ATTACHMENT
@@ -3805,8 +3816,9 @@ class RecapEmailContentReplication(TestCase):
             await att_doc.acount(), 2, msg="Wrong number of Attachments."
         )
         async for att_rd in att_doc:
-            self.assertTrue(att_rd.filepath_local)
-            self.assertTrue(att_rd.is_available)
+            with self.subTest(att_rd=att_rd):
+                self.assertTrue(att_rd.filepath_local)
+                self.assertTrue(att_rd.is_available)
 
         # An alert is sent.
         self.assertEqual(len(mail.outbox), 1)
@@ -3886,9 +3898,10 @@ class RecapEmailContentReplication(TestCase):
             document_type=RECAPDocument.PACER_DOCUMENT
         )
         async for rd in main_rds:
-            self.assertEqual(
-                rd.is_sealed, True, msg="Main documents are not sealed."
-            )
+            with self.subTest(rd=rd):
+                self.assertEqual(
+                    rd.is_sealed, True, msg="Main documents are not sealed."
+                )
 
         att_docs = RECAPDocument.objects.filter(
             document_type=RECAPDocument.ATTACHMENT

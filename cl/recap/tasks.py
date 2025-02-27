@@ -2822,7 +2822,6 @@ def download_pacer_pdf_and_save_to_pq(
             court_id=court_id,
             upload_type=UPLOAD_TYPE.PDF,
             date_created__gt=cutoff_date,
-            status=PROCESSING_STATUS.IN_PROGRESS,
         )
         if created and magic_number and not is_bankr_short_doc_id:
             response, r_msg = download_pdf_by_magic_number(
