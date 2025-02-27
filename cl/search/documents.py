@@ -1,4 +1,7 @@
+from collections.abc import Callable
 from datetime import datetime
+from functools import partial
+from typing import Any
 
 from django.conf import settings
 from django.http import QueryDict
@@ -9,12 +12,16 @@ from elasticsearch_dsl import Document as DSLDocument
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.corpus_importer.utils import is_bankruptcy_court
+from cl.custom_filters.templatetags.extras import render_string_or_list
 from cl.custom_filters.templatetags.text_filters import (
     best_case_name,
     html_decode,
 )
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import build_es_base_query
+from cl.lib.elasticsearch_utils import (
+    CSVSerializableDocumentMixin,
+    build_es_base_query,
+)
 from cl.lib.fields import JoinField, PercolatorField
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
@@ -23,12 +30,22 @@ from cl.lib.search_index_utils import (
 )
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import (
+    DATE_GRANULARITIES,
     Attorney,
     AttorneyOrganization,
     Person,
     Position,
 )
-from cl.search.constants import o_type_index_map
+from cl.search.constants import (
+    PEOPLE_ES_HL_FIELDS,
+    PEOPLE_ES_HL_KEYWORD_FIELDS,
+    SEARCH_OPINION_CHILD_HL_FIELDS,
+    SEARCH_OPINION_HL_FIELDS,
+    SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
+    SEARCH_RECAP_CHILD_HL_FIELDS,
+    SEARCH_RECAP_HL_FIELDS,
+    o_type_index_map,
+)
 from cl.search.es_indices import (
     opinion_index,
     oral_arguments_index,
@@ -39,6 +56,8 @@ from cl.search.es_indices import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    SOURCES,
     BankruptcyInformation,
     Citation,
     Docket,
@@ -50,7 +69,7 @@ from cl.search.models import (
 
 
 @parenthetical_group_index.document
-class ParentheticalGroupDocument(Document):
+class ParentheticalGroupDocument(CSVSerializableDocumentMixin, Document):
     author_id = fields.IntegerField(attr="opinion.author_id")
     caseName = fields.TextField(attr="opinion.cluster.case_name")
     citeCount = fields.IntegerField(attr="opinion.cluster.citation_count")
@@ -140,6 +159,14 @@ class ParentheticalGroupDocument(Document):
             "status",
             "suit_nature",
         ]
+
+    @classmethod
+    def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        hl_fields = ["representative_text", "docketNumber"]
+        transformations = {
+            key: lambda x: render_string_or_list(x) for key in hl_fields
+        }
+        return transformations
 
     def prepare_citation(self, instance):
         return [str(cite) for cite in instance.opinion.cluster.citations.all()]
@@ -320,7 +347,7 @@ class AudioDocumentBase(Document):
 
 
 @oral_arguments_index.document
-class AudioDocument(AudioDocumentBase):
+class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
     class Django:
         model = Audio
         ignore_signals = True
@@ -329,20 +356,20 @@ class AudioDocument(AudioDocumentBase):
     def get_csv_headers(cls) -> list[str]:
         return [
             "id",
-            "duration",
-            "download_url",
-            "judge",
-            "local_path",
-            "pacer_case_id",
-            "absolute_url",
-            "case_name",
-            "case_name_full",
+            "court_id",
+            "court_citation_string",
             "docket_id",
             "docket_number",
             "docket_slug",
-            "court_id",
-            "court_citation_string",
+            "case_name",
+            "case_name_full",
+            "pacer_case_id",
+            "judge",
+            "local_path",
+            "absolute_url",
+            "duration",
             "file_size_mp3",
+            "download_url",
             "panel_ids",
             "sha1",
             "source",
@@ -355,6 +382,21 @@ class AudioDocument(AudioDocumentBase):
             "date_reargument_denied_text",
             "date_created",
         ]
+
+    @classmethod
+    def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        transformations = {
+            key: lambda x: render_string_or_list(x)
+            for key in SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS.keys()
+        }
+        transformations["absolute_url"] = (
+            lambda x: f"https://www.courtlistener.com{x}"
+        )
+        transformations["local_path"] = lambda x: (
+            f"https://storage.courtlistener.com/{x}" if x else ""
+        )
+        transformations["source"] = lambda x: dict(SOURCES.NAMES).get(x, x)
+        return transformations
 
     def prepare_absolute_url(self, instance):
         return instance.get_absolute_url()
@@ -849,7 +891,7 @@ class PositionDocument(PersonBaseDocument):
 
 
 @people_db_index.document
-class PersonDocument(PersonBaseDocument):
+class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
     name_reverse = fields.KeywordField(
         attr="name_full_reverse",
     )
@@ -881,6 +923,32 @@ class PersonDocument(PersonBaseDocument):
             "school",
             "date_created",
         ]
+
+    @classmethod
+    def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        list_fields = ["races", "aba_rating", "alias"]
+        hl_fields = (
+            list(PEOPLE_ES_HL_FIELDS.keys()) + PEOPLE_ES_HL_KEYWORD_FIELDS
+        )
+        transformations = {
+            key: lambda x: render_string_or_list(x)
+            for key in (hl_fields + list_fields)
+        }
+
+        # Adds tranformation for relative URL and compute human-readable values
+        transformations["absolute_url"] = (
+            lambda x: f"https://www.courtlistener.com{x}"
+        )
+        transformations["religion"] = lambda x: dict(Person.RELIGIONS).get(
+            x, x
+        )
+        transformations["date_granularity_dob"] = lambda x: dict(
+            DATE_GRANULARITIES
+        ).get(x, x)
+        transformations["date_granularity_dod"] = lambda x: dict(
+            DATE_GRANULARITIES
+        ).get(x, x)
+        return transformations
 
     def prepare_person_child(self, instance):
         return "person"
@@ -1136,7 +1204,9 @@ class ESRECAPBaseDocument(DSLDocument):
 
 
 @recap_index.document
-class ESRECAPDocument(RECAPBaseDocument, ESRECAPBaseDocument):
+class ESRECAPDocument(
+    CSVSerializableDocumentMixin, RECAPBaseDocument, ESRECAPBaseDocument
+):
 
     class Django:
         model = RECAPDocument
@@ -1145,20 +1215,57 @@ class ESRECAPDocument(RECAPBaseDocument, ESRECAPBaseDocument):
     @classmethod
     def get_csv_headers(cls) -> list[str]:
         return [
-            "docket_entry_id",
             "docket_entry_description",
             "docket_entry_number",
             "docket_entry_date_filed",
-            "rd_description",
+            "rd_absolute_url",
             "pacer_doc_id",
-            "rd_plain_text",
-            "rd_attachment_number",
+            "rd_description",
             "rd_is_available",
             "rd_page_count",
             "filepath_local",
-            "absolute_url",
+            "rd_plain_text",
             "cites",
         ]
+
+
+    @classmethod
+    def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        transformations = {
+            key: lambda x: render_string_or_list(x)
+            for key in SEARCH_RECAP_CHILD_HL_FIELDS.keys()
+        }
+
+        # Add a transformation for relative URLs.
+        transformations["filepath_local"] = lambda x: (
+            f"https://storage.courtlistener.com/{x}" if x else ""
+        )
+        transformations["rd_absolute_url"] = (
+            lambda x: f"https://www.courtlistener.com{x['absolute_url']}"
+        )
+
+        # Define a mapping of new CSV column names to the corresponding source
+        # keys in the data. This allows renaming specific fields for the CSV
+        # output.
+        new_keys_mapping = {
+            "docket_entry_description": "description",
+            "docket_entry_number": "entry_number",
+            "docket_entry_date_filed": "entry_date_filed",
+            "rd_id": "id",
+            "rd_description": "description",
+            "rd_document_number": "document_number",
+            "rd_attachment_number": "attachment_number",
+            "rd_is_available": "is_available",
+            "rd_page_count": "page_count",
+            "rd_plain_text": "plain_text",
+        }
+        # Add transformations to rename fields. Each transformation extracts
+        # the value from the source key in the input data.
+        for new_key, source in new_keys_mapping.items():
+            transformations[new_key] = partial(
+                lambda origin_key, document: document[origin_key], source
+            )
+        return transformations
 
     def prepare_document_number(self, instance):
         return instance.document_number or None
@@ -1314,18 +1421,24 @@ class DocketBaseDocument(DSLDocument):
 
 
 @recap_index.document
-class DocketDocument(DocketBaseDocument, RECAPBaseDocument):
+class DocketDocument(
+    CSVSerializableDocumentMixin, DocketBaseDocument, RECAPBaseDocument
+):
 
-    @classmethod
     def get_csv_headers(cls) -> list[str]:
         return [
             "docket_id",
+            "docket_entry_id",
+            "rd_id",
             "docket_number",
+            "rd_document_number",
+            "rd_attachment_number",
             "docket_slug",
             "docket_absolute_url",
             "court_id",
             "court",
             "court_citation_string",
+            "pacer_case_id",
             "case_name",
             "case_name_full",
             "suit_nature",
@@ -1341,8 +1454,6 @@ class DocketDocument(DocketBaseDocument, RECAPBaseDocument):
             "referred_to_id",
             "chapter",
             "trustee_str",
-            "date_created",
-            "pacer_case_id",
             "party_id",
             "party",
             "attorney_id",
@@ -1350,6 +1461,20 @@ class DocketDocument(DocketBaseDocument, RECAPBaseDocument):
             "firm_id",
             "firm",
         ]
+
+    @classmethod
+    def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        list_fields = ["party", "attorney", "firm"]
+        hl_fields = list(SEARCH_RECAP_HL_FIELDS.keys())
+        transformations = {
+            key: lambda x: render_string_or_list(x)
+            for key in (hl_fields + list_fields)
+        }
+        # Add a transformation for relative URLs.
+        transformations["docket_absolute_url"] = (
+            lambda x: f"https://www.courtlistener.com{x}"
+        )
+        return transformations
 
     def prepare_caseName(self, instance):
         return best_case_name(instance)
@@ -1755,7 +1880,7 @@ class OpinionBaseDocument(Document):
 
 
 @opinion_index.document
-class OpinionDocument(OpinionBaseDocument):
+class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
     id = fields.IntegerField(
         attr="pk",
         fields={
@@ -1795,7 +1920,6 @@ class OpinionDocument(OpinionBaseDocument):
     @classmethod
     def get_csv_headers(cls) -> list[str]:
         return [
-            "id",
             "author_id",
             "type",
             "per_curiam",
@@ -1808,6 +1932,18 @@ class OpinionDocument(OpinionBaseDocument):
             "joined_by_ids",
             "date_created",
         ]
+
+    @classmethod
+    def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        transformations = {
+            key: lambda x: render_string_or_list(x)
+            for key in SEARCH_OPINION_CHILD_HL_FIELDS.keys()
+        }
+        # Add a transformation for relative URLs.
+        transformations["local_path"] = lambda x: (
+            f"https://storage.courtlistener.com/{x}" if x else ""
+        )
+        return transformations
 
     def prepare_absolute_url(self, instance):
         return instance.cluster.get_absolute_url()
@@ -1992,7 +2128,9 @@ class OpinionDocument(OpinionBaseDocument):
 
 
 @opinion_index.document
-class OpinionClusterDocument(OpinionBaseDocument):
+class OpinionClusterDocument(
+    CSVSerializableDocumentMixin, OpinionBaseDocument
+):
     court_exact = fields.KeywordField(attr="docket.court_id")
     non_participating_judge_ids = fields.ListField(
         fields.IntegerField(multi=True),
@@ -2012,23 +2150,23 @@ class OpinionClusterDocument(OpinionBaseDocument):
     @classmethod
     def get_csv_headers(cls) -> list[str]:
         return [
-            "court_exact",
-            "non_participating_judge_ids",
-            "source",
-            "absolute_url",
+            "id",
             "cluster_id",
+            "court_id",
+            "court",
+            "court_citation_string",
             "docket_id",
             "docket_number",
             "case_name",
             "case_name_full",
+            "source",
+            "absolute_url",
             "date_filed",
             "date_argued",
             "date_reargued",
             "date_reargument_denied",
-            "court_id",
-            "court",
-            "court_citation_string",
             "judge",
+            "non_participating_judge_ids",
             "panel_names",
             "attorney",
             "suit_nature",
@@ -2044,6 +2182,27 @@ class OpinionClusterDocument(OpinionBaseDocument):
             "lexis_cite",
             "cite_count",
         ]
+
+    @classmethod
+    def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        list_fields = ["panel_names", "citation"]
+        hl_fields = list(SEARCH_OPINION_HL_FIELDS.keys())
+        transformations = {
+            key: lambda x: render_string_or_list(x)
+            for key in (hl_fields + list_fields)
+        }
+
+        # Add a transformation for relative URL
+        transformations["absolute_url"] = (
+            lambda x: f"https://www.courtlistener.com{x}"
+        )
+
+        # Add a transformation to compute Human-readable values
+        transformations["source"] = lambda x: dict(SOURCES.NAMES).get(x, x)
+        transformations["status"] = lambda x: dict(
+            PRECEDENTIAL_STATUS.NAMES
+        ).get(x, x)
+        return transformations
 
     def prepare_non_participating_judge_ids(self, instance):
         return list(
