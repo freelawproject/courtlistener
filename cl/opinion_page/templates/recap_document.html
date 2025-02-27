@@ -78,9 +78,7 @@
 
 {% block content %}
     <article class="col-sm-9">
-      <h2 class="inline"><a
-              href="{{ rd.docket_entry.docket.get_absolute_url }}"
-              class="no-underline black-link">{{ rd.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
+      <h2 class="inline select-all">{{ rd.docket_entry.docket|best_case_name|safe|v_wrapper }}</h2>
       {% include "includes/notes_modal.html" %}
       {% include "includes/buy_pacer_modal.html" %}
       {% if redirect_to_pacer_modal %}

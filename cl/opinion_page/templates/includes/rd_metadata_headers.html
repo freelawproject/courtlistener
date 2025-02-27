@@ -11,9 +11,9 @@
 <p class="bottom">
   <span class="meta-data-header">Docket Number:</span>
   <span class="meta-data-value">
-    <a href="{{ rd.docket_entry.docket.get_absolute_url }}">
+    <span class="select-all">
         {{ rd.docket_entry.docket.docket_number }}
-    </a>
+    </span>
   </span>
 </p>
 {% include "includes/citation.html" with obj=rd.docket_entry %}
