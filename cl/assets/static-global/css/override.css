@@ -1843,3 +1843,7 @@ rect.series-segment {
   right: 15px;
   position: relative;
 }
+
+.learn-more-prayer-btn {
+  margin-right: auto;
+}

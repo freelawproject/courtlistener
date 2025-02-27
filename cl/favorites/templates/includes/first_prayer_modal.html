@@ -11,8 +11,10 @@
       <div class="modal-body">
         <p>By clicking 🙏, you used 1 of your 5 daily prayers asking somebody to buy a document for you from PACER. Your prayer will now show up on our <a href="{% url "top_prayers" %}">leaderboard of most-wanted PACER documents</a>, and when the community buys it for you, we'll send you an email to let you know.</p>
       </div>
-      <div class="modal-footer d-flex justify-content-between">
-        <a href="{% url "pray_and_pay_help" %}" class="btn btn-default">Learn more</a>
+      <div class="modal-footer flex">
+        <div class="flex learn-more-prayer-btn">
+          <a href="{% url "pray_and_pay_help" %}" class="btn btn-default">Learn more</a>
+        </div>
         <button type="button" class="btn btn-primary" data-dismiss="modal">Got it!</button>
       </div>
     </div>
