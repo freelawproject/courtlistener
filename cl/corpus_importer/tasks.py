@@ -1942,7 +1942,16 @@ def create_attachment_pq(
     rd_pk: int,
     user_pk: int,
 ) -> ProcessingQueue:
-    """ """
+    """Create a ProcessingQueue instance for an attachment.
+
+    Note that the PQ returned hasn't been persisted in the database.
+    It must be saved in a subsequent step.
+
+    :param rd_pk: The pk of the RECAPDocument.
+    :param user_pk: The pk of the User uploading the attachment.
+    :return: A ProcessingQueue instance for the attachment upload.
+    """
+
     rd = RECAPDocument.objects.get(pk=rd_pk)
     user = User.objects.get(pk=user_pk)
     pq = ProcessingQueue(
@@ -2034,14 +2043,14 @@ def save_attachment_pq_from_text(
     user_pk: int,
     att_report_text: str,
 ) -> int:
-    """Create an item in the processing queue for an attachment page.
+    """Create an item in the processing queue for an attachment page from the
+    att report text.
 
     :param rd_pk: The RECAP document that the attachment page is associated
     with
     :param user_pk: The user to associate with the ProcessingQueue object when
     it's created.
-    :param att_report_text: The attachment page report text if we got it from a
-    notification free look link.
+    :param att_report_text: The attachment page report text.
     :return: The pk of the ProcessingQueue object that's created.
     """
 

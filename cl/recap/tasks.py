@@ -179,7 +179,7 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
         result = chain(
             fetch_attachment_page.si(fq.pk),
-            replicate_fq_att_page_to_subdocket_rds.s(),
+            replicate_att_page_to_subdocket_rds.s(),
         ).apply_async()
     return result
 
@@ -1954,13 +1954,12 @@ def fetch_pacer_doc_by_rd_base(
         self.request.chain = None
         return
 
+    # Logic to replicate the PDF sub-dockets matched by RECAPDocument
     subdocket_pqs_to_replicate = find_subdocket_pdf_rds_from_data(
         fq.user_id, court_id, pacer_doc_id, [pacer_case_id], pdf_bytes
     )
-    if subdocket_pqs_to_replicate:
-        replicate_fq_pdf_to_subdocket_rds.delay(
-            [pq.pk for pq in subdocket_pqs_to_replicate]
-        )
+    if subdocket_pqs_to_replicate and not is_appellate_court(court_id):
+        replicate_pdf_to_subdocket_rds.delay(subdocket_pqs_to_replicate)
 
     return rd.pk
 
@@ -2179,17 +2178,17 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         return []
 
     # Return PQ IDs to process attachment page replication for sub-dockets.
-    return [pq.pk for pq in subdocket_pqs_to_replicate]
+    return subdocket_pqs_to_replicate
 
 
 @app.task(
     bind=True,
     ignore_result=True,
 )
-def replicate_fq_att_page_to_subdocket_rds(
+def replicate_att_page_to_subdocket_rds(
     self: Task, pq_ids_to_process: list[int]
 ) -> None:
-    """Replicate Attachment page from a FQ to subdocket RECAPDocuments.
+    """Replicate Attachment page to subdocket RECAPDocuments.
 
     :param self: The celery task
     :param pq_ids_to_process: A list of PQ IDs that require replication to sub-dockets.
@@ -2204,10 +2203,10 @@ def replicate_fq_att_page_to_subdocket_rds(
     bind=True,
     ignore_result=True,
 )
-def replicate_fq_pdf_to_subdocket_rds(
+def replicate_pdf_to_subdocket_rds(
     self: Task, pq_ids_to_process: list[int]
 ) -> None:
-    """Replicate a PDF from a FQ to subdocket RECAPDocuments.
+    """Replicate a PDF to subdocket RECAPDocuments.
 
     :param self: The celery task
     :param pq_ids_to_process: A list of PQ IDs that require replication to sub-dockets.
@@ -2806,8 +2805,8 @@ def fetch_attachment_data(
     dockets_updated: list[DocketUpdatedData],
     user_pk: int,
 ) -> str:
-    """Get the attachment page and merge the data into the dockets returned
-    by the recap.email notification.
+    """Fetch the attachment page data for the main document in the
+    recap.email notification.
 
     :param document_url: The document URL including the magic number to get the
      attachment page without being logged into PACER.
@@ -2815,10 +2814,11 @@ def fetch_attachment_data(
     :param dockets_updated: A list of DocketUpdatedData containing the dockets
     to merge the attachments in.
     :param user_pk: The user to associate with the ProcessingQueue object.
-    :return: A list of RECAPDocuments modified or created during the process
+    :return: The HTML page text.
     """
     session_data = get_pacer_cookie_from_cache(user_pk)
-    # Try to get the attachment page without being logged into PACER
+    # Try to fetch the attachment page without being logged into PACER using
+    # the free look URL.
     att_report_text = get_attachment_page_by_url(document_url, court_id)
     if att_report_text is None:
         main_rd = (
@@ -2841,8 +2841,7 @@ def merge_rd_attachments(
     """Merge the attachment data into the dockets returned by the recap.email
     notification.
 
-    :param att_report_text: The attachment page report text if we got it from a
-    notification free look link.
+    :param att_report_text: The attachment page report text.
     :param dockets_updated: A list of DocketUpdatedData containing the dockets
     to merge the attachments in.
     :param user_pk: The user to associate with the ProcessingQueue object.
@@ -2882,7 +2881,7 @@ def replicate_recap_email_to_subdockets(
     main_pdf_filepath: FieldFile,
     att_report_text: str | None,
     att_pqs: list[ProcessingQueue],
-):
+) -> None:
     """Replicate recap.email content to subdockets no mentioned in the
     email notification.
 
@@ -2890,23 +2889,24 @@ def replicate_recap_email_to_subdockets(
     - Replication of attachment page to subdockets.
     - Replication of attachment PDFs to subdockets.
 
-    :param user_pk: The primary key of the user.
-    :param court_id: The identifier for the court.
-    :param pacer_doc_id: The PACER document ID for the main document.
+    :param user_pk: The User ID.
+    :param court_id: The Court ID.
+    :param pacer_doc_id: The PACER document ID from the main document.
     :param unique_case_ids: A list of unique PACER case IDs to exclude.
     :param main_pdf_filepath: The filepath to the main PDF document.
-    :param att_report_text: Content for the attachment report.
-    :param att_pqs: An iterable of attachment ProcessingQueue objects.
+    :param att_report_text: The attachment page report text.
+    :param att_pqs: A list of attachment PQ objects from attachments that require
+    replication.
+
+    :return: None
     """
 
-    main_pdf_binary_content = None
-    if main_pdf_filepath:
-        with main_pdf_filepath.open(mode="rb") as local_path:
-            main_pdf_binary_content = local_path.read()
-
+    main_pdf_binary_content = (
+        main_pdf_filepath.open(mode="rb").read() if main_pdf_filepath else None
+    )
     subdocket_pdf_pqs_to_replicate = []
+    # Replicate main PDF to subdockets not mentioned in the notification.
     if main_pdf_binary_content:
-        # Replicate main PDF to subdockets not mentioned in the notification.
         subdocket_pdf_pqs_to_replicate.extend(
             find_subdocket_pdf_rds_from_data(
                 user_pk,
@@ -2917,13 +2917,10 @@ def replicate_recap_email_to_subdockets(
             )
         )
     if subdocket_pdf_pqs_to_replicate:
-        replicate_fq_pdf_to_subdocket_rds.delay(
-            [pq.pk for pq in subdocket_pdf_pqs_to_replicate]
-        )
+        replicate_pdf_to_subdocket_rds.delay(subdocket_pdf_pqs_to_replicate)
 
     # Replicate Attachments to subdockets not mentioned in the notification.
     subdocket_att_pqs_to_replicate = []
-
     if att_report_text:
         subdocket_att_pqs_to_replicate.extend(
             find_subdocket_atts_rds_from_data(
@@ -2931,21 +2928,22 @@ def replicate_recap_email_to_subdockets(
                 court_id,
                 pacer_doc_id,
                 unique_case_ids,
-                att_report_text,
+                att_report_text.encode(),
             )
         )
     if subdocket_att_pqs_to_replicate:
-        replicate_fq_att_page_to_subdocket_rds.delay(
-            [pq.pk for pq in subdocket_att_pqs_to_replicate]
+        replicate_att_page_to_subdocket_rds.delay(
+            subdocket_att_pqs_to_replicate
         )
 
     # Replicate attachments PDFs to subdockets not mentioned in the notification.
     all_pdf_atts_pqs_to_replicate = []
     for att_pq in att_pqs:
-        if not att_pq.filepath_local:
-            continue
-        with att_pq.filepath_local.open(mode="rb") as att_local_path:
-            pdf_binary_content_att = att_local_path.read()
+        pdf_binary_content_att = (
+            att_pq.filepath_local.open(mode="rb").read()
+            if att_pq.filepath_local
+            else None
+        )
         if pdf_binary_content_att:
             all_pdf_atts_pqs_to_replicate.extend(
                 find_subdocket_pdf_rds_from_data(
@@ -2957,9 +2955,7 @@ def replicate_recap_email_to_subdockets(
                 )
             )
     if all_pdf_atts_pqs_to_replicate:
-        replicate_fq_pdf_to_subdocket_rds.delay(
-            [pq.pk for pq in all_pdf_atts_pqs_to_replicate]
-        )
+        replicate_pdf_to_subdocket_rds.delay(all_pdf_atts_pqs_to_replicate)
 
 
 @app.task(
@@ -3155,7 +3151,6 @@ def process_recap_email(
                 dockets_updated,
                 user_pk,
             )
-
             att_pqs = get_and_copy_recap_attachment_docs(
                 self,
                 all_attachment_rds,
@@ -3172,10 +3167,7 @@ def process_recap_email(
             if att_report_text
             else None
         )
-        atts_files = [att_pq.filepath_local for att_pq in att_pqs]
-        content_to_replicate = any(
-            atts_files + main_rds_available + [valid_att_data]
-        )
+        content_to_replicate = any(main_rds_available + [valid_att_data])
         if (
             pacer_doc_id
             and content_to_replicate
@@ -3192,7 +3184,7 @@ def process_recap_email(
                 att_pqs,
             )
 
-        # After properly copying the PDF to the main RECAPDocuments,
+        # After properly copying the PDF to related RECAPDocuments,
         # mark the PQ object as successful and delete its filepath_local
         if pq.status != PROCESSING_STATUS.FAILED:
             async_to_sync(mark_pq_successful)(pq)
@@ -3253,7 +3245,6 @@ def process_recap_email(
 
     if not rds_to_extract:
         self.request.chain = None
-
     return [rd.pk for rd in rds_to_extract]
 
 
