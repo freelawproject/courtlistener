@@ -47,7 +47,9 @@ def get_cut_off_date(rate, d=datetime.date.today()):
         # important items (this will be filtered further later).
         cut_off_date = d - datetime.timedelta(days=10)
     elif rate == Alert.DAILY:
-        cut_off_date = d
+        # For daily alerts: Set cut_off_date to the previous day since the cron job
+        # runs early in the morning.
+        cut_off_date = d - datetime.timedelta(days=1)
     elif rate == Alert.WEEKLY:
         cut_off_date = d - datetime.timedelta(days=7)
     elif rate == Alert.MONTHLY:

@@ -4,6 +4,7 @@ from http import HTTPStatus
 from unittest import mock
 from urllib.parse import parse_qs, urlencode, urlparse
 
+import pytz
 import time_machine
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -156,7 +157,6 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         r = await self.async_client.post(
             "/", invalid_alert_type_params, follow=True
         )
-        print("r.content.decode()", r.content.decode())
         self.assertEqual(r.status_code, 200)
         self.assertIn("error creating your alert", r.content.decode())
         self.assertIn(
@@ -768,7 +768,9 @@ class SearchAlertsWebhooksTest(
         cls.person_1 = PersonFactory.create(
             gender="m",
         )
-        cls.mock_date = now().replace(day=15, hour=0)
+        pt_tz = pytz.timezone(settings.TIME_ZONE)
+        date_filed = pt_tz.localize(datetime(2025, 2, 14, 13, 30, 0))
+        cls.mock_date = pt_tz.localize(datetime(2025, 2, 15, 2, 30, 0))
         with (
             mock.patch(
                 "cl.search.tasks.percolator_alerts_models_supported",
@@ -786,14 +788,14 @@ class SearchAlertsWebhooksTest(
             cls.dly_opinion = OpinionWithParentsFactory.create(
                 cluster__case_name="California vs Lorem",
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__date_filed=(now() - timedelta(hours=5)).date(),
+                cluster__date_filed=date_filed.date(),
                 cluster__attorneys="Attorney General of North Carolina",
                 cluster__judges="Lorem Judge",
                 cluster__citation_count=1,
                 cluster__docket=DocketFactory(
                     court=cls.c1,
-                    date_reargued=(now() - timedelta(hours=6)).date(),
-                    date_reargument_denied=(now() - timedelta(hours=4)).date(),
+                    date_reargued=date_filed.date(),
+                    date_reargument_denied=date_filed.date(),
                 ),
                 plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
                 type=Opinion.LEAD,
