@@ -1911,6 +1911,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
     joined_by_ids = fields.ListField(
         fields.IntegerField(multi=True),
     )
+    ordering_key = fields.IntegerField(attr="ordering_key")
 
     class Django:
         model = Opinion

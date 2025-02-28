@@ -33,11 +33,11 @@ def fetch_citations(search_query: Search) -> list[Hit]:
     search_query = search_query.sort("id")
     # Only retrieve fields required for the lookup.
     search_query = search_query.source(
-        includes=["id", "caseName", "absolute_url", "dateFiled"]
+        includes=["id", "caseName", "absolute_url", "dateFiled", "cluster_id"]
     )
     # Citation resolution aims for a single match. Setting up a size of 2 is
-    # enough to determine if there is more than one match.
-    search_query = search_query.extra(size=2)
+    # enough to determine if there is more than one match after cluster collapse
+    search_query = search_query.extra(size=2, collapse={"field": "cluster_id"})
     response = search_query.execute()
     citation_hits.extend(response.hits)
     return citation_hits
@@ -201,15 +201,6 @@ def es_search_db_for_full_citation(
     query = Q("bool", must_not=must_not, filter=filters)
     citations_query = search_query.query(query)
     results = fetch_citations(citations_query)
-
-    # Deduplicate results using absolute_url. This will be useful when a
-    # citation points to a single cluster with multiple opinions. This will
-    # prefer the first opinion as ordered on the ES index
-    unique_clusters = {}
-    for result in results:
-        if result.absolute_url not in unique_clusters:
-            unique_clusters[result.absolute_url] = result
-    results = list(unique_clusters.values())
 
     citation_found = True if len(results) > 0 else False
     if len(results) == 1:
