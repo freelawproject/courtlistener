@@ -11,7 +11,7 @@ from cl.corpus_importer.tasks import (
     get_bankr_claims_registry,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
-    make_attachment_pq_object,
+    save_attachment_pq_object,
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.recap.tasks import process_recap_attachment
@@ -73,6 +73,6 @@ def get_district_attachment_pages(options, rd_pks, tag_names, session):
         throttle.maybe_wait()
         chain(
             get_attachment_page_by_rd.s(rd_pk, session).set(queue=q),
-            make_attachment_pq_object.s(rd_pk, recap_user.pk).set(queue=q),
+            save_attachment_pq_object.s(rd_pk, recap_user.pk).set(queue=q),
             process_recap_attachment.s(tag_names=tag_names).set(queue=q),
         ).apply_async()
