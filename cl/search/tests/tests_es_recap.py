@@ -8214,7 +8214,7 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
         cut_off_date = self.old_date + datetime.timedelta(days=10)
         # self.old_docket event's should be ignored for this cut_off_date
         dockets_and_slug_count = get_docket_events_and_slug_count(
-            cut_off_date, pk_offset=0
+            cut_off_date, pk_offset=0, docket_ids=None
         )
 
         self.assertEqual(
@@ -8265,7 +8265,9 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
                     )
 
         # Now get_dockets_to_fix to filter out dockets that require re-indexing.
-        dockets_to_fix = get_dockets_to_fix(cut_off_date, pk_offset=0)
+        dockets_to_fix = get_dockets_to_fix(
+            cut_off_date, pk_offset=0, docket_ids=None
+        )
         self.assertEqual(2, dockets_to_fix.count())
         dockets_to_fix = set(docket["pgh_obj_id"] for docket in dockets_to_fix)
         self.assertEqual({self.docket_2.pk, self.docket_3.pk}, dockets_to_fix)
