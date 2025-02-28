@@ -1424,6 +1424,7 @@ class DocketDocument(
     CSVSerializableDocumentMixin, DocketBaseDocument, RECAPBaseDocument
 ):
 
+    @classmethod
     def get_csv_headers(cls) -> list[str]:
         return [
             "docket_id",
