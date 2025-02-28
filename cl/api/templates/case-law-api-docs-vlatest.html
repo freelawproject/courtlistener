@@ -133,6 +133,10 @@
       </p>
     </li>
     <li>
+      <p>The <code>citations</code> field will contain a list of parallel citations for the cluster. See the <a href="{% url "citation_api_help" %}">citation API</a> for details.
+      </p>
+    </li>
+    <li>
       <p>There are several fields with judge information, such as <code>judges</code>, <code>panel</code>, <code>non_participating_judges</code>, etc. Some of these fields contain strings and others are linked to records in our <a href="{% url "judge_api_help" %}">judge API</a>. When we are able to normalize a judge's name into a record in the judge database, we do so. If not, we store their name in a string field for later normalization.
       </p>
     </li>
@@ -164,10 +168,6 @@
     </li>
     <li>
       <p>The <code>opinions_cited</code> field has a list of other opinions cited by the one you are reviewing.
-      </p>
-    </li>
-    <li>
-      <p>The <code>citations</code> field will contain a list of parallel citations for the cluster. See the <a href="{% url "citation_api_help" %}">citation API</a> for details.
       </p>
     </li>
     <li>
