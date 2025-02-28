@@ -183,7 +183,7 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
         result = chain(
             fetch_attachment_page.si(fq.pk),
-            replicate_att_page_to_subdocket_rds.s(),
+            replicate_fq_att_page_to_subdocket_rds.s(),
         ).apply_async()
     return result
 
@@ -1965,7 +1965,7 @@ def fetch_pacer_doc_by_rd_base(
         fq.user_id, court_id, pacer_doc_id, [pacer_case_id], pdf_bytes
     )
     if subdocket_pqs_to_replicate and not is_appellate_court(court_id):
-        replicate_pdf_to_subdocket_rds.delay(subdocket_pqs_to_replicate)
+        replicate_fq_pdf_to_subdocket_rds.delay(subdocket_pqs_to_replicate)
 
     return rd.pk
 
@@ -2191,7 +2191,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
     bind=True,
     ignore_result=True,
 )
-def replicate_att_page_to_subdocket_rds(
+def replicate_fq_att_page_to_subdocket_rds(
     self: Task, pq_ids_to_process: list[int]
 ) -> None:
     """Replicate Attachment page to subdocket RECAPDocuments.
@@ -2209,7 +2209,7 @@ def replicate_att_page_to_subdocket_rds(
     bind=True,
     ignore_result=True,
 )
-def replicate_pdf_to_subdocket_rds(
+def replicate_fq_pdf_to_subdocket_rds(
     self: Task, pq_ids_to_process: list[int]
 ) -> None:
     """Replicate a PDF to subdocket RECAPDocuments.
@@ -3090,7 +3090,7 @@ def replicate_recap_email_to_subdockets(
             )
         )
     if subdocket_pdf_pqs_to_replicate:
-        replicate_pdf_to_subdocket_rds.delay(subdocket_pdf_pqs_to_replicate)
+        replicate_fq_pdf_to_subdocket_rds.delay(subdocket_pdf_pqs_to_replicate)
 
     # Replicate Attachments to subdockets not mentioned in the notification.
     subdocket_att_pqs_to_replicate = []
@@ -3105,7 +3105,7 @@ def replicate_recap_email_to_subdockets(
             )
         )
     if subdocket_att_pqs_to_replicate:
-        replicate_att_page_to_subdocket_rds.delay(
+        replicate_fq_att_page_to_subdocket_rds.delay(
             subdocket_att_pqs_to_replicate
         )
 
@@ -3128,7 +3128,7 @@ def replicate_recap_email_to_subdockets(
                 )
             )
     if all_pdf_atts_pqs_to_replicate:
-        replicate_pdf_to_subdocket_rds.delay(all_pdf_atts_pqs_to_replicate)
+        replicate_fq_pdf_to_subdocket_rds.delay(all_pdf_atts_pqs_to_replicate)
 
 
 @app.task(
