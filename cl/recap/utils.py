@@ -99,11 +99,10 @@ def find_subdocket_pdf_rds_from_data(
     """
 
     sub_docket_main_rds = list(
-        get_main_rds(court_id, pacer_doc_id).exclude(
-            docket_entry__docket__pacer_case_id__in=pacer_case_ids
-        )
+        get_main_rds(court_id, pacer_doc_id)
+        .exclude(docket_entry__docket__pacer_case_id__in=pacer_case_ids)
+        .exclude(is_available=True)
     )
-
     sub_docket_pqs = []
     for main_rd in sub_docket_main_rds:
         # Create PQs related to RD that require replication.

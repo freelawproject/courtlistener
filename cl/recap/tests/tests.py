@@ -2304,6 +2304,62 @@ class ReplicateRecapUploadsTest(TestCase):
         # Confirm that the 3 PDFs have been extracted.
         self.assertEqual(mock_extract.call_count, 3)
 
+    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    def test_avoid_replication_on_pdf_available(self, mock_extract):
+        """Confirm that replication for RDs where the PDF is already available is omitted"""
+        # Add the docket entry to every case.
+        async_to_sync(add_docket_entries)(
+            self.d_1, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_2, self.de_data_2["docket_entries"]
+        )
+
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )
+
+        main_d_1_rd = d_1_recap_document[0]
+        main_d_1_rd.is_available = True
+        main_d_1_rd.filepath_local = SimpleUploadedFile(
+            "file.txt", b"file content more content"
+        )
+        main_d_1_rd.save()
+
+        main_d_2_rd = d_2_recap_document[0]
+        self.assertTrue(main_d_1_rd.is_available)
+        self.assertFalse(main_d_2_rd.is_available)
+
+        # Create an initial PQ.
+        pq = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id="104491",
+            pacer_doc_id="04505578697",
+            document_number=1,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+        # Process the PDF upload.
+        async_to_sync(process_recap_upload)(pq)
+
+        main_d_1_rd.refresh_from_db()
+        main_d_2_rd.refresh_from_db()
+
+        self.assertTrue(main_d_1_rd.filepath_local)
+        self.assertTrue(main_d_2_rd.filepath_local)
+
+        # Assert the number of PQs created to process the additional subdocket RDs.
+        pqs_created = ProcessingQueue.objects.all()
+        self.assertEqual(
+            pqs_created.count(),
+            1,
+            msg="The number of PQs doesn't match.",
+        )
+
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
 @mock.patch(

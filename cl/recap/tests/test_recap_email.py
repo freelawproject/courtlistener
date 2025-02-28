@@ -9,6 +9,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
 
@@ -3973,3 +3974,106 @@ class RecapEmailContentReplication(TestCase):
         # check we didn't create a docket entry
         docket_entry_query = DocketEntry.objects.all()
         self.assertEqual(await docket_entry_query.acount(), 0)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e: (
+            MockResponse(200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.recap.tasks.requests.get",
+        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+    )
+    async def test_recap_email_avoid_replication_on_pdf_available(
+        self,
+        mock_att_request,
+        mock_download_pdf,
+        mock_cookie,
+        mock_docket_entry_sealed,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_bucket_open,
+        mock_enqueue_alert,
+    ):
+        """Confirm that replication for RDs where the PDF is already available
+        is omitted.
+        """
+        # Create two Subdockets and RDs no mentioned in the email notification.
+        de_1 = await sync_to_async(DocketEntryFactory)(
+            docket=await sync_to_async(DocketFactory)(
+                court=self.court_canb,
+                case_name="Subdocket 1",
+                docket_number="1:20-cv-01296",
+                pacer_case_id="1309089",
+            ),
+            entry_number=18,
+        )
+        # Make PDF available.
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de_1,
+            pacer_doc_id="85001321035",
+            document_number="18",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=True,
+            filepath_local=SimpleUploadedFile(
+                "file.txt", b"file content more content"
+            ),
+        )
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="85001321035",
+                            document_number="1",
+                            pacer_case_id="1309088",
+                        )
+                    ],
+                )
+            ],
+        )
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (
+                email_data,
+                "HTML",
+            ),
+        ):
+            # Trigger a multi-nef recap.email notification from testing_1@recap.email
+            await self.async_client.post(
+                self.path, self.data_multi_canb, format="json"
+            )
+
+        # 2 RDs.
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(
+            await recap_documents.acount(),
+            2,
+            msg="Wrong number of RECAPDocuments.",
+        )
+        # Every RECAPDocument should have a file stored at this point.
+        async for rd in recap_documents:
+            with self.subTest(rd=rd):
+                self.assertTrue(rd.filepath_local)
+                self.assertTrue(rd.is_available)
+                self.assertEqual(rd.pacer_doc_id, "85001321035")
+
+        # 1 DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Only one PQ for email PDF. No replication PQ is created.
+        all_pqs_created = ProcessingQueue.objects.all().order_by("pk")
+        self.assertEqual(
+            await all_pqs_created.acount(),
+            1,
+            msg="Wrong number of ProcessingQueues.",
+        )

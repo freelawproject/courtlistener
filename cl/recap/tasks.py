@@ -768,7 +768,9 @@ async def find_subdocket_pdf_rds(
     """
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
-    main_rds = get_main_rds(pq.court_id, pq.pacer_doc_id)
+    main_rds = get_main_rds(pq.court_id, pq.pacer_doc_id).exclude(
+        is_available=True
+    )
     pqs_to_process_pks = [
         pq.pk
     ]  # Add the original pq to the list of pqs to process
