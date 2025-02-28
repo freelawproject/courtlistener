@@ -62,6 +62,7 @@ from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
+    DocketEntryFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionWithParentsFactory,
@@ -71,9 +72,14 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
     compose_redis_key,
     get_last_parent_document_id_processed,
 )
+from cl.search.management.commands.fix_rd_broken_links import (
+    get_docket_events_and_slug_count,
+    get_dockets_to_fix,
+)
 from cl.search.models import (
     SEARCH_TYPES,
     Docket,
+    DocketEvent,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
 )
@@ -8072,3 +8078,229 @@ class RECAPHistoryTablesIndexingTest(
         )
         if keys:
             self.r.delete(*keys)
+
+
+class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
+    """Test fix RECAPDocument broken links by leveraging history table events."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+
+        cls.old_date = now().replace(year=2024, month=3, day=15, hour=0)
+        with time_machine.travel(cls.old_date, tick=False):
+            cls.old_docket = DocketFactory(
+                court=cls.court,
+                date_filed=datetime.date(2010, 8, 16),
+                docket_number="45-bk-2632",
+                source=Docket.RECAP,
+            )
+            # Update the case_name in order to trigger a pgh event.
+            cls.old_docket.case_name = "America vs Lorem"
+            cls.old_docket.save()
+
+            # time_machine is unable to mock pgh_created_at due to is assigned
+            # within the DB operation. Update pgh_created_at manually to simulate
+            # and old pgh_created_at for this factory.
+            old_docket_event = DocketEvent.objects.filter(
+                id=cls.old_docket.pk
+            ).last()
+            old_docket_event.pgh_created_at = cls.old_docket.date_modified
+            old_docket_event.save()
+            cls.rd_old = RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(
+                    docket=cls.old_docket,
+                ),
+                document_number="1",
+            )
+
+        cls.docket_1 = DocketFactory(
+            court=cls.court,
+            case_name="Lorem Ipsum",
+            case_name_short="",
+            case_name_full="",
+            date_filed=datetime.date(2024, 8, 16),
+            docket_number="45-bk-2633",
+            source=Docket.RECAP,
+        )
+        cls.rd_1 = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(
+                docket=cls.docket_1,
+            ),
+            document_number="1",
+        )
+
+        cls.docket_2 = DocketFactory(
+            court=cls.court,
+            case_name="Ipsum Dolor",
+            case_name_short="",
+            case_name_full="",
+            date_filed=datetime.date(2024, 9, 16),
+            docket_number="45-bk-2634",
+            source=Docket.RECAP,
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_2,
+            ),
+            document_number="2",
+        )
+
+        cls.docket_3 = DocketFactory(
+            court=cls.court,
+            case_name="Ipsum Dolor Test",
+            case_name_short="",
+            case_name_full="",
+            date_filed=datetime.date(2025, 9, 16),
+            docket_number="45-bk-2630",
+            source=Docket.RECAP,
+        )
+        cls.rd_3 = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_3,
+            ),
+            document_number="3",
+        )
+
+        cls.docket_4 = DocketFactory(
+            court=cls.court,
+            case_name="Ipsum to Ignore",
+            case_name_short="",
+            case_name_full="",
+            date_filed=datetime.date(2025, 9, 16),
+            docket_number="45-bk-2639",
+            source=Docket.RECAP,
+        )
+
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+    def test_get_docket_events_and_docket_to_fix(self) -> None:
+        """Confirm that get_docket_events_and_slug_count can effectively
+        retrieve the slug count for dockets that match the cut_off_date and
+        ensure that their related slugs are properly annotated.
+
+        Also, confirm that get_dockets_to_fix correctly filters out dockets
+        that need to be fixed based on the slug count and the slugs in the
+        Docket and DocketEvent tables.
+        """
+
+        # Change slug with two different values.
+        self.docket_2.case_name = "Dolor Ipsum"
+        self.docket_2.save()
+        d2_last_slug_in_event_table = self.docket_2.slug
+        self.docket_2.case_name = "Dolor Ipsum 2"
+        self.docket_2.save()
+
+        # Change slug only one time.
+        d3_last_slug_in_event_table = self.docket_3.slug
+        self.docket_3.case_name = "Test Ipsum dolor"
+        self.docket_3.save()
+
+        # Slug didn't change.
+        self.docket_1.docket_number = "46-bk-2633"
+        self.docket_1.save()
+
+        # The slug changed, but it should be ignored since the docket
+        # doesn't have any entries.
+        self.docket_4.case_name = "Changed Ipsum dolor"
+        self.docket_4.save()
+
+        cut_off_date = self.old_date + datetime.timedelta(days=10)
+        # self.old_docket event's should be ignored for this cut_off_date
+        dockets_and_slug_count = get_docket_events_and_slug_count(
+            cut_off_date, pk_offset=0
+        )
+
+        self.assertEqual(
+            dockets_and_slug_count.count(),
+            3,
+            msg="Wrong number of dockets returned.",
+        )
+        expected_results = {
+            self.docket_1.pk: {
+                "slug_count": 1,  # slug didn't change
+                "event_table_slug": self.docket_1.slug,
+                "docket_table_slug": self.docket_1.slug,
+            },
+            self.docket_2.pk: {
+                "slug_count": 2,  # slug changed twice, we don't need to compare slugs.
+                "event_table_slug": None,
+                "docket_table_slug": None,
+            },
+            self.docket_3.pk: {
+                "slug_count": 1,  # slug changed once, final value is not in the event table.
+                "event_table_slug": d3_last_slug_in_event_table,
+                "docket_table_slug": self.docket_3.slug,
+            },
+        }
+        for docket in dockets_and_slug_count:
+            with self.subTest(docket=docket):
+                self.assertEqual(
+                    expected_results[docket["pgh_obj_id"]]["slug_count"],
+                    docket["slug_count"],
+                    msg="Slug count didn't match.",
+                )
+                if docket["slug_count"] == 1:
+                    # We only need to compare slugs if the slug_count in the
+                    # event table is equal to 1.
+                    self.assertEqual(
+                        expected_results[docket["pgh_obj_id"]][
+                            "event_table_slug"
+                        ],
+                        docket["event_table_slug"],
+                        msg="Event table slug didn't match.",
+                    )
+                    self.assertEqual(
+                        expected_results[docket["pgh_obj_id"]][
+                            "docket_table_slug"
+                        ],
+                        docket["docket_table_slug"],
+                        msg="Docket table slug didn't match.",
+                    )
+
+        # Now get_dockets_to_fix to filter out dockets that require re-indexing.
+        dockets_to_fix = get_dockets_to_fix(cut_off_date, pk_offset=0)
+        self.assertEqual(2, dockets_to_fix.count())
+        dockets_to_fix = set(docket["pgh_obj_id"] for docket in dockets_to_fix)
+        self.assertEqual({self.docket_2.pk, self.docket_3.pk}, dockets_to_fix)
+
+    @mock.patch("cl.search.management.commands.fix_rd_broken_links.logger")
+    def test_fix_broken_recap_document_links(self, mock_logger) -> None:
+        """Confirm fix_rd_broken_links properly fixes broken RECAPDocuments
+        links.
+        """
+
+        self.docket_2.case_name = "Dolor Ipsum"
+        self.docket_2.save()
+
+        self.docket_2.case_name = "Ipsum Dolor"
+        self.docket_2.save()
+
+        self.docket_1.docket_number = "46-bk-2633"
+        self.docket_1.save()
+
+        es_rd_2 = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_2.pk).RECAP)
+        # Simulate a wrong absolute_url value for es_rd_2
+        es_rd_2.absolute_url = self.docket_2.slug
+        es_rd_2.save()
+        self.assertEqual(es_rd_2.absolute_url, self.docket_2.slug)
+
+        cut_off_date = self.old_date + datetime.timedelta(days=10)
+        call_command(
+            "fix_rd_broken_links",
+            queue="celery",
+            start_date=cut_off_date.date(),
+            testing_mode=True,
+        )
+        mock_logger.info.assert_any_call(
+            "Processing chunk: %s", [self.docket_2.pk]
+        )
+        # Confirm rd_2 absolute_url is fixed after the command runs
+        es_rd_2 = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_2.pk).RECAP)
+        self.assertEqual(es_rd_2.absolute_url, self.rd_2.get_absolute_url())

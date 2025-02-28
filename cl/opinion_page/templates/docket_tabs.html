@@ -81,7 +81,7 @@
       </p>
     {% endif %}
     <h1 class="bottom inline" data-type="search.Docket" data-id="{{ docket.pk }}">
-      {{ docket|best_case_name|safe|v_wrapper }}
+      <span class="select-all">{{ docket|best_case_name|safe|v_wrapper }}</span>
       {% if docket.docket_number %}
         (<span class="select-all">{{ docket.docket_number }}</span>)
       {% endif %}
