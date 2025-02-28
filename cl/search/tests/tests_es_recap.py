@@ -2655,7 +2655,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         for docket in dockets_to_remove:
             docket.delete()
 
-    @mock.patch("cl.search.views.fetch_es_results")
+    @mock.patch("cl.lib.search_utils.fetch_es_results")
     @override_settings(
         RECAP_SEARCH_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
     )
@@ -7335,7 +7335,7 @@ class RECAPIndexingTest(
         # 100 results, 10 pages.
         total_results = 100
         with mock.patch(
-            "cl.search.views.fetch_es_results",
+            "cl.lib.search_utils.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
@@ -7355,7 +7355,7 @@ class RECAPIndexingTest(
         # 101 results, 11 pages.
         total_results = 101
         with mock.patch(
-            "cl.search.views.fetch_es_results",
+            "cl.lib.search_utils.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
@@ -7375,7 +7375,7 @@ class RECAPIndexingTest(
         # 20,000 results, 2,000 pages.
         total_results = 20_000
         with mock.patch(
-            "cl.search.views.fetch_es_results",
+            "cl.lib.search_utils.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
