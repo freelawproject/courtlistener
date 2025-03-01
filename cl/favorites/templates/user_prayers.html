@@ -15,6 +15,9 @@
 
   <div class="col-xs-12">
     <ul class="prayer-top-buttons nav navbar-nav navbar-right">
+      {% if is_page_owner %}
+        <li><a href="{% url "user_prayers_granted" user.username %}">Granted Requests</a></li>
+      {% endif is_page_owner %}
       {% include 'includes/remind_me_modal.html' %}
       <li class="hidden-xs">
         <a href="#" class="donate" data-toggle="modal" data-target="#remindMeModal">
@@ -96,7 +99,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="2">No document requests made. Consider making one!</td>
+                <td colspan="2">No document requests granted. Consider making one!</td>
             </tr>
             {% endfor %}
         </tbody>

@@ -47,12 +47,12 @@
     <div class="col-xs-12 v-offset-below-2 v-offset-above-3">
         <ul class="nav nav-tabs nav-justified" role="tablist">
             <li class="{% block nav-prayers-open %}inactive{% endblock %}" role="presentation">
-                <a href="{% url "user_prayers" %}">
+                <a href="{% url "user_prayers" user.username %}">
                   <i class="fa gray"></i>&nbsp;Open Prayers
                 </a>
             </li>
             <li class="{% block nav-prayers-granted %}inactive{% endblock %}" role="presentation">
-                <a href="{% url "user_prayers_granted" %}">
+                <a href="{% url "user_prayers_granted" user.username %}">
                   <i class="fa gray"></i>&nbsp;Granted Prayers
                 </a>
             </li>
