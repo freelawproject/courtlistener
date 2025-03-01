@@ -83,9 +83,13 @@ async def court_index(request: HttpRequest) -> HttpResponse:
 
 
 async def rest_docs(request, version=None):
-    """Show the correct version of the rest docs"""
+    """Show the correct version of the rest docs.
+
+    Latest version is shown when not specified in args.
+    """
     court_count = await Court.objects.acount()
-    context = {"court_count": court_count, "private": False}
+    latest = version is None
+    context = {"court_count": court_count, "private": not latest}
     return TemplateResponse(
         request,
         [f"rest-docs-{version}.html", "rest-docs-vlatest.html"],
