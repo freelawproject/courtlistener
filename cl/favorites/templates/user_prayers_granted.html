@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "user_prayers_list.html" %}
 {% load extras %}
 {% load text_filters %}
 {% load static %}
@@ -6,46 +6,7 @@
 {% load tz %}
 {% load humanize %}
 
-{% block title %}{% if is_page_owner %}Your PACER document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
-{% block og_title %}{% if is_page_owner %}Your PACER document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
-{% block description %}CourtListener lets you request the purchase of legal documents. View the documents requested by {{ requested_user }}.{% endblock %}
-{% block og_description %}CourtListener lets you request the purchase of legal documents. View the documents requested by {{ requested_user }}.{% endblock %}
-
-{% block content %}
-
-  <div class="col-xs-12">
-    <ul class="prayer-top-buttons nav navbar-nav navbar-right">
-      {% if is_page_owner %}
-      <li><a href="{% url "user_prayers" user.username %}">Pending Requests</a></li>
-      {% endif %}
-      {% include 'includes/remind_me_modal.html' %}
-      <li class="hidden-xs">
-        <a href="#" class="donate" data-toggle="modal" data-target="#remindMeModal">
-          <i class="fa fa-heart-o"></i>&nbsp;Remind Me to Help
-        </a>
-      </li>
-      <li>
-        <a href="{% url "top_prayers" %}"><div class="fa gray fa-fw">
-          {% include "includes/hand-holding-heart.svg" %}
-        </div> Leaderboard</a>
-      </li>
-      <li><a href="{% url "pray_and_pay_help" %}">Learn More</a></li>
-    </ul>
-  </div>
-
-  <div class="col-xs-12">
-    <h1 class="text-center v-offset-below-3">{% if is_page_owner %}Your PACER Document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %}</h1>
-    {% if is_page_owner %}<h3 class="text-center v-offset-below-3"><b>{{ user_history.prayer_count|intcomma }}</b> {{ user_history.prayer_count|pluralize:"prayer,prayers" }} granted totaling <b>${{ user_history.total_cost }}</b> (<b>{{ num_remaining }}</b> remaining today).</h3>{% endif %}
-  </div>
-
-  <div class="col-xs-12" id="prayer_summary" hx-swap-oob="true"
-    {% if request.user.is_authenticated %}
-    hx-get="{% url 'user_prayers' request.user.username %}"
-    hx-trigger="prayersListChanged from:body" hx-swap="none"
-    {%endif %}
-  >
-  </div>
-
+{% block prayer_list %}
   <h2 class="text-center v-offset-below-3">Granted Requests</h2>
   <div class="col-xs-12" id="prayer_list_granted" hx-swap-oob="true">
     <div class="table-responsive">
@@ -132,16 +93,4 @@
   {% endif %}
 
 
-{% endblock %}
-
-{% block footer-scripts %}
-  <script defer type="text/javascript"
-            src="{% static "js/buy_pacer_modal.js" %}"></script>
-  {% if DEBUG %}
-    <script src="{% static "js/htmx.js" %}"></script>
-    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
-  {% else %}
-    <script src="{% static "js/htmx.min.js" %}"></script>
-  {% endif %}
-  {% include "includes/buy_pacer_modal.html" %}
 {% endblock %}

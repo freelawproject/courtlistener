@@ -333,7 +333,7 @@ async def user_prayers_view(
         "private": False,
     }
 
-    return TemplateResponse(request, "user_prayers.html", context)
+    return TemplateResponse(request, "user_prayers_pending.html", context)
 
 
 async def user_prayers_view_granted(
