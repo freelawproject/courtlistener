@@ -156,10 +156,6 @@ def store_opinion_citations_and_update_parentheticals(
         **get_markup_kwargs(opinion),
     )
 
-    # If no citations are found, then there is nothing else to do for now.
-    if not citations:
-        return
-
     # Resolve all those different citation objects to Opinion objects,
     # using a variety of heuristics.
     citation_resolutions: Dict[
