@@ -146,7 +146,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
             prayer_count=Count(
                 "prayers", filter=Q(prayers__status=Prayer.WAITING)
             ),
-            view_count=F("docket_entry__docket__view_count")
+            view_count=F("docket_entry__docket__view_count"),
         )
         .order_by("-prayer_count", "-view_count")
     )
