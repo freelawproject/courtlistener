@@ -1,5 +1,6 @@
-import datetime
+import calendar
 import traceback
+from datetime import date, timedelta
 from urllib.parse import urlencode
 
 from asgiref.sync import async_to_sync
@@ -37,34 +38,72 @@ from cl.stats.utils import tally_stat
 MAX_RT_ITEM_QUERY = 1000
 
 
-def get_cut_off_date(rate, d=datetime.date.today()):
-    """Given a rate of dly, wly or mly and a date, returns the date after which
-    new results should be considered a hit for an cl.
-    """
-    cut_off_date = None
-    if rate == Alert.REAL_TIME:
-        # use a couple days ago to limit results without risk of leaving out
-        # important items (this will be filtered further later).
-        cut_off_date = d - datetime.timedelta(days=10)
-    elif rate == Alert.DAILY:
-        # For daily alerts: Set cut_off_date to the previous day since the cron job
-        # runs early in the morning.
-        cut_off_date = d - datetime.timedelta(days=1)
-    elif rate == Alert.WEEKLY:
-        cut_off_date = d - datetime.timedelta(days=7)
-    elif rate == Alert.MONTHLY:
-        if datetime.date.today().day > 28:
-            raise InvalidDateError(
-                "Monthly alerts cannot be run on the 29th, 30th or 31st."
-            )
+DAYS_WEEK = 7
+DAYS_MONTH = 28
 
-        # Get the first of the month of the previous month regardless of the
-        # current date
-        early_last_month = d - datetime.timedelta(days=28)
-        cut_off_date = datetime.datetime(
-            early_last_month.year, early_last_month.month, 1
-        )
-    return cut_off_date
+
+def get_cut_off_start_date(rate: str, d: date) -> date | None:
+    """Calculate the cut-off start date based on the given rate and date.
+
+    :param rate: The alert rate type.
+    :param d: The reference date from which the cut-off start date is calculated.
+    :return: The cut-off start date after which new results should be
+    considered a hit for an alert.
+    """
+    match rate:
+        case Alert.REAL_TIME:
+            # use a couple of days ago to limit results without risk of leaving out
+            # important items (this will be filtered further later).
+            return d - timedelta(days=10)
+        case Alert.DAILY:
+            # For daily alerts: Set cut_off_date to the previous day since the
+            # cron job runs early in the morning.
+            return d - timedelta(days=1)
+        case Alert.WEEKLY:
+            return d - timedelta(days=DAYS_WEEK)
+        case Alert.MONTHLY:
+            if date.today().day > DAYS_MONTH:
+                raise InvalidDateError(
+                    "Monthly alerts cannot be run on the 29th, 30th, or 31st."
+                )
+            # Get the first day of the previous month, regardless of the
+            # current date.
+            early_last_month = d - timedelta(days=DAYS_MONTH)
+            return date(early_last_month.year, early_last_month.month, 1)
+
+        case _:
+            return None
+
+
+def get_cut_off_end_date(rate: str, cutoff_start_date: date) -> date:
+    """Given a rate of dly, wly, or mly and the cutoff_start_date, returns
+    the cut-off end date to set the upper limit for the date range query.
+
+    :param rate: The alert rate type.
+    :param cutoff_start_date: The start date from which the cut-off end
+    date is calculated.
+    :return: The cut-off end date that serves as the upper limit for the
+    date range query.
+    """
+
+    match rate:
+        case Alert.DAILY:
+            cut_off_end_date = cutoff_start_date
+        case Alert.WEEKLY:
+            cut_off_end_date = cutoff_start_date + timedelta(
+                days=DAYS_WEEK - 1
+            )
+        case Alert.MONTHLY:
+            last_day = calendar.monthrange(
+                cutoff_start_date.year, cutoff_start_date.month
+            )[1]
+            cut_off_end_date = date(
+                cutoff_start_date.year, cutoff_start_date.month, last_day
+            )
+        case _:
+            cut_off_end_date = None
+
+    return cut_off_end_date
 
 
 def send_alert(user_profile, hits):
@@ -168,6 +207,7 @@ class Command(VerboseCommand):
         super().__init__(*args, **kwargs)
         self.options = {}
         self.valid_ids = []
+        self.date_today = date.today()
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -200,10 +240,13 @@ class Command(VerboseCommand):
         except KeyError:
             pass
         qd["order_by"] = "score desc"
-        cut_off_date = get_cut_off_date(rate)
+        cut_off_date = get_cut_off_start_date(rate, self.date_today)
         # Default to 'o', if not available, according to the front end.
         query_type = qd.get("type", SEARCH_TYPES.OPINION)
         qd["filed_after"] = cut_off_date
+        cut_off_end_date = get_cut_off_end_date(rate, cut_off_date)
+        if cut_off_end_date:
+            qd["filed_before"] = cut_off_end_date
         if query_type != SEARCH_TYPES.OPINION:
             # This command now only serves OPINION search alerts.
             return query_type, results, v1_results
@@ -212,7 +255,6 @@ class Command(VerboseCommand):
         search_form = SearchForm(qd)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-
             if rate == Alert.REAL_TIME and len(self.valid_ids) == 0:
                 # Bail out. No results will be found if no valid_ids.
                 return query_type, results, v1_results
@@ -301,7 +343,7 @@ class Command(VerboseCommand):
         them?
         """
         RealTimeQueue.objects.filter(
-            date_modified__lt=now() - datetime.timedelta(days=age),
+            date_modified__lt=now() - timedelta(days=age),
         ).delete()
 
     def get_new_ids(self):
