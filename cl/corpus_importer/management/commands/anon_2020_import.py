@@ -336,7 +336,7 @@ def find_court_id(court_str: str) -> str:
 
 
 def process_dates(
-    data: Dict[str, Any]
+    data: Dict[str, Any],
 ) -> Tuple[Optional[date], Optional[date]]:
     """Process date argued and date filed
 

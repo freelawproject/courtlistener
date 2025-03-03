@@ -45,8 +45,8 @@ def filter_invalid_XML_chars(input: str) -> str:
     if isinstance(input, str):
         # Only do str, unicode, etc.
         return re.sub(
-            "[^\u0020-\uD7FF\u0009\u000A\u000D\uE000-\uFFFD"
-            "\U00010000-\U0010FFFF]+",
+            "[^\u0020-\ud7ff\u0009\u000a\u000d\ue000-\ufffd"
+            "\U00010000-\U0010ffff]+",
             "",
             input,
         )
