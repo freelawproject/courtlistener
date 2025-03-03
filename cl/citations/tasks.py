@@ -237,7 +237,7 @@ def store_opinion_citations_and_update_parentheticals(
 
         if update_unmatched_status:
             update_unmatched_citations_status(citation_resolutions, opinion)
-        else:
+        elif unmatched_citations or ambiguous_matches:
             store_unmatched_citations(
                 unmatched_citations, ambiguous_matches, opinion
             )
@@ -333,6 +333,9 @@ def store_unmatched_citations(
     """
     unmatched_citations_to_store = []
     seen_citations = set()
+    citations_to_this_cluster = [
+        str(c) for c in opinion.cluster.citations.all()
+    ]
 
     for index, unmatched_citation in enumerate(
         unmatched_citations + ambiguous_matches, 1
@@ -346,13 +349,18 @@ def store_unmatched_citations(
         # values in required fields
         groups = unmatched_citation.groups
         if (
-            not groups.get("reporter", None)
-            or not groups.get("volume", None)
-            or not groups.get("volume").isdigit()
-            or not groups.get("page", None)
+            not groups.get("reporter")
+            or not groups.get("volume")
+            or not groups.get("page")
         ):
             logger.error(
                 "Unexpected null value in FullCaseCitation %s",
+                unmatched_citation,
+            )
+            continue
+        if not groups.get("volume").isdigit():
+            logger.error(
+                "Unexpected non-integer volume value in FullCaseCitation %s",
                 unmatched_citation,
             )
             continue
@@ -366,6 +374,14 @@ def store_unmatched_citations(
         if citation_str in seen_citations:
             continue
         seen_citations.add(citation_str)
+
+        # avoid storing self citations as unmatched; the self citation will
+        # usually be found at the beginning of the opinion's text
+        # Note that both Citation.__str__ and UnmatchedCitation.__str__ use
+        # the standardized volume, reporter and page values, so they are
+        # comparable
+        if citation_str in citations_to_this_cluster:
+            continue
 
         unmatched_citations_to_store.append(citation_object)
 
