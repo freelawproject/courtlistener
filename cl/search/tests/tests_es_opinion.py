@@ -3970,13 +3970,13 @@ class EsOpinionsIndexingTest(
         )
         o = OpinionFactory.create(
             author=self.person,
-            plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+            plain_text="Lorem ipsum control chars \x07\x08\x0b.",
             cluster=o_c,
             type="020lead",
         )
         o_2 = OpinionFactory.create(
             author=self.person,
-            html="<p>Lorem html ipsum control chars \x07\x08\x0B.</p>",
+            html="<p>Lorem html ipsum control chars \x07\x08\x0b.</p>",
             cluster=o_c,
             type="020lead",
         )
@@ -4257,7 +4257,7 @@ class OpinionFeedTest(
         """
         with mock.patch(
             "cl.search.documents.escape",
-            return_value="Lorem ipsum control chars \x07\x08\x0B.",
+            return_value="Lorem ipsum control chars \x07\x08\x0b.",
         ), self.captureOnCommitCallbacks(execute=True):
             court = CourtFactory(
                 id="ca1_test",
@@ -4273,7 +4273,7 @@ class OpinionFeedTest(
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
-                    plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+                    plain_text="Lorem ipsum control chars \x07\x08\x0b.",
                 ),
             )
 
