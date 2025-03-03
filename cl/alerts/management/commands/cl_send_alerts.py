@@ -42,7 +42,7 @@ DAYS_WEEK = 7
 DAYS_MONTH = 28
 
 
-def get_cut_off_start_date(rate: str, d: date) -> date | None:
+def get_cut_off_start_date(rate: str, d: date) -> date:
     """Calculate the cut-off start date based on the given rate and date.
 
     :param rate: The alert rate type.
@@ -72,38 +72,34 @@ def get_cut_off_start_date(rate: str, d: date) -> date | None:
             return date(early_last_month.year, early_last_month.month, 1)
 
         case _:
-            return None
+            raise NotImplementedError("Unsupported rate type: %s", rate)
 
 
-def get_cut_off_end_date(rate: str, cutoff_start_date: date) -> date:
+def get_cut_off_end_date(rate: str, cutoff_start_date: date) -> date | None:
     """Given a rate of dly, wly, or mly and the cutoff_start_date, returns
     the cut-off end date to set the upper limit for the date range query.
 
     :param rate: The alert rate type.
     :param cutoff_start_date: The start date from which the cut-off end
     date is calculated.
-    :return: The cut-off end date that serves as the upper limit for the
-    date range query.
+    :return: The cut-off end date that serves as the upper limit for the date
+    range query, or None if the rate is unsupported
     """
 
     match rate:
         case Alert.DAILY:
-            cut_off_end_date = cutoff_start_date
+            return cutoff_start_date
         case Alert.WEEKLY:
-            cut_off_end_date = cutoff_start_date + timedelta(
-                days=DAYS_WEEK - 1
-            )
+            return cutoff_start_date + timedelta(days=DAYS_WEEK - 1)
         case Alert.MONTHLY:
             last_day = calendar.monthrange(
                 cutoff_start_date.year, cutoff_start_date.month
             )[1]
-            cut_off_end_date = date(
+            return date(
                 cutoff_start_date.year, cutoff_start_date.month, last_day
             )
         case _:
-            cut_off_end_date = None
-
-    return cut_off_end_date
+            return None
 
 
 def send_alert(user_profile, hits):
