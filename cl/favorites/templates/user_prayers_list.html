@@ -15,18 +15,20 @@
 
   <div class="col-xs-12">
     <ul class="prayer-top-buttons nav navbar-nav navbar-right">
-      {% if request.resolver_match.view_name == 'user_prayers' %}
-        <li>
-          <a href="{% url "user_prayers_granted" user.username %}">
-            <i class="fa fa-check"></i>&nbsp;Granted Requests
-          </a>
-        </li>
-      {% else %}
-        <li>
-          <a href="{% url "user_prayers" user.username %}">
-            <i class="fa fa-list"></i>&nbsp;Pending Requests
-          </a>
-        </li>
+      {% if is_page_owner %}
+        {% if request.resolver_match.view_name == 'user_prayers' %}
+          <li>
+            <a href="{% url "user_prayers_granted" user.username %}">
+              <i class="fa fa-check"></i>&nbsp;Granted Requests
+            </a>
+          </li>
+        {% else %}
+          <li>
+            <a href="{% url "user_prayers" user.username %}">
+              <i class="fa fa-list"></i>&nbsp;Pending Requests
+            </a>
+          </li>
+        {% endif %}
       {% endif %}
       {% include 'includes/remind_me_modal.html' %}
       <li class="hidden-xs">
