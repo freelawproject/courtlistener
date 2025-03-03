@@ -58,6 +58,25 @@
   >
   </div>
 
+  {% if is_page_owner %}
+    {% block nav %}
+      <div class="col-xs-12 v-offset-below-2 v-offset-above-3">
+          <ul class="nav nav-tabs nav-justified" role="tablist">
+              <li class="{% block nav-pending %}inactive{% endblock %}" role="presentation">
+                  <a href="{% url "user_prayers" user.username %}">
+                    <i class="fa fa-list"></i>&nbsp;Pending Requests
+                  </a>
+              </li>
+              <li class="{% block nav-granted %}inactive{% endblock %}" role="presentation">
+                  <a href="{% url "user_prayers_granted" user.username %}">
+                    <i class="fa fa-check"></i>&nbsp;Granted Requests
+                  </a>
+              </li>
+          </ul>
+      </div>
+    {% endblock %}
+  {% endif %}
+
   {% block prayer_list %}  {% endblock %}
 
 {% endblock %}
