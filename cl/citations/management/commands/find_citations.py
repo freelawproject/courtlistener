@@ -56,6 +56,12 @@ class Command(VerboseCommand):
             "Opinion objects to update.",
         )
         parser.add_argument(
+            "--modified-before",
+            type=valid_date_time,
+            help="The modification date ISO-8601 format for a range of "
+            "Opinion objects to update.",
+        )
+        parser.add_argument(
             "--state",
             choices=[key[0] for key in USPS_CHOICES + OBSOLETE_STATES],
             help="State abbreviation E.g. NY, MA, CA.",
@@ -80,6 +86,7 @@ class Command(VerboseCommand):
             or options.get("filed_after") is not None
             or options.get("filed_before") is not None
             or options.get("modified_after") is not None
+            or options.get("modified_before") is not None
         )
         no_option = not any(
             [
@@ -89,6 +96,7 @@ class Command(VerboseCommand):
                 options.get("filed_after") is None,
                 options.get("filed_before") is None,
                 options.get("modified_after") is None,
+                options.get("modified_before") is None,
                 options.get("state") is not None,
                 options.get("all") is False,
             ]
@@ -127,6 +135,8 @@ class Command(VerboseCommand):
             )
         if options.get("modified_after"):
             query = query.filter(date_modified__gte=options["modified_after"])
+        if options.get("modified_before"):
+            query = query.filter(date_modified__lte=options["modified_before"])
         if options.get("all"):
             query = Opinion.objects.all()
             sys.stdout.write("Deleting all UnmatchedCitation rows")

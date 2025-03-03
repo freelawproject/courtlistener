@@ -67,7 +67,7 @@ class Command(VerboseCommand, CommandUtils):
         "Import a tab-separated file as produced by FJC for their IDB. "
         "Do not check for duplicates."
     )
-    BAD_CHARS = re.compile("[\u0000\u001E]")
+    BAD_CHARS = re.compile("[\u0000\u001e]")
 
     def add_arguments(self, parser):
         parser.add_argument(
