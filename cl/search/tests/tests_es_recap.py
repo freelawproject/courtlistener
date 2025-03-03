@@ -5734,7 +5734,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         """
         with mock.patch(
             "cl.search.documents.escape",
-            return_value="Lorem ipsum control chars \x07\x08\x0B.",
+            return_value="Lorem ipsum control chars \x07\x08\x0b.",
         ), self.captureOnCommitCallbacks(execute=True):
             de_1 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
@@ -5751,7 +5751,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="Control chars test",
                 document_number="1",
                 is_available=True,
-                plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+                plain_text="Lorem ipsum control chars \x07\x08\x0b.",
             )
 
         params = {
@@ -7404,7 +7404,7 @@ class RECAPIndexingTest(
             docket_entry=de_1,
             description="Leave to File",
             document_number="1",
-            plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+            plain_text="Lorem ipsum control chars \x07\x08\x0b.",
         )
 
         r_doc = ESRECAPDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
