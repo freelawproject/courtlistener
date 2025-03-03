@@ -237,7 +237,7 @@ def store_opinion_citations_and_update_parentheticals(
 
         if update_unmatched_status:
             update_unmatched_citations_status(citation_resolutions, opinion)
-        else:
+        elif unmatched_citations:
             store_unmatched_citations(unmatched_citations, opinion)
 
         # Nuke existing citations and parentheticals
@@ -325,7 +325,9 @@ def store_unmatched_citations(
     """
     unmatched_citations_to_store = []
     seen_citations = set()
-    citations_to_this_cluster = [str(c) for c in opinion.cluster.citations]
+    citations_to_this_cluster = [
+        str(c) for c in opinion.cluster.citations.all()
+    ]
 
     for unmatched_citation in unmatched_citations:
         if not isinstance(unmatched_citation, FullCaseCitation):
