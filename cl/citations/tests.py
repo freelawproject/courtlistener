@@ -2826,7 +2826,7 @@ class UnmatchedCitationTest(TransactionTestCase):
             tokenizer=HYPERSCAN_TOKENIZER,
         )
         opinion = cluster.sub_opinions.first()
-        store_unmatched_citations(eyecite_citations, opinion)
+        store_unmatched_citations(eyecite_citations, [], opinion)
         count = UnmatchedCitation.objects.filter(
             citing_opinion=opinion
         ).count()
