@@ -175,7 +175,7 @@ def store_opinion_citations_and_update_parentheticals(
     unmatched_citations = citation_resolutions.pop(NO_MATCH_RESOURCE, [])
 
     # Delete citations with multiple matches
-    citation_resolutions.pop(MULTIPLE_MATCHES_RESOURCE, None)
+    ambiguous_matches = citation_resolutions.pop(MULTIPLE_MATCHES_RESOURCE, [])
 
     # Increase the citation count for the cluster of each matched opinion
     # if that cluster has not already been cited by this opinion. First,
@@ -237,8 +237,10 @@ def store_opinion_citations_and_update_parentheticals(
 
         if update_unmatched_status:
             update_unmatched_citations_status(citation_resolutions, opinion)
-        elif unmatched_citations:
-            store_unmatched_citations(unmatched_citations, opinion)
+        elif unmatched_citations or ambiguous_matches:
+            store_unmatched_citations(
+                unmatched_citations, ambiguous_matches, opinion
+            )
 
         # Nuke existing citations and parentheticals
         OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
@@ -305,21 +307,27 @@ def update_unmatched_citations_status(
         if found.citation_string in resolved_citations:
             found.status = UnmatchedCitation.RESOLVED
         else:
-            if found.status == UnmatchedCitation.FAILED:
+            if found.status in [
+                UnmatchedCitation.FAILED,
+                UnmatchedCitation.FAILED_AMBIGUOUS,
+            ]:
                 continue
             found.status = UnmatchedCitation.FAILED
         found.save()
 
 
 def store_unmatched_citations(
-    unmatched_citations: List[CitationBase], opinion: Opinion
+    unmatched_citations: List[CitationBase],
+    ambiguous_matches: List[CitationBase],
+    opinion: Opinion,
 ) -> None:
     """Bulk create UnmatchedCitation instances cited by an opinion
 
     Only FullCaseCitations provide useful information for resolution
     updates. Other types are discarded
 
-    :param unmatched_citations:
+    :param unmatched_citations: citations with 0 matches
+    :param ambiguous_matches: citations with more than 1 match
     :param opinion: the citing opinion
     :return None:
     """
@@ -329,7 +337,11 @@ def store_unmatched_citations(
         str(c) for c in opinion.cluster.citations.all()
     ]
 
-    for unmatched_citation in unmatched_citations:
+    for index, unmatched_citation in enumerate(
+        unmatched_citations + ambiguous_matches, 1
+    ):
+        has_multiple_matches = index > len(unmatched_citations)
+
         if not isinstance(unmatched_citation, FullCaseCitation):
             continue
 
@@ -353,8 +365,13 @@ def store_unmatched_citations(
             )
             continue
 
+        # This would raise a DataError, we have seen cases from bad OCR or
+        # citation lookalikes. See #5191
+        if int(groups["volume"]) >= 32_767:
+            continue
+
         citation_object = UnmatchedCitation.create_from_eyecite(
-            unmatched_citation, opinion
+            unmatched_citation, opinion, has_multiple_matches
         )
 
         # use to prevent Integrity error from duplicates
