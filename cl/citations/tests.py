@@ -2804,3 +2804,25 @@ class UnmatchedCitationTest(TransactionTestCase):
             should_not_resolve.status == UnmatchedCitation.FAILED,
             f"UnmatchedCitation.status should be UnmatchedCitation.FAILED is {should_not_resolve.status}",
         )
+
+    def test_self_citation(self) -> None:
+        """Can we prevent a self citation being stored as UnmatchedCitation?"""
+        cluster = OpinionClusterFactoryWithChildrenAndParents()
+        CitationWithParentsFactory.create(
+            volume="948",
+            reporter="F.3d",
+            page="593",
+            cluster=cluster,
+        )
+        eyecite_citations = get_citations(
+            "something... 948 F.3d 593 something more...",
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
+        opinion = cluster.sub_opinions.first()
+        store_unmatched_citations(eyecite_citations, opinion)
+        count = UnmatchedCitation.objects.filter(
+            citing_opinion=opinion
+        ).count()
+        self.assertEqual(
+            count, 0, "Self-cite has been stored as UnmatchedCitation"
+        )

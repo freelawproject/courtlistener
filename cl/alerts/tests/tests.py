@@ -1,9 +1,10 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest import mock
 from urllib.parse import parse_qs, urlencode, urlparse
 
+import pytz
 import time_machine
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -21,6 +22,10 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
+from cl.alerts.management.commands.cl_send_alerts import (
+    get_cut_off_end_date,
+    get_cut_off_start_date,
+)
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
     get_cut_off_date,
@@ -60,7 +65,12 @@ from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
 from cl.people_db.factories import PersonFactory
-from cl.search.documents import AudioDocument, AudioPercolator
+from cl.search.documents import (
+    ES_CHILD_ID,
+    AudioDocument,
+    AudioPercolator,
+    OpinionDocument,
+)
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -84,6 +94,7 @@ from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
     SearchAlertsAssertions,
+    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse, make_client
@@ -156,7 +167,6 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         r = await self.async_client.post(
             "/", invalid_alert_type_params, follow=True
         )
-        print("r.content.decode()", r.content.decode())
         self.assertEqual(r.status_code, 200)
         self.assertIn("error creating your alert", r.content.decode())
         self.assertIn(
@@ -768,7 +778,14 @@ class SearchAlertsWebhooksTest(
         cls.person_1 = PersonFactory.create(
             gender="m",
         )
-        cls.mock_date = now().replace(day=15, hour=0)
+        cls.pt_tz = pytz.timezone(settings.TIME_ZONE)
+        cls.day_before_date_filed = cls.pt_tz.localize(
+            datetime(2025, 2, 28, 13, 30, 0)
+        )
+        cls.current_day_date_filed = cls.pt_tz.localize(
+            datetime(2025, 3, 1, 1, 30, 0)
+        )
+        cls.mock_date = cls.pt_tz.localize(datetime(2025, 3, 1, 2, 30, 0))
         with (
             mock.patch(
                 "cl.search.tasks.percolator_alerts_models_supported",
@@ -786,18 +803,19 @@ class SearchAlertsWebhooksTest(
             cls.dly_opinion = OpinionWithParentsFactory.create(
                 cluster__case_name="California vs Lorem",
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__date_filed=(now() - timedelta(hours=5)).date(),
+                cluster__date_filed=cls.day_before_date_filed.date(),
                 cluster__attorneys="Attorney General of North Carolina",
                 cluster__judges="Lorem Judge",
                 cluster__citation_count=1,
                 cluster__docket=DocketFactory(
                     court=cls.c1,
-                    date_reargued=(now() - timedelta(hours=6)).date(),
-                    date_reargument_denied=(now() - timedelta(hours=4)).date(),
+                    date_reargued=cls.day_before_date_filed.date(),
+                    date_reargument_denied=cls.day_before_date_filed.date(),
                 ),
                 plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
                 type=Opinion.LEAD,
             )
+
             cls.dly_opinion.joined_by.add(cls.person_1)
             cls.dly_opinion.cluster.panel.add(cls.person_1)
             cls.lexis_citation = CitationWithParentsFactory.create(
@@ -833,6 +851,22 @@ class SearchAlertsWebhooksTest(
                 citing_opinion=cls.dly_opinion_2,
             )
 
+            cls.dly_opinion_current_day = OpinionWithParentsFactory.create(
+                cluster__case_name="California vs Lorem Current Day",
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                cluster__date_filed=cls.current_day_date_filed.date(),
+                cluster__attorneys="Attorney General of North Carolina",
+                cluster__judges="Lorem Judge",
+                cluster__citation_count=1,
+                cluster__docket=DocketFactory(
+                    court=cls.c1,
+                    date_reargued=cls.current_day_date_filed.date(),
+                    date_reargument_denied=cls.current_day_date_filed.date(),
+                ),
+                plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
+                type=Opinion.LEAD,
+            )
+
             with mock.patch(
                 "cl.scrapers.tasks.microservice",
                 side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
@@ -851,10 +885,22 @@ class SearchAlertsWebhooksTest(
                 cluster__date_filed=now() - timedelta(days=2),
                 plain_text="Lorem dolor Ipsum",
             )
+            cls.wly_opinion_current_date = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                cluster__case_name="California vs Week Current Day",
+                cluster__date_filed=cls.current_day_date_filed.date(),
+                plain_text="Lorem dolor Ipsum",
+            )
             cls.mly_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__case_name="California vs Month",
                 cluster__date_filed=now() - timedelta(days=25),
+                plain_text="Lorem dolor Ipsum",
+            )
+            cls.mly_opinion_current_date = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                cluster__case_name="California vs Month Current Day",
+                cluster__date_filed=cls.current_day_date_filed.date(),
                 plain_text="Lorem dolor Ipsum",
             )
 
@@ -1179,6 +1225,20 @@ class SearchAlertsWebhooksTest(
 
     def test_send_search_alert_webhooks_rates(self):
         """Can we send search alert webhooks for different alert rates?"""
+
+        self.assertTrue(
+            OpinionDocument.exists(
+                id=ES_CHILD_ID(self.wly_opinion.pk).OPINION
+            ),
+            msg="wly error",
+        )
+        self.assertTrue(
+            OpinionDocument.exists(
+                id=ES_CHILD_ID(self.mly_opinion.pk).OPINION
+            ),
+            msg="mly error",
+        )
+
         with time_machine.travel(
             self.mock_date, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
@@ -1186,7 +1246,7 @@ class SearchAlertsWebhooksTest(
             rt_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__case_name="California vs RT",
-                cluster__date_filed=now(),
+                cluster__date_filed=self.day_before_date_filed.date(),
                 plain_text="Lorem dolor hearing Ipsum",
             )
             RealTimeQueue.objects.create(
@@ -1197,7 +1257,6 @@ class SearchAlertsWebhooksTest(
         self.assertEqual(len(webhooks_enabled), 3)
         search_alerts = Alert.objects.all()
         self.assertEqual(len(search_alerts), 9)
-
         # (rate, events expected, number of search results expected per event)
         # The number of expected results increases with every iteration since
         # daily events include results created for the RT test, weekly results
@@ -1223,60 +1282,62 @@ class SearchAlertsWebhooksTest(
                     # Send ES Alerts (Only OA for now)
                     call_command("cl_send_scheduled_alerts", rate=rate)
 
-            webhook_events = WebhookEvent.objects.all()
-            self.assertEqual(
-                len(webhook_events), events, msg="Wrong number of Events"
-            )
-
-            for webhook_sent in webhook_events:
+            with self.subTest(rate=rate):
+                webhook_events = WebhookEvent.objects.all()
                 self.assertEqual(
-                    webhook_sent.event_status,
-                    WEBHOOK_EVENT_STATUS.SUCCESSFUL,
-                    msg="Wrong number of webhooks sent.",
-                )
-                self.assertIn(
-                    webhook_sent.webhook.user,
-                    [self.user_profile.user, self.user_profile_3.user],
-                )
-                content = webhook_sent.content
-                # Check if the webhook event payload is correct.
-                self.assertEqual(
-                    content["webhook"]["event_type"],
-                    WebhookEventType.SEARCH_ALERT,
-                )
-                alert_to_compare = Alert.objects.get(
-                    pk=content["payload"]["alert"]["id"]
-                )
-                self.assertEqual(
-                    content["payload"]["alert"]["name"],
-                    alert_to_compare.name,
-                )
-                self.assertEqual(
-                    content["payload"]["alert"]["query"],
-                    alert_to_compare.query,
+                    len(webhook_events), events, msg="Wrong number of Events"
                 )
 
-                # The oral argument webhook is sent independently not grouped
-                # with opinions webhooks results.
-                if content["payload"]["alert"]["query"] == "type=oa":
+                for webhook_sent in webhook_events:
                     self.assertEqual(
-                        len(content["payload"]["results"]),
-                        1,
+                        webhook_sent.event_status,
+                        WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+                        msg="Wrong number of webhooks sent.",
+                    )
+                    self.assertIn(
+                        webhook_sent.webhook.user,
+                        [self.user_profile.user, self.user_profile_3.user],
+                    )
+                    content = webhook_sent.content
+                    # Check if the webhook event payload is correct.
+                    self.assertEqual(
+                        content["webhook"]["event_type"],
+                        WebhookEventType.SEARCH_ALERT,
+                    )
+                    alert_to_compare = Alert.objects.get(
+                        pk=content["payload"]["alert"]["id"]
                     )
                     self.assertEqual(
-                        content["payload"]["alert"]["rate"],
-                        Alert.DAILY,
-                    )
-                else:
-                    self.assertEqual(
-                        len(content["payload"]["results"]),
-                        results,
-                        msg="Wrong number of results.",
+                        content["payload"]["alert"]["name"],
+                        alert_to_compare.name,
                     )
                     self.assertEqual(
-                        content["payload"]["alert"]["rate"],
-                        rate,
+                        content["payload"]["alert"]["query"],
+                        alert_to_compare.query,
                     )
+
+                    # The oral argument webhook is sent independently not grouped
+                    # with opinions webhooks results.
+                    if content["payload"]["alert"]["query"] == "type=oa":
+                        self.assertEqual(
+                            len(content["payload"]["results"]),
+                            1,
+                            msg="Wrong number of results OA.",
+                        )
+                        self.assertEqual(
+                            content["payload"]["alert"]["rate"],
+                            Alert.DAILY,
+                        )
+                    else:
+                        self.assertEqual(
+                            len(content["payload"]["results"]),
+                            results,
+                            msg="Wrong number of results O.",
+                        )
+                        self.assertEqual(
+                            content["payload"]["alert"]["rate"],
+                            rate,
+                        )
             webhook_events.delete()
 
         rt_opinion.cluster.delete()
@@ -1329,6 +1390,215 @@ class SearchAlertsWebhooksTest(
         subject = build_alert_email_subject(alerts_hits)
         self.assertEqual(len(subject), 934)
         self.assertIn("...", subject)
+
+
+class SearchAlertsUtilsTest(SimpleTestCase):
+
+    def test_get_cut_off_dates(self):
+        """Confirm get_cut_off_date and get_cut_off_end_date return the right
+        values according to the input date.
+        """
+
+        test_cases = {
+            Alert.MONTHLY: [
+                {
+                    "month_to_run": 1,
+                    "day_to_run": 1,
+                    "cut_off_month": 12,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2024,
+                },
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 1,
+                    "cut_off_month": 1,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 3,
+                    "day_to_run": 1,
+                    "cut_off_month": 2,
+                    "day_start": 1,
+                    "day_end": 28,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 4,
+                    "day_to_run": 1,
+                    "cut_off_month": 3,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 5,
+                    "day_to_run": 1,
+                    "cut_off_month": 4,
+                    "day_start": 1,
+                    "day_end": 30,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 6,
+                    "day_to_run": 1,
+                    "cut_off_month": 5,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 7,
+                    "day_to_run": 1,
+                    "cut_off_month": 6,
+                    "day_start": 1,
+                    "day_end": 30,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 8,
+                    "day_to_run": 1,
+                    "cut_off_month": 7,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 9,
+                    "day_to_run": 1,
+                    "cut_off_month": 8,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 10,
+                    "day_to_run": 1,
+                    "cut_off_month": 9,
+                    "day_start": 1,
+                    "day_end": 30,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 11,
+                    "day_to_run": 1,
+                    "cut_off_month": 10,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 12,
+                    "day_to_run": 1,
+                    "cut_off_month": 11,
+                    "day_start": 1,
+                    "day_end": 30,
+                    "year": 2025,
+                },
+            ],
+            Alert.WEEKLY: [
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 1,
+                    "cut_off_month": 1,
+                    "day_start": 25,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 8,
+                    "cut_off_month": 2,
+                    "day_start": 1,
+                    "day_end": 7,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 15,
+                    "cut_off_month": 2,
+                    "day_start": 8,
+                    "day_end": 14,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 22,
+                    "cut_off_month": 2,
+                    "day_start": 15,
+                    "day_end": 21,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 3,
+                    "day_to_run": 1,
+                    "cut_off_month": 2,
+                    "day_start": 22,
+                    "day_end": 28,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 3,
+                    "day_to_run": 8,
+                    "cut_off_month": 3,
+                    "day_start": 1,
+                    "day_end": 7,
+                    "year": 2025,
+                },
+            ],
+            Alert.DAILY: [
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 28,
+                    "cut_off_month": 2,
+                    "day_start": 27,
+                    "day_end": 27,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 3,
+                    "day_to_run": 1,
+                    "cut_off_month": 2,
+                    "day_start": 28,
+                    "day_end": 28,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 3,
+                    "day_to_run": 2,
+                    "cut_off_month": 3,
+                    "day_start": 1,
+                    "day_end": 1,
+                    "year": 2025,
+                },
+            ],
+        }
+        for rate, test_cases in test_cases.items():
+            for test_case in test_cases:
+                with self.subTest(rate=rate, test_case=test_case):
+                    expected_date_start = date(
+                        test_case["year"],
+                        test_case["cut_off_month"],
+                        test_case["day_start"],
+                    )
+                    expected_date_end = date(
+                        test_case["year"],
+                        test_case["cut_off_month"],
+                        test_case["day_end"],
+                    )
+
+                    day_to_run = date(
+                        2025,
+                        test_case["month_to_run"],
+                        test_case["day_to_run"],
+                    )
+                    date_start = get_cut_off_start_date(rate, day_to_run)
+                    date_end = get_cut_off_end_date(rate, date_start)
+
+                    self.assertEqual(date_start, expected_date_start)
+                    self.assertEqual(date_end, expected_date_end)
 
 
 class DocketAlertAPITests(APITestCase):
