@@ -58,7 +58,7 @@ def make_citation(
         cluster=cluster,
         volume=citation_objs[0].groups["volume"],
         reporter=citation_objs[0].corrected_reporter(),
-        page=citation_objs[0].groups["page"],
+        page=citation_objs[0].corrected_page(),
         type=map_reporter_db_cite_type(cite_type_str),
     )
 
