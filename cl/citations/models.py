@@ -80,7 +80,7 @@ class UnmatchedCitation(BaseCitation):
         cls,
         eyecite_citation: FullCaseCitation,
         citing_opinion: Opinion,
-        more_than_one_match: bool,
+        has_multiple_matches: bool,
     ):
         """
         Create an UnmatchedCitation instance using an eyecite FullCaseCitation
@@ -90,7 +90,7 @@ class UnmatchedCitation(BaseCitation):
         :param eyecite_citation: a FullCaseCitation as returned by
             eyecite.get_citations
         :param citing_opinion: the opinion which uses the citation
-        :param more_than_one_match: if the citation was resolved to
+        :param has_multiple_matches: if the citation was resolved to
             MULTIPLE_MATCHES_RESOURCE
         :return: a UnmatchedCitation object
         """
@@ -110,7 +110,7 @@ class UnmatchedCitation(BaseCitation):
 
         # The citation exists in the search_citation table, but it couldn't
         # be resolved
-        if more_than_one_match:
+        if has_multiple_matches:
             unmatched_citation.status = cls.FAILED_AMBIGUOUS
         elif Citation.objects.filter(
             volume=unmatched_citation.volume,

@@ -340,7 +340,7 @@ def store_unmatched_citations(
     for index, unmatched_citation in enumerate(
         unmatched_citations + ambiguous_matches, 1
     ):
-        more_than_one_match = index > len(unmatched_citations)
+        has_multiple_matches = index > len(unmatched_citations)
 
         if not isinstance(unmatched_citation, FullCaseCitation):
             continue
@@ -366,7 +366,7 @@ def store_unmatched_citations(
             continue
 
         citation_object = UnmatchedCitation.create_from_eyecite(
-            unmatched_citation, opinion, more_than_one_match
+            unmatched_citation, opinion, has_multiple_matches
         )
 
         # use to prevent Integrity error from duplicates
