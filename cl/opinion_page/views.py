@@ -48,7 +48,6 @@ from cl.favorites.models import Note
 from cl.favorites.utils import (
     get_existing_prayers_in_bulk,
     get_prayer_counts_in_bulk,
-    prayer_eligible,
 )
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
