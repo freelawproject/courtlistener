@@ -353,6 +353,11 @@ def store_unmatched_citations(
             )
             continue
 
+        # This would raise a DataError, we have seen cases from bad OCR or
+        # citation lookalikes. See #5191
+        if int(groups["volume"]) >= 32_767:
+            continue
+
         citation_object = UnmatchedCitation.create_from_eyecite(
             unmatched_citation, opinion
         )
