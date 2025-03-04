@@ -62,6 +62,60 @@
                     </p>
                 </div>
             {% endif %}
+        {% if tab == "opinions" %}
+        <div id="opinion-toc" class="sidebar-section">
+              <h3> <span>Jump To</span> </h3>
+              <li class="jump-links active"><a id="nav_top" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#"  class="active">Top</a></li>
+              <li class="jump-links"><a id="nav_caption" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#caption" >Caption</a></li>
+              {% if cluster.headmatter %}
+                <li class="jump-links"><a id="nav_o" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o">Headmatter</a></li>
+              {% else %}
+
+                  {% if cluster.correction %}
+                      <li class="jump-links"><a  id="nav_correction" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#correction">Correction</a></li>
+                  {% endif %}
+                  {% if cluster.attorneys %}
+                      <li class="jump-links"><a id="nav_attorneys" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#attorneys">Attorneys</a></li>
+                  {% endif %}
+                  {% if cluster.headnotes %}
+                      <li class="jump-links"><a id="nav_headnotes" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#headnotes">Headnotes</a></li>
+                  {% endif %}
+                  {% if cluster.syllabus %}
+                      <li class="jump-links"><a id="nav_syllabus" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#syllabus">Syllabus</a></li>
+                  {% endif %}
+                  {% if cluster.summary %}
+                      <li class="jump-links"><a id="nav_summary" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#summary">Summary</a></li>
+                  {% endif %}
+                  {% if cluster.history %}
+                      <li class="jump-links"><a id="nav_history" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#history">History</a></li>
+                  {% endif %}
+                  {% if cluster.disposition %}
+                      <li class="jump-links"><a id="nav_disposition" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#disposition">Disposition</a></li>
+                  {% endif %}
+              {% endif %}
+              {% for sub_opinion in cluster.ordered_opinions %}
+              <li class="jump-links sub-opinion">
+                <a id="nav_o{{ forloop.counter }}" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o{{ forloop.counter }}" >
+                  {% if cluster.sub_opinions.all.count > 1 %}
+                    {% if sub_opinion.get_type_display == "Concurrence Opinion" %}
+                      Concurrence
+                    {% else %}
+                      {{ sub_opinion.get_type_display }}
+                    {% endif %}
+                        {% if sub_opinion.author_str %}
+                        by {{ sub_opinion.author_str }}
+                    {% endif %}
+                  {% else %}
+                    {{ sub_opinion.get_type_display }}
+                    {% if sub_opinion.author_str %}
+                      by {{ sub_opinion.author_str }}
+                    {% endif %}
+                  {% endif %}
+                </a>
+              </li>
+              {% endfor %}
+          </div>
+        {% endif %}
 
         {% if cluster.sub_opinions.all.first.extracted_by_ocr or "U" in cluster.source and tab == "opinions" %}
             <div class="col-sm-12 alert-warning alert v-offset-above-2">
