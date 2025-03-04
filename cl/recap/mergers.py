@@ -146,24 +146,24 @@ async def find_docket_object(
     if pacer_case_id:
         # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
         # blank pacer_case_id values.
-        lookups = (
-            [
-                {
-                    "pacer_case_id": pacer_case_id,
-                    "docket_number_core": docket_number_core,
-                },
-                # Appellate docket uploads usually include a pacer_case_id.
-                # Therefore, include the following lookup to attempt matching
-                # existing dockets without a pacer_case_id using docket_number_core
-                # to avoid creating duplicated dockets.
-                {
-                    "pacer_case_id": None,
-                    "docket_number_core": docket_number_core,
-                },
-            ]
-            if docket_number_core is not ""
-            else []  # Avoid doing lookups with blank docket_number_core
-        )
+        if docket_number_core:
+            # Only do these if docket_number_core is not blank. See #5058.
+            lookups.extend(
+                [
+                    {
+                        "pacer_case_id": pacer_case_id,
+                        "docket_number_core": docket_number_core,
+                    },
+                    # Appellate docket uploads usually include a pacer_case_id.
+                    # Therefore, include the following lookup to attempt matching
+                    # existing dockets without a pacer_case_id using docket_number_core
+                    # to avoid creating duplicated dockets.
+                    {
+                        "pacer_case_id": None,
+                        "docket_number_core": docket_number_core,
+                    },
+                ]
+            )
         lookups.append({"pacer_case_id": pacer_case_id})
     if docket_number_core and not pacer_case_id:
         # Sometimes we don't know how to make core docket numbers. If that's
