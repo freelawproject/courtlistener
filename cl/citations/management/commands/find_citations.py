@@ -73,6 +73,12 @@ class Command(VerboseCommand):
             help="Parse citations for all items",
         )
         parser.add_argument(
+            "--no-html-with-citations",
+            action="store_true",
+            default=False,
+            help="Parse only opinions without html_with_citations",
+        )
+        parser.add_argument(
             "--queue",
             default="batch1",
             help="The celery queue where the tasks should be processed.",
@@ -98,6 +104,7 @@ class Command(VerboseCommand):
                 options.get("modified_after") is None,
                 options.get("modified_before") is None,
                 options.get("state") is not None,
+                options.get("no_html_with_citations") is False,
                 options.get("all") is False,
             ]
         )
@@ -137,6 +144,8 @@ class Command(VerboseCommand):
             query = query.filter(date_modified__gte=options["modified_after"])
         if options.get("modified_before"):
             query = query.filter(date_modified__lte=options["modified_before"])
+        if options.get("no_html_with_citations"):
+            query = query.filter(html_with_citations="")
         if options.get("all"):
             query = Opinion.objects.all()
             sys.stdout.write("Deleting all UnmatchedCitation rows")

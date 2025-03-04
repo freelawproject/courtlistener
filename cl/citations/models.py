@@ -77,7 +77,10 @@ class UnmatchedCitation(BaseCitation):
 
     @classmethod
     def create_from_eyecite(
-        cls, eyecite_citation: FullCaseCitation, citing_opinion: Opinion
+        cls,
+        eyecite_citation: FullCaseCitation,
+        citing_opinion: Opinion,
+        has_multiple_matches: bool,
     ):
         """
         Create an UnmatchedCitation instance using an eyecite FullCaseCitation
@@ -87,6 +90,9 @@ class UnmatchedCitation(BaseCitation):
         :param eyecite_citation: a FullCaseCitation as returned by
             eyecite.get_citations
         :param citing_opinion: the opinion which uses the citation
+        :param has_multiple_matches: if the citation was resolved to
+            MULTIPLE_MATCHES_RESOURCE
+        :return: a UnmatchedCitation object
         """
         cite_type_str = eyecite_citation.all_editions[0].reporter.cite_type
         year = eyecite_citation.metadata.year
@@ -98,13 +104,15 @@ class UnmatchedCitation(BaseCitation):
             year=int(year) if year else None,
             volume=eyecite_citation.groups["volume"],
             reporter=eyecite_citation.corrected_reporter(),
-            page=eyecite_citation.groups["page"],
+            page=eyecite_citation.corrected_page(),
             type=map_reporter_db_cite_type(cite_type_str),
         )
 
         # The citation exists in the search_citation table, but it couldn't
         # be resolved
-        if Citation.objects.filter(
+        if has_multiple_matches:
+            unmatched_citation.status = cls.FAILED_AMBIGUOUS
+        elif Citation.objects.filter(
             volume=unmatched_citation.volume,
             reporter=unmatched_citation.reporter,
             page=unmatched_citation.page,
