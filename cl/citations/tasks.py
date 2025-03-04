@@ -167,6 +167,10 @@ def store_opinion_citations_and_update_parentheticals(
         opinion, citation_resolutions
     )
 
+    if not citations:
+        opinion.save()
+        return
+
     # Put apart the unmatched citations
     unmatched_citations = citation_resolutions.pop(NO_MATCH_RESOURCE, [])
 
