@@ -1840,4 +1840,10 @@ rect.series-segment {
 
 .prayer-top-buttons.nav > li > a {
   padding: 10px 15px;
+  right: 15px;
+  position: relative;
+}
+
+.learn-more-prayer-btn {
+  margin-right: auto;
 }
