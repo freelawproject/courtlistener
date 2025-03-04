@@ -300,26 +300,83 @@ async def user_prayers_view(
     if not is_page_owner:
         return redirect("top_prayers")
 
-    rd_with_prayers_granted = await get_user_prayers(
-        requested_user, Prayer.GRANTED
-    )
     rd_with_prayers_waiting = await get_user_prayers(
         requested_user, Prayer.WAITING
     )
 
     user_history = await get_user_prayer_history(requested_user)
 
-    is_eligible, num_remaining = await prayer_eligible(requested_user)
+    _, num_remaining = await prayer_eligible(requested_user)
+
+    waiting_page = request.GET.get("page", 1)
+
+    @sync_to_async
+    def paginate_waiting_prayers(waiting_prayers, prayer_page):
+        paginator = Paginator(waiting_prayers, 25, orphans=10)
+        try:
+            return paginator.page(prayer_page)
+        except PageNotAnInteger:
+            return paginator.page(1)
+        except EmptyPage:
+            return paginator.page(paginator.num_pages)
+
+    paginated_entries_waiting = await paginate_waiting_prayers(
+        rd_with_prayers_waiting, waiting_page
+    )
 
     context = {
-        "rd_with_prayers_granted": rd_with_prayers_granted,
-        "rd_with_prayers_waiting": rd_with_prayers_waiting,
+        "rd_with_prayers_waiting": paginated_entries_waiting,
         "requested_user": requested_user,
         "is_page_owner": is_page_owner,
         "user_history": user_history,
-        "is_eligible": is_eligible,
         "num_remaining": num_remaining,
         "private": False,
     }
 
-    return TemplateResponse(request, "user_prayers.html", context)
+    return TemplateResponse(request, "user_prayers_pending.html", context)
+
+
+async def user_prayers_view_granted(
+    request: HttpRequest, username: str
+) -> HttpResponse:
+    requested_user = await aget_object_or_404(User, username=username)
+    is_page_owner = await request.auser() == requested_user
+
+    # this is a temporary restriction for the MVP. The intention is to eventually treat like tags.
+    if not is_page_owner:
+        return redirect("top_prayers")
+
+    rd_with_prayers_granted = await get_user_prayers(
+        requested_user, Prayer.GRANTED
+    )
+
+    user_history = await get_user_prayer_history(requested_user)
+
+    _, num_remaining = await prayer_eligible(requested_user)
+
+    granted_page = request.GET.get("page", 1)
+
+    @sync_to_async
+    def paginate_granted_prayers(granted_page, prayer_page):
+        paginator = Paginator(granted_page, 25, orphans=10)
+        try:
+            return paginator.page(prayer_page)
+        except PageNotAnInteger:
+            return paginator.page(1)
+        except EmptyPage:
+            return paginator.page(paginator.num_pages)
+
+    paginated_entries_granted = await paginate_granted_prayers(
+        rd_with_prayers_granted, granted_page
+    )
+
+    context = {
+        "rd_with_prayers_granted": paginated_entries_granted,
+        "requested_user": requested_user,
+        "is_page_owner": is_page_owner,
+        "user_history": user_history,
+        "num_remaining": num_remaining,
+        "private": False,
+    }
+
+    return TemplateResponse(request, "user_prayers_granted.html", context)
