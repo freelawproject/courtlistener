@@ -35,11 +35,9 @@
                rel="nofollow"
                target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
           </div>
-          {% flag "pray-and-pay" %}
             <div class="prayer-button" data-gap-size="2px">
               {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count regular_size=True%}
             </div>
-          {% endflag %}
         </div>
       </div>
     </div>

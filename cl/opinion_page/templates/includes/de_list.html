@@ -171,11 +171,9 @@
                             target="_blank"
                             rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
                         </a>
-                        {% flag "pray-and-pay" %}
                           <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
                             {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
                           </div>
-                        {% endflag %}
                       {% endif %}
                     {% endif %}
                   {% endif %}
