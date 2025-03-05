@@ -2716,23 +2716,23 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     # this will produce 6 citations: 5 FullCase and 1 Id
     # last 2 should be ignored:
-    # the Thompsom cite is a known eyecite bug
+    # the Thompsom cite (4-index) produces a known eyecite bug; will be
+    # necessary to delete that test line once that's fixed
     # the last cite has a null page and would cause an error when storing
     plain_text = """
-    petition. 62 Tex. Sup. Ct. J. 313 (Jan. 18, 2019). II. Appraisal and the
-    TPPCA Although presented in... inference and resolving any doubts in the
-    nonmovants favor. E.g., Frost Natl Bank v. Fernandez, 315 S.W.3d 494, 508
-    (Tex. 2010) (citation omitted); Valence Operating Co. v. Dorsett,
-    164 S.W.3d 656, 661 (Tex. 2005) (citation omitted). When both parties move
-    for summary judgment on the same issue,... does not alter the fact that
-    State Farm complied with the Insurance Code . . . . Id. Likewise, we hold
-    in this case that State Farm's invocation...
-    United States v. Thompson, 281 F.3d 1088, 1090 (10th Cir. 2002).
-    182 A.3d ____________________________________________
+    0-index 62 Tex. Sup. Ct. J. 313 (Jan. 18, 2019).
+    1-index Frost Natl Bank v. Fernandez, 315 S.W.3d 494, 508 (Tex. 2010) (citation omitted);
+    2-index Valence Operating Co. v. Dorsett, 164 S.W.3d 656, 661 (Tex. 2005) (citation omitted).
+    3-index the fact that State Farm complied with the Insurance Code . . . . Id.
+    4-index United States v. Thompson, 281 F.3d 1088, 1090 (10th Cir. 2002).
+    5-index 182 A.3d ____________________________________________
     """
     eyecite_citations = get_citations(
         plain_text, tokenizer=HYPERSCAN_TOKENIZER
     )
+    # select one to mark as ambiguous; as happens on the resolution flow
+    # to MULTIPLE_RESOURCE_MATCH citations
+    ambiguous_citations = [eyecite_citations.pop(2)]
     cluster = None
     opinion = None
 
@@ -2744,7 +2744,9 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     def test_1st_creation(self) -> None:
         """Can we save unmatched citations?"""
-        store_unmatched_citations(self.eyecite_citations, self.opinion)
+        store_unmatched_citations(
+            self.eyecite_citations, self.ambiguous_citations, self.opinion
+        )
         unmatched_citations = list(
             UnmatchedCitation.objects.filter(citing_opinion=self.opinion).all()
         )
@@ -2753,11 +2755,16 @@ class UnmatchedCitationTest(TransactionTestCase):
             "Incorrect number of citations saved",
         )
         self.assertTrue(
-            unmatched_citations[-1].court_id == "tex",
+            unmatched_citations[1].court_id == "tex",
             "court_id was not saved",
         )
         self.assertTrue(
             unmatched_citations[0].year == 2019, "year was not saved"
+        )
+        self.assertEqual(
+            unmatched_citations[-1].status,
+            UnmatchedCitation.FAILED_AMBIGUOUS,
+            "ambiguous UnmatchedCitation was not marked properly",
         )
 
         # Test signal on matching Citation created
@@ -2803,4 +2810,26 @@ class UnmatchedCitationTest(TransactionTestCase):
         self.assertTrue(
             should_not_resolve.status == UnmatchedCitation.FAILED,
             f"UnmatchedCitation.status should be UnmatchedCitation.FAILED is {should_not_resolve.status}",
+        )
+
+    def test_self_citation(self) -> None:
+        """Can we prevent a self citation being stored as UnmatchedCitation?"""
+        cluster = OpinionClusterFactoryWithChildrenAndParents()
+        CitationWithParentsFactory.create(
+            volume="948",
+            reporter="F.3d",
+            page="593",
+            cluster=cluster,
+        )
+        eyecite_citations = get_citations(
+            "something... 948 F.3d 593 something more...",
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
+        opinion = cluster.sub_opinions.first()
+        store_unmatched_citations(eyecite_citations, [], opinion)
+        count = UnmatchedCitation.objects.filter(
+            citing_opinion=opinion
+        ).count()
+        self.assertEqual(
+            count, 0, "Self-cite has been stored as UnmatchedCitation"
         )

@@ -6,6 +6,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from cl.corpus_importer.tasks import make_docket_by_iquery_sweep
+from cl.corpus_importer.utils import get_iquery_pacer_courts_to_scrape
 from cl.lib.command_utils import logger
 from cl.lib.redis_utils import (
     acquire_redis_lock,
@@ -130,12 +131,7 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
     if (
         check_probe_or_created
         and instance.pacer_case_id
-        and instance.court_id
-        in list(
-            Court.federal_courts.district_or_bankruptcy_pacer_courts()
-            .exclude(pk__in=["uscfc", "arb", "cit"])
-            .values_list("pk", flat=True)
-        )
+        and instance.court_id in get_iquery_pacer_courts_to_scrape()
     ):
         transaction.on_commit(
             partial(update_latest_case_id_and_schedule_iquery_sweep, instance)
