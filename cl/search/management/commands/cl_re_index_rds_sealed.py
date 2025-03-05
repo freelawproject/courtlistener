@@ -11,7 +11,7 @@ from cl.lib.indexing_utils import (
     log_last_document_indexed,
 )
 from cl.search.models import SEARCH_TYPES, RECAPDocument
-from cl.search.tasks import index_parent_or_child_docs
+from cl.search.tasks import index_parent_or_child_docs_in_es
 
 
 def compose_redis_key() -> str:
@@ -116,6 +116,7 @@ class Command(VerboseCommand):
         chunk = []
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue)
+        use_streaming_bulk = True if testing_mode else False
         # Indexing Parent and their child documents.
         for item_id in items:
             chunk.append(item_id)
@@ -123,11 +124,11 @@ class Command(VerboseCommand):
             last_item = count == processed_count
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
-                index_parent_or_child_docs.si(
+                index_parent_or_child_docs_in_es.si(
                     chunk,
                     SEARCH_TYPES.RECAP,
                     "child",
-                    testing_mode=testing_mode,
+                    use_streaming_bulk=use_streaming_bulk,
                 ).set(queue=queue).apply_async()
 
                 chunk = []

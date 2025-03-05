@@ -3024,7 +3024,7 @@ class IndexOpinionDocumentsCommandTest(
         for pk in opinions_pks:
             self.assertTrue(OpinionDocument.exists(id=ES_CHILD_ID(pk).OPINION))
 
-    def test_index_parent_or_child_docs(self):
+    def test_index_parent_or_child_docs_in_es(self):
         """Confirm the command can properly index missing clusters when
         indexing only Opinions.
         """

@@ -39,7 +39,7 @@ from cl.search.models import (
 from cl.search.signals import recap_document_field_mapping
 from cl.search.tasks import (
     index_parent_and_child_docs,
-    index_parent_or_child_docs,
+    index_parent_or_child_docs_in_es,
     remove_parent_and_child_docs_by_query,
     update_children_docs_by_query,
 )
@@ -362,7 +362,7 @@ class Command(VerboseCommand):
                         .order_by("pk")
                         .values_list("pk", "docket_entry__docket_id")
                     )
-                    task_to_use = "index_parent_or_child_docs"
+                    task_to_use = "index_parent_or_child_docs_in_es"
                     es_document = ESRECAPDocument
                 else:
                     queryset = (
@@ -375,7 +375,7 @@ class Command(VerboseCommand):
                     )
                     task_to_use = "index_parent_and_child_docs"
                     if document_type == "parent":
-                        task_to_use = "index_parent_or_child_docs"
+                        task_to_use = "index_parent_or_child_docs_in_es"
                         es_document = DocketDocument
                 q = queryset.iterator()
                 count = queryset.count()
@@ -392,7 +392,7 @@ class Command(VerboseCommand):
                         .order_by("pk")
                         .values_list("pk", "cluster_id")
                     )
-                    task_to_use = "index_parent_or_child_docs"
+                    task_to_use = "index_parent_or_child_docs_in_es"
                     es_document = OpinionDocument
                 else:
                     # Get Opinion Clusters objects by pk_offset.
@@ -403,7 +403,7 @@ class Command(VerboseCommand):
                     )
                     task_to_use = "index_parent_and_child_docs"
                     if document_type == "parent":
-                        task_to_use = "index_parent_or_child_docs"
+                        task_to_use = "index_parent_or_child_docs_in_es"
                         es_document = OpinionClusterDocument
 
                 q = queryset.iterator()
@@ -469,6 +469,7 @@ class Command(VerboseCommand):
         chunk = []
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue)
+        use_streaming_bulk = True if testing_mode else False
         # Indexing Parent and their child documents.
         for item in items:
             item_id = item
@@ -501,15 +502,15 @@ class Command(VerboseCommand):
                         index_parent_and_child_docs.si(
                             chunk,
                             search_type,
-                            testing_mode=testing_mode,
+                            use_streaming_bulk=True,
                         ).set(queue=queue).apply_async()
 
-                    case "index_parent_or_child_docs":
-                        index_parent_or_child_docs.si(
+                    case "index_parent_or_child_docs_in_es":
+                        index_parent_or_child_docs_in_es.si(
                             chunk,
                             search_type,
                             document_type,
-                            testing_mode=testing_mode,
+                            use_streaming_bulk=use_streaming_bulk,
                         ).set(queue=queue).apply_async()
                     case "remove_parent_and_child_docs_by_query":
                         remove_parent_and_child_docs_by_query.si(
@@ -575,7 +576,7 @@ class Command(VerboseCommand):
                 count,
                 search_type,
                 chunk_size,
-                "index_parent_or_child_docs",
+                "index_parent_or_child_docs_in_es",
             )
 
         if event_doc_type == EventTable.RECAP_DOCUMENT:
@@ -586,7 +587,7 @@ class Command(VerboseCommand):
                 count,
                 search_type,
                 1,
-                "index_parent_or_child_docs",
+                "index_parent_or_child_docs_in_es",
             )
 
         # Process child documents to update.

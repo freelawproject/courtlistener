@@ -20,8 +20,14 @@ from cl.lib.indexing_utils import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry, DocketEvent
-from cl.search.tasks import index_parent_and_child_docs
+from cl.search.models import (
+    SEARCH_TYPES,
+    Docket,
+    DocketEntry,
+    DocketEvent,
+    RECAPDocument,
+)
+from cl.search.tasks import index_parent_or_child_docs_in_es
 
 
 def get_docket_events_and_slug_count(
@@ -103,7 +109,7 @@ def get_dockets_to_fix(
     return docket_events_and_slug_count.filter(
         Q(slug_count__gt=1)
         | (Q(slug_count=1) & ~Q(event_table_slug=F("docket_table_slug")))
-    )
+    ).values_list("pgh_obj_id", flat=True)
 
 
 def compose_redis_key() -> str:
@@ -174,31 +180,43 @@ class Command(VerboseCommand):
             required=False,
         )
 
-    def get_and_fix_dockets(self, cut_off_date: datetime) -> int:
-        """Get the dockets with broken RECAPDocument links and fix them by
-        re-indexing the affected dockets and their RDs.
+    def get_and_fix_rds(self, cut_off_date: datetime) -> int:
+        """Get the dockets with broken RECAPDocument links and fix their RDs by
+        re-indexing.
 
         :param cut_off_date: The cutoff date to filter docket events.
         :return: The number of dockets affected.
         """
 
         chunk = []
-        affected_dockets = 0
-        dockets_to_fix_queryset = get_dockets_to_fix(
+        affected_rds = 0
+        docket_ids_to_fix_queryset = get_dockets_to_fix(
             cut_off_date, self.pk_offset, self.ids
         )
-        count = dockets_to_fix_queryset.count()
-        for docket_to_fix in dockets_to_fix_queryset.iterator():
-            docket_id = docket_to_fix["pgh_obj_id"]
-            chunk.append(docket_id)
-            affected_dockets += 1
-            last_item = count == affected_dockets
-            if affected_dockets % self.chunk_size == 0 or last_item:
+        rd_queryset = (
+            RECAPDocument.objects.filter(
+                docket_entry__docket_id__in=Subquery(
+                    docket_ids_to_fix_queryset
+                )
+            )
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        logger.info(
+            "Getting the count of recap documents that need to be fixed."
+        )
+        count = rd_queryset.count()
+        for rd_id_to_fix in rd_queryset.iterator():
+            chunk.append(rd_id_to_fix)
+            affected_rds += 1
+            last_item = count == affected_rds
+            if affected_rds % self.chunk_size == 0 or last_item:
                 self.throttle.maybe_wait()
-                index_parent_and_child_docs.si(
+                index_parent_or_child_docs_in_es.si(
                     chunk,
                     SEARCH_TYPES.RECAP,
-                    testing_mode=self.testing_mode,
+                    "child",
+                    use_streaming_bulk=True,
                 ).set(queue=self.queue).apply_async()
                 if self.testing_mode:
                     logger.info("Processing chunk: %s", chunk)
@@ -209,15 +227,17 @@ class Command(VerboseCommand):
                 chunk = []
                 logger.info(
                     "Processed %d/%d (%.0f%%), last PK fixed: %s",
-                    affected_dockets,
+                    affected_rds,
                     count,
-                    (affected_dockets * 100.0) / count,
-                    docket_id,
+                    (affected_rds * 100.0) / count,
+                    rd_id_to_fix,
                 )
 
-                if not affected_dockets % 1000:
+                if not affected_rds % 1000:
                     # Log every 1000 documents processed.
-                    log_last_document_indexed(docket_id, compose_redis_key())
+                    log_last_document_indexed(
+                        rd_id_to_fix, compose_redis_key()
+                    )
 
         return count
 
@@ -239,9 +259,9 @@ class Command(VerboseCommand):
                 f"Auto-resume enabled starting indexing from ID: {self.pk_offset}."
             )
         start_date: datetime = options["start_date"]
-        affected_dockets = self.get_and_fix_dockets(start_date)
+        affected_rds = self.get_and_fix_rds(start_date)
         logger.info(
             "Successfully fixed %d items from pk %s.",
-            affected_dockets,
+            affected_rds,
             self.pk_offset,
         )
