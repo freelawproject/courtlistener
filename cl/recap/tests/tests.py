@@ -2113,8 +2113,19 @@ class ReplicateRecapUploadsTest(TestCase):
         "cl.recap.tasks.get_pacer_cookie_from_cache",
         side_effect=lambda x: True,
     )
-    def test_avoid_appellate_replication_for_subdocket_attachment_page_fq(
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
+            MockResponse(
+                200,
+                b"pdf content",
+            ),
+            "OK",
+        ),
+    )
+    def test_avoid_appellate_replication_for_subdocket_attachment_page_and_pdf_fq(
         self,
+        mock_download_pacer_pdf_by_rd,
         mock_get_pacer_cookie_from_cache,
         mock_is_pacer_court_accessible,
         mock_get_att_report_by_rd,
@@ -2136,6 +2147,7 @@ class ReplicateRecapUploadsTest(TestCase):
         d_2_recap_document = RECAPDocument.objects.filter(
             docket_entry__docket=self.d_2_a
         )
+        main_d_1_rd = d_1_recap_document[0]
         main_d_2_rd = d_2_recap_document[0]
 
         # Create FQ.
@@ -2186,6 +2198,29 @@ class ReplicateRecapUploadsTest(TestCase):
         # 1 PacerHtmlFiles should have been created for the FQ request.
         att_html_created = PacerHtmlFiles.objects.all()
         self.assertEqual(att_html_created.count(), 1)
+
+        # Avoid appellate PDF replication to subdockets.
+        pdf_fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=main_d_2_rd.pk,
+        )
+        do_pacer_fetch(pdf_fq)
+        main_d_1_rd.refresh_from_db()
+        main_d_2_rd.refresh_from_db()
+
+        self.assertTrue(
+            main_d_2_rd.is_available,
+            msg="is_available value doesn't match",
+        )
+        self.assertFalse(
+            main_d_1_rd.is_available,
+            msg="is_available value doesn't match",
+        )
+        # No additional PQs created.
+        self.assertEqual(
+            pqs_created.count(), 0, msg="Wrong number of PQs created."
+        )
 
     @mock.patch(
         "cl.recap.tasks.is_pacer_court_accessible",

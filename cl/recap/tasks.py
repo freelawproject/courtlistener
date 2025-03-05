@@ -1961,10 +1961,12 @@ def fetch_pacer_doc_by_rd_base(
         return
 
     # Logic to replicate the PDF sub-dockets matched by RECAPDocument
-    subdocket_pqs_to_replicate = find_subdocket_pdf_rds_from_data(
-        fq.user_id, court_id, pacer_doc_id, [pacer_case_id], pdf_bytes
-    )
-    if subdocket_pqs_to_replicate and not is_appellate_court(court_id):
+    subdocket_pqs_to_replicate = []
+    if not is_appellate_court(court_id):
+        subdocket_pqs_to_replicate = find_subdocket_pdf_rds_from_data(
+            fq.user_id, court_id, pacer_doc_id, [pacer_case_id], pdf_bytes
+        )
+    if subdocket_pqs_to_replicate:
         replicate_fq_pdf_to_subdocket_rds.delay(subdocket_pqs_to_replicate)
 
     return rd.pk

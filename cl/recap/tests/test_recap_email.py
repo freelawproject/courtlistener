@@ -3240,8 +3240,8 @@ class RecapEmailContentReplication(TestCase):
         mock_bucket_open,
         mock_enqueue_alert,
     ):
-        """Confirm the main PDF and the related attachment data and attachment
-        PDF are properly replicated from a multi-nef notification to subdockets.
+        """Confirm that the main PDF is properly replicated from a simple NEF
+        notification to subdockets for notifications that don't contain attachments.
         """
         # Create two Subdockets and RDs no mentioned in the email notification.
         de_1 = await sync_to_async(DocketEntryFactory)(
@@ -3590,8 +3590,8 @@ class RecapEmailContentReplication(TestCase):
         mock_bucket_open,
         mock_enqueue_alert,
     ):
-        """Confirm the main PDF and the related attachment data and attachment
-        PDF are properly replicated from a multi-nef notification to subdockets.
+        """Confirm that the replicate_recap_email_to_subdockets method is not
+        called for email notifications with minute entries.
         """
 
         minute_entry_data = RECAPEmailDocketEntryDataFactory(
