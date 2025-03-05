@@ -824,7 +824,6 @@ class RECAPPrayAndPay(TestCase):
     async def test_get_top_prayers_by_number_and_views(self) -> None:
         """Does the get_top_prayers method work properly?"""
 
-
         self.rd_2.docket_entry.docket.view_count = 4
         self.rd_3.docket_entry.docket.view_count = 1
         self.rd_4.docket_entry.docket.view_count = 6
