@@ -14,6 +14,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission, User
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
@@ -7776,6 +7777,34 @@ class LookupDocketsTest(TestCase):
         self.assertEqual(
             d_1.pacer_case_id, self.docket_data_appellate["pacer_case_id"]
         )
+
+    def test_avoid_lookup_by_blank_docket_number_core(self):
+        """Can we Avoid doing lookups with blank docket_number_core?"""
+        d = DocketFactory(
+            case_name="Young v. State",
+            docket_number="88-8330",
+            docket_number_core="",
+            pacer_case_id="",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+        )
+        d.refresh_from_db()
+        docket_no_number_core = RECAPEmailDocketDataFactory(
+            case_name="Barton v. State",
+            docket_number="",
+        )
+        new_d = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            "12457",
+            docket_no_number_core["docket_number"],
+            None,
+            None,
+            None,
+        )
+        with self.assertRaises(ValidationError):
+            # RECAP dockets must require a docket_number.
+            async_to_sync(update_docket_metadata)(new_d, docket_no_number_core)
+            new_d.save()
 
 
 class CleanUpDuplicateAppellateEntries(TestCase):
