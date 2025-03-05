@@ -55,9 +55,7 @@
             src="{% static "js/react/vendor.js" %}"></script>
 
     <script type="text/javascript" src="{% static "js/export-csv.js" %}"></script>
-    {% flag "pray-and-pay" %}
     <script src="{% static "js/pray_and_pay.js" %}"></script>
-    {% endflag %}
 {% endblock %}
 
 {% block nav %}
@@ -88,9 +86,7 @@
     </h1>
     {% include "includes/notes_modal.html" %}
     {% include "includes/docket_alerts_modal.html" %}
-    {% flag "pray-and-pay" %}
-      {% include "includes/first_prayer_modal.html" %}
-    {% endflag %}
+    {% include "includes/first_prayer_modal.html" %}
 
     <h2>{{ docket.court }}</h2>
 
