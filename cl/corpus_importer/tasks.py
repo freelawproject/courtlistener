@@ -1938,6 +1938,33 @@ def get_bankr_claims_registry(
     return data
 
 
+def create_attachment_pq(
+    rd_pk: int,
+    user_pk: int,
+) -> ProcessingQueue:
+    """Create a ProcessingQueue instance for an attachment.
+
+    Note that the PQ returned hasn't been persisted in the database.
+    It must be saved in a subsequent step.
+
+    :param rd_pk: The pk of the RECAPDocument.
+    :param user_pk: The pk of the User uploading the attachment.
+    :return: A ProcessingQueue instance for the attachment upload.
+    """
+
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    user = User.objects.get(pk=user_pk)
+    pq = ProcessingQueue(
+        court_id=rd.docket_entry.docket.court_id,
+        pacer_doc_id=rd.pacer_doc_id,
+        uploader=user,
+        upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+        pacer_case_id=rd.docket_entry.docket.pacer_case_id,
+    )
+    return pq
+
+
+# TODO: Remove after the new related methods have been rolled out.
 @app.task(bind=True, ignore_result=True)
 def make_attachment_pq_object(
     self: Task,
@@ -1975,7 +2002,65 @@ def make_attachment_pq_object(
     pq.filepath_local.save(
         "attachment_page.html", ContentFile(att_report_text.encode())
     )
+    return pq.pk
 
+
+@app.task(bind=True, ignore_result=True)
+def save_attachment_pq_object(
+    self: Task,
+    attachment_report: AttachmentPage,
+    rd_pk: int,
+    user_pk: int,
+) -> int:
+    """Create an item in the processing queue for an attachment page.
+
+    This is a helper shim to convert attachment page results into processing
+    queue objects that can be processed by our standard pipeline.
+
+    :param self: The celery task
+    :param attachment_report: An AttachmentPage object that's already queried
+    a page and populated its data attribute.
+    :param rd_pk: The RECAP document that the attachment page is associated
+    with
+    :param user_pk: The user to associate with the ProcessingQueue object when
+    it's created.
+    :return: The pk of the ProcessingQueue object that's created.
+    """
+
+    pq = create_attachment_pq(
+        rd_pk,
+        user_pk,
+    )
+    att_report_text = attachment_report.response.text
+    pq.filepath_local.save(
+        "attachment_page.html", ContentFile(att_report_text.encode())
+    )
+    return pq.pk
+
+
+def save_attachment_pq_from_text(
+    rd_pk: int,
+    user_pk: int,
+    att_report_text: str,
+) -> int:
+    """Create an item in the processing queue for an attachment page from the
+    att report text.
+
+    :param rd_pk: The RECAP document that the attachment page is associated
+    with
+    :param user_pk: The user to associate with the ProcessingQueue object when
+    it's created.
+    :param att_report_text: The attachment page report text.
+    :return: The pk of the ProcessingQueue object that's created.
+    """
+
+    pq = create_attachment_pq(
+        rd_pk,
+        user_pk,
+    )
+    pq.filepath_local.save(
+        "attachment_page.html", ContentFile(att_report_text.encode())
+    )
     return pq.pk
 
 
