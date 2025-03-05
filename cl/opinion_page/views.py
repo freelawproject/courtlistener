@@ -386,10 +386,11 @@ async def view_docket(
     prayer_counts = await get_prayer_counts_in_bulk(recap_documents)
     existing_prayers = {}
 
-    if request.user.is_authenticated:
+    user = await request.auser()
+    if user.is_authenticated:
         # Check prayer existence in bulk.
         existing_prayers = await get_existing_prayers_in_bulk(
-            request.user, recap_documents
+            user, recap_documents
         )
 
     # Merge counts and existing prayer status to RECAPDocuments.
@@ -708,11 +709,10 @@ async def view_recap_document(
     prayer_counts = await get_prayer_counts_in_bulk([rd])
     existing_prayers = {}
 
-    if request.user.is_authenticated:
+    user = await request.auser()
+    if user.is_authenticated:
         # Check prayer existence.
-        existing_prayers = await get_existing_prayers_in_bulk(
-            request.user, [rd]
-        )
+        existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
 
     # Merge counts and existing prayer status to RECAPDocuments.
     rd.prayer_count = prayer_counts.get(rd.id, 0)
