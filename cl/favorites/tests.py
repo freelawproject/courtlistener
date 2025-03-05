@@ -806,6 +806,10 @@ class RECAPPrayAndPay(TestCase):
         self.rd_3.docket_entry.docket.view_count = 12
         self.rd_4.docket_entry.docket.view_count = 6
 
+        self.rd_2.docket_entry.docket.save()
+        self.rd_3.docket_entry.docket.save()
+        self.rd_4.docket_entry.docket.save()
+
         await create_prayer(self.user, self.rd_4)
         await create_prayer(self.user, self.rd_2)
         await create_prayer(self.user_2, self.rd_3)
@@ -828,6 +832,11 @@ class RECAPPrayAndPay(TestCase):
         self.rd_3.docket_entry.docket.view_count = 1
         self.rd_4.docket_entry.docket.view_count = 6
         self.rd_5.docket_entry.docket.view_count = 8
+
+        self.rd_2.docket_entry.docket.save()
+        self.rd_3.docket_entry.docket.save()
+        self.rd_4.docket_entry.docket.save()
+        self.rd_5.docket_entry.docket.save()
 
         # Create prayers with different counts and views
 
