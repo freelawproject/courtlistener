@@ -798,35 +798,27 @@ class RECAPPrayAndPay(TestCase):
             msg="Wrong top_prayers based on prayers count.",
         )
 
-    async def test_get_top_prayers_by_age(self) -> None:
+    async def test_get_top_prayers_by_views(self) -> None:
         """Does the get_top_prayers method work properly?"""
 
-        # Test top documents based on prayer age.
-        current_time = now()
-        with time_machine.travel(
-            current_time - timedelta(minutes=1), tick=False
-        ):
-            await create_prayer(self.user, self.rd_4)
+        # Test top documents based on docket views.
+        self.rd_2.docket_entry.docket.view_count = 4
+        self.rd_3.docket_entry.docket.view_count = 12
+        self.rd_4.docket_entry.docket.view_count = 6
 
-        with time_machine.travel(
-            current_time - timedelta(minutes=2), tick=False
-        ):
-            await create_prayer(self.user, self.rd_2)
-
-        with time_machine.travel(
-            current_time - timedelta(minutes=3), tick=False
-        ):
-            await create_prayer(self.user_2, self.rd_3)
+        await create_prayer(self.user, self.rd_4)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_3)
 
         top_prayers = await get_top_prayers()
         self.assertEqual(await top_prayers.acount(), 3)
-        expected_top_prayers = [self.rd_3.pk, self.rd_2.pk, self.rd_4.pk]
+        expected_top_prayers = [self.rd_3.pk, self.rd_4.pk, self.rd_2.pk]
         actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
 
         self.assertEqual(
             actual_top_prayers,
             expected_top_prayers,
-            msg="Wrong top_prayers based on prayers age.",
+            msg="Wrong top_prayers based on docket view count.",
         )
 
     async def test_get_top_prayers_by_number_and_age(self) -> None:
