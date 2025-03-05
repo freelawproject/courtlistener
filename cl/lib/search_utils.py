@@ -473,6 +473,7 @@ def do_es_search(
     rows: int = settings.SEARCH_PAGE_SIZE,
     facet: bool = True,
     cache_key: str | None = None,
+    is_csv_export: bool = False,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -483,6 +484,8 @@ def do_es_search(
     does not do anything clever with the actual query, so if you use this, your
     cache key should *already* have factored in the query. If None, no caching
     is set or used. Results are saved for six hours.
+    :param is_csv_export: Indicates if the data being processed is intended for
+    an export process.
     :return: A big dict of variables for use in the search results, homepage, or
     other location.
     """
@@ -513,7 +516,9 @@ def do_es_search(
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             document_type = DocketDocument
             # Set a different number of results per page for RECAP SEARCH
-            rows = settings.RECAP_SEARCH_PAGE_SIZE
+            rows = (
+                settings.RECAP_SEARCH_PAGE_SIZE if not is_csv_export else rows
+            )
         case SEARCH_TYPES.OPINION:
             document_type = OpinionClusterDocument
 
@@ -708,46 +713,33 @@ def fetch_es_results_for_csv(
         search result.
     """
     csv_rows: list[dict[str, Any]] = []
-    while len(csv_rows) <= settings.MAX_SEARCH_RESULTS_EXPORTED:
-        search = do_es_search(
-            queryset, rows=settings.MAX_SEARCH_RESULTS_EXPORTED
-        )
-        if search["error"]:
-            return csv_rows
 
-        results = search["results"]
-        match search_type:
-            case (
-                SEARCH_TYPES.OPINION
-                | SEARCH_TYPES.RECAP
-                | SEARCH_TYPES.DOCKETS
-            ):
-                flat_results = []
-                for result in results.object_list:
-                    parent_dict = result.to_dict(skip_empty=False)
-                    child_docs = parent_dict.get("child_docs")
-                    if child_docs:
-                        flat_results.extend(
-                            [
-                                doc["_source"].to_dict() | parent_dict
-                                for doc in child_docs
-                            ]
-                        )
-                    else:
-                        flat_results.extend([parent_dict])
-            case _:
-                flat_results = [
-                    result.to_dict(skip_empty=False)
-                    for result in results.object_list
-                ]
+    search = do_es_search(
+        queryset, rows=settings.MAX_SEARCH_RESULTS_EXPORTED, is_csv_export=True
+    )
+    if search["error"]:
+        return csv_rows
 
-        csv_rows.extend(flat_results)
+    results = search["results"]
+    match search_type:
+        case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            flat_results = []
+            for result in results.object_list:
+                parent_dict = result.to_dict(skip_empty=False)
+                child_docs = parent_dict.get("child_docs")
+                if child_docs:
+                    flat_results.extend(
+                        [
+                            doc["_source"].to_dict() | parent_dict
+                            for doc in child_docs
+                        ]
+                    )
+                else:
+                    flat_results.extend([parent_dict])
+        case _:
+            flat_results = [
+                result.to_dict(skip_empty=False)
+                for result in results.object_list
+            ]
 
-        if not results.has_next():
-            if len(csv_rows) <= settings.MAX_SEARCH_RESULTS_EXPORTED:
-                return csv_rows
-            break
-
-        queryset["page"] = results.next_page_number()
-
-    return csv_rows[: settings.MAX_SEARCH_RESULTS_EXPORTED]
+    return flat_results[: settings.MAX_SEARCH_RESULTS_EXPORTED]
