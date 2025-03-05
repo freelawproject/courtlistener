@@ -1953,9 +1953,9 @@ def merge_unavailable_fields_on_parent_document(
                     value = position_dict.get(person_id)
                     cleaned_name = re.sub("_dict", "", field.name)
                     result[cleaned_name] = value
-        case (
-            SEARCH_TYPES.RECAP | SEARCH_TYPES.RECAP_DOCUMENT
-        ) if request_type == "v4" and not highlight:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.RECAP_DOCUMENT if (
+            request_type == "v4" and not highlight
+        ):
             # Retrieves the plain_text from the DB to fill the snippet when
             # highlighting is disabled.
 
@@ -1991,9 +1991,9 @@ def merge_unavailable_fields_on_parent_document(
                         result["id"], ""
                     )
 
-        case (
-            SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
-        ) if request_type == "frontend":
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if (
+            request_type == "frontend"
+        ):
             # Merge initial document button to the frontend search results.
             docket_ids = {doc["docket_id"] for doc in results}
             # This query retrieves initial documents considering two
@@ -2140,9 +2140,9 @@ def merge_unavailable_fields_on_parent_document(
                             opinion_docs_dict.get(op["_source"]["id"], "")
                         )
                     )
-        case (
-            SEARCH_TYPES.ORAL_ARGUMENT
-        ) if request_type == "v4" and not highlight:
+        case SEARCH_TYPES.ORAL_ARGUMENT if (
+            request_type == "v4" and not highlight
+        ):
             # Retrieves the Audio transcript from the DB to fill the snippet
             # when highlighting is disabled.
 

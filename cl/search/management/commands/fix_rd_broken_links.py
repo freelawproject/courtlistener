@@ -27,12 +27,14 @@ from cl.search.tasks import index_parent_and_child_docs
 def get_docket_events_and_slug_count(
     cut_off_date: datetime,
     pk_offset: int,
+    docket_ids: list[int] | None,
 ) -> QuerySet:
     """Retrieve docket events that need verification for broken links and their
      slug count.
 
     :param cut_off_date: The cutoff date for filtering docket events.
     :param pk_offset: The minimum Docket ID value to consider for auto-resume.
+    :param docket_ids: Optional, the Docket IDs to consider.
     :return: A queryset of docket events annotated with their slug count,
     the current slug from the Docket table, and the latest slug in the
     DocketEvent table.
@@ -43,13 +45,18 @@ def get_docket_events_and_slug_count(
         docket=OuterRef("id")
     ).values("id")[:1]
 
+    docket_queryset = Docket.objects.filter(
+        pk__gte=pk_offset,
+        date_modified__gte=cut_off_date,
+        source__in=Docket.RECAP_SOURCES(),
+    )
+    if docket_ids is not None:
+        docket_queryset = docket_queryset.filter(pk__in=docket_ids)
+
     docket_ids_subquery = (
-        Docket.objects.filter(
-            pk__gte=pk_offset,
-            date_modified__gte=cut_off_date,
-            source__in=Docket.RECAP_SOURCES(),
+        docket_queryset.annotate(
+            has_entries=Exists(docket_has_entries_subquery)
         )
-        .annotate(has_entries=Exists(docket_has_entries_subquery))
         .filter(has_entries=True)
         .values_list("id", flat=True)
     )
@@ -71,6 +78,7 @@ def get_docket_events_and_slug_count(
 def get_dockets_to_fix(
     cut_off_date: datetime,
     pk_offset: int,
+    docket_ids: list[int] | None,
 ) -> QuerySet:
     """Retrieve dockets that require fixing due to broken links by filtering
     docket events based on their slug count to identify cases where the slugs
@@ -78,11 +86,12 @@ def get_dockets_to_fix(
 
     :param cut_off_date: The cutoff date for filtering docket events.
     :param pk_offset: The minimum ID value to consider.
+    :param docket_ids: Optional, the Docket IDs to consider.
     :return: A queryset of docket events that need to be fixed.
     """
 
     docket_events_and_slug_count = get_docket_events_and_slug_count(
-        cut_off_date, pk_offset
+        cut_off_date, pk_offset, docket_ids
     )
 
     # If the slug count is greater than 1, it indicates that the slug has changed,
@@ -116,6 +125,7 @@ class Command(VerboseCommand):
         self.queue = None
         self.chunk_size = None
         self.interval = None
+        self.ids = None
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -156,6 +166,13 @@ class Command(VerboseCommand):
             default=0.5,
             help="Wait before scheduling a new chunk, in seconds.",
         )
+        parser.add_argument(
+            "--id",
+            dest="ids",
+            nargs="+",
+            help="Docket IDs to consider.",
+            required=False,
+        )
 
     def get_and_fix_dockets(self, cut_off_date: datetime) -> int:
         """Get the dockets with broken RECAPDocument links and fix them by
@@ -168,7 +185,7 @@ class Command(VerboseCommand):
         chunk = []
         affected_dockets = 0
         dockets_to_fix_queryset = get_dockets_to_fix(
-            cut_off_date, self.pk_offset
+            cut_off_date, self.pk_offset, self.ids
         )
         count = dockets_to_fix_queryset.count()
         for docket_to_fix in dockets_to_fix_queryset.iterator():
@@ -212,6 +229,7 @@ class Command(VerboseCommand):
         self.chunk_size = self.options["chunk_size"]
         self.throttle = CeleryThrottle(queue_name=self.queue)
         self.interval = self.options["interval"]
+        self.ids = options.get("ids")
         auto_resume = options["auto_resume"]
         if auto_resume:
             self.pk_offset = get_last_parent_document_id_processed(
