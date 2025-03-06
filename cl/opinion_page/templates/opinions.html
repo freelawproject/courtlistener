@@ -320,7 +320,7 @@
                 {% endif %}
                 {% if related_cases_count > 0  %}
                     <li role="presentation" {% if tab == "related-cases" %} class="active" {% endif %}>
-                        <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;Cases</a>
+                        <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Similar&nbsp;Cases</a>
                     </li>
                 {% endif %}
                 {% if has_downloads and "pdf" in pdf_path or cluster.filepath_pdf_harvard %}
