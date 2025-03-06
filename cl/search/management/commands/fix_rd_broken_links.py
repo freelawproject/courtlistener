@@ -187,7 +187,9 @@ class Command(VerboseCommand):
             required=False,
         )
 
-    def _process_docket_id_batch(self, batch_ids: list[int]) -> int:
+    def _process_docket_id_batch(
+        self, batch_number: int, batch_ids: list[int]
+    ) -> int:
         """Process a batch of docket IDs with broken RECAPDocument links and
         fix their RDs by re-indexing.
         :param batch_ids: A batch list of docket IDs.
@@ -225,7 +227,8 @@ class Command(VerboseCommand):
 
                 chunk = []
                 logger.info(
-                    "Processed in batch %d/%d (%.0f%%), last PK fixed: %s",
+                    "Processed RDs in batch %s: %d/%d (%.0f%%), last PK fixed: %s",
+                    batch_number,
                     affected_rds,
                     count,
                     (affected_rds * 100.0) / count,
@@ -262,7 +265,9 @@ class Command(VerboseCommand):
                     batch_number,
                     len(batch_ids),
                 )
-                all_affected_rds += self._process_docket_id_batch(batch_ids)
+                all_affected_rds += self._process_docket_id_batch(
+                    batch_number, batch_ids
+                )
                 batch_ids = []
 
             if not affected_dockets % 1000:
@@ -277,7 +282,9 @@ class Command(VerboseCommand):
                 batch_number,
                 len(batch_ids),
             )
-            all_affected_rds += self._process_docket_id_batch(batch_ids)
+            all_affected_rds += self._process_docket_id_batch(
+                batch_number, batch_ids
+            )
 
         return all_affected_rds
 
