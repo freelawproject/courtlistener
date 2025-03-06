@@ -8269,7 +8269,7 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             cut_off_date, pk_offset=0, docket_ids=None
         )
         self.assertEqual(2, dockets_to_fix.count())
-        dockets_to_fix = set(docket["pgh_obj_id"] for docket in dockets_to_fix)
+        dockets_to_fix = set(docket_id for docket_id in dockets_to_fix)
         self.assertEqual({self.docket_2.pk, self.docket_3.pk}, dockets_to_fix)
 
     @mock.patch("cl.search.management.commands.fix_rd_broken_links.logger")
@@ -8301,7 +8301,7 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             testing_mode=True,
         )
         mock_logger.info.assert_any_call(
-            "Processing chunk: %s", [self.docket_2.pk]
+            "Processing chunk: %s", [self.rd_2.pk]
         )
         # Confirm rd_2 absolute_url is fixed after the command runs
         es_rd_2 = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_2.pk).RECAP)

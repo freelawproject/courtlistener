@@ -166,15 +166,12 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
 async def get_user_prayers(
     user: User, status: str | None = None
 ) -> QuerySet[RECAPDocument]:
-    user_prayers = Prayer.objects.filter(user=user)
-
+    filters = {"prayers__user": user}
     if status is not None:
-        user_prayers = user_prayers.filter(status=status)
-
-    user_prayer_ids = user_prayers.values("recap_document_id")
+        filters["prayers__status"] = status
 
     documents = (
-        RECAPDocument.objects.filter(id__in=Subquery(user_prayer_ids))
+        RECAPDocument.objects.filter(**filters)
         .select_related(
             "docket_entry",
             "docket_entry__docket",
@@ -238,7 +235,7 @@ async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
                         F("recap_document__page_count") * Value(0.10),
                     ),
                 ),
-                default=Value(0.0),
+                default=Value(0.10),
             )
         )
         .aaggregate(Sum("price", default=0.0))
@@ -362,7 +359,7 @@ async def get_lifetime_prayer_stats(
         "distinct_count": distinct_prayers,
         "total_cost": f"{total_cost:,.2f}",
     }
-    one_day = 60 * 60 * 24
-    await cache.aset(cache_key, data, one_day)
+    one_minute = 60
+    await cache.aset(cache_key, data, one_minute)
 
     return PrayerStats(**data)

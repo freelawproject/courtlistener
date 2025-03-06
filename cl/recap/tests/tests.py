@@ -14,6 +14,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission, User
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
@@ -2113,8 +2114,19 @@ class ReplicateRecapUploadsTest(TestCase):
         "cl.recap.tasks.get_pacer_cookie_from_cache",
         side_effect=lambda x: True,
     )
-    def test_avoid_appellate_replication_for_subdocket_attachment_page_fq(
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
+            MockResponse(
+                200,
+                b"pdf content",
+            ),
+            "OK",
+        ),
+    )
+    def test_avoid_appellate_replication_for_subdocket_attachment_page_and_pdf_fq(
         self,
+        mock_download_pacer_pdf_by_rd,
         mock_get_pacer_cookie_from_cache,
         mock_is_pacer_court_accessible,
         mock_get_att_report_by_rd,
@@ -2136,6 +2148,7 @@ class ReplicateRecapUploadsTest(TestCase):
         d_2_recap_document = RECAPDocument.objects.filter(
             docket_entry__docket=self.d_2_a
         )
+        main_d_1_rd = d_1_recap_document[0]
         main_d_2_rd = d_2_recap_document[0]
 
         # Create FQ.
@@ -2186,6 +2199,29 @@ class ReplicateRecapUploadsTest(TestCase):
         # 1 PacerHtmlFiles should have been created for the FQ request.
         att_html_created = PacerHtmlFiles.objects.all()
         self.assertEqual(att_html_created.count(), 1)
+
+        # Avoid appellate PDF replication to subdockets.
+        pdf_fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=main_d_2_rd.pk,
+        )
+        do_pacer_fetch(pdf_fq)
+        main_d_1_rd.refresh_from_db()
+        main_d_2_rd.refresh_from_db()
+
+        self.assertTrue(
+            main_d_2_rd.is_available,
+            msg="is_available value doesn't match",
+        )
+        self.assertFalse(
+            main_d_1_rd.is_available,
+            msg="is_available value doesn't match",
+        )
+        # No additional PQs created.
+        self.assertEqual(
+            pqs_created.count(), 0, msg="Wrong number of PQs created."
+        )
 
     @mock.patch(
         "cl.recap.tasks.is_pacer_court_accessible",
@@ -2303,6 +2339,62 @@ class ReplicateRecapUploadsTest(TestCase):
         )
         # Confirm that the 3 PDFs have been extracted.
         self.assertEqual(mock_extract.call_count, 3)
+
+    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    def test_avoid_replication_on_pdf_available(self, mock_extract):
+        """Confirm that replication for RDs where the PDF is already available is omitted"""
+        # Add the docket entry to every case.
+        async_to_sync(add_docket_entries)(
+            self.d_1, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_2, self.de_data_2["docket_entries"]
+        )
+
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )
+
+        main_d_1_rd = d_1_recap_document[0]
+        main_d_1_rd.is_available = True
+        main_d_1_rd.filepath_local = SimpleUploadedFile(
+            "file.txt", b"file content more content"
+        )
+        main_d_1_rd.save()
+
+        main_d_2_rd = d_2_recap_document[0]
+        self.assertTrue(main_d_1_rd.is_available)
+        self.assertFalse(main_d_2_rd.is_available)
+
+        # Create an initial PQ.
+        pq = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id="104491",
+            pacer_doc_id="04505578697",
+            document_number=1,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+        )
+        # Process the PDF upload.
+        async_to_sync(process_recap_upload)(pq)
+
+        main_d_1_rd.refresh_from_db()
+        main_d_2_rd.refresh_from_db()
+
+        self.assertTrue(main_d_1_rd.filepath_local)
+        self.assertTrue(main_d_2_rd.filepath_local)
+
+        # Assert the number of PQs created to process the additional subdocket RDs.
+        pqs_created = ProcessingQueue.objects.all()
+        self.assertEqual(
+            pqs_created.count(),
+            1,
+            msg="The number of PQs doesn't match.",
+        )
 
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
@@ -7776,6 +7868,34 @@ class LookupDocketsTest(TestCase):
         self.assertEqual(
             d_1.pacer_case_id, self.docket_data_appellate["pacer_case_id"]
         )
+
+    def test_avoid_lookup_by_blank_docket_number_core(self):
+        """Can we Avoid doing lookups with blank docket_number_core?"""
+        d = DocketFactory(
+            case_name="Young v. State",
+            docket_number="88-8330",
+            docket_number_core="",
+            pacer_case_id="",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+        )
+        d.refresh_from_db()
+        docket_no_number_core = RECAPEmailDocketDataFactory(
+            case_name="Barton v. State",
+            docket_number="",
+        )
+        new_d = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            "12457",
+            docket_no_number_core["docket_number"],
+            None,
+            None,
+            None,
+        )
+        with self.assertRaises(ValidationError):
+            # RECAP dockets must require a docket_number.
+            async_to_sync(update_docket_metadata)(new_d, docket_no_number_core)
+            new_d.save()
 
 
 class CleanUpDuplicateAppellateEntries(TestCase):
