@@ -1224,3 +1224,17 @@ def is_long_appellate_document_number(
     :return: A boolean indicating whether this is a long appellate document number.
     """
     return isinstance(document_number, str) and len(document_number) >= 9
+
+
+def get_iquery_pacer_courts_to_scrape() -> list[str]:
+    """Retrieve all district and bankruptcy PACER courts for the iquery scraper.
+
+    :return: A list of Court IDs.
+    """
+    return list(
+        Court.federal_courts.district_or_bankruptcy_pacer_courts()
+        .exclude(
+            in_use=False,
+        )
+        .values_list("pk", flat=True)
+    )
