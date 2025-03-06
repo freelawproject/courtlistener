@@ -5435,14 +5435,14 @@ files = [
 
 [[package]]
 name = "types-simplejson"
-version = "3.19.0.20240801"
+version = "3.20.0.20250218"
 description = "Typing stubs for simplejson"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "types-simplejson-3.19.0.20240801.tar.gz", hash = "sha256:ef90cc81dd915f26c452fa2b5e0cbd3a36af81074ae63878fcf8a477e7594e4d"},
-    {file = "types_simplejson-3.19.0.20240801-py3-none-any.whl", hash = "sha256:37f1b33c8626d7f072ea87737629310674845d54d187f12387fe33d31c938288"},
+    {file = "types_simplejson-3.20.0.20250218-py3-none-any.whl", hash = "sha256:dbe00ea8497f8ba2f91dd9654d7064613cc09df545e5a008e8240fc6a407e98f"},
+    {file = "types_simplejson-3.20.0.20250218.tar.gz", hash = "sha256:5c5c46f67690f211d628d5182546b43ea9ff03936efd759549ac1795b213e3e7"},
 ]
 
 [[package]]
@@ -5958,4 +5958,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13, <3.14"
-content-hash = "3a0fba04aa144d49b9bc7c2cc8f34b21cb934eb543e46686ce67c625bb847b86"
+content-hash = "8d7135c4daeffd6827653708167d67384a4118ea2ea001b1b28e8f009d5cf504"
