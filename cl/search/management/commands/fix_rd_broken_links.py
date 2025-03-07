@@ -20,8 +20,14 @@ from cl.lib.indexing_utils import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry, DocketEvent
-from cl.search.tasks import index_parent_and_child_docs
+from cl.search.models import (
+    SEARCH_TYPES,
+    Docket,
+    DocketEntry,
+    DocketEvent,
+    RECAPDocument,
+)
+from cl.search.tasks import index_parent_or_child_docs_in_es
 
 
 def get_docket_events_and_slug_count(
@@ -103,7 +109,7 @@ def get_dockets_to_fix(
     return docket_events_and_slug_count.filter(
         Q(slug_count__gt=1)
         | (Q(slug_count=1) & ~Q(event_table_slug=F("docket_table_slug")))
-    )
+    ).values_list("pgh_obj_id", flat=True)
 
 
 def compose_redis_key() -> str:
@@ -126,6 +132,7 @@ class Command(VerboseCommand):
         self.chunk_size = None
         self.interval = None
         self.ids = None
+        self.docket_batch_size = None
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -139,6 +146,12 @@ class Command(VerboseCommand):
             type=int,
             default="100",
             help="The number of items to index in a single celery task.",
+        )
+        parser.add_argument(
+            "--docket-batch-size",
+            type=int,
+            default="2000",
+            help="The number of docket_ids to process per batch.",
         )
         parser.add_argument(
             "--auto-resume",
@@ -174,31 +187,37 @@ class Command(VerboseCommand):
             required=False,
         )
 
-    def get_and_fix_dockets(self, cut_off_date: datetime) -> int:
-        """Get the dockets with broken RECAPDocument links and fix them by
-        re-indexing the affected dockets and their RDs.
-
-        :param cut_off_date: The cutoff date to filter docket events.
-        :return: The number of dockets affected.
+    def _process_docket_id_batch(
+        self, batch_number: int, batch_ids: list[int]
+    ) -> int:
+        """Process a batch of docket IDs with broken RECAPDocument links and
+        fix their RDs by re-indexing.
+        :param batch_ids: A batch list of docket IDs.
+        :return: The number of RECAP documents processed for this batch.
         """
 
+        affected_rds = 0
         chunk = []
-        affected_dockets = 0
-        dockets_to_fix_queryset = get_dockets_to_fix(
-            cut_off_date, self.pk_offset, self.ids
+        rd_queryset = (
+            RECAPDocument.objects.filter(docket_entry__docket_id__in=batch_ids)
+            .order_by("pk")
+            .values_list("pk", flat=True)
         )
-        count = dockets_to_fix_queryset.count()
-        for docket_to_fix in dockets_to_fix_queryset.iterator():
-            docket_id = docket_to_fix["pgh_obj_id"]
-            chunk.append(docket_id)
-            affected_dockets += 1
-            last_item = count == affected_dockets
-            if affected_dockets % self.chunk_size == 0 or last_item:
+        logger.info(
+            "Getting the count of recap documents that need to be fixed in this batch."
+        )
+        count = rd_queryset.count()
+        for rd_id_to_fix in rd_queryset.iterator():
+            chunk.append(rd_id_to_fix)
+            affected_rds += 1
+            last_item = count == affected_rds
+            if affected_rds % self.chunk_size == 0 or last_item:
                 self.throttle.maybe_wait()
-                index_parent_and_child_docs.si(
+                index_parent_or_child_docs_in_es.si(
                     chunk,
                     SEARCH_TYPES.RECAP,
-                    testing_mode=self.testing_mode,
+                    "child",
+                    use_streaming_bulk=True,
                 ).set(queue=self.queue).apply_async()
                 if self.testing_mode:
                     logger.info("Processing chunk: %s", chunk)
@@ -208,18 +227,66 @@ class Command(VerboseCommand):
 
                 chunk = []
                 logger.info(
-                    "Processed %d/%d (%.0f%%), last PK fixed: %s",
-                    affected_dockets,
+                    "Processed RDs in batch %s: %d/%d (%.0f%%), last PK fixed: %s",
+                    batch_number,
+                    affected_rds,
                     count,
-                    (affected_dockets * 100.0) / count,
-                    docket_id,
+                    (affected_rds * 100.0) / count,
+                    rd_id_to_fix,
                 )
 
-                if not affected_dockets % 1000:
-                    # Log every 1000 documents processed.
-                    log_last_document_indexed(docket_id, compose_redis_key())
-
         return count
+
+    def get_and_fix_rds(self, cut_off_date: datetime) -> int:
+        """Get the dockets with broken RECAPDocument links and process them in
+        batches of docket IDs.
+
+        :param cut_off_date: The cutoff date to filter docket events.
+        :return: The total number of RECAP documents affected.
+        """
+
+        all_affected_rds = 0
+        docket_ids_queryset = get_dockets_to_fix(
+            cut_off_date, self.pk_offset, self.ids
+        )
+
+        batch_ids = []
+        batch_number = 0
+        affected_dockets = 0
+        for docket_id in docket_ids_queryset.iterator(
+            chunk_size=self.docket_batch_size
+        ):
+            batch_ids.append(docket_id)
+            affected_dockets += 1
+            if len(batch_ids) >= self.docket_batch_size:
+                batch_number += 1
+                logger.info(
+                    "Processing docket_ids batch %d with %d IDs",
+                    batch_number,
+                    len(batch_ids),
+                )
+                all_affected_rds += self._process_docket_id_batch(
+                    batch_number, batch_ids
+                )
+                batch_ids = []
+
+            if not affected_dockets % 1000:
+                # Log every 1000 documents processed.
+                log_last_document_indexed(docket_id, compose_redis_key())
+
+        # Process any remaining docket_ids in the final chunk.
+        if batch_ids:
+            batch_number += 1
+            logger.info(
+                "Processing final docket_ids batch %d with %d IDs",
+                batch_number,
+                len(batch_ids),
+            )
+            all_affected_rds += self._process_docket_id_batch(
+                batch_number, batch_ids
+            )
+
+        return all_affected_rds
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -230,6 +297,7 @@ class Command(VerboseCommand):
         self.throttle = CeleryThrottle(queue_name=self.queue)
         self.interval = self.options["interval"]
         self.ids = options.get("ids")
+        self.docket_batch_size = options.get("docket_batch_size")
         auto_resume = options["auto_resume"]
         if auto_resume:
             self.pk_offset = get_last_parent_document_id_processed(
@@ -239,7 +307,7 @@ class Command(VerboseCommand):
                 f"Auto-resume enabled starting indexing from ID: {self.pk_offset}."
             )
         start_date: datetime = options["start_date"]
-        affected_dockets = self.get_and_fix_dockets(start_date)
+        affected_dockets = self.get_and_fix_rds(start_date)
         logger.info(
             "Successfully fixed %d items from pk %s.",
             affected_dockets,

@@ -29,6 +29,7 @@ from cl.favorites.utils import (
     get_prayer_counts_in_bulk,
     get_top_prayers,
     get_user_prayer_history,
+    get_user_prayers,
     prayer_eligible,
 )
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
@@ -888,6 +889,34 @@ class RECAPPrayAndPay(TestCase):
         self.assertAlmostEqual(
             top_prayers[3].geometric_mean, rd_3_score, places=2
         )
+
+    async def test_get_user_prayers(self) -> None:
+        """Does the get_user_prayer method work properly?"""
+        # Create prayers for user and user_2 to establish test data.
+        prayer_rd_2 = await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+        await create_prayer(self.user, self.rd_3)
+
+        user_prayers = await get_user_prayers(user=self.user)
+        user_2_prayers = await get_user_prayers(user=self.user_2)
+
+        # Verify the correct number of prayers are returned for each user
+        self.assertEqual(
+            await user_prayers.acount(), 2, "User 1 should have 2 prayers."
+        )
+        self.assertEqual(
+            await user_2_prayers.acount(), 1, "User 2 should have 1 prayer."
+        )
+
+        # Update the status of one of user's prayers to 'GRANTED'.
+        prayer_rd_2.status = Prayer.GRANTED
+        await prayer_rd_2.asave()
+
+        # Verify only the 'GRANTED' prayer is returned.
+        user_granted_prayers = await get_user_prayers(
+            user=self.user, status=Prayer.GRANTED
+        )
+        self.assertEqual(await user_granted_prayers.acount(), 1)
 
     async def test_get_user_prayer_history(self) -> None:
         """Does the get_user_prayer_history method work properly?"""
