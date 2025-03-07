@@ -310,7 +310,7 @@
                 {% endif %}
                 {% if cited_by_count > 0 %}
                     <li role="presentation" {% if tab == "cited-by" %} class="active" {% endif %}>
-                        <a href="{% url "view_case_cited_by" cluster.pk cluster.slug %}">Cited&nbsp;By&nbsp;({{ cited_by_count }})</a>
+                        <a href="{% url "view_case_cited_by" cluster.pk cluster.slug %}">Cited&nbsp;By&nbsp;({{ cited_by_count|intcomma }})</a>
                     </li>
                 {% endif %}
                 {% if summaries_count > 0 %}

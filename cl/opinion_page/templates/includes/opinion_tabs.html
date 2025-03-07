@@ -117,14 +117,17 @@
 {% elif tab == "cited-by" %}
     {# Cited By #}
     <div class="tab-pane fade in active" id="cited-by">
-        <h2 class="opinion-section-title jump-link">
-            <span>
-                Cited By ({{ citing_cluster_count|intcomma }})
-                <a href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})" rel="nofollow">
-                    <i class="gray fa fa-rss" title="Subscribe to a feed of citations to this case."></i>
-                </a>
-            </span>
-        </h2>
+        <div class="row">
+            <div class="col-xs-6">
+                <h2 class="opinion-section-title jump-link">Cited By ({{ citing_cluster_count|intcomma }})</h2>
+            </div>
+            <div class="col-xs-6 text-right">
+                <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+             rel="nofollow"
+             class="btn btn-default opinion-section-title"
+          >View Citing Opinions</a>
+            </div>
+        </div>
         <hr class="hr-opinion">
 
         {% if citing_cluster_count > 0 %}
@@ -161,14 +164,6 @@
         {% else %}
             <h3>This case has not yet been cited in our system.</h3>
         {% endif %}
-
-        <br>
-        <p>
-          <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
-             rel="nofollow"
-             class="btn btn-default"
-          >View Citing Opinions</a>
-        </p>
     </div>
 
 {% elif tab == "related-cases" %}
