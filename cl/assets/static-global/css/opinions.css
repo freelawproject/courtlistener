@@ -682,6 +682,10 @@ div.footnote:first-of-type {
     margin-top: 50px;
   }
 
+  .mt-17 {
+    margin-top:17px;
+  }
+
   /*Add style to align roman numerals */
   .center-header {
     text-align: center;

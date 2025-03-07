@@ -117,15 +117,15 @@
 {% elif tab == "cited-by" %}
     {# Cited By #}
     <div class="tab-pane fade in active" id="cited-by">
-        <div class="row">
-            <div class="col-xs-6">
-                <h2 class="opinion-section-title jump-link">Cited By ({{ citing_cluster_count|intcomma }})</h2>
+        <div class="row opinion-section-title">
+            <div class="col-xs-12 col-sm-8">
+                <h2 class="jump-link">This case was cited by {{ citing_cluster_count|intcomma }} other&nbsp;decision{{ citing_cluster_count|pluralize }}</h2>
             </div>
-            <div class="col-xs-6 text-right">
+            <div class="col-xs-12 col-sm-4 mt-17 text-right">
                 <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
              rel="nofollow"
-             class="btn btn-default opinion-section-title"
-          >View Citing Opinions</a>
+             class="btn btn-default"
+          >View All Citing Opinions</a>
             </div>
         </div>
         <hr class="hr-opinion">
