@@ -54,7 +54,9 @@ async def create_prayer(
         )
         if created:
             if not fetch_prayer_availability.delay(recap_document.pk):
-                prayer_unavailable(recap_document) # is it possible to make this function async to avoid delays?
+                prayer_unavailable(
+                    recap_document
+                )  # is it possible to make this function async to avoid delays?
             return new_prayer
         else:
             return None
