@@ -3450,7 +3450,7 @@ def fetch_prayer_availability(self, pk: int) -> bool:
     :param pk: The primary key of the RECAPDocument of interest
     :return: bool that indicates whether document is available
     """
-    # should this function incorporate is_pacer_doc_sealed to avoid doing essentially the same thing in another part of the codebase? 
+    # should this function incorporate is_pacer_doc_sealed to avoid doing essentially the same thing in another part of the codebase?
     rd = RECAPDocument.objects.get(pk=pk)
 
     court_id = rd.docket_entry.docket.court.pk
