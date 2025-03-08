@@ -204,12 +204,12 @@
               <div class="flex justify-content-between top-row">
                 <span class="case-date-new">{{ cluster.date_filed }}</span>
                 <div class="action-buttons">
-                  <div id="get-citation-btn-group" class="btn-group hidden-print">
+                  <div class="btn-group hidden-print">
                     <a id="get-citation-alerts" href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
                       rel="nofollow"
-                      class="btn"
+                      class="btn btn-default"
                     ><i class="fa fa-bell-o"></i><span class="hidden-xs">Get Citation Alerts</span></a>
-                    <a class="btn dropdown-toggle"
+                    <a class="btn btn-default dropdown-toggle"
                       data-toggle="dropdown"
                       aria-haspopup="true"
                       aria-expanded="false">
