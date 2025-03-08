@@ -63,7 +63,6 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.favorites.models import Prayer
-from cl.favorites.utils import prayer_unavailable
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
@@ -3442,12 +3441,14 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     ignore_result=True,
 )
 @transaction.atomic
-def fetch_prayer_info(self, pk: int) -> None:
-    """Processes a recap.email when it comes in, fetches the free document and
-    triggers docket alerts and webhooks.
+def fetch_prayer_availability(self, pk: int) -> bool:
+    """Determines whether a RECAPDocument requested as part of the
+    pray-and-pay project is available for purchase or sealed/text-only.
+    If available, it updates the page_count of the rd. If unavailable,
+    it marks as sealed (if appropriate).
 
     :param pk: The primary key of the RECAPDocument of interest
-    :return: None
+    :return: bool that indicates whether document is available
     """
     # should this function incorporate is_pacer_doc_sealed to avoid doing essentially the same thing in another part of the codebase? 
     rd = RECAPDocument.objects.get(pk=pk)
@@ -3456,8 +3457,7 @@ def fetch_prayer_info(self, pk: int) -> None:
     pacer_doc_id = rd.pacer_doc_id
 
     if pacer_doc_id == "":
-        prayer_unavailable(rd)
-        return
+        return False
 
     recap_user = User.objects.get(username="recap")
     session_data = get_or_cache_pacer_cookies(
@@ -3473,13 +3473,11 @@ def fetch_prayer_info(self, pk: int) -> None:
         rd.is_sealed = True
         rd.save()
 
-        prayer_unavailable(rd)
-
-        return
+        return False
 
     # Document is available, so get cost to calculate page length, but billable_pages is ambiguous if there are exactly 30 pages
     if data.billable_pages != 30:
         rd.page_count = data.billable_pages
         rd.save()
 
-    return
+    return True
