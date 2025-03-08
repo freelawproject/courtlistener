@@ -3432,6 +3432,7 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
         extract_recap_pdf.s(),
     ).apply_async()
 
+
 @app.task(
     bind=True,
     autoretry_for=(RedisConnectionError, PacerLoginException),
@@ -3464,16 +3465,16 @@ def fetch_prayer_info(self, pk: int) -> None:
     receipt_report.query(pacer_doc_id)
     data = receipt_report.data
     if data == {}:
-        rd.is_sealed = True    
+        rd.is_sealed = True
         rd.save()
 
         prayer_unavailable(rd)
 
         return
-    
+
     # Document is available, so get cost to calculate page length, but billable_pages is ambiguous if there are exactly 30 pages
     if data.billable_pages != 30:
         rd.page_count = data.billable_pages
         rd.save()
-    
+
     return
