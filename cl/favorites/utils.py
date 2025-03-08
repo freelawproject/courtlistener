@@ -387,8 +387,8 @@ def prayer_unavailable(instance: RECAPDocument) -> None:
     # Send email notifications in bulk.
     if email_recipients:
         subject = f"A document you requested is unavailable for purchase"
-        txt_template = loader.get_template("prayer_email.txt")
-        html_template = loader.get_template("prayer_email.html")
+        txt_template = loader.get_template("prayer_email_unavailable.txt")
+        html_template = loader.get_template("prayer_email_unavailable.html")
 
         docket = instance.docket_entry.docket
         docket_entry = instance.docket_entry
