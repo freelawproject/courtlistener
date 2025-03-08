@@ -174,58 +174,61 @@
 {% elif tab == "related-cases" %}
     {# Related Cases #}
     <div class="tab-pane fade in active" id="related">
-        <h2 class="opinion-section-title jump-link">Related Cases</h2>
-        <hr class="hr-opinion">
-            {% url 'show_results' as show_results_url %}
-                {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
-                    {% with clusters=related_clusters full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
-                            {% for cluster in related_clusters %}
-                                <article>
-                                  <h3 class="bottom serif">
-                                      <a href="{{ cluster.absolute_url }}{% querystring %}" class="visitable">
-                                          {{ cluster.caseName }}
-                                      </a>
-                                  </h3>
-                                  <div class="bottom">
-                                      {% if cluster.dateFiled %}
-                                          <div class="inline-block">
-                                            <span class="meta-data-header">Date Filed:</span>
-                                            <time class="meta-data-value">
-                                                {{ cluster.dateFiled|date:"F jS, Y" }}
-                                            </time>
-                                          </div>
-                                      {% endif %}
-                                      {% if cluster.status %}
-                                      <div class="inline-block">
-                                        <span class="meta-data-header">Status:</span>
-                                        <span class="meta-data-value">{{ cluster.status }}</span>
-                                      </div>
-                                    {% endif %}
-                                  {% if cluster.citation %}
-                                        <div class="inline-block">
-                                          <span class="meta-data-header">Citations: </span>
-                                          <span class="meta-data-value">{{ cluster.citation.0 }}</span>
-                                        </div>
-                                  {% endif %}
-                                  {% if cluster.docketNumber %}
-                                        <div class="inline-block">
-                                          <span class="meta-data-header">Docket Number:</span>
-                                          <span class="meta-data-value select-all">{{ cluster.docketNumber }}</span>
-                                        </div>
-                                  {% endif %}
-                                  </div>
-                                  <div class="bottom">
-                                  </div>
-                                </article>
-                            {% endfor %}
-                        <br>
-                        <p>
-                            <a href="{{ full_list_url }}" class="btn btn-default">
-                                Search Full List
+    {% url 'show_results' as show_results_url %}
+    {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
+        {% with full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
+            <div class="row">
+                <div class="col-xs-6">
+                    <h2 class="opinion-section-title jump-link">Similar Cases</h2>
+                </div>
+                <div class="col-xs-6 text-right">
+                    <a href="{{ full_list_url }}" class="btn btn-default opinion-section-title">
+                        Filter Similar Cases
+                    </a>
+                </div>
+            </div>
+            <hr class="hr-opinion">
+            {% with clusters=related_clusters %}
+                {% for cluster in related_clusters %}
+                    <article>
+                        <h3 class="bottom serif">
+                            <a href="{{ cluster.absolute_url }}{% querystring %}" class="visitable">
+                                {{ cluster.caseName }}
                             </a>
-                        </p>
-                {% endwith %}
+                        </h3>
+                        <div class="bottom">
+                            {% if cluster.dateFiled %}
+                                <div class="inline-block">
+                                    <span class="meta-data-header">Date Filed:</span>
+                                    <time class="meta-data-value">
+                                        {{ cluster.dateFiled|date:"F jS, Y" }}
+                                    </time>
+                                </div>
+                            {% endif %}
+                            {% if cluster.status %}
+                                <div class="inline-block">
+                                    <span class="meta-data-header">Status:</span>
+                                    <span class="meta-data-value">{{ cluster.status }}</span>
+                                </div>
+                            {% endif %}
+                            {% if cluster.citation %}
+                                <div class="inline-block">
+                                    <span class="meta-data-header">Citations: </span>
+                                    <span class="meta-data-value">{{ cluster.citation.0 }}</span>
+                                </div>
+                            {% endif %}
+                            {% if cluster.docketNumber %}
+                                <div class="inline-block">
+                                    <span class="meta-data-header">Docket Number:</span>
+                                    <span class="meta-data-value select-all">{{ cluster.docketNumber }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </article>
+                {% endfor %}
             {% endwith %}
+        {% endwith %}
+    {% endwith %}
     </div>
 
 {% elif tab == "pdf" %}
