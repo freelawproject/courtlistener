@@ -25,7 +25,7 @@ from django.utils import timezone
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.models import Prayer
-from cl.recap.tasks import fetch_prayer_info
+from cl.recap.tasks import fetch_prayer_availability
 from cl.search.models import RECAPDocument
 
 
@@ -53,7 +53,7 @@ async def create_prayer(
             user=user, recap_document=recap_document
         )
         if created:
-            if not fetch_prayer_info.delay(recap_document.pk):
+            if not fetch_prayer_availability.delay(recap_document.pk):
                 prayer_unavailable(recap_document) # is it possible to make this function async to avoid delays?
             return new_prayer
         else:
