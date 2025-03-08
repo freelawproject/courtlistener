@@ -32,6 +32,7 @@ from juriscraper.pacer import (
     ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
+    DownloadConfirmationPage,
     PossibleCaseNumberApi,
     S3NotificationEmail,
 )
@@ -61,6 +62,8 @@ from cl.corpus_importer.utils import (
     mark_ia_upload_needed,
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
+from cl.favorites.models import Prayer
+from cl.favorites.utils import prayer_unavailable
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
@@ -3428,3 +3431,49 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
         process_recap_email.si(epq.pk, user.pk),
         extract_recap_pdf.s(),
     ).apply_async()
+
+@app.task(
+    bind=True,
+    autoretry_for=(RedisConnectionError, PacerLoginException),
+    max_retries=5,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
+@transaction.atomic
+def fetch_prayer_info(self, pk: int) -> None:
+    """Processes a recap.email when it comes in, fetches the free document and
+    triggers docket alerts and webhooks.
+
+    :param pk: The primary key of the RECAPDocument of interest
+    :return: None
+    """
+    rd = RECAPDocument.objects.get(pk=pk)
+
+    court_id = rd.docket_entry.docket.court.pk
+    pacer_doc_id = rd.pacer_doc_id
+
+    recap_user = User.objects.get(username="recap")
+    session_data = get_or_cache_pacer_cookies(
+        recap_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
+    )
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
+    receipt_report = DownloadConfirmationPage(court_id, s)
+    receipt_report.query(pacer_doc_id)
+    data = receipt_report.data
+    if data == {}:
+        rd.is_sealed = True    
+        rd.save()
+
+        prayer_unavailable(rd)
+
+        return
+    
+    # Document is available, so get cost to calculate page length, but billable_pages is ambiguous if there are exactly 30 pages
+    if data.billable_pages != 30:
+        rd.page_count = data.billable_pages
+        rd.save()
+    
+    return
