@@ -3456,6 +3456,7 @@ def fetch_prayer_availability(self, pk: int) -> bool:
     court_id = rd.docket_entry.docket.court.pk
     pacer_doc_id = rd.pacer_doc_id
 
+    # likely a text-only entry if there is no pacer_doc_id, but there may be edge cases.
     if pacer_doc_id == "":
         return False
 
