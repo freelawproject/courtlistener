@@ -52,12 +52,19 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
         tasks_to_schedule = (
             incoming_pacer_case_id - iquery_pacer_case_id_current
         )
+        logger.info(
+            "Found %s tasks to schedule for pacer case IDs ranging from %s to %s.",
+            tasks_to_schedule,
+            iquery_pacer_case_id_current,
+            incoming_pacer_case_id,
+        )
         if tasks_to_schedule > 10_800:
-            # Considering a Celery countdown of 1 second and a visibility_timeout
-            # of 6 hours, the maximum countdown time should be set to 21,600 to
-            # avoid a celery runaway. It's safer to abort if more than 10,800
-            # tasks are attempted to be scheduled. This could indicate an issue
-            # with retrieving the highest_known_pacer_case_id or a loss of the
+            # Considering a Celery countdown of 1 second applied via
+            # throttle_task and a visibility_timeout of 6 hours, the maximum
+            # countdown time should be set to 21,600 to avoid a celery runaway.
+            # It's safer to abort if more than 10,800 tasks are attempted to be
+            # scheduled. This could indicate an issue with retrieving the
+            # highest_known_pacer_case_id or a loss of the
             # iquery_pacer_case_id_current for the court in Redis.
             logger.error(
                 "Tried to schedule more than 10,800 iquery pages to scrape for "
@@ -66,20 +73,21 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
             )
             release_redis_lock(r, update_lock_key, lock_value)
             return None
-        task_scheduled_countdown = 0
+        task_to_schedule_count = 0
         while iquery_pacer_case_id_current + 1 < incoming_pacer_case_id:
             iquery_pacer_case_id_current += 1
-            task_scheduled_countdown += 1
-            # Schedule the next task with a 1-second countdown increment
+            task_to_schedule_count += 1
+            # Schedule the next task.
             make_docket_by_iquery_sweep.apply_async(
                 args=(court_id, iquery_pacer_case_id_current),
                 kwargs={"skip_iquery_sweep": True},
-                countdown=task_scheduled_countdown,
                 queue=settings.CELERY_IQUERY_QUEUE,
             )
             logger.info(
-                f"Enqueued iquery docket case ID: {iquery_pacer_case_id_current} "
-                f"for court {court_id} with countdown {task_scheduled_countdown}"
+                "Enqueued %s iquery docket with case ID: %s for court %s",
+                task_to_schedule_count,
+                iquery_pacer_case_id_current,
+                court_id,
             )
 
         # Update the iquery_pacer_case_id_current in Redis
