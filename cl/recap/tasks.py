@@ -3449,10 +3449,15 @@ def fetch_prayer_info(self, pk: int) -> None:
     :param pk: The primary key of the RECAPDocument of interest
     :return: None
     """
+    # should this function incorporate is_pacer_doc_sealed to avoid doing essentially the same thing in another part of the codebase? 
     rd = RECAPDocument.objects.get(pk=pk)
 
     court_id = rd.docket_entry.docket.court.pk
     pacer_doc_id = rd.pacer_doc_id
+
+    if pacer_doc_id == "":
+        prayer_unavailable(rd)
+        return
 
     recap_user = User.objects.get(username="recap")
     session_data = get_or_cache_pacer_cookies(
