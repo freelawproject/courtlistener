@@ -3475,6 +3475,10 @@ def fetch_prayer_availability(self, pk: int) -> bool:
         rd.save()
 
         return False
+    else:
+        # making for that previously sealed documents that are now available are marked as such
+        rd.is_sealed = False
+        rd.save()
 
     # Document is available, so get cost to calculate page length, but billable_pages is ambiguous if there are exactly 30 pages
     if data.billable_pages != 30:
