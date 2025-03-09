@@ -5,7 +5,7 @@ CourtListener.com
 Your Request Has Been Canceled.
 -------------------------------------------------------
 
-The document you requested is unavailable for purchase on PACER. This may mean it is sealed or a text-only entry.
+The document you requested is unavailable for purchase on PACER. This may mean it is sealed or a text-only entry. It may also be unavailable for online access pursuant to FRCP 5.2(c).
 -------------------------------------------------------
 
 {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
@@ -16,7 +16,7 @@ View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by
 Document Number: {{ docket_entry.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
 Date Filed: {% if docket_entry.datetime_filed %}{{ docket_entry.datetime_filed|utc|date:"M j, Y" }}{% else %}{{ docket_entry.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}
 Description: {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ docket_entry.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}
-View Document: https://www.courtlistener.com{{document_url}}
+View Document: Sealed on PACER
 ~~~
 You requested it on {{ date_created|date:"F j, Y" }}.
 {{num_waiting}} {{ num_waiting|pluralize:"person was,people were" }} waiting for it.
