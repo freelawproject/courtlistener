@@ -86,6 +86,9 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
     _cursor: Union[str, None, False] = False
     _has_next: bool = False
 
+    # make cache key with p=1 by default (to simplify the handling, @see `make_cache_key` in `sitemap.py`)
+    force_page_in_cache = True
+
     @property
     def section(self) -> str:
         """

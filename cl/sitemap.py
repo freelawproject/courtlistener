@@ -15,8 +15,7 @@ from django.utils.http import http_date
 
 from cl.lib.ratelimiter import ratelimiter_all_2_per_m
 
-
-def make_cache_key(request: HttpRequest, section: str) -> str:
+def make_cache_key(request: HttpRequest, section: str, force_page: bool = False) -> str:
     """Make a Cache key for a URL
 
     This is a simplified version of django's get_cache_key method, which
@@ -28,13 +27,14 @@ def make_cache_key(request: HttpRequest, section: str) -> str:
 
     :param request: The HttpRequest from the client
     :param section: The section of the sitemap that is loaded
+    :param force_page: Include page=1 to the cache key by default
     :return a key that can be used to cache the request
     """
     # url without query string
     base_url: str = request.build_absolute_uri(escape_uri_path(request.path))
     
     # include only 'p' parameter to the cache key, make it more deterministic
-    if page := request.GET.get("p", None):
+    if page := request.GET.get("p", 1 if force_page else None):
         base_url = f"{base_url}?p={page}"
 
     url = hashlib.md5(force_bytes(base_url))
@@ -63,10 +63,15 @@ def cached_sitemap(
         raise Http404(f"No sitemap available for section: {section!r}")
     sitemap = sitemaps[section]
     page = request.GET.get("p", 1)
+    
+    # handle infinite sitemaps, force p=1 by default
+    force_page = bool(getattr(sitemap, 'force_page_in_cache', False))
 
     cache = caches["db_cache"]
-    cache_key = make_cache_key(request, section)
+    cache_key = make_cache_key(request, section, force_page)
     urls = cache.get(cache_key, [])
+    
+    # return HttpResponse(f'{request.build_absolute_uri(escape_uri_path(request.path))} {cache_key} {urls}', content_type='text/plain')
     if not urls:
         try:
             if callable(sitemap):
