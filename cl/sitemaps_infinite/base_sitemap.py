@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from functools import cached_property
 from typing import Any, Tuple, Union
@@ -12,6 +13,8 @@ from redis import Redis
 
 from cl.lib.redis_utils import get_redis_interface
 from cl.sitemaps_infinite.types import SitemapsPagesNumber
+
+logger = logging.getLogger(__name__)
 
 REDIS_DB = "CACHE"
 HASH_NAME = "large-sitemaps:num_pages"
@@ -64,6 +67,7 @@ class CustomCursorPaginator(CursorPaginator):
         """
         redis_db: Redis = get_redis_interface(REDIS_DB)
         redis_db.hset(HASH_NAME, self.section, num)
+        logger.debug(f"Saved {num} pages for {self.section} in the cache")
 
 
 class InfinitePaginatorSitemap(sitemaps.Sitemap):
@@ -93,6 +97,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
 
     def set_cursor(self, cursor: str | None = None):
         self._cursor = cursor
+        logger.debug(f"Cursor set to '{cursor}' for section '{self.section}'")
 
     @property
     def cursor(self):
