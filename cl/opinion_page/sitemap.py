@@ -77,6 +77,7 @@ class DocketSitemap(InfinitePaginatorSitemap):
         new_or_popular = Q(view_count__gt=10) | Q(
             date_filed__gt=datetime.today() - timedelta(days=30)
         )
+        # Ordering should NOT be set here, define the ordering in the separate `ordering` property
         return (
             Docket.objects.filter(
                 new_or_popular,
