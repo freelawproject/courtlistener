@@ -3473,10 +3473,10 @@ def fetch_prayer_availability(self, pk: int) -> bool:
     if data == {}:
         rd.is_sealed = True
         rd.save()
-
         return False
+    
     else:
-        # making for that previously sealed documents that are now available are marked as such
+        # making sure that previously sealed documents that are now available are marked as such
         rd.is_sealed = False
         rd.save()
 
