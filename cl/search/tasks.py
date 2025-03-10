@@ -398,6 +398,8 @@ def email_search_results(user_id: int, query: str):
     csv_headers, csv_transformations = (
         get_headers_and_transformations_for_search_export(cd["type"])
     )
+    if not csv_headers:
+        return
 
     # Create the CSV content and store in a StringIO object
     csv_content = None
@@ -411,8 +413,9 @@ def email_search_results(user_id: int, query: str):
         )
         csvwriter.writeheader()
         for row in search_results:
-            for key, function in csv_transformations.items():
-                row[key] = function(row[key] if key in row else row)
+            if csv_transformations:
+                for key, function in csv_transformations.items():
+                    row[key] = function(row[key] if key in row else row)
 
             clean_dict = {
                 camel_to_snake(key): value for key, value in row.items()

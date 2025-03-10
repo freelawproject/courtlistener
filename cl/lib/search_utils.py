@@ -647,7 +647,7 @@ def do_es_search(
 
 def get_headers_and_transformations_for_search_export(
     type: str,
-) -> tuple[list[str], dict[str, Callable[..., Any]]]:
+) -> tuple[list[str], dict[str, Callable[..., Any]] | None]:
     """
     Retrieves CSV headers and data transformation functions for a given search
     type.
@@ -694,6 +694,8 @@ def get_headers_and_transformations_for_search_export(
                 OpinionClusterDocument.get_csv_transformations()
                 | OpinionDocument.get_csv_transformations()
             )
+        case _:
+            return [], None
 
     return keys, transformations
 
