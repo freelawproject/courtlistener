@@ -159,6 +159,9 @@
                     {# We don't have it #}
                     {% if rd.is_sealed %}
                       <span class="btn btn-primary btn-xs disabled">Sealed on PACER</span>
+                      <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
+                        {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
+                      </div>
                     {% else %}
                       {% if rd.pacer_url %}
                         <a href="{{ rd.pacer_url }}"
