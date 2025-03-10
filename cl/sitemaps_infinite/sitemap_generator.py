@@ -32,7 +32,7 @@ The `section` key contains the name of the sitemap section, and the `cursor` key
 cursor_data_default = TaskCursorData(
     {
         "section": None,
-        "last_page": 0,
+        "last_page": 1,
         "has_next": 1,
     }
 )
@@ -73,6 +73,7 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
     # count the number of files generated, stop when we reach the limit
     num_files: int = 0
     current_page: int = cursor_data.get("last_page")
+    # logger.debug(f"Current page: {current_page}")
     forced_exit = False
 
     # Iterate over the sitemap sections, find the place where we left off, and continue from there
@@ -267,6 +268,7 @@ def make_cache_key(
 
     uri = f"{scheme}://{host}{reverse('sitemaps-pregenerated', kwargs={"section": section})}?p={page}"
     url = hashlib.md5(force_bytes(iri_to_uri(uri)))
+    # logger.debug(f'Cache key: {uri} sitemap.{section}.{url.hexdigest()}')
 
     return f"sitemap.{section}.{url.hexdigest()}"
 
