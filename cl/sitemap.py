@@ -7,7 +7,7 @@ from django.contrib.sitemaps import Sitemap
 from django.contrib.sitemaps.views import x_robots_tag
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.cache import caches
-from django.core.paginator import EmptyPage, PageNotAnInteger
+from django.core.paginator import EmptyPage, PageNotAnInteger, InvalidPage
 from django.http import Http404, HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.encoding import force_bytes, escape_uri_path
@@ -78,6 +78,8 @@ def cached_sitemap(
             raise Http404(f"Page {page} empty")
         except PageNotAnInteger:
             raise Http404(f"No page '{page}'")
+        except InvalidPage:
+            raise Http404(f"Page '{page}' does not exist")
 
         if len(urls) == sitemap.limit:
             # Full sitemap. Cache it a long time.
