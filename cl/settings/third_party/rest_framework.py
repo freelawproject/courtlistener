@@ -34,6 +34,10 @@ REST_FRAMEWORK = {
         "texoya9545": "1/hour",
         "nedah94680": "1/hour",
         "robowiy352": "1/hour",
+        "AlirezaMirrokni": "1/hour",
+        "AliMirr": "1/hour",
+        "AliMirro": "1/hour",
+        "AlirezaMirr": "1/hour",
         # Multiple accounts
         "my_yancy_lost": "1/hour",
         "theworky_1980": "1/hour",
