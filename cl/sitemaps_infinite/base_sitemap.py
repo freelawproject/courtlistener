@@ -179,6 +179,15 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         all_items_lastmod = True  # track if all items have a lastmod
 
         paginator_page = self.paginator.page(first=self.limit, after=cursor)
+        # pprint(
+        #     [
+        #         ">>>>>>>>>>>>>>>",
+        #         cursor,
+        #         len(paginator_page),
+        #         paginator_page.has_next,
+        #         paginator_page.has_previous,
+        #     ]
+        # )
 
         for item in paginator_page:
             loc = f"{protocol}://{domain}{self._location(item)}"
@@ -232,6 +241,16 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
             if len(paginator_page)
             else None
         )
+        # pprint(
+        #     [
+        #         next_cursor,
+        #         "<<<<<<<<<<<<<<",
+        #         len(paginator_page),
+        #         self.paginator.position_from_instance(
+        #             paginator_page[-1] if paginator_page else None
+        #         ),
+        #     ]
+        # )
 
         # Save `next_cursor` in the list as cached metadata
         urls.next_cursor = next_cursor
