@@ -229,7 +229,7 @@
   <h2 id="recap-upload">RECAP Upload API <small>— <code>{% url "processingqueue-list" version=version %}</code></small></h2>
   <p>This API is used by the RECAP extension and a handful of special partners to upload PACER content to the RECAP Archive. This API is not available to the public. If you have a collection of PACER data you wish to donate to the RECAP Archive so it is permanently available to the public, please <a href="{% url "contact" %}">get in touch</a>.
   </p>
-  <p>We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.
+  <p>We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.
   </p>
   <p>When you make an upload, you create a <code>Processing Queue</code> object in the CourtListener system. This object will be returned in the HTTP response to your upload, so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:
   </p>
