@@ -108,11 +108,17 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.client.login(
             username=self.user_profile.user.username, password="password"
         )
+        query = 'q="Jackson"&type=r'
         self.client.post(
-            reverse("export_search_results"), {"query": 'q="Jackson"&type=r'}
+            reverse("export_search_results"), {"query": query}
         )
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
             mail.outbox[0].subject, "Your Search Results are Ready!"
+        )
+        # Verify that the email body contains a link with the expected query
+        # parameters.
+        self.assertIn(
+            f"https://www.courtlistener.com/?{query}", mail.outbox[0].body
         )
         self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)

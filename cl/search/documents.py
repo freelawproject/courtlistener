@@ -1238,7 +1238,7 @@ class ESRECAPDocument(
             "rd_description",
             "rd_is_available",
             "rd_page_count",
-            "filepath_local",
+            "rd_filepath_local",
             "rd_plain_text",
             "cites",
         ]
@@ -1246,16 +1246,25 @@ class ESRECAPDocument(
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
         transformations = {
-            key: lambda x: render_string_or_list(x)
+            key: partial(
+                lambda key, val: render_string_or_list(
+                    val.get(key) if isinstance(val, dict) else val
+                ),
+                key,
+            )
             for key in SEARCH_RECAP_CHILD_HL_FIELDS.keys()
         }
 
         # Add a transformation for relative URLs.
-        transformations["filepath_local"] = lambda x: (
-            f"https://storage.courtlistener.com/{x}" if x else ""
+        transformations["rd_filepath_local"] = lambda x: (
+            f"https://storage.courtlistener.com/{x['filepath_local']}"
+            if x.get("filepath_local")
+            else ""
         )
-        transformations["rd_absolute_url"] = (
-            lambda x: f"https://www.courtlistener.com{x['absolute_url']}"
+        transformations["rd_absolute_url"] = lambda x: (
+            f"https://www.courtlistener.com{x['absolute_url']}"
+            if x.get("absolute_url")
+            else ""
         )
 
         # Define a mapping of new CSV column names to the corresponding source
@@ -1277,7 +1286,8 @@ class ESRECAPDocument(
         # the value from the source key in the input data.
         for new_key, source in new_keys_mapping.items():
             transformations[new_key] = partial(
-                lambda origin_key, document: document[origin_key], source
+                lambda origin_key, document: document.get(origin_key, ""),
+                source,
             )
         return transformations
 
