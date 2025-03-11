@@ -905,12 +905,14 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
             "id",
             "name",
             "name_reverse",
+            "court",
             "absolute_url",
             "gender",
             "religion",
             "alias",
             "races",
             "political_affiliation",
+            "selection_method",
             "fjc_id",
             "dob",
             "dob_city",
@@ -921,12 +923,24 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
             "date_granularity_dod",
             "aba_rating",
             "school",
+            "appointer",
+            "supervisor",
+            "predecessor",
             "date_created",
         ]
 
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
-        list_fields = ["races", "aba_rating", "alias"]
+        list_fields = [
+            "races",
+            "aba_rating",
+            "alias",
+            "selection_method",
+            "appointer",
+            "supervisor",
+            "predecessor",
+            "court",
+        ]
         hl_fields = (
             list(PEOPLE_ES_HL_FIELDS.keys()) + PEOPLE_ES_HL_KEYWORD_FIELDS
         )
