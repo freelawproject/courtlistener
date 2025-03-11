@@ -1,9 +1,10 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest import mock
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
+import pytz
 import time_machine
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -21,6 +22,10 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
+from cl.alerts.management.commands.cl_send_alerts import (
+    get_cut_off_end_date,
+    get_cut_off_start_date,
+)
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
     get_cut_off_date,
@@ -40,7 +45,11 @@ from cl.alerts.tasks import (
     get_docket_notes_and_tags_by_user,
     send_alert_and_webhook,
 )
-from cl.alerts.utils import InvalidDateError, percolate_es_document
+from cl.alerts.utils import (
+    InvalidDateError,
+    build_alert_email_subject,
+    percolate_es_document,
+)
 from cl.api.factories import WebhookFactory
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
@@ -56,7 +65,12 @@ from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
 from cl.people_db.factories import PersonFactory
-from cl.search.documents import AudioDocument, AudioPercolator
+from cl.search.documents import (
+    ES_CHILD_ID,
+    AudioDocument,
+    AudioPercolator,
+    OpinionDocument,
+)
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -80,6 +94,7 @@ from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
     SearchAlertsAssertions,
+    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse, make_client
@@ -152,7 +167,6 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         r = await self.async_client.post(
             "/", invalid_alert_type_params, follow=True
         )
-        print("r.content.decode()", r.content.decode())
         self.assertEqual(r.status_code, 200)
         self.assertIn("error creating your alert", r.content.decode())
         self.assertIn(
@@ -457,7 +471,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
         self.assert_text_in_node("editing your alert", "body")
 
 
-class AlertAPITests(APITestCase):
+class AlertAPITests(APITestCase, ESIndexTestCase):
     """Check that API CRUD operations are working well for search alerts."""
 
     @classmethod
@@ -522,11 +536,22 @@ class AlertAPITests(APITestCase):
         """
 
         # Make two alerts for user_1
-        alert_1 = await self.make_an_alert(self.client, alert_name="alert_1")
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
+        )
         alert_2 = await self.make_an_alert(self.client, alert_name="alert_2")
 
         search_alert = Alert.objects.all()
         self.assertEqual(await search_alert.acount(), 2)
+
+        # Confirm alert is indexed in ES
+        alert_1_id = alert_1.json()["id"]
+        self.assertTrue(
+            AudioPercolator.exists(id=alert_1_id),
+            msg=f"Alert id: {alert_1.json()["id"]} was not indexed.",
+        )
 
         alert_1_path_detail = reverse(
             "alert-detail",
@@ -537,6 +562,12 @@ class AlertAPITests(APITestCase):
         response = await self.client.delete(alert_1_path_detail)
         self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
         self.assertEqual(await search_alert.acount(), 1)
+
+        # Confirm alert was removed from ES
+        self.assertFalse(
+            AudioPercolator.exists(id=alert_1_id),
+            msg=f"Alert id: {alert_1.json()["id"]} shouldn't be indexed.",
+        )
 
         alert_2_path_detail = reverse(
             "alert-detail",
@@ -578,11 +609,20 @@ class AlertAPITests(APITestCase):
         alert_1 = await self.make_an_alert(
             self.client,
             alert_name="alert_1",
-            alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
         )
-        self.assertEqual(alert_1.json()["alert_type"], SEARCH_TYPES.RECAP)
+        self.assertEqual(
+            alert_1.json()["alert_type"], SEARCH_TYPES.ORAL_ARGUMENT
+        )
         search_alert = Alert.objects.all()
         self.assertEqual(await search_alert.acount(), 1)
+
+        # Confirm alert is indexed in ES upon creation.
+        doc = AudioPercolator.get(id=alert_1.json()["id"])
+        response_str = str(doc.to_dict())
+        self.assertIn("'query': 'testing_query'", response_str)
+        self.assertEqual(doc.rate, "dly")
+
         alert_1_path_detail = reverse(
             "alert-detail",
             kwargs={"pk": alert_1.json()["id"], "version": "v3"},
@@ -591,8 +631,8 @@ class AlertAPITests(APITestCase):
         # Update the alert
         data_updated = {
             "name": "alert_1_updated",
-            "query": alert_1.json()["query"],
-            "rate": alert_1.json()["rate"],
+            "query": f"q=testing_2_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
+            "rate": Alert.REAL_TIME,
         }
         response = await self.client.put(alert_1_path_detail, data_updated)
 
@@ -600,6 +640,12 @@ class AlertAPITests(APITestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["name"], "alert_1_updated")
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
+
+        # Confirm alert is updated in ES upon update.
+        doc = AudioPercolator.get(id=alert_1.json()["id"])
+        response_str = str(doc.to_dict())
+        self.assertIn("'query': 'testing_2_query'", response_str)
+        self.assertEqual(doc.rate, "rt")
 
     async def test_invalid_alert_type_fail(self) -> None:
         """Does creating an alert for an unsupported type raises an error?"""
@@ -702,6 +748,13 @@ class SearchAlertsWebhooksTest(
             query=f"type=o&stat_{unpublished_status}=on",
             alert_type=SEARCH_TYPES.OPINION,
         )
+        cls.search_alert_2_1 = AlertFactory(
+            user=cls.user_profile_2.user,
+            rate=Alert.DAILY,
+            name="Test Alert O Copy",
+            query=f"type=o&stat_{unpublished_status}=on",
+            alert_type=SEARCH_TYPES.OPINION,
+        )
         cls.user_profile_3 = UserProfileWithParentsFactory(
             user__email="test_3@email.com"
         )
@@ -725,7 +778,14 @@ class SearchAlertsWebhooksTest(
         cls.person_1 = PersonFactory.create(
             gender="m",
         )
-        cls.mock_date = now().replace(day=15, hour=0)
+        cls.pt_tz = pytz.timezone(settings.TIME_ZONE)
+        cls.day_before_date_filed = cls.pt_tz.localize(
+            datetime(2025, 2, 28, 13, 30, 0)
+        )
+        cls.current_day_date_filed = cls.pt_tz.localize(
+            datetime(2025, 3, 1, 1, 30, 0)
+        )
+        cls.mock_date = cls.pt_tz.localize(datetime(2025, 3, 1, 2, 30, 0))
         with (
             mock.patch(
                 "cl.search.tasks.percolator_alerts_models_supported",
@@ -743,18 +803,19 @@ class SearchAlertsWebhooksTest(
             cls.dly_opinion = OpinionWithParentsFactory.create(
                 cluster__case_name="California vs Lorem",
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__date_filed=(now() - timedelta(hours=5)).date(),
+                cluster__date_filed=cls.day_before_date_filed.date(),
                 cluster__attorneys="Attorney General of North Carolina",
                 cluster__judges="Lorem Judge",
                 cluster__citation_count=1,
                 cluster__docket=DocketFactory(
                     court=cls.c1,
-                    date_reargued=(now() - timedelta(hours=6)).date(),
-                    date_reargument_denied=(now() - timedelta(hours=4)).date(),
+                    date_reargued=cls.day_before_date_filed.date(),
+                    date_reargument_denied=cls.day_before_date_filed.date(),
                 ),
                 plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
                 type=Opinion.LEAD,
             )
+
             cls.dly_opinion.joined_by.add(cls.person_1)
             cls.dly_opinion.cluster.panel.add(cls.person_1)
             cls.lexis_citation = CitationWithParentsFactory.create(
@@ -790,6 +851,22 @@ class SearchAlertsWebhooksTest(
                 citing_opinion=cls.dly_opinion_2,
             )
 
+            cls.dly_opinion_current_day = OpinionWithParentsFactory.create(
+                cluster__case_name="California vs Lorem Current Day",
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                cluster__date_filed=cls.current_day_date_filed.date(),
+                cluster__attorneys="Attorney General of North Carolina",
+                cluster__judges="Lorem Judge",
+                cluster__citation_count=1,
+                cluster__docket=DocketFactory(
+                    court=cls.c1,
+                    date_reargued=cls.current_day_date_filed.date(),
+                    date_reargument_denied=cls.current_day_date_filed.date(),
+                ),
+                plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
+                type=Opinion.LEAD,
+            )
+
             with mock.patch(
                 "cl.scrapers.tasks.microservice",
                 side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
@@ -808,10 +885,22 @@ class SearchAlertsWebhooksTest(
                 cluster__date_filed=now() - timedelta(days=2),
                 plain_text="Lorem dolor Ipsum",
             )
+            cls.wly_opinion_current_date = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                cluster__case_name="California vs Week Current Day",
+                cluster__date_filed=cls.current_day_date_filed.date(),
+                plain_text="Lorem dolor Ipsum",
+            )
             cls.mly_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__case_name="California vs Month",
                 cluster__date_filed=now() - timedelta(days=25),
+                plain_text="Lorem dolor Ipsum",
+            )
+            cls.mly_opinion_current_date = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                cluster__case_name="California vs Month Current Day",
+                cluster__date_filed=cls.current_day_date_filed.date(),
                 plain_text="Lorem dolor Ipsum",
             )
 
@@ -825,7 +914,7 @@ class SearchAlertsWebhooksTest(
             len(webhooks_enabled), 3, msg="Webhooks enabled doesn't match."
         )
         search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 8, msg="Alerts doesn't match.")
+        self.assertEqual(len(search_alerts), 9, msg="Alerts doesn't match.")
 
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -848,6 +937,11 @@ class SearchAlertsWebhooksTest(
 
         # First Opinion email alert assertions search_alert
         self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            f"1 Alert has hits: {self.search_alert.name}",
+        )
+
         # Plain text assertions
         opinion_alert_content = mail.outbox[0].body
         self.assertIn("daily opinion alert", opinion_alert_content)
@@ -935,16 +1029,22 @@ class SearchAlertsWebhooksTest(
         )
 
         self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
-        self.assertIn("daily opinion alert", mail.outbox[1].body)
         self.assertEqual(
-            mail.outbox[1].extra_headers["List-Unsubscribe-Post"],
-            "List-Unsubscribe=One-Click",
+            mail.outbox[1].subject,
+            f"2 Alerts have hits: {self.search_alert_2.name}, {self.search_alert_2_1.name}",
         )
-        unsubscribe_url = reverse(
-            "one_click_disable_alert", args=[self.search_alert_2.secret_key]
-        )
+        self.assertIn("daily opinion alert", mail.outbox[1].body)
+
+        params = {
+            "keys": [
+                self.search_alert_2.secret_key,
+                self.search_alert_2_1.secret_key,
+            ]
+        }
+        query_string = urlencode(params, doseq=True)
+        unsubscribe_path = reverse("disable_alert_list")
         self.assertIn(
-            unsubscribe_url,
+            f"{unsubscribe_path}{'?' if query_string else ''}{query_string}",
             mail.outbox[1].extra_headers["List-Unsubscribe"],
         )
 
@@ -1125,6 +1225,20 @@ class SearchAlertsWebhooksTest(
 
     def test_send_search_alert_webhooks_rates(self):
         """Can we send search alert webhooks for different alert rates?"""
+
+        self.assertTrue(
+            OpinionDocument.exists(
+                id=ES_CHILD_ID(self.wly_opinion.pk).OPINION
+            ),
+            msg="wly error",
+        )
+        self.assertTrue(
+            OpinionDocument.exists(
+                id=ES_CHILD_ID(self.mly_opinion.pk).OPINION
+            ),
+            msg="mly error",
+        )
+
         with time_machine.travel(
             self.mock_date, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
@@ -1132,7 +1246,7 @@ class SearchAlertsWebhooksTest(
             rt_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__case_name="California vs RT",
-                cluster__date_filed=now(),
+                cluster__date_filed=self.day_before_date_filed.date(),
                 plain_text="Lorem dolor hearing Ipsum",
             )
             RealTimeQueue.objects.create(
@@ -1142,8 +1256,7 @@ class SearchAlertsWebhooksTest(
         webhooks_enabled = Webhook.objects.filter(enabled=True)
         self.assertEqual(len(webhooks_enabled), 3)
         search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 8)
-
+        self.assertEqual(len(search_alerts), 9)
         # (rate, events expected, number of search results expected per event)
         # The number of expected results increases with every iteration since
         # daily events include results created for the RT test, weekly results
@@ -1169,60 +1282,62 @@ class SearchAlertsWebhooksTest(
                     # Send ES Alerts (Only OA for now)
                     call_command("cl_send_scheduled_alerts", rate=rate)
 
-            webhook_events = WebhookEvent.objects.all()
-            self.assertEqual(
-                len(webhook_events), events, msg="Wrong number of Events"
-            )
-
-            for webhook_sent in webhook_events:
+            with self.subTest(rate=rate):
+                webhook_events = WebhookEvent.objects.all()
                 self.assertEqual(
-                    webhook_sent.event_status,
-                    WEBHOOK_EVENT_STATUS.SUCCESSFUL,
-                    msg="Wrong number of webhooks sent.",
-                )
-                self.assertIn(
-                    webhook_sent.webhook.user,
-                    [self.user_profile.user, self.user_profile_3.user],
-                )
-                content = webhook_sent.content
-                # Check if the webhook event payload is correct.
-                self.assertEqual(
-                    content["webhook"]["event_type"],
-                    WebhookEventType.SEARCH_ALERT,
-                )
-                alert_to_compare = Alert.objects.get(
-                    pk=content["payload"]["alert"]["id"]
-                )
-                self.assertEqual(
-                    content["payload"]["alert"]["name"],
-                    alert_to_compare.name,
-                )
-                self.assertEqual(
-                    content["payload"]["alert"]["query"],
-                    alert_to_compare.query,
+                    len(webhook_events), events, msg="Wrong number of Events"
                 )
 
-                # The oral argument webhook is sent independently not grouped
-                # with opinions webhooks results.
-                if content["payload"]["alert"]["query"] == "type=oa":
+                for webhook_sent in webhook_events:
                     self.assertEqual(
-                        len(content["payload"]["results"]),
-                        1,
+                        webhook_sent.event_status,
+                        WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+                        msg="Wrong number of webhooks sent.",
+                    )
+                    self.assertIn(
+                        webhook_sent.webhook.user,
+                        [self.user_profile.user, self.user_profile_3.user],
+                    )
+                    content = webhook_sent.content
+                    # Check if the webhook event payload is correct.
+                    self.assertEqual(
+                        content["webhook"]["event_type"],
+                        WebhookEventType.SEARCH_ALERT,
+                    )
+                    alert_to_compare = Alert.objects.get(
+                        pk=content["payload"]["alert"]["id"]
                     )
                     self.assertEqual(
-                        content["payload"]["alert"]["rate"],
-                        Alert.DAILY,
-                    )
-                else:
-                    self.assertEqual(
-                        len(content["payload"]["results"]),
-                        results,
-                        msg="Wrong number of results.",
+                        content["payload"]["alert"]["name"],
+                        alert_to_compare.name,
                     )
                     self.assertEqual(
-                        content["payload"]["alert"]["rate"],
-                        rate,
+                        content["payload"]["alert"]["query"],
+                        alert_to_compare.query,
                     )
+
+                    # The oral argument webhook is sent independently not grouped
+                    # with opinions webhooks results.
+                    if content["payload"]["alert"]["query"] == "type=oa":
+                        self.assertEqual(
+                            len(content["payload"]["results"]),
+                            1,
+                            msg="Wrong number of results OA.",
+                        )
+                        self.assertEqual(
+                            content["payload"]["alert"]["rate"],
+                            Alert.DAILY,
+                        )
+                    else:
+                        self.assertEqual(
+                            len(content["payload"]["results"]),
+                            results,
+                            msg="Wrong number of results O.",
+                        )
+                        self.assertEqual(
+                            content["payload"]["alert"]["rate"],
+                            rate,
+                        )
             webhook_events.delete()
 
         rt_opinion.cluster.delete()
@@ -1262,6 +1377,228 @@ class SearchAlertsWebhooksTest(
         self.assertEqual(r.json()["count"], 1)
 
         frequency_o.cluster.delete()
+
+    def test_long_alert_subjects_truncation(self):
+        """Test long alert subjects get truncated below 935 characters."""
+        alerts_hits = []
+        for i in range(15):
+            alert: Alert = AlertFactory.create(
+                name="Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris aliquet ut."
+            )
+            alerts_hits.append((alert, "", [], 1))
+
+        subject = build_alert_email_subject(alerts_hits)
+        self.assertEqual(len(subject), 934)
+        self.assertIn("...", subject)
+
+
+class SearchAlertsUtilsTest(SimpleTestCase):
+
+    def test_get_cut_off_dates(self):
+        """Confirm get_cut_off_date and get_cut_off_end_date return the right
+        values according to the input date.
+        """
+
+        test_cases = {
+            Alert.MONTHLY: [
+                {
+                    "month_to_run": 1,
+                    "day_to_run": 1,
+                    "cut_off_month": 12,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2024,
+                },
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 1,
+                    "cut_off_month": 1,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 3,
+                    "day_to_run": 1,
+                    "cut_off_month": 2,
+                    "day_start": 1,
+                    "day_end": 28,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 4,
+                    "day_to_run": 1,
+                    "cut_off_month": 3,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 5,
+                    "day_to_run": 1,
+                    "cut_off_month": 4,
+                    "day_start": 1,
+                    "day_end": 30,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 6,
+                    "day_to_run": 1,
+                    "cut_off_month": 5,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 7,
+                    "day_to_run": 1,
+                    "cut_off_month": 6,
+                    "day_start": 1,
+                    "day_end": 30,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 8,
+                    "day_to_run": 1,
+                    "cut_off_month": 7,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 9,
+                    "day_to_run": 1,
+                    "cut_off_month": 8,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 10,
+                    "day_to_run": 1,
+                    "cut_off_month": 9,
+                    "day_start": 1,
+                    "day_end": 30,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 11,
+                    "day_to_run": 1,
+                    "cut_off_month": 10,
+                    "day_start": 1,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 12,
+                    "day_to_run": 1,
+                    "cut_off_month": 11,
+                    "day_start": 1,
+                    "day_end": 30,
+                    "year": 2025,
+                },
+            ],
+            Alert.WEEKLY: [
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 1,
+                    "cut_off_month": 1,
+                    "day_start": 25,
+                    "day_end": 31,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 8,
+                    "cut_off_month": 2,
+                    "day_start": 1,
+                    "day_end": 7,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 15,
+                    "cut_off_month": 2,
+                    "day_start": 8,
+                    "day_end": 14,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 22,
+                    "cut_off_month": 2,
+                    "day_start": 15,
+                    "day_end": 21,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 3,
+                    "day_to_run": 1,
+                    "cut_off_month": 2,
+                    "day_start": 22,
+                    "day_end": 28,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 3,
+                    "day_to_run": 8,
+                    "cut_off_month": 3,
+                    "day_start": 1,
+                    "day_end": 7,
+                    "year": 2025,
+                },
+            ],
+            Alert.DAILY: [
+                {
+                    "month_to_run": 2,
+                    "day_to_run": 28,
+                    "cut_off_month": 2,
+                    "day_start": 27,
+                    "day_end": 27,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 3,
+                    "day_to_run": 1,
+                    "cut_off_month": 2,
+                    "day_start": 28,
+                    "day_end": 28,
+                    "year": 2025,
+                },
+                {
+                    "month_to_run": 3,
+                    "day_to_run": 2,
+                    "cut_off_month": 3,
+                    "day_start": 1,
+                    "day_end": 1,
+                    "year": 2025,
+                },
+            ],
+        }
+        for rate, test_cases in test_cases.items():
+            for test_case in test_cases:
+                with self.subTest(rate=rate, test_case=test_case):
+                    expected_date_start = date(
+                        test_case["year"],
+                        test_case["cut_off_month"],
+                        test_case["day_start"],
+                    )
+                    expected_date_end = date(
+                        test_case["year"],
+                        test_case["cut_off_month"],
+                        test_case["day_end"],
+                    )
+
+                    day_to_run = date(
+                        2025,
+                        test_case["month_to_run"],
+                        test_case["day_to_run"],
+                    )
+                    date_start = get_cut_off_start_date(rate, day_to_run)
+                    date_end = get_cut_off_end_date(rate, date_start)
+
+                    self.assertEqual(date_start, expected_date_start)
+                    self.assertEqual(date_end, expected_date_end)
 
 
 class DocketAlertAPITests(APITestCase):
@@ -2033,7 +2370,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
     side_effect=lambda x, y: True,
 )
-class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
+class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     """Test ES Search Alerts"""
 
     @classmethod
@@ -2183,11 +2520,22 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                     stt_source=Audio.STT_OPENAI_WHISPER,
                 )
 
+        # Send RT alerts
+        with time_machine.travel(mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         # Confirm Alert date_last_hit is updated.
         self.search_alert.refresh_from_db()
         self.search_alert_2.refresh_from_db()
-        self.assertEqual(self.search_alert.date_last_hit, mock_date)
-        self.assertEqual(self.search_alert_2.date_last_hit, mock_date)
+        self.assertEqual(
+            self.search_alert.date_last_hit,
+            mock_date,
+            msg="Alert date of last hit didn't match.",
+        )
+        self.assertEqual(
+            self.search_alert_2.date_last_hit,
+            mock_date,
+            msg="Alert date of last hit didn't match.",
+        )
 
         webhooks_enabled = Webhook.objects.filter(enabled=True)
         self.assertEqual(len(webhooks_enabled), 1)
@@ -2195,6 +2543,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         # one for user_profile_2
         self.assertEqual(len(mail.outbox), 2)
         text_content = mail.outbox[0].body
+        self.assertEqual(
+            mail.outbox[0].subject,
+            f"1 Alert has hits: {self.search_alert.name}",
+        )
+
         self.assertIn(rt_oral_argument.case_name, text_content)
 
         # Should have the List-Unsubscribe-Post and List-Unsubscribe header
@@ -2299,6 +2652,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                     stt_transcript=transcript,
                 )
 
+        # Send RT alerts
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(len(mail.outbox), 3, msg="Wrong number of emails.")
         text_content = mail.outbox[2].body
 
@@ -2348,6 +2703,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 docket__docket_number="19-5735",
             )
 
+        # Send RT alerts
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
         # Two OA search alert emails should be sent, one for user_profile and
         # one for user_profile_2
         self.assertEqual(len(mail.outbox), 2)
@@ -2372,6 +2730,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rt_oral_argument.sha1 = "12345"
             rt_oral_argument.save()
 
+        # Send RT alerts
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         # New alerts shouldn't be sent. Since document was just updated.
         self.assertEqual(len(mail.outbox), 2)
         text_content = mail.outbox[0].body
@@ -2392,7 +2752,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert OA",
-            query="type=oa&docket_number=19-1010",
+            query="type=oa&docket_number=19-1010&order_by=score desc",
             alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
 
@@ -2402,6 +2762,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         response_str = str(doc.to_dict())
         self.assertIn("'query': '19-1010'", response_str)
         self.assertIn("'rate': 'rt'", response_str)
+        self.assertNotIn("function_score", response_str)
 
         # Update Alert
         search_alert_1.query = "type=oa&docket_number=19-1020"
@@ -2614,6 +2975,21 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     )
     def test_group_alerts_and_hits(self, mock_logger, mock_abort_audio):
         """"""
+
+        rt_oa_search_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test RT Alert OA",
+            query="q=docketNumber:19-5739 OR docketNumber:19-5740&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+        )
+        rt_oa_search_alert_2 = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test RT Alert OA 2",
+            query="q=docketNumber:19-5741&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+        )
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -2642,20 +3018,62 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 docket__docket_number="19-5741",
             )
 
-        # No emails should be sent in RT, since all the alerts triggered by the
-        # OA documents added are not RT.
-        self.assertEqual(len(mail.outbox), 0)
+        # Send RT alerts
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
-        # 7 webhook events should be triggered in RT:
-        # rt_oral_argument_1 should trigger 3: search_alert_3, search_alert_5
-        # and search_alert_6.
-        # rt_oral_argument_2 should trigger 3: search_alert_3, search_alert_5
-        # and search_alert_6.
-        # rt_oral_argument_3 should trigger 1: search_alert_4
-        # One webhook event should be sent to user_profile
+        # 1 email should be sent for the rt_oa_search_alert and rt_oa_search_alert_2
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Wrong number of emails sent."
+        )
+
+        # The OA RT alert email should contain 2 alerts, one for rt_oa_search_alert
+        # and one for rt_oa_search_alert_2. First alert should contain 2 hits.
+        # Second alert should contain only 1 hit.
+
+        # Assert text version.
+        text_content = mail.outbox[0].body
+        self.assertIn(rt_oral_argument_1.case_name, text_content)
+        self.assertIn(rt_oral_argument_2.case_name, text_content)
+        self.assertIn(rt_oral_argument_3.case_name, text_content)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            f"2 Alerts have hits: {rt_oa_search_alert.name}, {rt_oa_search_alert_2.name}",
+        )
+
+        # Assert html version.
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self._confirm_number_of_alerts(html_content, 2)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            rt_oa_search_alert.name,
+            2,
+            rt_oral_argument_1.case_name,
+            0,
+        )
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            rt_oa_search_alert.name,
+            2,
+            rt_oral_argument_2.case_name,
+            0,
+        )
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            rt_oa_search_alert_2.name,
+            1,
+            rt_oral_argument_3.case_name,
+            0,
+        )
+
+        # 10 webhook events should be triggered in RT:
+        # rt_oral_argument_1 should trigger 4: search_alert_3, search_alert_5,
+        # search_alert_6 and rt_oa_search_alert.
+        # rt_oral_argument_2 should trigger 4: search_alert_3, search_alert_5,
+        # search_alert_6 and rt_oa_search_alert.
+        # rt_oral_argument_3 should trigger 2: search_alert_4 and rt_oa_search_alert.
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(
-            len(webhook_events), 7, msg="Unexpected number of" "webhooks sent."
+            len(webhook_events), 10, msg="Unexpected number of webhooks sent."
         )
 
         # 7 webhook event should be sent to user_profile for 4 different
@@ -2666,6 +3084,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             self.search_alert_4.pk,
             self.search_alert_5.pk,
             self.search_alert_6.pk,
+            rt_oa_search_alert.pk,
+            rt_oa_search_alert_2.pk,
         ]
         for webhook_content in webhook_events:
             content = webhook_content.content["payload"]
@@ -2685,8 +3105,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # One OA search alert email should be sent.
         mock_logger.info.assert_called_with("Sent 1 dly email alerts.")
-        self.assertEqual(len(mail.outbox), 1)
-        text_content = mail.outbox[0].body
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Wrong number of emails sent."
+        )
+        text_content = mail.outbox[1].body
+        self.assertEqual(
+            mail.outbox[1].subject,
+            f"2 Alerts have hits: {self.search_alert_3.name}, {self.search_alert_4.name}",
+        )
 
         # The right alert type template is used.
         self.assertIn("oral argument", text_content)
@@ -2701,25 +3127,25 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertIn(self.search_alert_4.name, text_content)
 
         # Should not include the List-Unsubscribe-Post header.
-        self.assertIn("List-Unsubscribe", mail.outbox[0].extra_headers)
-        self.assertNotIn("List-Unsubscribe-Post", mail.outbox[0].extra_headers)
+        self.assertIn("List-Unsubscribe", mail.outbox[1].extra_headers)
+        self.assertNotIn("List-Unsubscribe-Post", mail.outbox[1].extra_headers)
         alert_list_url = reverse("disable_alert_list")
         self.assertIn(
             alert_list_url,
-            mail.outbox[0].extra_headers["List-Unsubscribe"],
+            mail.outbox[1].extra_headers["List-Unsubscribe"],
         )
         self.assertIn(
             f"keys={self.search_alert_3.secret_key}",
-            mail.outbox[0].extra_headers["List-Unsubscribe"],
+            mail.outbox[1].extra_headers["List-Unsubscribe"],
         )
         self.assertIn(
             f"keys={self.search_alert_4.secret_key}",
-            mail.outbox[0].extra_headers["List-Unsubscribe"],
+            mail.outbox[1].extra_headers["List-Unsubscribe"],
         )
 
         # Extract HTML version.
         html_content = None
-        for content, content_type in mail.outbox[0].alternatives:
+        for content, content_type in mail.outbox[1].alternatives:
             if content_type == "text/html":
                 html_content = content
                 break
@@ -2730,6 +3156,17 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         rt_oral_argument_1.delete()
         rt_oral_argument_2.delete()
         rt_oral_argument_3.delete()
+
+        # Confirm Stat object is properly created and updated.
+        stats_objects = Stat.objects.all()
+        self.assertEqual(stats_objects.count(), 2)
+        stat_names = set([stat.name for stat in stats_objects])
+        self.assertEqual(stat_names, {"alerts.sent.rt", "alerts.sent.dly"})
+        self.assertEqual(stats_objects[0].count, 1)
+        self.assertEqual(stats_objects[1].count, 1)
+
+        # Remove test instances.
+        rt_oa_search_alert.delete()
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_send_multiple_rt_alerts(self, mock_abort_audio):
@@ -2793,6 +3230,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 docket__date_argued=now().date(),
                 docket__docket_number="19-5735",
             )
+
+        # Send RT alerts
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         # 11 OA search alert emails should be sent, one for each user that
         # had donated enough.

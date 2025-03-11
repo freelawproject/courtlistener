@@ -3,37 +3,72 @@
 {% load text_filters %}
 {% load static %}
 {% load pacer %}
+{% load humanize %}
 
-{% block title %}RECAP Requests – CourtListener.com{% endblock %}
-{% block og_title %}RECAP Requests – CourtListener.com{% endblock %}
+{% block title %}Most Wanted PACER Documents — CourtListener.com{% endblock %}
+{% block og_title %}Most Wanted PACER Documents — CourtListener.com{% endblock %}
 
-{% block description %}RECAP Requests on CourtListener.{% endblock %}
-{% block og_description %}RECAP Requests on CourtListener.{% endblock %}
-
+{% block description %}CourtListener lets you request the purchase of legal documents. View the community's most wanted documents.{% endblock %}
+{% block og_description %}CourtListener lets you request the purchase of legal documents. View the community's most wanted documents.{% endblock %}
 
 {% block content %}
+
+  <div class="col-xs-12">
+    <ul class="prayer-top-buttons nav navbar-nav navbar-right">
+      {% include 'includes/remind_me_modal.html' %}
+      <li class="hidden-xs">
+        <a href="#" class="donate" data-toggle="modal" data-target="#remindMeModal">
+          <i class="fa fa-heart-o"></i>&nbsp;Remind Me to Help
+        </a>
+      </li>
+      <li>
+        <a href={% if user.is_authenticated %}"{% url 'user_prayers' user.username %}"{% else %}"{% url 'sign-in' %}?next={% url 'top_prayers' %}"{% endif %}><div class="fa gray fa-fw">
+          {% include "includes/hand-holding-heart.svg" %}
+        </div> Your Prayers</a>
+      </li>
+      <li><a href="{% url "pray_and_pay_help" %}">Learn More</a></li>
+    </ul>
+  </div>
+
+
+  <div class="col-xs-12">
+    <h1 class="text-center v-offset-below-3">Community's Most Wanted PACER Documents</h1>
+    <h3 class="text-center"><b>{{ granted_stats.prayer_count|intcomma }}</b> {{ granted_stats.prayer_count|pluralize:"prayer,prayers" }} granted totaling <b>${{ granted_stats.total_cost }}</b></h3>
+    <h3 class="text-center v-offset-below-3"><b>{{ waiting_stats.prayer_count|intcomma }}</b> {{ waiting_stats.prayer_count|pluralize:"prayer,prayers" }} pending totaling at least <b>${{ waiting_stats.total_cost }}</b></h3>
+  </div>
 
   <div class="col-xs-12">
     <div class="table-responsive">
       <table class="settings-table table">
         <thead>
             <tr>
-              <th>User Preference</th>
-              <th>Document Description</th>
+              <th>Court</th>
+              <th>Case Name</th>
               <th>Document Number</th>
-              <th>PACER Doc ID</th>
-              <th>Document Court</th>
+              <th>Document Description</th>
               <th>Buy on Pacer</th>
+            {% if perms.favorites.change_prayer %}
+              <th>Action</th>
+            {% endif %}
             </tr>
         </thead>
         <tbody>
             {% for prayer in top_prayers %}
             <tr>
-              <td>{{ forloop.counter }}</td>
+              <td>{{ prayer.docket_entry.docket.court.citation_string }}</td>
+              {% with docket=prayer.docket_entry.docket %}
+              <td>
+                <a href="{% url "view_docket" docket.pk docket.slug %}">
+                  {{ prayer.docket_entry.docket|best_case_name|safe|v_wrapper }} ({{ prayer.docket_entry.docket.docket_number }})
+                </a>
+              </td>
+              <td>
+                <a href="{% url "view_recap_document" docket.pk prayer.docket_entry.entry_number docket.slug %}">
+                  {{ prayer.document_number }}
+                </a>
+              </td>
+              {% endwith %}
               <td>{{ prayer.description }}</td>
-              <td>{{ prayer.document_number }}</td>
-              <td>{{ prayer.pacer_doc_id }}</td>
-              <td>{{ prayer.docket_entry.docket.court_id }}</td>
               <td><a href="{{ prayer.pacer_url }}"
                 {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                   class="open_buy_pacer_modal btn btn-default btn-xs"
@@ -43,6 +78,15 @@
                 {% endif %}
                   target="_blank"
                   rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
+              {% if perms.favorites.change_prayer %}
+                <td>
+                  <div class="flex">
+                    <a href="{% url 'admin:favorites_prayer_changelist' %}?recap_document={{prayer.id}}" class="btn btn-default btn-xs">
+                      <i class="fa fa-pencil"></i>&nbsp;Edit
+                    </a>
+                  </div>
+                </td>
+              {% endif %}
             </tr>
             {% empty %}
             <tr>
@@ -53,6 +97,12 @@
       </table>
     </div>
   </div>
+
+{% if top_prayers.has_other_pages %}
+  <div class="col-xs-12" >
+    {% include "includes/pagination.html" with page_obj=top_prayers %}
+  </div>
+{% endif %}
 {% endblock %}
 
 {% block footer-scripts %}

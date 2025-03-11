@@ -1622,6 +1622,10 @@ class RECAPAlertsSweepIndexTest(
             msg="Wrong number of V1 webhook events.",
         )
 
+        self.assertEqual(
+            mail.outbox[0].subject,
+            f"2 Alerts have hits: {docket_only_alert.name}, {cross_object_alert.name}",
+        )
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 2)
@@ -1713,6 +1717,11 @@ class RECAPAlertsSweepIndexTest(
         )
         self.assertEqual(
             v2_webhook_event.content["webhook"]["deprecation_date"], None
+        )
+
+        self.assertEqual(
+            mail.outbox[1].subject,
+            f"1 Alert has hits: {cross_object_alert_after_update.name}",
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
@@ -2221,13 +2230,19 @@ class RECAPAlertsPercolatorTest(
             user=self.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert Docket Only",
-            query='q="401 Civil"&type=r',
+            query='q="401 Civil"&type=r&order_by=score desc',
             alert_type=SEARCH_TYPES.RECAP,
         )
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert.pk),
             msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
         )
+        alert_doc = RECAPPercolator.get(id=docket_only_alert.pk)
+        response_str = str(alert_doc.to_dict())
+        self.assertIn("401 Civil", response_str)
+        self.assertIn("'rate': 'wly'", response_str)
+        # function_score breaks percolator queries. Ensure it is never indexed.
+        self.assertNotIn("function_score", response_str)
 
         docket_only_alert_id = docket_only_alert.pk
         # Remove the alert.

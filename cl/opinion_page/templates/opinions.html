@@ -62,8 +62,8 @@
                     </p>
                 </div>
             {% endif %}
-
-       <div id="opinion-toc" class="sidebar-section">
+        {% if tab == "opinions" %}
+        <div id="opinion-toc" class="sidebar-section">
               <h3> <span>Jump To</span> </h3>
               <li class="jump-links active"><a id="nav_top" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#"  class="active">Top</a></li>
               <li class="jump-links"><a id="nav_caption" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#caption" >Caption</a></li>
@@ -115,6 +115,7 @@
               </li>
               {% endfor %}
           </div>
+        {% endif %}
 
         {% if cluster.sub_opinions.all.first.extracted_by_ocr or "U" in cluster.source and tab == "opinions" %}
             <div class="col-sm-12 alert-warning alert v-offset-above-2">
@@ -160,6 +161,17 @@
             </div>
             <div class="clearfix"></div>
         {% endif %}
+
+        {% if tab == "pdf" %}
+            <div class="col-sm-12 alert-warning alert v-offset-above-2">
+                <p class="bottom">
+                    Certain sections of this document, such as headnotes or
+                    other content, may be redacted to comply with copyright
+                    or privacy requirements.
+                </p>
+            </div>
+            <div class="clearfix"></div>
+        {% endif %}
         </div>
 
         <div class="bottom-section">
@@ -192,12 +204,12 @@
               <div class="flex justify-content-between top-row">
                 <span class="case-date-new">{{ cluster.date_filed }}</span>
                 <div class="action-buttons">
-                  <div id="get-citation-btn-group" class="btn-group hidden-print">
+                  <div class="btn-group hidden-print">
                     <a id="get-citation-alerts" href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
                       rel="nofollow"
-                      class="btn"
+                      class="btn btn-default"
                     ><i class="fa fa-bell-o"></i><span class="hidden-xs">Get Citation Alerts</span></a>
-                    <a class="btn dropdown-toggle"
+                    <a class="btn btn-default dropdown-toggle"
                       data-toggle="dropdown"
                       aria-haspopup="true"
                       aria-expanded="false">
@@ -215,15 +227,15 @@
                 </div>
             </div>
 
-                <h1 class="case-caption jump-link" id="caption">{{ cluster|best_case_name|safe }}</h1>
+                <h1 class="case-caption jump-link select-all" id="caption">{{ cluster|best_case_name|safe }}</h1>
                 <h4 class="case-court">{{ cluster.docket.court }}</h4>
                 <br>
                 <div class="case-details">
                     <ul class="list-unstyled">
-                        <li><strong>Citations:</strong> {{ cluster.citation_string|default:"None known" }}</li>
+                      <li><strong>Citations:</strong> <span class="select-all">{{ cluster.citation_string|default:"None known" }}</span></li>
                         {% if cluster.case_name_full != cluster|best_case_name %}
                         <li><strong>Full Case Name:</strong>
-                            {{ cluster.case_name_full }}
+                          <span class="select-all">{{ cluster.case_name_full }}</span>
                         </li>
                         {% endif %}
 
@@ -287,28 +299,28 @@
                 </div>
             </div>
 
-            <ul class="nav nav-tabs hidden-print">
+            <ul class="nav nav-tabs hidden-print nav-justified">
                 <li role="presentation" {% if tab == "opinions" or tab == "" %} class="active" {% endif %}>
                     <a href="{% url 'view_case' cluster.pk cluster.slug %}">Opinion</a>
                 </li>
                 {% if authorities_count > 0 %}
                     <li role="presentation" {% if tab == "authorities" %} class="active" {% endif %}>
-                        <a href="{% url "view_case_authorities" cluster.pk cluster.slug %}">Auth<span class="hidden-xs hidden-sm hidden-md">orities&nbsp;({{ authorities_count }})</span></a>
+                        <a href="{% url "view_case_authorities" cluster.pk cluster.slug %}">Authorities&nbsp;({{ authorities_count }})</a>
                     </li>
                 {% endif %}
                 {% if cited_by_count > 0 %}
                     <li role="presentation" {% if tab == "cited-by" %} class="active" {% endif %}>
-                        <a href="{% url "view_case_cited_by" cluster.pk cluster.slug %}">Cited<span class="hidden-xs hidden-sm hidden-md">&nbsp;By&nbsp;({{ cited_by_count }})</span></a>
+                        <a href="{% url "view_case_cited_by" cluster.pk cluster.slug %}">Cited&nbsp;By&nbsp;({{ cited_by_count }})</a>
                     </li>
                 {% endif %}
                 {% if summaries_count > 0 %}
                     <li role="presentation" {% if tab == "summaries" %} class="active" {% endif %}>
-                        <a href="{% url "view_case_summaries" cluster.pk cluster.slug %}">Sum<span class="hidden-xs hidden-sm hidden-md">maries&nbsp;({{ summaries_count }})</span></a>
+                        <a href="{% url "view_case_summaries" cluster.pk cluster.slug %}">Summaries&nbsp;({{ summaries_count }})</a>
                     </li>
                 {% endif %}
                 {% if related_cases_count > 0  %}
                     <li role="presentation" {% if tab == "related-cases" %} class="active" {% endif %}>
-                        <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;<span class="hidden-xs hidden-sm hidden-md">Cases</span></a>
+                        <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;Cases</a>
                     </li>
                 {% endif %}
                 {% if has_downloads and "pdf" in pdf_path or cluster.filepath_pdf_harvard %}

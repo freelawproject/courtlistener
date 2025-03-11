@@ -6,7 +6,6 @@
 .opinion-body {
 
   .harvard > * {
-    font-family: Merriweather, "Times New Roman", Times, serif;
     font-size: 15px;
     letter-spacing: 0.2px;
     text-align: justify;
@@ -379,22 +378,17 @@ div.footnote:first-of-type {
 
   /*Case Caption CSS*/
   #caption-square {
-    background-color: #F6F2EE;
+    background-color: whitesmoke;
     margin-left: -15px;
     margin-right: -15px;
     margin-top: -20px;
   }
 
   #caption-square > ul > li {
-    background-color: #fcfaf9;
+    background-color: #e7e7e7;
     border-top-right-radius: 5px 5px; /* Rounds the corners */
     border-top-left-radius: 5px 5px; /* Rounds the corners */
     margin-left: 4px;
-  }
-
-  #caption-square > ul > li.active {
-      background-color: #ffffff;
-      border-bottom: 1px solid lightgrey;
   }
 
   #caption-square > ul > li.active {
@@ -407,7 +401,6 @@ div.footnote:first-of-type {
   }
 
   /*Opinion Date File*/
-
  .case-date-new {
     border: 1px solid #B53C2C;
     padding: 0px 10px;
@@ -439,7 +432,6 @@ div.footnote:first-of-type {
 
   #opinion-caption {
     margin-top: 20px;
-    font-family: Merriweather, "Times New Roman", Times, serif;
     font-size: 15px;
     letter-spacing: 0.2px;
     line-height: 2.3em;
@@ -461,29 +453,6 @@ div.footnote:first-of-type {
     font-style: italic;
   }
 
-  .opinion-button-row {
-    padding-top: 40px;
-  }
-
-  #download-original {
-    color: black;
-    border-color: black;
-    background-color: white;
-  }
-
-
-  #btn-group-download-original {
-    float:right;
-    margin-top: 0px;
-    margin-left:10px;
-    padding-right: 10px;
-  }
-  #add-note-button {
-    color: black;
-    border-color: black;
-    background-color: white;
-  }
-
   .top-row {
     height: 32px;
     line-height:28px
@@ -493,19 +462,6 @@ div.footnote:first-of-type {
     display: flex;
     column-gap: 5px;
   }
-
-  #get-citation-btn-group {
-    float:right;
-  }
-
-  #get-citation-btn-group > a {
-
-    color: black;
-    border-color: black;
-    background-color: white;
-    vertical-align: top;
-  }
-
 
   p > span.star-pagination::after {
     display: inline;
@@ -530,7 +486,6 @@ div.footnote:first-of-type {
   }
 
   div.subopinion-content > .harvard {
-    font-family: Merriweather, "Times New Roman", Times, serif;
     font-size: 15px;
     letter-spacing: 0.2px;
     line-height: 2.3em;
@@ -538,7 +493,6 @@ div.footnote:first-of-type {
   }
 
   #columbia-text {
-    font-family: Merriweather, "Times New Roman", Times, serif;
     font-size: 15px;
     letter-spacing: 0.2px;
     line-height: 2.3em;
@@ -684,14 +638,12 @@ div.footnote:first-of-type {
   }
 
   .case-details {
-    font-family: Merriweather, "Times New Roman", Times, serif;
     letter-spacing: 0.2px;
     line-height:2.3em;
   }
 
   .opinion-section-title {
     margin-top: 50px;
-    font-family: Merriweather, "Times New Roman", Times, serif;
   }
 
   /*Add style to align roman numerals */

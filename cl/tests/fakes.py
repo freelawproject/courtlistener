@@ -44,6 +44,15 @@ class FakeDocketReport:
         }
 
 
+class FakeAppellateDocketReport(FakeDocketReport):
+
+    @property
+    def data(self):
+        data = super(FakeAppellateDocketReport, self).data
+        data["court_id"] = "ca1"
+        return data
+
+
 class FakePossibleCaseNumberApi:
     def __init__(self, *args, **kwargs):
         pass
@@ -74,6 +83,25 @@ class FakeAttachmentPage:
     def data(self, *args, **kwargs):
         return {
             "pacer_doc_id": "17711118263",
+            "document_number": "1",
+            "attachments": [],
+        }
+
+
+class FakeAppellateAttachmentPage:
+    response = MagicMock(text="")
+    _parse_text = MagicMock()
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def query(self, *args, **kwargs):
+        pass
+
+    @property
+    def data(self, *args, **kwargs):
+        return {
+            "pacer_doc_id": "1208699339",
             "document_number": "1",
             "attachments": [],
         }

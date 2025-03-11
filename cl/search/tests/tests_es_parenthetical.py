@@ -169,7 +169,6 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.rebuild_index("search.ParentheticalGroup")
 
     def test_filter_search(self) -> None:
         """Test filtering and search at the same time"""
@@ -465,7 +464,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            "docket_number. Expected %s, but got %s." % (expected, actual),
         )
         r = await self.async_client.get(
             reverse("show_results"),

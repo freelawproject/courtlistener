@@ -9,9 +9,16 @@ from django.db import connections
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import get_redis_interface
+from cl.people_db.models import Position
 from cl.search.models import SEARCH_TYPES
 
 s3_client = boto3.client("s3")
+
+JUDICIAL_POSITIONS: list[str] = [
+    key
+    for key, value in Position.POSITION_TYPE_GROUPS.items()
+    if value == "Judge"
+]
 
 
 def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
@@ -31,6 +38,7 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
     Returns:
         int: The total number of records matching the specified data type.
     """
+    params: list[Any] = []
     match type:
         case SEARCH_TYPES.RECAP_DOCUMENT:
             base_query = (
@@ -40,8 +48,15 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
             WHERE is_available=True AND page_count>0 AND ocr_status!=1
             """
         case SEARCH_TYPES.OPINION:
-            base_query = "SELECT count(*) AS exact_count FROM search_opinion"
-            filter_clause = "WHERE extracted_by_ocr != true"
+            base_query = (
+                "SELECT count(*) AS exact_count "
+                "FROM search_opinion O "
+                "INNER JOIN search_opinioncluster OC ON O.cluster_id = OC.id"
+            )
+            filter_clause = (
+                "WHERE (extracted_by_ocr != true OR OC.source LIKE %s)"
+            )
+            params.append("%U%")
         case SEARCH_TYPES.ORAL_ARGUMENT:
             base_query = "SELECT count(*) AS exact_count FROM audio_audio"
             filter_clause = """WHERE local_path_mp3 != '' AND
@@ -49,6 +64,17 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
                 position('Unavailable' in download_url) = 0 AND
                 duration > 30
             """
+        case SEARCH_TYPES.PEOPLE:
+            base_query = (
+                "SELECT count(DISTINCT P.id) "
+                "FROM people_db_person P "
+                "JOIN people_db_position POS ON P.id = POS.person_id"
+            )
+            filter_clause = "WHERE POS.position_type=ANY(%s)"
+            params.append(JUDICIAL_POSITIONS)
+        case "fd":
+            base_query = "SELECT count(*) AS exact_count FROM disclosures_financialdisclosure"
+            filter_clause = ""
 
     if options["random_sample_percentage"]:
         percentage = options["random_sample_percentage"]
@@ -62,7 +88,7 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
     with connections[
         "replica" if options["use_replica"] else "default"
     ].cursor() as cursor:
-        cursor.execute(query, [])
+        cursor.execute(query, params)
         result = cursor.fetchone()
 
     return int(result[0])
@@ -89,7 +115,7 @@ def get_custom_query(
             query(str) and a list of parameters (list[Any]) to be used with
             the query.
     """
-    params = []
+    params: list[Any] = []
     random_sample = options["random_sample_percentage"]
     match type:
         case SEARCH_TYPES.RECAP_DOCUMENT:
@@ -98,8 +124,15 @@ def get_custom_query(
                 "WHERE is_available=True AND page_count>0 AND ocr_status!=1"
             )
         case SEARCH_TYPES.OPINION:
-            base_query = "SELECT id from search_opinion"
-            filter_clause = "WHERE extracted_by_ocr != true"
+            base_query = (
+                "SELECT O.id "
+                "FROM search_opinion O "
+                "INNER JOIN search_opinioncluster OC ON O.cluster_id = OC.id"
+            )
+            filter_clause = (
+                "WHERE (extracted_by_ocr != true OR OC.source LIKE %s)"
+            )
+            params.append("%U%")
         case SEARCH_TYPES.ORAL_ARGUMENT:
             base_query = "SELECT id from audio_audio"
             filter_clause = """
@@ -108,6 +141,17 @@ def get_custom_query(
                 position('Unavailable' in download_url) = 0 AND
                 duration > 30
             """
+        case SEARCH_TYPES.PEOPLE:
+            base_query = (
+                "SELECT DISTINCT P.id "
+                "FROM people_db_person P "
+                "JOIN people_db_position POS ON P.id = POS.person_id"
+            )
+            filter_clause = "WHERE POS.position_type=ANY(%s)"
+            params.append(JUDICIAL_POSITIONS)
+        case "fd":
+            base_query = "SELECT id FROM disclosures_financialdisclosure"
+            filter_clause = ""
 
     if random_sample:
         base_query = f"{base_query} TABLESAMPLE SYSTEM ({random_sample})"
@@ -120,10 +164,17 @@ def get_custom_query(
     # removes these clauses when retrieving a random sample to ensure all rows
     # have an equal chance of being selected.
     if last_pk and not random_sample:
+        match type:
+            case SEARCH_TYPES.OPINION:
+                base_id = "O.id"
+            case SEARCH_TYPES.PEOPLE:
+                base_id = "P.id"
+            case _:
+                base_id = "id"
         filter_clause = (
-            f"WHERE id > %s"
+            f"WHERE {base_id} > %s"
             if not filter_clause
-            else f"{filter_clause} AND id > %s"
+            else f"{filter_clause} AND {base_id} > %s"
         )
         params.append(last_pk)
 
@@ -152,6 +203,8 @@ class Command(VerboseCommand):
                 SEARCH_TYPES.RECAP_DOCUMENT,
                 SEARCH_TYPES.OPINION,
                 SEARCH_TYPES.ORAL_ARGUMENT,
+                SEARCH_TYPES.PEOPLE,
+                "fd",  # Type for financial disclosures
             ],
             help=(
                 "Which type of records do you want to import?"
@@ -202,6 +255,13 @@ class Command(VerboseCommand):
             default=False,
             help="Use this flag to retrieve all records from the table without"
             " applying any filters.",
+        )
+        parser.add_argument(
+            "--save-ids-as-sequence",
+            action="store_true",
+            default=False,
+            help="Store IDs in manifest files as a string sequence (e.g., '1_2_3') "
+            "instead of a range (e.g., '1-3').",
         )
 
     def handle(self, *args, **options):
@@ -264,7 +324,10 @@ class Command(VerboseCommand):
                     extrasaction="ignore",
                 )
                 for row in batched(rows, options["lambda_record_size"]):
-                    if options["random_sample_percentage"]:
+                    if (
+                        options["random_sample_percentage"]
+                        or options["save_ids_as_sequence"]
+                    ):
                         # Create an underscore-separated file name that lambda
                         # can split and use as part of batch processing.
                         ids = [str(r[0]) for r in row]
@@ -322,5 +385,5 @@ class Command(VerboseCommand):
                 )
             )
 
-        # Removes the key from the cache after a succesfull execution
+        # Removes the key from the cache after a successful execution
         r.delete(f"{record_type}_import_status")

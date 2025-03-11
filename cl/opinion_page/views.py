@@ -48,7 +48,6 @@ from cl.favorites.models import Note
 from cl.favorites.utils import (
     get_existing_prayers_in_bulk,
     get_prayer_counts_in_bulk,
-    prayer_eligible,
 )
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
@@ -57,7 +56,7 @@ from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.ratelimiter import ratelimiter_all_10_per_h
-from cl.lib.search_utils import make_get_string
+from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
@@ -92,12 +91,12 @@ from cl.search.models import (
     Court,
     Docket,
     DocketEntry,
+    Opinion,
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
 )
 from cl.search.selectors import get_clusters_from_citation_str
-from cl.search.views import do_es_search
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -376,32 +375,27 @@ async def view_docket(
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
-    prayer_is_eligible = False
-    flag_for_prayers = await sync_to_async(waffle.flag_is_active)(
-        request, "pray-and-pay"
-    )
-    if flag_for_prayers:
-        # Extract recap documents from the current page.
-        recap_documents = [
-            rd
-            for entry in await sync_to_async(list)(paginated_entries)
-            async for rd in entry.recap_documents.all()
-        ]
-        # Get prayer counts in bulk.
-        prayer_counts = await get_prayer_counts_in_bulk(recap_documents)
-        existing_prayers = {}
+    # Extract recap documents from the current page.
+    recap_documents = [
+        rd
+        for entry in await sync_to_async(list)(paginated_entries)
+        async for rd in entry.recap_documents.all()
+    ]
+    # Get prayer counts in bulk.
+    prayer_counts = await get_prayer_counts_in_bulk(recap_documents)
+    existing_prayers = {}
 
-        if request.user.is_authenticated:
-            # Check prayer existence in bulk.
-            existing_prayers = await get_existing_prayers_in_bulk(
-                request.user, recap_documents
-            )
-            prayer_is_eligible = await prayer_eligible(request.user)
+    user = await request.auser()
+    if user.is_authenticated:
+        # Check prayer existence in bulk.
+        existing_prayers = await get_existing_prayers_in_bulk(
+            user, recap_documents
+        )
 
-        # Merge counts and existing prayer status to RECAPDocuments.
-        for rd in recap_documents:
-            rd.prayer_count = prayer_counts.get(rd.id, 0)
-            rd.prayer_exists = existing_prayers.get(rd.id, False)
+    # Merge counts and existing prayer status to RECAPDocuments.
+    for rd in recap_documents:
+        rd.prayer_count = prayer_counts.get(rd.id, 0)
+        rd.prayer_exists = existing_prayers.get(rd.id, False)
 
     context.update(
         {
@@ -412,7 +406,6 @@ async def view_docket(
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
-            "prayer_eligible": prayer_is_eligible,
         }
     )
     return TemplateResponse(request, "docket.html", context)
@@ -545,7 +538,7 @@ async def docket_authorities(
             # Needed to show/hide parties tab.
             "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
-            "authorities": docket.authorities_with_data,
+            "authorities": docket.authority_opinions.distinct(),
         }
     )
     return TemplateResponse(request, "docket_authorities.html", context)
@@ -711,6 +704,19 @@ async def view_recap_document(
 
     de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
     d = await Docket.objects.aget(id=de.docket_id)
+
+    prayer_counts = await get_prayer_counts_in_bulk([rd])
+    existing_prayers = {}
+
+    user = await request.auser()
+    if user.is_authenticated:
+        # Check prayer existence.
+        existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
+
+    # Merge counts and existing prayer status to RECAPDocuments.
+    rd.prayer_count = prayer_counts.get(rd.id, 0)
+    rd.prayer_exists = existing_prayers.get(rd.id, False)
+
     return TemplateResponse(
         request,
         "recap_document.html",
@@ -796,7 +802,15 @@ async def view_opinion_old(
     unbound form.
     """
     # Look up the court, cluster, title and note information
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    cluster: OpinionCluster = await aget_object_or_404(
+        OpinionCluster.objects.prefetch_related(
+            Prefetch(
+                "sub_opinions",
+                queryset=Opinion.objects.order_by("ordering_key"),
+            )
+        ),
+        pk=pk,
+    )
     title = ", ".join(
         [
             s

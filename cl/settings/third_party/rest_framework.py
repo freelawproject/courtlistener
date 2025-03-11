@@ -28,7 +28,48 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Sock puppets
+        "kokonag227": "1/hour",
+        "dedadi7242": "1/hour",
+        "texoya9545": "1/hour",
+        "nedah94680": "1/hour",
+        "robowiy352": "1/hour",
+        # Multiple accounts
+        "my_yancy_lost": "1/hour",
+        "theworky_1980": "1/hour",
+        "thelaw_2025": "1/hour",
+        "world_over_eggs": "1/hour",
+        "yancy_closer": "1/hour",
+        "phx_major": "1/hour",
+        "giraffe_counsel_2025": "1/hour",
+        "yoway_3897": "1/hour",
+        "deantaylor2025": "1/hour",
+        "yoway_3897": "1/hour",
+        # Multiple accounts
+        "api_1": "1/hour",
+        "api_2": "1/hour",
+        "api_account_1": "1/hour",
+        "api_account_2": "1/hour",
+        "api_account_3": "1/hour",
+        "api_account_4": "1/hour",
+        "api_account_5": "1/hour",
+        "court_test_account_3": "1/hour",
+        "court_test_account_2": "1/hour",
+        "court_api_1": "1/hour",
+        "court_api_2": "1/hour",
+        "court_api_3": "1/hour",
+        "court_api_4": "1/hour",
+        "court_api_5": "1/hour",
+        "JamesBond": "1/hour",
+        "JackSparrow": "1/hour",
+        "PeterPan": "1/hour",
+        "HomerSimpson": "1/hour",
+        "BruceWayne": "1/hour",
+        "mibefis809": "1/hour",
         # Unresponsive
+        "AlirezaMirrokni": "1/hour",
+        "court_test_account": "1/hour",
+        "jmmckinnie": "1/hour",
         "projecttesting": "1/hour",
         "SAGW": "1/hour",
         # Bounced
@@ -64,7 +105,6 @@ REST_FRAMEWORK = {
         # No response
         "commernet": "1/hour",
         "zealousgalileo": "1/hour",
-        "tuhinharit": "1/hour",  # Deep pagination
         "JaneDoe": "1/hour",
         "chinamkm": "1/hour",
         "shreyngd": "100/hour",

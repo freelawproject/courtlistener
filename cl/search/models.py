@@ -1,7 +1,7 @@
 import logging
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Tuple, TypeVar
+from typing import Dict, List, Tuple, TypeVar
 
 import pghistory
 import pytz
@@ -12,9 +12,10 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Prefetch, Q, QuerySet
+from django.db.models.aggregates import Count, Sum
 from django.db.models.functions import MD5
-from django.urls import NoReverseMatch, reverse
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.functional import cached_property
@@ -28,7 +29,6 @@ from model_utils import FieldTracker
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
-from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     CSVExportMixin,
     linkify_orig_docket_number,
@@ -37,7 +37,6 @@ from cl.lib.model_helpers import (
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
-from cl.lib.search_index_utils import InvalidDocumentError
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.search.docket_sources import DocketSources
@@ -870,6 +869,22 @@ class Docket(AbstractDateTimeModel, DocketSources):
         """
         return build_authorities_query(self.authorities)
 
+    @property
+    def authority_opinions(self):
+        """Return a queryset of Opinions cited by this docket's RDs.
+
+        This is similar to the authorities property, but instead of
+        listing OpinionsCitedByRECAPDocuments, it lists Opinions.
+
+        The returned queryset is annotated with the number of filings
+        and the total depth across references, and optimized by prefetching
+        related data.
+        """
+        opinions = Opinion.objects.filter(
+            citing_documents__citing_document__docket_entry__docket_id=self.pk
+        )
+        return build_authority_opinions_query(opinions)
+
     def add_idb_source(self):
         if self.source in self.NON_IDB_SOURCES():
             self.source = self.source + self.IDB
@@ -1383,6 +1398,19 @@ class RECAPDocument(
                 },
             )
 
+    def is_acms_document(self) -> bool:
+        """
+        Checks if the document is from ACMS based on the presence of hyphens
+        in the pacer_doc_id.
+
+        ACMS documents are currently the only ones using hyphens in their
+        doc_id.
+
+        :return: True if the doc_id contains more than one hyphen, False
+            otherwise.
+        """
+        return self.pacer_doc_id.count("-") > 1
+
     @property
     def pacer_url(self) -> str | None:
         """Construct a doc1 URL for any item, if we can. Else, return None."""
@@ -1391,7 +1419,7 @@ class RECAPDocument(
         court = self.docket_entry.docket.court
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
-            if self.pacer_doc_id.count("-") > 1:
+            if self.is_acms_document():
                 return (
                     f"https://{court_id}-showdoc.azurewebsites.us/docs/"
                     f"{self.docket_entry.docket.pacer_case_id}/"
@@ -1557,61 +1585,6 @@ class RECAPDocument(
             )
             logger.error(msg)
             raise ValidationError({"attachment_number": msg})
-
-    def get_docket_metadata(self):
-        """The metadata for the item that comes from the Docket."""
-        docket = self.docket_entry.docket
-        # IDs
-        out = {
-            "docket_id": docket.pk,
-            "court_id": docket.court.pk,
-            "assigned_to_id": getattr(docket.assigned_to, "pk", None),
-            "referred_to_id": getattr(docket.referred_to, "pk", None),
-        }
-
-        # Docket
-        out.update(
-            {
-                "docketNumber": docket.docket_number,
-                "caseName": best_case_name(docket),
-                "suitNature": docket.nature_of_suit,
-                "cause": docket.cause,
-                "juryDemand": docket.jury_demand,
-                "jurisdictionType": docket.jurisdiction_type,
-            }
-        )
-        if docket.date_argued is not None:
-            out["dateArgued"] = midnight_pt(docket.date_argued)
-        if docket.date_filed is not None:
-            out["dateFiled"] = midnight_pt(docket.date_filed)
-        if docket.date_terminated is not None:
-            out["dateTerminated"] = midnight_pt(docket.date_terminated)
-        try:
-            out["docket_absolute_url"] = docket.get_absolute_url()
-        except NoReverseMatch:
-            raise InvalidDocumentError(
-                f"Unable to save to index due to missing absolute_url: {self.pk}"
-            )
-
-        # Judges
-        if docket.assigned_to is not None:
-            out["assignedTo"] = docket.assigned_to.name_full
-        elif docket.assigned_to_str:
-            out["assignedTo"] = docket.assigned_to_str
-        if docket.referred_to is not None:
-            out["referredTo"] = docket.referred_to.name_full
-        elif docket.referred_to_str:
-            out["referredTo"] = docket.referred_to_str
-
-        # Court
-        out.update(
-            {
-                "court": docket.court.full_name,
-                "court_exact": docket.court_id,  # For faceting
-                "court_citation_string": docket.court.citation_string,
-            }
-        )
-        return out
 
     def get_csv_columns(self, get_column_name=False):
         columns = [
@@ -2935,8 +2908,7 @@ class OpinionClusterNonParticipatingJudges(
         proxy = True
 
 
-@pghistory.track()
-class Citation(models.Model):
+class BaseCitation(models.Model):
     """A simple class to hold citations."""
 
     FEDERAL = 1
@@ -2976,12 +2948,6 @@ class Citation(models.Model):
             "72 Soc.Sec.Rep.Serv. 318)",
         ),
     )
-    cluster = models.ForeignKey(
-        OpinionCluster,
-        help_text="The cluster that the citation applies to",
-        related_name="citations",
-        on_delete=models.CASCADE,
-    )
     volume = models.SmallIntegerField(help_text="The volume of the reporter")
     reporter = models.TextField(
         help_text="The abbreviation for the reporter",
@@ -3002,9 +2968,24 @@ class Citation(models.Model):
         help_text="The type of citation that this is.", choices=CITATION_TYPES
     )
 
+    class Meta:
+        abstract = True
+
     def __str__(self) -> str:
         # Note this representation is used in the front end.
         return "{volume} {reporter} {page}".format(**self.__dict__)
+
+
+@pghistory.track()
+class Citation(BaseCitation):
+    """A citation to an OpinionCluster"""
+
+    cluster = models.ForeignKey(
+        OpinionCluster,
+        help_text="The cluster that the citation applies to",
+        related_name="citations",
+        on_delete=models.CASCADE,
+    )
 
     def get_absolute_url(self) -> str:
         return self.cluster.get_absolute_url()
@@ -3240,6 +3221,7 @@ class Opinion(AbstractDateTimeModel):
             "html",
             "plain_text",
             "sha1",
+            "ordering_key",
         ]
     )
     ordering_key = models.IntegerField(null=True, blank=True)
@@ -3343,6 +3325,51 @@ class OpinionsCitedByRECAPDocument(models.Model):
         verbose_name_plural = "Opinions cited by RECAP document"
         unique_together = ("citing_document", "cited_opinion")
         indexes = [models.Index(fields=["depth"])]
+
+
+def build_authority_opinions_query(
+    base_queryset: QuerySet[Opinion],
+) -> QuerySet[Opinion]:
+    """Annotates a queryset of Opinions and optimizes related queries.
+
+    The annotated queryset includes the number of filings (total number of
+    RECAPDocuments that cite each opinion) and the total depth (total
+    number of references across documents).
+    """
+    return (
+        base_queryset.select_related("cluster__docket__court")
+        .prefetch_related(
+            "cluster__citations",
+            "citing_documents",
+            Prefetch(
+                "cluster__sub_opinions",
+                queryset=Opinion.objects.only("pk", "cluster_id"),
+            ),
+        )
+        .annotate(
+            num_filings=Count(
+                "citing_documents__citing_document", distinct=True
+            ),
+            total_depth=Sum("citing_documents__depth"),
+        )
+        .only(
+            "cluster__id",
+            "cluster__blocked",
+            "cluster__case_name",
+            "cluster__case_name_full",
+            "cluster__case_name_short",
+            "cluster__docket_id",
+            "cluster__docket__court__full_name",
+            "cluster__docket__docket_number",
+            "cluster__docket__court_id",
+            "cluster__docket__court__citation_string",
+            "cluster__slug",
+            "cluster__citation_count",
+            "cluster__docket_id",
+            "cluster__date_filed",
+        )
+        .order_by("-num_filings", "-total_depth")
+    )
 
 
 def build_authorities_query(

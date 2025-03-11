@@ -1829,3 +1829,21 @@ rect.series-segment {
 .prayer-button[data-gap-size="large"]{
   margin-left: 44px;
 }
+
+.gap-1 {
+  gap: 0.25rem
+}
+
+.gap-2 {
+  gap: 0.5rem
+}
+
+.prayer-top-buttons.nav > li > a {
+  padding: 10px 15px;
+  right: 15px;
+  position: relative;
+}
+
+.learn-more-prayer-btn {
+  margin-right: auto;
+}
