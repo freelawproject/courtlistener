@@ -119,6 +119,26 @@ class S3PrivateUUIDStorage(S3Storage):
         return os.path.join(dir_name, uuid.uuid4().hex + file_ext)
 
 
+class S3GlacierInstantRetrievalStorage(S3Storage):
+    """Uses S3 GlacierInstantRetrieval storage class with private ACL"""
+
+    default_acl = "private"
+    bucket_name = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
+    file_overwrite = True
+
+    def get_object_parameters(self, name: str) -> Dict[str, str]:
+        params = self.object_parameters.copy()
+        params["StorageClass"] = "GLACIER_IR"
+        return params
+
+    def get_available_name(
+        self,
+        name: str,
+        max_length: Optional[int] = None,
+    ) -> str:
+        return get_name_by_incrementing(self, name, max_length)
+
+
 class HarvardPDFStorage(S3Boto3Storage):
     """S3 file storage for Harvard PDFs."""
 

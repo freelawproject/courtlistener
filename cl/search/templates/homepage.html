@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load extras humanize static %}{% load waffle_tags %}
+{% load extras humanize static %}
 
 {% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}Non-Profit Free Legal Search Engine and Alert System – CourtListener.com{% endblock %}
@@ -105,11 +105,7 @@
             <h3>Latest Opinions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
             <p>We download case law from many jurisdictions on an ongoing basis. Here are the most recent ones.
             </p>
-            {% flag "o-es-active" %}
-              {% include "includes/search_result.html" with results=results_o type_override=SEARCH_TYPES.OPINION simple=True %}
-            {% else %}
-              {% include "includes/search_result_solr.html" with results=results_o type_override=SEARCH_TYPES.OPINION simple=True %}
-            {% endflag %}
+            {% include "includes/search_result.html" with results=results_o type_override=SEARCH_TYPES.OPINION simple=True %}
             <p class="right">
                 <a href="/?order_by=dateFiled+desc"
                    rel="nofollow"
@@ -124,11 +120,7 @@
             <p>We download oral arguments from many jurisdictions on an
                 ongoing basis. Here are the most recent ones.
             </p>
-            {% flag "oa-es-active" %}
-              {% include "includes/search_result.html" with results=results_oa type_override=SEARCH_TYPES.ORAL_ARGUMENT simple=True %}
-            {% else %}
-              {% include "includes/search_result_solr.html" with results=results_oa type_override=SEARCH_TYPES.ORAL_ARGUMENT simple=True %}
-            {% endflag %}
+            {% include "includes/search_result.html" with results=results_oa type_override=SEARCH_TYPES.ORAL_ARGUMENT simple=True %}
             <p class="right">
                 <a href="/?order_by=dateArgued+desc&type=oa"
                    rel="nofollow"

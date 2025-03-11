@@ -15,7 +15,6 @@ from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.recap.constants import PATENT, PATENT_ANDA
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Docket
-from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
@@ -92,7 +91,6 @@ def get_dockets(options: dict) -> None:
                         "doc_num_end": "",  # No end doc num
                     },
                 ).set(queue=q),
-                add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
         else:
             d = dockets[0]
@@ -110,7 +108,6 @@ def get_dockets(options: dict) -> None:
                         "show_list_of_member_cases": False,
                     },
                 ).set(queue=q),
-                add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
 
 

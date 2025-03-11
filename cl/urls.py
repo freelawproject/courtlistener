@@ -108,7 +108,11 @@ urlpatterns = [
 
 if settings.DEVELOPMENT:
     urlpatterns.append(
-        path("__debug__/", include("debug_toolbar.urls")),
+        path("__reload__/", include("django_browser_reload.urls")),
     )
+    if not settings.TESTING:
+        urlpatterns.append(
+            path("__debug__/", include("debug_toolbar.urls")),
+        )
 
 urlpatterns += static("/", document_root=settings.MEDIA_ROOT)  # type: ignore

@@ -31,13 +31,13 @@
 <div class="col-xs-12 col-md-8 col-lg-6">
   <h1 id="about">V4 API Migration Guide</h1>
   <p class="overview lead">
-    After several years of planning and development we have released v4 of our APIs.
+    After several years of planning and development, we have released v4 of our APIs.
   </p>
   <p>
     This upgrade responds to feedback we have received over the years and should be much better for our users — faster, more featureful, more scalable, and more accurate.
   </p>
   <p>
-    Unfortunately, we couldn't make these new APIs completely backwards compatible so this guide explains what's new.
+    Unfortunately, we couldn't make these new APIs completely backwards compatible, so this guide explains what's new.
   </p>
 
   <h2 id="support">Support</h2>
@@ -71,10 +71,10 @@
   </p>
   <h2 id="what-if-do-nothing">What If I Do Nothing?</h2>
   <p>
-    You might be fine. Most of the database and search APIs are only changing slightly and v3 will be supported for some period of time.
+    You might be fine. Most of the database and search APIs are only changing slightly, and v3 will be supported for some period of time.
     But you should read this guide to see if any changes are needed to your application.
   </p>
-  <p>The remainder of this guide is in three section:</p>
+  <p>The remainder of this guide is in three sections:</p>
   <ul>
     <li>New features you can expect</li>
     <li>How to migrate database APIs</li>
@@ -90,7 +90,7 @@
   <h3 id="elasticsearch">ElasticSearch</h3>
   <p>v4 of the Search API is powered by ElasticSearch instead of Solr. This is a huge upgrade to our API and search engine.
   </p>
-  <p>Some of the improvements include:</p>
+  <p>Some improvements include:</p>
   <ul>
     <li>In v4, all PACER cases are now searchable. In v3 you only got results if a case had a docket entry.
     </li>
@@ -107,12 +107,12 @@
       <li>Camelcase words like "McDonalds" are more searchable.</li>
       <li>Highlighting is more consistent and can be disabled for better performance.</li>
     </ul>
-    <li>Emojis and unicode characters are now searchable.</li>
+    <li>Emojis and Unicode characters are now searchable.</li>
     <li>Docket number and other fielded searches are more robust.</li>
     <li>Timezone handling is more consistent.</li>
     <li>We've added a number of new searchable fields.</li>
   </ul>
-  <p>For more details please<a href="https://free.law/2024/01/18/new-recap-archive-search-is-live/" target="_blank"> see our blog</a>.</p>
+  <p>For more details, please<a href="https://free.law/2024/01/18/new-recap-archive-search-is-live/" target="_blank"> see our blog</a>.</p>
   <h2 id="breaking-changes">Breaking Changes to v3 of the Search API</h2>
   <p>We cannot continue running Solr forever, but we can do our best to support v3 of the API. To do this, on <strong>November 25, 2024</strong>,
     v3 of the Search API will be upgraded to use ElasticSearch. We expect this to support most uses, but it will cause some breaking changes, as outlined in this section.

@@ -11,6 +11,7 @@ import cl.search.models as search_model
 from cl.lib.crypto import sha256
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData
+from cl.search.exception import DisallowedWildcardPattern, QueryType
 
 
 class _UNSPECIFIED:
@@ -232,13 +233,84 @@ def modify_court_id_queries(query_str: str) -> str:
     return modified_query
 
 
+def check_query_for_disallowed_wildcards(query_string: str) -> bool:
+    """Check if the query_string contains not allowed wildcards that can be
+    really expensive.
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-wildcard
+
+    * at the beginning of a term
+    * in a term with less than 3 characters.
+    ! in a term with less than 3 characters.
+
+    Like:
+    *ing
+    a* or !a
+
+    :param query_string: The query string to be checked.
+    :return: A boolean indicating if the query string contains not allowed wildcards.
+    """
+
+    # Match any term that starts with *
+    wildcard_start = r"(?:^|\s)\*\w+"
+
+    # Match any term with less than 3 chars that ends with *
+    wildcard_end = r"(?:^|\s)\w{1,2}\*(?=$|\s)"
+
+    # Match any term with less than 3 chars that starts with !
+    root_expander_short_term = r"(?:^|\s)\![^\s]{1,2}(?=$|\s)"
+
+    if any(
+        re.search(pattern, query_string)
+        for pattern in [wildcard_start, wildcard_end, root_expander_short_term]
+    ):
+        return True
+    return False
+
+
+def perform_special_character_replacements(query_string: str) -> str:
+    """Perform a series of special character replacements in the given query
+    string to clean it up and support the % &, !, and * search connectors.
+
+    :param query_string: The user query string.
+    :return: The transformed query string with the specified replacements applied.
+    """
+
+    # Replace smart quotes with standard double quotes for consistency.
+    query_string = re.sub(r"[“”]", '"', query_string)
+
+    # Replace % (but not) by NOT
+    query_string = re.sub(r" % ", " NOT ", query_string)
+
+    # Replace & by AND
+    query_string = re.sub(r" & ", " AND ", query_string)
+
+    # Replace ! (root expander) at the beginning of words with * at the end.
+    root_expander_pattern = r"(^|\s)!([a-zA-Z]+)"
+    root_expander_replacement = r"\1\2*"
+    query_string = re.sub(
+        root_expander_pattern, root_expander_replacement, query_string
+    )
+
+    # Replace * (universal character) that is not at the end of a word with ?.
+    universal_char_pattern = r"\*(?=\w)"
+    universal_char_replacement = "?"
+    query_string = re.sub(
+        universal_char_pattern, universal_char_replacement, query_string
+    )
+
+    return query_string
+
+
 def cleanup_main_query(query_string: str) -> str:
     """Enhance the query string with some simple fixes
 
+     - Check for expensive wildcards and thrown an error if found.
+     - Perform special character replacements for search connectors.
      - Make any numerical queries into phrases (except dates)
      - Add hyphens to district docket numbers that lack them
      - Ignore tokens inside phrases
      - Handle query punctuation correctly by mostly ignoring it
+     - Removes spaces between phrase query and tilde(~) operator
      - Capture "court_id:court" queries, retrieve the child courts for each
      court in the query, append them, and then add them back to the original
      query.
@@ -248,12 +320,23 @@ def cleanup_main_query(query_string: str) -> str:
     """
     inside_a_phrase = False
     cleaned_items = []
+
+    if check_query_for_disallowed_wildcards(query_string):
+        raise DisallowedWildcardPattern(QueryType.QUERY_STRING)
+
+    query_string = perform_special_character_replacements(query_string)
+
     for item in re.split(r'([^a-zA-Z0-9_\-^~":]+)', query_string):
         if not item:
             continue
 
-        if item.startswith('"') or item.endswith('"'):
-            # Start or end of a phrase; flip whether we're inside a phrase
+        if (
+            item.startswith('"')
+            or item.endswith('"')
+            or bool(re.match(r'\w+:"[^"]', item))
+        ):
+            # Start or end of a phrase or a fielded query using quotes e.g: field:"test"
+            # flip whether we're inside a phrase
             inside_a_phrase = not inside_a_phrase
             cleaned_items.append(item)
             continue
@@ -267,6 +350,27 @@ def cleanup_main_query(query_string: str) -> str:
         is_date_str = re.match(
             "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", item
         )
+
+        if "docketNumber:" in item:
+            potential_docket_number = item.split("docketNumber:", 1)[1]
+
+            if not potential_docket_number:
+                # The docket_number is wrapped in parentheses
+                cleaned_items.append(item)
+            else:
+                # Improve the docket_number query by:
+                # If it's a known docket_number format, wrap it in quotes and
+                # add a ~1 slop to match slight variations like 1:21-bk-1234-ABC → 1:21-bk-1234
+                # If it's not a known docket_number format, just wrap it in
+                # quotes to avoid syntax errors caused by : in the number.
+                slop_suffix = (
+                    "~1" if is_docket_number(potential_docket_number) else ""
+                )
+                cleaned_items.append(
+                    f'docketNumber:"{potential_docket_number}"{slop_suffix}'
+                )
+            continue
+
         if any([not_numeric, is_date_str]):
             cleaned_items.append(item)
             continue
@@ -278,7 +382,7 @@ def cleanup_main_query(query_string: str) -> str:
 
         # Some sort of number, probably a docket number or other type of number
         # Wrap in quotes to do a phrase search
-        if is_docket_number(item) and "docketNumber:" not in query_string:
+        if is_docket_number(item):
             # Confirm is a docket number and clean it. So docket_numbers with
             # suffixes can be searched: 1:21-bk-1234-ABC -> 1:21-bk-1234,
             item = clean_docket_number(item)
@@ -289,6 +393,8 @@ def cleanup_main_query(query_string: str) -> str:
             cleaned_items.append(f'"{item}"')
 
     cleaned_query = "".join(cleaned_items)
+    # Removes spaces between phrase query and tilde(~) operator
+    cleaned_query = re.sub(r'(")\s*(?=~\d+)', r"\1", cleaned_query)
     # If it's a court_id query, parse it, append the child courts, and then
     # reintegrate them into the original query.
     final_query = modify_court_id_queries(cleaned_query)
@@ -327,8 +433,8 @@ def check_unbalanced_quotes(query: str) -> bool:
     :param query: The input query string
     :return: True if the query contains unbalanced quotes. Otherwise False
     """
-    quotes_count = query.count('"')
-    return quotes_count % 2 != 0
+    all_quotes = re.findall(r"[“”\"]", query)
+    return len(all_quotes) % 2 != 0
 
 
 def remove_last_symbol_occurrence(
@@ -379,6 +485,8 @@ def sanitize_unbalanced_quotes(query: str) -> str:
     :param query: The input query string
     :return: The sanitized query string, after removing unbalanced quotes.
     """
+    # Replace smart quotes with standard double quotes for consistency.
+    query = re.sub(r"[“”]", '"', query)
     quotes_count = query.count('"')
     while quotes_count % 2 != 0:
         query, quotes_count = remove_last_symbol_occurrence(

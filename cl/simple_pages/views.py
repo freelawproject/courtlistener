@@ -29,6 +29,8 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
+from cl.favorites.models import Prayer
+from cl.favorites.utils import get_lifetime_prayer_stats
 from cl.people_db.models import Person
 from cl.search.models import (
     SOURCES,
@@ -130,6 +132,18 @@ async def markdown_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request, "help/markdown_help.html", {"private": False}
     )
+
+
+async def prayer_help(request: HttpRequest) -> HttpResponse:
+    stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+
+    context = {
+        "daily_quota": settings.ALLOWED_PRAYER_COUNT,
+        "private": False,
+        "granted_stats": stats,
+    }
+
+    return TemplateResponse(request, "help/prayer_help.html", context)
 
 
 async def tag_notes_help(request: HttpRequest) -> HttpResponse:
@@ -458,6 +472,10 @@ async def latest_terms(request: HttpRequest) -> HttpResponse:
 
 async def validate_for_wot(request: HttpRequest) -> HttpResponse:
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
+
+
+async def components(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "components.html", {"private": True})
 
 
 async def ratelimited(

@@ -11,7 +11,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.management import call_command
 from django.db.models import F
 from django.http import HttpRequest
-from django.test import AsyncRequestFactory, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from django.utils.html import strip_tags
 from django.utils.timezone import now
@@ -28,7 +28,6 @@ from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     CourtTestCase,
-    EmptySolrTestCase,
     PeopleTestCase,
     SearchTestCase,
     opinion_document_v4_api_keys,
@@ -74,7 +73,6 @@ from cl.search.tasks import (
     update_children_docs_by_query,
     update_es_document,
 )
-from cl.search.views import do_search
 from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
@@ -400,7 +398,6 @@ class OpinionSearchAPICommonTests(
         )
 
 
-@override_flag("o-es-search-api-active", active=True)
 class OpinionV3APISearchTest(
     OpinionSearchAPICommonTests, ESIndexTestCase, TestCase
 ):
@@ -1484,15 +1481,54 @@ class OpinionsESSearchTest(
         r = await self._test_article_count(search_params, 1, "filed_range")
         self.assertIn("Honda", r.content.decode())
 
-    async def test_can_filter_using_a_docket_number(self) -> None:
+    def test_can_filter_using_a_docket_number(self) -> None:
         """Can we query by docket number?"""
+
+        # Regular docket_number filtering.
         search_params = {"q": "*", "docket_number": "2"}
 
         # Frontend
-        r = await self._test_article_count(search_params, 1, "docket_number")
+        r = async_to_sync(self._test_article_count)(
+            search_params, 1, "docket_number"
+        )
         self.assertIn(
             "Honda", r.content.decode(), "Result not found by docket number!"
         )
+
+        # Filter by case by docket_number containing repeated numbers like: 1:21-bk-0021
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory(
+                case_name="Strickland v. Lorem.",
+                docket=DocketFactory(
+                    court=self.court_1, docket_number="1:21-bk-0021"
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "docket_number": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # docket_number filter works properly combined with child document fields
+        with self.captureOnCommitCallbacks(execute=True):
+            OpinionFactory.create(cluster=cluster, plain_text="Lorem Ipsum")
+
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Lorem Ipsum",
+            "docket_number": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docket_number and text"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+        self.assertIn("Lorem Ipsum", r.content.decode())
+
+        # Remove factories to prevent affecting other tests.
+        cluster.delete()
 
     async def test_can_filter_by_citation_number(self) -> None:
         """Can we query by citation number?"""
@@ -1818,10 +1854,6 @@ class OpinionsESSearchTest(
         self.assertIn("1 Opinion", r.content.decode())
 
         search_params["q"] = "Howard NOT Honda"
-        r = await self._test_article_count(search_params, 0, "negation query")
-        self.assertIn("had no results", r.content.decode())
-
-        search_params["q"] = "Howard !Honda"
         r = await self._test_article_count(search_params, 0, "negation query")
         self.assertIn("had no results", r.content.decode())
 
@@ -2234,7 +2266,8 @@ class OpinionsESSearchTest(
         r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact filter"
         )
-        self.assertIn("<mark>Maecenas Howell</mark>", r.content.decode())
+        self.assertIn("<mark>Maecenas</mark>", r.content.decode())
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
 
         # case_name filter: Howells
         search_params = {
@@ -2244,7 +2277,8 @@ class OpinionsESSearchTest(
         r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact filter"
         )
-        self.assertIn("<mark>Maecenas Howells</mark>", r.content.decode())
+        self.assertIn("<mark>Maecenas</mark>", r.content.decode())
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
 
         # text query: Howell
         search_params = {
@@ -2270,10 +2304,276 @@ class OpinionsESSearchTest(
         cluster_2.delete()
 
 
+class OpinionSearchDecayRelevancyTest(
+    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+):
+    """
+    Opinion Search Decay Relevancy Tests
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        # Rebuild the Opinion index
+        cls.rebuild_index("search.OpinionCluster")
+
+        # Same keywords but different dateFiled
+        cls.opinion_old = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(1832, 2, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-old",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1235",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_old = OpinionFactory.create(
+            cluster=cls.opinion_old, plain_text="", author_str=""
+        )
+
+        cls.opinion_recent = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2024, 2, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-recent",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1236",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_recent = OpinionFactory.create(
+            cluster=cls.opinion_recent, plain_text="", author_str=""
+        )
+
+        # Different relevance with same dateFiled
+        cls.opinion_high_relevance = OpinionClusterFactory.create(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2022, 2, 23),
+            procedural_history="More Highly Relevant Keywords",
+            source="C",
+            attorneys="More Highly Relevant Keywords",
+            slug="opinion-high-rel",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1237",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_high_relevance = OpinionFactory.create(
+            cluster=cls.opinion_high_relevance, plain_text="", author_str=""
+        )
+
+        cls.opinion_low_relevance = OpinionClusterFactory.create(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2022, 2, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-low-rel",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1238",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_low_relevance = OpinionFactory.create(
+            cluster=cls.opinion_low_relevance, plain_text="", author_str=""
+        )
+
+        # Different relevance with different dateFiled
+        cls.opinion_high_relevance_old_date = OpinionClusterFactory.create(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(1900, 2, 23),
+            procedural_history="More Ipsum Dolor Terms",
+            source="C",
+            attorneys="More Ipsum Dolor Terms",
+            slug="opinion-high-rel-old",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1239",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_high_relevance_old_date = OpinionFactory.create(
+            cluster=cls.opinion_high_relevance_old_date,
+            plain_text="",
+            author_str="",
+        )
+
+        cls.opinion_low_relevance_new_date = OpinionClusterFactory.create(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2024, 12, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-low-rel-new",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1241",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_low_relevance_new_date = OpinionFactory.create(
+            cluster=cls.opinion_low_relevance_new_date,
+            plain_text="",
+            author_str="",
+        )
+
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+        cls.test_cases = [
+            {
+                "name": "Same keywords, different dateFiled",
+                "search_params": {
+                    "q": "Keyword Match",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    cls.opinion_recent.docket.docket_number,  # Most recent dateFiled
+                    cls.opinion_old.docket.docket_number,  # Oldest dateFiled
+                ],
+                "expected_order": [  # API
+                    cls.opinion_recent.pk,
+                    cls.opinion_old.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy same dateFiled",
+                "search_params": {
+                    "q": "Highly Relevant Keywords",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    cls.opinion_high_relevance.docket.docket_number,  # Most relevant by keywords
+                    cls.opinion_low_relevance.docket.docket_number,  # Less relevant by keywords
+                ],
+                "expected_order": [  # API
+                    cls.opinion_high_relevance.pk,  # Most relevant by keywords
+                    cls.opinion_low_relevance.pk,  # Less relevant by keywords
+                ],
+            },
+            {
+                "name": "Different relevancy and different dateFiled",
+                "search_params": {
+                    "q": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    cls.opinion_low_relevance_new_date.docket.docket_number,  # Combination of relevance and date rank it first.
+                    cls.opinion_high_relevance_old_date.docket.docket_number,
+                ],
+                "expected_order": [  # API
+                    cls.opinion_low_relevance_new_date.pk,
+                    cls.opinion_high_relevance_old_date.pk,
+                ],
+            },
+            {
+                "name": "Match all query decay relevancy.",
+                "search_params": {
+                    "q": "",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                # Order by recency and then by relevancy as per decay scoring logic
+                "expected_order_frontend": [
+                    cls.opinion_low_relevance_new_date.docket.docket_number,  # 2024-12-23 1:21-bk-1241
+                    cls.opinion_recent.docket.docket_number,  # 2024-02-23 1:21-bk-1236
+                    cls.opinion_high_relevance.docket.docket_number,  # 2022-02-23 1:21-bk-1237 Indexed first, displayed first.
+                    cls.opinion_low_relevance.docket.docket_number,  # 2022-02-23 1:21-bk-1238
+                    cls.opinion_high_relevance_old_date.docket.docket_number,  # 1800-02-23 1:21-bk-1239
+                    cls.opinion_old.docket.docket_number,  # 1732-02-23 1:21-bk-1235
+                ],
+                "expected_order": [  # V4 API
+                    cls.opinion_low_relevance_new_date.pk,  # 2024-12-23
+                    cls.opinion_recent.pk,  # 2024-02-23
+                    cls.opinion_low_relevance.pk,  # 2022-02-23 Higher PK in V4, API pk is a secondary sorting key.
+                    cls.opinion_high_relevance.pk,  # 2022-02-23 Lower PK
+                    cls.opinion_high_relevance_old_date.pk,  # 1800-02-23
+                    cls.opinion_old.pk,  # 1732-02-23
+                ],
+                "expected_order_v3": [  # V3 API
+                    cls.opinion_low_relevance_new_date.pk,  # 2024-12-23
+                    cls.opinion_recent.pk,  # 2024-02-23
+                    cls.opinion_high_relevance.pk,  # 2022-02-23 Indexed first, displayed first.
+                    cls.opinion_low_relevance.pk,  # 2022-02-23
+                    cls.opinion_high_relevance_old_date.pk,  # 1800-02-23
+                    cls.opinion_old.pk,  # 1732-02-23
+                ],
+            },
+        ]
+
+    def test_relevancy_decay_scoring_frontend(self) -> None:
+        """Test relevancy decay scoring for Opinion search Frontend"""
+
+        for test in self.test_cases:
+            with self.subTest(test["name"]):
+                r = async_to_sync(self._test_article_count)(
+                    test["search_params"],
+                    len(test["expected_order_frontend"]),
+                    f"Failed count {test['name']}",
+                )
+                self._assert_order_in_html(
+                    r.content.decode(), test["expected_order_frontend"]
+                )
+
+    def test_relevancy_decay_scoring_v4_api(self) -> None:
+        """Test relevancy decay scoring for Opinion search V4 API"""
+
+        for test in self.test_cases:
+            self._test_results_ordering(test, "cluster_id")
+
+    def test_relevancy_decay_scoring_v3_api(self) -> None:
+        """Test relevancy decay scoring for Opinion search V3 API"""
+
+        for test in self.test_cases:
+            self._test_results_ordering(test, "cluster_id", version="v3")
+
+
+@override_flag("ui_flag_for_o", False)
+@override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
-
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
@@ -2374,6 +2674,9 @@ class RelatedSearchTest(
             < r.content.decode().index("/opinion/%i/" % expected_second_pk),
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
+        # Confirm that results contain a snippet
+        self.assertIn("<mark>plain</mark>", r.content.decode())
+
         # Confirm "related to" cluster legend is within the results' header.
         h2_element = html.fromstring(r.content.decode()).xpath(
             '//h2[@id="result-count"]'
@@ -2661,99 +2964,6 @@ class RelatedSearchTest(
             msg="Unexpected opinion cited.",
         )
         await sync_to_async(self.async_client.logout)()
-
-
-class GroupedSearchTest(EmptySolrTestCase):
-    @classmethod
-    def setUpTestData(cls):
-        court = CourtFactory(id="ca1", jurisdiction="F")
-
-        docket = DocketFactory.create(
-            date_reargument_denied=datetime.date(2015, 8, 15),
-            date_reargued=datetime.date(2015, 8, 15),
-            court_id=court.pk,
-            case_name_full="Voutila v. Bonvini",
-            date_argued=datetime.date(2015, 8, 15),
-            case_name="case name docket 10",
-            case_name_short="short name for Voutila v. Bonvini",
-            docket_number="1337-np",
-            slug="case-name",
-            pacer_case_id="666666",
-            blocked=False,
-            source=Docket.HARVARD,
-            date_blocked=None,
-        )
-
-        grouped_cluster = OpinionClusterFactory.create(
-            case_name_full="Reference to Voutila v. Bonvini",
-            case_name_short="Case name in short for Voutila v. Bonvini",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 12, 20),
-            procedural_history="some rando history",
-            source="C",
-            judges="",
-            case_name="Voutila v. Bonvini",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            citation_count=1,
-            posture="",
-            scdb_id="",
-            nature_of_suit="",
-            docket=docket,
-        )
-
-        OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=None,
-            plain_text="This is a lead opinion too.",
-            cluster=grouped_cluster,
-            local_path="txt/2015/12/28/opinion_text.txt",
-            per_curiam=False,
-            type="020lead",
-        )
-
-        OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=None,
-            plain_text="This is a combined opinion.",
-            cluster=grouped_cluster,
-            local_path="doc/2005/05/04/state_of_indiana_v._charles_barker.doc",
-            per_curiam=False,
-            type=Opinion.COMBINED,
-        )
-        super().setUpTestData()
-
-    def setUp(self) -> None:
-        # Set up some handy variables
-        super().setUp()
-        args = [
-            "--type",
-            "search.Opinion",
-            "--solr-url",
-            f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
-            "--update",
-            "--everything",
-            "--do-commit",
-            "--noinput",
-        ]
-        call_command("cl_update_index", *args)
-        self.factory = AsyncRequestFactory()
-
-    def test_grouped_queries(self) -> None:
-        """When we have a cluster with multiple opinions, do results get
-        grouped?
-        """
-        request = self.factory.get(reverse("show_results"), {"q": "Voutila"})
-        response = do_search(request.GET.copy())
-        result_count = response["results"].object_list.result.numFound
-        num_expected = 1
-        self.assertEqual(
-            result_count,
-            num_expected,
-            msg="Found %s items, but should have found %s if the items were "
-            "grouped properly." % (result_count, num_expected),
-        )
 
 
 class IndexOpinionDocumentsCommandTest(

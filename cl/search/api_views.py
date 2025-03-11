@@ -1,6 +1,6 @@
 from http import HTTPStatus
 
-import waffle
+from django.db.models import Prefetch
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
@@ -27,7 +27,6 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
-    SearchResultSerializer,
     TagSerializer,
     V3OAESResultSerializer,
     V3OpinionESResultSerializer,
@@ -222,7 +221,12 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_modified",
     ]
     queryset = OpinionCluster.objects.prefetch_related(
-        "sub_opinions", "panel", "non_participating_judges", "citations"
+        Prefetch(
+            "sub_opinions", queryset=Opinion.objects.order_by("ordering_key")
+        ),
+        "panel",
+        "non_participating_judges",
+        "citations",
     ).order_by("-id")
 
 
@@ -287,28 +291,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
     permission_classes = (permissions.AllowAny, V3APIPermission)
 
     def list(self, request, *args, **kwargs):
-
-        match request.GET.get("type", SEARCH_TYPES.OPINION):
-            case SEARCH_TYPES.ORAL_ARGUMENT if waffle.flag_is_active(
-                request, "oa-es-active"
-            ):
-                es_flag_is_active = True
-            case SEARCH_TYPES.PEOPLE if waffle.flag_is_active(
-                request, "p-es-active"
-            ):
-                es_flag_is_active = True
-            case SEARCH_TYPES.OPINION if waffle.flag_is_active(
-                request, "o-es-search-api-active"
-            ):
-                es_flag_is_active = True
-            case (
-                SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
-            ) if waffle.flag_is_active(request, "r-es-search-api-active"):
-                es_flag_is_active = True
-            case _:
-                es_flag_is_active = False
-
-        search_form = SearchForm(request.GET, is_es_form=es_flag_is_active)
+        search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]
@@ -317,35 +300,25 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 request,
                 cd=cd,
                 paginator=paginator,
-                es_flag_status=es_flag_is_active,
             )
             result_page = paginator.paginate_queryset(sl, request)
-
             match search_type:
-                case SEARCH_TYPES.ORAL_ARGUMENT if es_flag_is_active:
+                case SEARCH_TYPES.ORAL_ARGUMENT:
                     serializer = V3OAESResultSerializer(result_page, many=True)
-                case SEARCH_TYPES.PEOPLE if es_flag_is_active:
+                case SEARCH_TYPES.PEOPLE:
                     serializer = ExtendedPersonESSerializer(
                         result_page, many=True
                     )
-                case SEARCH_TYPES.OPINION if es_flag_is_active:
-                    serializer = V3OpinionESResultSerializer(
-                        result_page, many=True
-                    )
-                case (
-                    SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
-                ) if es_flag_is_active:
+                case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
                     serializer = V3RECAPDocumentESResultSerializer(
                         result_page, many=True
                     )
                 case _:
-                    if cd["q"] == "":
-                        cd["q"] = "*"  # Get everything
-                    serializer = SearchResultSerializer(
-                        result_page,
-                        many=True,
-                        context={"schema": sl.conn.schema},
+                    # Default to Opinion type.
+                    serializer = V3OpinionESResultSerializer(
+                        result_page, many=True
                     )
+
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(
@@ -386,7 +359,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
     }
 
     def list(self, request, *args, **kwargs):
-        search_form = SearchForm(request.GET, is_es_form=True)
+        search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]

@@ -40,19 +40,6 @@ services:
     networks:
       - cl_net_overlay
 
-  # Search engine
-  cl-solr:
-    container_name: cl-solr
-    image: freelawproject/solr:latest
-    ports:
-      - "8983:8983"
-    # needs chmod 777
-    volumes:
-      - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/data:/var/opt/solr/indices
-      - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/solr/cores/:/etc/opt/solr:ro
-    networks:
-      - cl_net_overlay
-
   cl-webpack:
     container_name: cl-webpack
     image: node:16
@@ -62,6 +49,12 @@ services:
       - ../../.env.dev
     working_dir: /opt/courtlistener/cl
     command: sh -c 'npm install && exec npx webpack --progress --watch --mode=development'
+    healthcheck:
+      test: sh -c 'ps aux | grep -v grep | grep webpack >/dev/null 2>&1 && echo 0 || echo 1'
+      interval: 1s
+      retries: 45
+      start_period: 1s
+      timeout: 1s
 
   # Task Server
   cl-celery:
@@ -89,6 +82,20 @@ services:
         - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
         - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
 
+  cl-tailwind-reload:
+    container_name: cl-tailwind-reload
+    working_dir: /opt/courtlistener/cl
+    image: node:16
+    volumes:
+      - ${CL_BASE_DIR:-../../}:/opt/courtlistener
+    env_file:
+      - ../../.env.dev
+    command: sh -c 'npm run dev'
+    depends_on:
+      cl-webpack:
+        condition: service_healthy
+    tty: true
+
   cl-django:
     container_name: cl-django
     build:
@@ -101,7 +108,6 @@ services:
       - cl-postgresql
       - cl-redis
       - cl-celery
-      - cl-solr
       - cl-selenium
       - cl-doctor
       - cl-disclosures

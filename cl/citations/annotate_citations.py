@@ -1,10 +1,13 @@
 import html
+import re
 from typing import Dict, List
 
 from eyecite import annotate_citations, clean_text
 
 from cl.citations.match_citations import NO_MATCH_RESOURCE
 from cl.citations.types import MatchedResourceType, SupportedCitationType
+from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.string_utils import trunc
 from cl.search.models import Opinion, RECAPDocument
 
 
@@ -15,10 +18,20 @@ def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
 
     :param document: The Opinion or RECAPDocument whose text should be parsed
     """
-    for attr in ["html_anon_2020", "html_columbia", "html_lawbox", "html"]:
+
+    # We prefer CAP data (xml_harvard) first.
+    for attr in [
+        "xml_harvard",
+        "html_anon_2020",
+        "html_columbia",
+        "html_lawbox",
+        "html",
+    ]:
         text = getattr(document, attr, None)
         if text:
             document.source_text = text
+            # Remove XML encodings from xml_harvard
+            text = re.sub(r"^<\?xml.*?\?>", "", text, count=1)
             document.cleaned_text = clean_text(
                 text, ["html", "all_whitespace"]
             )
@@ -50,8 +63,13 @@ def generate_annotations(
                 "</span>",
             ]
         else:  # If successfully matched...
+            case_name = trunc(best_case_name(opinion.cluster), 60, "...")
+            safe_case_name = html.escape(case_name)
             annotation = [
-                f'<span class="citation" data-id="{opinion.pk}"><a href="{opinion.cluster.get_absolute_url()}">',
+                f'<span class="citation" data-id="{opinion.pk}">'
+                f'<a href="{opinion.cluster.get_absolute_url()}"'
+                f' aria-description="Citation for case: {safe_case_name}"'
+                ">",
                 "</a></span>",
             ]
         for c in citations:

@@ -346,23 +346,63 @@ class V4SearchAPIAssertions(SimpleTestCase):
                         f"Parent field '{field}' does not match.",
                     )
 
-    def _test_results_ordering(self, test, field):
+    def _test_results_ordering(self, test, field, version="v4"):
         """Ensure dockets appear in the response in a specific order."""
 
         with self.subTest(test=test, msg=f'{test["name"]}'):
             r = self.client.get(
-                reverse("search-list", kwargs={"version": "v4"}),
+                reverse("search-list", kwargs={"version": version}),
                 test["search_params"],
             )
-            self.assertEqual(len(r.data["results"]), test["expected_results"])
+
+            expected_order_key = "expected_order"
+            if version == "v3":
+                expected_order_key = (
+                    "expected_order_v3"
+                    if "expected_order_v3" in test
+                    else "expected_order"
+                )
+
+            self.assertEqual(
+                len(r.data["results"]), len(test[expected_order_key])
+            )
             # Note that dockets where the date_field is null are sent to the bottom
             # of the results
             actual_order = [result[field] for result in r.data["results"]]
             self.assertEqual(
                 actual_order,
-                test["expected_order"],
-                msg=f'Expected order {test["expected_order"]}, but got {actual_order}',
+                test[expected_order_key],
+                msg=f"Expected order {test[expected_order_key]}, but got {actual_order} for "
+                f"Search type: {test["search_params"]["type"]}",
             )
+
+    def _assert_order_in_html(
+        self, decoded_content: str, expected_order: list
+    ) -> None:
+        """Assert that the expected order of documents appears correctly in the
+        HTML content."""
+
+        for i in range(len(expected_order) - 1):
+            self.assertTrue(
+                decoded_content.index(str(expected_order[i]))
+                < decoded_content.index(str(expected_order[i + 1])),
+                f"Expected {expected_order[i]} to appear before {expected_order[i + 1]} in the HTML content.",
+            )
+
+    async def _test_article_count(self, params, expected_count, field_name):
+        r = await self.async_client.get("/", params)
+        tree = html.fromstring(r.content.decode())
+        got = len(tree.xpath("//article"))
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in Frontend with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
 
     def _test_page_variables(
         self, response, test_case, current_page, search_type

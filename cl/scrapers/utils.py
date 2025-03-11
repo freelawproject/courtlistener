@@ -1,5 +1,6 @@
+import json
 import os
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
@@ -8,7 +9,10 @@ import requests
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.db.models import Q
+from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
@@ -20,13 +24,85 @@ from cl.citations.utils import map_reporter_db_cite_type
 from cl.corpus_importer.utils import winnow_case_name
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
+from cl.lib.storage import S3GlacierInstantRetrievalStorage
 from cl.recap.mergers import find_docket_object
 from cl.scrapers.exceptions import (
     EmptyFileError,
     NoDownloadUrlError,
     UnexpectedContentTypeError,
 )
-from cl.search.models import Court, Docket
+from cl.search.models import Citation, Court, Docket, OpinionCluster
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+
+def make_citation(
+    cite_str: str, cluster: OpinionCluster, court_id: str
+) -> Optional[Citation]:
+    """Create and return a citation object for the input values."""
+    citation_objs = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
+    if not citation_objs:
+        logger.error(
+            "Could not parse citation from court '%s'",
+            court_id,
+            extra=dict(
+                cite=cite_str,
+                cluster=cluster,
+                fingerprint=[f"{court_id}-no-citation-found"],
+            ),
+        )
+        return None
+    # Convert the found cite type to a valid cite type for our DB.
+    cite_type_str = citation_objs[0].all_editions[0].reporter.cite_type
+    return Citation(
+        cluster=cluster,
+        volume=citation_objs[0].groups["volume"],
+        reporter=citation_objs[0].corrected_reporter(),
+        page=citation_objs[0].groups["page"],
+        type=map_reporter_db_cite_type(cite_type_str),
+    )
+
+
+def citation_is_duplicated(citation_candidate: Citation, cite: str) -> bool:
+    """Checks if the citation is duplicated for the cluster
+
+    Following corpus_importer.utils.add_citations_to_cluster we
+    identify 2 types of duplication:
+    - exact: a citation with the same fields already exists for the cluster
+    - duplication in the same reporter: the cluster already has a citation
+        in that reporter
+
+    :param citation_candidate: the citation object
+    :param cite: citation string
+
+    :return: True if citation is duplicated, False if not
+    """
+    citation_params = {**citation_candidate.__dict__}
+    citation_params.pop("_state", "")
+    citation_params.pop("id", "")
+    cluster_id = citation_candidate.cluster.id
+
+    # Exact duplication
+    if Citation.objects.filter(**citation_params).exists():
+        logger.info(
+            "Citation '%s' already exists for cluster %s",
+            cite,
+            cluster_id,
+        )
+        return True
+
+    # Duplication in the same reporter
+    if Citation.objects.filter(
+        cluster_id=cluster_id, reporter=citation_candidate.reporter
+    ).exists():
+        logger.info(
+            "Another citation in the same reporter '%s' exists for cluster %s",
+            citation_candidate.reporter,
+            cluster_id,
+        )
+        return True
+
+    return False
 
 
 def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
@@ -446,3 +522,37 @@ def scraped_citation_object_is_valid(citation_object: dict) -> bool:
         logger.error("Parsed reporter '%s' does not exist", parsed_reporter)
 
     return False
+
+
+def save_response(site: AbstractSite) -> None:
+    """Stores scrapers responses content and headers in a S3 bucket
+
+    This is passed to juriscraper's Site objects as the
+    `save_response_fn` argument, which will make Juriscraper
+    save every response
+
+    :param site: the Site object, used to access the saved response
+    :return None
+    """
+
+    storage = S3GlacierInstantRetrievalStorage()
+    response = site.request["response"]
+
+    scraper_id = site.court_id.split(".")[-1]
+    scrape_type = site.court_id.split(".")[1]  # opinions or oral args
+    now_str = datetime.now().strftime("%Y/%m/%d/%H_%M_%S")
+    base_name = f"responses/{scrape_type}/{scraper_id}/{now_str}"
+
+    headers_json = json.dumps(dict(response.headers), indent=4)
+    storage.save(f"{base_name}_headers.json", ContentFile(headers_json))
+
+    try:
+        # both tests for and parses JSON content
+        content = json.dumps(json.loads(response.content), indent=4)
+        extension = "json"
+    except (UnicodeDecodeError, json.decoder.JSONDecodeError):
+        content = response.content
+        extension = "html"
+
+    content_name = f"{base_name}.{extension}"
+    storage.save(content_name, ContentFile(content))

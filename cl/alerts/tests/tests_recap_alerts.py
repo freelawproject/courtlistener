@@ -113,24 +113,21 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test RT RECAP Alert",
             query='q="401 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         dly_recap_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.DAILY,
             name="Test DLY RECAP Alert",
             query='q="401 Civil"&type=r',
-        )
-        AlertFactory(
-            user=self.user_profile_2.user,
-            rate=Alert.REAL_TIME,
-            name="Test RT RECAP Alert",
-            query='q="401 Civil"',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         AlertFactory(
             user=self.user_profile_no_member.user,
             rate=Alert.REAL_TIME,
             name="Test RT RECAP Alert no Member",
             query='q="401 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
 
         with mock.patch(
@@ -391,6 +388,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only",
             query='q="401 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -426,6 +424,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only Not Triggered",
             query='q="405 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         # Simulate docket is ingested a day before.
         one_day_before = self.mock_date - datetime.timedelta(days=1)
@@ -482,6 +481,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only",
             query='q="plain text for 018036652436"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -572,6 +572,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only Docket Entry",
             query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -606,6 +607,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query",
             query=f'q="Motion to File 2"&docket_number={docket.docket_number}&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -662,6 +664,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query",
             query=f"q=docket_id:{self.de.docket.pk} OR pacer_doc_id:{self.rd_2.pacer_doc_id}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -708,6 +711,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query",
             query=f"q=docket_id:{self.de.docket.pk} OR pacer_doc_id:{self.rd.pacer_doc_id}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -754,6 +758,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object text query",
             query=f'q="United states"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         two_days_before = self.mock_date - datetime.timedelta(days=2)
         mock_two_days_before = two_days_before.replace(hour=5)
@@ -923,6 +928,7 @@ class RECAPAlertsSweepIndexTest(
             f"pacer_doc_id:{self.rd.pacer_doc_id} OR "
             f'("United States of America" OR '
             f"pacer_doc_id:{rd_3.pacer_doc_id})&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -980,6 +986,7 @@ class RECAPAlertsSweepIndexTest(
             name="Test Alert Cross-object query combined.",
             query=f'q=("United States of America" AND '
             f"pacer_doc_id:{rd_3.pacer_doc_id})&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1045,6 +1052,7 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only Docket Entry",
             query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1146,12 +1154,14 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only",
             query='q="410 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         recap_only_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only Docket Entry",
             query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         cross_object_alert_with_hl = AlertFactory(
             user=self.user_profile.user,
@@ -1161,6 +1171,7 @@ class RECAPAlertsSweepIndexTest(
             f'"plain text lorem" AND "410 Civil" AND '
             f"id:{rd_2.pk}&docket_number={docket.docket_number}"
             f'&case_name="{docket.case_name}"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         AlertFactory(
             user=self.user_profile_2.user,
@@ -1170,6 +1181,7 @@ class RECAPAlertsSweepIndexTest(
             f'"plain text lorem" AND "410 Civil" AND '
             f"id:{rd_2.pk}&docket_number={docket.docket_number}"
             f'&case_name="{docket.case_name}"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
 
         with mock.patch(
@@ -1345,18 +1357,21 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.WEEKLY,
             name="Test Alert Docket Only",
             query='q="401 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         recap_only_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.MONTHLY,
             name="Test Alert RECAP Only Docket Entry",
             query=f"q=docket_entry_id:{self.de.pk}&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         cross_object_alert_with_hl = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert Cross-object",
             query=f'q="401 Civil" id:{self.rd.pk}&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1517,18 +1532,21 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only",
             query='q="410 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         cross_object_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object",
             query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         cross_object_alert_after_update = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object 2",
             query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE UPDATED"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
 
         with mock.patch("cl.users.signals.notify_new_or_updated_webhook"):
@@ -1604,6 +1622,10 @@ class RECAPAlertsSweepIndexTest(
             msg="Wrong number of V1 webhook events.",
         )
 
+        self.assertEqual(
+            mail.outbox[0].subject,
+            f"2 Alerts have hits: {docket_only_alert.name}, {cross_object_alert.name}",
+        )
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 2)
@@ -1695,6 +1717,11 @@ class RECAPAlertsSweepIndexTest(
         )
         self.assertEqual(
             v2_webhook_event.content["webhook"]["deprecation_date"], None
+        )
+
+        self.assertEqual(
+            mail.outbox[1].subject,
+            f"1 Alert has hits: {cross_object_alert_after_update.name}",
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
@@ -2203,12 +2230,19 @@ class RECAPAlertsPercolatorTest(
             user=self.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert Docket Only",
-            query='q="401 Civil"&type=r',
+            query='q="401 Civil"&type=r&order_by=score desc',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert.pk),
             msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
         )
+        alert_doc = RECAPPercolator.get(id=docket_only_alert.pk)
+        response_str = str(alert_doc.to_dict())
+        self.assertIn("401 Civil", response_str)
+        self.assertIn("'rate': 'wly'", response_str)
+        # function_score breaks percolator queries. Ensure it is never indexed.
+        self.assertNotIn("function_score", response_str)
 
         docket_only_alert_id = docket_only_alert.pk
         # Remove the alert.
@@ -2224,6 +2258,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.WEEKLY,
             name="Test Alert Docket Only",
             query='q="401 Civil"&case_name="Lorem Ipsum"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert_filter.pk),
@@ -2246,6 +2281,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only 1",
             query='q="SUBPOENAS SERVED CASE"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2282,6 +2318,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only 2",
             query='q="plain text for 018036652436"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2335,6 +2372,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only 3",
             query='q="Hearing for Leave"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2387,6 +2425,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only 4",
             query='q="Hearing to File Updated"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2440,6 +2479,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only 5",
             query='q="SUBPOENAS SERVED LOREM"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2473,6 +2513,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only 6",
             query="q=(SUBPOENAS SERVED) AND chapter:7&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2497,6 +2538,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only 7",
             query='atty_name="John Lorem"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         firm = AttorneyOrganizationFactory(
             name="Associates LLP 2", lookup_key="firm_llp"
@@ -2544,6 +2586,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only",
             query='q="SUBPOENAS SERVED CASE"&docket_number="1:21-bk-1234"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2574,6 +2617,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only",
             query='q="plain text for 018036652000"&description="Affidavit Of Compliance"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2679,18 +2723,21 @@ class RECAPAlertsPercolatorTest(
                 rate=Alert.REAL_TIME,
                 name="Test Alert Docket Only",
                 query='q="410 Civil"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
             )
             docket_only_alert_no_member = AlertFactory(
                 user=self.user_profile_no_member.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert Docket Only",
                 query='q="410 Civil"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
             )
             recap_only_alert = AlertFactory(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert RECAP Only Docket Entry",
                 query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
             )
             cross_object_alert_with_hl = AlertFactory(
                 user=self.user_profile.user,
@@ -2700,6 +2747,7 @@ class RECAPAlertsPercolatorTest(
                 f'"plain text lorem" AND "410 Civil" AND '
                 f"id:{rd_1.pk}&docket_number={docket.docket_number}"
                 f'&case_name="{docket.case_name}"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
             )
 
         self.assertEqual(
@@ -2918,6 +2966,7 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only Not Triggered",
             query='q="405 Civil"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2962,12 +3011,14 @@ class RECAPAlertsPercolatorTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query AND",
             query=f'q="405 Civil" AND pacer_doc_id:018036652436&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         cross_object_alert_d_or_rd_field = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query OR",
             query=f'q="018036652436" OR cause:405&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
         )
         # RD ingestion.
         with mock.patch(
@@ -3045,6 +3096,7 @@ class RECAPAlertsPercolatorTest(
                 rate=Alert.WEEKLY,
                 name=f"Test Alert Docket Only {i}",
                 query='q="405 Civil"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
             )
             alerts_created_user_1.append(docket_only_alert)
             docket_only_alert_2 = AlertFactory(
@@ -3052,6 +3104,7 @@ class RECAPAlertsPercolatorTest(
                 rate=Alert.WEEKLY,
                 name=f"Test Alert Docket Only {i}",
                 query='q="405 Civil"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
             )
             alerts_created_user_2.append(docket_only_alert_2)
 

@@ -79,6 +79,25 @@ class FakeAttachmentPage:
         }
 
 
+class FakeAppellateAttachmentPage:
+    response = MagicMock(text="")
+    _parse_text = MagicMock()
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def query(self, *args, **kwargs):
+        pass
+
+    @property
+    def data(self, *args, **kwargs):
+        return {
+            "pacer_doc_id": "1208699339",
+            "document_number": "1",
+            "attachments": [],
+        }
+
+
 class FakeFreeOpinionReport:
     def __init__(self, *args, **kwargs):
         pass

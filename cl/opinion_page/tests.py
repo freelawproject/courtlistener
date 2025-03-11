@@ -59,7 +59,6 @@ from cl.people_db.models import Person
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
-    DocketDataFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
 )
@@ -114,6 +113,7 @@ class SimpleLoadTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
+@override_flag("ui_flag_for_o", False)
 class OpinionPageLoadTest(
     ESIndexTestCase,
     CourtTestCase,
@@ -291,7 +291,6 @@ class CitationRedirectorTest(TestCase):
         r = await self.async_client.get(reverse("citation_homepage"))
         self.assertStatus(r, HTTPStatus.OK)
 
-    @override_flag("o-es-active", False)
     def test_with_a_citation(self) -> None:
         """Make sure that the url paths are working properly."""
         # Are we redirected to the correct place when we use GET or POST?
@@ -651,7 +650,7 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
 
-    @override_flag("o-es-active", False)
+    @override_flag("ui_flag_for_o", False)
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
@@ -740,7 +739,7 @@ class CitationRedirectorTest(TestCase):
         )
 
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        self.assertTemplateUsed(r, "opinion.html")
+        self.assertTemplateUsed(r, "opinions.html")
         self.assertIn(str(chests_of_tea), r.content.decode())
 
     async def test_show_error_for_non_opinion_citations(self):

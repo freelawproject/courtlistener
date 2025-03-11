@@ -40,7 +40,6 @@ from cl.scrapers.utils import (
     get_binary_content,
     get_existing_docket,
     get_extension,
-    scraped_citation_object_is_valid,
     update_or_create_docket,
 )
 from cl.search.factories import (
@@ -49,7 +48,14 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import SOURCES, Citation, Court, Docket, Opinion
+from cl.search.models import (
+    SEARCH_TYPES,
+    SOURCES,
+    Citation,
+    Court,
+    Docket,
+    Opinion,
+)
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
@@ -72,6 +78,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             rate=Alert.DAILY,
             name="Test Alert OA",
             query="type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
 
     def test_extension(self):
@@ -984,26 +991,6 @@ class UpdateFromTextCommandTest(TestCase):
             self.opinion_2020_unpub.cluster.docket.docket_number,
             "13",
             "Unpublished docket should not be modified",
-        )
-
-    def test_scraped_citation_object_is_valid(self):
-        """Can we validate Citation dicts got from `Site.extract_from_text`"""
-        bad_type = {"reporter": "WI", "type": Citation.FEDERAL}
-        self.assertFalse(
-            scraped_citation_object_is_valid(bad_type),
-            "Citation should be marked as invalid. Type does not match reporter",
-        )
-
-        bad_reporter = {"reporter": "Some text"}
-        self.assertFalse(
-            scraped_citation_object_is_valid(bad_reporter),
-            "Citation should be marked as invalid. Reporter does not exist",
-        )
-
-        valid_citation = {"reporter": "WI", "type": Citation.NEUTRAL}
-        self.assertTrue(
-            scraped_citation_object_is_valid(valid_citation),
-            "Citation object should be marked as valid",
         )
 
 

@@ -311,7 +311,9 @@ async def cache_hash(item_hash):
 
 
 @app.task(bind=True, max_retries=1)
-def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
+def merge_rss_feed_contents(
+    self, feed_data, court_pk, metadata_only=False
+) -> list[tuple[int, datetime]]:
     """Merge the rss feed contents into CourtListener
 
     :param self: The Celery task
@@ -319,9 +321,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
     already queried the feed and been parsed.
     :param court_pk: The CourtListener court ID.
     :param metadata_only: Whether to only do metadata and skip docket entries.
-    :returns Dict containing keys:
-      d_pks_to_alert: A list of (docket, alert_time) tuples for sending alerts
-      rds_for_solr: A list of RECAPDocument PKs for updating in Solr
+    :returns A list of (docket ids, alert_time) tuples for sending alerts
     """
     start_time = now()
 
@@ -374,13 +374,13 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
         all_rds_created.extend([rd.pk for rd in rds_created])
 
     logger.info(
-        "%s: Sending %s new RECAP documents to Solr for indexing and "
+        "%s: Sending %s new RECAP documents for indexing and "
         "sending %s dockets for alerts.",
         court_pk,
         len(all_rds_created),
         len(d_pks_to_alert),
     )
-    return {"d_pks_to_alert": d_pks_to_alert, "rds_for_solr": all_rds_created}
+    return d_pks_to_alert
 
 
 @app.task

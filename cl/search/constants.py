@@ -1,21 +1,9 @@
-# Solr fields that are used for highlighting or other output in the search results
+# fields that are used for highlighting or other output in the search results
 import re
 from typing import Dict
 
 from cl.search.models import SEARCH_TYPES, Opinion
 
-SOLR_OPINION_HL_FIELDS = [
-    "caseName",
-    "citation",
-    "court_citation_string",
-    "docketNumber",
-    "judge",
-    "lexisCite",
-    "neutralCite",
-    "suitNature",
-    "text",
-]
-SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
 PEOPLE_ES_HL_FIELDS = {
     "name": 0,
     "dob_city": 0,
@@ -110,22 +98,15 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "syllabus",
 ]
 SEARCH_MLT_OPINION_QUERY_FIELDS = [
-    "procedural_history",
-    "posture",
-    "syllabus",
-    "text",
+    "procedural_history.exact",
+    "posture.exact",
+    "syllabus.exact",
+    "text.exact",
 ]
 
 # ES fields that are used for highlighting
 SEARCH_HL_TAG = "mark"
 ALERTS_HL_TAG = "strong"
-SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
-    "text",
-    "caseName",
-    "judge",
-    "docketNumber",
-    "court_citation_string",
-]
 SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = {
     "caseName": 0,
     "judge": 0,
@@ -138,18 +119,6 @@ SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = {
     "docketNumber": 0,
     "judge": 0,
 }
-SOLR_RECAP_HL_FIELDS = [
-    "assignedTo",
-    "caseName",
-    "cause",
-    "court_citation_string",
-    "docketNumber",
-    "juryDemand",
-    "referredTo",
-    "short_description",
-    "suitNature",
-    "text",
-]
 SEARCH_RECAP_HL_FIELDS = {
     "assignedTo": 0,
     "caseName": 0,
@@ -277,16 +246,6 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
         SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_es,
         SEARCH_TYPES.OPINION: opinion_boosts_es,
     },
-    # Phrase-based boosts.
-    "pf": {
-        SEARCH_TYPES.OPINION: {"text": 3.0, "caseName": 3.0},
-        SEARCH_TYPES.RECAP: recap_boosts_pf,
-        SEARCH_TYPES.DOCKETS: recap_boosts_pf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3.0},
-        SEARCH_TYPES.PEOPLE: {
-            # None here. Phrases don't make much sense for people.
-        },
-    },
 }
 
 
@@ -315,4 +274,38 @@ cardinality_query_unique_ids = {
     SEARCH_TYPES.PEOPLE: "id",
     SEARCH_TYPES.ORAL_ARGUMENT: "id",
     SEARCH_TYPES.PARENTHETICAL: "id",
+}
+
+
+date_decay_relevance_types = {
+    SEARCH_TYPES.OPINION: {
+        "field": "dateFiled",
+        "scale": 50,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.RECAP: {
+        "field": "dateFiled",
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.DOCKETS: {
+        "field": "dateFiled",
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.RECAP_DOCUMENT: {
+        "field": "dateFiled",
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.ORAL_ARGUMENT: {
+        "field": "dateArgued",
+        "scale": 50,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
 }

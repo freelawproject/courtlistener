@@ -30,19 +30,19 @@ ada-url = "^1.15.0"
 argparse = "*"
 beautifulsoup4 = "==4.12.*"
 celery = "^5.4.0"
-certifi = "^2024.8.30"
+certifi = "^2024.12.14"
 courts-db = "*"
 disposable-email-domains = "*"
-Django = "^5.1.2"
+Django = "^5.1.5"
 django-cache-memoize = "==0.*"
-django-cors-headers = "^4.5.0"
+django-cors-headers = "^4.6.0"
 django-csp = "^3.8"
 django-extensions = "^3.2.3"
-django-filter = "^23.5"
+django-filter = "^24.3"
 django-localflavor = "^4.0"
 django-markdown-deux = "^1.0.6"
 django-mathfilters = "*"
-django-pghistory = "^3.4.4"
+django-pghistory = "^3.5.1"
 django-ratelimit = "^4.1.0"
 django-storages = "^1.14.3"
 djangorestframework = {git = "https://github.com/encode/django-rest-framework.git", rev = "cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2"}
@@ -75,7 +75,6 @@ simplejson = "^3.19.3"
 timeout-decorator = "*"
 unidecode = "*"
 usaddress = "^0.5.11"
-scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
 gunicorn = "^23.0.0"
 django-hCaptcha = "^0.2.0"
@@ -94,26 +93,27 @@ django-override-storage = "^0.3.2"
 django-environ = "^0.11.2"
 judge-pics = "^2.0.5"
 django-admin-cursor-paginator = "^0.1.6"
-sentry-sdk = {extras = ["celery", "django"], version = "^2.17.0"}
+sentry-sdk = {extras = ["celery", "django"], version = "^2.19.2"}
 selenium = "^4.25.0"
 ipython = "^8.28.0"
 time-machine = "^2.16.0"
 dateparser = "1.2.0"
 types-dateparser = "^1.2.0.20240420"
-uvicorn = {extras = ["standard"], version = "^0.32.0"}
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
 daphne = "^4.1.2"
-httpx = {extras = ["http2"], version = "^0.27.2"}
+httpx = {extras = ["http2"], version = "^0.28.1"}
 django-model-utils = "^5.0.0"
 django-permissions-policy = "^4.22.0"
 tiktoken = "^0.8.0"
 hyperscan = "^0.7.8"
-openai = "^1.52.0"
+openai = "^1.58.1"
 seal-rookery = "^2.2.5"
 types-pytz = "^2024.2.0.20241003"
 psycopg = {version = "3.2.3", extras = ["binary", "pool"]}
 boto3 = "^1.35.44"
+django-tailwind = "^3.8.0"
 drf-dynamic-fields = "^0.4.0"
-django-ses = {extras = ["events"], version = "^4.1.1"}
+django-ses = {extras = ["events"], version = "^4.3.2"}
 juriscraper = "^2.6.26"
 django-cursor-pagination = "^0.3.0"
 
@@ -137,6 +137,7 @@ black = "^24.10.0"
 types-simplejson = "^3.19.0.20240801"
 lxml-stubs = "^0.5.1"
 django-debug-toolbar = "^4.4.6"
+django-tailwind = {extras = ["reload"], version = "^3.8.0"}
 
 [tool.black]
 include = '''

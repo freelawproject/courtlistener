@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static extras humanize %}
 
-{% block title %}REST API, v4 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v4.1 &ndash; CourtListener.com{% endblock %}
 {% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 {% block og_description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 
@@ -24,7 +24,7 @@
     {% include "includes/toc_sidebar.html" %}
   </div>
   <div class="col-xs-12 col-md-8 col-lg-6">
-    <h1 id="about">REST API &ndash; v4.0</h1>
+    <h1 id="about">REST API &ndash; v4.1</h1>
 
     <p class="lead">APIs for developers and researchers that need granular legal data.
     </p>
@@ -446,7 +446,7 @@
     </p>
 
     <h3 id="pacer-apis">PACER Data APIs</h3>
-    <p>We have almost half a billion PACER-related objects in the RECAP Archive. Use these APIs to access and understand this data.
+    <p>We have almost half a billion PACER-related objects in the RECAP Archive including dockets, entries, documents, parties, and attorneys. Use these APIs to access and understand this data.
     </p>
     <p>
       <a href="{% url "pacer_api_help" %}" class="btn btn-default btn-lg">Learn More</a>

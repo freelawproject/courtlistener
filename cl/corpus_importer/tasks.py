@@ -5,6 +5,7 @@ import shutil
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
+from pyexpat import ExpatError
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
@@ -25,12 +26,14 @@ from eyecite.tokenizers import HyperscanTokenizer
 from httpx import (
     HTTPStatusError,
     NetworkError,
+    ReadError,
     RemoteProtocolError,
     TimeoutException,
 )
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
+    AppellateAttachmentPage,
     AppellateDocketReport,
     AttachmentPage,
     CaseQuery,
@@ -43,7 +46,6 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
-from pyexpat import ExpatError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
 from requests.exceptions import (
@@ -64,6 +66,8 @@ from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    is_appellate_court,
+    is_long_appellate_document_number,
     make_iquery_probing_key,
     mark_ia_upload_needed,
 )
@@ -126,7 +130,6 @@ from cl.search.models import (
     RECAPDocument,
     Tag,
 )
-from cl.search.tasks import add_items_to_solr
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -598,6 +601,7 @@ def process_free_opinion_result(
         ConnectionError,
         ReadTimeout,
         RedisConnectionError,
+        ReadError,
     ),
     max_retries=15,
     interval_start=5,
@@ -1298,7 +1302,6 @@ def make_docket_by_iquery_base(
         report_text,
         d,
         tag_names,
-        add_to_solr=True,
         avoid_trigger_signal=avoid_trigger_signal,
     )
 
@@ -1614,7 +1617,7 @@ def get_docket_by_pacer_case_id(
     :param tag_names: A list of tag names that should be stored with the item
     in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
-    :return: A dict indicating if we need to update Solr.
+    :return: A dict indicating if we need to update the search engine.
     """
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
@@ -1792,7 +1795,10 @@ def get_att_report_by_rd(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    att_report = AttachmentPage(pacer_court_id, s)
+    if is_appellate_court(pacer_court_id):
+        att_report = AppellateAttachmentPage(pacer_court_id, s)
+    else:
+        att_report = AttachmentPage(pacer_court_id, s)
     att_report.query(rd.pacer_doc_id)
     return att_report
 
@@ -1976,7 +1982,7 @@ def make_attachment_pq_object(
 def download_pacer_pdf_by_rd(
     rd_pk: int,
     pacer_case_id: str,
-    pacer_doc_id: int,
+    pacer_doc_id: str,
     session_data: SessionData,
     magic_number: str | None = None,
     de_seq_num: str | None = None,
@@ -2000,12 +2006,21 @@ def download_pacer_pdf_by_rd(
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
-    report = FreeOpinionReport(pacer_court_id, s)
-
-    r, r_msg = report.download_pdf(
-        pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
-    )
-
+    if is_appellate_court(pacer_court_id):
+        report = AppellateDocketReport(pacer_court_id, s)
+        pacer_doc_id = (
+            pacer_doc_id
+            if not rd.attachment_number
+            else f"{pacer_doc_id[:3]}1{pacer_doc_id[4:]}"
+        )
+        r, r_msg = report.download_pdf(
+            pacer_doc_id=pacer_doc_id, pacer_case_id=pacer_case_id
+        )
+    else:
+        report = FreeOpinionReport(pacer_court_id, s)
+        r, r_msg = report.download_pdf(
+            pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
+        )
     return r, r_msg
 
 
@@ -2110,7 +2125,7 @@ def get_document_number_for_appellate(
     if not len(document_number_split) == 1:
         document_number = document_number_split[0]
 
-    if len(document_number) > 9:
+    if is_long_appellate_document_number(document_number):
         # If the number is really big, it's probably a court that uses
         # pacer_doc_id instead of regular docket entry numbering.
         # Force the fourth-digit to 0:
@@ -2203,8 +2218,13 @@ def update_rd_metadata(
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if pdf_bytes is None:
-        if r_msg:
-            # Send a specific message all the way from Juriscraper
+        if r_msg and "An attachment page was returned instead" in r_msg:
+            msg = (
+                "This PACER document is part of an attachment page. "
+                "Our system currently lacks the metadata for this attachment. "
+                "Please purchase the attachment page and try again."
+            )
+        elif r_msg:
             msg = f"{r_msg}: {court_id=}, {rd_pk=}"
         else:
             msg = (
@@ -2439,7 +2459,6 @@ def get_pacer_doc_by_rd_and_description(
 
     # Skip OCR for now. It'll happen in a second step.
     async_to_sync(extract_recap_pdf_base)(rd.pk, ocr_available=False)
-    add_items_to_solr([rd.pk], "search.RECAPDocument")
 
 
 @app.task(
@@ -2740,7 +2759,6 @@ def recap_document_into_opinions(
     self,
     task_data: Optional[TaskData] = None,
     recap_document_id: Optional[int] = None,
-    add_to_solr: bool = False,
 ) -> Optional[TaskData]:
     """Ingest recap document into Opinions
 
@@ -2749,7 +2767,6 @@ def recap_document_into_opinions(
         command. This task should be chained after the PDF has
         been downloaded from PACER
     :param recap_document_id: The document id to inspect and import
-    :param add_to_solr: Whether to add to solr
 
     :return: The same `task_data` that came as input
     """
@@ -2832,10 +2849,6 @@ def recap_document_into_opinions(
             local_path=recap_document.filepath_local,
             extracted_by_ocr=r["extracted_by_ocr"],
         )
-
-        if add_to_solr:
-            # Add opinions to solr
-            add_items_to_solr.delay([opinion.id], "search.Opinion")
 
         logger.info(
             "Successfully imported https://www.courtlistener.com/opinion/{}/decision/".format(
