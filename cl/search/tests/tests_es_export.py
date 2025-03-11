@@ -1,3 +1,6 @@
+import csv
+import io
+
 from django.core import mail
 from django.core.management import call_command
 from django.http import QueryDict
@@ -5,7 +8,9 @@ from django.urls import reverse
 
 from cl.lib.search_utils import fetch_es_results_for_csv
 from cl.lib.test_helpers import RECAPSearchTestCase
-from cl.search.models import SEARCH_TYPES
+from cl.search.documents import ESRECAPDocument
+from cl.search.factories import DocketFactory
+from cl.search.models import SEARCH_TYPES, Docket
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -21,6 +26,15 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user_profile = UserProfileWithParentsFactory()
+        cls.no_doc_docket = (
+            DocketFactory(
+                case_name_short="Wu",
+                case_name_full="Wu v. Lipo Flavonoid LLC",
+                docket_number="1:25-cv-01363",
+                source=Docket.RECAP,
+                cause="443 Civil Rights: Accommodations",
+            ),
+        )
         cls.rebuild_index("search.Docket")
         super().setUpTestData()
         cls.rebuild_index("people_db.Person")
@@ -103,15 +117,43 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_can_send_email_with_docket_no_child(self) -> None:
+        "Confirms we can send emails when the document has no child"
+        self.client.login(
+            username=self.user_profile.user.username, password="password"
+        )
+        self.client.post(
+            reverse("export_search_results"), {"query": 'q="Wu"&type=r'}
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            mail.outbox[0].subject, "Your Search Results are Ready!"
+        )
+        self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
+        # Assert that the email contains exactly one attachment.
+        self.assertEqual(len(mail.outbox[0].attachments), 1)
+        _, attachment_content, attachment_tye = mail.outbox[0].attachments[0]
+
+        # Verify that the attachment is a CSV file.
+        self.assertEqual(attachment_tye, "text/csv")
+
+        # Confirm that all child fields within the CSV are empty.
+        reader = csv.DictReader(io.StringIO(attachment_content))
+        for row in reader:
+            with self.subTest(row=row, msg="Test content of child fields."):
+                for field in ESRECAPDocument.get_csv_headers():
+                    self.assertFalse(
+                        row[field],
+                        f"Field '{field}' should be empty in CSV row: {row}",
+                    )
+
     def test_sends_email_with_attachment(self) -> None:
-        "Confirms we dont send emails when provided with invalid query"
+        "Confirms we can send emails when the query is correct"
         self.client.login(
             username=self.user_profile.user.username, password="password"
         )
         query = 'q="Jackson"&type=r'
-        self.client.post(
-            reverse("export_search_results"), {"query": query}
-        )
+        self.client.post(reverse("export_search_results"), {"query": query})
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
             mail.outbox[0].subject, "Your Search Results are Ready!"
@@ -122,3 +164,6 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             f"https://www.courtlistener.com/?{query}", mail.outbox[0].body
         )
         self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
+        self.assertEqual(len(mail.outbox[0].attachments), 1)
+        *_, attachment_type = mail.outbox[0].attachments[0]
+        self.assertEqual(attachment_type, "text/csv")
