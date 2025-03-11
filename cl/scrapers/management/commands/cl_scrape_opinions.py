@@ -10,6 +10,7 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
+from juriscraper.lib.exceptions import InvalidDocumentError
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
@@ -261,7 +262,11 @@ class Command(ScraperCommand):
                 added += 1
             except ConsecutiveDuplicatesError:
                 break
-            except (SingleDuplicateError, BadContentError):
+            except (
+                SingleDuplicateError,
+                BadContentError,
+                InvalidDocumentError,
+            ):
                 pass
 
         # Update the hash if everything finishes properly.

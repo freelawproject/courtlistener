@@ -59,10 +59,6 @@ async def faq(request: HttpRequest) -> HttpResponse:
             "scraped_court_count": await Court.objects.filter(
                 in_use=True, has_opinion_scraper=True
             ).acount(),
-            "total_opinion_count": await OpinionCluster.objects.all().acount(),
-            "total_recap_count": await RECAPDocument.objects.filter(
-                is_available=True
-            ).acount(),
             "total_oa_minutes": (
                 (await Audio.objects.aaggregate(Sum("duration")))[
                     "duration__sum"
