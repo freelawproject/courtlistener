@@ -51,11 +51,12 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         invalid query parameters."""
         for description, query in self.errors:
             with self.subTest(description):
-                results = fetch_es_results_for_csv(
+                results, error_flag = fetch_es_results_for_csv(
                     QueryDict(query.encode(), mutable=True),
                     SEARCH_TYPES.OPINION,
                 )
                 self.assertEqual(len(results), 0)
+                self.assertTrue(error_flag)
 
     def test_limit_number_of_search_results(self) -> None:
         """Checks hat `fetch_es_results_for_csv` returns a list with a size
@@ -68,7 +69,7 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             with self.subTest(
                 f"try to fetch only {i+1} results"
             ), self.settings(MAX_SEARCH_RESULTS_EXPORTED=i + 1):
-                results = fetch_es_results_for_csv(
+                results, _ = fetch_es_results_for_csv(
                     QueryDict(query.encode(), mutable=True),
                     SEARCH_TYPES.PEOPLE,
                 )
@@ -82,7 +83,7 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         nested results."""
         # this query should match both docket records indexed
         query = "type=r&q=12-1235 OR Jackson"
-        results = fetch_es_results_for_csv(
+        results, _ = fetch_es_results_for_csv(
             QueryDict(query.encode(), mutable=True), SEARCH_TYPES.RECAP
         )
         # We expect 3 results because:

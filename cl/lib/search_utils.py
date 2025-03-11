@@ -702,7 +702,7 @@ def get_headers_and_transformations_for_search_export(
 
 def fetch_es_results_for_csv(
     queryset: QueryDict, search_type: str
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], bool]:
     """Retrieves matching results from Elasticsearch and returns them as a list
 
     This method will flatten nested results (like those returned by opinion and
@@ -711,8 +711,9 @@ def fetch_es_results_for_csv(
 
     :param queryset: The query parameters sent by the user.
     :param search_type: The type of Elasticsearch search to be performed.
-    :return: A list of dictionaries, where each dictionary represents a single
-        search result.
+    :return: A tuple containing a list of dictionaries, where each dictionary
+        represents a single search result and a boolean value indicating
+        whether a search error occurred.
     """
     csv_rows: list[dict[str, Any]] = []
 
@@ -720,7 +721,7 @@ def fetch_es_results_for_csv(
         queryset, rows=settings.MAX_SEARCH_RESULTS_EXPORTED, is_csv_export=True
     )
     if search["error"]:
-        return csv_rows
+        return csv_rows, True
 
     results = search["results"]
     match search_type:
@@ -744,4 +745,4 @@ def fetch_es_results_for_csv(
                 for result in results.object_list
             ]
 
-    return flat_results[: settings.MAX_SEARCH_RESULTS_EXPORTED]
+    return flat_results[: settings.MAX_SEARCH_RESULTS_EXPORTED], False

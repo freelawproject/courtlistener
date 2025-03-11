@@ -364,11 +364,11 @@ def document_fields_to_update(
 
 
 @app.task(
-    autoretry_for=(ConnectionError, ConflictError, ConnectionTimeout),
+    bind=True,
     max_retries=3,
     ignore_result=True,
 )
-def email_search_results(user_id: int, query: str):
+def email_search_results(self: Task, user_id: int, query: str):
     """Sends an email to the user with their search results as a CSV attachment.
 
     :param user_id: The ID of the user to send the email to.
@@ -387,9 +387,16 @@ def email_search_results(user_id: int, query: str):
     cd = search_form.cleaned_data
 
     # Fetch search results from Elasticsearch based on query and search type
-    search_results = fetch_es_results_for_csv(
+    search_results, error = fetch_es_results_for_csv(
         queryset=qd, search_type=cd["type"]
     )
+
+    # Retry task if an error occurred and retry limit not reached.
+    if error:
+        if self.request.retries == self.max_retries:
+            return None
+        raise self.retry()
+
     if not search_results:
         return
 
@@ -402,7 +409,6 @@ def email_search_results(user_id: int, query: str):
         return
 
     # Create the CSV content and store in a StringIO object
-    csv_content = None
     with io.StringIO() as output:
         csvwriter = csv.DictWriter(
             output,
