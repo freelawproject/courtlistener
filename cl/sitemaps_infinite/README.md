@@ -1,6 +1,6 @@
 # Short description of the sitemaps_infinite app
 
-The sitemaps_infinite app is based on the SQL `cursor pagination` approach implemented in the `django-cursor-pagination` app. 
+The sitemaps_infinite app is based on the SQL `cursor pagination` approach implemented in the `django-cursor-pagination` app.
 
 ## Idea
 
@@ -22,8 +22,8 @@ The app also contains a celery task doing the same that `generate_sitemaps` comm
 
 The document type should have a unique key with the index, that is used for the cursor iteration. By default the primary key is used for that purpose.
 
-The generation command sequentially takes sitemap sections and iterate all pages in each section until the files limit is hit, to decrease the impact on the database and cache. 
-The last section and cursor is saved in the `redis` DB and the next command invocation will continue the generation process. 
+The generation command sequentially takes sitemap sections and iterate all pages in each section until the files limit is hit, to decrease the impact on the database and cache.
+The last section and cursor is saved in the `redis` DB and the next command invocation will continue the generation process.
 
 This command should be called periodically to make sure the new pages are added or the existing ones are updated properly.
 

@@ -8,7 +8,7 @@ from cl.sitemaps_infinite.sitemap_generator import (
 
 
 class Command(VerboseCommand):
-    help = """The command starts or continues the sitemap urls generation. 
+    help = """The command starts or continues the sitemap urls generation.
     The place where the generation was stopped last time is saved into the redis cache and then loaded when the command starts"""
 
     def add_arguments(self, parser: CommandParser) -> None:
