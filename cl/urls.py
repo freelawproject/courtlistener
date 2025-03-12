@@ -78,7 +78,10 @@ urlpatterns = [
     path(
         "large-sitemap.xml",
         cache_page(60 * 60 * 24, cache="db_cache")(sitemaps_views.index),
-        {"sitemaps": pregenerated_sitemaps, "sitemap_url_name": "sitemaps-pregenerated"},
+        {
+            "sitemaps": pregenerated_sitemaps,
+            "sitemap_url_name": "sitemaps-pregenerated",
+        },
     ),
     path(
         "large-sitemap-<str:section>.xml",

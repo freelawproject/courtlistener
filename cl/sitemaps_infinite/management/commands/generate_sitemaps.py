@@ -23,6 +23,8 @@ class Command(VerboseCommand):
 
         if options["force_regenerate"]:
             reset_sitemaps_cursor()
-            logger.info("Sitemaps cursor was reset, run `generate_sitemaps` again to start the generation")
+            logger.info(
+                "Sitemaps cursor was reset, run `generate_sitemaps` again to start the generation"
+            )
 
         generate_urls_chunk(options["force_regenerate"])

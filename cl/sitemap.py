@@ -7,15 +7,18 @@ from django.contrib.sitemaps import Sitemap
 from django.contrib.sitemaps.views import x_robots_tag
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.cache import caches
-from django.core.paginator import EmptyPage, PageNotAnInteger, InvalidPage
+from django.core.paginator import EmptyPage, InvalidPage, PageNotAnInteger
 from django.http import Http404, HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
-from django.utils.encoding import force_bytes, escape_uri_path
+from django.utils.encoding import escape_uri_path, force_bytes
 from django.utils.http import http_date
 
 from cl.lib.ratelimiter import ratelimiter_all_2_per_m
 
-def make_cache_key(request: HttpRequest, section: str, force_page: bool = False) -> str:
+
+def make_cache_key(
+    request: HttpRequest, section: str, force_page: bool = False
+) -> str:
     """Make a Cache key for a URL
 
     This is a simplified version of django's get_cache_key method, which
@@ -32,13 +35,13 @@ def make_cache_key(request: HttpRequest, section: str, force_page: bool = False)
     """
     # url without query string
     base_url: str = request.build_absolute_uri(escape_uri_path(request.path))
-    
+
     # include only 'p' parameter to the cache key, make it more deterministic
     if page := request.GET.get("p", 1 if force_page else None):
         base_url = f"{base_url}?p={page}"
 
     url = hashlib.md5(force_bytes(base_url))
-    
+
     return f"sitemap.{section}.{url.hexdigest()}"
 
 
@@ -63,14 +66,14 @@ def cached_sitemap(
         raise Http404(f"No sitemap available for section: {section!r}")
     sitemap = sitemaps[section]
     page = request.GET.get("p", 1)
-    
+
     # handle infinite sitemaps, force p=1 by default
-    force_page = bool(getattr(sitemap, 'force_page_in_cache', False))
+    force_page = bool(getattr(sitemap, "force_page_in_cache", False))
 
     cache = caches["db_cache"]
     cache_key = make_cache_key(request, section, force_page)
     urls = cache.get(cache_key, [])
-    
+
     # return HttpResponse(f'{request.build_absolute_uri(escape_uri_path(request.path))} {cache_key} {urls}', content_type='text/plain')
     if not urls:
         try:

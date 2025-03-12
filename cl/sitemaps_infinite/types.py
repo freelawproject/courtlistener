@@ -1,6 +1,5 @@
 from typing import TypedDict
 
-
 """
 A TypedDict representing the data associated with large sitemaps pre-generation process.
 It holds the place where the pre-generation task stopped so next task invocation can continue from there.

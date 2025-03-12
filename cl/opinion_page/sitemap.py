@@ -4,7 +4,12 @@ from typing import Tuple
 from django.contrib import sitemaps
 from django.db.models import Q, QuerySet
 
-from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Docket, OpinionCluster
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    SEARCH_TYPES,
+    Docket,
+    OpinionCluster,
+)
 from cl.sitemaps_infinite.base_sitemap import InfinitePaginatorSitemap
 
 
@@ -71,7 +76,7 @@ class DocketSitemap(InfinitePaginatorSitemap):
     @property
     def ordering(self) -> Tuple[str]:
         return ("pk",)
-    
+
     def items(self) -> QuerySet:
         # Give items ten days to get some views.
         new_or_popular = Q(view_count__gt=10) | Q(

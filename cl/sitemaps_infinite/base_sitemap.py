@@ -80,9 +80,10 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
     The `get_urls_by_cursor` method is used to generate the URLs,
     taking an optional cursor parameter to fetch the next set of URLs.
     """
+
     # set url scheme to be compatible with the regular sitemap
     protocol = settings.SITEMAPS_URL_SCHEME
-    
+
     _cursor: Union[str, None, False] = False
     _has_next: bool = False
 
