@@ -33,7 +33,7 @@ The main settings are:
 `cl/settings/sitemaps.py`:
 
   - `SITEMAPS_GENERATED_OFFLINE` has the list of the infinite sitemaps that should be iterated.
-  - `SITEMAPS_FILES_PER_CALL` - limits the number of pages generated per a single command call
+  - `SITEMAPS_FILES_PER_CALL` - limits the number of pages generated per a single command call (10 by default)
 
 `cl/urls.py`:
   - `pregenerated_sitemaps` contains the list of infinite sitemaps classes that are used in the `large-sitemap*` routes.
@@ -44,3 +44,5 @@ The main settings are:
 The domain of the sitemap urls is retrieved from the `django.contrib.sites` current site.
 
 The `DocketSitemap` in `cl/opinion_page` app is currently implemented as an example.
+
+You need to submit the new `/large-sitemap.xml` url to google.com in order to index all the large sitemaps, generated using this module.
