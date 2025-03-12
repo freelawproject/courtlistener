@@ -36,9 +36,7 @@
   {% else %}
     <script src="{% static "js/htmx.min.js" %}"></script>
   {% endif %}
-  {% flag "pray-and-pay" %}
-  <script src="{% static "js/pray_and_pay.js" %}"></script>
-  {% endflag %}
+    <script src="{% static "js/pray_and_pay.js" %}"></script>
 {% endblock %}
 
 {% block sidebar %}
@@ -86,6 +84,7 @@
       {% if redirect_to_pacer_modal %}
         {% include "includes/redirect_to_pacer_modal.html" %}
       {% endif %}
+      {% include "includes/first_prayer_modal.html" %}
       {% include "includes/rd_metadata_headers.html" %}
       <br>
 
@@ -199,11 +198,9 @@
                   <a href="https://free.law/recap/"
                      class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
                 {% endif %}
-                {% flag "pray-and-pay" %}
                 <div class="prayer-button">
                   {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count regular_size=True%}
                 </div>
-                {% endflag %}
               </div>
             </div>
           {% endif %}

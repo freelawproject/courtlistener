@@ -146,21 +146,25 @@ async def find_docket_object(
     if pacer_case_id:
         # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
         # blank pacer_case_id values.
-        lookups = [
-            {
-                "pacer_case_id": pacer_case_id,
-                "docket_number_core": docket_number_core,
-            },
-            # Appellate docket uploads usually include a pacer_case_id.
-            # Therefore, include the following lookup to attempt matching
-            # existing dockets without a pacer_case_id using docket_number_core
-            # to avoid creating duplicated dockets.
-            {
-                "pacer_case_id": None,
-                "docket_number_core": docket_number_core,
-            },
-            {"pacer_case_id": pacer_case_id},
-        ]
+        if docket_number_core:
+            # Only do these if docket_number_core is not blank. See #5058.
+            lookups.extend(
+                [
+                    {
+                        "pacer_case_id": pacer_case_id,
+                        "docket_number_core": docket_number_core,
+                    },
+                    # Appellate docket uploads usually include a pacer_case_id.
+                    # Therefore, include the following lookup to attempt matching
+                    # existing dockets without a pacer_case_id using docket_number_core
+                    # to avoid creating duplicated dockets.
+                    {
+                        "pacer_case_id": None,
+                        "docket_number_core": docket_number_core,
+                    },
+                ]
+            )
+        lookups.append({"pacer_case_id": pacer_case_id})
     if docket_number_core and not pacer_case_id:
         # Sometimes we don't know how to make core docket numbers. If that's
         # the case, we will have a blank value for the field. We must not do
@@ -1951,7 +1955,7 @@ def save_iquery_to_docket(
     iquery_text: str,
     d: Docket,
     tag_names: Optional[List[str]],
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
 
@@ -1960,13 +1964,13 @@ def save_iquery_to_docket(
     :param iquery_text: The HTML text data from a successful iquery response
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
-    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep: Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: The pk of the docket if successful. Else, None.
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
-    d.avoid_trigger_signal = avoid_trigger_signal
+    d.skip_iquery_sweep = skip_iquery_sweep
     try:
         d.save()
         add_bankruptcy_data_to_docket(d, iquery_data)
@@ -2038,7 +2042,7 @@ def process_case_query_report(
     pacer_case_id: int,
     report_data: dict[str, Any],
     report_text: str,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = False,
 ) -> None:
     """Process the case query report from probe_iquery_pages task.
     Find and update/store the docket accordingly. This method is able to retry
@@ -2048,7 +2052,7 @@ def process_case_query_report(
     :param pacer_case_id: The internal PACER case ID number
     :param report_data: A dictionary containing report data.
     :param report_text: The HTML text data from a successful iquery response
-    :param avoid_trigger_signal:  Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep:  Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None
@@ -2065,7 +2069,7 @@ def process_case_query_report(
     d.pacer_case_id = pacer_case_id
     d.add_recap_source()
     d = async_to_sync(update_docket_metadata)(d, report_data)
-    d.avoid_trigger_signal = avoid_trigger_signal
+    d.skip_iquery_sweep = skip_iquery_sweep
     d.save()
     add_bankruptcy_data_to_docket(d, report_data)
     logger.info(

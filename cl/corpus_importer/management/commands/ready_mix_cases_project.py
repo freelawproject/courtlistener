@@ -10,6 +10,7 @@ from redis import Redis
 from redis.exceptions import ConnectionError
 
 from cl.corpus_importer.tasks import make_docket_by_iquery
+from cl.corpus_importer.utils import get_iquery_pacer_courts_to_scrape
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
@@ -111,7 +112,7 @@ def get_courts_to_scrape(court_type: str, court_ids: list[str]) -> list[str]:
     """
 
     court_ids_to_scrape = (
-        get_bankruptcy_courts(court_ids) + get_district_courts(court_ids)
+        get_iquery_pacer_courts_to_scrape()
         if court_type == "all"
         else (
             get_district_courts(court_ids)
@@ -166,8 +167,7 @@ def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
             court_id, options["date_filed"]
         )
         if not latest_pacer_case_id:
-            r.hdel("iquery_status", court_id)
-            continue
+            latest_pacer_case_id = "1"
         r.hset("iquery_status", court_id, latest_pacer_case_id)
         # Set the Redis keys for the iquery daemon and the sweep scraper.
         r.hset(

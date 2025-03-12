@@ -6,6 +6,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from cl.corpus_importer.tasks import make_docket_by_iquery_sweep
+from cl.corpus_importer.utils import get_iquery_pacer_courts_to_scrape
 from cl.lib.command_utils import logger
 from cl.lib.redis_utils import (
     acquire_redis_lock,
@@ -51,12 +52,19 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
         tasks_to_schedule = (
             incoming_pacer_case_id - iquery_pacer_case_id_current
         )
+        logger.info(
+            "Found %s tasks to schedule for pacer case IDs ranging from %s to %s.",
+            tasks_to_schedule,
+            iquery_pacer_case_id_current,
+            incoming_pacer_case_id,
+        )
         if tasks_to_schedule > 10_800:
-            # Considering a Celery countdown of 1 second and a visibility_timeout
-            # of 6 hours, the maximum countdown time should be set to 21,600 to
-            # avoid a celery runaway. It's safer to abort if more than 10,800
-            # tasks are attempted to be scheduled. This could indicate an issue
-            # with retrieving the highest_known_pacer_case_id or a loss of the
+            # Considering a Celery countdown of 1 second applied via
+            # throttle_task and a visibility_timeout of 6 hours, the maximum
+            # countdown time should be set to 21,600 to avoid a celery runaway.
+            # It's safer to abort if more than 10,800 tasks are attempted to be
+            # scheduled. This could indicate an issue with retrieving the
+            # highest_known_pacer_case_id or a loss of the
             # iquery_pacer_case_id_current for the court in Redis.
             logger.error(
                 "Tried to schedule more than 10,800 iquery pages to scrape for "
@@ -65,20 +73,21 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
             )
             release_redis_lock(r, update_lock_key, lock_value)
             return None
-        task_scheduled_countdown = 0
+        task_to_schedule_count = 0
         while iquery_pacer_case_id_current + 1 < incoming_pacer_case_id:
             iquery_pacer_case_id_current += 1
-            task_scheduled_countdown += 1
-            # Schedule the next task with a 1-second countdown increment
+            task_to_schedule_count += 1
+            # Schedule the next task.
             make_docket_by_iquery_sweep.apply_async(
                 args=(court_id, iquery_pacer_case_id_current),
-                kwargs={"avoid_trigger_signal": True},
-                countdown=task_scheduled_countdown,
+                kwargs={"skip_iquery_sweep": True},
                 queue=settings.CELERY_IQUERY_QUEUE,
             )
             logger.info(
-                f"Enqueued iquery docket case ID: {iquery_pacer_case_id_current} "
-                f"for court {court_id} with countdown {task_scheduled_countdown}"
+                "Enqueued %s iquery docket with case ID: %s for court %s",
+                task_to_schedule_count,
+                iquery_pacer_case_id_current,
+                court_id,
             )
 
         # Update the iquery_pacer_case_id_current in Redis
@@ -105,15 +114,15 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
     """
 
     if not settings.IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED and getattr(
-        instance, "avoid_trigger_signal", True
+        instance, "skip_iquery_sweep", True
     ):
         # If the signal is disabled for uploads in general and the instance
-        # doesn't have avoid_trigger_signal set, abort it. This is a Docket
+        # doesn't have skip_iquery_sweep set, abort it. This is a Docket
         # created by an upload or another RECAP source different from the
         # iquery probe daemon.
         return None
 
-    if getattr(instance, "avoid_trigger_signal", False):
+    if getattr(instance, "skip_iquery_sweep", False):
         # This is an instance added by the probe_iquery_pages task
         # or the iquery sweep scraper that should be ignored (no the highest
         # pacer_case_id)
@@ -125,17 +134,12 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
     # - The docket was newly created (when IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True), or
     # - The docket was created or updated by the last probe iteration from probe_iquery_pages.
     check_probe_or_created = (
-        not getattr(instance, "avoid_trigger_signal", False) or created
+        not getattr(instance, "skip_iquery_sweep", False) or created
     )
     if (
         check_probe_or_created
         and instance.pacer_case_id
-        and instance.court_id
-        in list(
-            Court.federal_courts.district_or_bankruptcy_pacer_courts()
-            .exclude(pk__in=["uscfc", "arb", "cit"])
-            .values_list("pk", flat=True)
-        )
+        and instance.court_id in get_iquery_pacer_courts_to_scrape()
     ):
         transaction.on_commit(
             partial(update_latest_case_id_and_schedule_iquery_sweep, instance)
