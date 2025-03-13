@@ -675,8 +675,8 @@ class ParentheticalESSignalProcessorTest(
         self.o.opinions_cited.remove(self.o_2)
 
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
-        self.assertEqual(None, doc.cites)
-        self.assertEqual(None, doc.panel_ids)
+        self.assertEqual([], doc.cites)
+        self.assertEqual([], doc.panel_ids)
         self.pg_test.delete()
 
     def test_keep_in_sync_related_pa_objects_on_reverse_relation(self) -> None:
@@ -706,7 +706,7 @@ class ParentheticalESSignalProcessorTest(
         citation_lexis.delete()
         citation_neutral.delete()
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
-        self.assertEqual(None, doc.citation)
+        self.assertEqual([], doc.citation)
         self.assertEqual(None, doc.lexisCite)
         self.assertEqual(None, doc.neutralCite)
         self.pg_test.delete()
