@@ -3225,6 +3225,12 @@ class Opinion(AbstractDateTimeModel):
         ]
     )
     ordering_key = models.IntegerField(null=True, blank=True)
+    main_version = models.ForeignKey(
+        "self",
+        help_text="The id of another Opinion which is the updated or final version of this opinion",
+        null=True,
+        on_delete=models.SET_NULL,
+    )
 
     class Meta:
         constraints = [
