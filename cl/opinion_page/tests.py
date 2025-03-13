@@ -9,6 +9,7 @@ from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 from asgiref.sync import async_to_sync, sync_to_async
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group, User
@@ -84,6 +85,7 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -998,14 +1000,39 @@ class DocketSitemapTest(SitemapTest):
             blocked=True,
         )
 
+        # set the domain name in the Sites framework to match the test domain name, set http url schema
+        domain = "testserver"
+        SiteModel = apps.get_model("sites", "Site")
+
+        SiteModel.objects.update_or_create(
+            pk=settings.SITE_ID, defaults={"domain": domain, "name": domain}
+        )
+        settings.SITEMAPS_URL_SCHEME = "http"
+
     def setUp(self) -> None:
         self.sitemap_url = reverse(
-            "sitemaps", kwargs={"section": SEARCH_TYPES.RECAP}
+            "sitemaps-pregenerated", kwargs={"section": SEARCH_TYPES.RECAP}
         )
         self.expected_item_count = 2
 
-    def test_does_the_sitemap_have_content(self) -> None:
-        super().assert_sitemap_has_content()
+    def test_is_the_sitemap_generated_and_have_content(self) -> None:
+        """Is content generated and read properly from the cache into the sitemap?"""
+        response = self.client.get(self.sitemap_url)
+        self.assertEqual(
+            404,
+            response.status_code,
+            msg="Did not get a '400 Page not found' status code before generating the sitemap.",
+        )
+
+        # call_command("generate_sitemaps", "--force-regenerate")
+        generate_urls_chunk()
+
+        response = self.client.get(self.sitemap_url)
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get a 200 OK status code after generating the sitemap.",
+        )
 
 
 class BlockedSitemapTest(SitemapTest):
