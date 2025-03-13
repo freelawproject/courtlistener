@@ -160,7 +160,7 @@ services:
 
   cl-es:
     container_name: cl-es
-    image: elasticsearch:8.8.1
+    image: elasticsearch:8.17.3
     environment:
       - discovery.type=single-node
       - cluster.name=courtlistener-cluster
