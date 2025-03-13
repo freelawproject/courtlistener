@@ -19,8 +19,12 @@ from django.http.response import (
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
+    HttpResponseServerError,
 )
-from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
+from django.shortcuts import (  # type: ignore[attr-defined]
+    aget_object_or_404,
+    render,
+)
 from django.template.defaultfilters import slugify
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -956,12 +960,12 @@ async def setup_opinion_context(
         str(opinion.pk) async for opinion in cluster.sub_opinions.all()
     ]
 
-    es_has_cited_opinions = await es_cited_case_count(
-        cluster.id, sub_opinion_pks
-    )
-    es_has_related_opinions = await es_related_case_count(
-        cluster.id, sub_opinion_pks
-    )
+    # es_has_cited_opinions = await es_cited_case_count(
+    #     cluster.id, sub_opinion_pks
+    # )
+    # es_has_related_opinions = await es_related_case_count(
+    #     cluster.id, sub_opinion_pks
+    # )
 
     try:
         note = await Note.objects.aget(
@@ -1003,10 +1007,10 @@ async def setup_opinion_context(
         "get_string": get_string,
         "private": cluster.blocked,
         "sponsored": sponsored,
-        "summaries_count": await cluster.parentheticals.acount(),
-        "authorities_count": await cluster.aauthority_count(),
-        "related_cases_count": es_has_related_opinions,
-        "cited_by_count": es_has_cited_opinions,
+        # "summaries_count": await cluster.parentheticals.acount(),
+        # "authorities_count": await cluster.aauthority_count(),
+        # "related_cases_count": es_has_related_opinions,
+        # "cited_by_count": es_has_cited_opinions,
     }
 
     return context
@@ -1044,27 +1048,61 @@ async def render_opinion_view(
     if additional_context:
         context.update(additional_context)
 
-    # Just redirect if people attempt to URL hack to pages without content
-    tab_count_mapping = {
-        "pdf": "has_downloads",
-        "authorities": "authorities_count",
-        "cited-by": "cited_by_count",
-        "related-by": "related_by_count",
-        "summaries": "summaries_count",
-    }
-
-    # Check if the current tab needs a redirect based on the mapping
-    if context["tab"] in tab_count_mapping:
-        count_key = tab_count_mapping[context["tab"]]
-        if not context[count_key]:
-            return HttpResponseRedirect(
-                reverse("view_case", args=[cluster.pk, cluster.slug])
-            )
-
     return TemplateResponse(
         request,
         "opinions.html",
         context,
+    )
+
+
+async def update_opinion_tabs(request: HttpRequest, pk: int):
+    # return HttpResponseServerError("Server error occurred")
+
+    cluster = await OpinionCluster.objects.filter(pk=pk).afirst()
+    if not cluster:
+        return await sync_to_async(render)(
+            request, "includes/opinion_tabs.html", {"cluster": None}
+        )
+
+    authorities_count = await cluster.aauthority_count()
+    summaries_count = await cluster.parentheticals.acount()
+
+    ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
+        request, "ui_flag_for_o_es"
+    )
+    if ui_flag_for_o_es:
+        # Flag enabled, query ES to get counts
+        sub_opinion_pks = [
+            str(opinion.pk) async for opinion in cluster.sub_opinions.all()
+        ]
+        es_has_cited_opinions = await es_cited_case_count(
+            cluster.id, sub_opinion_pks
+        )
+        es_has_related_opinions = await es_related_case_count(
+            cluster.id, sub_opinion_pks
+        )
+        cited_by_count = es_has_cited_opinions
+        related_cases_count = es_has_related_opinions
+    else:
+        # Don't query ES for counts
+        # TODO query db?
+        cited_by_count = 0
+        related_cases_count = 0
+
+    # Get `tab` from request parameters (fallback to 'opinions')
+    tab = request.GET.get("tab", "opinions")
+
+    context = {
+        "cluster": cluster,
+        "authorities_count": authorities_count,
+        "cited_by_count": cited_by_count,
+        "summaries_count": summaries_count,
+        "related_cases_count": related_cases_count,
+        "tab": tab,
+    }
+
+    return await sync_to_async(render)(
+        request, "includes/opinion_tabs.html", context
     )
 
 
