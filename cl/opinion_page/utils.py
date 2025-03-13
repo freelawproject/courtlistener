@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from io import StringIO
 from typing import Dict, Tuple, Union
 
+import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
@@ -449,6 +450,15 @@ async def es_get_citing_and_related_clusters_with_cache(
 
     if is_bot(request) or not sub_opinion_pks:
         return RelatedCitingResults(url_search_params=url_search_params)
+
+    if not await sync_to_async(waffle.flag_is_active)(
+        request, "citing_and_related_enabled"
+    ):
+        # Don't perform any queries if citing_and_related_enabled is disabled.
+        # Return True for timeout to display buttons for users to click.
+        return RelatedCitingResults(
+            url_search_params=url_search_params, timeout=True
+        )
 
     (
         cached_citing_results,
