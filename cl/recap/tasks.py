@@ -4,6 +4,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
 from typing import Any, Optional, Tuple
@@ -1967,8 +1968,14 @@ def fetch_pacer_doc_by_rd_base(
             fq.user_id, court_id, pacer_doc_id, [pacer_case_id], pdf_bytes
         )
     if subdocket_pqs_to_replicate:
-        replicate_fq_pdf_to_subdocket_rds.delay(subdocket_pqs_to_replicate)
-
+        # Wait for the transaction to be committed before triggering the task,
+        # ensuring that all PQs already exist.
+        transaction.on_commit(
+            partial(
+                replicate_fq_pdf_to_subdocket_rds.delay,
+                subdocket_pqs_to_replicate,
+            )
+        )
     return rd.pk
 
 
@@ -3336,37 +3343,37 @@ def process_recap_email(
                 de_seq_num=pacer_seq_no,
             )
 
-        # Replicate content to subdockets not mentioned in the notification.
-        valid_att_data = (
-            get_data_from_att_report(att_report_text, court_id)
-            if att_report_text
-            else None
+    # Replicate content to subdockets not mentioned in the notification.
+    valid_att_data = (
+        get_data_from_att_report(att_report_text, court_id)
+        if att_report_text
+        else None
+    )
+    content_to_replicate = any(main_rds_available + [valid_att_data])
+    if (
+        pacer_doc_id
+        and content_to_replicate
+        and got_content_updated
+        and not is_appellate_court(court_id)
+    ):
+        replicate_recap_email_to_subdockets(
+            user_pk,
+            court_id,
+            pacer_doc_id,
+            unique_case_ids,
+            pq.filepath_local,
+            att_report_text,
+            att_pqs,
         )
-        content_to_replicate = any(main_rds_available + [valid_att_data])
-        if (
-            pacer_doc_id
-            and content_to_replicate
-            and got_content_updated
-            and not is_appellate_court(court_id)
-        ):
-            replicate_recap_email_to_subdockets(
-                user_pk,
-                court_id,
-                pacer_doc_id,
-                unique_case_ids,
-                pq.filepath_local,
-                att_report_text,
-                att_pqs,
-            )
 
-        # After properly copying the PDF to related RECAPDocuments,
-        # mark the PQ object as successful and delete its filepath_local
+    # After properly copying the PDF to related RECAPDocuments,
+    # mark the PQ object as successful and delete its filepath_local
+    if pq.status != PROCESSING_STATUS.FAILED:
+        async_to_sync(mark_pq_successful)(pq)
+
+    for pq in att_pqs:
         if pq.status != PROCESSING_STATUS.FAILED:
             async_to_sync(mark_pq_successful)(pq)
-
-        for pq in att_pqs:
-            if pq.status != PROCESSING_STATUS.FAILED:
-                async_to_sync(mark_pq_successful)(pq)
 
     # Send docket alerts and webhooks for each docket updated.
     recap_email_recipients = get_recap_email_recipients(epq.destination_emails)
