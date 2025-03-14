@@ -37,6 +37,19 @@ def replication_status(request: HttpRequest) -> HttpResponse:
     )
 
 
+def elasticsearch_status(request: HttpRequest) -> JsonResponse:
+    """Checks the health of the Elasticsearch cluster."""
+    is_elastic_up = check_elasticsearch()
+    return JsonResponse(
+        {"is_elastic_up": is_elastic_up},
+        status=(
+            HTTPStatus.OK
+            if is_elastic_up
+            else HTTPStatus.INTERNAL_SERVER_ERROR
+        ),
+    )
+
+
 def redis_writes(request: HttpRequest) -> HttpResponse:
     """Just return 200 OK if we can write to redis. Else return 500 Error."""
     r = get_redis_interface("STATS")
