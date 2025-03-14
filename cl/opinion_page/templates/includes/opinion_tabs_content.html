@@ -7,6 +7,8 @@
         <h2 class="opinion-section-title jump-link" id="case-details">Table of Authorities</h2>
         <hr class="hr-opinion">
         <div id="authorities">
+            <h3>This opinion cites {{ authorities_with_data|length|intcomma }} opinion{{ authorities_with_data|length|pluralize }}.</h3>
+            <hr>
             {% for authority in authorities_with_data %}
                 <article>
                     <h3 class="bottom serif">
@@ -50,6 +52,8 @@
         <h2 class="opinion-section-title jump-link" id="case-details">Summaries ({{ summaries_count|intcomma }})</h2>
         <hr class="hr-opinion">
         <div id="all-summaries">
+            <h3>{{ summaries_count|intcomma }} judge-written summar{{ summaries_count|pluralize:"y,ies" }} of this opinion
+            from other cases.</h3>
             <ul>
                 {% for group in parenthetical_groups %}
                     {% with representative=group.representative %}
