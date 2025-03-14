@@ -1060,7 +1060,12 @@ async def render_opinion_view(
 
 
 async def update_opinion_tabs(request: HttpRequest, pk: int):
-    # return HttpResponseServerError("Server error occurred")
+    """Generate opinions tab dinamically
+
+    :param request: The HTTP request from the user
+    :param pk: OpinionCluster pk
+    :return: partial rendered or blank if not htmx request
+    """
 
     if "HX-Request" not in request.headers:
         return HttpResponse("")

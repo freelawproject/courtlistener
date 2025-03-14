@@ -289,12 +289,3 @@ document.querySelectorAll("page-label").forEach(label => {
         }
     });
 });
-
-
-// Add an event listener for HTMX response errors when loading opinion tabs
-document.addEventListener('htmx:responseError', function (event) {
-    const errorAlert = document.getElementById('error-alert');
-    if (errorAlert) {
-        errorAlert.style.display = 'block'; // Make the alert visible
-    }
-});
