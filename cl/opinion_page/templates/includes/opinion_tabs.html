@@ -1,32 +1,34 @@
 {% if cluster %}
-    <ul class="nav nav-tabs hidden-print nav-justified">
-        <li role="presentation" {% if tab == "opinions" or tab == "" %} class="active" {% endif %}>
-            <a href="{% url 'view_case' cluster.pk cluster.slug %}">Opinion</a>
-        </li>
-        {% if authorities_count > 0 %}
-            <li role="presentation" {% if tab == "authorities" %} class="active" {% endif %}>
-                <a href="{% url "view_case_authorities" cluster.pk cluster.slug %}">Authorities&nbsp;({{ authorities_count }})</a>
+    {% if authorities_count > 0 or cited_by_count > 0 or summaries_count > 0 or related_cases_count > 0 or has_downloads %}
+        <ul class="nav nav-tabs hidden-print nav-justified">
+            <li role="presentation" {% if tab == "opinions" or tab == "" %} class="active" {% endif %}>
+                <a href="{% url 'view_case' cluster.pk cluster.slug %}">Opinion</a>
             </li>
-        {% endif %}
-        {% if cited_by_count > 0 %}
-            <li role="presentation" {% if tab == "cited-by" %} class="active" {% endif %}>
-                <a href="{% url "view_case_cited_by" cluster.pk cluster.slug %}">Cited&nbsp;By&nbsp;({{ cited_by_count }})</a>
-            </li>
-        {% endif %}
-        {% if summaries_count > 0 %}
-            <li role="presentation" {% if tab == "summaries" %} class="active" {% endif %}>
-                <a href="{% url "view_case_summaries" cluster.pk cluster.slug %}">Summaries&nbsp;({{ summaries_count }})</a>
-            </li>
-        {% endif %}
-        {% if related_cases_count > 0 %}
-            <li role="presentation" {% if tab == "related-cases" %} class="active" {% endif %}>
-                <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;Cases</a>
-            </li>
-        {% endif %}
-        {% if has_downloads and "pdf" in pdf_path or cluster.filepath_pdf_harvard %}
-            <li role="presentation" {% if tab == "pdf" %} class="active" {% endif %}>
-                <a rel="nofollow" href="{% url 'view_case_pdf' cluster.pk cluster.slug %}">PDF</a>
-            </li>
-        {% endif %}
-    </ul>
+            {% if authorities_count > 0 %}
+                <li role="presentation" {% if tab == "authorities" %} class="active" {% endif %}>
+                    <a href="{% url "view_case_authorities" cluster.pk cluster.slug %}">Authorities&nbsp;({{ authorities_count }})</a>
+                </li>
+            {% endif %}
+            {% if cited_by_count > 0 %}
+                <li role="presentation" {% if tab == "cited-by" %} class="active" {% endif %}>
+                    <a href="{% url "view_case_cited_by" cluster.pk cluster.slug %}">Cited&nbsp;By&nbsp;({{ cited_by_count }})</a>
+                </li>
+            {% endif %}
+            {% if summaries_count > 0 %}
+                <li role="presentation" {% if tab == "summaries" %} class="active" {% endif %}>
+                    <a href="{% url "view_case_summaries" cluster.pk cluster.slug %}">Summaries&nbsp;({{ summaries_count }})</a>
+                </li>
+            {% endif %}
+            {% if related_cases_count > 0 %}
+                <li role="presentation" {% if tab == "related-cases" %} class="active" {% endif %}>
+                    <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;Cases</a>
+                </li>
+            {% endif %}
+            {% if has_downloads and "pdf" in pdf_path or cluster.filepath_pdf_harvard %}
+                <li role="presentation" {% if tab == "pdf" %} class="active" {% endif %}>
+                    <a rel="nofollow" href="{% url 'view_case_pdf' cluster.pk cluster.slug %}">PDF</a>
+                </li>
+            {% endif %}
+        </ul>
+    {%  endif %}
 {%  endif %}

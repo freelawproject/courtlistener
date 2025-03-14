@@ -920,6 +920,30 @@ async def view_opinion_old(
     )
 
 
+async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
+    """Generate the context for downloads
+
+    :param cluster: The opinion cluster
+    :return: a dict containing a boolean if the cluster has downloads and string gile path to the pdf file
+    """
+    has_downloads = False
+    pdf_path = None
+    if cluster.filepath_pdf_harvard:
+        has_downloads = True
+        pdf_path = cluster.filepath_pdf_harvard
+    else:
+        async for sub_opinion in cluster.sub_opinions.all():
+            if str(sub_opinion.local_path).endswith(".pdf"):
+                has_downloads = True
+                pdf_path = sub_opinion.local_path.url
+                break
+            elif sub_opinion.download_url:
+                has_downloads = True
+                pdf_path = None
+
+    return {"has_downloads": has_downloads, "pdf_path": pdf_path}
+
+
 async def setup_opinion_context(
     cluster: OpinionCluster, request: HttpRequest, tab: str
 ) -> dict[str, Any]:
@@ -939,33 +963,8 @@ async def setup_opinion_context(
     }
     tab_intro = tab_intros.get(tab, "")
     title = f"{tab_intro}{trunc(best_case_name(cluster), 100, ellipsis='...')}"
-    has_downloads = False
-    pdf_path = None
-    if cluster.filepath_pdf_harvard:
-        has_downloads = True
-        pdf_path = cluster.filepath_pdf_harvard
-    else:
-        async for sub_opinion in cluster.sub_opinions.all():
-            if str(sub_opinion.local_path).endswith(".pdf"):
-                has_downloads = True
-                pdf_path = sub_opinion.local_path.url
-                break
-            elif sub_opinion.download_url:
-                has_downloads = True
-                pdf_path = None
 
     get_string = make_get_string(request)
-
-    sub_opinion_pks = [
-        str(opinion.pk) async for opinion in cluster.sub_opinions.all()
-    ]
-
-    # es_has_cited_opinions = await es_cited_case_count(
-    #     cluster.id, sub_opinion_pks
-    # )
-    # es_has_related_opinions = await es_related_case_count(
-    #     cluster.id, sub_opinion_pks
-    # )
 
     try:
         note = await Note.objects.aget(
@@ -1001,17 +1000,14 @@ async def setup_opinion_context(
         "title": title,
         "caption": await cluster.acaption(),
         "cluster": cluster,
-        "has_downloads": has_downloads,
-        "pdf_path": pdf_path,
         "note_form": note_form,
         "get_string": get_string,
         "private": cluster.blocked,
         "sponsored": sponsored,
-        # "summaries_count": await cluster.parentheticals.acount(),
-        # "authorities_count": await cluster.aauthority_count(),
-        # "related_cases_count": es_has_related_opinions,
-        # "cited_by_count": es_has_cited_opinions,
     }
+
+    download_context = await get_downloads_context(cluster)
+    context.update(download_context)
 
     return context
 
@@ -1100,6 +1096,9 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
         "related_cases_count": related_cases_count,
         "tab": tab,
     }
+
+    download_context = await get_downloads_context(cluster)
+    context.update(download_context)
 
     return await sync_to_async(render)(
         request, "includes/opinion_tabs.html", context
