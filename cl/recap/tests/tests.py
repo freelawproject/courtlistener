@@ -2281,8 +2281,8 @@ class ReplicateRecapUploadsTest(TestCase):
             request_type=REQUEST_TYPE.PDF,
             recap_document_id=main_d_2_rd.pk,
         )
-
-        do_pacer_fetch(fq)
+        with self.captureOnCommitCallbacks(execute=True):
+            do_pacer_fetch(fq)
 
         main_d_1_rd.refresh_from_db()
         main_d_2_rd.refresh_from_db()
