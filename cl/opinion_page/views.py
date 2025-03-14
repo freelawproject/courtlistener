@@ -964,6 +964,10 @@ async def setup_opinion_context(
     tab_intro = tab_intros.get(tab, "")
     title = f"{tab_intro}{trunc(best_case_name(cluster), 100, ellipsis='...')}"
 
+    # Counts that don't require ES
+    authorities_count = await cluster.aauthority_count()
+    summaries_count = await cluster.parentheticals.acount()
+
     get_string = make_get_string(request)
 
     try:
@@ -1004,6 +1008,10 @@ async def setup_opinion_context(
         "get_string": get_string,
         "private": cluster.blocked,
         "sponsored": sponsored,
+        "cited_by_count": 0,
+        "related_cases_count": 0,
+        "authorities_count": authorities_count,
+        "summaries_count": summaries_count,
     }
 
     download_context = await get_downloads_context(cluster)
@@ -1054,6 +1062,9 @@ async def render_opinion_view(
 async def update_opinion_tabs(request: HttpRequest, pk: int):
     # return HttpResponseServerError("Server error occurred")
 
+    if "HX-Request" not in request.headers:
+        return HttpResponse("")
+
     cluster = await OpinionCluster.objects.filter(pk=pk).afirst()
     if not cluster:
         return await sync_to_async(render)(
@@ -1081,7 +1092,6 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
         related_cases_count = es_has_related_opinions
     else:
         # Don't query ES for counts
-        # TODO query db?
         cited_by_count = 0
         related_cases_count = 0
 
@@ -1095,6 +1105,8 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
         "summaries_count": summaries_count,
         "related_cases_count": related_cases_count,
         "tab": tab,
+        "is_htmx": "HX-Request" in request.headers,
+        "es_enabled": ui_flag_for_o_es,
     }
 
     download_context = await get_downloads_context(cluster)
