@@ -2242,6 +2242,7 @@ def update_rd_metadata(
     pacer_doc_id: str,
     document_number: str,
     attachment_number: int,
+    omit_page_count: bool = False,
 ) -> Tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
 
@@ -2256,6 +2257,7 @@ def update_rd_metadata(
     :param document_number: The docket entry number for use in file names.
     :param attachment_number: The attachment number (if applicable) for use in
     file names.
+    :param omit_page_count: If true, omit requesting the page_count from doctor.
     :return: A two-tuple of a boolean indicating success and a corresponding
     error/success message string.
     """
@@ -2287,19 +2289,19 @@ def update_rd_metadata(
     rd.is_available = True  # We've got the PDF.
     rd.date_upload = rd.date_upload or now()
 
-    # request.content is sometimes a str, sometimes unicode, so
-    # force it all to be bytes, pleasing hashlib.
-    rd.sha1 = sha1(pdf_bytes)
-    response = async_to_sync(microservice)(
-        service="page-count",
-        item=rd,
-    )
-    if response.is_success:
-        rd.page_count = int(response.text)
-
-    assert isinstance(
-        rd.page_count, (int, type(None))
-    ), "page_count must be an int or None."
+    if not omit_page_count:
+        # request.content is sometimes a str, sometimes unicode, so
+        # force it all to be bytes, pleasing hashlib.
+        rd.sha1 = sha1(pdf_bytes)
+        response = async_to_sync(microservice)(
+            service="page-count",
+            item=rd,
+        )
+        if response.is_success:
+            rd.page_count = int(response.text)
+        assert isinstance(
+            rd.page_count, (int, type(None))
+        ), "page_count must be an int or None."
 
     # Save and extract, skipping OCR.
     rd.save()
