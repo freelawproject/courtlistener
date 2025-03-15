@@ -964,10 +964,6 @@ async def setup_opinion_context(
     tab_intro = tab_intros.get(tab, "")
     title = f"{tab_intro}{trunc(best_case_name(cluster), 100, ellipsis='...')}"
 
-    # Counts that don't require ES
-    authorities_count = await cluster.aauthority_count()
-    summaries_count = await cluster.parentheticals.acount()
-
     get_string = make_get_string(request)
 
     try:
@@ -999,6 +995,15 @@ async def setup_opinion_context(
         and date_created > three_years_ago
     )
 
+    # Only calculate the count when the tab is displayed
+    summaries_count = 0
+    authorities_count = 0
+    if tab == "summaries":
+        summaries_count = await cluster.parentheticals.acount()
+
+    if tab == "authorities":
+        authorities_count = await cluster.aauthority_count()
+
     context = {
         "tab": tab,
         "title": title,
@@ -1008,8 +1013,6 @@ async def setup_opinion_context(
         "get_string": get_string,
         "private": cluster.blocked,
         "sponsored": sponsored,
-        "cited_by_count": 0,
-        "related_cases_count": 0,
         "authorities_count": authorities_count,
         "summaries_count": summaries_count,
     }

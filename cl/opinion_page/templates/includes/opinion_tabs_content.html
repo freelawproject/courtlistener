@@ -4,7 +4,7 @@
 {% if tab == "authorities" %}
 {# Table of Authorities #}
     <div class="tab-pane fade in active" id="opinion">
-        <h2 class="opinion-section-title jump-link" id="case-details">Table of Authorities</h2>
+        <h2 class="opinion-section-title jump-link" id="case-details">Table of Authorities ({{ authorities_count|intcomma }})</h2>
         <hr class="hr-opinion">
         <div id="authorities">
             <h3>This opinion cites {{ authorities_with_data|length|intcomma }} opinion{{ authorities_with_data|length|pluralize }}.</h3>
@@ -178,7 +178,7 @@
 {% elif tab == "related-cases" %}
     {# Related Cases #}
     <div class="tab-pane fade in active" id="related">
-        <h2 class="opinion-section-title jump-link">Related Cases</h2>
+        <h2 class="opinion-section-title jump-link">Related Cases ({{ related_clusters|length|intcomma }})</h2>
         <hr class="hr-opinion">
             {% if related_clusters %}
                 {% url 'show_results' as show_results_url %}
