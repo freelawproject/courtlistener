@@ -463,6 +463,57 @@ class PacerBulkFetchUnitTest(TestCase):
                     f"should_skip returned {skip_status.should_skip} for {case['name']}",
                 )
 
+    def test_exclude_transcript_documents(
+        self,
+        mock_failed_docs_cache_key,
+        mock_fetched_cache_key,
+    ):
+        """Test exclude RECAPDocuments that are likely transcripts"""
+        self.command.options["min_page_count"] = 1000
+        self.command.options["max_page_count"] = 2000
+
+        # Transcript RDs:
+        de_5 = DocketEntryFactory(docket=self.docket, description="")
+        RECAPDocumentFactory(
+            docket_entry=de_5,
+            document_number=4,
+            pacer_doc_id=f"11236",
+            is_available=False,
+            page_count=1500,
+            description="Notice of Transcript of",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de_5,
+            document_number=5,
+            pacer_doc_id=f"11237",
+            is_available=False,
+            page_count=1500,
+            description="96 Transcripts-Part 3",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de_5,
+            document_number=6,
+            pacer_doc_id=f"11238",
+            is_available=False,
+            page_count=1500,
+            description="Deposition Transcripts by",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de_5,
+            document_number=7,
+            pacer_doc_id=f"11239",
+            is_available=False,
+            page_count=1500,
+            description="Exhibit PX 25 (transcripts)",
+        )
+
+        self.command.identify_documents()
+
+        actual_docs = [doc["id"] for doc in self.command.recap_documents]
+        self.assertFalse(
+            set(actual_docs), msg="Transcript RDs shoudn't be matched."
+        )
+
     @patch(
         "cl.search.management.commands.pacer_bulk_fetch.fetch_pacer_doc_by_rd_and_mark_fq_completed.si"
     )
@@ -671,10 +722,10 @@ class BulkFetchPacerIntegrationTest(TestCase):
         cls.docket_3 = DocketFactory(court=cls.ca2)
         cls.docket_4 = DocketFactory(court=cls.ca2)
 
-        de_1 = DocketEntryFactory(docket=cls.docket_1)
-        de_2 = DocketEntryFactory(docket=cls.docket_2)
-        de_3 = DocketEntryFactory(docket=cls.docket_3)
-        de_4 = DocketEntryFactory(docket=cls.docket_4)
+        de_1 = DocketEntryFactory(docket=cls.docket_1, description="")
+        de_2 = DocketEntryFactory(docket=cls.docket_2, description="")
+        de_3 = DocketEntryFactory(docket=cls.docket_3, description="")
+        de_4 = DocketEntryFactory(docket=cls.docket_4, description="")
 
         # Create RECAP docs in DB (no real caching)
         des = [de_1, de_2, de_3, de_4]
@@ -696,6 +747,28 @@ class BulkFetchPacerIntegrationTest(TestCase):
             pacer_doc_id=f"1234",
             is_available=False,
             page_count=100,
+        )
+
+        # Transcript RDs, should be ignored:
+        RECAPDocumentFactory(
+            docket_entry=de_3,
+            document_number=4,
+            pacer_doc_id=f"1236",
+            is_available=False,
+            page_count=1500,
+            description="Trial Transcripts",
+        )
+
+        de_5 = DocketEntryFactory(
+            docket=cls.docket_4, description="Transcripts-Part 1"
+        )
+        RECAPDocumentFactory(
+            docket_entry=de_5,
+            document_number=4,
+            pacer_doc_id=f"1237",
+            is_available=False,
+            page_count=1500,
+            description="",
         )
 
     def tearDown(self):
@@ -720,8 +793,10 @@ class BulkFetchPacerIntegrationTest(TestCase):
         "cl.search.management.commands.pacer_bulk_fetch.enough_time_elapsed",
         return_value=True,
     )
+    @patch("cl.corpus_importer.tasks.microservice")
     def test_pacer_bulk_fetch_integration(
         self,
+        microservice_mock,
         mock_enough_time_elapsed,
         mock_download_pacer_pdf_by_rd,
         mock_is_pacer_court_accessible,
@@ -750,6 +825,9 @@ class BulkFetchPacerIntegrationTest(TestCase):
             stage="fetch",
             username=self.user.username,
         )
+
+        # Page count microservice shouldn't be called.
+        microservice_mock.assert_not_called()
 
         # After the command runs, all rds_to_retrieve IDs should be available.
         rds_purchased = RECAPDocument.objects.filter(is_available=True)
