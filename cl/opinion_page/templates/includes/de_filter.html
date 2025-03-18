@@ -1,7 +1,7 @@
 <div class="well well-sm">
   <div class="row filter-box">
     <!-- Search -->
-    <div class="col-xs-12 col-md-2">
+    <div class="col-xs-12 col-md-3">
       {% if docket_entries %}
         <div class="row" id="main-query-box">
           <div id="search-container" class="col-xs-12 text-center">
@@ -25,7 +25,7 @@
       {% endif %}
     </div>
     <form action="">
-      <div class="form-inline">
+      <div class="col-md-9 form-inline flex flex-row" style="flex-wrap: wrap">
         {% if form.errors %}
           <div class="col-xs-12">
             <p class="text-danger"><strong>There were errors applying your filters.</strong>
@@ -33,7 +33,7 @@
           </div>
         {% endif %}
         <!-- date select -->
-        <div class="tight-input col-xs-6 col-sm-5 col-md-4 col-lg-3">
+        <div class="tight-input range-input left-group">
           <div class="cl-form-group{% if form.filed_after.errors %} has-error{% endif %}">
             <label for="id_filed_after"
                    class="control-label">Filed</label>
@@ -41,24 +41,24 @@
           </div>
           <div class="cl-form-group{% if form.filed_before.errors %} has-error{% endif %}">
             <label for="id_filed_before"
-                   class="control-label">to</label>
+                   class="control-label padding-inline">to</label>
             {{ form.filed_before }}
           </div>
         </div>
         <!-- Document group -->
-        <div class="tight-input col-xs-6 col-sm-4 col-md-3">
+        <div class="tight-input range-input right-group" style="padding-inline: 1rem;">
           <div class="cl-form-group{% if form.entry_gte.errors %} has-error{% endif %}">
             <label for="id_entry_gte" class="control-label">Documents</label>
             {{ form.entry_gte }}
           </div>
           <div class="cl-form-group{% if form.entry_lte.errors %} has-error{% endif %}">
             <label for="id_entry_lte"
-                   class="control-label">to</label>
+                   class="control-label padding-inline">to</label>
             {{ form.entry_lte }}
           </div>
         </div>
         <!-- sort ordering -->
-        <div class="tight-input col-xs-6 col-sm-3 col-md-2">
+        <div class="tight-input button-group left-group" style="padding-right: 2rem;">
           <div id="sort-buttons"
                class="btn-group tight-input pull-right xs-pull-left cl-sm-pull-left"
                data-toggle="buttons"
@@ -82,24 +82,24 @@
           </div>
         </div>
         <!-- Navigate buttons -->
-        <div class="tight-input col-xs-6 hidden-sm col-sm-6 col-md-1 col-lg-2" >
+        <div class="tight-input button-group right-group" >
           <div class="pull-right" >
             {% if docket_entries.has_previous %}
               <a class="btn btn-default" href="{% querystring page=docket_entries.previous_page_number %}" rel="prev" >
-                <i class="fa fa-caret-left" ></i><span class="hidden-md" >&nbsp;Prev.</span>
+                <i class="fa fa-caret-left" ></i><span >&nbsp;Prev.</span>
               </a>
             {% else %}
               <a class="btn btn-default disabled" href="#" rel="prev" >
-                <i class="fa fa-caret-left" ></i><span class="hidden-md" >&nbsp;Prev.</span>
+                <i class="fa fa-caret-left" ></i><span >&nbsp;Prev.</span>
               </a>
             {% endif %}
             {% if docket_entries.has_next %}
               <a class="btn btn-default" href="{% querystring page=docket_entries.next_page_number %}" rel="next" >
-                <span class="hidden-md" >Next&nbsp;</span><i class="fa fa-caret-right"></i>
+                <span >Next&nbsp;</span><i class="fa fa-caret-right"></i>
               </a>
             {% else %}
               <a class="btn btn-default disabled" href="#" rel="next" >
-                <span class="hidden-md" >Next&nbsp;</span><i class="fa fa-caret-right"></i>
+                <span >Next&nbsp;</span><i class="fa fa-caret-right"></i>
               </a>
             {% endif %}
           </div>
@@ -121,3 +121,38 @@
   </p>
 {% endif %}
 </div>
+
+<style>
+.range-input {
+  display: flex;
+  @media (max-device-width: 991px) and (min-device-width: 541px) {
+    width: 50% !important;
+    &.left-group {
+      justify-content: end;
+    }
+    &.right-group {
+      justify-content: start;
+    }
+  }
+  @media (max-device-width: 540px) {
+    width: 100% !important;
+    justify-content: center;
+  }
+}
+.button-group {
+  &.left-group {
+    padding-left: 1rem;
+  }
+  @media (max-device-width: 991px) {
+    &.left-group {
+      margin-left: auto;
+    }
+    &.right-group {
+      margin-right: auto;
+    }
+  }
+}
+.padding-inline {
+  padding-inline: 0.4rem;
+}
+</style>
