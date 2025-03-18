@@ -44,7 +44,6 @@ from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.lib.elasticsearch_utils import build_daterange_query
-from cl.lib.storage import AWSMediaStorage
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
@@ -53,6 +52,7 @@ from cl.lib.search_utils import (
     fetch_es_results_for_csv,
     get_headers_and_transformations_for_search_export,
 )
+from cl.lib.storage import AWSMediaStorage
 from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
@@ -1721,7 +1721,6 @@ def create_opinion_text_embeddings(
 def save_embeddings(
     embeddings: list[dict],
     directory: str = "opinions",
-    npl_model_name: str = "nomic-ai/modernbert-embed-base",
 ) -> None:
     """Save embeddings to S3.
 
@@ -1771,8 +1770,7 @@ def save_embeddings(
         file_path = os.path.join(
             "embeddings",
             directory,
-            npl_model_name,
+            settings.NLP_EMBEDDING_MODEL,
             f"{record_id}.json",
         )
-
         storage.save(file_path, ContentFile(file_contents))
