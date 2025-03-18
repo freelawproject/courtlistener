@@ -108,4 +108,16 @@
       </div>
     </form>
   </div>
+
+{% if docket.date_terminated is None %}
+  <p style="margin-top: 10px;">
+    <i class="fa fa-info-circle"></i> Docket entries on this page are sourced from PACER and may not be up to date. Learn more about our coverage <a href="{% url 'coverage_recap' %}">here</a>.
+  </p>
+{#  <p>#}
+{#    To help improve public access to court records, consider <a href="https://free.law/recap/" class="alert-link">installing RECAP</a>—it's quick, easy, and free!#}
+{#  </p>#}
+  <p style="margin-bottom: 0;">
+    Notice an issue with the data displayed? Please <a href="{% url 'contact' %}">let us know</a>, and to further help improve public access to court records, consider <a href="https://free.law/recap/" class="alert-link">installing RECAP</a>—it's quick, easy, and free!
+  </p>
+{% endif %}
 </div>
