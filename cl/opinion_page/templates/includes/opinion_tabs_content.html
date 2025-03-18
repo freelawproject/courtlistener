@@ -4,11 +4,9 @@
 {% if tab == "authorities" %}
 {# Table of Authorities #}
     <div class="tab-pane fade in active" id="opinion">
-        <h2 class="opinion-section-title jump-link" id="case-details">Table of Authorities ({{ authorities_count|intcomma }})</h2>
+        <h2 class="opinion-section-title jump-link" id="case-details">Table of Authorities</h2>
         <hr class="hr-opinion">
         <div id="authorities">
-            <h3>This opinion cites {{ authorities_with_data|length|intcomma }} opinion{{ authorities_with_data|length|pluralize }}.</h3>
-            <hr>
             {% for authority in authorities_with_data %}
                 <article>
                     <h3 class="bottom serif">
@@ -44,16 +42,12 @@
             {% endfor %}
         </div>
     </div>
-{#{% elif tab == "details" %}#}
-{#    {% include "includes/tab_details.html" %}#}
 {% elif tab == "summaries" %}
     {# Summaries #}
     <div class="tab-pane fade in active" id="summaries">
-        <h2 class="opinion-section-title jump-link" id="case-details">Summaries ({{ summaries_count|intcomma }})</h2>
+        <h2 class="opinion-section-title jump-link" id="case-details">Summaries</h2>
         <hr class="hr-opinion">
         <div id="all-summaries">
-            <h3>{{ summaries_count|intcomma }} judge-written summar{{ summaries_count|pluralize:"y,ies" }} of this opinion
-            from other cases.</h3>
             <ul>
                 {% for group in parenthetical_groups %}
                     {% with representative=group.representative %}
@@ -123,7 +117,7 @@
     <div class="tab-pane fade in active" id="cited-by">
         <h2 class="opinion-section-title jump-link">
             <span>
-                Cited By ({{ citing_cluster_count|intcomma }})
+                Cited By
                 <a href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})" rel="nofollow">
                     <i class="gray fa fa-rss" title="Subscribe to a feed of citations to this case."></i>
                 </a>
@@ -178,7 +172,7 @@
 {% elif tab == "related-cases" %}
     {# Related Cases #}
     <div class="tab-pane fade in active" id="related">
-        <h2 class="opinion-section-title jump-link">Related Cases ({{ related_clusters|length|intcomma }})</h2>
+        <h2 class="opinion-section-title jump-link">Related Cases</h2>
         <hr class="hr-opinion">
             {% if related_clusters %}
                 {% url 'show_results' as show_results_url %}

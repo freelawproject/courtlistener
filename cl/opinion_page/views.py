@@ -995,15 +995,6 @@ async def setup_opinion_context(
         and date_created > three_years_ago
     )
 
-    # Only calculate the count when the tab is displayed
-    summaries_count = 0
-    authorities_count = 0
-    if tab == "summaries":
-        summaries_count = await cluster.parentheticals.acount()
-
-    if tab == "authorities":
-        authorities_count = await cluster.aauthority_count()
-
     context = {
         "tab": tab,
         "title": title,
@@ -1013,8 +1004,6 @@ async def setup_opinion_context(
         "get_string": get_string,
         "private": cluster.blocked,
         "sponsored": sponsored,
-        "authorities_count": authorities_count,
-        "summaries_count": summaries_count,
     }
 
     download_context = await get_downloads_context(cluster)
@@ -1263,6 +1252,7 @@ async def view_opinion_cited_by(
         "citing_clusters": cited_query.citing_clusters,
         "citing_cluster_count": cited_query.citing_cluster_count,
     }
+    print("additional_context", additional_context)
     return await render_opinion_view(
         request, cluster, "cited-by", additional_context
     )
