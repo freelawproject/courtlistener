@@ -105,6 +105,40 @@ def elasticsearch_enabled(func: Callable) -> Callable:
     return wrapper_func
 
 
+class CSVSerializableDocumentMixin:
+
+    @classmethod
+    def get_csv_headers(cls) -> list[str]:
+        """
+        Returns a list of strings representing the headers for a CSV file.
+
+        This method defines the column headers for a CSV representation of the
+        data associated with this class.
+
+        :return: A list of strings, where each string is a column header.
+        """
+        raise NotImplementedError(
+            "Subclass must implement get_csv_headers method"
+        )
+
+    @classmethod
+    def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        """
+        Generates a dictionary of transformation functions for CSV export.
+
+        This method defines how specific fields in a data structure should be
+        transformed before being written to a CSV file. It covers
+        transformations for various fields, including those from list of fields
+        with highlights, file paths, URLs, and renamed fields.
+
+        :return: A dictionary where keys are field names and values are lambda
+        functions that define the transformations.
+        """
+        raise NotImplementedError(
+            "Subclass must implement get_csv_transformations method"
+        )
+
+
 def build_numeric_range_query(
     field: str,
     lower_bound: int | float,
@@ -374,18 +408,6 @@ def build_fulltext_query(
     """
     if value:
         validate_query_syntax(value, QueryType.QUERY_STRING)
-        # In Elasticsearch, the colon (:) character is used to separate the
-        # field name and the field value in a query.
-        # To avoid parsing errors escape any colon characters in the value
-        # parameter with a backslash.
-        if "docketNumber:" in value:
-            docket_number_matches = re.findall("docketNumber:([^ ]+)", value)
-            for match in docket_number_matches:
-                replacement = match.replace(":", r"\:")
-                value = value.replace(
-                    f"docketNumber:{match}", f"docketNumber:{replacement}"
-                )
-
         # Used for the phrase query_string, no conjunctions appended.
         query_value = cleanup_main_query(value)
         # To enable the search of each term in the query across multiple fields
@@ -465,7 +487,18 @@ def build_term_query(
         validate_query_syntax(value, QueryType.FILTER)
 
     if make_phrase:
-        return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
+        return [
+            Q(
+                "match_phrase",
+                **{
+                    field: {
+                        "query": value,
+                        "slop": slop,
+                        "analyzer": "search_analyzer_exact",
+                    }
+                },
+            )
+        ]
 
     if isinstance(value, list):
         value = list(filter(None, value))
@@ -767,7 +800,7 @@ def build_es_plain_filters(cd: CleanData) -> List:
         # Build docket number term query
         queries_list.extend(
             build_term_query(
-                "docketNumber",
+                "docketNumber.exact",
                 cd.get("docket_number", ""),
                 make_phrase=True,
                 slop=1,
@@ -1920,9 +1953,9 @@ def merge_unavailable_fields_on_parent_document(
                     value = position_dict.get(person_id)
                     cleaned_name = re.sub("_dict", "", field.name)
                     result[cleaned_name] = value
-        case (
-            SEARCH_TYPES.RECAP | SEARCH_TYPES.RECAP_DOCUMENT
-        ) if request_type == "v4" and not highlight:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.RECAP_DOCUMENT if (
+            request_type == "v4" and not highlight
+        ):
             # Retrieves the plain_text from the DB to fill the snippet when
             # highlighting is disabled.
 
@@ -1958,9 +1991,9 @@ def merge_unavailable_fields_on_parent_document(
                         result["id"], ""
                     )
 
-        case (
-            SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
-        ) if request_type == "frontend":
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if (
+            request_type == "frontend"
+        ):
             # Merge initial document button to the frontend search results.
             docket_ids = {doc["docket_id"] for doc in results}
             # This query retrieves initial documents considering two
@@ -2107,9 +2140,9 @@ def merge_unavailable_fields_on_parent_document(
                             opinion_docs_dict.get(op["_source"]["id"], "")
                         )
                     )
-        case (
-            SEARCH_TYPES.ORAL_ARGUMENT
-        ) if request_type == "v4" and not highlight:
+        case SEARCH_TYPES.ORAL_ARGUMENT if (
+            request_type == "v4" and not highlight
+        ):
             # Retrieves the Audio transcript from the DB to fill the snippet
             # when highlighting is disabled.
 
@@ -2374,7 +2407,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                 ),
                 *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_term_query(
-                    "docketNumber",
+                    "docketNumber.exact",
                     cd.get("docket_number", ""),
                     make_phrase=True,
                     slop=1,
@@ -2418,7 +2451,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                     cd.get("filed_after", ""),
                 ),
                 *build_term_query(
-                    "docketNumber",
+                    "docketNumber.exact",
                     cd.get("docket_number", ""),
                     make_phrase=True,
                     slop=1,

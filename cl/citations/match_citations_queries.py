@@ -33,11 +33,11 @@ def fetch_citations(search_query: Search) -> list[Hit]:
     search_query = search_query.sort("id")
     # Only retrieve fields required for the lookup.
     search_query = search_query.source(
-        includes=["id", "caseName", "absolute_url", "dateFiled"]
+        includes=["id", "caseName", "absolute_url", "dateFiled", "cluster_id"]
     )
     # Citation resolution aims for a single match. Setting up a size of 2 is
-    # enough to determine if there is more than one match.
-    search_query = search_query.extra(size=2)
+    # enough to determine if there is more than one match after cluster collapse
+    search_query = search_query.extra(size=2, collapse={"field": "cluster_id"})
     response = search_query.execute()
     citation_hits.extend(response.hits)
     return citation_hits
@@ -201,6 +201,7 @@ def es_search_db_for_full_citation(
     query = Q("bool", must_not=must_not, filter=filters)
     citations_query = search_query.query(query)
     results = fetch_citations(citations_query)
+
     citation_found = True if len(results) > 0 else False
     if len(results) == 1:
         return results, citation_found
@@ -214,9 +215,9 @@ def es_search_db_for_full_citation(
                 full_citation,
                 full_citation.citing_opinion,
             )
-            return results, citation_found
-    # Give up.
-    return [], citation_found
+
+    # Return all possible results
+    return results, citation_found
 
 
 def es_get_query_citation(
@@ -244,6 +245,7 @@ def es_get_query_citation(
             missing_citations.append(citation)
 
     if len(citations) == 1 and matches and len(matches) == 1:
-        # If more than one match, don't show the tip
+        # If only one match, show the tip
         return matches[0], missing_citations
-    return matches, missing_citations
+    # No exact match, don't show the tip
+    return None, missing_citations

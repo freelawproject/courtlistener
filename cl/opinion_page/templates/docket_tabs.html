@@ -55,9 +55,7 @@
             src="{% static "js/react/vendor.js" %}"></script>
 
     <script type="text/javascript" src="{% static "js/export-csv.js" %}"></script>
-    {% flag "pray-and-pay" %}
     <script src="{% static "js/pray_and_pay.js" %}"></script>
-    {% endflag %}
 {% endblock %}
 
 {% block nav %}
@@ -81,13 +79,14 @@
       </p>
     {% endif %}
     <h1 class="bottom inline" data-type="search.Docket" data-id="{{ docket.pk }}">
-      {{ docket|best_case_name|safe|v_wrapper }}
+      <span class="select-all">{{ docket|best_case_name|safe|v_wrapper }}</span>
       {% if docket.docket_number %}
         (<span class="select-all">{{ docket.docket_number }}</span>)
       {% endif %}
     </h1>
     {% include "includes/notes_modal.html" %}
     {% include "includes/docket_alerts_modal.html" %}
+    {% include "includes/first_prayer_modal.html" %}
 
     <h2>{{ docket.court }}</h2>
 
@@ -493,7 +492,7 @@
         </li>
         {% endif %}
 
-        {% if authorities %}
+        {% if docket.authority_count %}
         <li class="{% block nav-authorities %}inactive{% endblock %}"
             role="presentation">
           <a href="{% url "docket_authorities" docket_id=docket.pk slug=docket.slug %}">Authorities

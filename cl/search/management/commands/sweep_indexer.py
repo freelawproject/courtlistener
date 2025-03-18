@@ -23,7 +23,7 @@ from cl.search.documents import (
 from cl.search.models import SEARCH_TYPES, Docket, Opinion, RECAPDocument
 from cl.search.tasks import (
     index_parent_and_child_docs,
-    index_parent_or_child_docs,
+    index_parent_or_child_docs_in_es,
 )
 from cl.search.types import ESDocumentClassType
 
@@ -234,7 +234,7 @@ class Command(VerboseCommand):
         child: Literal["parent", "child"] = "child"
         while models_stack:
             app_label = models_stack.pop()
-            task_to_use = "index_parent_or_child_docs"
+            task_to_use = "index_parent_or_child_docs_in_es"
 
             match app_label:
                 case "people_db.Person":
@@ -363,6 +363,7 @@ class Command(VerboseCommand):
             min_items=self.chunk_size,
             queue_name=self.queue,
         )
+        use_streaming_bulk = True if testing_mode else False
         document_type, search_type, es_document = task_params
         for item in items:
             if isinstance(item, tuple):
@@ -393,15 +394,17 @@ class Command(VerboseCommand):
                 match task_to_use:
                     case "index_parent_and_child_docs":
                         index_parent_and_child_docs.si(
-                            chunk, search_type, testing_mode=testing_mode
+                            chunk,
+                            search_type,
+                            use_streaming_bulk=use_streaming_bulk,
                         ).set(queue=self.queue).apply_async()
 
-                    case "index_parent_or_child_docs":
-                        index_parent_or_child_docs.si(
+                    case "index_parent_or_child_docs_in_es":
+                        index_parent_or_child_docs_in_es.si(
                             chunk,
                             search_type,
                             document_type,
-                            testing_mode=testing_mode,
+                            use_streaming_bulk=use_streaming_bulk,
                         ).set(queue=self.queue).apply_async()
 
                 accumulated_chunk += len(chunk)

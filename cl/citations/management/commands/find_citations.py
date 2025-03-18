@@ -6,6 +6,7 @@ from django.core.management import CommandError
 from django.core.management.base import CommandParser
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 
+from cl.citations.models import UnmatchedCitation
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
@@ -55,6 +56,12 @@ class Command(VerboseCommand):
             "Opinion objects to update.",
         )
         parser.add_argument(
+            "--modified-before",
+            type=valid_date_time,
+            help="The modification date ISO-8601 format for a range of "
+            "Opinion objects to update.",
+        )
+        parser.add_argument(
             "--state",
             choices=[key[0] for key in USPS_CHOICES + OBSOLETE_STATES],
             help="State abbreviation E.g. NY, MA, CA.",
@@ -64,6 +71,12 @@ class Command(VerboseCommand):
             action="store_true",
             default=False,
             help="Parse citations for all items",
+        )
+        parser.add_argument(
+            "--no-html-with-citations",
+            action="store_true",
+            default=False,
+            help="Parse only opinions without html_with_citations",
         )
         parser.add_argument(
             "--queue",
@@ -79,6 +92,7 @@ class Command(VerboseCommand):
             or options.get("filed_after") is not None
             or options.get("filed_before") is not None
             or options.get("modified_after") is not None
+            or options.get("modified_before") is not None
         )
         no_option = not any(
             [
@@ -88,7 +102,9 @@ class Command(VerboseCommand):
                 options.get("filed_after") is None,
                 options.get("filed_before") is None,
                 options.get("modified_after") is None,
+                options.get("modified_before") is None,
                 options.get("state") is not None,
+                options.get("no_html_with_citations") is False,
                 options.get("all") is False,
             ]
         )
@@ -126,8 +142,15 @@ class Command(VerboseCommand):
             )
         if options.get("modified_after"):
             query = query.filter(date_modified__gte=options["modified_after"])
+        if options.get("modified_before"):
+            query = query.filter(date_modified__lte=options["modified_before"])
+        if options.get("no_html_with_citations"):
+            query = query.filter(html_with_citations="")
         if options.get("all"):
             query = Opinion.objects.all()
+            sys.stdout.write("Deleting all UnmatchedCitation rows")
+            UnmatchedCitation.objects.all().delete()
+
         self.count = query.count()
         self.average_per_s = 0.0
         self.timings: List[float] = []
