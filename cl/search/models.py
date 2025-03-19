@@ -2716,6 +2716,14 @@ class OpinionCluster(AbstractDateTimeModel):
         return ", ".join(str(c) for c in citations)
 
     @property
+    def citation_spans(self):
+        """Make a citation string, joined by commas, wrapped in <span> tags"""
+        citations = sorted(self.citations.all(), key=sort_cites)
+        return ", ".join(
+            f'<span class="citation">{c}</span>' for c in citations
+        )
+
+    @property
     def authorities(self):
         """Returns a queryset that can be used for querying and caching
         authorities.

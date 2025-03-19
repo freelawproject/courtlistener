@@ -227,7 +227,7 @@
                 <br>
                 <div class="case-details">
                     <ul class="list-unstyled">
-                      <li><strong>Citations:</strong> <span class="select-all">{{ cluster.citation_string|default:"None known" }}</span></li>
+                      <li><strong>Citations:</strong> {{ cluster.citation_spans|default:"None known" | safe }} </li>
                         {% if cluster.case_name_full != cluster|best_case_name %}
                         <li><strong>Full Case Name:</strong>
                           <span class="select-all">{{ cluster.case_name_full }}</span>
