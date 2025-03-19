@@ -1074,6 +1074,11 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
     ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o_es"
     )
+
+    # Default count when flag is disabled
+    cited_by_count = 0
+    related_cases_count = 0
+
     if ui_flag_for_o_es:
         # Flag enabled, query ES to get counts
         sub_opinion_pks = [
@@ -1083,10 +1088,6 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
         related_cases_count = await es_related_case_count(
             cluster.id, sub_opinion_pks
         )
-    else:
-        # Don't query ES for counts
-        cited_by_count = 0
-        related_cases_count = 0
 
     # Get `tab` from request parameters (fallback to 'opinions')
     tab = request.GET.get("tab", "opinions")
