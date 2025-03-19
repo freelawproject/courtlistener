@@ -388,7 +388,6 @@ div.footnote:first-of-type {
     background-color: #e7e7e7;
     border-top-right-radius: 5px 5px; /* Rounds the corners */
     border-top-left-radius: 5px 5px; /* Rounds the corners */
-    margin-left: 4px;
   }
 
   #caption-square > ul > li.active {
@@ -665,6 +664,23 @@ div.footnote:first-of-type {
       display: none;
     }
   }
+
+/* Stack tabs starting at 991px resolution */
+@media (max-width: 991px) {
+    .nav-tabs.nav-justified {
+      width: 100%;
+      border-bottom: 0;
+    }
+    .nav-tabs.nav-justified > li {
+      float: none;
+      display: block;
+      width: 100%;
+    }
+    .nav-tabs.nav-justified > li > a {
+      text-align: center;
+      margin-bottom: 5px;
+    }
+}
 
   .scraped-html p {
     display: block;
