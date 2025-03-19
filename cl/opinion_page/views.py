@@ -19,8 +19,12 @@ from django.http.response import (
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
+    HttpResponseServerError,
 )
-from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
+from django.shortcuts import (  # type: ignore[attr-defined]
+    aget_object_or_404,
+    render,
+)
 from django.template.defaultfilters import slugify
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -916,6 +920,30 @@ async def view_opinion_old(
     )
 
 
+async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
+    """Generate the context for downloads
+
+    :param cluster: The opinion cluster
+    :return: a dict containing a boolean if the cluster has downloads and string gile path to the pdf file
+    """
+    has_downloads = False
+    pdf_path = None
+    if cluster.filepath_pdf_harvard:
+        has_downloads = True
+        pdf_path = cluster.filepath_pdf_harvard
+    else:
+        async for sub_opinion in cluster.sub_opinions.all():
+            if str(sub_opinion.local_path).endswith(".pdf"):
+                has_downloads = True
+                pdf_path = sub_opinion.local_path.url
+                break
+            elif sub_opinion.download_url:
+                has_downloads = True
+                pdf_path = None
+
+    return {"has_downloads": has_downloads, "pdf_path": pdf_path}
+
+
 async def setup_opinion_context(
     cluster: OpinionCluster, request: HttpRequest, tab: str
 ) -> dict[str, Any]:
@@ -935,33 +963,8 @@ async def setup_opinion_context(
     }
     tab_intro = tab_intros.get(tab, "")
     title = f"{tab_intro}{trunc(best_case_name(cluster), 100, ellipsis='...')}"
-    has_downloads = False
-    pdf_path = None
-    if cluster.filepath_pdf_harvard:
-        has_downloads = True
-        pdf_path = cluster.filepath_pdf_harvard
-    else:
-        async for sub_opinion in cluster.sub_opinions.all():
-            if str(sub_opinion.local_path).endswith(".pdf"):
-                has_downloads = True
-                pdf_path = sub_opinion.local_path.url
-                break
-            elif sub_opinion.download_url:
-                has_downloads = True
-                pdf_path = None
 
     get_string = make_get_string(request)
-
-    sub_opinion_pks = [
-        str(opinion.pk) async for opinion in cluster.sub_opinions.all()
-    ]
-
-    es_has_cited_opinions = await es_cited_case_count(
-        cluster.id, sub_opinion_pks
-    )
-    es_has_related_opinions = await es_related_case_count(
-        cluster.id, sub_opinion_pks
-    )
 
     try:
         note = await Note.objects.aget(
@@ -997,17 +1000,14 @@ async def setup_opinion_context(
         "title": title,
         "caption": await cluster.acaption(),
         "cluster": cluster,
-        "has_downloads": has_downloads,
-        "pdf_path": pdf_path,
         "note_form": note_form,
         "get_string": get_string,
         "private": cluster.blocked,
         "sponsored": sponsored,
-        "summaries_count": await cluster.parentheticals.acount(),
-        "authorities_count": await cluster.aauthority_count(),
-        "related_cases_count": es_has_related_opinions,
-        "cited_by_count": es_has_cited_opinions,
     }
+
+    download_context = await get_downloads_context(cluster)
+    context.update(download_context)
 
     return context
 
@@ -1044,27 +1044,73 @@ async def render_opinion_view(
     if additional_context:
         context.update(additional_context)
 
-    # Just redirect if people attempt to URL hack to pages without content
-    tab_count_mapping = {
-        "pdf": "has_downloads",
-        "authorities": "authorities_count",
-        "cited-by": "cited_by_count",
-        "related-by": "related_by_count",
-        "summaries": "summaries_count",
-    }
-
-    # Check if the current tab needs a redirect based on the mapping
-    if context["tab"] in tab_count_mapping:
-        count_key = tab_count_mapping[context["tab"]]
-        if not context[count_key]:
-            return HttpResponseRedirect(
-                reverse("view_case", args=[cluster.pk, cluster.slug])
-            )
-
     return TemplateResponse(
         request,
         "opinions.html",
         context,
+    )
+
+
+async def update_opinion_tabs(request: HttpRequest, pk: int):
+    """Generate opinions tab dinamically
+
+    :param request: The HTTP request from the user
+    :param pk: OpinionCluster pk
+    :return: partial rendered or blank if not htmx request
+    """
+
+    if "HX-Request" not in request.headers:
+        return HttpResponse("")
+
+    cluster = await OpinionCluster.objects.filter(pk=pk).afirst()
+    if not cluster:
+        return await sync_to_async(render)(
+            request, "includes/opinion_tabs.html", {"cluster": None}
+        )
+
+    authorities_count = await cluster.aauthority_count()
+    summaries_count = await cluster.parentheticals.acount()
+
+    ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
+        request, "ui_flag_for_o_es"
+    )
+    if ui_flag_for_o_es:
+        # Flag enabled, query ES to get counts
+        sub_opinion_pks = [
+            str(opinion.pk) async for opinion in cluster.sub_opinions.all()
+        ]
+        es_has_cited_opinions = await es_cited_case_count(
+            cluster.id, sub_opinion_pks
+        )
+        es_has_related_opinions = await es_related_case_count(
+            cluster.id, sub_opinion_pks
+        )
+        cited_by_count = es_has_cited_opinions
+        related_cases_count = es_has_related_opinions
+    else:
+        # Don't query ES for counts
+        cited_by_count = 0
+        related_cases_count = 0
+
+    # Get `tab` from request parameters (fallback to 'opinions')
+    tab = request.GET.get("tab", "opinions")
+
+    context = {
+        "cluster": cluster,
+        "authorities_count": authorities_count,
+        "cited_by_count": cited_by_count,
+        "summaries_count": summaries_count,
+        "related_cases_count": related_cases_count,
+        "tab": tab,
+        "is_htmx": "HX-Request" in request.headers,
+        "es_enabled": ui_flag_for_o_es,
+    }
+
+    download_context = await get_downloads_context(cluster)
+    context.update(download_context)
+
+    return await sync_to_async(render)(
+        request, "includes/opinion_tabs.html", context
     )
 
 
@@ -1206,6 +1252,7 @@ async def view_opinion_cited_by(
         "citing_clusters": cited_query.citing_clusters,
         "citing_cluster_count": cited_query.citing_cluster_count,
     }
+    print("additional_context", additional_context)
     return await render_opinion_view(
         request, cluster, "cited-by", additional_context
     )
