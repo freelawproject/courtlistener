@@ -6,11 +6,19 @@ from cl.search.feeds import (
     SearchFeed,
     search_feed_error_handler,
 )
-from cl.search.views import advanced, es_search, show_results
+from cl.search.views import (
+    advanced,
+    es_search,
+    export_search_results,
+    show_results,
+)
 
 urlpatterns = [
     # Search pages
     path("", show_results, name="show_results"),
+    path(
+        "search/export/", export_search_results, name="export_search_results"
+    ),
     path("opinion/", advanced, name="advanced_o"),
     path("audio/", advanced, name="advanced_oa"),
     path("person/", advanced, name="advanced_p"),

@@ -2,6 +2,15 @@ import re
 from typing import Optional
 
 
+def camel_to_snake(key: str) -> str:
+    """Converts a camelCase string to snake_case.
+
+    :param key: The camelCase string to convert.
+    :return: The snake_case version of the input string.
+    """
+    return re.sub(r"([a-z])([A-Z])", r"\1_\2", key).lower()
+
+
 def trunc(s: str, length: int, ellipsis: Optional[str] = None) -> str:
     """Truncates a string at a good length.
 
