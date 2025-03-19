@@ -28,7 +28,7 @@
     <!-- Related Cases tab -->
     <li role="presentation" class="{% if related_cases_count == 0 and es_enabled and is_htmx %}disabled{% elif tab == 'related-cases' %}active{% endif %}">
         <a href="{% if not is_htmx or related_cases_count > 0 or not es_enabled %}{% url 'view_case_related_cases' cluster.pk cluster.slug %}{% else %}#{% endif %}">
-            Related&nbsp;Cases{% if is_htmx %}&nbsp;({{ related_cases_count|default:"0" }}){% endif %}
+            Similar&nbsp;Cases{% if is_htmx %}&nbsp;({{ related_cases_count|default:"0" }}){% endif %}
         </a>
     </li>
 
