@@ -1,15 +1,13 @@
 from celery import chain
 from django.conf import settings
 
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.indexing_utils import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.lib.string_utils import get_token_count_from_string
-from cl.search.management.commands.pacer_bulk_fetch import (
-    append_value_in_cache,
-)
+from cl.lib.utils import append_value_in_cache
 from cl.search.models import SEARCH_TYPES, Opinion
 from cl.search.tasks import create_opinion_text_embeddings, save_embeddings
 
@@ -56,6 +54,7 @@ class Command(VerboseCommand):
             "--batch-size",
             type=int,
             help="How many tokens per batch.",
+            required=True,
         )
         parser.add_argument(
             "--start-id",
@@ -78,13 +77,20 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--embedding-queue",
             type=str,
+            default="batch1",
             help="Which celery queue to use for embedding.",
         )
         parser.add_argument(
             "--upload-queue",
             type=str,
             default="batch1",
-            help="which celery queue to use for uploading to S3",
+            help="which celery queue to use for uploading to S3.",
+        )
+        parser.add_argument(
+            "--throttle-min-items",
+            type=int,
+            default=5,
+            help="The celery throttle min items.",
         )
 
     def handle(self, *args, **options):
@@ -96,6 +102,7 @@ class Command(VerboseCommand):
         auto_resume = options["auto_resume"]
         min_opinion_size = settings.MIN_OPINION_SIZE
         start_id = options["start_id"]
+        throttle = CeleryThrottle(queue_name=embedding_queue, min_items=5)
         if auto_resume:
             start_id = get_last_parent_document_id_processed(
                 compose_redis_key()
@@ -104,21 +111,24 @@ class Command(VerboseCommand):
                 f"Auto-resume enabled starting embedding from ID: {start_id}."
             )
 
-        opinions = (
-            Opinion.objects.filter(id__gte=start_id)
-            .order_by("pk")
-            .with_best_text()
-        )
+        opinions = Opinion.objects.filter(id__gte=start_id)
         # Limit opinions to retrieve if count was provided.
-        opinions = opinions[:count] if count is not None else opinions
-        count = opinions.count()
+        opinions_to_process = (
+            opinions[:count] if count is not None else opinions
+        )
+        opinions_with_best_text = opinions.order_by("pk").with_best_text()
+        opinions_with_best_text = (
+            opinions_with_best_text[:count] if count is not None else opinions
+        )
+
+        count = opinions_to_process.count()
         current_batch: list[int] = []
         current_batch_size = 0
         processed_count = 0
-        for opinion in opinions.iterator():
+        for opinion in opinions_with_best_text.iterator():
             opinion_id = opinion.pk
             processed_count += 1
-            token_count = get_token_count_from_string(opinion.best_text)
+            token_count = opinion.token_count
             if token_count < min_opinion_size:
                 continue
             if token_count > batch_size:
@@ -127,6 +137,7 @@ class Command(VerboseCommand):
                 continue
             # Check if adding this opinion would exceed the batch size.
             if current_batch_size + token_count > batch_size:
+                throttle.maybe_wait()
                 # Send the current batch since adding this opinion would break the limit.
                 send_batch(
                     current_batch, embedding_queue, upload_queue, database

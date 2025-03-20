@@ -9,7 +9,6 @@ import pytz
 import tiktoken
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
-from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
@@ -49,7 +48,7 @@ from cl.lib.model_helpers import (
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
 from cl.lib.storage import IncrementingAWSMediaStorage
-from cl.lib.string_utils import trunc
+from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.docket_sources import DocketSources
 from cl.users.models import User
 
@@ -3339,9 +3338,7 @@ class Opinion(AbstractDateTimeModel):
     @property
     def token_count(self) -> int:
         """Returns the number of tokens in this opinion text."""
-        encoding = tiktoken.get_encoding("cl100k_base")
-        num_tokens = len(encoding.encode(self.clean_text))
-        return num_tokens
+        return get_token_count_from_string(self.clean_text)
 
     def __str__(self) -> str:
         try:

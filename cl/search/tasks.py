@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 import json
@@ -8,7 +9,7 @@ from importlib import import_module
 from random import randint
 from typing import Any, Generator
 
-import requests
+from botocore import exceptions as botocore_exception
 from celery import Task
 from celery.canvas import chain
 from django.apps import apps
@@ -35,6 +36,13 @@ from elasticsearch.helpers import (
     streaming_bulk,
 )
 from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
+from httpx import (
+    HTTPStatusError,
+    NetworkError,
+    ReadError,
+    RemoteProtocolError,
+    TimeoutException,
+)
 
 from cl.alerts.tasks import (
     percolator_response_processing,
@@ -44,6 +52,7 @@ from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.lib.elasticsearch_utils import build_daterange_query
+from cl.lib.microservice_utils import microservice
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
@@ -52,7 +61,7 @@ from cl.lib.search_utils import (
     fetch_es_results_for_csv,
     get_headers_and_transformations_for_search_export,
 )
-from cl.lib.storage import AWSMediaStorage
+from cl.lib.storage import S3IntelligentTieringStorage
 from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
@@ -1688,19 +1697,42 @@ def remove_documents_by_query(
     return response
 
 
-def inception_batch_request(
-    batch: list[dict],
-) -> list[dict]:
-    inception_batch_url = ""
-    response = requests.post(
-        inception_batch_url,
-        json=json.dumps(batch),
+def inception_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the inception batch microservice.
+
+    param batch: A list of dictionaries, where each dictionary represents an
+    opinion document with the following keys:
+    "id": The Opinion ID.
+    "text": The content of the opinion.
+    :return: A list of dictionaries, each containing the embeddings for the
+    corresponding opinion document as returned  by the inception microservice.
+    """
+
+    data = json.dumps(batch)
+    response = asyncio.run(
+        microservice(
+            service="inception-batch",
+            method="POST",
+            data=data,
+        )
     )
     return response.json()
 
 
-@app.task()
+@app.task(
+    bind=True,
+    autoretry_for=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+        ReadError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
 def create_opinion_text_embeddings(
+    self,
     batch: list[int],
     database,
 ) -> list[dict]:
@@ -1708,17 +1740,25 @@ def create_opinion_text_embeddings(
     opinions = (
         Opinion.objects.filter(id__in=batch).with_best_text().using(database)
     )
-
     opinions_to_vectorize = [
         {"id": opinion.pk, "text": opinion.clean_text} for opinion in opinions
     ]
-    embeddings = inception_batch_request(opinions_to_vectorize)
-
+    batch_request = {"documents": opinions_to_vectorize}
+    embeddings = inception_batch_request(batch_request)
     return embeddings
 
 
-@app.task()
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
 def save_embeddings(
+    self,
     embeddings: list[dict],
     directory: str = "opinions",
 ) -> None:
@@ -1761,11 +1801,9 @@ def save_embeddings(
     For example, if uploading a batch of opinion embeddings, each file will
     be stored at embeddings/opinions/nomic-ai/{opinion_id}.json
     """
-    storage = AWSMediaStorage()
-
+    storage = S3IntelligentTieringStorage()
     for embedding_record in embeddings:
         record_id = embedding_record["id"]
-
         file_contents = json.dumps(embedding_record)
         file_path = os.path.join(
             "embeddings",

@@ -17,7 +17,7 @@ from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion
 from cl.tests.cases import TestCase
 
 
-class FakeAWSMediaStorage:
+class FakeS3IntelligentTieringStorage:
     """A fake storage class that simulates saving files to S3 by storing them
     locally.
     """
@@ -33,6 +33,7 @@ class FakeAWSMediaStorage:
 
 
 def inception_batch_request_mock(opinions_to_vectorize):
+    documents = opinions_to_vectorize["documents"]
     return [
         {
             "id": opinion_data["id"],
@@ -44,7 +45,7 @@ def inception_batch_request_mock(opinions_to_vectorize):
                 },
             ],
         }
-        for opinion_data in opinions_to_vectorize
+        for opinion_data in documents
     ]
 
 
@@ -58,11 +59,8 @@ class GenerateOpinionEmbeddingTest(TestCase):
         court = CourtFactory(
             id="canb",
             jurisdiction="FB",
-            full_name="court of the Medical Worries",
         )
         cls.opinion_cluster_1 = OpinionClusterFactory(
-            case_name="Strickland v. Washington.",
-            case_name_full="Strickland v. Washington.",
             docket=DocketFactory(
                 court=court,
                 docket_number="1:21-cv-1234",
@@ -78,12 +76,17 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
                 "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
                 "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
-                "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa</p>"
+                "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa unde omnis iste</p>"
             ),
         )
+        cls.opinion_ignored_min_size = OpinionWithChildrenFactory(
+            cluster=cls.opinion_cluster_1,
+            html_columbia=(
+                "<p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem</p>"
+            ),
+        )
+
         cls.opinion_cluster_2 = OpinionClusterFactory(
-            case_name="Strickland v. Lorem.",
-            case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
             docket=DocketFactory(
                 court=court,
@@ -98,11 +101,9 @@ class GenerateOpinionEmbeddingTest(TestCase):
             "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
             "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
             "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
-            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa ",
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa  ",
         )
         cls.opinion_cluster_3 = OpinionClusterFactory(
-            case_name="Strickland v. Lorem.",
-            case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
             docket=DocketFactory(
                 court=court,
@@ -121,8 +122,6 @@ class GenerateOpinionEmbeddingTest(TestCase):
         )
 
         cls.opinion_cluster_4 = OpinionClusterFactory(
-            case_name="Strickland v. Lorem.",
-            case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
             docket=DocketFactory(
                 court=court,
@@ -170,9 +169,9 @@ class GenerateOpinionEmbeddingTest(TestCase):
             {"id": opinion.pk, "text": opinion.clean_text}
             for opinion in opinions
         ]
-        return opinions_to_vectorize
+        return {"documents": opinions_to_vectorize}
 
-    @patch("cl.search.tasks.AWSMediaStorage")
+    @patch("cl.search.tasks.S3IntelligentTieringStorage")
     @patch(
         "cl.search.tasks.inception_batch_request",
         side_effect=inception_batch_request_mock,
@@ -188,14 +187,14 @@ class GenerateOpinionEmbeddingTest(TestCase):
         - Calls the inception service to get text embeddings.
         - Saves each embedding record to S3 (using mock).
         """
-        # Create an instance of fake AWSMediaStorage.
-        fake_storage = FakeAWSMediaStorage()
+        # Create an instance of fake S3IntelligentTieringStorage.
+        fake_storage = FakeS3IntelligentTieringStorage()
         mock_aws_media_storage.return_value = fake_storage
         call_command(
             "generate_opinion_embeddings",
             batch_size=10000,
             start_id=0,
-            count=2,
+            count=3,
         )
 
         # Verify that inception_batch_request was called once.
@@ -224,12 +223,12 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 self.assertEqual(expected_path, path)
                 self.assertIn(embedding_dict, expected_embeddings)
 
-    @patch("cl.search.tasks.AWSMediaStorage")
+    @patch("cl.search.tasks.S3IntelligentTieringStorage")
     def test_limit_batch_size(self, mock_aws_media_storage, mock_long_doc_key):
         """Test generate_opinion_embeddings limit the batch size properly."""
 
-        # Create an instance of fake AWSMediaStorage.
-        fake_storage = FakeAWSMediaStorage()
+        # Create an instance of fake S3IntelligentTieringStorage.
+        fake_storage = FakeS3IntelligentTieringStorage()
         mock_aws_media_storage.return_value = fake_storage
 
         with patch(
@@ -240,7 +239,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 "generate_opinion_embeddings",
                 batch_size=250,
                 start_id=0,
-                count=3,
+                count=4,
             )
             # The embedding generation should be split into two inception
             # requests due to the specified batch size.
@@ -273,14 +272,14 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 self.assertEqual(expected_path, path)
                 self.assertIn(embedding_dict, expected_embeddings)
 
-    @patch("cl.search.tasks.AWSMediaStorage")
+    @patch("cl.search.tasks.S3IntelligentTieringStorage")
     def test_log_long_documents(
         self, mock_aws_media_storage, mock_long_doc_key
     ):
         """Test log documents that individually exceed the batch size."""
 
-        # Create an instance of fake AWSMediaStorage.
-        fake_storage = FakeAWSMediaStorage()
+        # Create an instance of fake S3IntelligentTieringStorage.
+        fake_storage = FakeS3IntelligentTieringStorage()
         mock_aws_media_storage.return_value = fake_storage
 
         with patch(
