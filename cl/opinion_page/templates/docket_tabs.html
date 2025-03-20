@@ -487,7 +487,7 @@
         {% if docket.idb_data %}
         <li class="{% block nav-idb %}inactive{% endblock %}"
             role="presentation">
-          <a href="{% url "docket_idb_data" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-info-circle"></i>&nbsp;FJC Integrated Database
+          <a href="{% url "docket_idb_data" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-info-circle gray"></i>&nbsp;FJC Integrated Database
           </a>
         </li>
         {% endif %}
