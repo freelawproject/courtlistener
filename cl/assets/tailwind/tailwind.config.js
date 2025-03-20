@@ -8,6 +8,12 @@ module.exports = {
     '../templates/**/*.html',
 
     /*
+     * Custom fonts
+     */
+    '../../assets/static-global/fonts/**/*.woff',
+    '../../assets/static-global/fonts/**/*.woff2',
+
+    /*
      * Main templates directory of the project (BASE_DIR/templates).
      * Adjust the following line to match your project structure.
      */
@@ -21,7 +27,12 @@ module.exports = {
     '../../**/templates/**/*.svg',
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        cooper: ['Cooper Hewitt', 'sans-serif'],
+      },
+    },
   },
   plugins: [],
 };
