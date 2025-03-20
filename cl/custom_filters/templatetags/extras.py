@@ -391,27 +391,27 @@ def humanize_number(value):
     except (TypeError, ValueError):
         return value
 
-    if value < 1000:
-        # No formatting for numbers less than 1000
+    if value < 1_000:
+        # No formatting for numbers less than 1_000
         return str(value)
-    elif value < 1000000:
+    elif value < 1_000_000:
         # Format as thousands
-        num = round(value / 1000)
+        num = round(value / 1_000)
         # Check if the number is a whole number
         if num == int(num):
             return f"{int(num)}K"
         else:
             return f"{num:.1f}K"
-    elif value < 1000000000:
+    elif value < 1_000_000_000:
         # Format as millions
-        num = value / 1000000
+        num = value / 1_000_000
         if num == int(num):
             return f"{int(num)}M"
         else:
             return f"{num:.1f}M"
     else:
         # Format as billions
-        num = value / 1000000000
+        num = value / 1_000_000_000
         if num == int(num):
             return f"{int(num)}B"
         else:
