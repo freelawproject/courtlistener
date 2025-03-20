@@ -453,15 +453,6 @@ div.footnote:first-of-type {
     font-style: italic;
   }
 
-/*  To make selection of citations easy */
-.citation {
-    -webkit-user-select: all;  /* Safari, Chrome (WebKit) */
-    -moz-user-select: all;     /* Firefox (Gecko) */
-    -ms-user-select: all;      /* Internet Explorer/Edge (Trident) */
-    user-select: all;          /* Standard property for modern browsers */
-    cursor: text;              /* Ensures it looks like selectable text */
-}
-
   .top-row {
     height: 32px;
     line-height:28px

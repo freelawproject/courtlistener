@@ -95,6 +95,7 @@ from cl.search.models import (
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
+    sort_cites,
 )
 from cl.search.selectors import get_clusters_from_citation_str
 
@@ -1007,6 +1008,7 @@ async def setup_opinion_context(
         "authorities_count": await cluster.aauthority_count(),
         "related_cases_count": es_has_related_opinions,
         "cited_by_count": es_has_cited_opinions,
+        "citations": sorted(cluster.citations.all(), key=sort_cites),
     }
 
     return context
