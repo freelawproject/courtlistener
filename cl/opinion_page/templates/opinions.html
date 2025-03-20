@@ -137,12 +137,7 @@
         {% if tab == "related-cases" %}
             <div class="col-sm-12 alert-warning alert v-offset-above-2">
                 <p class="bottom">
-                    The Related Cases query is used to find legal cases
-                    related to a given case by analyzing textual similarities.
-                    It identifies and retrieves cases with similar content,
-                    allowing for the generation of a summary of related cases,
-                    including their names, links, and filing dates,
-                    to help users explore precedents or comparable rulings.
+                    The Similar Cases query helps you explore precedents or comparable rulings. It analyzes textual similarities to a given case to build a list of similar cases, their names, links and filing dates.
                 </p>
             </div>
             <div class="clearfix"></div>
@@ -299,38 +294,16 @@
                 </div>
             </div>
 
-            <ul class="nav nav-tabs hidden-print nav-justified">
-                <li role="presentation" {% if tab == "opinions" or tab == "" %} class="active" {% endif %}>
-                    <a href="{% url 'view_case' cluster.pk cluster.slug %}">Opinion</a>
-                </li>
-                {% if authorities_count > 0 %}
-                    <li role="presentation" {% if tab == "authorities" %} class="active" {% endif %}>
-                        <a href="{% url "view_case_authorities" cluster.pk cluster.slug %}">Authorities&nbsp;({{ authorities_count }})</a>
-                    </li>
-                {% endif %}
-                {% if cited_by_count > 0 %}
-                    <li role="presentation" {% if tab == "cited-by" %} class="active" {% endif %}>
-                        <a href="{% url "view_case_cited_by" cluster.pk cluster.slug %}">Cited&nbsp;By&nbsp;({{ cited_by_count }})</a>
-                    </li>
-                {% endif %}
-                {% if summaries_count > 0 %}
-                    <li role="presentation" {% if tab == "summaries" %} class="active" {% endif %}>
-                        <a href="{% url "view_case_summaries" cluster.pk cluster.slug %}">Summaries&nbsp;({{ summaries_count }})</a>
-                    </li>
-                {% endif %}
-                {% if related_cases_count > 0  %}
-                    <li role="presentation" {% if tab == "related-cases" %} class="active" {% endif %}>
-                        <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;Cases</a>
-                    </li>
-                {% endif %}
-                {% if has_downloads and "pdf" in pdf_path or cluster.filepath_pdf_harvard %}
-                    <li role="presentation" {% if tab == "pdf" %} class="active" {% endif %}>
-                        <a rel="nofollow" href="{% url 'view_case_pdf' cluster.pk cluster.slug %}">PDF</a>
-                    </li>
-                {% endif %}
-            </ul>
+            <div id="tabs-container"
+                 hx-get="{% url 'update_opinion_tabs' cluster.pk %}"
+                 hx-trigger="load"
+                 hx-swap="outerHTML"
+                 hx-vals='{"tab": "{{ tab }}"}'>
+                {% include 'includes/opinion_tabs.html' %}
+            </div>
         </div>
-        {% include "includes/opinion_tabs.html" %}
+
+        {% include "includes/opinion_tabs_content.html" %}
         {% include "includes/notes_modal.html" %}
 
     </div>
@@ -349,4 +322,11 @@
         {% endif %}
     {% endif %}
     <script type="text/javascript" src="{% static "js/opinions.js" %}"></script>
+    {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
 {% endblock %}
+
