@@ -235,7 +235,7 @@ async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
                         F("recap_document__page_count") * Value(0.10),
                     ),
                 ),
-                default=Value(0.10),
+                default=Value(0.91),
             )
         )
         .aaggregate(Sum("price", default=0.0))
