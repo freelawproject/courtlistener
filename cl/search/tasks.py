@@ -1736,7 +1736,13 @@ def create_opinion_text_embeddings(
     batch: list[int],
     database,
 ) -> list[dict]:
-    """Get embeddings for Opinion texts from inception."""
+    """Get embeddings for Opinion texts from inception.
+
+    :param self: The Celery task.
+    :param batch: A list of Opinion IDs representing the batch to process.
+    :param database: The database to be used during processing.
+    :return: A list of dictionaries, each containing the opinion embeddings.
+    """
     opinions = (
         Opinion.objects.filter(id__in=batch).with_best_text().using(database)
     )
@@ -1800,6 +1806,12 @@ def save_embeddings(
 
     For example, if uploading a batch of opinion embeddings, each file will
     be stored at embeddings/opinions/nomic-ai/{opinion_id}.json
+
+    :param self: The Celery task.
+    :param embeddings: A list of dictionaries representing the embeddings to
+     be saved.
+    :param directory: The directory where the embeddings will be stored.
+    :return: None.
     """
     storage = S3IntelligentTieringStorage()
     for embedding_record in embeddings:

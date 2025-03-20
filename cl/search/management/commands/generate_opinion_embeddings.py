@@ -32,6 +32,15 @@ def send_batch(
     upload_queue: str,
     database: str,
 ) -> None:
+    """Send a batch of items for embedding creation and saving to S3.
+
+    :param batch: A list of Opinion IDs representing the batch to process.
+    :param embedding_queue: The name of the queue to process the embedding task.
+    :param upload_queue: The name of the queue to process the saving task.
+    :param database: The database to be used during processing.
+    :return: None.
+    """
+
     chain(
         create_opinion_text_embeddings.si(batch, database).set(
             queue=embedding_queue
