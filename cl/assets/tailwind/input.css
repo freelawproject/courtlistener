@@ -3,3 +3,45 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .display-xs-semibold {
+    @apply font-sans text-[24px] font-[600] leading-[32px];
+  }
+
+  .text-sm-semibold {
+    @apply font-sans text-[14px] font-[600] leading-[20px];
+  }
+
+  .text-sm-regular {
+    @apply font-sans text-[14px] font-[400] leading-[20px];
+  }
+
+  .text-sm-medium {
+    @apply font-sans text-[14px] font-[500] leading-[20px];
+  }
+
+  .text-md-regular {
+    @apply font-sans text-[16px] font-[400] leading-[24px];
+  }
+
+  .text-md-medium {
+    @apply font-sans text-[16px] font-[500] leading-[24px];
+  }
+
+  .text-xl-semibold {
+    @apply font-sans text-[20px] font-[600] leading-[28px];
+  }
+
+  .text-h3-bold {
+    @apply font-cooper text-[24px] font-[700] leading-[32px];
+  }
+
+  .text-h2-bold {
+    @apply font-cooper text-[40px] font-[700] leading-[48px];
+  }
+
+  .text-h1-bold {
+    @apply font-cooper text-[44px] font-[700] leading-[52px];
+  }
+}
