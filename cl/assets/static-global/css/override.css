@@ -658,11 +658,9 @@ mark {
 }
 
 .select-all {
-    -webkit-user-select: all;  /* Safari, Chrome (WebKit) */
-    -moz-user-select: all;     /* Firefox (Gecko) */
-    -ms-user-select: all;      /* Internet Explorer/Edge (Trident) */
-    user-select: all;          /* Standard property for modern browsers */
-    cursor: text;              /* Ensures it looks like selectable text */
+    -webkit-user-select: all;
+    user-select: all;
+    cursor: text;
 }
 
 /* layout */
