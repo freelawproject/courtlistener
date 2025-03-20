@@ -1,7 +1,7 @@
 import re
-import tiktoken
-
 from typing import Optional
+
+import tiktoken
 
 
 def camel_to_snake(key: str) -> str:

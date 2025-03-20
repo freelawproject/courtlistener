@@ -44,4 +44,7 @@ NO_MATCH_HL_SIZE = 500
 # SEMANTIC SEARCH #
 ###################
 MIN_OPINION_SIZE = env("MIN_OPINION_SIZE", default=100)
-NLP_EMBEDDING_MODEL = env("NLP_EMBEDDING_MODEL_NAME", default="Free-Law-Project/modernbert-embed-base_finetune_512")
+NLP_EMBEDDING_MODEL = env(
+    "NLP_EMBEDDING_MODEL_NAME",
+    default="Free-Law-Project/modernbert-embed-base_finetune_512",
+)

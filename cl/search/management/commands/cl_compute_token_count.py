@@ -5,8 +5,9 @@ from django.contrib.humanize.templatetags.humanize import intword
 from django.db.models import QuerySet
 
 from cl.lib.command_utils import VerboseCommand
-from cl.search.models import Opinion, RECAPDocument
 from cl.lib.string_utils import get_token_count_from_string
+from cl.search.models import Opinion, RECAPDocument
+
 
 def get_recap_random_dataset(
     percentage: float = 0.1,

@@ -3,22 +3,25 @@ import json
 import os
 from unittest.mock import patch
 
-from django.core.management import call_command
 from django.conf import settings
+from django.core.cache import cache
+from django.core.management import call_command
 
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
-    OpinionWithChildrenFactory, OpinionClusterFactory,
+    OpinionClusterFactory,
+    OpinionWithChildrenFactory,
 )
-from cl.search.models import Docket, PRECEDENTIAL_STATUS, Opinion
+from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion
 from cl.tests.cases import TestCase
 
 
 class FakeAWSMediaStorage:
-    """ A fake storage class that simulates saving files to S3 by storing them
-     locally.
+    """A fake storage class that simulates saving files to S3 by storing them
+    locally.
     """
+
     def __init__(self):
         self.saved_files = {}
 
@@ -44,6 +47,11 @@ def inception_batch_request_mock(opinions_to_vectorize):
         for opinion_data in opinions_to_vectorize
     ]
 
+
+@patch(
+    "cl.search.management.commands.generate_opinion_embeddings.long_document_key",
+    return_value="test_long_document",
+)
 class GenerateOpinionEmbeddingTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -87,10 +95,10 @@ class GenerateOpinionEmbeddingTest(TestCase):
         cls.opinion_2 = OpinionWithChildrenFactory(
             cluster=cls.opinion_cluster_2,
             plain_text="Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
-                "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
-                "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
-                "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
-                "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
+            "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
+            "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa ",
         )
         cls.opinion_cluster_3 = OpinionClusterFactory(
             case_name="Strickland v. Lorem.",
@@ -106,27 +114,75 @@ class GenerateOpinionEmbeddingTest(TestCase):
         cls.opinion_3 = OpinionWithChildrenFactory(
             cluster=cls.opinion_cluster_3,
             plain_text="Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
-                       "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
-                       "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
-                       "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
-                       "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
+            "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
+            "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa ",
+        )
+
+        cls.opinion_cluster_4 = OpinionClusterFactory(
+            case_name="Strickland v. Lorem.",
+            case_name_full="Strickland v. Lorem.",
+            date_filed=datetime.date(2020, 8, 15),
+            docket=DocketFactory(
+                court=court,
+                docket_number="123458",
+                source=Docket.HARVARD,
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        cls.opinion_4 = OpinionWithChildrenFactory(
+            cluster=cls.opinion_cluster_4,
+            plain_text="Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
+            "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
+            "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
+            "Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
+            "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
+            "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
+            "Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
+            "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
+            "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
+            "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa ",
+        )
+
+    @staticmethod
+    def _clean_cache_keys(keys):
+        for key in keys:
+            cache.delete(key)
+
+    def tearDown(self):
+        self._clean_cache_keys(
+            [
+                "pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
+                "pacer_bulk_fetch.test_page_count_filtering.failed_docs",
+            ]
         )
 
     @staticmethod
     def _get_opinions_to_vectorize(batch):
-        opinions = (
-            Opinion.objects.filter(id__in=batch).with_best_text()
-        )
+        opinions = Opinion.objects.filter(id__in=batch).with_best_text()
         opinions_to_vectorize = [
-            {"id": opinion.pk, "text": opinion.clean_text} for opinion in
-            opinions
+            {"id": opinion.pk, "text": opinion.clean_text}
+            for opinion in opinions
         ]
         return opinions_to_vectorize
 
     @patch("cl.search.tasks.AWSMediaStorage")
-    @patch("cl.search.tasks.inception_batch_request", side_effect=inception_batch_request_mock)
-    def test_embed_opinions(self, mock_inception_batch_request,
-                            mock_aws_media_storage):
+    @patch(
+        "cl.search.tasks.inception_batch_request",
+        side_effect=inception_batch_request_mock,
+    )
+    def test_embed_opinions(
+        self,
+        mock_inception_batch_request,
+        mock_aws_media_storage,
+        mock_long_doc_key,
+    ):
         """Test that the generate_opinion_embeddings command:
 
         - Calls the inception service to get text embeddings.
@@ -145,12 +201,15 @@ class GenerateOpinionEmbeddingTest(TestCase):
         # Verify that inception_batch_request was called once.
         mock_inception_batch_request.assert_called_once()
 
-
         # For each embedding record, verify that a file was saved with the expected content.
         documents_embedded_count = len(fake_storage.saved_files)
         # Only two opinions should be requested: opinion_1 and opinion_2,
         # since the count is set to 2.
-        expected_embeddings = inception_batch_request_mock(self._get_opinions_to_vectorize([self.opinion_1.pk, self.opinion_2.pk]))
+        expected_embeddings = inception_batch_request_mock(
+            self._get_opinions_to_vectorize(
+                [self.opinion_1.pk, self.opinion_2.pk]
+            )
+        )
         self.assertEqual(documents_embedded_count, len(expected_embeddings))
         for path, embedding in fake_storage.saved_files.items():
             with self.subTest(embedding):
@@ -165,22 +224,23 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 self.assertEqual(expected_path, path)
                 self.assertIn(embedding_dict, expected_embeddings)
 
-
     @patch("cl.search.tasks.AWSMediaStorage")
-    def test_limit_batch_size(self, mock_aws_media_storage):
-        """Test generate_opinion_embeddings limit the batch size properly.
-        """
+    def test_limit_batch_size(self, mock_aws_media_storage, mock_long_doc_key):
+        """Test generate_opinion_embeddings limit the batch size properly."""
 
         # Create an instance of fake AWSMediaStorage.
         fake_storage = FakeAWSMediaStorage()
         mock_aws_media_storage.return_value = fake_storage
 
-        with patch("cl.search.tasks.inception_batch_request",
-               side_effect=inception_batch_request_mock) as mock_inception_batch_request:
+        with patch(
+            "cl.search.tasks.inception_batch_request",
+            side_effect=inception_batch_request_mock,
+        ) as mock_inception_batch_request:
             call_command(
                 "generate_opinion_embeddings",
                 batch_size=250,
                 start_id=0,
+                count=3,
             )
             # The embedding generation should be split into two inception
             # requests due to the specified batch size.
@@ -191,10 +251,12 @@ class GenerateOpinionEmbeddingTest(TestCase):
         documents_embedded_count = len(fake_storage.saved_files)
         expected_embeddings_1 = inception_batch_request_mock(
             self._get_opinions_to_vectorize(
-                [self.opinion_1.pk, self.opinion_2.pk]))
+                [self.opinion_1.pk, self.opinion_2.pk]
+            )
+        )
         expected_embeddings_2 = inception_batch_request_mock(
-            self._get_opinions_to_vectorize(
-                [self.opinion_3.pk]))
+            self._get_opinions_to_vectorize([self.opinion_3.pk])
+        )
 
         expected_embeddings = expected_embeddings_1 + expected_embeddings_2
         self.assertEqual(documents_embedded_count, len(expected_embeddings))
@@ -210,3 +272,30 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 )
                 self.assertEqual(expected_path, path)
                 self.assertIn(embedding_dict, expected_embeddings)
+
+    @patch("cl.search.tasks.AWSMediaStorage")
+    def test_log_long_documents(
+        self, mock_aws_media_storage, mock_long_doc_key
+    ):
+        """Test log documents that individually exceed the batch size."""
+
+        # Create an instance of fake AWSMediaStorage.
+        fake_storage = FakeAWSMediaStorage()
+        mock_aws_media_storage.return_value = fake_storage
+
+        with patch(
+            "cl.search.tasks.inception_batch_request",
+            side_effect=inception_batch_request_mock,
+        ) as mock_inception_batch_request:
+            call_command(
+                "generate_opinion_embeddings",
+                batch_size=250,
+                start_id=0,
+            )
+            # The embedding generation should be split into two inception
+            # requests due to the specified batch size.
+            # Verify that inception_batch_request was called twice.
+            self.assertEqual(mock_inception_batch_request.call_count, 2)
+
+        cached_long_docs = cache.get(mock_long_doc_key.return_value, [])
+        self.assertIn(self.opinion_4.pk, cached_long_docs)
