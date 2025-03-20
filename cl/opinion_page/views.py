@@ -1300,9 +1300,13 @@ async def view_opinion_summaries(
     if not ui_flag_for_o:
         # Old page to load for people outside the flag
         return await view_summaries(request=request, pk=pk, slug="summaries")
+
+    summaries_count = await cluster.parentheticals.acount()
+
     additional_context = {
         "parenthetical_groups": parenthetical_groups,
         "ui_flag_for_o": ui_flag_for_o,
+        "summaries_count": summaries_count,
     }
     return await render_opinion_view(
         request, cluster, "summaries", additional_context

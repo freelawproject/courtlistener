@@ -687,3 +687,7 @@ div.footnote:first-of-type {
 html {
     scroll-behavior: smooth;
 }
+
+#all-summaries {
+    margin-top: 20px;
+}
