@@ -63,7 +63,7 @@
                 </a>
               </td>
               <td>
-                <a href="{% url "view_recap_document" docket.pk prayer.docket_entry.entry_number docket.slug %}">
+                <a href="{{ prayer.get_absolute_url }}">
                   {{ prayer.document_number }}
                 </a>
               </td>
