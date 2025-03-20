@@ -99,6 +99,7 @@ from cl.search.models import (
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
+    sort_cites,
 )
 from cl.search.selectors import get_clusters_from_citation_str
 
@@ -1004,6 +1005,7 @@ async def setup_opinion_context(
         "get_string": get_string,
         "private": cluster.blocked,
         "sponsored": sponsored,
+        "citations": sorted(cluster.citations.all(), key=sort_cites),
     }
 
     download_context = await get_downloads_context(cluster)

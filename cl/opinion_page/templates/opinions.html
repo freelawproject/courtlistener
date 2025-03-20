@@ -227,7 +227,15 @@
                 <br>
                 <div class="case-details">
                     <ul class="list-unstyled">
-                      <li><strong>Citations:</strong> <span class="select-all">{{ cluster.citation_string|default:"None known" }}</span></li>
+                        <li><strong>Citations:</strong>
+                          {% if citations %}
+                            {% for cite in citations %}
+                              <span class="select-all">{{ cite }}</span>{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                          {% else %}
+                            None known
+                          {% endif %}
+                        </li>
                         {% if cluster.case_name_full != cluster|best_case_name %}
                         <li><strong>Full Case Name:</strong>
                           <span class="select-all">{{ cluster.case_name_full }}</span>
