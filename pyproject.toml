@@ -104,7 +104,7 @@ daphne = "^4.1.2"
 httpx = {extras = ["http2"], version = "^0.28.1"}
 django-model-utils = "^5.0.0"
 django-permissions-policy = "^4.25.0"
-tiktoken = "^0.8.0"
+tiktoken = "^0.9.0"
 hyperscan = "^0.7.8"
 openai = "^1.58.1"
 seal-rookery = "^2.2.5"
