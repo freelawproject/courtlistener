@@ -157,8 +157,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
     def tearDown(self):
         self._clean_cache_keys(
             [
-                "pacer_bulk_fetch.test_page_count_filtering.docs_to_process",
-                "pacer_bulk_fetch.test_page_count_filtering.failed_docs",
+                "test_long_document",
             ]
         )
 

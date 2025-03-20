@@ -26,31 +26,12 @@ def long_document_key() -> str:
     return f"{SEARCH_TYPES.OPINION}_long_document"
 
 
-def send_batch(
-    batch: list[int],
-    embedding_queue: str,
-    upload_queue: str,
-    database: str,
-) -> None:
-    """Send a batch of items for embedding creation and saving to S3.
-
-    :param batch: A list of Opinion IDs representing the batch to process.
-    :param embedding_queue: The name of the queue to process the embedding task.
-    :param upload_queue: The name of the queue to process the saving task.
-    :param database: The database to be used during processing.
-    :return: None.
-    """
-
-    chain(
-        create_opinion_text_embeddings.si(batch, database).set(
-            queue=embedding_queue
-        ),
-        save_embeddings.s().set(queue=upload_queue),
-    ).apply_async()
-
-
 class Command(VerboseCommand):
     help = "Gets text embeddings for opinions and stores them in S3."
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.throttle = None
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -102,6 +83,29 @@ class Command(VerboseCommand):
             help="The celery throttle min items.",
         )
 
+    def send_batch(
+        self,
+        batch: list[int],
+        embedding_queue: str,
+        upload_queue: str,
+        database: str,
+    ) -> None:
+        """Send a batch of items for embedding creation and saving to S3.
+
+        :param batch: A list of Opinion IDs representing the batch to process.
+        :param embedding_queue: The name of the queue to process the embedding task.
+        :param upload_queue: The name of the queue to process the saving task.
+        :param database: The database to be used during processing.
+        :return: None.
+        """
+        self.throttle.maybe_wait()
+        chain(
+            create_opinion_text_embeddings.si(batch, database).set(
+                queue=embedding_queue
+            ),
+            save_embeddings.s().set(queue=upload_queue),
+        ).apply_async()
+
     def handle(self, *args, **options):
         embedding_queue = options["embedding_queue"]
         upload_queue = options["upload_queue"]
@@ -111,7 +115,10 @@ class Command(VerboseCommand):
         auto_resume = options["auto_resume"]
         min_opinion_size = settings.MIN_OPINION_SIZE
         start_id = options["start_id"]
-        throttle = CeleryThrottle(queue_name=embedding_queue, min_items=5)
+        throttle_min_items = options["throttle_min_items"]
+        self.throttle = CeleryThrottle(
+            queue_name=embedding_queue, min_items=throttle_min_items
+        )
         if auto_resume:
             start_id = get_last_parent_document_id_processed(
                 compose_redis_key()
@@ -146,9 +153,9 @@ class Command(VerboseCommand):
                 continue
             # Check if adding this opinion would exceed the batch size.
             if current_batch_size + token_count > batch_size:
-                throttle.maybe_wait()
+
                 # Send the current batch since adding this opinion would break the limit.
-                send_batch(
+                self.send_batch(
                     current_batch, embedding_queue, upload_queue, database
                 )
                 current_batch = []
@@ -170,7 +177,9 @@ class Command(VerboseCommand):
 
         # Send any remainder
         if current_batch:
-            send_batch(current_batch, embedding_queue, upload_queue, database)
+            self.send_batch(
+                current_batch, embedding_queue, upload_queue, database
+            )
 
         self.stdout.write(
             f"Successfully requested for embedding {processed_count} items from"
