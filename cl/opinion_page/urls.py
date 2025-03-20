@@ -12,6 +12,7 @@ from cl.opinion_page.views import (
     download_docket_entries_csv,
     redirect_docket_recap,
     redirect_og_lookup,
+    update_opinion_tabs,
     view_docket,
     view_docket_feed,
     view_opinion,
@@ -43,6 +44,11 @@ urlpatterns = [
         "docket/<int:docket_id>/feed/",
         view_docket_feed,  # type: ignore[arg-type]
         name="docket_feed",
+    ),
+    path(
+        "opinion/update-tabs/<int:pk>/",
+        update_opinion_tabs,
+        name="update_opinion_tabs",
     ),
     path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),  # type: ignore[arg-type]
     path(
