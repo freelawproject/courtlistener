@@ -32,7 +32,7 @@
                 </a>
               </td>
               <td>
-                <a href="{% url "view_recap_document" docket.pk rd.docket_entry.entry_number docket.slug %}">
+                <a href="{{ rd.get_absolute_url }}">
                   {{ rd.document_number }}
                 </a>
               </td>
