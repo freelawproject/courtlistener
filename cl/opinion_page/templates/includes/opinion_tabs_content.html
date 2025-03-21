@@ -25,12 +25,10 @@
                             <span class="meta-data-header">Status:</span>
                             <span class="meta-data-value">{{ authority.precedential_status }}</span>
                         </div>
-                        {% if authority.docket.court %}
-                                <div class="inline-block">
-                                    <span class="meta-data-header">Court:</span>
-                                    <span class="meta-data-value">{{ authority.docket.court }}</span>
-                                </div>
-                        {% endif %}
+                        <div class="inline-block">
+                            <span class="meta-data-header">Court:</span>
+                            <span class="meta-data-value">{{ authority.docket.court }}</span>
+                        </div>
                         {% if authority.citation_string %}
                             <div class="inline-block">
                                 <span class="meta-data-header">Citations: </span>
