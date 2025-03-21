@@ -7,6 +7,7 @@ from cl.custom_filters.templatetags.extras import (
     get_canonical_element,
     get_full_host,
     granular_date,
+    humanize_number,
 )
 from cl.custom_filters.templatetags.text_filters import (
     naturalduration,
@@ -187,3 +188,40 @@ class TestExtras(SimpleTestCase):
         obj["date_granularity_start"] = GRANULARITY_DAY
 
         self.assertEqual(granular_date(obj, "date_start"), "Unknown")
+
+    def test_humanize_number(self):
+        """Test multiple values for the humanize_number function
+
+        Test cases includes multiple examples to see when the function rounds up or down a number, validate when a
+        invalid value is passed and some edge cases.
+        """
+        test_cases = [
+            # Input value, Expected output
+            (500, "500"),
+            (999, "999"),
+            (1000, "1K"),
+            (1040, "1K"),
+            (1050, "1K"),
+            (1060, "1.1K"),
+            (1500, "1.5K"),
+            (10987, "11K"),
+            (999999, "1M"),  # Edge case for thousands
+            (1000000, "1M"),
+            (1500000, "1.5M"),
+            (999999999, "1B"),  # Edge case for millions
+            (1000000000, "1B"),
+            (1500000000, "1.5B"),
+            (2000000000, "2B"),
+            ("3.1416", "3.1416"),
+            ("abc", "abc"),
+            ("", ""),
+        ]
+
+        for value, expected in test_cases:
+            with self.subTest(value=value, expected=expected):
+                result = humanize_number(value)
+                self.assertEqual(
+                    result,
+                    expected,
+                    msg=f"Number formatted incorrectly. Input: {value} - Result: {result} - Expected: {expected}",
+                )

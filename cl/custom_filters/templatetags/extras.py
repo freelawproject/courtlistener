@@ -365,3 +365,48 @@ def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
     if request_q:
         return f"({request_q}) AND docket_id:{docket_id}"
     return f"docket_id:{docket_id}"
+
+
+@register.filter
+def humanize_number(value):
+    """Formats a number into a human-readable abbreviated form
+
+    :param value: The number to format. Can be an integer, float, or string representation of a number.
+    :return: The formatted number as a string. If the input cannot be converted to a number, it is returned as-is.
+
+    Example usage:
+        >>> humanize_number(500)
+        '500'
+        >>> humanize_number(1050)
+        '1K'
+        >>> humanize_number(10987)
+        '11K'
+        >>> humanize_number(1500000)
+        '1.5M'
+        >>> humanize_number(2000000000)
+        '2B'
+    """
+    try:
+        num = float(f"{value:.3g}")
+    except (TypeError, ValueError):
+        return value
+
+    if num < 1_000:
+        return str(value)
+
+    magnitude = 0
+    while abs(num) >= 1000:
+        magnitude += 1
+        num /= 1000.0
+
+    abbreviation = ["", "K", "M", "B"][magnitude]
+
+    # Round to one decimal place
+    num = round(num * 10) / 10
+
+    if num == int(num):
+        formatted = str(int(num))
+    else:
+        formatted = str(num)
+
+    return f"{formatted}{abbreviation}"
