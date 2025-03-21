@@ -77,6 +77,6 @@ MICROSERVICE_URLS = {
     },
     "inception-batch": {
         "url": f"{INCEPTION_HOST}/api/v1/embed/batch",
-        "timeout": 60 * 10,
+        "timeout": 10,
     },
 }

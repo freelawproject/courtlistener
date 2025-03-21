@@ -4,14 +4,13 @@ import os
 from unittest.mock import patch
 
 from django.conf import settings
-from django.core.cache import cache
 from django.core.management import call_command
 
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionWithChildrenFactory,
+    OpinionFactory,
 )
 from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion
 from cl.tests.cases import TestCase
@@ -49,10 +48,6 @@ def inception_batch_request_mock(opinions_to_vectorize):
     ]
 
 
-@patch(
-    "cl.search.management.commands.generate_opinion_embeddings.long_document_key",
-    return_value="test_long_document",
-)
 class GenerateOpinionEmbeddingTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -69,7 +64,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
             date_filed=datetime.date(2020, 8, 15),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
-        cls.opinion_1 = OpinionWithChildrenFactory(
+        cls.opinion_1 = OpinionFactory(
             cluster=cls.opinion_cluster_1,
             html_columbia=(
                 "<p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
@@ -79,7 +74,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa unde omnis iste</p>"
             ),
         )
-        cls.opinion_ignored_min_size = OpinionWithChildrenFactory(
+        cls.opinion_ignored_min_size = OpinionFactory(
             cluster=cls.opinion_cluster_1,
             html_columbia=(
                 "<p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem</p>"
@@ -95,7 +90,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
-        cls.opinion_2 = OpinionWithChildrenFactory(
+        cls.opinion_2 = OpinionFactory(
             cluster=cls.opinion_cluster_2,
             plain_text="Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
             "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
@@ -112,7 +107,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
-        cls.opinion_3 = OpinionWithChildrenFactory(
+        cls.opinion_3 = OpinionFactory(
             cluster=cls.opinion_cluster_3,
             plain_text="Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
             "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
@@ -130,7 +125,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
-        cls.opinion_4 = OpinionWithChildrenFactory(
+        cls.opinion_4 = OpinionFactory(
             cluster=cls.opinion_cluster_4,
             plain_text="Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
             "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
@@ -147,18 +142,6 @@ class GenerateOpinionEmbeddingTest(TestCase):
             "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
             "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
             "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa ",
-        )
-
-    @staticmethod
-    def _clean_cache_keys(keys):
-        for key in keys:
-            cache.delete(key)
-
-    def tearDown(self):
-        self._clean_cache_keys(
-            [
-                "test_long_document",
-            ]
         )
 
     @staticmethod
@@ -179,7 +162,6 @@ class GenerateOpinionEmbeddingTest(TestCase):
         self,
         mock_inception_batch_request,
         mock_aws_media_storage,
-        mock_long_doc_key,
     ):
         """Test that the generate_opinion_embeddings command:
 
@@ -223,7 +205,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 self.assertIn(embedding_dict, expected_embeddings)
 
     @patch("cl.search.tasks.S3IntelligentTieringStorage")
-    def test_limit_batch_size(self, mock_aws_media_storage, mock_long_doc_key):
+    def test_limit_batch_size(self, mock_aws_media_storage):
         """Test generate_opinion_embeddings limit the batch size properly."""
 
         # Create an instance of fake S3IntelligentTieringStorage.
@@ -272,9 +254,8 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 self.assertIn(embedding_dict, expected_embeddings)
 
     @patch("cl.search.tasks.S3IntelligentTieringStorage")
-    def test_log_long_documents(
-        self, mock_aws_media_storage, mock_long_doc_key
-    ):
+    @patch("cl.search.management.commands.generate_opinion_embeddings.logger")
+    def test_log_long_documents(self, mock_logger, mock_aws_media_storage):
         """Test log documents that individually exceed the batch size."""
 
         # Create an instance of fake S3IntelligentTieringStorage.
@@ -295,5 +276,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
             # Verify that inception_batch_request was called twice.
             self.assertEqual(mock_inception_batch_request.call_count, 2)
 
-        cached_long_docs = cache.get(mock_long_doc_key.return_value, [])
-        self.assertIn(self.opinion_4.pk, cached_long_docs)
+        mock_logger.error.assert_called_with(
+            "The opinion ID:%s exceeds the batch size limit.",
+            self.opinion_4.pk,
+        )

@@ -1805,7 +1805,7 @@ def save_embeddings(
     in the previous list.
 
     For example, if uploading a batch of opinion embeddings, each file will
-    be stored at embeddings/opinions/nomic-ai/{opinion_id}.json
+    be stored embeddings/opinions/freelawproject/modernbert-embed-base_finetune_512/{opinion_id}.json
 
     :param self: The Celery task.
     :param embeddings: A list of dictionaries representing the embeddings to

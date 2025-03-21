@@ -2,12 +2,11 @@ from celery import chain
 from django.conf import settings
 
 from cl.lib.celery_utils import CeleryThrottle
-from cl.lib.command_utils import VerboseCommand
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.indexing_utils import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.lib.utils import append_value_in_cache
 from cl.search.models import SEARCH_TYPES, Opinion
 from cl.search.tasks import create_opinion_text_embeddings, save_embeddings
 
@@ -17,13 +16,6 @@ def compose_redis_key() -> str:
     :return: A Redis key as a string.
     """
     return f"{SEARCH_TYPES.OPINION}_inception_embedding:log"
-
-
-def long_document_key() -> str:
-    """Compose a Redis key based on the search type for embedding log.
-    :return: A Redis key as a string.
-    """
-    return f"{SEARCH_TYPES.OPINION}_long_document"
 
 
 class Command(VerboseCommand):
@@ -62,7 +54,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--count",
             type=int,
-            help="The number of opinions embedding to generate.",
+            help="The number of opinions to process.",
         )
         parser.add_argument(
             "--embedding-queue",
@@ -149,7 +141,10 @@ class Command(VerboseCommand):
                 continue
             if token_count > batch_size:
                 # Log documents that individually exceed the batch size.
-                append_value_in_cache(long_document_key(), opinion_id)
+                logger.error(
+                    "The opinion ID:%s exceeds the batch size limit.",
+                    opinion_id,
+                )
                 continue
             # Check if adding this opinion would exceed the batch size.
             if current_batch_size + token_count > batch_size:
@@ -163,13 +158,12 @@ class Command(VerboseCommand):
 
             current_batch.append(opinion_id)
             current_batch_size += token_count
-            self.stdout.write(
-                "\rProcessed {}/{}, ({:.0%}), last ID requested for embedding: {},".format(
-                    processed_count,
-                    count,
-                    processed_count * 1.0 / count,
-                    opinion_id,
-                )
+            logger.info(
+                "\rProcessed %s/%s, (%s), last ID requested for embedding: %s",
+                processed_count,
+                count,
+                f"{processed_count * 1.0 / count:.0%}",
+                opinion_id,
             )
             if not processed_count % 1000:
                 # Log every 1000 documents processed.
@@ -181,7 +175,8 @@ class Command(VerboseCommand):
                 current_batch, embedding_queue, upload_queue, database
             )
 
-        self.stdout.write(
-            f"Successfully requested for embedding {processed_count} items from"
-            f" pk {start_id}."
+        logger.info(
+            "Successfully requested for embedding %s items from pk %s.",
+            processed_count,
+            start_id,
         )
