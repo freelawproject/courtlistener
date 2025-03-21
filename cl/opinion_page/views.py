@@ -1076,23 +1076,20 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
     ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o_es"
     )
+
+    # Default count when flag is disabled
+    cited_by_count = 0
+    related_cases_count = 0
+
     if ui_flag_for_o_es:
         # Flag enabled, query ES to get counts
         sub_opinion_pks = [
             str(opinion.pk) async for opinion in cluster.sub_opinions.all()
         ]
-        es_has_cited_opinions = await es_cited_case_count(
+        cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
+        related_cases_count = await es_related_case_count(
             cluster.id, sub_opinion_pks
         )
-        es_has_related_opinions = await es_related_case_count(
-            cluster.id, sub_opinion_pks
-        )
-        cited_by_count = es_has_cited_opinions
-        related_cases_count = es_has_related_opinions
-    else:
-        # Don't query ES for counts
-        cited_by_count = 0
-        related_cases_count = 0
 
     # Get `tab` from request parameters (fallback to 'opinions')
     tab = request.GET.get("tab", "opinions")
@@ -1254,7 +1251,6 @@ async def view_opinion_cited_by(
         "citing_clusters": cited_query.citing_clusters,
         "citing_cluster_count": cited_query.citing_cluster_count,
     }
-    print("additional_context", additional_context)
     return await render_opinion_view(
         request, cluster, "cited-by", additional_context
     )
