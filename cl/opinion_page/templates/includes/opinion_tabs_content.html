@@ -26,9 +26,15 @@
                             <span class="meta-data-value">{{ authority.precedential_status }}</span>
                         </div>
                         <div class="inline-block">
-                            <span class="meta-data-header">Citations: </span>
-                            <span class="meta-data-value">{{ authority.citation_string }}</span>
+                            <span class="meta-data-header">Court:</span>
+                            <span class="meta-data-value">{{ authority.docket.court }}</span>
                         </div>
+                        {% if authority.citation_string %}
+                            <div class="inline-block">
+                                <span class="meta-data-header">Citations: </span>
+                                <span class="meta-data-value">{{ authority.citation_string }}</span>
+                            </div>
+                        {% endif %}
                         </div>
                         <div class="bottom">
                             <div class="inline-block">
@@ -149,14 +155,18 @@
                             <span class="meta-data-header">Status:</span>
                             <span class="meta-data-value">{{ citing_cluster.status }}</span>
                         </div>
-                        <div class="inline-block">
-                            <span class="meta-data-header">Citations:</span>
-                            <span class="meta-data-value">{{ citing_cluster.citation|join:", " }}</span>
-                        </div>
-                        <div class="inline-block">
-                            <span class="meta-data-header">Docket Number:</span>
-                            <span class="meta-data-value select-all">{{ citing_cluster.docketNumber }}</span>
-                        </div>
+                        {% if citing_cluster.court %}
+                            <div class="inline-block">
+                                <span class="meta-data-header">Court:</span>
+                                <span class="meta-data-value">{{ citing_cluster.court }}</span>
+                            </div>
+                        {% endif %}
+                        {% if citing_cluster.citation %}
+                            <div class="inline-block">
+                                <span class="meta-data-header">Citations:</span>
+                                <span class="meta-data-value">{{ citing_cluster.citation|join:", " }}</span>
+                            </div>
+                        {% endif %}
                     </div>
                 </article>
             {% endfor %}
@@ -205,16 +215,16 @@
                                     <span class="meta-data-value">{{ cluster.status }}</span>
                                 </div>
                             {% endif %}
+                            {% if cluster.court %}
+                                <div class="inline-block">
+                                    <span class="meta-data-header">Court:</span>
+                                    <span class="meta-data-value">{{ cluster.court }}</span>
+                                </div>
+                            {% endif %}
                             {% if cluster.citation %}
                                 <div class="inline-block">
                                     <span class="meta-data-header">Citations: </span>
-                                    <span class="meta-data-value">{{ cluster.citation.0 }}</span>
-                                </div>
-                            {% endif %}
-                            {% if cluster.docketNumber %}
-                                <div class="inline-block">
-                                    <span class="meta-data-header">Docket Number:</span>
-                                    <span class="meta-data-value select-all">{{ cluster.docketNumber }}</span>
+                                    <span class="meta-data-value">{{ cluster.citation|join:", " }}</span>
                                 </div>
                             {% endif %}
                         </div>

@@ -168,6 +168,7 @@ async def build_cites_clusters_query(
                 "citation",
                 "status",
                 "dateFiled",
+                "court",
             ]
         )
         .extra(size=20, track_total_hits=True)
@@ -209,9 +210,10 @@ async def build_related_clusters_query(
                 "caseName",
                 "cluster_id",
                 "docketNumber",
-                "citations",
+                "citation",
                 "status",
                 "dateFiled",
+                "court",
             ]
         )
         .extra(size=20)
