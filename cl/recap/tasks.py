@@ -1852,7 +1852,11 @@ def update_docket_from_hidden_api(data):
 
 
 def fetch_pacer_doc_by_rd_base(
-    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
+    self,
+    rd_pk: int,
+    fq_pk: int,
+    magic_number: Optional[str] = None,
+    omit_page_count: bool = False,
 ) -> Optional[int]:
     """Fetch a PACER PDF by rd_pk
 
@@ -1864,6 +1868,7 @@ def fetch_pacer_doc_by_rd_base(
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
     :param magic_number: The magic number to fetch PACER documents for free
     this is an optional field, only used by RECAP Email documents
+    :param omit_page_count: If true, omit requesting the page_count from doctor
     :return: The RECAPDocument PK
     """
 
@@ -1954,6 +1959,7 @@ def fetch_pacer_doc_by_rd_base(
         pacer_doc_id,
         rd.document_number,
         rd.attachment_number,
+        omit_page_count=omit_page_count,
     )
 
     if success is False:
@@ -2013,7 +2019,11 @@ def fetch_pacer_doc_by_rd(
 )
 @transaction.atomic
 def fetch_pacer_doc_by_rd_and_mark_fq_completed(
-    self, rd_pk: int, fq_pk: int, magic_number: str | None = None
+    self,
+    rd_pk: int,
+    fq_pk: int,
+    magic_number: str | None = None,
+    omit_page_count: bool = False,
 ) -> None:
     """Celery task wrapper for fetch_pacer_doc_by_rd_base, which also marks
     the FQ as completed if the fetch is successful.
@@ -2023,9 +2033,12 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
     :param magic_number: The magic number to fetch PACER documents for free
     this is an optional field, only used by RECAP Email documents
+    :param omit_page_count: If true, omit requesting the page_count from doctor.
     :return: None
     """
-    rd_pk = fetch_pacer_doc_by_rd_base(self, rd_pk, fq_pk, magic_number)
+    rd_pk = fetch_pacer_doc_by_rd_base(
+        self, rd_pk, fq_pk, magic_number, omit_page_count=omit_page_count
+    )
     if rd_pk:
         # Mark the FQ as completed if the RD pk is returned, since in any other
         # case, fetch_pacer_doc_by_rd_base will return None.
