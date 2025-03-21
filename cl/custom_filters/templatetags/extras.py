@@ -367,6 +367,7 @@ def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
     return f"docket_id:{docket_id}"
 
 
+@register.filter
 def humanize_number(value):
     """Formats a number into a human-readable abbreviated form
 
