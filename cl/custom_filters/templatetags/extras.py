@@ -367,7 +367,6 @@ def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
     return f"docket_id:{docket_id}"
 
 
-@register.filter
 def humanize_number(value):
     """Formats a number into a human-readable abbreviated form
 
@@ -378,41 +377,35 @@ def humanize_number(value):
         >>> humanize_number(500)
         '500'
         >>> humanize_number(1050)
-        '1.1K'
+        '1K'
         >>> humanize_number(10987)
         '11K'
         >>> humanize_number(1500000)
         '1.5M'
         >>> humanize_number(2000000000)
-        '2.0B'
+        '2B'
     """
     try:
-        value = int(value)
+        num = float(f"{value:.3g}")
     except (TypeError, ValueError):
         return value
 
-    if value < 1_000:
-        # No formatting for numbers less than 1_000
+    if num < 1_000:
         return str(value)
-    elif value < 1_000_000:
-        # Format as thousands
-        num = round(value / 1_000)
-        # Check if the number is a whole number
-        if num == int(num):
-            return f"{int(num)}K"
-        else:
-            return f"{num:.1f}K"
-    elif value < 1_000_000_000:
-        # Format as millions
-        num = value / 1_000_000
-        if num == int(num):
-            return f"{int(num)}M"
-        else:
-            return f"{num:.1f}M"
+
+    magnitude = 0
+    while abs(num) >= 1000:
+        magnitude += 1
+        num /= 1000.0
+
+    abbreviation = ["", "K", "M", "B"][magnitude]
+
+    # Round to one decimal place
+    num = round(num * 10) / 10
+
+    if num == int(num):
+        formatted = str(int(num))
     else:
-        # Format as billions
-        num = value / 1_000_000_000
-        if num == int(num):
-            return f"{int(num)}B"
-        else:
-            return f"{num:.1f}B"
+        formatted = str(num)
+
+    return f"{formatted}{abbreviation}"
