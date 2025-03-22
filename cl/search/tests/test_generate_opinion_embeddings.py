@@ -72,13 +72,13 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
                 "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
                 "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa unde omnis iste</p>"
-            ),
+            ),  # roughly ~104 tokens
         )
         cls.opinion_ignored_min_size = OpinionFactory(
             cluster=cls.opinion_cluster_1,
             html_columbia=(
                 "<p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem</p>"
-            ),
+            ),  # roughly ~18 tokens
         )
 
         cls.opinion_cluster_2 = OpinionClusterFactory(
@@ -97,7 +97,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
             "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
             "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
             "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa  ",
-        )
+        )  # roughly ~100 tokens
         cls.opinion_cluster_3 = OpinionClusterFactory(
             date_filed=datetime.date(2020, 8, 15),
             docket=DocketFactory(
@@ -114,7 +114,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
             "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
             "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
             "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa ",
-        )
+        )  # roughly ~100 tokens
 
         cls.opinion_cluster_4 = OpinionClusterFactory(
             date_filed=datetime.date(2020, 8, 15),
@@ -142,7 +142,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
             "quae ab illo inventore veritatis et quasi architecto beatae vitae dicta "
             "sunt explicabo. Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
             "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa ",
-        )
+        )  # roughly ~296 tokens
 
     @staticmethod
     def _get_opinions_to_vectorize(batch):
