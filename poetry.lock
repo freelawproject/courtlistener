@@ -1605,14 +1605,14 @@ tests = ["asttokens (>=2.1.0)", "coverage", "coverage-enable-subprocess", "ipyth
 
 [[package]]
 name = "exrex"
-version = "0.11.0"
+version = "0.12.0"
 description = "Irregular methods for regular expressions"
 optional = false
 python-versions = "*"
 groups = ["dev"]
 files = [
-    {file = "exrex-0.11.0-py2.py3-none-any.whl", hash = "sha256:7bbc4987ebbb63cda7aad1a63b4e29032ba24826de4f295354bce1743e3aeb52"},
-    {file = "exrex-0.11.0.tar.gz", hash = "sha256:59912f0234567a5966b10d963c37ca9fe07f1640fd158e77c0dc7c3aee780489"},
+    {file = "exrex-0.12.0-py3-none-any.whl", hash = "sha256:1228f2e3afb008cacf6adc3ec20b098f1303886f4382b57cdf3b7259fb7c0ad3"},
+    {file = "exrex-0.12.0.tar.gz", hash = "sha256:3f582add0700d4141e279625252e7a0655f9ad81feab3b8ab9077966668a2c99"},
 ]
 
 [[package]]
@@ -5958,4 +5958,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13, <3.14"
-content-hash = "06553461643119b0e58628a5519506a72254fd1e3177ca637a0d99acc545dd69"
+content-hash = "258f04fdf80bec80e427cd8daf536afb3eff4a73c39215db5756e5eacf6f96d6"
