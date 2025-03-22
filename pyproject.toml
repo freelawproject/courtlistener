@@ -28,7 +28,7 @@ cl-manage = "manage:main"
 [tool.poetry.dependencies]
 ada-url = "^1.15.0"
 argparse = "*"
-beautifulsoup4 = "==4.12.*"
+beautifulsoup4 = "==4.13.*"
 celery = "^5.4.0"
 certifi = "^2024.12.14"
 courts-db = "*"
