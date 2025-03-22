@@ -4649,14 +4649,14 @@ test = ["Cython", "array-api-strict (>=2.0,<2.1.1)", "asv", "gmpy2", "hypothesis
 
 [[package]]
 name = "seal-rookery"
-version = "2.2.5"
+version = "2.3.1"
 description = "A collection of court seals that can be used in any project."
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "seal_rookery-2.2.5-py2.py3-none-any.whl", hash = "sha256:a1bcca9c20540058ae2477b5d40e374037958e771437b1fca5338682bb8a6034"},
-    {file = "seal_rookery-2.2.5.tar.gz", hash = "sha256:16c8d68875f2105ff44354573be6ef098e631af97e9ac00fcd06d6614e6db17e"},
+    {file = "seal_rookery-2.3.1-py2.py3-none-any.whl", hash = "sha256:6506bd7b30bb505a9685ac8ac003d6c82f295629fc005767c9c87ed868bbd9dd"},
+    {file = "seal_rookery-2.3.1.tar.gz", hash = "sha256:fd8a7e02f12403b9dd6f8241ad51d0912946ab8f329a64add736fca174279dd7"},
 ]
 
 [[package]]
@@ -5959,4 +5959,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13, <3.14"
-content-hash = "d94dd4fe42400bd083b9127bc7ffc57e4a3808bccffd88df0f7d9ef78efe11ca"
+content-hash = "48e57a341db4520efcd74c3c07ca461cab360c454b4636028ae2c4859942b4ad"
