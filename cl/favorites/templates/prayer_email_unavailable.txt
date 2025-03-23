@@ -20,7 +20,7 @@ View Document: Sealed on PACER
 ~~~
 You requested it on {{ date_created|date:"F j, Y" }}.
 {{num_waiting}} {{ num_waiting|pluralize:"person is,people are" }} waiting for it.
-It may become available in the future, in which case it will be restored to its position on the leaderboard. 
+It may become available in the future, in which case it will be restored to its position on the leaderboard.
 
 ************************
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
