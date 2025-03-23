@@ -3463,8 +3463,7 @@ def _run_availability_check(rd: RECAPDocument) -> bool:
         rd.is_sealed = True
         rd.save()
         PrayerAvailability.objects.update_or_create(
-            recap_document=rd,
-            defaults={"last_checked": now}
+            recap_document=rd, defaults={"last_checked": now}
         )
         return False
     else:
@@ -3478,7 +3477,7 @@ def _run_availability_check(rd: RECAPDocument) -> bool:
         rd.save()
 
     return True
-    
+
 
 @app.task(
     bind=True,
@@ -3507,15 +3506,18 @@ def fetch_prayer_availability(self, pk: int) -> bool:
     # no need to query the db first since these docs will always be unavailable for purchase (per CourtListener logic, but they can be purchased on PACER by buying docket reports)
     if pacer_doc_id == "":
         PrayerAvailability.objects.update_or_create(
-            recap_document=rd,
-            defaults={"last_checked": now}
+            recap_document=rd, defaults={"last_checked": now}
         )
-        
+
         return False
-    
+
     try:
-        document_availability = PrayerAvailability.objects.get(recap_document=rd)
-        if document_availability.last_checked >= (now - datetime.timedelta(weeks=1)):
+        document_availability = PrayerAvailability.objects.get(
+            recap_document=rd
+        )
+        if document_availability.last_checked >= (
+            now - datetime.timedelta(weeks=1)
+        ):
             return False
         else:
             return _run_availability_check(rd, now)
