@@ -202,6 +202,7 @@ class Prayer(models.Model):
             ),
         ]
 
+
 # model to keep track of when we last checked whether a given PACER document was still unavailable for purchase
 class PrayerAvailability(models.Model):
     recap_document = models.ForeignKey(
