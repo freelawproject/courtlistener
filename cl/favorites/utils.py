@@ -384,7 +384,6 @@ def prayer_unavailable(instance: RECAPDocument) -> None:
         }
         for prayer in open_prayers.values("user__email", "date_created")
     ]
-    open_prayers.delete()
 
     # Send email notifications in bulk.
     if email_recipients:

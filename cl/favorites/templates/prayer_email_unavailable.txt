@@ -2,10 +2,10 @@
 CourtListener.com
 *****************
 -------------------------------------------------------
-Your Request Has Been Canceled.
+Your Request Cannot Be Fulfilled At This Time.
 -------------------------------------------------------
 
-The document you requested is unavailable for purchase on PACER. This may mean it is sealed or a text-only entry. It may also be unavailable for online access pursuant to FRCP 5.2(c).
+The document you requested is currently unavailable for purchase on PACER. This may mean it is sealed or a text-only entry. It may also be unavailable for online access pursuant to FRCP 5.2(c).
 -------------------------------------------------------
 
 {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
@@ -19,8 +19,8 @@ Description: {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else
 View Document: Sealed on PACER
 ~~~
 You requested it on {{ date_created|date:"F j, Y" }}.
-{{num_waiting}} {{ num_waiting|pluralize:"person was,people were" }} waiting for it.
-We encourage you to request it for purchase again in the future, in case it becomes available.
+{{num_waiting}} {{ num_waiting|pluralize:"person is,people are" }} waiting for it.
+It may become available in the future, in which case it will be restored to its position on the leaderboard. 
 
 ************************
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
