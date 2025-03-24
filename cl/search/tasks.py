@@ -1,5 +1,7 @@
+import csv
+import io
 import logging
-from datetime import date
+from datetime import date, datetime
 from importlib import import_module
 from random import randint
 from typing import Any, Generator
@@ -8,8 +10,12 @@ from celery import Task
 from celery.canvas import chain
 from django.apps import apps
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
+from django.http import QueryDict
+from django.template import loader
 from elasticsearch.exceptions import (
     ApiError,
     ConflictError,
@@ -38,6 +44,11 @@ from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
 )
+from cl.lib.search_utils import (
+    fetch_es_results_for_csv,
+    get_headers_and_transformations_for_search_export,
+)
+from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
@@ -49,6 +60,7 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
     Docket,
@@ -349,6 +361,97 @@ def document_fields_to_update(
             field_value = prepare_timestamp(main_instance)
             fields_to_update["timestamp"] = field_value
     return fields_to_update
+
+
+@app.task(
+    bind=True,
+    max_retries=3,
+    ignore_result=True,
+)
+def email_search_results(self: Task, user_id: int, query: str):
+    """Sends an email to the user with their search results as a CSV attachment.
+
+    :param user_id: The ID of the user to send the email to.
+    :param query: The user's search query string.
+    """
+    user = User.objects.get(pk=user_id)
+    # Parse the query string into a dictionary
+    qd = QueryDict(query.encode(), mutable=True)
+
+    # Create a search form instance and validate the query data
+    search_form = SearchForm(qd)
+    if not search_form.is_valid():
+        return
+
+    # Get the cleaned data from the validated form
+    cd = search_form.cleaned_data
+
+    # Fetch search results from Elasticsearch based on query and search type
+    search_results, error = fetch_es_results_for_csv(
+        queryset=qd, search_type=cd["type"]
+    )
+
+    # Retry task if an error occurred and retry limit not reached.
+    if error:
+        if self.request.retries == self.max_retries:
+            return None
+        raise self.retry()
+
+    if not search_results:
+        return
+
+    # Get the headers and basic transformation for the CSV file based on the
+    # search type
+    csv_headers, csv_transformations = (
+        get_headers_and_transformations_for_search_export(cd["type"])
+    )
+    if not csv_headers:
+        return
+
+    # Create the CSV content and store in a StringIO object
+    with io.StringIO() as output:
+        csvwriter = csv.DictWriter(
+            output,
+            fieldnames=csv_headers,
+            extrasaction="ignore",
+            quotechar='"',
+            quoting=csv.QUOTE_ALL,
+        )
+        csvwriter.writeheader()
+        for row in search_results:
+            if csv_transformations:
+                for key, function in csv_transformations.items():
+                    row[key] = function(row[key] if key in row else row)
+
+            clean_dict = {
+                camel_to_snake(key): value for key, value in row.items()
+            }
+            csvwriter.writerow(clean_dict)
+
+        csv_content: str = output.getvalue()
+
+    # Prepare email content
+    txt_template = loader.get_template("search_results_email.txt")
+    email_context = {
+        "username": user.username,
+        "query_link": f"https://www.courtlistener.com/?{query}",
+    }
+
+    # Create email object
+    message = EmailMessage(
+        subject="Your Search Results are Ready!",
+        body=txt_template.render(email_context),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+
+    # Generate a filename for the CSV attachment with timestamp
+    now = datetime.now()
+    filename = f'search_results_{now.strftime("%Y%m%d_%H%M%S")}.csv'
+
+    # Send email with attachments
+    message.attach(filename, csv_content, "text/csv")
+    message.send(fail_silently=False)
 
 
 @app.task(
@@ -1025,106 +1128,6 @@ def index_parent_or_child_docs_in_es(
 
     parent_instances = QuerySet()
     child_instances = QuerySet()
-    match search_type:
-        case SEARCH_TYPES.RECAP:
-            parent_es_document = DocketDocument
-            child_es_document = ESRECAPDocument
-            child_id_property = "RECAP"
-            if document_type == "parent":
-                parent_instances = Docket.objects.filter(pk__in=instance_ids)
-            elif document_type == "child":
-                child_instances = RECAPDocument.objects.filter(
-                    pk__in=instance_ids
-                )
-        case SEARCH_TYPES.OPINION:
-            parent_es_document = OpinionClusterDocument
-            child_es_document = OpinionDocument
-            child_id_property = "OPINION"
-            if document_type == "parent":
-                parent_instances = OpinionCluster.objects.filter(
-                    pk__in=instance_ids
-                )
-            elif document_type == "child":
-                child_instances = Opinion.objects.filter(pk__in=instance_ids)
-        case SEARCH_TYPES.ORAL_ARGUMENT:
-            parent_es_document = AudioDocument
-            if document_type == "parent":
-                parent_instances = Audio.objects.filter(pk__in=instance_ids)
-        case _:
-            return
-
-    base_doc = {
-        "_op_type": "index",
-        "_index": parent_es_document._index._name,
-    }
-    if document_type == "child":
-        # Then index only child documents in bulk.
-        failed_docs = index_documents_in_bulk_from_queryset(
-            child_instances,
-            child_es_document,
-            base_doc,
-            child_id_property=child_id_property,
-            use_streaming_bulk=use_streaming_bulk,
-        )
-
-        if failed_docs:
-            model_label = child_es_document.Django.model.__name__.capitalize()
-            logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
-            )
-
-    if document_type == "parent":
-        # Index only parent documents.
-        failed_docs = index_documents_in_bulk_from_queryset(
-            parent_instances,
-            parent_es_document,
-            base_doc,
-            use_streaming_bulk=use_streaming_bulk,
-        )
-        if failed_docs:
-            model_label = parent_es_document.Django.model.__name__.capitalize()
-            logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
-            )
-
-    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
-        # Set auto-refresh, used for testing.
-        parent_es_document._index.refresh()
-
-
-# TODO: Remove after the new task is rolled out and all scheduled tasks have been processed.
-@app.task(
-    bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
-    ignore_result=True,
-)
-def index_parent_or_child_docs(
-    self: Task,
-    instance_ids: list[int],
-    search_type: str,
-    document_type: str | None,
-    testing_mode: bool = False,
-) -> None:
-    """Index parent or child documents in Elasticsearch.
-
-    :param self: The Celery task instance
-    :param instance_ids: The parent instance IDs to index.
-    :param search_type: The Search Type to index parent and child docs.
-    :param document_type: The document type to index, 'parent' or 'child' documents
-    :param testing_mode: Set to True to enable streaming bulk, which is used in
-     TestCase-based tests because parallel_bulk is incompatible with them.
-    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
-    Default is False.
-    :return: None
-    """
-
-    parent_instances = QuerySet()
-    child_instances = QuerySet()
-    use_streaming_bulk = True if testing_mode else False
     match search_type:
         case SEARCH_TYPES.RECAP:
             parent_es_document = DocketDocument
