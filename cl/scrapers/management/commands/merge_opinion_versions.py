@@ -3,15 +3,15 @@ import re
 from difflib import Differ, SequenceMatcher
 from typing import Union
 
-import elasticsearch
 from django.db import transaction
 from django.db.models import Count, Q
+from elasticsearch import NotFoundError
 from eyecite import clean_text
 
 from cl.favorites.models import Note
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.documents import OpinionClusterDocument, OpinionDocument
-from cl.search.models import Citation, Opinion, OpinionCluster
+from cl.search.documents import ES_CHILD_ID, OpinionDocument
+from cl.search.models import Opinion, OpinionCluster
 
 MIN_SEQUENCE_SIMILARITY = 0.9
 
@@ -154,18 +154,9 @@ def merge_opinion_versions(
 
     version_cluster = version_opinion.cluster
     update_notes = Note.objects.filter(cluster_id=version_cluster.id).exists()
-    version_cluster_id = version_cluster.id
 
     # Citations
-    citations_to_update = []
-    citations_to_delete = []
     citations = {str(c) for c in main_opinion.cluster.citations.all()}
-    for version_citation in version_cluster.citations.all():
-        if str(version_citation) in citations:
-            citations_to_delete.append(version_citation)
-            continue
-        version_citation.cluster_id = main_opinion.cluster.id
-        citations_to_update.append(version_citation)
 
     with transaction.atomic():
         if update_main_opinion:
@@ -177,26 +168,32 @@ def merge_opinion_versions(
                 cluster_id=main_opinion.cluster.id
             )
 
+        # update the cluster_id to prevent the version cluster deletion cascade
+        for version_citation in version_cluster.citations.all():
+            if str(version_citation) in citations:
+                continue
+            version_citation.cluster_id = main_opinion.cluster.id
+            version_citation.save()
+
         version_opinion.cluster_id = main_opinion.cluster.id
         version_opinion.main_version = main_opinion
         version_opinion.save()
 
-        if citations_to_update:
-            Citation.objects.bulk_update(citations_to_update, ["cluster_id"])
-
-        if citations_to_delete:
-            Citation.objects.filter(
-                id__in=[cite.id for cite in citations_to_delete]
-            ).delete()
-
+        # Both Opinion and Citation have a ForeignKey to OpinionCluster, with
+        # on_delete=models.CASCADE. Also, there are signals (see
+        # o_cluster_field_mapping) to delete the related Elasticsearch docs
+        # So, deleting the cluster will delete any associated Citation,
+        # and will delete the associated objects in ES
         version_cluster.delete()
 
-    # Delete from the elastic search indexes
-    try:
-        OpinionDocument.get(id=version_opinion.id).delete()
-        OpinionClusterDocument(id=version_cluster_id).delete()
-    except elasticsearch.NotFoundError:
-        pass
+        # since the cluster was reassigned, this opinion was not deleted from
+        # the ES index. We don't want versions to show up on search
+        try:
+            OpinionDocument.get(
+                id=ES_CHILD_ID(version_opinion.id).OPINION
+            ).delete()
+        except NotFoundError:
+            pass
 
 
 def merge_versions_by_download_url(
