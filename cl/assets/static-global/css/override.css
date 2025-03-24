@@ -1844,3 +1844,11 @@ rect.series-segment {
 .learn-more-prayer-btn {
   margin-right: auto;
 }
+
+.row-gap-3 {
+  row-gap: 1rem;
+}
+
+#doc-no-available-warning a.btn {
+  height: 28px;
+}

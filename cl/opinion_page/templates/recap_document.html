@@ -184,10 +184,12 @@
               </p>
             </div>
           {% else %}
-            <div class="flex col-sm-12 alert-warning alert justify-content-between">
-              <p class="bottom">This item is not yet in the RECAP collection.
-              </p>
-              <div class="flex flex-row gap-2">
+            <div id="doc-no-available-warning" class="flex flex-column flex-sm-row row-gap-3 alert-warning alert justify-content-between">
+              <div class="col-sm-12">
+                <p class="bottom">This item is not yet in the RECAP collection.
+                </p>
+              </div>
+              <div class="col-sm-12 flex flex-row gap-2 justify-content-end">
                 {% if rd.pacer_url %}
                   <a class="btn btn-primary btn-sm"
                      href="{{ rd.pacer_url }}"
