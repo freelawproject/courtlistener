@@ -238,35 +238,40 @@
 {% elif tab == "pdf" %}
     {# PDF #}
     <div class="tab-pane fade in active" id="pdf">
-        <div>
-            <h2 class="opinion-section-title jump-link">
-                Source:
-                <em>
-                    {% if cluster.filepath_pdf_harvard %}
-                        Case Law Access Project
-                    {% elif pdf_path %}
-                        {{ cluster.docket.court }}
-                    {% endif %}
-                </em>
-            </h2>
+        <div class="row">
+            <div class="col-xs-8">
+                <h2 class="opinion-section-title jump-link">
+                {% if pdf_path %}
+                    Source: {% if cluster.filepath_pdf_harvard %}Case Law Access Project{% else %}{{ cluster.docket.court }}{% endif %}
+                {% else %}
+                    No PDF available
+                {% endif %}
+                </h2>
+            </div>
+            <div class="col-xs-4 text-right">
+                {% if pdf_path %}
+                    <a href="{{ pdf_path }}" class="btn btn-default opinion-section-title">
+                        Download PDF
+                    </a>
+                {% endif %}
+            </div>
         </div>
         <hr class="hr-opinion">
-        <div class="embed-responsive embed-responsive-8by11">
-            <object data="{% if cluster.filepath_pdf_harvard %}{{ cluster.filepath_pdf_harvard.url }}{% elif pdf_path %}{{ cluster.sub_opinions.all.0.local_path.url }}{% endif %}?no-og=true"
-                    type="application/pdf"
-                    width="100%"
-                    height="100%">
-                <div class="row">
-                    <div class="col-sm-1 col-md-2 col-lg-3"></div>
-                    <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
-                        <p>Oops! Your browser does not support embedded PDF viewing.</p>
-                        <div class="v-offset-below-1 v-offset-above-1">
-                            {% include "includes/rd_download_button.html" %}
+        {% if pdf_path %}
+            <div class="embed-responsive embed-responsive-8by11">
+                <object data="{{ pdf_path }}?no-og=true"
+                        type="application/pdf"
+                        width="100%"
+                        height="100%">
+                    <div class="row">
+                        <div class="col-sm-1 col-md-2 col-lg-3"></div>
+                        <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
+                            <p>Oops! Your browser does not support embedded PDF viewing.</p>
                         </div>
                     </div>
-                </div>
-            </object>
-        </div>
+                </object>
+            </div>
+        {% endif %}
     </div>
 {% else %}
 
