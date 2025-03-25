@@ -5,9 +5,14 @@ import environ
 env = environ.FileAwareEnv()
 
 ###################
+# Export setting #
+###################
+MAX_SEARCH_RESULTS_EXPORTED = env("MAX_SEARCH_RESULTS_EXPORTED", default=250)
+
+###################
 # Related content #
 ###################
-RELATED_COUNT = 5
+RELATED_COUNT = 20
 RELATED_USE_CACHE = True
 RELATED_CACHE_TIMEOUT = 60 * 60 * 24 * 7
 RELATED_MLT_MAXQT = 10

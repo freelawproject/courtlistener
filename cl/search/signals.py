@@ -3,6 +3,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from cl.audio.models import Audio
+from cl.citations.models import UnmatchedCitation
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
@@ -365,7 +366,6 @@ recap_document_field_mapping = {
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
                 "pacer_case_id": ["pacer_case_id"],
-                "slug": ["absolute_url"],
             }
         },
         Person: {
@@ -425,6 +425,7 @@ o_field_mapping = {
                 "html": ["text"],
                 "plain_text": ["text"],
                 "sha1": ["sha1"],
+                "ordering_key": ["ordering_key"],
             },
         },
     },
@@ -575,3 +576,21 @@ def handle_recap_doc_change(
         and instance.is_available == True
     ):
         send_prayer_emails(instance)
+
+
+@receiver(
+    post_save,
+    sender=Citation,
+    dispatch_uid="handle_citation_save_uid",
+)
+def update_unmatched_citation(
+    sender, instance: Citation, created: bool, **kwargs
+):
+    """Updates UnmatchedCitation.status to MATCHED, if found"""
+    if not created:
+        return
+    UnmatchedCitation.objects.filter(
+        volume=instance.volume,
+        reporter=instance.reporter,
+        page=instance.page,
+    ).update(status=UnmatchedCitation.FOUND)

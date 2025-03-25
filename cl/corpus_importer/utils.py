@@ -107,6 +107,23 @@ async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
         await d.asave()
 
 
+def is_bankruptcy_court(court_id: str) -> bool:
+    """Checks if a given court ID corresponds to a bankruptcy court.
+
+    This function queries the database to determine if the provided court
+    ID is associated with a federal bankruptcy court.
+
+    Args:
+        court_id: The ID of the court to check (string).
+
+    Returns:
+        True if the court ID corresponds to a bankruptcy court, False otherwise
+        (boolean).
+    """
+    bankr_court_ids = Court.federal_courts.bankruptcy_pacer_courts()
+    return bankr_court_ids.filter(pk=court_id).exists()
+
+
 def is_appellate_court(court_id: str) -> bool:
     """Checks if the given court_id belongs to an appellate court.
 
@@ -1195,3 +1212,29 @@ class CycleChecker:
             # when self.court_counts[court_id] != self.current_iteration
             self.prev_iteration_courts.add(court_id)
             return True
+
+
+def is_long_appellate_document_number(
+    document_number: str | int | None,
+) -> bool:
+    """Check whether this docket_number is longer than 9 digits, indicating that it
+    comes from a court that doesn't use regular numbering.
+
+    :param document_number: The document number
+    :return: A boolean indicating whether this is a long appellate document number.
+    """
+    return isinstance(document_number, str) and len(document_number) >= 9
+
+
+def get_iquery_pacer_courts_to_scrape() -> list[str]:
+    """Retrieve all district and bankruptcy PACER courts for the iquery scraper.
+
+    :return: A list of Court IDs.
+    """
+    return list(
+        Court.federal_courts.district_or_bankruptcy_pacer_courts()
+        .exclude(
+            in_use=False,
+        )
+        .values_list("pk", flat=True)
+    )
