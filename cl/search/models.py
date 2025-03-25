@@ -3230,6 +3230,7 @@ class Opinion(AbstractDateTimeModel):
         help_text="The id of another Opinion which is the updated or final version of this opinion",
         null=True,
         on_delete=models.SET_NULL,
+        related_name="versions",
     )
 
     class Meta:
