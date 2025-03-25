@@ -1,5 +1,6 @@
 import itertools
 import re
+from collections import defaultdict
 from difflib import Differ, SequenceMatcher
 from typing import Union
 
@@ -16,19 +17,31 @@ from cl.search.models import Opinion, OpinionCluster
 MIN_SEQUENCE_SIMILARITY = 0.9
 
 
-def get_query_from_url(url: str) -> Q:
+def get_query_from_url(url: str, url_filter: str) -> Q:
     """Build an OR query with the alternative to http or https
 
     :param url: the input url
+    :param url_filter: a string that identified a Django filter.
+        Currently supporting
+        - 'startswith'
+        - 'exact', meaning an equality filter
+
     :return: a Q OR object
     """
+    if url_filter not in ["exact", "startswith"]:
+        raise ValueError("`url_filter` must be in [exact, startswith]")
+
     if "https" in url:
         extra_query = url.replace("https", "http")
     else:
         extra_query = url.replace("http", "https")
-    return Q(download_url__startswith=url) | Q(
-        download_url__startswith=extra_query
-    )
+
+    if url_filter == "startswith":
+        return Q(download_url__startswith=url) | Q(
+            download_url__startswith=extra_query
+        )
+
+    return Q(download_url=url) | Q(download_url=extra_query)
 
 
 def clean_opinion_text(opinion: Opinion) -> str:
@@ -57,8 +70,8 @@ def text_is_similar(text1: str, text2: str) -> bool:
     # depending on how long the sequence is, and if it is an addition/removal
     # or a correction. In general, a 0.9 MIN value should tolerate a difference
     # of a few words between versions, which is what we expect
-    # Note that this in sensible to argument order, so we retry it if the first
-    # oder fails
+    # Note that this in sensible to argument order, so we retry with inverted
+    # order if the first run fails
     sm = SequenceMatcher(None, text1, text2)
     ratio = sm.ratio()
     if ratio < MIN_SEQUENCE_SIMILARITY:
@@ -210,7 +223,7 @@ def merge_versions_by_download_url(
     :param limit: max number of groups to correct
     :return None
     """
-    query = get_query_from_url(url_start)
+    query = get_query_from_url(url_start, "startswith")
     qs = (
         Opinion.objects.filter(query)
         .values("download_url")
@@ -228,12 +241,7 @@ def merge_versions_by_download_url(
     # {'download_url': 'https://caseinfo.nvsupremecourt...',
     # 'number_of_rows': 2, 'number_of_hashes': 2}
     seen_urls = set()
-    stats = {
-        "different dockets": 0,
-        "text too different": 0,
-        "success": 0,
-        "seen_urls": 0,
-    }
+    stats = defaultdict(lambda: 0)
     for group in qs:
         if group["download_url"].replace("https", "http") in seen_urls:
             continue
@@ -245,44 +253,72 @@ def merge_versions_by_download_url(
 
         logger.info("Processing group %s", group)
 
-        query = get_query_from_url(group["download_url"])
+        query = get_query_from_url(group["download_url"], "exact")
         # keep the latest opinion as the main version
+        # exclude opinions that already have a main_version. If that main
+        # version is a version of the current document, they will be updated
+        # transitively
         main, *versions = (
             Opinion.objects.filter(query)
+            .exclude(main_version__isnull=False)
             .select_related("cluster", "cluster__docket")
             .order_by("-date_created")
         )
+        merge_versions_by_text_similarity(main, versions, stats)
+        stats["seen_urls"] = len(seen_urls)
 
-        main_text = clean_opinion_text(main)
-        if not main_text:
-            logger.warning("Opinion has no text %s", main.id)
+    logger.info(stats)
+
+
+def merge_versions_by_text_similarity(
+    main: Opinion, versions: list[Opinion], stats: dict
+) -> None:
+    """Compare text of main and candidate version opinions; merge if similar
+
+    :param main: the opinion that will be the main version
+    :param versions: a list of opinions that will be compared to `main`, in
+        order to decide if they should point to it
+    :param stats: a dictionary to hold stats
+
+    :return: None
+    """
+    main_text = clean_opinion_text(main)
+    if not main_text:
+        logger.warning("Opinion has no text %s", main.id)
+        return
+
+    for version in versions:
+        # we should investigate this case further
+        if main.cluster.docket.id != version.cluster.docket.id:
+            stats["different dockets"] += 1
+            logger.error(
+                "Main opinion docket %s is not the same as version docket %s",
+                main.cluster.docket.id,
+                version.cluster.docket.id,
+            )
             continue
 
-        for version in versions:
-            # we should investigate this case further
-            if main.cluster.docket.id != version.cluster.docket.id:
-                stats["different dockets"] += 1
-                logger.error(
-                    "Main opinion docket %s is not the same as version docket %s",
-                    main.cluster.docket.id,
-                    version.cluster.docket.id,
-                )
+        version_text = clean_opinion_text(version)
+        if text_is_similar(main_text, version_text):
+            merge_opinion_versions(main, version)
+            stats["success"] += 1
+
+            if not version.versions.exists():
                 continue
 
-            version_text = clean_opinion_text(version)
-            if text_is_similar(main_text, version_text):
-                merge_opinion_versions(main, version)
-                stats["success"] += 1
-            else:
-                stats["text too different"] += 1
-                logger.error(
-                    "Opinions grouped by URL have disimilar text. Main: %s. Version %s",
-                    main.id,
-                    version.id,
-                )
-
-    stats["seen_urls"] = len(seen_urls)
-    logger.info(stats)
+            # if the opinion that is now a version has versions itself,
+            # make them point to the new main
+            for version_to_update in version.versions.all():
+                version_to_update.main_version = main
+                version_to_update.save()
+                stats["updated child versions"] += 1
+        else:
+            stats["text too different"] += 1
+            logger.error(
+                "Opinions grouped by URL have disimilar text. Main: %s. Version %s",
+                main.id,
+                version.id,
+            )
 
 
 def explain_version_differences(opinions: list[Opinion | int]) -> None:

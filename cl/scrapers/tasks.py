@@ -1,6 +1,7 @@
 import logging
 import random
 import traceback
+from collections import defaultdict
 from typing import List, Optional, Tuple, Union
 
 import httpx
@@ -29,6 +30,10 @@ from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
+from cl.scrapers.management.commands.merge_opinion_versions import (
+    get_query_from_url,
+    merge_versions_by_text_similarity,
+)
 from cl.scrapers.utils import citation_is_duplicated, make_citation
 from cl.search.models import Docket, Opinion, RECAPDocument
 
@@ -212,10 +217,46 @@ def extract_doc_content(
         )
         return
 
+    find_and_merge_versions.delay(pk=opinion.id)
+
     # Identify and link citations within the document content
     find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
         ([opinion.pk],), countdown=random.randint(0, 3600)
     )
+
+
+@app.task(bind=True)
+def find_and_merge_versions(self, pk: int) -> None:
+    """Find versions of the `pk` opinion, and try to merge them
+
+    Since this relies on text similarity, we are calling it from
+    `extract_doc_content`
+
+    Currently only checks for exact `download_url` match, update this when
+    different strategies are implemented
+
+    :param pk: opinion primary key
+    :return None:
+    """
+    recently_scraped_opinion = Opinion.objects.get(id=pk)
+    query = get_query_from_url(recently_scraped_opinion.download_url, "exact")
+    versions = (
+        Opinion.objects.filter(query)
+        .exclude(id=pk)
+        .exclude(main_version__isnull=False)
+        .order_by("-date_created")
+    )
+
+    # versions are ordered in descending date_created, we keep the latest
+    # creation as the main version, since we expect it to be freshest
+    # from the court's server. Since this task is called on a scrape, we assume
+    # that is the most recent
+    if versions.exists():
+        stats = defaultdict(lambda: 0)
+        merge_versions_by_text_similarity(
+            recently_scraped_opinion, versions, stats
+        )
+        logger.debug(stats)
 
 
 @app.task(

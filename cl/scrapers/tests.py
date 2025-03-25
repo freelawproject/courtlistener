@@ -36,7 +36,11 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_versions_by_download_url,
 )
 from cl.scrapers.models import UrlHash
-from cl.scrapers.tasks import extract_doc_content, process_audio_file
+from cl.scrapers.tasks import (
+    extract_doc_content,
+    find_and_merge_versions,
+    process_audio_file,
+)
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
     case_names_are_too_different,
@@ -1042,6 +1046,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         cls.rebuild_index("search.OpinionCluster")
 
     def test_merge_versions_by_download_url(self):
+        """Can we merge opinion versions and delete ES documents correctly?"""
         docket = DocketFactory()
 
         other_dates = "Argued on March 10 2025"
@@ -1208,3 +1213,35 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             str(new_citation) in ocd.citation,
             f"{str(new_citation)} not in {ocd.citation}",
         )
+
+    def test_find_and_merge_versions_task(self):
+        """Does the scraper versioning task work?"""
+        download_url = "https://something.com/1"
+        plain_text = "Something ..."
+        docket = DocketFactory()
+        previous_main = OpinionFactory(
+            cluster=OpinionClusterFactory.create(docket=docket),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=None,
+        )
+        a_version = OpinionFactory(
+            cluster=OpinionClusterFactory.create(docket=docket),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=previous_main,
+        )
+        main = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(docket=docket),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=None,
+        )
+
+        find_and_merge_versions(pk=main.id)
+        a_version.refresh_from_db()
+        previous_main.refresh_from_db()
+
+        self.assertEqual(previous_main.main_version.id, main.id)
+        # test transitive main_version update
+        self.assertEqual(a_version.main_version.id, main.id)
