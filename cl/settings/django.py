@@ -184,6 +184,7 @@ INSTALLED_APPS = [
     "cl.users",
     "cl.visualizations",
     "tailwind",
+    "django_cotton",
 ]
 
 if DEVELOPMENT:
