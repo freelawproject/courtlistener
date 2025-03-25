@@ -26,9 +26,15 @@
                             <span class="meta-data-value">{{ authority.precedential_status }}</span>
                         </div>
                         <div class="inline-block">
-                            <span class="meta-data-header">Citations: </span>
-                            <span class="meta-data-value">{{ authority.citation_string }}</span>
+                            <span class="meta-data-header">Court:</span>
+                            <span class="meta-data-value">{{ authority.docket.court }}</span>
                         </div>
+                        {% if authority.citation_string %}
+                            <div class="inline-block">
+                                <span class="meta-data-header">Citations: </span>
+                                <span class="meta-data-value">{{ authority.citation_string }}</span>
+                            </div>
+                        {% endif %}
                         </div>
                         <div class="bottom">
                             <div class="inline-block">
@@ -47,38 +53,32 @@
     <div class="tab-pane fade in active" id="summaries">
         <h2 class="opinion-section-title jump-link" id="case-details">Summaries</h2>
         <hr class="hr-opinion">
+        <h3>{{ summaries_count|intcomma }} judge-written summar{{ summaries_count|pluralize:"y,ies" }} of this opinion
+            from other cases.</h3>
+        {% if summaries_count > 0 %}
+            <p>We looked through our complete case law collection for parenthetical summaries of this case and
+                organized them into {{ parenthetical_groups|length }}
+                group{{ parenthetical_groups|length|pluralize }}.</p>
+        {% endif %}
         <div id="all-summaries">
             <ul>
                 {% for group in parenthetical_groups %}
                     {% with representative=group.representative %}
                         {% with representative_cluster=representative.describing_opinion.cluster %}
-                            <article>
-                                <h3 class="bottom serif">
-                                    <a href="{% url 'view_case' representative_cluster.pk representative_cluster.slug %}" class="visitable">
-                                        {{ representative_cluster|best_case_name|safe }}
-                                    </a>
-                                </h3>
-                                <div class="bottom">
-                                    <div class="inline-block">
-                                        <span class="meta-data-header">Date Filed:</span>
-                                        <time class="meta-data-value">{{ representative_cluster.date_filed|date:"F jS, Y" }}</time>
-                                    </div>
-                                    <div class="inline-block">
-                                        <span class="meta-data-header">Status:</span>
-                                        <span class="meta-data-value">{{ representative_cluster.precedential_status }}</span>
-                                    </div>
-                                    <div class="inline-block">
-                                        <span class="meta-data-header">Citations:</span>
-                                        <span class="meta-data-value">{{ representative_cluster.citation_string }}</span>
-                                    </div>
-                                </div>
-                            </article>
                             <li class="v-offset-below-2">
-                                <span class="meta-data-header">Summaries:</span> {{ representative.text|capfirst }} --
+                                {{ representative.text|capfirst }}
                                 <br/>
                                 <div class="summary-group-metadata">
+                                    <span class="bullet-tail">{{ representative_cluster.date_filed|date:"F jS, Y" }}</span>
+                                    <span class="bullet-tail">
+                                        <a href="{{ representative_cluster.get_absolute_url }}{% querystring %}">
+                                            {{ representative_cluster|best_case_name|safe }}
+                                        </a>
+                                    </span>
+                                    <span class="bullet-tail">{{ representative_cluster.docket.court }}</span>
                                     {% if group.size > 1 %}
-                                        <button class="toggle-group-summaries btn btn-link" type="button" data-toggle="collapse"
+                                        <button class="toggle-group-summaries btn btn-link" type="button"
+                                                data-toggle="collapse"
                                                 aria-expanded="false" aria-controls="group-summaries"
                                                 data-target="#group-summaries-{{ representative.pk }}">
                                             <span class="collapsed">Show all {{ group.size|intcomma }} summaries like this</span>
@@ -90,15 +90,16 @@
                             <ul class="group-summaries collapse" id="group-summaries-{{ representative.pk }}">
                                 {% for summary in group.parentheticals.all %}
                                     {% with describing_cluster=summary.describing_opinion.cluster %}
+                                        {# Don't duplicate the representative cluster in the nested group #}
                                         {% if summary != representative %}
                                             <li class="v-offset-below-1">
                                                 {{ summary.text|capfirst }}
                                                 <br/>
-                                                <span class="bullet-tail">{{ describing_cluster.date_filed }}</span>
+                                                <span class="bullet-tail">{{ describing_cluster.date_filed|date:"F jS, Y" }}</span>
                                                 <span class="bullet-tail">
-                                                    <a href="{{ describing_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                                                        {{ describing_cluster|best_case_name|safe }}
-                                                    </a>
+                                                  <a href="{{ describing_cluster.get_absolute_url }}{% querystring %}">
+                                                      {{ describing_cluster|best_case_name|safe }}
+                                                  </a>
                                                 </span>
                                                 <span class="bullet-tail">{{ describing_cluster.docket.court }}</span>
                                             </li>
@@ -154,14 +155,18 @@
                             <span class="meta-data-header">Status:</span>
                             <span class="meta-data-value">{{ citing_cluster.status }}</span>
                         </div>
-                        <div class="inline-block">
-                            <span class="meta-data-header">Citations:</span>
-                            <span class="meta-data-value">{{ citing_cluster.citation|join:", " }}</span>
-                        </div>
-                        <div class="inline-block">
-                            <span class="meta-data-header">Docket Number:</span>
-                            <span class="meta-data-value select-all">{{ citing_cluster.docketNumber }}</span>
-                        </div>
+                        {% if citing_cluster.court %}
+                            <div class="inline-block">
+                                <span class="meta-data-header">Court:</span>
+                                <span class="meta-data-value">{{ citing_cluster.court }}</span>
+                            </div>
+                        {% endif %}
+                        {% if citing_cluster.citation %}
+                            <div class="inline-block">
+                                <span class="meta-data-header">Citations:</span>
+                                <span class="meta-data-value">{{ citing_cluster.citation|join:", " }}</span>
+                            </div>
+                        {% endif %}
                     </div>
                 </article>
             {% endfor %}
@@ -210,16 +215,16 @@
                                     <span class="meta-data-value">{{ cluster.status }}</span>
                                 </div>
                             {% endif %}
+                            {% if cluster.court %}
+                                <div class="inline-block">
+                                    <span class="meta-data-header">Court:</span>
+                                    <span class="meta-data-value">{{ cluster.court }}</span>
+                                </div>
+                            {% endif %}
                             {% if cluster.citation %}
                                 <div class="inline-block">
                                     <span class="meta-data-header">Citations: </span>
-                                    <span class="meta-data-value">{{ cluster.citation.0 }}</span>
-                                </div>
-                            {% endif %}
-                            {% if cluster.docketNumber %}
-                                <div class="inline-block">
-                                    <span class="meta-data-header">Docket Number:</span>
-                                    <span class="meta-data-value select-all">{{ cluster.docketNumber }}</span>
+                                    <span class="meta-data-value">{{ cluster.citation|join:", " }}</span>
                                 </div>
                             {% endif %}
                         </div>
