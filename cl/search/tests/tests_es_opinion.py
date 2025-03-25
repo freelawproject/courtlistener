@@ -506,7 +506,8 @@ class OpinionV3APISearchTest(
                 type=cd["type"],
             )
             for result in hits:
-                ids_in_results.add(result.id)
+                if result:
+                    ids_in_results.add(result.id)
         self.assertEqual(
             len(ids_in_results),
             total_opinions,
