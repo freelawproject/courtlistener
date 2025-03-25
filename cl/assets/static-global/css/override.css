@@ -658,7 +658,9 @@ mark {
 }
 
 .select-all {
-  user-select: all;
+    -webkit-user-select: all;
+    user-select: all;
+    cursor: text;
 }
 
 /* layout */
@@ -766,11 +768,6 @@ div.shown ul {
   /* Use > b/c we don't want rule applying to drop downs */
   list-style-type: none;
   padding: 3px 0 5px 0;
-}
-
-#summaries ul {
-  padding-inline-start: 15px;
-  border-bottom: 1pt solid #DDD;
 }
 
 #summaries li {
@@ -1846,4 +1843,12 @@ rect.series-segment {
 
 .learn-more-prayer-btn {
   margin-right: auto;
+}
+
+.row-gap-3 {
+  row-gap: 1rem;
+}
+
+#doc-no-available-warning a.btn {
+  height: 28px;
 }

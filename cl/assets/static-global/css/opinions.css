@@ -633,7 +633,11 @@ div.footnote:first-of-type {
   }
 
   .meta-data-header {
-      font-size:15px;
+      font-size:14px;
+  }
+
+  .meta-data-value {
+      font-size:14px;
   }
 
   .case-details {
@@ -686,4 +690,8 @@ div.footnote:first-of-type {
 
 html {
     scroll-behavior: smooth;
+}
+
+#all-summaries {
+    margin-top: 20px;
 }
