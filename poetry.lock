@@ -1572,22 +1572,25 @@ vectorstore-mmr = ["numpy (>=1)", "simsimd (>=3)"]
 
 [[package]]
 name = "elasticsearch-dsl"
-version = "8.11.0"
+version = "8.17.1"
 description = "Python client for Elasticsearch"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "elasticsearch-dsl-8.11.0.tar.gz", hash = "sha256:44af4fd7f62009bb19193b55e1c2143b6932517e4c0ec30107e7ff4d968a127e"},
-    {file = "elasticsearch_dsl-8.11.0-py3-none-any.whl", hash = "sha256:61000f8ff5e9633d3381aea5a6dfba5c9c4505fe2e6c5cba6a17cd7debc890d9"},
+    {file = "elasticsearch_dsl-8.17.1-py3-none-any.whl", hash = "sha256:49ee12a6a8d43fcfc0af42b49649531a6ef228c9e4795325de27f6b309b62b6d"},
+    {file = "elasticsearch_dsl-8.17.1.tar.gz", hash = "sha256:d8170699bfdb4fe7fab3854cdac319a2d6dddbaa29c9ea7993d2ec22056db5a0"},
 ]
 
 [package.dependencies]
+elastic-transport = ">=8.0.0,<9.0.0"
 elasticsearch = ">=8.0.0,<9.0.0"
 python-dateutil = "*"
+typing-extensions = "*"
 
 [package.extras]
-develop = ["coverage", "pytest", "pytest-cov", "pytest-mock", "pytz", "sphinx (>2)", "sphinx-rtd-theme (>0.5)"]
+async = ["elasticsearch[async] (>=8.0.0,<9.0.0)"]
+develop = ["coverage", "elasticsearch[async]", "jinja2", "mypy", "nltk", "pyright", "pytest", "pytest-asyncio", "pytest-cov", "pytest-mock", "pytz", "sentence-transformers", "sphinx (>2)", "sphinx-rtd-theme (>0.5)", "tqdm", "types-python-dateutil", "types-pytz", "types-tqdm", "unasync"]
 
 [[package]]
 name = "executing"
