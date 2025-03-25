@@ -4,7 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer components {
+@layer utilities {
   .display-xs-semibold {
     @apply font-sans text-[24px] font-[600] leading-[32px];
   }
