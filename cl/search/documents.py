@@ -1958,7 +1958,6 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
                 dims=768,
                 index=True,
                 similarity="dot_product",
-                index_options={"type": "int8_hnsw"},
             ),
         }
     )
