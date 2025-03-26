@@ -3410,7 +3410,7 @@ def do_es_sweep_alert_query(
         and docket_results.hits.total.value
         >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
-    if should_repeat_parent_query:
+    if should_repeat_parent_query and parent_query:
         docket_ids = [int(d.docket_id) for d in main_results]
         # Adds extra filter to refine results.
         parent_query.filter.append(Q("terms", docket_id=docket_ids))
@@ -3431,7 +3431,7 @@ def do_es_sweep_alert_query(
         and rd_results.hits.total.value
         >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
-    if should_repeat_child_query:
+    if should_repeat_child_query and child_query:
         rd_ids = [
             int(rd["_source"]["id"])
             for docket in main_results
