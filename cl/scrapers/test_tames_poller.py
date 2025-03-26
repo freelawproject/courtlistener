@@ -6,11 +6,15 @@ from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
 
+import httpx
 import responses
 import time_machine
 from django.conf import settings
 
 from cl.corpus_importer.tasks import TAMES_PENDING_SUBSCRIPTIONS_KEY
+from cl.scrapers.management.commands.back_scrape_dockets import (
+    RateLimitedRequestManager,
+)
 from cl.scrapers.management.commands.tames_poller import (
     CASEMAIL_CASE_ADD_URL,
     CASEMAIL_LOGIN_URL,
@@ -72,7 +76,7 @@ def make_search_rows(n: int, start: int = 1, **kwargs) -> list[dict[str, str]]:
 def make_scraper_mock(cases: list[dict[str, str]]) -> MagicMock:
     """Create a mock TAMESScraper whose backfill yields the given cases."""
     scraper = MagicMock()
-    scraper.backfill.return_value = iter(cases)
+    scraper.backfill.return_value.__aiter__.return_value = cases
     scraper.COURT_IDS = ["texas_cossup"]
     scraper.FIRST_RECORD_DATE = date(1900, 1, 1)
     return scraper
@@ -88,7 +92,7 @@ def setup_rm(MockRM: MagicMock, case_html: str = "<html></html>") -> None:
     mock_rm2 = MagicMock()  # case RM
     mock_response = MagicMock()
     mock_response.text = case_html
-    mock_rm2.__enter__.return_value.get.return_value = mock_response
+    mock_rm2.__aenter__.return_value.get.return_value = mock_response
     MockRM.side_effect = [mock_rm1, mock_rm2]
 
 
@@ -108,7 +112,7 @@ def get_options(**overrides: object) -> dict:
 
 
 @time_machine.travel(FROZEN_DATE)
-class TamesPollerTest(TestCase):
+class TamesPollerTest(SimpleTestCase):
     """Integration tests for the TAMES poller _poll_cycle method."""
 
     def setUp(self) -> None:
@@ -280,6 +284,75 @@ class TamesPollerTest(TestCase):
             5,
             "Should dispatch only the 5 new cases before hitting a cached URL",
         )
+
+
+class RateLimitedRequestManagerTest(SimpleTestCase):
+    """Exercise async HTTP retries, callbacks, and session cleanup."""
+
+    async def test_retry_transient_failures(self) -> None:
+        """Retry forbidden responses and timeouts before returning success."""
+        for failure in ("forbidden", "timeout"):
+            with self.subTest(failure=failure):
+                attempts = []
+
+                def respond(request: httpx.Request) -> httpx.Response:
+                    """Fail the first request and succeed on the retry."""
+                    attempts.append(request)
+                    if len(attempts) == 1:
+                        if failure == "timeout":
+                            raise httpx.ReadTimeout(
+                                "Timed out", request=request
+                            )
+                        return httpx.Response(403)
+                    return httpx.Response(200, text="docket")
+
+                session = httpx.AsyncClient(
+                    transport=httpx.MockTransport(respond)
+                )
+                callback = MagicMock()
+                with mock.patch(
+                    "cl.scrapers.management.commands.back_scrape_dockets.asyncio.sleep"
+                ) as sleep:
+                    async with RateLimitedRequestManager(
+                        requests_per_second=0,
+                        session=session,
+                        all_response_fn=callback,
+                    ) as manager:
+                        response = await manager.post(
+                            "https://search.txcourts.gov/", data={"page": "1"}
+                        )
+
+                self.assertEqual(response.text, "docket")
+                self.assertEqual(len(attempts), 2)
+                self.assertEqual(attempts[-1].method, "POST")
+                sleep.assert_awaited_once_with(1)
+                callback.assert_called_once_with(manager, response)
+                self.assertTrue(session.is_closed)
+
+    async def test_retry_budget_exhaustion(self) -> None:
+        """Stop retrying after the configured backoff budget is exhausted."""
+        attempts = []
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            """Keep returning a retryable error."""
+            attempts.append(request)
+            return httpx.Response(403)
+
+        session = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        with mock.patch(
+            "cl.scrapers.management.commands.back_scrape_dockets.asyncio.sleep"
+        ) as sleep:
+            with self.assertRaises(httpx.HTTPStatusError):
+                async with RateLimitedRequestManager(
+                    requests_per_second=0,
+                    max_backoff_seconds=1,
+                    session=session,
+                ) as manager:
+                    await manager.get("https://search.txcourts.gov/")
+
+        self.assertEqual(len(attempts), 2)
+        sleep.assert_awaited_once_with(1)
+        self.assertTrue(session.is_closed)
 
 
 class SubscribePendingCasesTest(TestCase):

@@ -4,11 +4,15 @@ This command runs state-level docket scrapers that enumerate dockets across
 multiple courts within a state, with rate limiting and retry support.
 """
 
+import asyncio
 import json
 import time
 from datetime import date, datetime
+from types import TracebackType
+from typing import Any, Self
 
-import requests
+import httpx
+from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from juriscraper.lib.importer import build_module_list
@@ -42,7 +46,7 @@ class RateLimitedRequestManager(ScraperRequestManager):
     - Session management with Chrome headers
 
     Attributes:
-        session: The requests Session used for HTTP requests
+        session: The HTTPX AsyncClient used for HTTP requests
         requests_per_second: Maximum request rate
         max_backoff_seconds: Maximum time to wait during exponential backoff
         all_response_fn: Optional callback invoked after every HTTP response
@@ -52,7 +56,7 @@ class RateLimitedRequestManager(ScraperRequestManager):
         self,
         requests_per_second: float = 1.0,
         max_backoff_seconds: int = 300,
-        session: requests.Session | None = None,
+        session: httpx.AsyncClient | None = None,
         all_response_fn: ResponseCallback | None = None,
     ) -> None:
         """Initialize the rate-limited request manager.
@@ -60,16 +64,15 @@ class RateLimitedRequestManager(ScraperRequestManager):
         Args:
             requests_per_second: Maximum requests per second (default 1.0)
             max_backoff_seconds: Maximum backoff time for 403 retries (default 300)
-            session: Optional requests Session. If not provided, a new session
+            session: Optional HTTPX AsyncClient. If not provided, a new session
                 will be created with default Juriscraper headers.
             all_response_fn: Optional callback function invoked after every
                 HTTP response. Receives the request manager and response.
         """
         if session is not None:
-            # pyrefly:ignore[bad-override-mutable-attribute]
-            self.session: requests.Session | None = session
+            self.session = session
         else:
-            self.session = requests.Session()
+            self.session = httpx.AsyncClient(follow_redirects=True, http2=True)
             # Match more closely a chrome browser
             self.session.headers.update(
                 {
@@ -99,38 +102,39 @@ class RateLimitedRequestManager(ScraperRequestManager):
             1.0 / requests_per_second if requests_per_second > 0 else 0
         )
 
-    def __enter__(self) -> "RateLimitedRequestManager":
+    async def __aenter__(self) -> Self:
+        """Use the manager within an async context to close its session."""
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Close the session when leaving the async context."""
         # Leave the logging to Sentry
-        self.close()
+        await self.close()
 
-    def __del__(self) -> None:
-        """Close the session when the manager is garbage collected."""
-        self.close()
-
-    def close(self) -> None:
+    async def close(self) -> None:
         """Close the HTTP session."""
-        if self.session:
-            self.session.close()
-            self.session = None
+        await self.session.aclose()
 
-    def _wait_for_rate_limit(self) -> None:
+    async def _wait_for_rate_limit(self) -> None:
         """Wait if necessary to respect rate limiting."""
         if self._last_request_time is None:
             return
 
         elapsed = time.monotonic() - self._last_request_time
         if elapsed < self._min_interval:
-            time.sleep(self._min_interval - elapsed)
+            await asyncio.sleep(self._min_interval - elapsed)
 
-    def _request_with_retry(
+    async def _request_with_retry(
         self,
         method: str,
         url: str,
-        **kwargs,
-    ) -> requests.Response:
+        **kwargs: Any,
+    ) -> httpx.Response:
         """Make a request with exponential backoff retry on 403 or timeout.
 
         Args:
@@ -139,28 +143,28 @@ class RateLimitedRequestManager(ScraperRequestManager):
             **kwargs: Additional arguments passed to session.request()
 
         Returns:
-            The requests Response object
+            The HTTPX Response object
 
         Raises:
-            requests.HTTPError: If max backoff time exceeded on 403
-            requests.Timeout: If max backoff time exceeded on read/connect timeout
+            httpx.HTTPStatusError: If max backoff time exceeded on 403
+            httpx.TimeoutException: If max backoff time exceeded on timeout
         """
         kwargs.setdefault("timeout", 60)
         backoff = 1
         total_wait = 0
 
         while True:
-            self._wait_for_rate_limit()
+            await self._wait_for_rate_limit()
             self._last_request_time = time.monotonic()
 
-            if not self.session:
+            if self.session.is_closed:
                 raise ValueError(
                     "RequestManager has no session, likely invoked after closed."
                 )
 
             try:
-                response = self.session.request(method, url, **kwargs)
-            except requests.Timeout as e:
+                response = await self.session.request(method, url, **kwargs)
+            except httpx.TimeoutException as e:
                 if total_wait >= self.max_backoff_seconds:
                     logger.error(
                         "Max backoff time (%d seconds) exceeded on timeout for URL: %s",
@@ -201,18 +205,18 @@ class RateLimitedRequestManager(ScraperRequestManager):
                     response.text[:500],
                 )
 
-            time.sleep(backoff)
+            await asyncio.sleep(backoff)
             total_wait += backoff
             backoff = min(backoff * 2, self.max_backoff_seconds - total_wait)
             if backoff <= 0:
                 backoff = 1
 
-    def request(
+    async def request(
         self,
         method: str,
         url: str,
-        **kwargs,
-    ) -> requests.Response:
+        **kwargs: Any,
+    ) -> httpx.Response:
         """Make an HTTP request with rate limiting and 403 retry.
 
         Args:
@@ -221,9 +225,9 @@ class RateLimitedRequestManager(ScraperRequestManager):
             **kwargs: Additional arguments passed to session.request()
 
         Returns:
-            The requests Response object
+            The HTTPX Response object
         """
-        response = self._request_with_retry(method, url, **kwargs)
+        response = await self._request_with_retry(method, url, **kwargs)
 
         if self.all_response_fn:
             self.all_response_fn(self, response)
@@ -232,23 +236,23 @@ class RateLimitedRequestManager(ScraperRequestManager):
 
     def merge_headers(self, headers: dict[str, str]) -> None:
         """Merge additional headers into the session headers."""
-        if not self.session:
+        if self.session.is_closed:
             raise ValueError(
                 "RequestManager has no session, likely invoked after closed."
             )
         self.session.headers.update(headers)
 
-    def get(self, url: str, **kwargs) -> requests.Response:
+    async def get(self, url: str, **kwargs: Any) -> httpx.Response:
         """Make a GET request. See request() for details."""
-        return self.request("GET", url, **kwargs)
+        return await self.request("GET", url, **kwargs)
 
-    def post(self, url: str, **kwargs) -> requests.Response:
+    async def post(self, url: str, **kwargs: Any) -> httpx.Response:
         """Make a POST request. See request() for details."""
-        return self.request("POST", url, **kwargs)
+        return await self.request("POST", url, **kwargs)
 
 
 def save_docket_response(
-    response: requests.Response,
+    response: httpx.Response,
     scraper_class_name: str,
     case_meta: dict,
     court_id: str = "unknown_court",
@@ -357,7 +361,7 @@ def save_batch_meta(
     return path
 
 
-def _process_batch(
+async def _process_batch(
     batch: list[dict],
     scraper_class_name: str,
     case_request_manager: RateLimitedRequestManager,
@@ -377,8 +381,8 @@ def _process_batch(
 
         court_id = case.get("court_code") or "unknown_court"
         try:
-            case_response = case_request_manager.get(case_url)
-            save_docket_response(
+            case_response = await case_request_manager.get(case_url)
+            await sync_to_async(save_docket_response)(
                 case_response,
                 scraper_class_name,
                 case,
@@ -386,7 +390,7 @@ def _process_batch(
                 skip_meta=False,
             )
             fetched += 1
-        except requests.RequestException as e:
+        except httpx.HTTPError as e:
             logger.error("Failed to fetch case URL %s: %s", case_url, e)
     return fetched
 
@@ -460,11 +464,13 @@ class Command(StateBackScrapeCommand):
             help="Number of cases to collect before writing a batch meta JSONL file and fetching case pages (default: 100)",
         )
 
-    def handle(
+    @async_to_sync
+    async def handle(
         self,
-        *args,
-        **options,
-    ):
+        *args: Any,
+        **options: Any,
+    ) -> None:
+        """Run the backfill and HTTP sessions on a single event loop."""
         scraper_module_path = options["scraper"]
 
         # Validate date range is provided
@@ -540,8 +546,8 @@ class Command(StateBackScrapeCommand):
             # We are manually processing the saves here since we can do it with a bit more info
         }
 
-        sleep_minutes = options.get("sleep")
-        with (
+        sleep_minutes = options["sleep"]
+        async with (
             RateLimitedRequestManager(
                 **search_rm_args
             ) as search_request_manager,
@@ -557,7 +563,7 @@ class Command(StateBackScrapeCommand):
             courts = (
                 [c.strip() for c in options["courts"].split(",")]
                 if options["courts"]
-                else None
+                else scraper.COURT_IDS
             )
 
             logger.info(
@@ -571,7 +577,7 @@ class Command(StateBackScrapeCommand):
             case_count = 0
             current_batch: list[dict] = []
 
-            for case in scraper.backfill(courts, (start_date, end_date)):
+            async for case in scraper.backfill(courts, (start_date, end_date)):
                 if not case.get("case_url"):
                     logger.warning("Case without case_url: %s", case)
                     continue
@@ -580,20 +586,20 @@ class Command(StateBackScrapeCommand):
                 if len(current_batch) < batch_size:
                     continue
 
-                case_count += _process_batch(
+                case_count += await _process_batch(
                     current_batch,
                     scraper_class_name,
                     case_request_manager,
                 )
-                _checkpoint_and_sleep(
-                    case_count, case, auto_resume, sleep_minutes
+                await sync_to_async(_checkpoint_and_sleep)(
+                    case_count, dict(case), auto_resume, sleep_minutes
                 )
 
                 current_batch = []
 
             # Final partial batch
             if current_batch:
-                case_count += _process_batch(
+                case_count += await _process_batch(
                     current_batch,
                     scraper_class_name,
                     case_request_manager,

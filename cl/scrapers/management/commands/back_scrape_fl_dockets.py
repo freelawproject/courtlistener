@@ -10,7 +10,7 @@ from typing import ClassVar
 from uuid import UUID
 
 import botocore.exceptions
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from django.core.management import CommandParser
 from httpx import Response
 from juriscraper.state.florida import FloridaCase, FloridaScraper
@@ -146,7 +146,7 @@ class S3Cache(RequestHandler):
             )
             return
 
-        self.save_to_s3(request, response)
+        await sync_to_async(self.save_to_s3)(request, response)
 
     def __hash__(self) -> int:
         return hash(id(self))
@@ -191,30 +191,35 @@ async def _backfill_targeted(
     throttle: CeleryThrottle,
     queue_name: str,
     scraper: FloridaScraper,
-):
+) -> None:
+    """Backfill selected cases, taking ownership of the scraper's lifetime."""
     logger.info("Starting targeted backfill of %d cases...", len(cases))
-    for i, (court_id, case_uuid) in enumerate(cases):
-        logger.info("Fetching case %s for %s", case_uuid, court_id)
-        case = await _get_full_case(court_id.value, str(case_uuid), scraper)
-        if case is None:
-            continue
-
-        content = case.model_dump_json(ensure_ascii=True).encode("utf-8")
-
-        key = _make_case_key(court_id, case.docket_number)
-
-        throttle.maybe_wait()
-        save_response_to_s3.si(key, content).set(
-            queue=queue_name
-        ).apply_async()
-
-        if i % 10 == 0:
-            logger.info(
-                "Completed scrape of %d/%d cases (%.2f%%)",
-                i + 1,
-                len(cases),
-                (i + 1) / len(cases) * 100,
+    async with scraper:
+        for i, (court_id, case_uuid) in enumerate(cases):
+            logger.info("Fetching case %s for %s", case_uuid, court_id)
+            case = await _get_full_case(
+                court_id.value, str(case_uuid), scraper
             )
+            if case is None:
+                continue
+
+            content = case.model_dump_json(ensure_ascii=True).encode("utf-8")
+
+            key = _make_case_key(court_id, case.docket_number)
+
+            await sync_to_async(throttle.maybe_wait)()
+            save_task = save_response_to_s3.si(key, content).set(
+                queue=queue_name
+            )
+            await sync_to_async(save_task.apply_async)()
+
+            if i % 10 == 0:
+                logger.info(
+                    "Completed scrape of %d/%d cases (%.2f%%)",
+                    i + 1,
+                    len(cases),
+                    (i + 1) / len(cases) * 100,
+                )
 
 
 async def _backfill(
@@ -226,46 +231,54 @@ async def _backfill(
     queue_name: str,
     skip_parsed: bool,
     cache: S3Cache,
-):
+) -> None:
+    """Backfill date ranges, taking ownership of the scraper's lifetime."""
     logger.info("Starting Florida backfill...")
     full_scrape_loop = full_scrape and not skip_parsed
     try:
-        for court_id, (start_date, end_date) in date_ranges.items():
-            i = 0
-            async for case in scraper.backfill(
-                start_date,
-                end_date,
-                court_ids=[court_id],
-                full_scrape=full_scrape_loop,
-            ):
-                key = _make_case_key(court_id, case.docket_number)
-                if skip_parsed and cache.s3_key_exists(key):
-                    continue
-                if full_scrape and skip_parsed:
-                    full_case = await _get_full_case(
-                        court_id.value, str(case.case_uuid), scraper
-                    )
-                    if not full_case:
+        async with scraper:
+            for court_id, (start_date, end_date) in date_ranges.items():
+                i = 0
+                async for case in scraper.backfill(
+                    start_date,
+                    end_date,
+                    court_ids=[court_id],
+                    full_scrape=full_scrape_loop,
+                ):
+                    key = _make_case_key(court_id, case.docket_number)
+                    if skip_parsed and await sync_to_async(
+                        cache.s3_key_exists, thread_sensitive=False
+                    )(key):
                         continue
-                    case = full_case
+                    if full_scrape and skip_parsed:
+                        full_case = await _get_full_case(
+                            court_id.value, str(case.case_uuid), scraper
+                        )
+                        if not full_case:
+                            continue
+                        case = full_case
 
-                content = case.model_dump_json(ensure_ascii=True).encode(
-                    "utf-8"
-                )
-
-                throttle.maybe_wait()
-                save_response_to_s3.si(key, content).set(
-                    queue=queue_name
-                ).apply_async()
-
-                i += 1
-                if i % 100 == 0:
-                    logger.info(
-                        "Updating checkpoint for %s to %s",
-                        court_id,
-                        case.date_filed,
+                    content = case.model_dump_json(ensure_ascii=True).encode(
+                        "utf-8"
                     )
-                    checkpoint_trackers[court_id].set(case.date_filed)
+
+                    await sync_to_async(throttle.maybe_wait)()
+                    save_task = save_response_to_s3.si(key, content).set(
+                        queue=queue_name
+                    )
+                    await sync_to_async(save_task.apply_async)()
+
+                    i += 1
+                    if i % 100 == 0:
+                        logger.info(
+                            "Updating checkpoint for %s to %s",
+                            court_id,
+                            case.date_filed,
+                        )
+                        await sync_to_async(
+                            checkpoint_trackers[court_id].set,
+                            thread_sensitive=False,
+                        )(case.date_filed)
     except Exception:
         logger.exception("Florida backfill failed.")
     else:

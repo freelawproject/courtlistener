@@ -1,7 +1,7 @@
 from datetime import date
 from unittest.mock import MagicMock
 
-from requests.exceptions import HTTPError, Timeout
+from httpx import HTTPStatusError, Request, Response, TimeoutException
 
 from cl.corpus_importer.factories import (
     CaseQueryDataFactory,
@@ -19,7 +19,7 @@ class FakeDocketReport:
     def __init__(self, *args, **kwargs):
         pass
 
-    def query(self, *args, **kwargs):
+    async def query(self, *args, **kwargs):
         pass
 
     @property
@@ -121,7 +121,7 @@ class FakePossibleCaseNumberApi:
     def __init__(self, *args, **kwargs):
         pass
 
-    def query(self, *args, **kwargs):
+    async def query(self, *args, **kwargs):
         pass
 
     def data(self, *args, **kwargs):
@@ -140,7 +140,7 @@ class FakeAttachmentPage:
     def __init__(self, *args, **kwargs):
         pass
 
-    def query(self, *args, **kwargs):
+    async def query(self, *args, **kwargs):
         pass
 
     @property
@@ -159,7 +159,7 @@ class FakeAppellateAttachmentPage:
     def __init__(self, *args, **kwargs):
         pass
 
-    def query(self, *args, **kwargs):
+    async def query(self, *args, **kwargs):
         pass
 
     @property
@@ -223,10 +223,10 @@ class FakeFreeOpinionReport:
     def __init__(self, *args, **kwargs):
         pass
 
-    def download_pdf(self, *args, **kwargs) -> tuple[MagicMock, str]:
-        return MagicMock(content=b""), ""
+    async def download_pdf(self, *args, **kwargs) -> tuple[Response, str]:
+        return Response(200, content=b"Hello World"), ""
 
-    def query(self, *args, **kwargs):
+    async def query(self, *args, **kwargs):
         pass
 
     @property
@@ -242,7 +242,7 @@ class FakeConfirmationPage:
     def __init__(self, *args, **kwargs):
         pass
 
-    def query(self, *args, **kwargs):
+    async def query(self, *args, **kwargs):
         pass
 
     @property
@@ -325,8 +325,8 @@ test_patterns = {
         13: False,
         16: False,
     },
-    "gamb": HTTPError,
-    "hib": Timeout,
+    "gamb": HTTPStatusError,
+    "hib": TimeoutException,
     "cacd": {
         1: False,
         2: False,
@@ -370,18 +370,28 @@ class FakeCaseQueryReport:
         self.pacer_case_id = None
         self.court_id = court_id
 
-    def query(self, pacer_case_id):
+    async def query(self, pacer_case_id):
         self.pacer_case_id = pacer_case_id
 
     @property
     def data(self):
         test_pattern = test_patterns.get(self.court_id, {})
-        if not isinstance(test_pattern, dict) and issubclass(
-            test_pattern, Exception
-        ):
-            raise test_pattern()
+        if test_pattern is HTTPStatusError:
+            request = Request(
+                "GET",
+                f"https://ecf.{self.court_id}.uscourts.gov/cgi-bin/iquery.pl",
+            )
+            raise HTTPStatusError(
+                "Test Pattern Exception",
+                request=request,
+                response=Response(403, request=request),
+            )
+        if test_pattern is TimeoutException:
+            raise TimeoutException("Test Pattern Exception")
 
-        if test_pattern and test_pattern.get(self.pacer_case_id):
+        if isinstance(test_pattern, dict) and test_pattern.get(
+            self.pacer_case_id
+        ):
             return CaseQueryDataFactory()
         return None
 

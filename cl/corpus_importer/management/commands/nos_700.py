@@ -1,5 +1,6 @@
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 from django.conf import settings
 
@@ -12,7 +13,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import SessionData, log_into_pacer
 from cl.recap.constants import (
     AIRPLANE_PERSONAL_INJURY,
     AIRPLANE_PRODUCT_LIABILITY,
@@ -228,10 +229,9 @@ def get_dockets(options, items, tags, sample_size=0):
 
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
     for i, row in enumerate(items):
         if i < options["offset"]:
             continue
@@ -241,10 +241,9 @@ def get_dockets(options, items, tags, sample_size=0):
         if i % 5000 == 0:
             # Re-authenticate just in case the auto-login mechanism isn't
             # working.
-            session = ProxyPacerSession(
+            session = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            session.login()
 
         # All tests pass. Get the docket.
         logger.info("Doing row %s: %s", i, row)
@@ -278,10 +277,9 @@ def get_attachment_pages(options, tag):
     rd_pks = RECAPDocument.objects.filter(
         tags__name=tag, docket_entry__description__icontains="attachment"
     ).values_list("pk", flat=True)
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
     get_district_attachment_pages(
         options=options, rd_pks=rd_pks, tag_names=[tag], session=session
     )

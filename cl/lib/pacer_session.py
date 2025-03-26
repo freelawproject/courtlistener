@@ -2,12 +2,13 @@ import pickle
 import random
 from dataclasses import dataclass
 from http.cookiejar import Cookie
-from urllib.parse import urlparse
+from typing import Any
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
+from httpx import URL, Cookies, Request, Response
 from juriscraper.pacer import PacerSession
 from redis import Redis
-from requests.cookies import RequestsCookieJar
 
 from cl.lib.redis_utils import get_redis_interface
 
@@ -25,59 +26,55 @@ class SessionData:
     Handles default values for the `proxy` attribute when not explicitly
     provided, indicating session data was not generated using the
     `ProxyPacerSession` class.
-
-    Cookies are always stored as a plain `RequestsCookieJar`, even when a
-    subclass such as `InsecureCookieJar` is passed in. Reassigning `cookies`
-    after construction bypasses this conversion.
     """
 
-    cookies: RequestsCookieJar
+    cookies: Cookies | None
     proxy_address: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Normalize cached cookies and supply a default proxy."""
         if not self.proxy_address:
             self.proxy_address = settings.EGRESS_PROXY_HOSTS[0]
-        # SessionData is pickled into the Redis cookie cache and into Celery
-        # task arguments. Store only requests' own jar class so pods running
-        # code without InsecureCookieJar (mid-rollout or after a rollback) can
-        # still unpickle it. ProxyPacerSession re-wraps it in InsecureCookieJar.
-        if (
-            self.cookies is not None
-            and type(self.cookies) is not RequestsCookieJar
-        ):
-            plain = RequestsCookieJar()
-            plain.update(self.cookies)
-            self.cookies = plain
+        if self.cookies is not None:
+            if not isinstance(self.cookies, Cookies):
+                self.cookies = Cookies(self.cookies)
+            allow_insecure_cookie_transport(self.cookies)
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Serialize cookies without HTTPX's unpicklable cookie-jar lock."""
+        state = self.__dict__.copy()
+        if self.cookies is not None:
+            state["cookies"] = list(self.cookies.jar)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore cookies, including older caches containing cookie jars."""
+        if isinstance(state["cookies"], list):
+            cookies = Cookies()
+            for cookie in state["cookies"]:
+                cookies.jar.set_cookie(cookie)
+            state["cookies"] = cookies
+        self.__dict__.update(state)
+        self.__post_init__()
 
 
-class InsecureCookieJar(RequestsCookieJar):
-    """Cookie jar that stores every cookie as non-secure.
-
-    ProxyPacerSession sends requests over http:// to the egress proxy, which
-    then opens the TLS connection to PACER. requests never sends Secure cookies
-    over http, so cookies that PACER sets or refreshes with the Secure flag
-    would otherwise be dropped from later requests, logging the session out.
-    """
-
-    def set_cookie(self, cookie: Cookie, *args, **kwargs) -> None:
-        """Store the cookie with its Secure flag cleared."""
+def allow_insecure_cookie_transport(cookies: Cookies) -> None:
+    """Clear Secure flags so proxy-rewritten PACER requests send cookies."""
+    for cookie in cookies.jar:
+        if not isinstance(cookie, Cookie):
+            raise TypeError(f"expected Cookie, got {type(cookie).__name__}")
         cookie.secure = False
-        super().set_cookie(cookie, *args, **kwargs)
 
 
 class ProxyPacerSession(PacerSession):
     """
-    This class overrides the _prepare_login_request and post methods of the
-    PacerSession class to achieve the following:
+    Route PACER requests, including redirects, through Webhook Sentry.
 
     - Sets the 'X-WhSentry-TLS' header to 'true' for all requests.
     - Replaces 'https://' with 'http://' in the URL before making the request.
     - Uses a proxy server for all requests.
 
-    If the post method is called with a 'headers' argument, it merges the
-    provided headers with the 'X-WhSentry-TLS' header set to 'true'. If no headers
-    argument is provided, it adds a new dictionary with the 'X-WhSentry-TLS' header
-    set to 'true' as the 'headers' argument.
+    Secure cookie flags are cleared because TLS is initiated by the proxy.
     """
 
     def __init__(
@@ -90,39 +87,26 @@ class ProxyPacerSession(PacerSession):
         *args,
         **kwargs,
     ):
-        super().__init__(
-            cookies, username, password, client_code, *args, **kwargs
-        )
         self.proxy_address = proxy if proxy else self._pick_proxy_connection()
-        self.proxies = {
-            "http": self.proxy_address,
-        }
-        self.headers["X-WhSentry-TLS"] = "true"
+        super().__init__(
+            cookies,
+            username,
+            password,
+            client_code,
+            *args,
+            proxy=self.proxy_address,
+            **kwargs,
+        )
+        allow_insecure_cookie_transport(self.cookies)
 
-    @property
-    def cookies(self) -> InsecureCookieJar:
-        """The session's cookie jar, always an InsecureCookieJar."""
-        return self._cookies
-
-    @cookies.setter
-    def cookies(self, jar: RequestsCookieJar) -> None:
-        """Store `jar` as an InsecureCookieJar, copying it if needed.
-
-        requests, juriscraper's PacerSession.__init__ and PacerSession.login()
-        all replace the jar wholesale with a plain RequestsCookieJar. Wrapping
-        on every assignment keeps cookies that PACER later refreshes with the
-        Secure flag sendable over the proxy.
-        """
-        if not isinstance(jar, InsecureCookieJar):
-            insecure = InsecureCookieJar()
-            insecure.update(jar)
-            jar = insecure
-        self._cookies = jar
-
-    def send(self, request, **kwargs):
-        """Send a given PreparedRequest."""
+    async def _send_single_request(self, request: Request) -> Response:
+        """Apply proxy transport rules to each request in a redirect chain."""
         request.url = self._change_protocol(request.url)
-        return super().send(request, **kwargs)
+        request.headers["X-WhSentry-TLS"] = "true"
+        response = await super()._send_single_request(request)
+        # HTTPX has extracted cookies here, but has not built a redirect yet.
+        allow_insecure_cookie_transport(self.cookies)
+        return response
 
     def _pick_proxy_connection(self) -> str:
         """
@@ -136,7 +120,7 @@ class ProxyPacerSession(PacerSession):
         """
         return random.choice(settings.EGRESS_PROXY_HOSTS)
 
-    def _change_protocol(self, url: str) -> str:
+    def _change_protocol(self, url: URL | str) -> URL:
         """Converts a URL from HTTPS to HTTP protocol.
 
         By default, HTTP clients create a CONNECT tunnel when a proxy is
@@ -151,52 +135,15 @@ class ProxyPacerSession(PacerSession):
         https://github.com/juggernaut/webhook-sentry?tab=readme-ov-file#https-target
 
         Args:
-            url (str): The URL to modify.
+            url (URL): The URL to modify.
 
         Returns:
-            str: The URL with the protocol changed from HTTPS to HTTP.
+            URL: The URL with the protocol changed from HTTPS to HTTP.
         """
-        new_url = urlparse(url)
-        return new_url._replace(scheme="http").geturl()
-
-    def _prepare_login_request(self, url, *args, **kwargs):
-        return super(PacerSession, self).post(
-            self._change_protocol(url), **kwargs
-        )
-
-    def post(self, url, *args, **kwargs):
-        return super().post(self._change_protocol(url), **kwargs)
-
-    def get(self, url, *args, **kwargs):
-        return super().get(self._change_protocol(url), **kwargs)
-
-    def _get_saml_auth_request_parameters(
-        self, court_id: str
-    ) -> dict[str, str]:
-        """
-        Override base method to tweak cookies for proxy compatibility.
-
-        Ensures that all cookies obtained during the initial SAML authentication
-        workflow can be reused in subsequent requests through a proxy connection
-        by setting their 'secure' attribute to False.
-        """
-        saml_credentials = super()._get_saml_auth_request_parameters(court_id)
-        # Update cookies so they can be sent over non-HTTPS connections
-        for cookie in self.cookies:
-            # `RequestsCookieJar` claims to be a `MutableMapping[str, str | None]`,
-            # but `__iter__` ignores override mismatch and returns an
-            # `Iterator[Cookie]`. Here we verify this behavior, clarifying things
-            # for static type checking and making sure that a future failure is
-            # more easily recognized.
-            if not isinstance(cookie, Cookie):
-                raise TypeError(
-                    f"expected Cookie, got {type(cookie).__name__}"
-                )
-            cookie.secure = False
-        return saml_credentials
+        return URL(url, scheme="http")
 
 
-def log_into_pacer(
+async def log_into_pacer(
     username: str,
     password: str,
     client_code: str | None = None,
@@ -209,16 +156,16 @@ def log_into_pacer(
     :param client_code: A PACER client_code
     :return: A SessionData object containing the session's cookies and proxy.
     """
-    s = ProxyPacerSession(
+    async with ProxyPacerSession(
         username=username,
         password=password,
         client_code=client_code,
-    )
-    s.login()
-    return SessionData(s.cookies, s.proxy_address)
+    ) as s:
+        await s.login()
+        return SessionData(s.cookies, s.proxy_address)
 
 
-def get_or_cache_pacer_cookies(
+async def get_or_cache_pacer_cookies(
     user_pk: str | int,
     username: str,
     password: str,
@@ -244,17 +191,17 @@ def get_or_cache_pacer_cookies(
     :return: A SessionData object containing the session's cookies and proxy.
     """
     r = get_redis_interface("CACHE", decode_responses=False)
-    cookies_data = get_pacer_cookie_from_cache(user_pk, r=r)
-    ttl_seconds = r.ttl(session_key % user_pk)
+    cookies_data = await get_pacer_cookie_from_cache(user_pk, r=r)
+    ttl_seconds = await sync_to_async(r.ttl)(session_key % user_pk)
     if cookies_data and ttl_seconds >= 300 and not refresh:
         # cookies were found in cache and ttl >= 5 minutes, return them
         return cookies_data
 
     # Unable to find cookies in cache, are about to expire or refresh needed
     # Login and cache new values.
-    session_data = log_into_pacer(username, password, client_code)
+    session_data = await log_into_pacer(username, password, client_code)
     cookie_expiration = 60 * 60
-    r.set(
+    await sync_to_async(r.set)(
         session_key % user_pk,
         pickle.dumps(session_data),
         ex=cookie_expiration,
@@ -262,6 +209,7 @@ def get_or_cache_pacer_cookies(
     return session_data
 
 
+@sync_to_async
 def get_pacer_cookie_from_cache(
     user_pk: str | int,
     r: Redis | None = None,
@@ -280,7 +228,7 @@ def get_pacer_cookie_from_cache(
         try:
             session_data = pickle.loads(pickled_cookie)
             if isinstance(session_data, SessionData) and isinstance(
-                session_data.cookies, RequestsCookieJar
+                session_data.cookies, Cookies
             ):
                 return session_data
         except Exception:
@@ -288,6 +236,7 @@ def get_pacer_cookie_from_cache(
         r.delete(session_key % user_pk)
 
 
+@sync_to_async
 def delete_pacer_cookie_from_cache(
     user_pk: str | int,
     r: Redis | None = None,

@@ -60,6 +60,7 @@ from cl.lib.file_validation import (
     file_too_large_message,
 )
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
+from cl.lib.pacer_session import SessionData
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -2900,6 +2901,7 @@ class ReplicateRecapUploadsTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
+    return_value=SessionData(None, "http://proxy_1:9090"),
 )
 class RecapDocketFetchApiTest(TestCase):
     """Tests for the RECAP docket Fetch API
@@ -3709,7 +3711,10 @@ class PacerFetchQueueScopedAccessTest(TestCase):
         self.assertEqual(self.fq.pacer_case_id, "123456")
 
 
-@mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
+@mock.patch(
+    "cl.recap.tasks.get_pacer_cookie_from_cache",
+    return_value=SessionData(None, "http://proxy_1:9090"),
+)
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
     side_effect=lambda a: True,
@@ -4203,6 +4208,7 @@ class RecapAttPageFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
+        return_value=SessionData(None, "http://proxy_1:9090"),
     )
     @mock.patch(
         "cl.recap.tasks.get_data_from_att_report",
@@ -4247,6 +4253,7 @@ class RecapAttPageFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
+        return_value=SessionData(None, "http://proxy_1:9090"),
     )
     @mock.patch(
         "cl.recap.tasks.get_data_from_appellate_att_report",
@@ -4296,6 +4303,7 @@ class RecapAttPageFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
+        return_value=SessionData(None, "http://proxy_1:9090"),
     )
     @mock.patch(
         "cl.corpus_importer.tasks.ACMSAttachmentPage",
@@ -8317,6 +8325,7 @@ class WebhooksRetries(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
+    return_value=SessionData(None, "http://proxy_1:9090"),
 )
 class RecapFetchWebhooksTest(TestCase):
     """Test RECAP Fetch Webhooks"""

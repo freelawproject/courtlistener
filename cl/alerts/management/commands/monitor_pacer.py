@@ -1,6 +1,7 @@
+import asyncio
 import datetime
-import time
 
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template import loader
@@ -45,43 +46,47 @@ class Command(VerboseCommand):
         recipients = options["recipients"].split(",")
         print(f"Recipients list is: {recipients}")
 
-        s = ProxyPacerSession(
+        async_to_sync(self.monitor)(recipients, options["sleep"])
+
+    async def monitor(self, recipients: list[str], sleep: int) -> None:
+        """Poll until results arrive, keeping login and queries on one loop."""
+        async with ProxyPacerSession(
             username=settings.PACER_USERNAME, password=settings.PACER_PASSWORD
-        )
-        s.login()
-        report = CaseQueryAdvancedBankruptcy("canb", s)
-        t1 = now()
-        while True:
-            query = "Pacific"
-            report.query(
-                name_last=query,
-                filed_from=datetime.date(2019, 1, 28),
-                filed_to=datetime.date(2019, 1, 30),
-            )
-            num_results = len(report.data)
-            print(f"Checked '{query}' and got {num_results} results")
-            if num_results > 0:
-                print("Sending emails and exiting!")
-                send_emails(report, recipients)
-                exit(0)
+        ) as s:
+            await s.login()
+            report = CaseQueryAdvancedBankruptcy("canb", s)
+            t1 = now()
+            while True:
+                query = "Pacific"
+                await report.query(
+                    name_last=query,
+                    filed_from=datetime.date(2019, 1, 28),
+                    filed_to=datetime.date(2019, 1, 30),
+                )
+                num_results = len(report.data)
+                print(f"Checked '{query}' and got {num_results} results")
+                if num_results > 0:
+                    print("Sending emails and exiting!")
+                    await sync_to_async(send_emails)(report, recipients)
+                    return
 
-            query = "PG&E"
-            report.query(
-                name_last=query,
-                filed_from=datetime.date(2019, 1, 28),
-                filed_to=datetime.date(2019, 1, 30),
-            )
-            num_results = len(report.data)
-            print(f"Checked '{query}' and got {num_results} results")
-            if num_results > 0:
-                print("Sending emails and exiting!")
-                send_emails(report, recipients)
-                exit(0)
+                query = "PG&E"
+                await report.query(
+                    name_last=query,
+                    filed_from=datetime.date(2019, 1, 28),
+                    filed_to=datetime.date(2019, 1, 30),
+                )
+                num_results = len(report.data)
+                print(f"Checked '{query}' and got {num_results} results")
+                if num_results > 0:
+                    print("Sending emails and exiting!")
+                    await sync_to_async(send_emails)(report, recipients)
+                    return
 
-            time.sleep(options["sleep"])
-            t2 = now()
-            min_login_frequency = 60 * 30  # thirty minutes
-            if (t2 - t1).seconds > min_login_frequency:
-                print("Logging in again.")
-                s.login()
-                t1 = now()
+                await asyncio.sleep(sleep)
+                t2 = now()
+                min_login_frequency = 60 * 30  # thirty minutes
+                if (t2 - t1).seconds > min_login_frequency:
+                    print("Logging in again.")
+                    await s.login()
+                    t1 = now()

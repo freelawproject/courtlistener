@@ -51,6 +51,7 @@ from cl.favorites.utils import (
     prayer_unavailable,
 )
 from cl.favorites.views import get_note
+from cl.lib.pacer_session import SessionData
 from cl.lib.test_helpers import (
     AudioTestCase,
     PrayAndPayTestCase,
@@ -1881,7 +1882,10 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
         )
 
 
-@patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
+@patch(
+    "cl.favorites.tasks.get_or_cache_pacer_cookies",
+    return_value=SessionData(None, "http://proxy_1:9090"),
+)
 @patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
     @patch(
