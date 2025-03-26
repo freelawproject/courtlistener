@@ -1,5 +1,6 @@
 import time
 
+from asgiref.sync import async_to_sync
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
 
@@ -28,7 +29,7 @@ class Command(cl_scrape_oral_arguments.Command):
             mod,
             save_response_fn=save_response,
         ):
-            site.parse()
+            async_to_sync(site.parse)()
             self.scrape_court(site, full_crawl=True, backscrape=True)
 
             if wait := options["backscrape_wait"]:

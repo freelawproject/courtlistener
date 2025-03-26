@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 from django.conf import settings
 
@@ -34,7 +35,7 @@ def get_dockets(options):
     session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
     session_data = SessionData(session.cookies, session.proxy_address)
     for i, row in enumerate(reader):
         if i < options["offset"]:
@@ -101,7 +102,7 @@ def get_att_pages(options):
     session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
     get_district_attachment_pages(
         options=options, rd_pks=rd_pks, tag_names=[TAG], session=session
     )

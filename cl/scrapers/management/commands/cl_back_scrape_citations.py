@@ -9,6 +9,7 @@ downloaded. If we find an Opinion we don't have in the database,
 we ingest it as in a regular scrape
 """
 
+from asgiref.sync import async_to_sync
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
 from juriscraper.lib.exceptions import BadContentError
@@ -62,7 +63,7 @@ class Command(cl_back_scrape_opinions.Command):
                 continue
 
             try:
-                content = site.download_content(
+                content = async_to_sync(site.download_content)(
                     case["download_urls"], media_root=settings.MEDIA_ROOT
                 )
             except BadContentError:

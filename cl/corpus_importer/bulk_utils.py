@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync
 from celery import chain
 
 from cl.corpus_importer.tasks import get_pacer_doc_by_rd
@@ -45,7 +46,7 @@ def get_petitions(
     session = ProxyPacerSession(
         username=pacer_username, password=pacer_password
     )
-    session.login()
+    async_to_sync(session.login)()
     for i, rd_pk in enumerate(rds):
         if i < options["offset"]:
             i += 1
@@ -57,7 +58,7 @@ def get_petitions(
             session = ProxyPacerSession(
                 username=pacer_username, password=pacer_password
             )
-            session.login()
+            async_to_sync(session.login)()
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
