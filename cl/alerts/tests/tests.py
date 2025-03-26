@@ -661,6 +661,74 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         search_alert = Alert.objects.all()
         self.assertEqual(await search_alert.acount(), 0)
 
+    async def test_can_validate_required_fields(self) -> None:
+        # Test creation with missing required fields:
+        response = await self.client.post(self.alert_path, {}, format="json")
+
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("This field is required.", response.json()["name"])
+        self.assertIn("This field is required.", response.json()["query"])
+        self.assertIn("This field is required.", response.json()["rate"])
+
+        # Create a valid alert for subsequent update testing:
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+        )
+        alert_1_data = alert_1.json()
+        # Try to update an alert using a PUT request with missing required
+        # fields:
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1_data["id"], "version": "v3"},
+        )
+        data_updated = {"name": "alert_1_updated"}  # Missing query and rate
+        response = await self.client.put(alert_1_path_detail, data_updated)
+
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("This field is required.", response.json()["query"])
+        self.assertIn("This field is required.", response.json()["rate"])
+
+    async def test_can_update_alert_using_patch_request(self) -> None:
+        # Create an initial alert for testing:
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+        )
+        alert_1_data = alert_1.json()
+
+        # Verify initial alert state:
+        self.assertEqual(alert_1_data["alert_type"], SEARCH_TYPES.OPINION)
+        search_alert = Alert.objects.all()
+        self.assertEqual(await search_alert.acount(), 1)
+
+        # Construct the detail URL for the alert:
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1_data["id"], "version": "v3"},
+        )
+
+        # Update the alert's name:
+        data_updated = {"name": "alert_1_updated"}
+        response = await self.client.patch(alert_1_path_detail, data_updated)
+
+        # Check that the alert was updated
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["name"], "alert_1_updated")
+        self.assertEqual(response.json()["id"], alert_1_data["id"])
+
+        # Update the alert's rate:
+        data_updated = {"rate": "wly"}
+        response = await self.client.patch(alert_1_path_detail, data_updated)
+
+        # Verify successful rate update, and that name persists:
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["id"], alert_1_data["id"])
+        self.assertEqual(response.json()["name"], "alert_1_updated")
+        self.assertEqual(response.json()["rate"], "wly")
+
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 class SearchAlertsWebhooksTest(
