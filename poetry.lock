@@ -1572,22 +1572,25 @@ vectorstore-mmr = ["numpy (>=1)", "simsimd (>=3)"]
 
 [[package]]
 name = "elasticsearch-dsl"
-version = "8.11.0"
+version = "8.17.1"
 description = "Python client for Elasticsearch"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "elasticsearch-dsl-8.11.0.tar.gz", hash = "sha256:44af4fd7f62009bb19193b55e1c2143b6932517e4c0ec30107e7ff4d968a127e"},
-    {file = "elasticsearch_dsl-8.11.0-py3-none-any.whl", hash = "sha256:61000f8ff5e9633d3381aea5a6dfba5c9c4505fe2e6c5cba6a17cd7debc890d9"},
+    {file = "elasticsearch_dsl-8.17.1-py3-none-any.whl", hash = "sha256:49ee12a6a8d43fcfc0af42b49649531a6ef228c9e4795325de27f6b309b62b6d"},
+    {file = "elasticsearch_dsl-8.17.1.tar.gz", hash = "sha256:d8170699bfdb4fe7fab3854cdac319a2d6dddbaa29c9ea7993d2ec22056db5a0"},
 ]
 
 [package.dependencies]
+elastic-transport = ">=8.0.0,<9.0.0"
 elasticsearch = ">=8.0.0,<9.0.0"
 python-dateutil = "*"
+typing-extensions = "*"
 
 [package.extras]
-develop = ["coverage", "pytest", "pytest-cov", "pytest-mock", "pytz", "sphinx (>2)", "sphinx-rtd-theme (>0.5)"]
+async = ["elasticsearch[async] (>=8.0.0,<9.0.0)"]
+develop = ["coverage", "elasticsearch[async]", "jinja2", "mypy", "nltk", "pyright", "pytest", "pytest-asyncio", "pytest-cov", "pytest-mock", "pytz", "sentence-transformers", "sphinx (>2)", "sphinx-rtd-theme (>0.5)", "tqdm", "types-python-dateutil", "types-pytz", "types-tqdm", "unasync"]
 
 [[package]]
 name = "executing"
@@ -2474,14 +2477,14 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.6.62"
+version = "2.6.63"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "juriscraper-2.6.62-py27-none-any.whl", hash = "sha256:c0f43556664a0fa227a39f7af7e1b333c3bea3c87b83e2d986cfb7c3c153be4d"},
-    {file = "juriscraper-2.6.62.tar.gz", hash = "sha256:9ba61bc22fae958b8308ffa5530112b4d3e0fcb0d14ec75f80a9e1f04338b1ab"},
+    {file = "juriscraper-2.6.63-py27-none-any.whl", hash = "sha256:a98f6a58e52470a27d4f6b1c9f84f7b0d3a78569e4361994b209b80e339cd0bf"},
+    {file = "juriscraper-2.6.63.tar.gz", hash = "sha256:ac90ec0ec75b97db65378c7d91643d15ebb4c45c33ffa2fcf968bdee36262ae8"},
 ]
 
 [package.dependencies]
