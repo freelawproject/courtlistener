@@ -502,7 +502,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.9.0" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", specifier = ">=2.6.68" },
+    { name = "juriscraper", git = "https://github.com/ttys0dev/juriscraper.git?rev=4d8f17746601f368b9ab62ef41f804404fa8ac0e" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=6.0.2" },
     { name = "markdown2", specifier = ">=2.5.4" },
@@ -1814,8 +1814,8 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.7.0"
-source = { registry = "https://pypi.org/simple" }
+version = "2.7.1"
+source = { git = "https://github.com/ttys0dev/juriscraper.git?rev=4d8f17746601f368b9ab62ef41f804404fa8ac0e#4d8f17746601f368b9ab62ef41f804404fa8ac0e" }
 dependencies = [
     { name = "certifi" },
     { name = "chardet" },
@@ -1825,16 +1825,12 @@ dependencies = [
     { name = "feedparser" },
     { name = "geonamescache" },
     { name = "html5lib" },
+    { name = "httpx", extra = ["http2"] },
     { name = "lxml" },
     { name = "nh3" },
     { name = "python-dateutil" },
-    { name = "requests" },
     { name = "selenium" },
     { name = "tldextract" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/41/e6/490da60dd1ef109faf77e71461f194c90e73cd7b459b2cf5793c31483122/juriscraper-2.7.0.tar.gz", hash = "sha256:c61aef3a95027e81c6d12ac0d07a64334982ee051d3937a2d74427becdf1f8cf", size = 358447, upload-time = "2025-12-31T21:14:18.658Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a6/8d/32d2bb240169dce657f6c8296ce45d00017e78d62ebc275821d638435056/juriscraper-2.7.0-py3-none-any.whl", hash = "sha256:87416fad3c64dda2f73f4c511f74b92f000b71bc99155d2c5d1d324140cdfacf", size = 579002, upload-time = "2025-12-31T21:14:17.091Z" },
 ]
 
 [[package]]

@@ -126,19 +126,7 @@ def is_bankruptcy_court(court_id: str) -> bool:
     return bankr_court_ids.filter(pk=court_id).exists()
 
 
-def is_appellate_court(court_id: str) -> bool:
-    """Checks if the given court_id belongs to an appellate court.
-
-    :param court_id: The unique identifier of the court.
-
-    :return: True if the court_id corresponds to an appellate court,
-        False otherwise.
-    """
-    appellate_court_ids = Court.federal_courts.appellate_courts()
-    return appellate_court_ids.filter(pk=court_id).exists()
-
-
-async def ais_appellate_court(court_id: str) -> bool:
+async def is_appellate_court(court_id: str) -> bool:
     """Checks if the given court_id belongs to an appellate court.
 
     :param court_id: The unique identifier of the court.
