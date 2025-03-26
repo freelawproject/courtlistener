@@ -363,7 +363,7 @@ class Command(ScraperCommand):
 
         # download content
         for sub_opinion in opinions_to_download:
-            content = site.download_content(
+            content = async_to_sync(site.download_content)(
                 sub_opinion["download_urls"], media_root=settings.MEDIA_ROOT
             )
             opinions_content.append(
@@ -464,7 +464,7 @@ class Command(ScraperCommand):
             )
 
     def parse_and_scrape_site(self, mod, options: dict):
-        site = mod.Site(save_response_fn=save_response).parse()
+        site = async_to_sync(mod.Site(save_response_fn=save_response).parse)()
         self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
