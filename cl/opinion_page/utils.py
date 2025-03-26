@@ -23,6 +23,7 @@ from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
+    build_cardinality_count,
     build_join_es_filters,
     build_more_like_this_query,
 )
@@ -167,6 +168,7 @@ async def build_cites_clusters_query(
                 "citation",
                 "status",
                 "dateFiled",
+                "court",
             ]
         )
         .extra(size=20, track_total_hits=True)
@@ -208,9 +210,10 @@ async def build_related_clusters_query(
                 "caseName",
                 "cluster_id",
                 "docketNumber",
-                "citations",
+                "citation",
                 "status",
                 "dateFiled",
+                "court",
             ]
         )
         .extra(size=20)
@@ -579,7 +582,12 @@ async def es_cited_case_count(
         ],
     )
     cluster_cites_query = cluster_search.query(cites_query)
-    cited_by_count = cluster_cites_query.count()
+    cluster_cites_query = build_cardinality_count(
+        cluster_cites_query, "cluster_id"
+    )
+    cited_by_count = (
+        cluster_cites_query.execute().aggregations.unique_documents.value
+    )
 
     await cache.aset(
         cache_cited_by_key,
@@ -597,6 +605,11 @@ async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
     :param sub_opinion_pks: The sub opinion ids of the cluster
     :return: The count of related cases in elastic
     """
+
+    if not sub_opinion_pks:
+        # Early abort if the cluster doesn't have sub opinions. e.g. cluster id: 3561702
+        return 0
+
     cache = caches["db_cache"]
     cache_related_cases_key = f"related-cases-count-es:{cluster_id}"
     cached_related_cases_count = (
@@ -619,7 +632,13 @@ async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
         minimum_should_match=1,
     )
     cluster_related_query = cluster_search.query(main_query)
-    related_cases_count = cluster_related_query.count()
+    cluster_related_query = build_cardinality_count(
+        cluster_related_query, "cluster_id"
+    )
+    related_cases_count = (
+        cluster_related_query.execute().aggregations.unique_documents.value
+    )
+
     await cache.aset(
         cache_related_cases_key,
         related_cases_count,
