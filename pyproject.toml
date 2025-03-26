@@ -113,6 +113,7 @@ dependencies = [
   "django-cursor-pagination>=0.3.0",
   "django-elasticsearch-dsl>=8.0",
   "juriscraper>=2.6.68",
+  "juriscraper @ git+https://github.com/ttys0dev/juriscraper.git@28dca41dfdad6cf4904b4776e1fbb4d6415f43bb",
   "instructor>=1.11.3",
   "django-s3-express-cache>=0.1.0",
   "zohocrmsdk8-0==4.0.0",
@@ -139,6 +140,7 @@ dev = [
 
 [tool.uv.sources]
 djangorestframework = { git = "https://github.com/encode/django-rest-framework.git", rev = "cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2" }
+juriscraper = {git = "https://github.com/ttys0dev/juriscraper.git", rev = "28dca41dfdad6cf4904b4776e1fbb4d6415f43bb"}
 
 [tool.ruff]
 line-length = 79

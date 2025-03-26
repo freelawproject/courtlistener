@@ -2,7 +2,9 @@ import json
 import random
 
 import requests
+from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.contrib.auth.models import User
 from elasticsearch_dsl.response import Response
 from rest_framework.renderers import JSONRenderer
 
@@ -80,7 +82,7 @@ def send_webhook_event(
         update_webhook_event_after_request(webhook_event, error=error_str)
 
 
-def send_old_alerts_webhook_event(
+async def send_old_alerts_webhook_event(
     webhook: Webhook, report: OldAlertReport
 ) -> None:
     """Send webhook event for old alerts
@@ -115,14 +117,14 @@ def send_old_alerts_webhook_event(
         post_content,
         accepted_media_type="application/json;",
     )
-    webhook_event = WebhookEvent.objects.create(
+    webhook_event = await WebhookEvent.objects.acreate(
         webhook=webhook,
         content=post_content,
     )
-    send_webhook_event(webhook_event, json_bytes)
+    await sync_to_async(send_webhook_event)(webhook_event, json_bytes)
 
 
-def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
+async def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
     """Send webhook event for processed PacerFetchQueue objects.
 
     :param fq: The PacerFetchQueue object related to the event.
@@ -137,10 +139,11 @@ def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
         PROCESSING_STATUS.INVALID_CONTENT,
         PROCESSING_STATUS.NEEDS_INFO,
     ]:
-        user_webhooks = fq.user.webhooks.filter(
+        user = await User.objects.aget(pk=fq.user_id)
+        user_webhooks = user.webhooks.filter(
             event_type=WebhookEventType.RECAP_FETCH, enabled=True
         )
-        for webhook in user_webhooks:
+        async for webhook in user_webhooks:
             payload = PacerFetchQueueSerializer(fq).data
             post_content = {
                 "webhook": generate_webhook_key_content(webhook),
@@ -151,11 +154,11 @@ def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
                 post_content,
                 accepted_media_type="application/json;",
             )
-            webhook_event = WebhookEvent.objects.create(
+            webhook_event = await WebhookEvent.objects.acreate(
                 webhook=webhook,
                 content=post_content,
             )
-            send_webhook_event(webhook_event, json_bytes)
+            await sync_to_async(send_webhook_event)(webhook_event, json_bytes)
 
 
 def send_search_alert_webhook(

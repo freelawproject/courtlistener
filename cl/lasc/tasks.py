@@ -3,13 +3,14 @@ import logging
 import os
 import pickle
 
+from asgiref.sync import async_to_sync
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
+from httpx import RequestError
 from juriscraper.lasc.fetch import LASCSearch
 from juriscraper.lasc.http import LASCSession
-from requests import RequestException
 
 from cl.celery_init import app
 from cl.lasc.models import (
@@ -110,8 +111,8 @@ def download_pdf(self, pdf_pk):
         return
 
     try:
-        pdf_data = lasc.get_pdf_from_url(q_pdf.document_url)
-    except RequestException as exc:
+        pdf_data = async_to_sync(lasc.get_pdf_from_url)(q_pdf.document_url)
+    except RequestError as exc:
         logger.warning(
             "Got RequestException trying to get PDF for PDF Queue %s",
             q_pdf.pk,
@@ -194,9 +195,11 @@ def add_or_update_case_db(self, case_id):
 
     clean_data = {}
     try:
-        clean_data = lasc.get_json_from_internal_case_id(case_id)
+        clean_data = async_to_sync(lasc.get_json_from_internal_case_id)(
+            case_id
+        )
         logger.info("Successful Query")
-    except RequestException as e:
+    except RequestError as e:
         retries_remaining = self.max_retries - self.request.retries
         if retries_remaining == 0:
             logger.error("RequestException, unable to get case at %s", case_id)
@@ -349,8 +352,8 @@ def fetch_date_range(self, start, end):
     lasc = make_lasc_search()
 
     try:
-        cases = lasc.query_cases_by_date(start, end)
-    except RequestException as exc:
+        cases = async_to_sync(lasc.query_cases_by_date)(start, end)
+    except RequestError as exc:
         logger.warning(
             "Got RequestException trying to get cases by date "
             "between %s and %s",
