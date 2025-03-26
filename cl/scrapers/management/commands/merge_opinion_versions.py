@@ -226,6 +226,7 @@ def merge_versions_by_download_url(
     query = get_query_from_url(url_start, "startswith")
     qs = (
         Opinion.objects.filter(query)
+        .exclude(download_url="")
         .values("download_url")
         .annotate(
             number_of_rows=Count("download_url"),

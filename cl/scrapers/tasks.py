@@ -239,6 +239,8 @@ def find_and_merge_versions(self, pk: int) -> None:
     :return None:
     """
     recently_scraped_opinion = Opinion.objects.get(id=pk)
+    if not recently_scraped_opinion.download_url:
+        return
     query = get_query_from_url(recently_scraped_opinion.download_url, "exact")
     versions = (
         Opinion.objects.filter(query)
