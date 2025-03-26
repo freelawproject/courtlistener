@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 
 from cl.corpus_importer.task_canvases import get_docket_and_claims
@@ -70,7 +71,7 @@ def get_data(options, row_transform, tags):
     session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
     for i, row in enumerate(reader):
         if i < options["offset"]:
             continue

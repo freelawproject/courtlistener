@@ -10,7 +10,8 @@ class Site(OralArgumentSite):
     def __init__(self):
         super().__init__()
         self.court_id = self.__module__
-        self.url = join(
+        self.url = "http://test"
+        self.mock_url = join(
             settings.INSTALL_ROOT,
             "cl/scrapers/test_assets/test_oral_arg_site.xml",
         )
