@@ -1020,6 +1020,48 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
         docket_2.delete()
 
+    @mock.patch("cl.alerts.management.commands.cl_send_recap_alerts.logger")
+    def test_alert_fails_gracefully(self, mock_logger, mock_prefix) -> None:
+        """This test confirms that if an alert has bad syntax or another
+        Elasticsearch issue that prevents it from being sent, it fails
+        gracefully by logging the error and continuing with the remaining alerts.
+        """
+
+        AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Failing Alert query",
+            query="q=test :&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Good query",
+            query="q=SUBPOENAS SERVED OFF&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+        error = "ApiError(200, 'N/A', 'Failed to parse query [test AND :]')"
+        mock_logger.warning.assert_called_with(
+            "ApiError when querying an alert from the sweep index: %s", error
+        )
+        # Confirm remaining alert was properly sent.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        # Confirm alert_sweep keys are removed from Redis.
+        self.assertFalse(self.r.exists("alert_sweep:main_re_index_completed"))
+        self.assertFalse(self.r.exists("alert_sweep:rd_re_index_completed"))
+        self.assertFalse(self.r.exists("alert_sweep:query_date"))
+
     def test_limit_alert_case_child_hits(self, mock_prefix) -> None:
         """Test limit case child hits up to 5 and display the "View additional
         results for this Case" button.
