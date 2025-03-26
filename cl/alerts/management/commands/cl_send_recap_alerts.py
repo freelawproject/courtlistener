@@ -171,33 +171,45 @@ def index_daily_recap_documents(
         local_midnight = local_now.replace(
             hour=0, minute=0, second=0, microsecond=0
         )
+        # Date query from previous day since the command currently runs
+        # early each day.
+        day_before_local_midnight = local_midnight - datetime.timedelta(days=1)
         r.set(
-            "alert_sweep:query_date", local_midnight.isoformat(), ex=3600 * 12
+            "alert_sweep:query_date",
+            day_before_local_midnight.isoformat(),
+            ex=3600 * 12,
         )
         logger.info(
             "Starting %s re-indexing process for date: %s",
             target_index._index._name,
-            local_midnight,
+            day_before_local_midnight,
         )
 
     else:
         # If "alert_sweep:query_date" already exists get it from Redis.
         local_midnight_str: str = str(r.get("alert_sweep:query_date"))
-        local_midnight = datetime.datetime.fromisoformat(local_midnight_str)
+        day_before_local_midnight = datetime.datetime.fromisoformat(
+            local_midnight_str
+        )
         logger.info(
             "Resuming %s re-indexing process for date: %s",
             target_index._index._name,
-            local_midnight,
+            day_before_local_midnight,
         )
 
     es = connections.get_connection()
     # Convert the local (PDT) midnight time to UTC
     local_timezone = pytz.timezone(timezone.get_current_timezone_name())
-    local_midnight_localized = local_timezone.localize(local_midnight)
-    local_midnight_utc = local_midnight_localized.astimezone(pytz.utc)
-    next_day_utc = local_midnight_utc + datetime.timedelta(days=1)
-
-    today_datetime_iso = local_midnight_utc.isoformat().replace("+00:00", "Z")
+    day_before_local_midnight_localized = local_timezone.localize(
+        day_before_local_midnight
+    )
+    day_before_local_midnight_utc = (
+        day_before_local_midnight_localized.astimezone(pytz.utc)
+    )
+    next_day_utc = day_before_local_midnight_utc + datetime.timedelta(days=1)
+    day_before_datetime_iso = (
+        day_before_local_midnight_utc.isoformat().replace("+00:00", "Z")
+    )
     next_day_utc_iso = next_day_utc.isoformat().replace("+00:00", "Z")
     # Re Index API query.
     query = (
@@ -211,7 +223,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": today_datetime_iso,
+                                            "gte": day_before_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -227,7 +239,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": today_datetime_iso,
+                                        "gte": day_before_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -241,7 +253,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": today_datetime_iso,
+                                            "gte": day_before_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -257,7 +269,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": today_datetime_iso,
+                                        "gte": day_before_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -278,7 +290,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": today_datetime_iso,
+                                        "gte": day_before_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -292,7 +304,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": today_datetime_iso,
+                                            "gte": day_before_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
