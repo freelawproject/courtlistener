@@ -1,6 +1,7 @@
 import os
 import time
 
+from asgiref.sync import async_to_sync
 from celery import chain
 from django.conf import settings
 
@@ -42,7 +43,7 @@ def get_dockets(options: dict) -> None:
     session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
     session_data = SessionData(session.cookies, session.proxy_address)
     NOS_CODES = [PATENT, PATENT_ANDA]
     DISTRICTS = ["ded", "txwd"]

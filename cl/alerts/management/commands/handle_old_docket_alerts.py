@@ -1,5 +1,6 @@
 from argparse import RawTextHelpFormatter
 
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
@@ -78,7 +79,7 @@ def build_user_report(user, delete=False):
     return report
 
 
-def send_old_alert_warning_email_and_webhook(user, report) -> int:
+async def send_old_alert_warning_email_and_webhook(user, report) -> int:
     """Send alerts emails and webhooks for old alerts
 
     :param user: The user with terminated dockets
@@ -91,17 +92,21 @@ def send_old_alert_warning_email_and_webhook(user, report) -> int:
     )
     webhook_count = 0
     if report.very_old_alerts or report.disabled_alerts:
-        for user_webhook in user_webhooks:
-            send_old_alerts_webhook_event(user_webhook, report)
+        async for user_webhook in user_webhooks:
+            await send_old_alerts_webhook_event(user_webhook, report)
             webhook_count += 1
 
     count = report.total_count()
     subject_template = loader.get_template("emails/old_email_subject.txt")
     subject = subject_template.render({"count": count}).strip()
-    txt = loader.get_template("emails/old_alert_email.txt").render(
+    txt = await sync_to_async(
+        loader.get_template("emails/old_alert_email.txt").render
+    )(
         {"report_data": report},
     )
-    html = loader.get_template("emails/old_alert_email.html").render(
+    html = await sync_to_async(
+        loader.get_template("emails/old_alert_email.html").render
+    )(
         {"report_data": report},
     )
     msg = EmailMultiAlternatives(
@@ -174,9 +179,9 @@ The schedule is thus:
             count = report.total_count()
             if options["send_alerts"] and count > 0:
                 emails_sent += 1
-                webhooks_count = send_old_alert_warning_email_and_webhook(
-                    user, report
-                )
+                webhooks_count = async_to_sync(
+                    send_old_alert_warning_email_and_webhook
+                )(user, report)
                 webhooks_sent += webhooks_count
 
         logger.info(

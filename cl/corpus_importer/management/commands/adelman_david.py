@@ -1,6 +1,7 @@
 import csv
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 from django.conf import settings
 
@@ -31,7 +32,7 @@ def download_dockets(options):
     session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
     session_data = SessionData(session.cookies, session.proxy_address)
     for i, row in enumerate(reader):
         if i < options["offset"]:

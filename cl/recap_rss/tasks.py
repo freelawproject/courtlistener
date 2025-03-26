@@ -6,7 +6,7 @@ import re
 from calendar import SATURDAY, SUNDAY
 from datetime import datetime, timedelta
 
-import requests
+import httpx
 from asgiref.sync import async_to_sync
 from celery import Task
 from dateparser import parse
@@ -15,10 +15,10 @@ from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
+from httpx import HTTPError
 from juriscraper.pacer import PacerRssFeed
 from pytz import timezone
 from redis import Redis
-from requests import HTTPError
 
 from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery_init import app
@@ -205,8 +205,8 @@ def check_if_feed_changed(
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     rss_feed = PacerRssFeed(map_cl_to_pacer_id(court_pk))
     try:
-        rss_feed.query()
-    except requests.RequestException:
+        async_to_sync(rss_feed.query)()
+    except httpx.RequestError:
         logger.warning(
             "Network error trying to get RSS feed at %s", rss_feed.url
         )
