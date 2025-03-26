@@ -6,6 +6,7 @@ from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -381,9 +382,11 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         inception_response.json.return_value = vectors
         return inception_response
 
-    def _test_api_results_count(self, params, expected_count, field_name):
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
         """Get the result count in a API query response"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("search-list", kwargs={"version": "v4"}), params
         )
         got = len(r.data["results"])
@@ -400,7 +403,8 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
 
     @override_flag("store-search-api-queries", active=True)
     @override_settings(WAFFLE_CACHE_PREFIX="test_semantic_search_opinion")
-    def test_can_perform_a_regular_semantic_query(
+    @async_to_sync
+    async def test_can_perform_a_regular_semantic_query(
         self, inception_mock
     ) -> None:
         """Can we perform a semantic search using the API?"""
@@ -411,10 +415,12 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
 
         # Perform search and check that exactly two results are returned
         search_params = {"q": self.situational_query, "semantic": True}
-        r = self._test_api_results_count(search_params, 2, "semantic query")
+        r = await self._test_api_results_count(
+            search_params, 2, "semantic query"
+        )
 
         # Ensure a SearchQuery row was logged with SEMANTIC querymode
-        last_query = SearchQuery.objects.last()
+        last_query = await SearchQuery.objects.alast()
         self.assertEqual(last_query.query_mode, SearchQuery.SEMANTIC)
 
         content = r.content.decode()
@@ -429,7 +435,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
                 cluster_id=cluster["cluster_id"], msg="Snippet content test."
             ):
                 for opinion in cluster["opinions"]:
-                    record = Opinion.objects.get(id=opinion["id"])
+                    record = await Opinion.objects.aget(id=opinion["id"])
                     self.assertNotEqual(
                         opinion["snippet"],
                         record.plain_text[: settings.NO_MATCH_HL_SIZE],
@@ -439,7 +445,9 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self.assertNotIn(f'"cluster_id":{self.opinion_4.cluster.id}', content)
         self.assertNotIn(f'"cluster_id":{self.opinion_5.cluster.id}', content)
 
-    def test_can_apply_filter_to_semantic_query(self, inception_mock) -> None:
+    async def test_can_apply_filter_to_semantic_query(
+        self, inception_mock
+    ) -> None:
         """Can we apply filtering to semantic search results?"""
         inception_mock.return_value = self._get_mock_for_inception(
             self.situational_query_vectors
@@ -453,7 +461,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         }
 
         # Should return only the opinion from the Ohio court
-        r = self._test_api_results_count(
+        r = await self._test_api_results_count(
             search_params, 1, "semantic query with court filter"
         )
         content = r.content.decode()
@@ -468,14 +476,16 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         }
 
         # Should return only the result matching the docket number
-        r = self._test_api_results_count(
+        r = await self._test_api_results_count(
             search_params, 1, "semantic query with docket number filter"
         )
         content = r.content.decode()
         self.assertNotIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
         self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
 
-    def test_can_sort_semantic_search_results(self, inception_mock) -> None:
+    async def test_can_sort_semantic_search_results(
+        self, inception_mock
+    ) -> None:
         """Can we sort semantic search results by cite count?"""
         inception_mock.return_value = self._get_mock_for_inception(
             self.situational_query_vectors
@@ -487,7 +497,9 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             "semantic": True,
             "order_by": "citeCount desc",
         }
-        r = self._test_api_results_count(search_params, 2, "citeCount desc")
+        r = await self._test_api_results_count(
+            search_params, 2, "citeCount desc"
+        )
         content = r.content.decode()
 
         # Opinion with higher cite count should appear first
@@ -504,7 +516,9 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             "semantic": True,
             "order_by": "citeCount asc",
         }
-        r = self._test_api_results_count(search_params, 2, "citeCount asc")
+        r = await self._test_api_results_count(
+            search_params, 2, "citeCount asc"
+        )
         content = r.content.decode()
 
         # Opinion with lower cite count should appear first
@@ -515,14 +529,14 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             " ordered by ascending citeCount.",
         )
 
-    def test_is_semantic_score_standarized(self, inception_mock) -> None:
+    async def test_is_semantic_score_standarized(self, inception_mock) -> None:
         """Ensure that semantic scores are consistently returned as floats"""
         inception_mock.return_value = self._get_mock_for_inception(
             self.situational_query_vectors
         )
 
         search_params = {"q": self.hybrid_query, "semantic": True}
-        r = self._test_api_results_count(
+        r = await self._test_api_results_count(
             search_params, 3, "hybrid semantic search query"
         )
 
@@ -542,7 +556,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
                 else:
                     self.assertEqual(semantic_score, 0.0)
 
-    def test_can_do_hybrid_search_query(self, inception_mock) -> None:
+    async def test_can_do_hybrid_search_query(self, inception_mock) -> None:
         """Can we combine semantic and keyword matches in hybrid search?"""
         inception_mock.return_value = self._get_mock_for_inception(
             self.situational_query_vectors
@@ -550,7 +564,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
 
         # Hybrid query should return semantic and keyword matches (3 total)
         search_params = {"q": self.hybrid_query, "semantic": True}
-        r = self._test_api_results_count(
+        r = await self._test_api_results_count(
             search_params, 3, "hybrid semantic search query"
         )
         content = r.content.decode()
@@ -573,7 +587,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
                 cluster_id=cluster["cluster_id"], msg="Snippet content test."
             ):
                 for opinion in cluster["opinions"]:
-                    record = Opinion.objects.get(id=opinion["id"])
+                    record = await Opinion.objects.aget(id=opinion["id"])
                     if record.id == self.opinion_5.id:
                         self.assertEqual(
                             opinion["snippet"],
