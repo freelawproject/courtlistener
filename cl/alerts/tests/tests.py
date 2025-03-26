@@ -480,7 +480,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         cls.user_2 = UserFactory()
 
     def setUp(self) -> None:
-        self.alert_path = reverse("alert-list", kwargs={"version": "v3"})
+        self.alert_path = reverse("alert-list", kwargs={"version": "v4"})
         self.client = make_client(self.user_1.pk)
         self.client_2 = make_client(self.user_2.pk)
 
@@ -523,12 +523,12 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         # Get the alerts for user_1, should be 2
         response = await self.client.get(self.alert_path)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(response.json()["count"], 2)
+        self.assertEqual(len(response.json()["results"]), 2)
 
         # Get the alerts for user_2, should be 1
         response_2 = await self.client_2.get(self.alert_path)
         self.assertEqual(response_2.status_code, HTTPStatus.OK)
-        self.assertEqual(response_2.json()["count"], 1)
+        self.assertEqual(len(response_2.json()["results"]), 1)
 
     async def test_delete_alert(self) -> None:
         """Can we delete an alert?
@@ -555,7 +555,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
 
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_1.json()["id"], "version": "v4"},
         )
 
         # Delete the alert for user_1
@@ -571,7 +571,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
 
         alert_2_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_2.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_2.json()["id"], "version": "v4"},
         )
 
         # user_2 tries to delete a user_1 alert, it should fail
@@ -590,7 +590,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         self.assertEqual(await search_alert.acount(), 1)
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_1.json()["id"], "version": "v4"},
         )
 
         # Get the alert detail for user_1
@@ -625,7 +625,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
 
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_1.json()["id"], "version": "v4"},
         )
 
         # Update the alert
@@ -681,7 +681,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         # fields:
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1_data["id"], "version": "v3"},
+            kwargs={"pk": alert_1_data["id"], "version": "v4"},
         )
         data_updated = {"name": "alert_1_updated"}  # Missing query and rate
         response = await self.client.put(alert_1_path_detail, data_updated)
@@ -707,7 +707,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         # Construct the detail URL for the alert:
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1_data["id"], "version": "v3"},
+            kwargs={"pk": alert_1_data["id"], "version": "v4"},
         )
 
         # Update the alert's name:
