@@ -5,6 +5,7 @@ import os
 import re
 from typing import TypedDict, cast
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 
 from cl.corpus_importer.bulk_utils import make_bankr_docket_number
@@ -72,7 +73,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
     session = ProxyPacerSession(
         username=CLIENT_PACER_USERNAME, password=CLIENT_PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
     throttle = CeleryThrottle(queue_name=q)
     completed = 0
     for i, rows in enumerate(
