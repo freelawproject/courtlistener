@@ -216,7 +216,11 @@ class Command(VerboseCommand):
         self.recap_documents = (
             RECAPDocument.objects.filter(*filters)
             .exclude(pk__in=ids_to_skip)
-            .select_related("docket_entry__docket")
+            .exclude(
+                Q(description__icontains="transcript")
+                | Q(docket_entry__description__icontains="transcript")
+            )
+            .select_related("docket_entry", "docket_entry__docket")
             .values(
                 "id",
                 "page_count",
@@ -264,7 +268,7 @@ class Command(VerboseCommand):
             user_id=self.user.pk,
         )
         fetch_pacer_doc_by_rd_and_mark_fq_completed.si(
-            rd_pk, fq.pk
+            rd_pk, fq.pk, omit_page_count=True
         ).apply_async(queue=self.queue_name)
         append_value_in_cache(self.docs_to_process_cache_key(), (rd_pk, fq.pk))
         self.total_launched += 1
