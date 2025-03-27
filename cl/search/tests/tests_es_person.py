@@ -2485,7 +2485,7 @@ class PeopleIndexingTest(
             Counter(person_doc.races),
         )
         # political_affiliation_id is removed from person doc.
-        self.assertEqual(None, person_doc.political_affiliation_id)
+        self.assertEqual([], person_doc.political_affiliation_id)
         pos_5_doc = PositionDocument.get(
             id=ES_CHILD_ID(position_5.pk).POSITION
         )
@@ -2666,7 +2666,7 @@ class PeopleIndexingTest(
         rating.delete()
         person_3_doc = PersonDocument.get(self.person_3.pk)
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
-        self.assertEqual(None, person_3_doc.aba_rating)
+        self.assertEqual([], person_3_doc.aba_rating)
         self.assertEqual([], pos_doc.aba_rating)
 
     def test_person_indexing_and_tasks_count(self) -> None:
