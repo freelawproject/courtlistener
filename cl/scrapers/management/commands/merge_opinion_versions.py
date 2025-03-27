@@ -15,6 +15,7 @@ from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import Opinion, OpinionCluster
 
 MIN_SEQUENCE_SIMILARITY = 0.9
+DRY_RUN = False
 
 
 def get_query_from_url(url: str, url_filter: str) -> Q:
@@ -223,10 +224,14 @@ def merge_versions_by_download_url(
     :param limit: max number of groups to correct
     :return None
     """
-    query = get_query_from_url(url_start, "startswith")
+    if url_start:
+        query = get_query_from_url(url_start, "startswith")
+    else:
+        query = Q()
+
     qs = (
         Opinion.objects.filter(query)
-        .exclude(download_url="")
+        .exclude(Q(download_url="") | Q(download_url__isnull=True))
         .values("download_url")
         .annotate(
             number_of_rows=Count("download_url"),
@@ -301,8 +306,10 @@ def merge_versions_by_text_similarity(
 
         version_text = clean_opinion_text(version)
         if text_is_similar(main_text, version_text):
-            merge_opinion_versions(main, version)
             stats["success"] += 1
+            if DRY_RUN:
+                continue
+            merge_opinion_versions(main, version)
 
             if not version.versions.exists():
                 continue
@@ -343,14 +350,26 @@ def explain_version_differences(opinions: list[Opinion | int]) -> None:
 
         # Actually see the difference
         differ = Differ()
+        prev_index = 0
+        prev_key = ""
+        diff = ""
+        print(f"Difference between {op1} {op2}")
         for index, i in enumerate(differ.compare(text1, text2)):
             if i[0] in "-+?":
-                print(
-                    f"Difference between {op1} {op2} at index {index} is {repr(i)}"
-                )
+                if prev_index == index - 1 and prev_key == i[0]:
+                    diff += i[-1]
+                else:
+                    print(
+                        f"difference at index {index} is {prev_key} {repr(diff)}"
+                    )
+                    diff = ""
+                prev_key = i[0]
+                prev_index = index
 
         sm = SequenceMatcher(None, text1, text2)
-        print("SequenceMatcher ratio", sm.ratio())
+        print("SequenceMatcher.ratio(text1, text2)", sm.ratio())
+        sm = SequenceMatcher(None, text2, text1)
+        print("SequenceMatcher.ratio(text2, text1)", sm.ratio())
 
 
 class Command(VerboseCommand):
@@ -361,7 +380,6 @@ class Command(VerboseCommand):
         parser.add_argument(
             "method",
             choices=["download_url", "docket"],
-            required=True,
             help="""Currently we have researched 2 methods
             - `download_url`: group opinions by exact `download_url` match
             and confirm their text similarity
@@ -370,17 +388,25 @@ class Command(VerboseCommand):
             """,
         )
         parser.add_argument(
-            "url_template",
-            required=False,
+            "--url_template",
+            default="",
             help="""The general domain and directory parts of the URL as found
             on Opinion.download_url. For example, for `nev` opinions:
-            'http://caseinfo.nvsupreme'""",
+            'http://caseinfo.nvsupreme'. If empty, will attempt to process all
+            groups
+            """,
         )
         parser.add_argument(
             "--limit",
-            required=False,
             type=int,
             help="""A limit of version groups to process""",
+        )
+        parser.add_argument(
+            "--dry-run",
+            default=False,
+            action="store_true",
+            help="""If passed, the command will run but no change will be saved
+            """,
         )
 
         # for the `docket` method, we will need more arguments
@@ -390,7 +416,11 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
+        if options["dry_run"]:
+            global DRY_RUN
+            DRY_RUN = True
+
         if options["method"] == "download_url":
             merge_versions_by_download_url(
-                options["url_template"], options.get("limit")
+                options["url_template"].strip(), options.get("limit")
             )
