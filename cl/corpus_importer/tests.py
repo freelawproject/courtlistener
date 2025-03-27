@@ -2083,6 +2083,7 @@ class ScrapeIqueryPagesTest(TestCase):
         cls.court_gand = CourtFactory(id="gand", jurisdiction="FB")
         cls.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
         cls.court_cacd = CourtFactory(id="cacd", jurisdiction="FB")
+        cls.court_vib = CourtFactory(id="vib", jurisdiction="FB")
 
     def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
@@ -2366,6 +2367,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
         r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -2409,6 +2411,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
         r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -2764,6 +2767,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
         r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000)
 
         tests = [600, 1200, 2400, 4800, 9600, 19200]
         for expected_wait in tests:
@@ -2807,13 +2811,16 @@ class ScrapeIqueryPagesTest(TestCase):
     )
     @patch("cl.corpus_importer.tasks.logger")
     @override_settings(
-        IQUERY_EMPTY_PROBES_LIMIT=5,
+        IQUERY_EMPTY_PROBES_LIMIT_HOURS={
+            "default": 0.41,
+        },
+        IQUERY_PROBE_WAIT=300,
     )
     def test_probe_iquery_pages_daemon_court_got_stuck(
         self, mock_logger, mock_cookies
     ):
         """Test probe_iquery_pages_daemon when the probe daemon got stuck in a
-        court after IQUERY_EMPTY_PROBES_LIMIT are reached.
+        court after IQUERY_EMPTY_PROBES_LIMIT_HOURS are reached.
         """
 
         r = get_redis_interface("CACHE")
@@ -2828,6 +2835,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
         r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000)
         r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000)
 
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
         self.assertEqual(court_wait_cacd, None)
@@ -2857,15 +2865,92 @@ class ScrapeIqueryPagesTest(TestCase):
             )
 
         mock_logger.error.assert_called_with(
-            "The court %s has accumulated %s empty probe attempts. "
-            "Probably the probe got stuck and manual intervention is required.",
+            "Court %s has accumulated many probe attempts over "
+            "approximately %s hours. It appears the probe may be stuck; "
+            "manual intervention may be required.",
             self.court_cacd.pk,
-            settings.IQUERY_EMPTY_PROBES_LIMIT,
+            0.41,
         )
         court_wait = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
         self.assertEqual(int(court_wait), 3600)
         court_empty_attempts = r.get(
             f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
+        )
+        self.assertEqual(int(court_empty_attempts), 0)
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    @patch("cl.corpus_importer.tasks.logger")
+    @override_settings(
+        IQUERY_EMPTY_PROBES_LIMIT_HOURS={
+            "default": 60,
+            "vib": 120,
+        },
+        IQUERY_PROBE_WAIT=14_400,
+    )
+    def test_probe_iquery_pages_daemon_special_court_got_stuck(
+        self, mock_logger, mock_cookies
+    ):
+        """Test probe_iquery_pages_daemon when the probe daemon got stuck in a
+        special court after its hardcoded limit is reached.
+        """
+
+        r = get_redis_interface("CACHE")
+        r.hset("iquery:highest_known_pacer_case_id", self.court_vib.pk, 0)
+
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
+
+        court_wait_cacd = r.get(f"iquery:court_wait:{self.court_vib.pk}")
+        self.assertEqual(court_wait_cacd, None)
+
+        for test in range(1, 30):
+            with self.subTest(test=test):
+                r.delete(f"iquery:court_wait:{self.court_vib.pk}")
+                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                    call_command(
+                        "probe_iquery_pages_daemon",
+                        testing_iterations=1,
+                    )
+
+                # Assertions for court_vib empty probe.
+                # court_wait is set to one hour.
+                empty_probe_attempts = r.get(
+                    f"iquery:court_empty_probe_attempts:{self.court_vib.pk}"
+                )
+                self.assertEqual(
+                    int(empty_probe_attempts), test, "Wrong empty probes."
+                )
+
+        # Test one more attempt. The alert error should be triggered.
+        r.delete(f"iquery:court_wait:{self.court_vib.pk}")
+        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+            call_command(
+                "probe_iquery_pages_daemon",
+                testing_iterations=1,
+            )
+
+        mock_logger.error.assert_called_with(
+            "Court %s has accumulated many probe attempts over "
+            "approximately %s hours. It appears the probe may be stuck; "
+            "manual intervention may be required.",
+            self.court_vib.pk,
+            120,
+        )
+        court_wait = r.get(f"iquery:court_wait:{self.court_vib.pk}")
+        self.assertEqual(int(court_wait), 3600)
+        court_empty_attempts = r.get(
+            f"iquery:court_empty_probe_attempts:{self.court_vib.pk}"
         )
         self.assertEqual(int(court_empty_attempts), 0)
 

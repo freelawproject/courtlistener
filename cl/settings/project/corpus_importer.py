@@ -11,7 +11,16 @@ IQUERY_COURT_BLOCKED_WAIT = env.int("IQUERY_COURT_BLOCKED_WAIT", default=600)
 IQUERY_COURT_BLOCKED_MAX_ATTEMPTS = env.int(
     "IQUERY_COURT_BLOCKED_MAX_ATTEMPTS", default=6
 )
+# TODO remove after probe_iquery_pages in queue has been processed.
 IQUERY_EMPTY_PROBES_LIMIT = env.int("IQUERY_EMPTY_PROBES_LIMIT", default=15)
+IQUERY_EMPTY_PROBES_LIMIT_HOURS = env.dict(
+    "IQUERY_EMPTY_PROBES_LIMIT_HOURS",
+    default={
+        "default": 60,  # 60 hours
+        "nmib": 8760,  # 1 year
+        "vib": 1140,  # 2 months
+    },
+)
 IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED = env.bool(
     "IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED", default=False
 )
