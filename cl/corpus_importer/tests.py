@@ -2106,7 +2106,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
         highest_known_pacer_case_id = 0
         probe_pattern = []
-        for i in range(9):
+        for i in range(18):
             next_probe = compute_next_binary_probe(
                 highest_known_pacer_case_id,
                 i + 1,
@@ -2114,7 +2114,26 @@ class ScrapeIqueryPagesTest(TestCase):
             )
             probe_pattern.append(next_probe)
 
-        expected_pattern = [1, 2, 4, 8, 16, 32, 64, 128, 256]
+        expected_pattern = [
+            1,
+            2,
+            4,
+            8,
+            16,
+            32,
+            64,
+            96,
+            128,
+            160,
+            192,
+            224,
+            256,
+            288,
+            320,
+            352,
+            384,
+            416,
+        ]
         self.assertEqual(
             expected_pattern,
             probe_pattern,
@@ -2138,9 +2157,13 @@ class ScrapeIqueryPagesTest(TestCase):
             len(unique_probe_pattern_jitter), len(probe_pattern_jitter)
         )
 
-        jitter_applied = probe_pattern_jitter[0] - expected_pattern[0]
-        for expected, actual in zip(expected_pattern, probe_pattern_jitter):
-            self.assertEqual(actual - jitter, expected)
+        for i, (expected, actual) in enumerate(
+            zip(expected_pattern, probe_pattern_jitter)
+        ):
+            # jitter is not applied in the first iteration to speed up
+            # the detection of new cases once courts catch up.
+            jitter_applied = 0 if i is 0 else jitter
+            self.assertEqual(actual - jitter_applied, expected)
 
     @patch(
         "cl.corpus_importer.tasks.CaseQuery",
@@ -2214,23 +2237,54 @@ class ScrapeIqueryPagesTest(TestCase):
         #         24: True,
         #         40: True,
         #         72: True,
+        #         104: True,
         #         136: True,
+        #         168: True,
+        #         200: True,
+        #         232: True,
         #         264: True,
-        #         520: True,
+        #         296: True,
+        #         328: True,
+        #         360: True,
+        #         392: True,
+        #         424: True, #18
+        #         456: True,
         #     }
-        # Note that the probe is terminated on 264 after reaching the 9 probe
+        # Note that the probe is terminated on 424 after reaching the 18 probe
         # iterations.
         highest_known_pacer_case_id = r.hget(
             "iquery:test_highest_known_pacer_case_id", self.court_nysd.pk
         )
-        self.assertEqual(int(highest_known_pacer_case_id), 264)
-        # Probing will add 6 more dockets
+        self.assertEqual(int(highest_known_pacer_case_id), 424)
+        # Probing will add 15 more dockets
         dockets = Docket.objects.filter(
             court_id=self.court_nysd.pk,
-            pacer_case_id__in=["16", "24", "40", "72", "136", "264"],
         )
         self.assertEqual(
-            dockets.count(), 6, msg="Docket number doesn't match."
+            dockets.count(), 15, msg="Docket number doesn't match."
+        )
+        dockets_added = Docket.objects.filter(
+            court_id=self.court_nysd.pk,
+            pacer_case_id__in=[
+                "16",
+                "24",
+                "40",
+                "72",
+                "104",
+                "136",
+                "168",
+                "200",
+                "232",
+                "264",
+                "296",
+                "328",
+                "360",
+                "392",
+                "424",
+            ],
+        )
+        self.assertEqual(
+            dockets_added.count(), 15, msg="Docket number doesn't match."
         )
 
     @patch(
