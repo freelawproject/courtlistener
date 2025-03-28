@@ -1107,9 +1107,12 @@ def compute_binary_probe_jitter(testing: bool) -> int:
     :return: An integer representing the jitter value for binary probes.
     """
 
-    # Probe limit e.g: 6 probe iterations -> 32
-    probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
-    return random.randint(1, round(probe_limit * 0.05)) if not testing else 0
+    # The jitter will be a random value between 1 and half of IQUERY_MAX_PROBE.
+    return (
+        random.randint(1, round(settings.IQUERY_MAX_PROBE * 0.5))
+        if not testing
+        else 0
+    )
 
 
 def compute_next_binary_probe(
@@ -1133,7 +1136,7 @@ def compute_next_binary_probe(
 
     # Avoid applying jitter on the first iteration to speed up
     # the detection of new cases once courts catch up.
-    jitter = 0 if iteration is 1 else jitter
+    jitter = 0 if iteration == 1 else jitter
     max_probe = settings.IQUERY_MAX_PROBE
     cap_iteration = int(math.log2(max_probe)) + 1
     if iteration < cap_iteration:

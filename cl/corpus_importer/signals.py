@@ -41,11 +41,6 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     incoming_pacer_case_id = int(docket.pacer_case_id)
     found_higher_case_id = False
     if incoming_pacer_case_id > highest_known_pacer_case_id:
-        r.hset(
-            "iquery:highest_known_pacer_case_id",
-            court_id,
-            incoming_pacer_case_id,
-        )
         found_higher_case_id = True
 
     if found_higher_case_id:
@@ -59,21 +54,26 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
             iquery_pacer_case_id_current,
             incoming_pacer_case_id,
         )
-        if tasks_to_schedule > 10_800:
-            # Considering a Celery countdown of 1 second applied via
-            # throttle_task and a visibility_timeout of 6 hours, the maximum
-            # countdown time should be set to 21,600 to avoid a celery runaway.
-            # It's safer to abort if more than 10,800 tasks are attempted to be
+        if tasks_to_schedule > 600:
+            # Don't schedule more than 600 tasks at a time to prevent Redis
+            # from being filled up.
+            # It's safer to abort if more than 600 tasks are attempted to be
             # scheduled. This could indicate an issue with retrieving the
             # highest_known_pacer_case_id or a loss of the
             # iquery_pacer_case_id_current for the court in Redis.
             logger.error(
-                "Tried to schedule more than 10,800 iquery pages to scrape for "
-                "court %s aborting it to avoid Celery runaways.",
+                "Tried to schedule more than 600 iquery pages to scrape for "
+                "court %s; aborting to avoid Redis memory exhaustion.",
                 court_id,
             )
             release_redis_lock(r, update_lock_key, lock_value)
             return None
+
+        r.hset(
+            "iquery:highest_known_pacer_case_id",
+            court_id,
+            incoming_pacer_case_id,
+        )
         task_to_schedule_count = 0
         while iquery_pacer_case_id_current + 1 < incoming_pacer_case_id:
             iquery_pacer_case_id_current += 1
