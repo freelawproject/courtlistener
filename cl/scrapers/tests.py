@@ -32,8 +32,15 @@ from cl.scrapers.management.commands import (
     cl_scrape_oral_arguments,
     update_from_text,
 )
+from cl.scrapers.management.commands.merge_opinion_versions import (
+    merge_versions_by_download_url,
+)
 from cl.scrapers.models import UrlHash
-from cl.scrapers.tasks import extract_doc_content, process_audio_file
+from cl.scrapers.tasks import (
+    extract_doc_content,
+    find_and_merge_versions,
+    process_audio_file,
+)
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
     case_names_are_too_different,
@@ -42,7 +49,13 @@ from cl.scrapers.utils import (
     get_extension,
     update_or_create_docket,
 )
+from cl.search.documents import (
+    ES_CHILD_ID,
+    OpinionClusterDocument,
+    OpinionDocument,
+)
 from cl.search.factories import (
+    CitationWithParentsFactory,
     CourtFactory,
     DocketFactory,
     OpinionClusterFactory,
@@ -55,9 +68,15 @@ from cl.search.models import (
     Court,
     Docket,
     Opinion,
+    OpinionCluster,
 )
 from cl.settings import MEDIA_ROOT
-from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.tests.cases import (
+    ESIndexTestCase,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -1018,3 +1037,211 @@ class CommandInputTest(TestCase):
             "juriscraper.oral_args.united_states.federal_appellate.ca1",
             get_module_by_court_id("ca1", "oral_args"),
         )
+
+
+class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.rebuild_index("search.OpinionCluster")
+
+    def test_merge_versions_by_download_url(self):
+        """Can we merge opinion versions and delete ES documents correctly?"""
+        docket = DocketFactory()
+
+        other_dates = "Argued on March 10 2025"
+        summary = "Something..."
+        cluster1 = OpinionClusterFactory.create(
+            docket=docket, other_dates="", summary=""
+        )
+        cluster2 = OpinionClusterFactory.create(
+            docket=docket,
+            # other_dates should overwrite the empty field in the main cluster
+            other_dates=other_dates,
+            summary="",
+        )
+        cluster3 = OpinionClusterFactory.create(
+            docket=docket, other_dates="", summary=summary
+        )
+        cluster4 = OpinionClusterFactory.create(docket=DocketFactory.create())
+
+        main_citation = CitationWithParentsFactory.create(
+            cluster=cluster1, volume=10000, reporter="U.S.", page="1"
+        )
+        repeated_citation = CitationWithParentsFactory.create(
+            cluster=cluster2, volume=10000, reporter="U.S.", page="1"
+        )
+        new_citation = CitationWithParentsFactory.create(
+            cluster=cluster2,
+            volume=20,
+            reporter="Nev.",
+            page="20",
+            type=Citation.STATE,
+        )
+
+        plain_text = (
+            """Lorem ipsum dolor sit amet, consectetur adipiscing
+        elit, sed do eiusmod tempor incididunt ut labore et dolore magna
+        aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco
+        laboris nisi ut aliquip ex ea commodo consequat.
+        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
+        dolore eu fugiat nulla pariatur...
+        """
+            * 3
+        )
+        # simulate an updated text
+        # Note that similarity(text1, text2) is around 0.6 for this test
+        # while similarity(text2, text1) is greater than 0.9
+        updated_plain_text = f"100 Nev 2\n{plain_text}\n"
+        download_url = "http://caseinfo.nvsupreme/111.pdf"
+        author_str = "A Judge"
+
+        # Creation order matters, since we can't override date_created
+        # the opinion we intend to be the main version must be created last
+        version = OpinionFactory(
+            cluster=cluster2,
+            # see if we can pick up opinions with different protocols
+            download_url=download_url.replace("http", "https"),
+            plain_text=plain_text,
+            html="",
+            # This field should be updated
+            author_str=author_str,
+            sha1="22222",
+        )
+        version2 = OpinionFactory(
+            cluster=cluster3,
+            download_url=download_url,
+            plain_text=plain_text,
+            html="",
+            author_str="",
+            sha1="33333",
+        )
+        unrelated_opinion = OpinionFactory(
+            cluster=cluster4,
+            download_url=download_url.replace("111", "222"),
+            sha1="44444",
+        )
+        main_opinion = OpinionFactory(
+            cluster=cluster1,
+            download_url=download_url,
+            plain_text=updated_plain_text,
+            html="",
+            author_str="",
+            sha1="11111",
+        )
+
+        # Check that elasticsearch docs exist before the merging
+        self.assertTrue(OpinionClusterDocument.exists(id=cluster2.id))
+        self.assertTrue(
+            OpinionDocument.exists(id=ES_CHILD_ID(version.id).OPINION)
+        )
+
+        # Function to test
+        merge_versions_by_download_url(download_url.rsplit("/", 1)[0])
+
+        # Check elasticsearch deletions
+        self.assertFalse(OpinionClusterDocument.exists(id=cluster2.id))
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(version.id).OPINION)
+        )
+
+        # Time to test
+        version.refresh_from_db()
+        main_opinion.refresh_from_db()
+        cluster1.refresh_from_db()
+        new_citation.refresh_from_db()
+        unrelated_opinion.refresh_from_db()
+        version2.refresh_from_db()
+
+        # Opinions
+        self.assertEqual(
+            version.main_version,
+            main_opinion,
+            "Opinion.main_version was not updated",
+        )
+        self.assertEqual(
+            version2.main_version,
+            main_opinion,
+            "version2 Opinion.main_version was not updated",
+        )
+        self.assertEqual(
+            main_opinion.author_str,
+            author_str,
+            "Opinion.author_str was not updated in the main object",
+        )
+        self.assertEqual(
+            unrelated_opinion.main_version_id,
+            None,
+            "`unrelated_opinion` should not be updated",
+        )
+
+        # Clusters
+        try:
+            cluster2.refresh_from_db()
+            self.fail("`cluster2` should had been deleted")
+            cluster3.refresh_from_db()
+            self.fail("`cluster3` should had been deleted")
+        except OpinionCluster.DoesNotExist:
+            pass
+        self.assertEqual(
+            cluster1.other_dates,
+            other_dates,
+            "cluster1.other_dates was not updated on merge",
+        )
+        self.assertEqual(
+            cluster1.summary,
+            summary,
+            "cluster1.summary was not updated on merge",
+        )
+
+        # Citations
+        try:
+            repeated_citation.refresh_from_db()
+            self.fail("`repeated_citation` should had been deleted")
+        except Citation.DoesNotExist:
+            pass
+
+        self.assertEqual(
+            new_citation.cluster_id,
+            cluster1.id,
+            "new_citation.cluster_id was not updated",
+        )
+
+        # Check that the new citation was indexed in the OpinionClusterDocument
+        ocd = OpinionClusterDocument.get(id=cluster1.id)
+        self.assertTrue(
+            str(new_citation) in ocd.citation,
+            f"{str(new_citation)} not in {ocd.citation}",
+        )
+
+    def test_find_and_merge_versions_task(self):
+        """Does the scraper versioning task work?"""
+        download_url = "https://something.com/1"
+        plain_text = "Something ..."
+        docket = DocketFactory()
+        previous_main = OpinionFactory(
+            cluster=OpinionClusterFactory.create(docket=docket),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=None,
+        )
+        a_version = OpinionFactory(
+            cluster=OpinionClusterFactory.create(docket=docket),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=previous_main,
+        )
+        main = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(docket=docket),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=None,
+        )
+
+        find_and_merge_versions(pk=main.id)
+        a_version.refresh_from_db()
+        previous_main.refresh_from_db()
+
+        self.assertEqual(previous_main.main_version.id, main.id)
+        # test transitive main_version update
+        self.assertEqual(a_version.main_version.id, main.id)
