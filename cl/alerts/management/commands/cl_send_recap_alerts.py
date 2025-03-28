@@ -11,7 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from django.utils import timezone
 from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import RequestError, TransportError
+from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import connections
 from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrList
@@ -171,22 +171,45 @@ def index_daily_recap_documents(
         local_midnight = local_now.replace(
             hour=0, minute=0, second=0, microsecond=0
         )
-        r.set("alert_sweep:query_date", local_midnight.isoformat())
+        # Date query from previous day since the command currently runs
+        # early each day.
+        day_before_local_midnight = local_midnight - datetime.timedelta(days=1)
+        r.set(
+            "alert_sweep:query_date",
+            day_before_local_midnight.isoformat(),
+            ex=3600 * 12,
+        )
+        logger.info(
+            "Starting %s re-indexing process for date: %s",
+            target_index._index._name,
+            day_before_local_midnight,
+        )
 
     else:
         # If "alert_sweep:query_date" already exists get it from Redis.
         local_midnight_str: str = str(r.get("alert_sweep:query_date"))
-        local_midnight = datetime.datetime.fromisoformat(local_midnight_str)
-        logger.info(f"Resuming re-indexing process for date: {local_midnight}")
+        day_before_local_midnight = datetime.datetime.fromisoformat(
+            local_midnight_str
+        )
+        logger.info(
+            "Resuming %s re-indexing process for date: %s",
+            target_index._index._name,
+            day_before_local_midnight,
+        )
 
     es = connections.get_connection()
     # Convert the local (PDT) midnight time to UTC
     local_timezone = pytz.timezone(timezone.get_current_timezone_name())
-    local_midnight_localized = local_timezone.localize(local_midnight)
-    local_midnight_utc = local_midnight_localized.astimezone(pytz.utc)
-    next_day_utc = local_midnight_utc + datetime.timedelta(days=1)
-
-    today_datetime_iso = local_midnight_utc.isoformat().replace("+00:00", "Z")
+    day_before_local_midnight_localized = local_timezone.localize(
+        day_before_local_midnight
+    )
+    day_before_local_midnight_utc = (
+        day_before_local_midnight_localized.astimezone(pytz.utc)
+    )
+    next_day_utc = day_before_local_midnight_utc + datetime.timedelta(days=1)
+    day_before_datetime_iso = (
+        day_before_local_midnight_utc.isoformat().replace("+00:00", "Z")
+    )
     next_day_utc_iso = next_day_utc.isoformat().replace("+00:00", "Z")
     # Re Index API query.
     query = (
@@ -200,7 +223,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": today_datetime_iso,
+                                            "gte": day_before_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -216,7 +239,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": today_datetime_iso,
+                                        "gte": day_before_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -230,7 +253,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": today_datetime_iso,
+                                            "gte": day_before_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -246,7 +269,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": today_datetime_iso,
+                                        "gte": day_before_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -267,7 +290,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": today_datetime_iso,
+                                        "gte": day_before_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -281,7 +304,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": today_datetime_iso,
+                                            "gte": day_before_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -297,6 +320,9 @@ def index_daily_recap_documents(
 
     if not r.exists("alert_sweep:task_id"):
         # Remove the index from the previous day and create a new one.
+        logger.info(
+            "Deleting %s index from previous day.", target_index._index._name
+        )
         target_index._index.delete(ignore=404)
         target_index.init()
         target_index_name = target_index._index._name
@@ -338,11 +364,19 @@ def index_daily_recap_documents(
         response = es.reindex(**params)
         # Store the task ID in Redis
         task_id = response["task"]
-        r.set("alert_sweep:task_id", task_id)
-        logger.info(f"Re-indexing task scheduled ID: {task_id}")
+        r.set("alert_sweep:task_id", task_id, ex=3600 * 12)
+        logger.info(
+            "Re-indexing task for index %s scheduled with ID: %s",
+            target_index_name,
+            task_id,
+        )
     else:
         task_id = r.get("alert_sweep:task_id")
-        logger.info(f"Resuming re-index task ID: {task_id}")
+        logger.info(
+            "Resuming re-index task for index %s with ID: %s",
+            target_index._index._name,
+            task_id,
+        )
 
     initial_wait = 0.01 if testing else 60.0
     time.sleep(initial_wait)
@@ -463,6 +497,12 @@ def query_alerts(
     ):
         traceback.print_exc()
         logger.info(f"Search for this alert failed: {search_params}\n")
+        return None, None, None
+    except ApiError as e:
+        traceback.print_exc()
+        logger.warning(
+            "ApiError when querying an alert from the sweep index: %s", str(e)
+        )
         return None, None, None
 
 
@@ -603,7 +643,6 @@ def query_and_send_alerts(
             alert.query_run = search_params.urlencode()  # type: ignore
             alert.date_last_hit = timezone.now()
             alert.save()
-
             # Send webhooks
             send_search_alert_webhooks(user, results_to_send, alert.pk)
 
