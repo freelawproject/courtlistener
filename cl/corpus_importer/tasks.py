@@ -1445,6 +1445,7 @@ def probe_iquery_pages(
     r = get_redis_interface("CACHE")
     probe_iteration = 1
     latest_match = 0
+    probe_offset = 0
     highest_known_pacer_case_id = int(
         r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
     )
@@ -1452,8 +1453,8 @@ def probe_iquery_pages(
     reports_data = []
     found_match = False
     pacer_case_id_to_lookup = highest_known_pacer_case_id
-    while probe_iteration <= settings.IQUERY_PROBE_ITERATIONS:
-        pacer_case_id_to_lookup = compute_next_binary_probe(
+    while probe_offset <= settings.IQUERY_PROBE_MAX_OFFSET:
+        pacer_case_id_to_lookup, probe_offset = compute_next_binary_probe(
             highest_known_pacer_case_id, probe_iteration, jitter
         )
         probe_iteration += 1

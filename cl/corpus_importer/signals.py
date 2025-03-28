@@ -54,16 +54,20 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
             iquery_pacer_case_id_current,
             incoming_pacer_case_id,
         )
-        if tasks_to_schedule > 600:
-            # Don't schedule more than 600 tasks at a time to prevent Redis
-            # from being filled up.
+        if (
+            tasks_to_schedule
+            > settings.IQUERY_PROBE_MAX_OFFSET + settings.IQUERY_MAX_PROBE
+        ):
+            # Don't schedule more than IQUERY_PROBE_MAX_OFFSET tasks at a time
+            # to prevent Redis from being filled up.
             # It's safer to abort if more than 600 tasks are attempted to be
             # scheduled. This could indicate an issue with retrieving the
             # highest_known_pacer_case_id or a loss of the
             # iquery_pacer_case_id_current for the court in Redis.
             logger.error(
-                "Tried to schedule more than 600 iquery pages to scrape for "
+                "Tried to schedule more than %s iquery pages to scrape for "
                 "court %s; aborting to avoid Redis memory exhaustion.",
+                tasks_to_schedule,
                 court_id,
             )
             release_redis_lock(r, update_lock_key, lock_value)

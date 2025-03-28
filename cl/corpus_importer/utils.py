@@ -1117,7 +1117,7 @@ def compute_binary_probe_jitter(testing: bool) -> int:
 
 def compute_next_binary_probe(
     highest_known_pacer_case_id: int, iteration: int, jitter: int
-) -> int:
+) -> tuple[int, int]:
     """Compute the next binary probe target for a given PACER case ID.
 
     This computes the next probe target using a geometric sequence
@@ -1131,7 +1131,8 @@ def compute_next_binary_probe(
     :param highest_known_pacer_case_id: The final PACER case ID.
     :param iteration: The current probe iteration number.
     :param jitter: The jitter value to apply.
-    :return: The updated probe_iteration and the PACER case ID to lookup.
+    :return: The updated probe_iteration and the PACER case ID to lookup and
+    the probe offset + jitter computed.
     """
 
     # Avoid applying jitter on the first iteration to speed up
@@ -1144,7 +1145,7 @@ def compute_next_binary_probe(
     else:
         offset = ((iteration - cap_iteration) + 1) * max_probe
     pacer_case_id_to_lookup = highest_known_pacer_case_id + offset + jitter
-    return pacer_case_id_to_lookup
+    return pacer_case_id_to_lookup, offset + jitter
 
 
 def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:

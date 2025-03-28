@@ -2109,7 +2109,7 @@ class ScrapeIqueryPagesTest(TestCase):
         highest_known_pacer_case_id = 0
         probe_pattern = []
         for i in range(18):
-            next_probe = compute_next_binary_probe(
+            next_probe, _ = compute_next_binary_probe(
                 highest_known_pacer_case_id,
                 i + 1,
                 jitter=0,
@@ -2146,7 +2146,7 @@ class ScrapeIqueryPagesTest(TestCase):
         probe_pattern_jitter = []
         jitter = 5
         for i in range(9):
-            next_probe = compute_next_binary_probe(
+            next_probe, _ = compute_next_binary_probe(
                 highest_known_pacer_case_id, i + 1, jitter=jitter
             )
             probe_pattern_jitter.append(next_probe)
