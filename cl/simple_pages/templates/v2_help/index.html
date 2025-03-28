@@ -8,11 +8,13 @@
 
 
 {% block content %}
-  <div class="hidden-xs col-sm-2 col-md-3"></div>
+  <div class="flex flex-col gap-4 my-20">
+    <div class="text-sm font-semibold text-primary-600 uppercase">CourtListener</div>
+    <h1 class="font-cooper font-semibold text-display-lg">Getting Help on CourtListener</h1>
+    <p class="font-normal text-greyscale-600">The following help articles are currently available:</p>
+  </div>
   <div class="col-xs-12 col-sm-8 col-md-6">
-    <h1>Getting Help on CourtListener</h1>
-    <p class="lead">The following help articles are currently available:</p>
-    <ol>
+    <ol class="text-sm font-normal">
       <li><p><a href="{% url "alert_help" %}">Help with search and docket alerts</a></p></li>
       <li><p><a href="{% url "pray_and_pay_help" %}">Help with Pray and Pay project</a></p></li>
       <li><p><a href="{% url "recap_email_help" %}">Help with @recap.email</a></p></li>
