@@ -69,6 +69,7 @@ from cl.corpus_importer.utils import (
     ClusterSourceException,
     DocketSourceException,
     compare_documents,
+    compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
     get_start_of_quarter,
@@ -2108,7 +2109,7 @@ class ScrapeIqueryPagesTest(TestCase):
         highest_known_pacer_case_id = 0
         probe_pattern = []
         for i in range(18):
-            next_probe = compute_next_binary_probe(
+            next_probe, _ = compute_next_binary_probe(
                 highest_known_pacer_case_id,
                 i + 1,
                 jitter=0,
@@ -2145,7 +2146,7 @@ class ScrapeIqueryPagesTest(TestCase):
         probe_pattern_jitter = []
         jitter = 5
         for i in range(9):
-            next_probe = compute_next_binary_probe(
+            next_probe, _ = compute_next_binary_probe(
                 highest_known_pacer_case_id, i + 1, jitter=jitter
             )
             probe_pattern_jitter.append(next_probe)
@@ -2163,8 +2164,14 @@ class ScrapeIqueryPagesTest(TestCase):
         ):
             # jitter is not applied in the first iteration to speed up
             # the detection of new cases once courts catch up.
-            jitter_applied = 0 if i is 0 else jitter
+            jitter_applied = 0 if i == 0 else jitter
             self.assertEqual(actual - jitter_applied, expected)
+
+    def test_jitter_is_capped(self, mock_cookies):
+        """Confirm that jitter can't be greater than IQUERY_MAX_PROBE"""
+
+        jitter = compute_binary_probe_jitter(testing=False)
+        self.assertTrue(jitter < settings.IQUERY_MAX_PROBE)
 
     @patch(
         "cl.corpus_importer.tasks.CaseQuery",
