@@ -4,13 +4,23 @@ env = environ.FileAwareEnv()
 IQUERY_CASE_PROBE_DAEMON_ENABLED = env.bool(
     "IQUERY_CASE_PROBE_DAEMON_ENABLED", default=False
 )
-IQUERY_PROBE_ITERATIONS = env.int("IQUERY_PROBE_ITERATIONS", default=9)
+IQUERY_PROBE_ITERATIONS = env.int("IQUERY_PROBE_ITERATIONS", default=18)
+IQUERY_MAX_PROBE = env.int("IQUERY_MAX_PROBE", default=32)
 IQUERY_PROBE_WAIT = env.int("IQUERY_PROBE_WAIT", default=300)
 IQUERY_COURT_BLOCKED_WAIT = env.int("IQUERY_COURT_BLOCKED_WAIT", default=600)
 IQUERY_COURT_BLOCKED_MAX_ATTEMPTS = env.int(
     "IQUERY_COURT_BLOCKED_MAX_ATTEMPTS", default=6
 )
+# TODO remove after probe_iquery_pages in queue has been processed.
 IQUERY_EMPTY_PROBES_LIMIT = env.int("IQUERY_EMPTY_PROBES_LIMIT", default=15)
+IQUERY_EMPTY_PROBES_LIMIT_HOURS = env.dict(
+    "IQUERY_EMPTY_PROBES_LIMIT_HOURS",
+    default={
+        "default": 60,  # 60 hours
+        "nmib": 8760,  # 1 year
+        "vib": 1140,  # 2 months
+    },
+)
 IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED = env.bool(
     "IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED", default=False
 )

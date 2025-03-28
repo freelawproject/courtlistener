@@ -53,8 +53,9 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
             incoming_pacer_case_id - iquery_pacer_case_id_current
         )
         logger.info(
-            "Found %s tasks to schedule for pacer case IDs ranging from %s to %s.",
+            "Found %s %s tasks to schedule for pacer case IDs ranging from %s to %s.",
             tasks_to_schedule,
+            court_id,
             iquery_pacer_case_id_current,
             incoming_pacer_case_id,
         )
