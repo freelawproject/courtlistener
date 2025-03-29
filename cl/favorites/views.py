@@ -296,8 +296,7 @@ async def user_prayers_view(
     requested_user = await aget_object_or_404(User, username=username)
     is_page_owner = await request.auser() == requested_user
 
-    # this is a temporary restriction for the MVP. The intention is to eventually treat like tags.
-    if not is_page_owner:
+    if not is_page_owner and not requested_user.profile.prayers_public:
         return redirect("top_prayers")
 
     rd_with_prayers_waiting = await get_user_prayers(
@@ -342,7 +341,7 @@ async def user_prayers_view_granted(
     requested_user = await aget_object_or_404(User, username=username)
     is_page_owner = await request.auser() == requested_user
 
-    # this is a temporary restriction for the MVP. The intention is to eventually treat like tags.
+    # unlike pending prayers page, this should always remain private, per the current design
     if not is_page_owner:
         return redirect("top_prayers")
 
