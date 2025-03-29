@@ -64,7 +64,11 @@
               </td>
               <td>
                 <a href="{{ prayer.get_absolute_url }}" rel="nofollow">
-                  {{ prayer.document_number }}
+                  {% if prayer.attachment_number %}
+                    {{ prayer.document_number }}-{{ prayer.attachment_number }}
+                  {% else %}
+                    {{ prayer.document_number }}
+                  {% endif %}
                 </a>
               </td>
               {% endwith %}
