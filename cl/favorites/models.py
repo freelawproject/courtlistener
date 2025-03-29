@@ -213,7 +213,7 @@ class PrayerAvailability(models.Model):
     )
     last_checked = models.DateTimeField(
         help_text="The time when the availability of this document was last checked.",
-        default=timezone.now(),
+        default=timezone.now,
     )
 
     class Meta:
