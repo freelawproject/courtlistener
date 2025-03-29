@@ -63,8 +63,12 @@
                 </a>
               </td>
               <td>
-                <a href="{% url "view_recap_document" docket.pk prayer.docket_entry.entry_number docket.slug %}">
-                  {{ prayer.document_number }}
+                <a href="{{ prayer.get_absolute_url }}" rel="nofollow">
+                  {% if prayer.attachment_number %}
+                    {{ prayer.document_number }}-{{ prayer.attachment_number }}
+                  {% else %}
+                    {{ prayer.document_number }}
+                  {% endif %}
                 </a>
               </td>
               {% endwith %}
