@@ -47,6 +47,7 @@
               <th>Document Number</th>
               <th>Document Description</th>
               <th>Buy on Pacer</th>
+              <th></th>
             {% if perms.favorites.change_prayer %}
               <th>Action</th>
             {% endif %}
@@ -78,6 +79,11 @@
                 {% endif %}
                   target="_blank"
                   rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
+              <td>
+                <div class="prayer-button">
+                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=prayer.prayer_exists document_id=prayer.recap_document.id count=prayer.prayer_count regular_size=True%}
+                </div>
+              </td>
               {% if perms.favorites.change_prayer %}
                 <td>
                   <div class="flex">
