@@ -32,7 +32,7 @@
                 </a>
               </td>
               <td>
-                <a href="{{ rd.document_number }}" rel="nofollow">
+                <a href="{{ rd.get_absolute_url }}" rel="nofollow">
                   {% if rd.attachment_number %}
                     {{ rd.document_number }}-{{ rd.attachment_number }}
                   {% else %}
