@@ -221,10 +221,6 @@ class PrayerAvailability(models.Model):
             models.UniqueConstraint(
                 fields=["recap_document"],
                 name="unique_recap_document",
-            ),
-        ]
-        indexes = [
-            models.Index(
-                fields=["recap_document", "last_checked"],
+                include=["last_checked"]
             ),
         ]
