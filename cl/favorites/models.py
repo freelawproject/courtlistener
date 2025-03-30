@@ -221,6 +221,6 @@ class PrayerAvailability(models.Model):
             models.UniqueConstraint(
                 fields=["recap_document"],
                 name="unique_recap_document",
-                include=["last_checked"]
+                include=["last_checked"],
             ),
         ]
