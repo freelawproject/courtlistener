@@ -6,6 +6,7 @@ from cl.favorites.views import (
     delete_prayer_view,
     open_prayers,
     save_or_update_note,
+    toggle_prayer_public,
     user_prayers_view,
     user_prayers_view_granted,
     view_tag,
@@ -44,5 +45,10 @@ urlpatterns = [
         "prayers/<str:username>/granted",
         user_prayers_view_granted,
         name="user_prayers_granted",
+    ),
+    path(
+        "prayers/pending/toggle/",
+        toggle_prayer_public,
+        name="toggle_prayer_public",
     ),
 ]

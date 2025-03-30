@@ -15,6 +15,7 @@ from django.http import (
 from django.shortcuts import aget_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.utils.datastructures import MultiValueDictKeyError
+from django.views.decorators.http import require_http_methods
 
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, Prayer, UserTag
@@ -30,6 +31,7 @@ from cl.favorites.utils import (
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
 from cl.search.models import RECAPDocument
+from cl.users.models import UserProfile
 
 
 async def get_note(request: HttpRequest) -> HttpResponse:
@@ -296,7 +298,9 @@ async def user_prayers_view(
     requested_user = await aget_object_or_404(User, username=username)
     is_page_owner = await request.auser() == requested_user
 
-    if not is_page_owner and not requested_user.profile.prayers_public:
+    page_public = requested_user.profile.prayers_public
+
+    if not (is_page_owner or page_public):
         return redirect("top_prayers")
 
     rd_with_prayers_waiting = await get_user_prayers(
@@ -329,6 +333,7 @@ async def user_prayers_view(
         "is_page_owner": is_page_owner,
         "user_history": user_history,
         "num_remaining": num_remaining,
+        "page_public": page_public,
         "private": False,
     }
 
@@ -379,3 +384,20 @@ async def user_prayers_view_granted(
     }
 
     return TemplateResponse(request, "user_prayers_granted.html", context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def toggle_prayer_public(
+    request: HttpRequest,
+) -> HttpResponse:
+    """Toggle the user's setting to make pending prayers public"""
+
+    user = request.user
+    if request.POST["current_toggle_status"] == "True":
+        UserProfile.objects.filter(user=user).update(prayers_public=False)
+        msg = "Pending prayers page is now private"
+    else:
+        UserProfile.objects.filter(user=user).update(prayers_public=True)
+        msg = "Pending prayers page is now public"
+    return HttpResponse(msg)

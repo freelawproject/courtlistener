@@ -39,7 +39,7 @@
     {% if request.user.is_authenticated %}
     hx-get="{% url 'user_prayers' request.user.username %}"
     hx-trigger="prayersListChanged from:body" hx-swap="none"
-    {%endif %}
+    {% endif %}
   >
   </div>
 
