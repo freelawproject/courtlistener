@@ -42,12 +42,12 @@
       <table class="settings-table table">
         <thead>
             <tr>
+              <th></th>
               <th>Court</th>
               <th>Case Name</th>
               <th>Document Number</th>
               <th>Document Description</th>
               <th>Buy on Pacer</th>
-              <th></th>
             {% if perms.favorites.change_prayer %}
               <th>Action</th>
             {% endif %}
@@ -56,6 +56,11 @@
         <tbody>
             {% for prayer in top_prayers %}
             <tr>
+              <td>
+                <div class="prayer-button">
+                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=prayer.prayer_exists document_id=prayer.recap_document.id count=prayer.prayer_count regular_size=True%}
+                </div>
+              </td>
               <td>{{ prayer.docket_entry.docket.court.citation_string }}</td>
               {% with docket=prayer.docket_entry.docket %}
               <td>
@@ -79,11 +84,6 @@
                 {% endif %}
                   target="_blank"
                   rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
-              <td>
-                <div class="prayer-button">
-                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=prayer.prayer_exists document_id=prayer.recap_document.id count=prayer.prayer_count regular_size=True%}
-                </div>
-              </td>
               {% if perms.favorites.change_prayer %}
                 <td>
                   <div class="flex">
