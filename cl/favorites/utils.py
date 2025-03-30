@@ -401,7 +401,7 @@ def prayer_unavailable(instance: RECAPDocument, user_pk: int) -> None:
         docket = instance.docket_entry.docket
         docket_entry = instance.docket_entry
         document_url = instance.get_absolute_url()
-        num_waiting = len(email_recipients)
+        num_waiting = open_prayers.count()
         doc_price = price(instance)
 
         messages = []
