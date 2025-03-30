@@ -29,7 +29,9 @@ urlpatterns = [
         views.delete_prayer_view,
         name="delete_prayer",
     ),
-    path("prayers/<str:username>/", views.user_prayers_view, name="user_prayers"),
+    path(
+        "prayers/<str:username>/", views.user_prayers_view, name="user_prayers"
+    ),
     path(
         "prayers/<str:username>/granted",
         views.user_prayers_view_granted,
