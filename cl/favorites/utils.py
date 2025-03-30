@@ -25,7 +25,7 @@ from django.utils import timezone
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.models import Prayer
-from cl.recap.tasks import fetch_prayer_availability
+from cl.recap.tasks import check_prayer_availability, should_check_prayer_availability
 from cl.search.models import RECAPDocument
 
 
@@ -48,18 +48,21 @@ async def prayer_eligible(user: User) -> tuple[bool, int]:
 async def create_prayer(
     user: User, recap_document: RECAPDocument
 ) -> Prayer | None:
-    if (await prayer_eligible(user))[0] and not recap_document.is_available:
-        new_prayer, created = await Prayer.objects.aget_or_create(
-            user=user, recap_document=recap_document
-        )
-        if created:
-            if not fetch_prayer_availability.delay(recap_document.pk):
-                # is it possible to make this function async to avoid delays?
-                prayer_unavailable(recap_document)
-            return new_prayer
-        else:
-            return None
-    return None
+    is_user_eligible, _ = await prayer_eligible(user)
+
+    if not is_user_eligible or recap_document.is_available:
+        return None
+    
+    new_prayer, created = await Prayer.objects.aget_or_create(
+        user=user, recap_document=recap_document
+    )
+    if not created:
+        return None
+    
+    if should_check_prayer_availability(recap_document.pk, User.pk):
+        check_prayer_availability.delay(recap_document.pk, User.pk)
+
+    return new_prayer
 
 
 async def delete_prayer(user: User, recap_document: RECAPDocument) -> bool:
@@ -372,20 +375,21 @@ async def get_lifetime_prayer_stats(
     return PrayerStats(**data)
 
 
-def prayer_unavailable(instance: RECAPDocument) -> None:
+def prayer_unavailable(instance: RECAPDocument, user_pk: int) -> None:
     open_prayers = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
     ).select_related("user")
-    # Retrieve email recipients before deleting pending prayers.
+
+    user_prayer = open_prayers.filter(user__pk=user_pk).first()
+
     email_recipients = [
         {
-            "email": prayer["user__email"],
-            "date_created": prayer["date_created"],
+            "email": user_prayer.user.email,
+            "date_created": user_prayer.date_created,
         }
-        for prayer in open_prayers.values("user__email", "date_created")
     ]
 
-    # Send email notifications in bulk.
+    # Send email notification.
     if email_recipients:
         subject = f"A document you requested is unavailable for purchase"
         txt_template = loader.get_template("prayer_email_unavailable.txt")
