@@ -1643,9 +1643,12 @@ class SearchAlertsUtilsTest(SimpleTestCase):
                 },
             ],
         }
+        mock_date = now().replace(day=27, hour=5)
         for rate, test_cases in test_cases.items():
             for test_case in test_cases:
-                with self.subTest(rate=rate, test_case=test_case):
+                with self.subTest(
+                    rate=rate, test_case=test_case
+                ), time_machine.travel(mock_date, tick=False):
                     expected_date_start = date(
                         test_case["year"],
                         test_case["cut_off_month"],
