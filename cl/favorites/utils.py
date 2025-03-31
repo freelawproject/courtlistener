@@ -116,11 +116,13 @@ async def get_existing_prayers_in_bulk(
 
 
 async def get_top_prayers() -> QuerySet[RECAPDocument]:
-    # Calculate the age of each prayer
-    prayer_age = ExpressionWrapper(
-        Extract(Now() - F("prayers__date_created"), "epoch"),
-        output_field=FloatField(),
-    )
+    """Retrieve the most desired documents that have open prayers. It first
+    ranks by the number of requests and then by the number of views the particular
+    docket has received.
+
+    :return: A queryset of RECAPDocuments in descending order of preference.
+    """
+
     waiting_prayers = Prayer.objects.filter(status=Prayer.WAITING).values(
         "recap_document_id"
     )
@@ -157,20 +159,9 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
             prayer_count=Count(
                 "prayers", filter=Q(prayers__status=Prayer.WAITING)
             ),
-            avg_prayer_age=Avg(
-                prayer_age, filter=Q(prayers__status=Prayer.WAITING)
-            ),
+            view_count=F("docket_entry__docket__view_count"),
         )
-        .annotate(
-            geometric_mean=Sqrt(
-                Cast(
-                    F("prayer_count")
-                    * Cast(F("avg_prayer_age"), FloatField()),
-                    FloatField(),
-                )
-            )
-        )
-        .order_by("-geometric_mean")
+        .order_by("-prayer_count", "-view_count")
     )
 
     return documents
