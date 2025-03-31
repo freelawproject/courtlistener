@@ -1,4 +1,5 @@
 {% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
+{% load static tailwind_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,6 +44,9 @@
   <meta property="og:image:height" content="{% block og_image_height %}630{% endblock %}"/>
   {% endblock %}
 
+  {% tailwind_css %}
+  {% tailwind_preload_css %}
+
   {% block icons %}
   {# Touch icons, etc from: https://evilmartians.com/chronicles/how-to-favicon-in-2021-six-files-that-fit-most-needs #}
   <link rel="icon" href="{% static "ico/favicon.ico" %}" sizes="32x32">
@@ -67,8 +71,6 @@
   <title>{% block title %}CourtListener.com{% endblock %}</title>
   {% block head %}{% endblock %}
   {% block canonical %}{% endblock %}
-  <link rel="stylesheet" href="{% static "css/override.css" %}" type="text/css"
-        media="screen, projection">
 </head>
 
 <body class="{% block body-classes %}{% endblock %}">
