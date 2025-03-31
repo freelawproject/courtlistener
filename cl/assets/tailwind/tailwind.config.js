@@ -18,6 +18,14 @@ module.exports = {
   },
   theme: {
     extend: {
+      screens: {
+        xs: '380px',
+      },
+      spacing: {
+        13: '52px',
+        15: '60px',
+        35: '140px',
+      },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
         cooper: ['Cooper Hewitt', 'sans-serif'],
@@ -81,6 +89,9 @@ module.exports = {
         'display-md': ['32px', '40px'],
         'display-lg': ['40px', '48px'],
         'display-xl': ['44px', '52px'],
+      },
+      maxWidth: {
+        content: '948px',
       },
     },
   },
