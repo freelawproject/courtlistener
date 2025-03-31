@@ -51,6 +51,7 @@ from cl.scrapers.utils import (
 )
 from cl.search.documents import (
     ES_CHILD_ID,
+    DocketDocument,
     OpinionClusterDocument,
     OpinionDocument,
 )
@@ -1046,27 +1047,60 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         cls.rebuild_index("search.OpinionCluster")
 
     def test_merge_versions_by_download_url(self):
-        """Can we merge opinion versions and delete ES documents correctly?"""
-        docket = DocketFactory()
+        """Can we merge opinion versions and delete ES documents correctly?
+
+        This a end to end test. It's testing
+        - Docket deletion, metadata merging and related objects updating
+        - Cluster deletion and metadata merging
+        - Opinion.main_version population
+        - ElasticSearch deletion
+        """
+        court_id = "nev"
+        court = CourtFactory.create(id=court_id)
+        docket_number = "2020-11111"
+        appeal_from = "Some lower court"
+        main_docket = DocketFactory.create(
+            court=court, docket_number=docket_number, appeal_from_str=""
+        )
+        # Will help to see if we can match this docket and update its
+        # related objects
+        version_docket = DocketFactory.create(
+            court=court,
+            docket_number=docket_number,
+            appeal_from_str=appeal_from,
+        )
+
+        # Create related objects to the version docket so we can update their
+        # references on merging
+        version_docket_another_cluster = OpinionClusterFactory.create(
+            docket=version_docket
+        )
+        version_audio = AudioWithParentsFactory.create(docket=version_docket)
+
+        # Opinions will have the same URL, but it has a different docket number
+        not_comparable_docket = DocketFactory.create(
+            court=court, docket_number="2021-11111"
+        )
 
         other_dates = "Argued on March 10 2025"
         summary = "Something..."
-        cluster1 = OpinionClusterFactory.create(
-            docket=docket, other_dates="", summary=""
+        main_cluster = OpinionClusterFactory.create(
+            docket=main_docket, other_dates="", summary=""
         )
         cluster2 = OpinionClusterFactory.create(
-            docket=docket,
+            docket=main_docket,
             # other_dates should overwrite the empty field in the main cluster
             other_dates=other_dates,
             summary="",
         )
         cluster3 = OpinionClusterFactory.create(
-            docket=docket, other_dates="", summary=summary
+            docket=version_docket, other_dates="", summary=summary
         )
         cluster4 = OpinionClusterFactory.create(docket=DocketFactory.create())
+        cluster5 = OpinionClusterFactory.create(docket=not_comparable_docket)
 
         main_citation = CitationWithParentsFactory.create(
-            cluster=cluster1, volume=10000, reporter="U.S.", page="1"
+            cluster=main_cluster, volume=10000, reporter="U.S.", page="1"
         )
         repeated_citation = CitationWithParentsFactory.create(
             cluster=cluster2, volume=10000, reporter="U.S.", page="1"
@@ -1098,7 +1132,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
 
         # Creation order matters, since we can't override date_created
         # the opinion we intend to be the main version must be created last
-        version = OpinionFactory(
+        version = OpinionFactory.create(
             cluster=cluster2,
             # see if we can pick up opinions with different protocols
             download_url=download_url.replace("http", "https"),
@@ -1108,7 +1142,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             author_str=author_str,
             sha1="22222",
         )
-        version2 = OpinionFactory(
+        version2 = OpinionFactory.create(
             cluster=cluster3,
             download_url=download_url,
             plain_text=plain_text,
@@ -1116,13 +1150,19 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             author_str="",
             sha1="33333",
         )
-        unrelated_opinion = OpinionFactory(
+        unrelated_opinion = OpinionFactory.create(
             cluster=cluster4,
             download_url=download_url.replace("111", "222"),
             sha1="44444",
         )
-        main_opinion = OpinionFactory(
-            cluster=cluster1,
+        same_url_different_docket_number = OpinionFactory.create(
+            cluster=cluster5,
+            download_url=download_url,
+            plain_text=plain_text,
+            sha1="5555",
+        )
+        main_opinion = OpinionFactory.create(
+            cluster=main_cluster,
             download_url=download_url,
             plain_text=updated_plain_text,
             html="",
@@ -1131,27 +1171,46 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
 
         # Check that elasticsearch docs exist before the merging
-        self.assertTrue(OpinionClusterDocument.exists(id=cluster2.id))
         self.assertTrue(
-            OpinionDocument.exists(id=ES_CHILD_ID(version.id).OPINION)
+            OpinionClusterDocument.exists(id=cluster2.id),
+            "OpinionClusterDocument does not exist",
+        )
+        self.assertTrue(
+            OpinionDocument.exists(id=ES_CHILD_ID(version.id).OPINION),
+            "OpinionDocument does not exist",
+        )
+        self.assertTrue(
+            DocketDocument.exists(id=version_docket.id),
+            "Docket document does not exist",
         )
 
         # Function to test
         merge_versions_by_download_url(download_url.rsplit("/", 1)[0])
 
         # Check elasticsearch deletions
-        self.assertFalse(OpinionClusterDocument.exists(id=cluster2.id))
         self.assertFalse(
-            OpinionDocument.exists(id=ES_CHILD_ID(version.id).OPINION)
+            OpinionClusterDocument.exists(id=cluster2.id),
+            "OpinionClusterDocument was not deleted",
+        )
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(version.id).OPINION),
+            "OpinionDocument was not deleted",
+        )
+        self.assertFalse(
+            DocketDocument.exists(id=version_docket.id),
+            "Docket document was not deleted",
         )
 
         # Time to test
         version.refresh_from_db()
         main_opinion.refresh_from_db()
-        cluster1.refresh_from_db()
+        main_cluster.refresh_from_db()
         new_citation.refresh_from_db()
         unrelated_opinion.refresh_from_db()
         version2.refresh_from_db()
+        same_url_different_docket_number.refresh_from_db()
+        version_docket_another_cluster.refresh_from_db()
+        version_audio.refresh_from_db()
 
         # Opinions
         self.assertEqual(
@@ -1174,6 +1233,11 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             None,
             "`unrelated_opinion` should not be updated",
         )
+        self.assertEqual(
+            same_url_different_docket_number.main_version_id,
+            None,
+            "`same_url_different_docket_number` should not have it's version updated",
+        )
 
         # Clusters
         try:
@@ -1184,14 +1248,37 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         except OpinionCluster.DoesNotExist:
             pass
         self.assertEqual(
-            cluster1.other_dates,
+            main_cluster.other_dates,
             other_dates,
-            "cluster1.other_dates was not updated on merge",
+            "main_cluster.other_dates was not updated on merge",
         )
         self.assertEqual(
-            cluster1.summary,
+            main_cluster.summary,
             summary,
-            "cluster1.summary was not updated on merge",
+            "main_cluster.summary was not updated on merge",
+        )
+
+        # Docket
+        main_docket.refresh_from_db()
+        self.assertEqual(
+            main_docket.appeal_from_str,
+            appeal_from,
+            "Docket.appeal_from_str should be updated",
+        )
+        try:
+            version_docket.refresh_from_db()
+            self.fail("Version docket should be deleted")
+        except Docket.DoesNotExist:
+            pass
+        self.assertEqual(
+            version_docket_another_cluster.docket_id,
+            main_docket.id,
+            "The cluster assigned to `version_docket` should be assigned to `main_docket`",
+        )
+        self.assertEqual(
+            version_audio.docket_id,
+            main_docket.id,
+            "The docket entry assigned to `version_docket` should be assigned to `main_docket`",
         )
 
         # Citations
@@ -1203,12 +1290,12 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
 
         self.assertEqual(
             new_citation.cluster_id,
-            cluster1.id,
+            main_cluster.id,
             "new_citation.cluster_id was not updated",
         )
 
         # Check that the new citation was indexed in the OpinionClusterDocument
-        ocd = OpinionClusterDocument.get(id=cluster1.id)
+        ocd = OpinionClusterDocument.get(id=main_cluster.id)
         self.assertTrue(
             str(new_citation) in ocd.citation,
             f"{str(new_citation)} not in {ocd.citation}",
@@ -1218,14 +1305,14 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         """Does the scraper versioning task work?"""
         download_url = "https://something.com/1"
         plain_text = "Something ..."
-        docket = DocketFactory()
-        previous_main = OpinionFactory(
+        docket = DocketFactory(docket_number="111")
+        previous_main = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(docket=docket),
             download_url=download_url,
             plain_text=plain_text,
             main_version=None,
         )
-        a_version = OpinionFactory(
+        a_version = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(docket=docket),
             download_url=download_url,
             plain_text=plain_text,

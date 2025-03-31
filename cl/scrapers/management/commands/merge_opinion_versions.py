@@ -9,13 +9,126 @@ from django.db.models import Count, Q
 from elasticsearch import NotFoundError
 from eyecite import clean_text
 
-from cl.favorites.models import Note
+from cl.alerts.models import DocketAlert
+from cl.audio.models import Audio
+from cl.favorites.models import DocketTag, Note
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.people_db.models import (
+    AttorneyOrganizationAssociation,
+    PartyType,
+    Role,
+)
+from cl.recap.models import PacerFetchQueue, ProcessingQueue
+from cl.scrapers.models import PACERMobilePageData
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
-from cl.search.models import Opinion, OpinionCluster
+from cl.search.models import (
+    BankruptcyInformation,
+    Claim,
+    Docket,
+    DocketEntry,
+    DocketPanel,
+    DocketTags,
+    Opinion,
+    OpinionCluster,
+    OpinionClusterNonParticipatingJudges,
+    OpinionClusterPanel,
+)
 
 MIN_SEQUENCE_SIMILARITY = 0.9
 DRY_RUN = False
+
+models_that_reference_docket = [
+    (DocketAlert, "docket"),
+    (Audio, "docket"),
+    (DocketTags, "docket"),
+    (Note, "docket_id"),
+    (AttorneyOrganizationAssociation, "docket"),
+    (PartyType, "docket"),  # UNIQUE CONSTRAINT(docket_id, party_id, name)
+    (
+        Role,
+        "docket",
+    ),  # UNIQUE CONSTRAINT, btree (party_id, attorney_id, role, docket_id, date_action)
+    (PacerFetchQueue, "docket"),
+    (ProcessingQueue, "docket"),
+    (PACERMobilePageData, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id)
+    (BankruptcyInformation, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id)
+    (Claim, "docket"),
+    (DocketPanel, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id, person_id)
+    (DocketEntry, "docket"),
+    (DocketTag, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id, tag_id)
+    (OpinionCluster, "docket"),
+]
+
+# related names are not standard
+models_that_reference_cluster = [
+    (Note, "cluster_id"),
+    (OpinionClusterPanel, "opinioncluster"),
+    (OpinionClusterNonParticipatingJudges, "opinioncluster"),
+]
+
+docket_fields_to_merge = [
+    "source",
+    "appeal_from",
+    "parent_docket",
+    "appeal_from_str",
+    "originating_court_information",
+    "idb_data",
+    "assigned_to",
+    "assigned_to_str",
+    "referred_to",
+    "referred_to_str",
+    "panel_str",
+    "date_last_index",
+    "date_cert_granted",
+    "date_cert_denied",
+    "date_argued",
+    "date_reargued",
+    "date_reargument_denied",
+    "date_filed",
+    "date_terminated",
+    "date_last_filing",
+    "case_name_short",
+    "case_name",
+    "case_name_full",
+    "docket_number_core",
+    "federal_dn_office_code",
+    "federal_dn_case_type",
+    "federal_dn_judge_initials_assigned",
+    "federal_dn_judge_initials_referred",
+    "federal_defendant_number",
+    "pacer_case_id",
+    "cause",
+    "nature_of_suit",
+    "jury_demand",
+    "jurisdiction_type",
+    "appellate_fee_status",
+    "appellate_case_type_information",
+    "mdl_status",
+    "filepath_local",
+    "date_blocked",
+    "blocked",
+]
+
+cluster_fields_to_merge = [
+    "judges",
+    "case_name_short",
+    "case_name_full",
+    "procedural_history",
+    "attorneys",
+    "nature_of_suit",
+    "posture",
+    "syllabus",
+    "blocked",
+    "date_blocked",
+    "headnotes",
+    "cross_reference",
+    "correction",
+    "disposition",
+    "other_dates",
+    "summary",
+    "arguments",
+    "headmatter",
+]
 
 
 def get_query_from_url(url: str, url_filter: str) -> Q:
@@ -80,20 +193,75 @@ def text_is_similar(text1: str, text2: str) -> bool:
             SequenceMatcher(None, text2, text1).ratio()
             > MIN_SEQUENCE_SIMILARITY
         )
-    return ratio
+    return ratio > MIN_SEQUENCE_SIMILARITY
+
+
+def update_referencing_objects(
+    main_object: Union[OpinionCluster, Docket],
+    version_object: Union[OpinionCluster, Docket],
+):
+    """Make all objects referencing to `version_object` point to `main_object`
+
+    This way, prevent cascade deletion. Some of these may fail due to
+    unique constraints; this will break the whole update. Let's let this
+    happen so we can debug, and control it later
+
+    :param main_object: the main version OpinionCluster or Docket
+    :param version_object: the secondary version OpinionCluster or Docket
+    """
+    if isinstance(main_object, OpinionCluster):
+        referencing_models = models_that_reference_cluster
+    elif isinstance(main_object, Docket):
+        referencing_models = models_that_reference_docket
+    else:
+        return
+
+    for model, related_name in referencing_models:
+        filter_query = {related_name: version_object}
+        update_query = {related_name: main_object}
+
+        qs = model.objects.filter(**filter_query)
+        if qs.exists():
+            logger.info(
+                "Updating related %s for %s %s",
+                model._meta.model_name,
+                main_object._meta.model_name,
+                main_object.id,
+            )
+            qs.update(**update_query)
 
 
 def merge_metadata(
-    main_object: Union[Opinion, OpinionCluster],
-    version_object: Union[Opinion, OpinionCluster],
-    fields_to_merge: list[str],
+    main_object: Union[Opinion, OpinionCluster, Docket],
+    version_object: Union[Opinion, OpinionCluster, Docket],
 ) -> bool:
     """Merge `fields_to_merge` from `version_object` into `main_object`
 
-    :param main_object: the main OpinionCluster or Opinion
+    :param main_object: the main OpinionCluster or Opinion or Docket
     :param version_object: the secondary version Opinion, or its OpinionCluster
-    :param fields_to_merge: a list of field names to merge
+    :return: True if the main object was updated and needs to be saved
     """
+    if main_object.id == version_object.id:
+        return False
+
+    if isinstance(main_object, Opinion):
+        fields_to_merge = [
+            "author_str",
+            "author",
+            "per_curiam",
+            "joined_by",
+            "joined_by_str",
+            "html_lawbox",
+            "html_columbia",
+            "xml_harvard",
+        ]
+    elif isinstance(main_object, OpinionCluster):
+        fields_to_merge = cluster_fields_to_merge
+    elif isinstance(main_object, Docket):
+        fields_to_merge = docket_fields_to_merge
+    else:
+        fields_to_merge = []
+
     changed = False
 
     for field in fields_to_merge:
@@ -102,10 +270,11 @@ def merge_metadata(
         if main_value:
             if version_value and not main_value == version_value:
                 logger.warning(
-                    "Unexpected difference in %s: '%s' '%s'. Opinions: %s, %s",
+                    "Unexpected difference in %s: '%s' '%s'. %s: %s, %s",
                     field,
                     main_value,
                     version_value,
+                    main_object._meta.model_name,
                     main_object.id,
                     version_object.id,
                 )
@@ -121,70 +290,43 @@ def merge_opinion_versions(
 ) -> None:
     """Merge the version opinion and related objects into the main opinion
 
-    Currently,this merges OpinionClusters, Citations, and Notes
-    In the future, we may want to also merge Dockets spread apart that belong
-    together
+    Currently,this merges Opinion, OpinionClusters and Dockets
+    It also changes the references on related objects such as Notes for Cluster
+    and a whole list of  `models_that_reference_docket` for Dockets
 
     :param main_opinion: the main version
     :param version_opinion: the secondary version
     :return None
     """
-    opinion_fields = [
-        "author_str",
-        "author",
-        "per_curiam",
-        "joined_by",
-        "joined_by_str",
-        "html_lawbox",
-        "html_columbia",
-        "xml_harvard",
-    ]
-    cluster_fields = [
-        "judges",
-        "case_name_short",
-        "case_name_full",
-        "procedural_history",
-        "attorneys",
-        "nature_of_suit",
-        "posture",
-        "syllabus",
-        "blocked",
-        "date_blocked",
-        "headnotes",
-        "cross_reference",
-        "correction",
-        "disposition",
-        "other_dates",
-        "summary",
-        "arguments",
-        "headmatter",
-    ]
-    update_main_opinion = merge_metadata(
-        main_opinion, version_opinion, opinion_fields
-    )
+    logger.info("Merging %s %s", main_opinion, version_opinion)
+    update_main_opinion = merge_metadata(main_opinion, version_opinion)
     updated_main_cluster = merge_metadata(
-        main_opinion.cluster, version_opinion.cluster, cluster_fields
+        main_opinion.cluster, version_opinion.cluster
     )
-
     version_cluster = version_opinion.cluster
-    update_notes = Note.objects.filter(cluster_id=version_cluster.id).exists()
 
-    # Citations
-    citations = {str(c) for c in main_opinion.cluster.citations.all()}
+    main_docket = main_opinion.cluster.docket
+    version_docket = version_opinion.cluster.docket
+    is_same_docket = main_docket.id == version_docket.id
+    updated_main_docket = merge_metadata(main_docket, version_docket)
+
+    main_citations = {str(c) for c in main_opinion.cluster.citations.all()}
 
     with transaction.atomic():
         if update_main_opinion:
             main_opinion.save()
         if updated_main_cluster:
             main_opinion.cluster.save()
-        if update_notes:
-            Note.objects.filter(cluster_id=version_cluster.id).update(
-                cluster_id=main_opinion.cluster.id
-            )
+        if updated_main_docket:
+            main_opinion.cluster.docket.save()
+
+        update_referencing_objects(main_opinion.cluster, version_cluster)
+        if not is_same_docket:
+            update_referencing_objects(main_docket, version_docket)
 
         # update the cluster_id to prevent the version cluster deletion cascade
         for version_citation in version_cluster.citations.all():
-            if str(version_citation) in citations:
+            if str(version_citation) in main_citations:
                 continue
             version_citation.cluster_id = main_opinion.cluster.id
             version_citation.save()
@@ -199,6 +341,9 @@ def merge_opinion_versions(
         # So, deleting the cluster will delete any associated Citation,
         # and will delete the associated objects in ES
         version_cluster.delete()
+
+        if not is_same_docket:
+            version_docket.delete()
 
         # since the cluster was reassigned, this opinion was not deleted from
         # the ES index. We don't want versions to show up on search
@@ -276,6 +421,33 @@ def merge_versions_by_download_url(
     logger.info(stats)
 
 
+def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
+    """
+    Make sure that the dockets have at least the same court_id and docket number
+
+    :param docket: the main docket
+    :param version_docket: the version docket
+    :return: True if dockets have the same court_id and docket number
+    """
+    # the same docket
+    if docket.id == version_docket.id:
+        return True
+
+    log_template = "Different '%s' for docket %s and %s"
+
+    if docket.court_id != version_docket.court_id:
+        logger.error(log_template, "court_id", docket.id, version_docket.id)
+        return False
+
+    if docket.docket_number != version_docket.docket_number:
+        logger.error(
+            log_template, "docket_number", docket.id, version_docket.id
+        )
+        return False
+
+    return True
+
+
 def merge_versions_by_text_similarity(
     main: Opinion, versions: list[Opinion], stats: dict
 ) -> None:
@@ -294,14 +466,9 @@ def merge_versions_by_text_similarity(
         return
 
     for version in versions:
-        # we should investigate this case further
-        if main.cluster.docket.id != version.cluster.docket.id:
+        # logger.info("Main %s %s %s version %s %s %s", main.id, main.cluster.id, main.cluster.docket.id, version.id, version.cluster.id, version.cluster.docket.id)
+        if not comparable_dockets(main.cluster.docket, version.cluster.docket):
             stats["different dockets"] += 1
-            logger.error(
-                "Main opinion docket %s is not the same as version docket %s",
-                main.cluster.docket.id,
-                version.cluster.docket.id,
-            )
             continue
 
         version_text = clean_opinion_text(version)
