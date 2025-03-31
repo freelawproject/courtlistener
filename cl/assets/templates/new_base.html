@@ -74,9 +74,9 @@
 </head>
 
 <body class="{% block body-classes %}{% endblock %}">
-<div class="container round-bottom">
+<div class="">
   {% block header %}
-  <header class="row">
+  <header class="border border-greyscale-200">
   New design MVP
   </header>
   {% endblock %}
@@ -97,59 +97,13 @@
       <p>Your content seems to be missing! This is never good.</p>
     {% endblock %}
   </div>
-
-  {% block newsletter %}
-    <div class="row base-newsletter hidden-print">
-      <div class="col-sm-6">
-        <p class="bold bottom">Newsletter</p>
-        <p>Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
-      </div>
-      <div class="col-sm-6 right">
-        <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?forwardedFromSecureDomain=1&subscription=9"
-          class="btn btn-default"
-          tabindex="10000">
-          <i class="fa fa-newspaper-o"></i>&nbsp;Subscribe
-        </a>
-      </div>
-    </div>
   {% endblock %}
 
   {% block footer %}
-  <footer class="row hidden-print">
+  <footer class="">
   </footer>
   {% endblock %}
 </div>
-
-{% block social %}
-<div class="text-center hidden-print" id="social-container">
-  <a href="https://free.law/"
-     class="fa-stack fa-lg"
-     tabindex="12000">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-link fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://x.com/freelawproject"
-     rel="noreferrer"
-     class="fa-stack fa-lg"
-     tabindex="12001">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-twitter fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9"
-     class="fa-stack fa-lg"
-     tabindex="12002">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-newspaper-o fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://github.com/freelawproject/courtlistener"
-     rel="noreferrer"
-     class="fa-stack fa-lg"
-     tabindex="12003">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
-  </a>
-</div>
-{% endblock %}
 
 {% if DEBUG %}
 <script type="text/javascript"
