@@ -2570,7 +2570,6 @@ class OpinionSearchDecayRelevancyTest(
             self._test_results_ordering(test, "cluster_id", version="v3")
 
 
-@override_flag("ui_flag_for_o", False)
 @override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
@@ -2703,14 +2702,16 @@ class RelatedSearchTest(
             )
         )
 
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
 
         recomendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
         recommendations_expected = [
             (
@@ -2746,14 +2747,16 @@ class RelatedSearchTest(
             )
         )
 
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
 
-        recomendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        recommendations_actual = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
 
         recommendations_expected = [
@@ -2774,7 +2777,7 @@ class RelatedSearchTest(
         # Test if related opinion exist in expected order
         self.assertEqual(
             recommendations_expected,
-            recomendations_actual,
+            recommendations_actual,
             msg="Unexpected opinion recommendations.",
         )
         await sync_to_async(self.async_client.logout)()
@@ -2793,14 +2796,16 @@ class RelatedSearchTest(
             )
         )
 
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
 
         recommendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
         recommendations_expected = [
             (
@@ -2824,40 +2829,6 @@ class RelatedSearchTest(
         )
         await sync_to_async(self.async_client.logout)()
 
-    async def test_es_get_citing_and_related_clusters_no_cache_timeout(
-        self,
-    ) -> None:
-        """Confirm that 'Unable to retrieve clusters...' message is shown if
-        the MLT and citing query time out."""
-        seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
-
-        # Login as staff user (related items are by default disabled for guests)
-        self.assertTrue(
-            await sync_to_async(self.async_client.login)(
-                username="admin", password="password"
-            )
-        )
-
-        with mock.patch(
-            "elasticsearch_dsl.MultiSearch.execute"
-        ) as mock_m_search_execute:
-            mock_m_search_execute.side_effect = ConnectionTimeout(
-                "Connection timeout"
-            )
-            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
-
-        self.assertEqual(r.status_code, 200)
-        tree = html.fromstring(r.content.decode())
-        recommendations_text = tree.xpath("//*[@id='recommendations']")[
-            0
-        ].text_content()
-        citing_text = tree.xpath("//*[@id='cited-by']")[0].text_content()
-        self.assertIn(
-            "Unable to retrieve related clusters.", recommendations_text
-        )
-        self.assertIn("Unable to retrieve citing clusters.", citing_text)
-        await sync_to_async(self.async_client.logout)()
-
     async def test_es_get_citing_and_related_clusters_no_cache_connection_error(
         self,
     ) -> None:
@@ -2878,13 +2849,13 @@ class RelatedSearchTest(
             "elasticsearch_dsl.MultiSearch.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionError()
-            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/cited-by/" % seed_pk
+            )
 
         self.assertEqual(r.status_code, 200)
         tree = html.fromstring(r.content.decode())
-        recommendations_text = tree.xpath("//*[@id='recommendations']")
         citing_text = tree.xpath("//*[@id='cited-by']")[0].text_content()
-        self.assertEqual([], recommendations_text)
         self.assertIn(
             "This case has not yet been cited in our system.", citing_text
         )
@@ -2908,26 +2879,24 @@ class RelatedSearchTest(
         r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
         self.assertEqual(r.status_code, 200)
 
-        # Timeout Request.
+        # Timeout Request for related cases
         with mock.patch(
             "elasticsearch_dsl.MultiSearch.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionTimeout(
                 "Connection timeout"
             )
-            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/related-cases/" % seed_pk
+            )
 
         self.assertEqual(r.status_code, 200)
         tree = html.fromstring(r.content.decode())
 
         # Results are returned from cache.
         recommendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
-        ]
-        citing_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='cited-by']/ul/li/a")
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
         recommendations_expected = [
             (
@@ -2948,6 +2917,25 @@ class RelatedSearchTest(
             recommendations_actual,
             msg="Unexpected opinion recommendations.",
         )
+
+        # Timeout Request for cited by cases
+        with mock.patch(
+            "elasticsearch_dsl.MultiSearch.execute"
+        ) as mock_m_search_execute:
+            mock_m_search_execute.side_effect = ConnectionTimeout(
+                "Connection timeout"
+            )
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/cited-by/" % seed_pk
+            )
+
+        self.assertEqual(r.status_code, 200)
+        tree = html.fromstring(r.content.decode())
+
+        citing_actual = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='cited-by']/article/h3/a")
+        ]
 
         citing_expected = [
             (
