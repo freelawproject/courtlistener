@@ -2368,13 +2368,13 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Set a big court_wait for the following courts in order to abort them in
         # this test.
-        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -2412,13 +2412,13 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Set a big court_wait for the following courts in order to abort them in
         # this test.
-        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -2767,14 +2767,14 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Set a big court_wait for the following courts in order to abort them in
         # this test.
-        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
 
         tests = [600, 1200, 2400, 4800, 9600, 19200]
         for expected_wait in tests:
@@ -2817,6 +2817,9 @@ class ScrapeIqueryPagesTest(TestCase):
         new=FakeCaseQueryReport,
     )
     @patch("cl.corpus_importer.tasks.logger")
+    @patch(
+        "cl.corpus_importer.management.commands.probe_iquery_pages_daemon.logger"
+    )
     @override_settings(
         IQUERY_EMPTY_PROBES_LIMIT_HOURS={
             "default": 0.41,
@@ -2824,7 +2827,7 @@ class ScrapeIqueryPagesTest(TestCase):
         IQUERY_PROBE_WAIT=300,
     )
     def test_probe_iquery_pages_daemon_court_got_stuck(
-        self, mock_logger, mock_cookies
+        self, mock_logger_daemon, mock_logger, mock_cookies
     ):
         """Test probe_iquery_pages_daemon when the probe daemon got stuck in a
         court after IQUERY_EMPTY_PROBES_LIMIT_HOURS are reached.
@@ -2835,14 +2838,14 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Set a big court_wait for the following courts in order to abort them in
         # this test.
-        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 100, ex=3600)
 
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
         self.assertEqual(court_wait_cacd, None)
@@ -2862,6 +2865,12 @@ class ScrapeIqueryPagesTest(TestCase):
                     f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
                 )
                 self.assertEqual(int(empty_probe_attempts), test)
+
+        mock_logger_daemon.info.assert_any_call(
+            "Skipping court %s for %s hours.",
+            self.court_hib.pk,
+            round(3600 / 3600, 2),
+        )
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
@@ -2909,14 +2918,14 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Set a big court_wait for the following courts in order to abort them in
         # this test.
-        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000)
-        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
 
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_vib.pk}")
         self.assertEqual(court_wait_cacd, None)
