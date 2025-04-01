@@ -27,6 +27,7 @@ from cl.alerts.utils import (
 )
 from cl.api.models import WebhookEventType
 from cl.api.tasks import send_search_alert_webhook_es
+from cl.lib.argparse_types import valid_date_time
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.date_time import dt_as_local_date
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
@@ -125,6 +126,7 @@ def index_daily_recap_documents(
     r: Redis,
     source_index_name: str,
     target_index: type[RECAPSweepDocument] | type[ESRECAPSweepDocument],
+    query_date: datetime.datetime,
     testing: bool = False,
     only_rd: bool = False,
 ) -> int:
@@ -137,6 +139,7 @@ def index_daily_recap_documents(
     documents will be queried.
     :param target_index: The target Elasticsearch index to which documents will
      be re-indexed.
+    :param query_date: The query date to which documents will be queried.
     :param testing: Boolean flag for testing mode.
     :param only_rd: Whether to reindex only RECAPDocuments into the
     ESRECAPSweepDocument index.
@@ -164,51 +167,22 @@ def index_daily_recap_documents(
         # it and proceed with sending alerts.
         return 0
 
-    if not r.exists("alert_sweep:query_date"):
-        # In case of a failure, store the date when alerts should be queried in
-        # Redis, so the command can be resumed.
-        local_now = timezone.localtime().replace(tzinfo=None)
-        local_midnight = local_now.replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        # Date query from previous day since the command currently runs
-        # early each day.
-        day_before_local_midnight = local_midnight - datetime.timedelta(days=1)
-        r.set(
-            "alert_sweep:query_date",
-            day_before_local_midnight.isoformat(),
-            ex=3600 * 12,
-        )
-        logger.info(
-            "Starting %s re-indexing process for date: %s",
-            target_index._index._name,
-            day_before_local_midnight,
-        )
-
-    else:
-        # If "alert_sweep:query_date" already exists get it from Redis.
-        local_midnight_str: str = str(r.get("alert_sweep:query_date"))
-        day_before_local_midnight = datetime.datetime.fromisoformat(
-            local_midnight_str
-        )
-        logger.info(
-            "Resuming %s re-indexing process for date: %s",
-            target_index._index._name,
-            day_before_local_midnight,
-        )
+    logger.info(
+        "Starting %s re-indexing process for date: %s",
+        target_index._index._name,
+        query_date,
+    )
 
     es = connections.get_connection()
     # Convert the local (PDT) midnight time to UTC
     local_timezone = pytz.timezone(timezone.get_current_timezone_name())
-    day_before_local_midnight_localized = local_timezone.localize(
-        day_before_local_midnight
+    query_date_local_midnight_localized = local_timezone.localize(query_date)
+    query_date_local_midnight_utc = (
+        query_date_local_midnight_localized.astimezone(pytz.utc)
     )
-    day_before_local_midnight_utc = (
-        day_before_local_midnight_localized.astimezone(pytz.utc)
-    )
-    next_day_utc = day_before_local_midnight_utc + datetime.timedelta(days=1)
-    day_before_datetime_iso = (
-        day_before_local_midnight_utc.isoformat().replace("+00:00", "Z")
+    next_day_utc = query_date_local_midnight_utc + datetime.timedelta(days=1)
+    query_date_datetime_iso = (
+        query_date_local_midnight_utc.isoformat().replace("+00:00", "Z")
     )
     next_day_utc_iso = next_day_utc.isoformat().replace("+00:00", "Z")
     # Re Index API query.
@@ -223,7 +197,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": day_before_datetime_iso,
+                                            "gte": query_date_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -239,7 +213,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": day_before_datetime_iso,
+                                        "gte": query_date_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -253,7 +227,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": day_before_datetime_iso,
+                                            "gte": query_date_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -269,7 +243,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": day_before_datetime_iso,
+                                        "gte": query_date_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -290,7 +264,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": day_before_datetime_iso,
+                                        "gte": query_date_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -304,7 +278,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": day_before_datetime_iso,
+                                            "gte": query_date_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -604,7 +578,6 @@ def query_and_send_alerts(
     :param query_date: The daily re_index query date.
     :return: None.
     """
-
     alert_users: UserProfile.user = User.objects.filter(
         alerts__rate=rate
     ).distinct()
@@ -723,6 +696,19 @@ def query_and_schedule_alerts(
             ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
 
 
+def get_day_before_query_date() -> datetime.datetime:
+    """Get the datetime representing the day before the current local date.
+
+    :return: A naive datetime object representing midnight of the day before
+    the current local date.
+    """
+    local_now = timezone.localtime().replace(tzinfo=None)
+    local_midnight = local_now.replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    return local_midnight - datetime.timedelta(days=1)
+
+
 class Command(VerboseCommand):
     """Query and re-index (into the RECAP sweep index) all the RECAP content
     that has changed during the current period, along with their related
@@ -738,15 +724,33 @@ class Command(VerboseCommand):
             action="store_true",
             help="Use this flag for testing purposes.",
         )
+        parser.add_argument(
+            "--query-date",
+            type=valid_date_time,
+            help="Query date in ISO-8601 format.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
         testing_mode = options.get("testing_mode", False)
         r = get_redis_interface("CACHE")
+        query_date: datetime.datetime | None = options.get("query_date", None)
+
+        if query_date is not None:
+            # Convert the provided query_date to midnight.
+            query_date = query_date.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ).replace(tzinfo=None)
+        else:
+            # Date query from previous day since the command currently runs
+            # early each day.
+            query_date = get_day_before_query_date()
+
         index_daily_recap_documents(
             r,
             DocketDocument._index._name,
             RECAPSweepDocument,
+            query_date,
             testing=testing_mode,
         )
         if not testing_mode:
@@ -757,6 +761,7 @@ class Command(VerboseCommand):
             r,
             DocketDocument._index._name,
             ESRECAPSweepDocument,
+            query_date,
             testing=testing_mode,
             only_rd=True,
         )
@@ -765,17 +770,10 @@ class Command(VerboseCommand):
             # can be omitted in case of a failure.
             r.set("alert_sweep:rd_re_index_completed", 1, ex=3600 * 12)
 
-        query_date = timezone.localtime(
-            timezone.make_aware(
-                datetime.datetime.fromisoformat(
-                    str(r.get("alert_sweep:query_date"))
-                )
-            )
-        ).date()
-        query_and_send_alerts(r, Alert.REAL_TIME, query_date)
-        query_and_send_alerts(r, Alert.DAILY, query_date)
-        query_and_schedule_alerts(r, Alert.WEEKLY, query_date)
-        query_and_schedule_alerts(r, Alert.MONTHLY, query_date)
+        date_to_query = query_date.date()
+        query_and_send_alerts(r, Alert.REAL_TIME, date_to_query)
+        query_and_send_alerts(r, Alert.DAILY, date_to_query)
+        query_and_schedule_alerts(r, Alert.WEEKLY, date_to_query)
+        query_and_schedule_alerts(r, Alert.MONTHLY, date_to_query)
         r.delete("alert_sweep:main_re_index_completed")
         r.delete("alert_sweep:rd_re_index_completed")
-        r.delete("alert_sweep:query_date")

@@ -12,6 +12,7 @@ from elasticsearch_dsl import Q, connections
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.management.commands.cl_send_recap_alerts import (
+    get_day_before_query_date,
     index_daily_recap_documents,
 )
 from cl.alerts.models import (
@@ -99,7 +100,6 @@ class RECAPAlertsSweepIndexTest(
 
     def setUp(self):
         self.r = get_redis_interface("CACHE")
-        self.r.delete("alert_sweep:query_date")
         self.r.delete("alert_sweep:task_id")
         keys = self.r.keys("alert_hits_sweep:*")
         if keys:
@@ -177,10 +177,12 @@ class RECAPAlertsSweepIndexTest(
         # Index documents based Dockets changed yesterday + all their
         # RECAPDocuments indexed.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
@@ -229,10 +231,12 @@ class RECAPAlertsSweepIndexTest(
 
         # Run the indexer.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
@@ -269,10 +273,12 @@ class RECAPAlertsSweepIndexTest(
 
         # Run the indexer.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
@@ -313,10 +319,12 @@ class RECAPAlertsSweepIndexTest(
 
         # Run the indexer. No new documents re_indexed.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
@@ -332,10 +340,12 @@ class RECAPAlertsSweepIndexTest(
 
         # Run the indexer. No new documents re_indexed.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
@@ -351,10 +361,12 @@ class RECAPAlertsSweepIndexTest(
 
         # Run the indexer. No new documents re_indexed.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
@@ -1064,7 +1076,64 @@ class RECAPAlertsSweepIndexTest(
         # Confirm alert_sweep keys are removed from Redis.
         self.assertFalse(self.r.exists("alert_sweep:main_re_index_completed"))
         self.assertFalse(self.r.exists("alert_sweep:rd_re_index_completed"))
-        self.assertFalse(self.r.exists("alert_sweep:query_date"))
+
+    def test_send_alerts_on_custom_date(self, mock_prefix) -> None:
+        """This test confirms that the cl_send_recap_alerts --query-date
+        argument works correctly to send alerts for the specified date.
+        """
+
+        indexing_date = now() - datetime.timedelta(days=5)
+        with time_machine.travel(
+            indexing_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 5 Days Ago",
+                docket_number="1:21-bk-1239",
+                source=Docket.RECAP,
+            )
+
+        AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert 5 days ago",
+            query="q=SUBPOENAS SERVED 5 Days Ago&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        # Run the command using a date that should not trigger any alerts.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command(
+                "cl_send_recap_alerts",
+                query_date=indexing_date - datetime.timedelta(days=1),
+                testing_mode=True,
+            )
+        # No alerts should be triggered.
+        self.assertEqual(
+            len(mail.outbox), 0, msg="Outgoing emails don't match."
+        )
+
+        # Run the command on the same date the documents were indexed.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command(
+                "cl_send_recap_alerts",
+                query_date=indexing_date,
+                testing_mode=True,
+            )
+        # Confirm remaining alert was properly sent.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
 
     def test_limit_alert_case_child_hits(self, mock_prefix) -> None:
         """Test limit case child hits up to 5 and display the "View additional
