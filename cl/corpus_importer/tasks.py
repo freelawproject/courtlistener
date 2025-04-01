@@ -1445,14 +1445,16 @@ def probe_iquery_pages(
     r = get_redis_interface("CACHE")
     probe_iteration = 1
     latest_match = 0
+    probe_offset = 0
     highest_known_pacer_case_id = int(
         r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
     )
     jitter = compute_binary_probe_jitter(testing)
     reports_data = []
     found_match = False
-    while probe_iteration <= settings.IQUERY_PROBE_ITERATIONS:
-        pacer_case_id_to_lookup = compute_next_binary_probe(
+    pacer_case_id_to_lookup = highest_known_pacer_case_id
+    while probe_offset + jitter < settings.IQUERY_PROBE_MAX_OFFSET:
+        pacer_case_id_to_lookup, probe_offset = compute_next_binary_probe(
             highest_known_pacer_case_id, probe_iteration, jitter
         )
         probe_iteration += 1
@@ -1532,15 +1534,32 @@ def probe_iquery_pages(
         )
 
     if not reports_data:
+        logger.info(
+            "No cases were found during this probe for court %s - case IDs from %s to %s.",
+            court_id,
+            str(highest_known_pacer_case_id),
+            str(pacer_case_id_to_lookup),
+        )
         court_empty_probe_attempts = r.incr(
             f"iquery:court_empty_probe_attempts:{court_id}"
         )
-        if court_empty_probe_attempts >= settings.IQUERY_EMPTY_PROBES_LIMIT:
+        # Compute the duration of empty probes in hours based on the number of
+        # court_empty_probe_attempts and the current IQUERY_PROBE_WAIT interval
+        empty_probes_hours = (
+            court_empty_probe_attempts * settings.IQUERY_PROBE_WAIT
+        ) / 3600
+        court_empty_probe_limit_hours = (
+            settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS.get(
+                court_id, settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS["default"]
+            )
+        )
+        if empty_probes_hours >= court_empty_probe_limit_hours:
             logger.error(
-                "The court %s has accumulated %s empty probe attempts. "
-                "Probably the probe got stuck and manual intervention is required.",
+                "Court %s has accumulated many probe attempts over "
+                "approximately %s hours. It appears the probe may be stuck; "
+                "manual intervention may be required.",
                 court_id,
-                settings.IQUERY_EMPTY_PROBES_LIMIT,
+                court_empty_probe_limit_hours,
             )
             # Restart court_blocked_attempts to avoid continue logging the
             # error on next iterations.

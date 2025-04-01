@@ -480,7 +480,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         cls.user_2 = UserFactory()
 
     def setUp(self) -> None:
-        self.alert_path = reverse("alert-list", kwargs={"version": "v3"})
+        self.alert_path = reverse("alert-list", kwargs={"version": "v4"})
         self.client = make_client(self.user_1.pk)
         self.client_2 = make_client(self.user_2.pk)
 
@@ -523,12 +523,12 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         # Get the alerts for user_1, should be 2
         response = await self.client.get(self.alert_path)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(response.json()["count"], 2)
+        self.assertEqual(len(response.json()["results"]), 2)
 
         # Get the alerts for user_2, should be 1
         response_2 = await self.client_2.get(self.alert_path)
         self.assertEqual(response_2.status_code, HTTPStatus.OK)
-        self.assertEqual(response_2.json()["count"], 1)
+        self.assertEqual(len(response_2.json()["results"]), 1)
 
     async def test_delete_alert(self) -> None:
         """Can we delete an alert?
@@ -555,7 +555,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
 
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_1.json()["id"], "version": "v4"},
         )
 
         # Delete the alert for user_1
@@ -571,7 +571,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
 
         alert_2_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_2.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_2.json()["id"], "version": "v4"},
         )
 
         # user_2 tries to delete a user_1 alert, it should fail
@@ -590,7 +590,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         self.assertEqual(await search_alert.acount(), 1)
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_1.json()["id"], "version": "v4"},
         )
 
         # Get the alert detail for user_1
@@ -625,7 +625,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
 
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_1.json()["id"], "version": "v4"},
         )
 
         # Update the alert
@@ -660,6 +660,74 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         )
         search_alert = Alert.objects.all()
         self.assertEqual(await search_alert.acount(), 0)
+
+    async def test_can_validate_required_fields(self) -> None:
+        # Test creation with missing required fields:
+        response = await self.client.post(self.alert_path, {}, format="json")
+
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("This field is required.", response.json()["name"])
+        self.assertIn("This field is required.", response.json()["query"])
+        self.assertIn("This field is required.", response.json()["rate"])
+
+        # Create a valid alert for subsequent update testing:
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+        )
+        alert_1_data = alert_1.json()
+        # Try to update an alert using a PUT request with missing required
+        # fields:
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1_data["id"], "version": "v4"},
+        )
+        data_updated = {"name": "alert_1_updated"}  # Missing query and rate
+        response = await self.client.put(alert_1_path_detail, data_updated)
+
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("This field is required.", response.json()["query"])
+        self.assertIn("This field is required.", response.json()["rate"])
+
+    async def test_can_update_alert_using_patch_request(self) -> None:
+        # Create an initial alert for testing:
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+        )
+        alert_1_data = alert_1.json()
+
+        # Verify initial alert state:
+        self.assertEqual(alert_1_data["alert_type"], SEARCH_TYPES.OPINION)
+        search_alert = Alert.objects.all()
+        self.assertEqual(await search_alert.acount(), 1)
+
+        # Construct the detail URL for the alert:
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1_data["id"], "version": "v4"},
+        )
+
+        # Update the alert's name:
+        data_updated = {"name": "alert_1_updated"}
+        response = await self.client.patch(alert_1_path_detail, data_updated)
+
+        # Check that the alert was updated
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["name"], "alert_1_updated")
+        self.assertEqual(response.json()["id"], alert_1_data["id"])
+
+        # Update the alert's rate:
+        data_updated = {"rate": "wly"}
+        response = await self.client.patch(alert_1_path_detail, data_updated)
+
+        # Verify successful rate update, and that name persists:
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["id"], alert_1_data["id"])
+        self.assertEqual(response.json()["name"], "alert_1_updated")
+        self.assertEqual(response.json()["rate"], "wly")
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
@@ -1575,9 +1643,12 @@ class SearchAlertsUtilsTest(SimpleTestCase):
                 },
             ],
         }
+        mock_date = now().replace(day=27, hour=5)
         for rate, test_cases in test_cases.items():
             for test_case in test_cases:
-                with self.subTest(rate=rate, test_case=test_case):
+                with self.subTest(
+                    rate=rate, test_case=test_case
+                ), time_machine.travel(mock_date, tick=False):
                     expected_date_start = date(
                         test_case["year"],
                         test_case["cut_off_month"],

@@ -30,7 +30,7 @@ case "$1" in
         --worker-class cl.workers.UvicornWorker \
         --limit-request-line 6000 \
         --timeout 0 \
-        --max-requests 1000 \
+        --max-requests 500 \
         --max-requests-jitter 50 \
         --bind 0.0.0.0:8000
     ;;
