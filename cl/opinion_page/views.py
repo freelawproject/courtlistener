@@ -1122,23 +1122,6 @@ async def view_opinion_related_cases(
     )
 
 
-async def cluster_visualizations(
-    request: HttpRequest, pk: int, slug: str
-) -> HttpResponse:
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
-    return TemplateResponse(
-        request,
-        "opinion_visualizations.html",
-        {
-            "title": await get_case_title(cluster),
-            "caption": await cluster.acaption(),
-            "cluster": cluster,
-            "private": cluster.blocked
-            or await cluster.ahas_private_authority(),
-        },
-    )
-
-
 async def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
     return TemplateResponse(
         request,
