@@ -384,6 +384,10 @@ class RECAPDocumentValidationTest(TestCase):
         self.assertIsNotNone(document.id)
 
 
+@mock.patch(
+    "cl.lib.courts.get_cache_key_for_court_list",
+    return_value="common_search:minimal-court-list",
+)
 class ESCommonSearchTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -493,7 +497,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         """Get the article count in a query response"""
         return len(html.fromstring(r.content.decode()).xpath("//article"))
 
-    def test_get_child_court_ids_for_parents(self) -> None:
+    def test_get_child_court_ids_for_parents(
+        self, court_cache_key_mock
+    ) -> None:
         def compare_strings_regardless_order(str1, str2):
             set1 = {s.strip('" ').strip() for s in str1.split("OR")}
             set2 = {s.strip('" ').strip() for s in str2.split("OR")}
@@ -562,7 +568,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             )
         )
 
-    def test_modify_court_id_queries(self) -> None:
+    def test_modify_court_id_queries(self, court_cache_key_mock) -> None:
         """Test parse_court_id_query method, it should properly parse a
         court_id query
         """
@@ -602,7 +608,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             output_str = modify_court_id_queries(test["input"])
             self.assertEqual(output_str, test["output"])
 
-    async def test_filter_parent_child_courts(self) -> None:
+    async def test_filter_parent_child_courts(
+        self, court_cache_key_mock
+    ) -> None:
         """Does filtering in a given parent court return opinions from the
         parent and its child courts?
         """
@@ -637,7 +645,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertIn("National", r.content.decode())
         self.assertIn("Nevada", r.content.decode())
 
-    async def test_advanced_search_parent_child_courts(self) -> None:
+    async def test_advanced_search_parent_child_courts(
+        self, court_cache_key_mock
+    ) -> None:
         """Does querying in a given parent court return opinions from the
         parent and its child courts?
         """
@@ -687,7 +697,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertIn("National", r.content.decode())
         self.assertIn("Nevada", r.content.decode())
 
-    async def test_es_bad_syntax_proximity_tokens(self) -> None:
+    async def test_es_bad_syntax_proximity_tokens(
+        self, court_cache_key_mock
+    ) -> None:
         """Can we make a suggestion for queries that use unrecognized proximity
         search?
         """
@@ -731,7 +743,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             r.content.decode(),
         )
 
-    async def test_es_unbalanced_quotes(self) -> None:
+    async def test_es_unbalanced_quotes(self, court_cache_key_mock) -> None:
         """Can we make a suggestion for queries that use include unbalanced
         quotes?
         """
@@ -763,7 +775,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertNotIn("Did you mean:", r.content.decode())
 
-    def test_handle_unbalanced_parentheses(self) -> None:
+    def test_handle_unbalanced_parentheses(self, court_cache_key_mock) -> None:
         """Can we make a suggestion for queries that use include unbalanced
         parentheses?
         """
@@ -814,7 +826,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertNotIn("Did you mean", r.content.decode())
 
-    def test_round_estimated_search_counts(self) -> None:
+    def test_round_estimated_search_counts(self, court_cache_key_mock) -> None:
         """Confirm search counts above the threshold are properly rounded"""
 
         tests = [
@@ -838,7 +850,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             with self.subTest(test=test, msg="Test estimated search counts."):
                 self.assertEqual(simplify_estimated_count(test[0]), test[1])
 
-    def test_avoid_wrapping_boosted_numbers_in_quotes(self) -> None:
+    def test_avoid_wrapping_boosted_numbers_in_quotes(
+        self, court_cache_key_mock
+    ) -> None:
         """Confirm that numbers in boost queries are not wrapped in quotes
         that makes the query to fail.
         """
@@ -852,7 +866,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertNotIn("encountered an error", r.content.decode())
 
-    def test_raise_forbidden_error_on_depth_pagination(self) -> None:
+    def test_raise_forbidden_error_on_depth_pagination(
+        self, court_cache_key_mock
+    ) -> None:
         """Confirm that a 403 Forbidden error is raised on depth pagination."""
         search_params = {
             "type": SEARCH_TYPES.OPINION,
@@ -865,7 +881,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
-    def test_query_cleanup_function(self) -> None:
+    def test_query_cleanup_function(self, court_cache_key_mock) -> None:
         # Send string of search_query to the function and expect it
         # to be encoded properly
         q_a = (
@@ -989,7 +1005,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
             self.assertEqual(cleanup_main_query(q), a)
 
-    def test_built_in_search_connectors(self) -> None:
+    def test_built_in_search_connectors(self, court_cache_key_mock) -> None:
         """Verify that built in ES search connectors return the expected results."""
 
         tests = [
@@ -1055,7 +1071,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                         msg=f"Failed on: {test_case['label']} missing {expected_str}",
                     )
 
-    def test_support_search_connectors(self) -> None:
+    def test_support_search_connectors(self, court_cache_key_mock) -> None:
         """Verify that new supported custom search connectors yield the
         expected results.
         """
@@ -1142,7 +1158,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                         msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
                     )
 
-    def test_support_search_connectors_filters(self) -> None:
+    def test_support_search_connectors_filters(
+        self, court_cache_key_mock
+    ) -> None:
         """Verify that new supported custom search connectors yield the
         expected results.
         """
@@ -1229,7 +1247,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                         msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
                     )
 
-    def test_disallowed_wildcard_pattern(self) -> None:
+    def test_disallowed_wildcard_pattern(self, court_cache_key_mock) -> None:
         """Verify that expensive wildcard queries thrown an error."""
 
         tests = [
