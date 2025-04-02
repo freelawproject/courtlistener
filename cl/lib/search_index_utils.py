@@ -1,5 +1,10 @@
 import re
 from datetime import date
+from typing import Any
+
+from elasticsearch.exceptions import ConflictError
+from elasticsearch.helpers import BulkIndexError, bulk
+from elasticsearch_dsl import connections
 
 from cl.lib.date_time import midnight_pt
 
@@ -104,3 +109,50 @@ def get_parties_from_case_name_bankr(case_name: str) -> list[str]:
         if separator in case_name:
             return cleaned_case_name.split(separator, 1)
     return [cleaned_case_name]
+
+
+def check_bulk_indexing_exception(
+    errors: list[dict[str, Any]], exception: str
+) -> bool:
+    """Check for a specific exception type in bulk indexing errors.
+    :param errors: A list of dictionaries representing errors from a bulk
+    indexing operation.
+    :param exception: The exception type string to check for in the error
+    details.
+    :return: True if the specified exception is found in any of the error
+    dictionaries; otherwise, returns False.
+    """
+    for error in errors:
+        if error.get("update", {}).get("error", {}).get("type") == exception:
+            return True
+    return False
+
+
+def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
+    """Index documents in Elasticsearch using the bulk API.
+
+    :param documents_to_index: A list of dictionaries representing the documents
+    to be indexed in bulk.
+    :return: None.
+    """
+
+    client = connections.get_connection(alias="no_retry_connection")
+    # Execute the bulk update
+    ids = [doc["_id"] for doc in documents_to_index]
+    try:
+        bulk(client, documents_to_index)
+    except BulkIndexError as exc:
+        # Catch any BulkIndexError exceptions to handle specific error message.
+        # If the error is a version conflict, raise a ConflictError for retrying it.
+        if check_bulk_indexing_exception(
+            exc.errors, "version_conflict_engine_exception"
+        ):
+            raise ConflictError(
+                "ConflictError indexing cites.",
+                "",
+                {"ids": ids},
+            )
+        else:
+            # If the error is of any other type, raises the original
+            # BulkIndexError for debugging.
+            raise exc
