@@ -33,6 +33,7 @@ from cl.scrapers.management.commands import (
     update_from_text,
 )
 from cl.scrapers.management.commands.merge_opinion_versions import (
+    merge_judge_names,
     merge_versions_by_download_url,
 )
 from cl.scrapers.models import UrlHash
@@ -1369,3 +1370,34 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             ),
             SOURCES.COLUMBIA_M_COURT_M_HARVARD,
         )
+
+    def test_string_merging(self):
+        """Can we merge strings while reducing repetition?"""
+        cases = [
+            ("Bender", "Bender, P.J.E.", "Bender, P.J.E."),
+            ("Mundy, Sallie", "Justice Sallie Mundy", "Justice Sallie Mundy"),
+            (
+                "Per Curiam",
+                "Breckenridge, Stith, Draper, Russell, Wilson, Fischer",
+                "Per Curiam Breckenridge, Stith, Draper, Russell, Wilson, Fischer",
+            ),
+            (
+                "Ishee, Lee, Irving, Griffis, Barnes, Carlton, Maxwell, Fair, James, Wilson",
+                "Irving, Ishee, Carlton, Lee, Griffis, Barnes, Roberts, Maxwell, Fair, James",
+                "Ishee; Lee; Irving; Griffis; Barnes; Carlton; Maxwell; Fair; James; Wilson; Roberts",
+            ),
+            (
+                "Ishee, Lee, Irving, Griffis, Barnes, Carlton, Maxwell, Fair, James, Wilson".replace(
+                    ",", ";"
+                ),
+                "Irving, Ishee, Carlton, Lee, Griffis, Barnes, Roberts, Maxwell, Fair, James",
+                "Ishee; Lee; Irving; Griffis; Barnes; Carlton; Maxwell; Fair; James; Wilson; Roberts",
+            ),
+            (
+                "Simpson, Wojcik, Pellegrini",
+                "Simpson, J.",
+                "Simpson, Wojcik, Pellegrini",
+            ),
+        ]
+        for str1, str2, expected_result in cases:
+            self.assertEqual(merge_judge_names(str1, str2), expected_result)

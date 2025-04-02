@@ -38,6 +38,50 @@ from cl.search.models import (
 MIN_SEQUENCE_SIMILARITY = 0.9
 DRY_RUN = False
 
+
+def explain_version_differences(opinions: list[Opinion | int]) -> None:
+    """Debugging function to inspect version differences
+
+    :param opinions: a list of Opinion objects or ids
+    :return None
+    """
+    if isinstance(opinions[0], int):
+        opinions = [
+            Opinion.objects.get(id=opinion_id) for opinion_id in opinions
+        ]
+
+    text_combinations = itertools.combinations(
+        [(opinion.id, opinion.plain_text.strip()) for opinion in opinions], 2
+    )
+    for (op1, text1), (op2, text2) in text_combinations:
+        if text1 == text2:
+            print(f"Content is the same for {op1} {op2}")
+            continue
+
+        # Actually see the difference
+        differ = Differ()
+        prev_index = 0
+        prev_key = ""
+        diff = ""
+        print(f"Difference between {op1} {op2}")
+        for index, i in enumerate(differ.compare(text1, text2)):
+            if i[0] in "-+?":
+                if prev_index == index - 1 and prev_key == i[0]:
+                    diff += i[-1]
+                else:
+                    print(
+                        f"difference at index {index} is {prev_key} {repr(diff)}"
+                    )
+                    diff = ""
+                prev_key = i[0]
+                prev_index = index
+
+        sm = SequenceMatcher(None, text1, text2)
+        print("SequenceMatcher.ratio(text1, text2)", sm.ratio())
+        sm = SequenceMatcher(None, text2, text1)
+        print("SequenceMatcher.ratio(text2, text1)", sm.ratio())
+
+
 models_that_reference_docket = [
     (DocketAlert, "docket"),
     (Audio, "docket"),
@@ -63,31 +107,78 @@ models_that_reference_docket = [
 # related names are not standard
 models_that_reference_cluster = [
     (Note, "cluster_id"),
+    (Opinion, "cluster"),
     (OpinionClusterPanel, "opinioncluster"),
     (OpinionClusterNonParticipatingJudges, "opinioncluster"),
 ]
 
 
-def merge_strings(str1: str, str2: str) -> str:
-    """Merge 2 strings while trying to reduce repetition in them
+def get_separator(name: str) -> str:
+    """Try to find a separator for a list of comma or colon separated names"""
+    for sep in ["; ", ";", ", ", ","]:
+        if name.count(sep) > 1:
+            return sep
 
-    If a string is contained in another, return the longest.
-    If not, concatenate them
-    Useful for merging `OpinionCluster.judges`
+    return ""
 
-    :param str1: a string
-    :param str2: another string
-    :return: a merged string
+
+def merge_judge_names(name1: str, name2: str) -> str:
+    """Merge 2 judge name strings while trying to reduce repetition in them
+
+    If a string is contained in another, return the container.
+    If they have something in common, merge them
+    If there is nothing in common, concatenate them
+
+    :param name1: a name
+    :param name2: another name
+    :return: a merged name
     """
-    std1 = str1.lower().strip(".,;() ")
-    std2 = str2.lower().strip(".,;() ")
+    noise = {"judge", "justice", "j", "p", "chief"}
 
-    if std1 in std2:
-        return str2
-    if std2 in std1:
-        return str1
+    # clean whitespace, commas, etc
+    set1 = set(re.findall(r"\w+", name1.lower()))
+    set2 = set(re.findall(r"\w+", name2.lower()))
 
-    return f"{str1} {str2}"
+    if not set1:
+        return name2
+    if not set2:
+        return name1
+
+    # `<=` is the subset operator
+    if set1.difference(noise) <= set2:
+        return name2
+    if set2.difference(noise) <= set1:
+        return name1
+
+    if not set1.intersection(set2).difference(noise):
+        # if they have nothing in common, just return the concatenation
+        return f"{name1} {name2}"
+
+    # if they have something in common, let's check if they are lists and try
+    # to merge them
+    sep1 = get_separator(name1)
+    sep2 = get_separator(name2)
+    if sep1 and sep2:
+        parts1 = [p.strip() for p in name1.split(sep1)]
+        parts2 = [p.strip() for p in name2.split(sep2)]
+        merged_parts = []
+        seen_parts = set()
+
+        for part in parts1:
+            if part.lower() not in seen_parts:
+                merged_parts.append(part)
+                seen_parts.add(part.lower())
+
+        for part in parts2:
+            if part.lower() not in seen_parts:
+                merged_parts.append(part)
+                seen_parts.add(part.lower())
+
+        return "; ".join(merged_parts)
+
+    # Fallback to concatenation if we couldn't merge them via separating lists
+    # of names
+    return f"{name1} {name2}"
 
 
 docket_fields_to_merge = [
@@ -132,7 +223,7 @@ docket_fields_to_merge = [
 ]
 
 cluster_fields_to_merge = [
-    ("judges", merge_strings),
+    ("judges", merge_judge_names),
     "date_filed",
     "date_filed_is_approximate",
     "case_name_short",
@@ -277,11 +368,11 @@ def merge_metadata(
 
     if isinstance(main_object, Opinion):
         fields_to_merge = [
-            "author_str",
+            ("author_str", merge_judge_names),
             "author",
             "per_curiam",
             "joined_by",
-            "joined_by_str",
+            ("joined_by_str", merge_judge_names),
             "html_lawbox",
             "html_columbia",
             "xml_harvard",
@@ -541,49 +632,6 @@ def merge_versions_by_text_similarity(
                 main.id,
                 version.id,
             )
-
-
-def explain_version_differences(opinions: list[Opinion | int]) -> None:
-    """Debugging function to inspect version differences
-
-    :param opinions: a list of Opinion objects or ids
-    :return None
-    """
-    if isinstance(opinions[0], int):
-        opinions = [
-            Opinion.objects.get(id=opinion_id) for opinion_id in opinions
-        ]
-
-    text_combinations = itertools.combinations(
-        [(opinion.id, opinion.plain_text.strip()) for opinion in opinions], 2
-    )
-    for (op1, text1), (op2, text2) in text_combinations:
-        if text1 == text2:
-            print(f"Content is the same for {op1} {op2}")
-            continue
-
-        # Actually see the difference
-        differ = Differ()
-        prev_index = 0
-        prev_key = ""
-        diff = ""
-        print(f"Difference between {op1} {op2}")
-        for index, i in enumerate(differ.compare(text1, text2)):
-            if i[0] in "-+?":
-                if prev_index == index - 1 and prev_key == i[0]:
-                    diff += i[-1]
-                else:
-                    print(
-                        f"difference at index {index} is {prev_key} {repr(diff)}"
-                    )
-                    diff = ""
-                prev_key = i[0]
-                prev_index = index
-
-        sm = SequenceMatcher(None, text1, text2)
-        print("SequenceMatcher.ratio(text1, text2)", sm.ratio())
-        sm = SequenceMatcher(None, text2, text1)
-        print("SequenceMatcher.ratio(text2, text1)", sm.ratio())
 
 
 class Command(VerboseCommand):
