@@ -66,7 +66,7 @@
   <h3 id="fulfilling-prayer">Fulfilling a Prayer</h3>
   <p>The most-wanted documents are shown on a <a href="{% url "top_prayers" %}">leaderboard</a> ranked by how many users have requested a particular document and how many views their corresponding docket has received. As requests are fulfilled, they are removed from the leaderboard.
   </p>
-  <p>Fulfilling somebody's prayer only works if you install the RECAP extension. Once it's installed, all your PACER purchases will be sent to CourtListener automatically — Prayers will be granted!</p>
+  <p>Fulfilling somebody's prayer only works if you install the RECAP extension. Once it's installed, all your PACER purchases will be sent to CourtListener automatically — prayers will be granted!</p>
   <p>
     <a href="https://free.law/recap/"
        class="btn btn-primary">Install RECAP</a>
@@ -75,7 +75,7 @@
   </p>
 
   <h3 id="creating-prayer">Creating a Prayer</h3>
-  <p>To create a Prayer, find a document you are interested in, and press the "Prayer Hands" emoji button on the right (🙏). The number on the button is how many others have requested the document. If you have reached your daily limit, a message will inform you.
+  <p>To create a prayer, find a document you are interested in, and press the "Prayer Hands" emoji button on the right (🙏). The number on the button is how many others have requested the document. If you have reached your daily limit, a message will inform you.
   </p>
   <p>
     <img src="{% static "png/pray-button.png" %}"
@@ -106,7 +106,7 @@
   </p>
 
   <h3 id="deleting-prayer">Deleting a Prayer</h3>
-  <p>To delete a Prayer, navigate to a docket you have previously requested a document from, and press the 🙏 button on the right again. Alternatively, you can navigate to the {% if user.is_authenticated %}<a href="{% url 'user_prayers' user.username %}">list of prayers in your profile</a>{% else %}list of prayers in your profile{% endif %} and delete from there. It is not possible to delete a prayer once it is fulfilled.
+  <p>To delete a prayer, navigate to a docket you have previously requested a document from, and press the 🙏 button on the right again. Alternatively, you can navigate to the {% if user.is_authenticated %}<a href="{% url 'user_prayers' user.username %}">list of prayers in your profile</a>{% else %}list of prayers in your profile{% endif %} and delete from there. It is not possible to delete a prayer once it is fulfilled.
   </p>
 
   <h2>Coming Soon</h2>
