@@ -40,6 +40,9 @@ REST_FRAMEWORK = {
         "nedah94680": "1/hour",
         "robowiy352": "1/hour",
         # Multiple accounts
+        "sophia@newyorklawreview.com": "1/hour",
+        "gab@newyorklawreview.com": "1/hour",
+        "james@newyorklawreview.com": "1/hour",
         "my_yancy_lost": "1/hour",
         "theworky_1980": "1/hour",
         "thelaw_2025": "1/hour",
@@ -72,6 +75,7 @@ REST_FRAMEWORK = {
         "BruceWayne": "1/hour",
         "mibefis809": "1/hour",
         # Unresponsive
+        "victorchaps": "1/hour",
         "AlirezaMirrokni": "1/hour",
         "court_test_account": "1/hour",
         "jmmckinnie": "1/hour",
