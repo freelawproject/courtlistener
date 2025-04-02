@@ -1453,7 +1453,7 @@ def probe_iquery_pages(
     reports_data = []
     found_match = False
     pacer_case_id_to_lookup = highest_known_pacer_case_id
-    while probe_offset <= settings.IQUERY_PROBE_MAX_OFFSET:
+    while probe_offset + jitter < settings.IQUERY_PROBE_MAX_OFFSET:
         pacer_case_id_to_lookup, probe_offset = compute_next_binary_probe(
             highest_known_pacer_case_id, probe_iteration, jitter
         )

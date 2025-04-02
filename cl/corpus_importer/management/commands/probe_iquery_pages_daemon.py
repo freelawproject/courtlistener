@@ -72,7 +72,14 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
         testing = True if testing_iterations else False
         while True and settings.IQUERY_CASE_PROBE_DAEMON_ENABLED:
             for court_id in court_ids:
-                if r.exists(f"iquery:court_wait:{court_id}"):
+                wait_key = f"iquery:court_wait:{court_id}"
+                if r.exists(wait_key):
+                    ttl = r.ttl(wait_key)
+                    logger.info(
+                        "Skipping court %s for %s hours.",
+                        court_id,
+                        round(ttl / 3600, 2),
+                    )
                     continue
                 try:
                     newly_enqueued = enqueue_iquery_probe(court_id)
