@@ -230,6 +230,33 @@ class SOURCES:
         ),
     )
 
+    # use a frozenset since the order of characters is arbitrary
+    parts_to_source_mapper = {frozenset(name[0]): name[0] for name in NAMES}
+
+    @classmethod
+    def merge_sources(cls, source1: str, source2: str) -> str:
+        """Merge source values
+
+        Use this to merge sources when merging clusters
+
+        :param source1: a source
+        :param source2: other source
+        :return: a source which merges the input sources
+        """
+        if source1 in source2:
+            return source2
+        if source2 in source1:
+            return source1
+
+        unique_parts = frozenset(source1 + source2)
+        if cls.parts_to_source_mapper.get(unique_parts):
+            return cls.parts_to_source_mapper.get(unique_parts)
+
+        # Unexpected case
+        if len(source1) > len(source2):
+            return source1
+        return source2
+
 
 @pghistory.track()
 class OriginatingCourtInformation(AbstractDateTimeModel):

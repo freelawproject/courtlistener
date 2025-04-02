@@ -1332,3 +1332,40 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(previous_main.main_version.id, main.id)
         # test transitive main_version update
         self.assertEqual(a_version.main_version.id, main.id)
+
+    def test_source_merging(self):
+        """Can we merge both Docket and Cluster sources?"""
+        self.assertEqual(
+            Docket.merge_sources(Docket.SCRAPER, Docket.SCRAPER_AND_HARVARD),
+            Docket.SCRAPER_AND_HARVARD,
+        )
+        self.assertEqual(
+            Docket.merge_sources(Docket.SCRAPER, Docket.DIRECT_INPUT),
+            Docket.SCRAPER + Docket.DIRECT_INPUT,
+        )
+
+        self.assertEqual(
+            SOURCES.merge_sources(
+                SOURCES.COURT_WEBSITE, SOURCES.COURT_WEBSITE
+            ),
+            SOURCES.COURT_WEBSITE,
+        )
+        self.assertEqual(
+            SOURCES.merge_sources(
+                SOURCES.COURT_WEBSITE,
+                SOURCES.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            ),
+            SOURCES.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+        )
+        self.assertEqual(
+            SOURCES.merge_sources(
+                SOURCES.COURT_WEBSITE, SOURCES.PUBLIC_RESOURCE
+            ),
+            SOURCES.COURT_M_RESOURCE,
+        )
+        self.assertEqual(
+            SOURCES.merge_sources(
+                SOURCES.HARVARD_CASELAW, SOURCES.COLUMBIA_M_COURT
+            ),
+            SOURCES.COLUMBIA_M_COURT_M_HARVARD,
+        )

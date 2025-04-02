@@ -22,6 +22,7 @@ from cl.recap.models import PacerFetchQueue, ProcessingQueue
 from cl.scrapers.models import PACERMobilePageData
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
+    SOURCES,
     BankruptcyInformation,
     Claim,
     Docket,
@@ -66,8 +67,31 @@ models_that_reference_cluster = [
     (OpinionClusterNonParticipatingJudges, "opinioncluster"),
 ]
 
+
+def merge_strings(str1: str, str2: str) -> str:
+    """Merge 2 strings while trying to reduce repetition in them
+
+    If a string is contained in another, return the longest.
+    If not, concatenate them
+    Useful for merging `OpinionCluster.judges`
+
+    :param str1: a string
+    :param str2: another string
+    :return: a merged string
+    """
+    std1 = str1.lower().strip(".,;() ")
+    std2 = str2.lower().strip(".,;() ")
+
+    if std1 in std2:
+        return str2
+    if std2 in std1:
+        return str1
+
+    return f"{str1} {str2}"
+
+
 docket_fields_to_merge = [
-    "source",
+    ("source", Docket.merge_sources),
     "appeal_from",
     "parent_docket",
     "appeal_from_str",
@@ -88,9 +112,7 @@ docket_fields_to_merge = [
     "date_terminated",
     "date_last_filing",
     "case_name_short",
-    "case_name",
     "case_name_full",
-    "docket_number_core",
     "federal_dn_office_code",
     "federal_dn_case_type",
     "federal_dn_judge_initials_assigned",
@@ -105,27 +127,36 @@ docket_fields_to_merge = [
     "appellate_case_type_information",
     "mdl_status",
     "filepath_local",
-    "date_blocked",
+    ("date_blocked", min),
     "blocked",
 ]
 
 cluster_fields_to_merge = [
-    "judges",
+    ("judges", merge_strings),
+    "date_filed",
+    "date_filed_is_approximate",
     "case_name_short",
     "case_name_full",
+    "scdb_id",
+    "scdb_decision_direction",
+    "scdb_votes_majority",
+    "scdb_votes_minority",
+    ("source", SOURCES.merge_sources),
     "procedural_history",
     "attorneys",
     "nature_of_suit",
     "posture",
     "syllabus",
     "blocked",
-    "date_blocked",
+    ("date_blocked", min),
     "headnotes",
     "cross_reference",
     "correction",
     "disposition",
     "other_dates",
     "summary",
+    "filepath_json_harvard",
+    "filepath_pdf_harvard",
     "arguments",
     "headmatter",
 ]
@@ -265,19 +296,35 @@ def merge_metadata(
     changed = False
 
     for field in fields_to_merge:
+        merging_func = None
+        if isinstance(field, tuple):
+            field, merging_func = field
+
         main_value = getattr(main_object, field)
         version_value = getattr(version_object, field)
         if main_value:
-            if version_value and not main_value == version_value:
-                logger.warning(
-                    "Unexpected difference in %s: '%s' '%s'. %s: %s, %s",
+            if not version_value:
+                continue
+            if main_value == version_value:
+                continue
+            if merging_func:
+                setattr(
+                    main_object,
                     field,
-                    main_value,
-                    version_value,
-                    main_object._meta.model_name,
-                    main_object.id,
-                    version_object.id,
+                    merging_func(main_value, version_value),
                 )
+                changed = True
+                continue
+
+            logger.warning(
+                "Unexpected difference in %s: '%s' '%s'. %s: %s, %s",
+                field,
+                main_value,
+                version_value,
+                main_object._meta.model_name,
+                main_object.id,
+                version_object.id,
+            )
         elif version_value:
             setattr(main_object, field, version_value)
             changed = True
