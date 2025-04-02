@@ -1673,7 +1673,7 @@ def retrieve_embeddings(
 
     storage = AWSMediaStorage()
 
-    def download_embedding(opinion_id: int) -> dict:
+    def download_embedding(opinion_id: int) -> dict | None:
         file_path = os.path.join(
             "embeddings",
             directory,
@@ -1690,7 +1690,7 @@ def retrieve_embeddings(
             logger.error(
                 "Embeddings for opinion ID:%s doesn't exist.", opinion_id
             )
-            return {}
+            return None
 
     embeddings: list[dict] = []
     # Download embeddings concurrently.
@@ -1700,7 +1700,9 @@ def retrieve_embeddings(
             for opinion_id in opinion_ids
         ]
         for future in concurrent.futures.as_completed(futures):
-            embeddings.append(future.result())
+            result = future.result()
+            if result:
+                embeddings.append(result)
     return embeddings
 
 

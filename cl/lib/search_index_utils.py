@@ -6,6 +6,7 @@ from elasticsearch.exceptions import ConflictError
 from elasticsearch.helpers import BulkIndexError, bulk
 from elasticsearch_dsl import connections
 
+from cl.lib.command_utils import logger
 from cl.lib.date_time import midnight_pt
 
 
@@ -151,6 +152,13 @@ def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
                 "ConflictError indexing cites.",
                 "",
                 {"ids": ids},
+            )
+        if check_bulk_indexing_exception(
+            exc.errors, "document_missing_exception"
+        ):
+            missing_opinion = exc.errors[0].get("update", {}).get("_id", None)
+            logger.warning(
+                "Opinion with ID %s is not indexed in ES.", missing_opinion
             )
         else:
             # If the error is of any other type, raises the original
