@@ -1,13 +1,21 @@
 import datetime
 import pickle
 from typing import Tuple, TypedDict, cast
+from unittest import mock
 from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
+from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.test import override_settings
 from requests.cookies import RequestsCookieJar
 
+from cl.lib.courts import (
+    get_active_court_from_cache,
+    get_cache_key_for_court_list,
+    get_minimal_list_of_courts,
+    lookup_child_courts_cache,
+)
 from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
@@ -89,6 +97,70 @@ class TestPacerUtils(TestCase):
             msg="Bankruptcy dockets that start blocked "
             "should stay blocked.",
         )
+
+
+@mock.patch(
+    "cl.lib.courts.get_cache_key_for_court_list",
+    return_value="lib_test:minimal-court-list",
+)
+class TestCachedCourtUtils(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent_court = CourtFactory(id="parent_court")
+        cls.child_court_1 = CourtFactory(
+            id="child_1", jurisdiction="FB", parent_court=cls.parent_court
+        )
+        cls.child_court_2 = CourtFactory(
+            id="child_2",
+            jurisdiction="FB",
+            parent_court=cls.parent_court,
+        )
+        cls.court_not_in_use = CourtFactory(in_use=False)
+
+    def setUp(self):
+        # Pre-populate the cache with the court list
+        with patch(
+            "cl.lib.courts.get_cache_key_for_court_list",
+            return_value="lib_test:minimal-court-list",
+        ):
+            get_minimal_list_of_courts()
+
+    def test_can_get_active_courts_from_cache(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            in_use_courts = get_active_court_from_cache()
+
+        court_count = Court.objects.filter(in_use=True).count()
+        self.assertEqual(len(in_use_courts), court_count)
+
+    def test_can_handle_empty_inputs(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([])
+
+        self.assertEqual(child_ids, set())
+
+    def test_can_return_empty_set_for_court_w_no_child(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([self.court_not_in_use.pk])
+
+        self.assertEqual(child_ids, set())
+
+    def test_can_return_set_with_child_court_ids(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([self.parent_court.pk])
+
+        self.assertSetEqual(
+            {
+                self.parent_court.pk,
+                self.child_court_1.pk,
+                self.child_court_2.pk,
+            },
+            child_ids,
+        )
+
+    def tearDown(self):
+        cache.delete("lib_test:minimal-court-list")
+        return super().tearDown()
 
 
 @override_settings(

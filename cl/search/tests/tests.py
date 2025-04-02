@@ -514,59 +514,60 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             )
         )
 
-        # Get all the courts of ny_child_l1_1 at all lower levels.
-        parent_child_courts = get_child_court_ids_for_parents(
-            '"ny_child_l1_1"'
-        )
-        self.assertTrue(
-            compare_strings_regardless_order(
-                parent_child_courts,
-                '"ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+        with self.assertNumQueries(0):
+            # Get all the courts of ny_child_l1_1 at all lower levels.
+            parent_child_courts = get_child_court_ids_for_parents(
+                '"ny_child_l1_1"'
             )
-        )
+            self.assertTrue(
+                compare_strings_regardless_order(
+                    parent_child_courts,
+                    '"ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+                )
+            )
 
-        # Get all the courts of ny_child_l1_2 at all lower levels.
-        parent_child_courts = get_child_court_ids_for_parents(
-            '"ny_child_l2_1"'
-        )
-        self.assertTrue(
-            compare_strings_regardless_order(
-                parent_child_courts, '"ny_child_l2_1" OR "ny_child_l3_1"'
+            # Get all the courts of ny_child_l1_2 at all lower levels.
+            parent_child_courts = get_child_court_ids_for_parents(
+                '"ny_child_l2_1"'
             )
-        )
+            self.assertTrue(
+                compare_strings_regardless_order(
+                    parent_child_courts, '"ny_child_l2_1" OR "ny_child_l3_1"'
+                )
+            )
 
-        # Get all the courts of ny_child_l3_1, no child courts, retrieve itself.
-        parent_child_courts = get_child_court_ids_for_parents(
-            '"ny_child_l3_1"'
-        )
-        self.assertTrue(
-            compare_strings_regardless_order(
-                parent_child_courts, '"ny_child_l3_1"'
+            # Get all the courts of ny_child_l3_1, no child courts, retrieve itself.
+            parent_child_courts = get_child_court_ids_for_parents(
+                '"ny_child_l3_1"'
             )
-        )
+            self.assertTrue(
+                compare_strings_regardless_order(
+                    parent_child_courts, '"ny_child_l3_1"'
+                )
+            )
 
-        # Confirm courts are not duplicated if a parent-child court is included
-        # in the query:
-        parent_child_courts = get_child_court_ids_for_parents(
-            '"ny_child_l1_1" OR "ny_child_l2_1"'
-        )
-        self.assertTrue(
-            compare_strings_regardless_order(
-                parent_child_courts,
-                '"ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+            # Confirm courts are not duplicated if a parent-child court is included
+            # in the query:
+            parent_child_courts = get_child_court_ids_for_parents(
+                '"ny_child_l1_1" OR "ny_child_l2_1"'
             )
-        )
+            self.assertTrue(
+                compare_strings_regardless_order(
+                    parent_child_courts,
+                    '"ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+                )
+            )
 
-        # Get all courts from 2 different parent courts 'canb' and 'gand'.
-        parent_child_courts = get_child_court_ids_for_parents(
-            '"canb" OR "gand"'
-        )
-        self.assertTrue(
-            compare_strings_regardless_order(
-                parent_child_courts,
-                '"canb" OR "ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1" OR "gand" OR "ga_child_l1_1"',
+            # Get all courts from 2 different parent courts 'canb' and 'gand'.
+            parent_child_courts = get_child_court_ids_for_parents(
+                '"canb" OR "gand"'
             )
-        )
+            self.assertTrue(
+                compare_strings_regardless_order(
+                    parent_child_courts,
+                    '"canb" OR "ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1" OR "gand" OR "ga_child_l1_1"',
+                )
+            )
 
     def test_modify_court_id_queries(self, court_cache_key_mock) -> None:
         """Test parse_court_id_query method, it should properly parse a
