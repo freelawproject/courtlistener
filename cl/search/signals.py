@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -8,6 +9,7 @@ from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
 from cl.favorites.utils import send_prayer_emails
+from cl.lib.courts import get_cache_key_for_court_list
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
@@ -594,3 +596,16 @@ def update_unmatched_citation(
         reporter=instance.reporter,
         page=instance.page,
     ).update(status=UnmatchedCitation.FOUND)
+
+
+@receiver(
+    post_save,
+    sender=Court,
+    dispatch_uid="handle_court_changes_uid",
+)
+def update_court_cache(sender, instance: Court, created: bool, **kwargs):
+    """
+    Invalidates the cached court list to ensure data consistency when a Court
+    instance is created or updated.
+    """
+    cache.delete(get_cache_key_for_court_list())
