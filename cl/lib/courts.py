@@ -7,16 +7,8 @@ from cl.search.models import Court
 
 def get_cache_key_for_court_list() -> str:
     """
-    Retrieves the cache key used to store the list of courts.
-
-    This function provides a consistent and easily identifiable key for caching
-    court data. It's particularly useful for:
-
-    -   Ensuring consistent cache access across different parts of the
-        application.
-    -   Facilitating cache isolation during testing, allowing for predictable
-        and controlled test environments.
-    -   Simplifying cache invalidation and management.
+    Returns the cache key used to store the list of courts. This method
+    allows predictable cache isolation during testing.
 
     :return: The cache key, which is currently "minimal-court-list".
     """
@@ -33,11 +25,9 @@ class MinimalCourtData:
 
 def get_minimal_list_of_courts() -> list[MinimalCourtData]:
     """
-    Retrieves a list of courts with minimal data.
+    Retrieves a list of courts with essential information.
 
-    This method fetches a list of courts from the database, including only the
-    primary key (pk), short name, in_use status, jurisdiction, and parent court
-    ID. It uses a cache to store and retrieve this data, reducing db load.
+    It uses a cache to store and retrieve this data, reducing db load.
 
     The cache is set to expire after 24 hours.
 
@@ -61,21 +51,17 @@ def get_active_court_from_cache() -> list[MinimalCourtData]:
     """
     Retrieves a list of active courts from the cached court data.
 
-    This method fetches the court data using `get_minimal_list_of_courts()`. it
-    then filters this list to include only courts where the 'in_use' attribute
-    is True.
-
-    :returns: A list of MinimalCourtData objects representing active courts.
+    :return: A list of MinimalCourtData objects representing active courts.
     """
     courts = get_minimal_list_of_courts()
     return [c for c in courts if c.in_use]
 
 
-def get_parent_ids_from_cache(courts: list[MinimalCourtData]) -> set[str]:
+def get_court_parent_ids(courts: list[MinimalCourtData]) -> set[str]:
     """
     Extracts the unique parent court IDs from a list of court objects.
 
-    :returns: A set containing the unique parent court IDs, excluding None
+    :return: A set containing the unique parent court IDs, excluding None
         values.
     """
     court_ids = {
@@ -89,15 +75,14 @@ def lookup_child_courts_cache(court_ids: list[str]) -> set[str]:
     Recursively finds all child court IDs for a given list of court IDs, using
     a cached list of courts.
 
-    Returns:
-        A set containing the original court IDs and all their descendant court
-        IDs.
+    :return: A set containing the original court IDs and all their descendant
+        court IDs.
     """
     if not court_ids:
         return set()
 
     courts_from_cache = get_minimal_list_of_courts()
-    parent_court_ids = get_parent_ids_from_cache(courts_from_cache)
+    parent_court_ids = get_court_parent_ids(courts_from_cache)
     courts = set(court_ids)
 
     # check if the input has at least a child
