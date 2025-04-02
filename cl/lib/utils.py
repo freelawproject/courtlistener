@@ -8,6 +8,7 @@ from typing import Match, Optional, Tuple
 from django.core.cache import caches
 
 import cl.search.models as search_model
+from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.crypto import sha256
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData
@@ -185,7 +186,7 @@ def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
     :return: A string containing the unique combination of parent and child courts.
     """
     unique_courts = set(re.findall(r'"(.*?)"', selected_courts_string))
-    unique_courts.update(lookup_child_courts(list(unique_courts)))
+    unique_courts.update(lookup_child_courts_cache(list(unique_courts)))
     courts = [f'"{c}"' for c in sorted(list(unique_courts))]
     return " OR ".join(courts)
 
