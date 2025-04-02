@@ -5,11 +5,7 @@ from typing import Any
 from typing import Iterable as IterableType
 from typing import Match, Optional, Tuple
 
-from django.core.cache import caches
-
-import cl.search.models as search_model
 from cl.lib.courts import lookup_child_courts_cache
-from cl.lib.crypto import sha256
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData
 from cl.search.exception import DisallowedWildcardPattern, QueryType
@@ -143,38 +139,6 @@ def get_array_of_selected_fields(cd: CleanData, prefix: str) -> list[str]:
         for k, v in cd.items()
         if (k.startswith(prefix) and v is True)
     ]
-
-
-def lookup_child_courts(parent_courts: list[str]) -> set[str]:
-    """Recursively fetches child courts for the given parent courts.
-
-    :param parent_courts: List of parent court_ids.
-    :return: Set of all child court IDs.
-    """
-
-    cache = caches["db_cache"]
-    all_child_courts = set()
-    sorted_courts_hash = sha256("-".join(sorted(parent_courts)))
-    cache_key = f"child_courts:{sorted_courts_hash}"
-    cached_result = cache.get(cache_key)
-
-    if cached_result is not None:
-        return set(cached_result)
-
-    child_courts = search_model.Court.objects.filter(
-        parent_court_id__in=parent_courts
-    ).values_list("id", flat=True)
-    all_child_courts.update(child_courts)
-    if not all_child_courts:
-        return set()
-
-    final_results = all_child_courts.union(
-        lookup_child_courts(list(all_child_courts))
-    )
-    sorted_final_results = sorted(final_results)
-    one_month = 60 * 60 * 24 * 30
-    cache.set(cache_key, sorted_final_results, one_month)
-    return set(sorted_final_results)
 
 
 def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
