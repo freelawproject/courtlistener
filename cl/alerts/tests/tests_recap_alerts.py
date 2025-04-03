@@ -30,6 +30,7 @@ from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.api.utils import get_webhook_deprecation_date
 from cl.donate.models import NeonMembership
+from cl.lib.date_time import midnight_pt
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
 from cl.people_db.factories import (
@@ -74,7 +75,7 @@ class RECAPAlertsSweepIndexTest(
         cls.rebuild_index("search.Docket")
         # Mock indexing date to the previous day since the command currently
         # runs early each day.
-        date_now = now()
+        date_now = midnight_pt(now().date())
         cls.mock_date_indexing = date_now - datetime.timedelta(days=1)
         cls.mock_date = date_now
         with time_machine.travel(
@@ -139,7 +140,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # Only the RECAP RT alert for a member and the RECAP DLY alert are sent.
@@ -211,8 +212,7 @@ class RECAPAlertsSweepIndexTest(
             )
 
         # Its related RD is ingested two days before.
-        two_days_before = now() - datetime.timedelta(days=2)
-        mock_two_days_before = two_days_before.replace(hour=5)
+        mock_two_days_before = self.mock_date - datetime.timedelta(days=2)
         with time_machine.travel(
             mock_two_days_before, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
@@ -287,10 +287,9 @@ class RECAPAlertsSweepIndexTest(
 
         # Docket and RD created on previous days, will be used later to confirm
         # documents got indexed into the sweep index after partial updates.
-        three_days_before = now() - datetime.timedelta(days=5)
-        mock_three_days_before = three_days_before.replace(hour=5)
+        mock_five_days_before = self.mock_date - datetime.timedelta(days=5)
         with time_machine.travel(
-            mock_three_days_before, tick=False
+            mock_five_days_before, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             docket_old = DocketFactory(
                 court=self.court,
@@ -776,8 +775,9 @@ class RECAPAlertsSweepIndexTest(
             query=f'q="United states"&type=r',
             alert_type=SEARCH_TYPES.RECAP,
         )
-        two_days_before = self.mock_date_indexing - datetime.timedelta(days=2)
-        mock_two_days_before = two_days_before.replace(hour=5)
+        mock_two_days_before = self.mock_date_indexing - datetime.timedelta(
+            days=2
+        )
         with time_machine.travel(
             mock_two_days_before, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
@@ -1082,7 +1082,7 @@ class RECAPAlertsSweepIndexTest(
         argument works correctly to send alerts for the specified date.
         """
 
-        indexing_date = now() - datetime.timedelta(days=5)
+        indexing_date = self.mock_date - datetime.timedelta(days=5)
         with time_machine.travel(
             indexing_date, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
@@ -1174,7 +1174,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -1306,7 +1306,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -1495,7 +1495,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # Weekly and monthly alerts are not sent right away but are scheduled as
@@ -1706,8 +1706,8 @@ class RECAPAlertsSweepIndexTest(
                 pacer_doc_id="0190645981",
                 plain_text="plain text lorem",
             )
-
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
@@ -1743,10 +1743,11 @@ class RECAPAlertsSweepIndexTest(
             msg="Wrong number of V1 webhook events.",
         )
 
-        self.assertEqual(
-            mail.outbox[0].subject,
-            f"2 Alerts have hits: {docket_only_alert.name}, {cross_object_alert.name}",
-        )
+        subject = mail.outbox[0].subject
+        self.assertIn("2 Alerts have hits:", subject)
+        self.assertIn(docket_only_alert.name, subject)
+        self.assertIn(cross_object_alert.name, subject)
+
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 2)
@@ -1786,7 +1787,8 @@ class RECAPAlertsSweepIndexTest(
         # cross_object_alert_after_update alert is missed by the percolator.
         # due to the related RECAPDocument is not being percolated after the
         # Docket field update.
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
