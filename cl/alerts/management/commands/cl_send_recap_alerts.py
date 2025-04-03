@@ -722,6 +722,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--testing-mode",
             action="store_true",
+            default=False,
             help="Use this flag for testing purposes.",
         )
         parser.add_argument(
@@ -732,9 +733,9 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        testing_mode = options.get("testing_mode", False)
+        testing_mode = options["testing_mode"]
         r = get_redis_interface("CACHE")
-        query_date: datetime.datetime | None = options.get("query_date", None)
+        query_date: datetime.datetime | None = options["query_date"]
 
         if query_date is not None:
             # Convert the provided query_date to midnight.
