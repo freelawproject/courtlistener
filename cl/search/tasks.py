@@ -3,9 +3,9 @@ import csv
 import io
 import json
 import logging
-import os
 from datetime import date, datetime
 from importlib import import_module
+from pathlib import PurePosixPath
 from random import randint
 from typing import Any, Generator
 
@@ -1817,10 +1817,12 @@ def save_embeddings(
     for embedding_record in embeddings:
         record_id = embedding_record["id"]
         file_contents = json.dumps(embedding_record)
-        file_path = os.path.join(
-            "embeddings",
-            directory,
-            settings.NLP_EMBEDDING_MODEL,
-            f"{record_id}.json",
+        file_path = str(
+            PurePosixPath(
+                "embeddings",
+                directory,
+                settings.NLP_EMBEDDING_MODEL,
+                f"{record_id}.json",
+            )
         )
         storage.save(file_path, ContentFile(file_contents))
