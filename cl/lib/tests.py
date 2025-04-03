@@ -118,6 +118,19 @@ class TestCachedCourtUtils(TestCase):
         )
         cls.court_not_in_use = CourtFactory(in_use=False)
 
+        cls.self_referencing_court = CourtFactory(
+            id="self_ref", parent_court_id="self_ref"
+        )
+        cls.self_referencing_child_1 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+        cls.self_referencing_child_1_1 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+        cls.self_referencing_child_2 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+
     def setUp(self):
         # Pre-populate the cache with the court list
         with patch(
@@ -154,6 +167,22 @@ class TestCachedCourtUtils(TestCase):
                 self.parent_court.pk,
                 self.child_court_1.pk,
                 self.child_court_2.pk,
+            },
+            child_ids,
+        )
+
+    def test_can_handle_self_referencing_courts(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache(
+                [self.self_referencing_court.pk]
+            )
+
+        self.assertSetEqual(
+            {
+                self.self_referencing_court.pk,
+                self.self_referencing_child_1.pk,
+                self.self_referencing_child_1_1.pk,
+                self.self_referencing_child_2.pk,
             },
             child_ids,
         )

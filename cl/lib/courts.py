@@ -91,30 +91,31 @@ def lookup_child_courts_cache(court_ids: list[str]) -> set[str]:
         # children.
         return set()
 
-    child_courts: set[str] = set()
     # step will hold the child courts found in the previous iteration.
-    step: set[str] = set()
+    # In the first iteration, use the original courts, then use the courts
+    # found in the previous step. create the set of child court ids from
+    # memory
+    step: set[str] = courts
     while True:
-        # In the first iteration, use the original courts, then use the courts
-        # found in the previous step. create the set of child court ids from
-        # memory
-        courts_to_check = step or courts
-
         # create the set of child court ids from memory
         new_child = {
             court.pk
             for court in courts_from_cache
-            if court.parent_court_id in courts_to_check
+            if court.parent_court_id in step
         }
 
+        # Only consider IDs we haven't seen before to avoid infinite loops due
+        # to courts pointing to themselves.
+        new_ids = new_child - courts
+        if not new_ids:
+            break
+
         # Update the set of child courts found so far.
-        child_courts.update(new_child)
-        if new_child.isdisjoint(parent_court_ids):
+        courts.update(new_ids)
+        if new_ids.isdisjoint(parent_court_ids):
             # If no new children are parent courts, then stop iterating, as
             # there are no more levels.
             break
-        step = new_child
+        step = new_ids
 
-    # Add all the found ids to the original set of courts.
-    courts.update(child_courts)
     return courts
