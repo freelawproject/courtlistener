@@ -14,7 +14,7 @@
     url('../../static/fonts/cooper-hewitt/CooperHewitt-Medium.woff2') format('woff2'),
     url('../../static/fonts/cooper-hewitt/CooperHewitt-Medium.woff') format('woff'),
     url('../../static/fonts/cooper-hewitt/CooperHewitt-Medium.otf') format('opentype');
-  font-weight: 600;
+  font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
