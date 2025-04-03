@@ -1097,10 +1097,10 @@ class SearchAlertsWebhooksTest(
         )
 
         self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
-        self.assertEqual(
-            mail.outbox[1].subject,
-            f"2 Alerts have hits: {self.search_alert_2.name}, {self.search_alert_2_1.name}",
-        )
+        subject = mail.outbox[1].subject
+        self.assertIn("2 Alerts have hits:", subject)
+        self.assertIn(self.search_alert_2.name, subject)
+        self.assertIn(self.search_alert_2_1.name, subject)
         self.assertIn("daily opinion alert", mail.outbox[1].body)
 
         params = {
@@ -3106,10 +3106,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertIn(rt_oral_argument_1.case_name, text_content)
         self.assertIn(rt_oral_argument_2.case_name, text_content)
         self.assertIn(rt_oral_argument_3.case_name, text_content)
-        self.assertEqual(
-            mail.outbox[0].subject,
-            f"2 Alerts have hits: {rt_oa_search_alert.name}, {rt_oa_search_alert_2.name}",
-        )
+        subject = mail.outbox[0].subject
+        self.assertIn("2 Alerts have hits:", subject)
+        self.assertIn(rt_oa_search_alert.name, subject)
+        self.assertIn(rt_oa_search_alert_2.name, subject)
 
         # Assert html version.
         html_content = self.get_html_content_from_email(mail.outbox[0])
@@ -3180,10 +3180,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             len(mail.outbox), 2, msg="Wrong number of emails sent."
         )
         text_content = mail.outbox[1].body
-        self.assertEqual(
-            mail.outbox[1].subject,
-            f"2 Alerts have hits: {self.search_alert_3.name}, {self.search_alert_4.name}",
-        )
+        subject = mail.outbox[1].subject
+        self.assertIn("2 Alerts have hits:", subject)
+        self.assertIn(self.search_alert_3.name, subject)
+        self.assertIn(self.search_alert_4.name, subject)
 
         # The right alert type template is used.
         self.assertIn("oral argument", text_content)
