@@ -63,7 +63,7 @@ def retry(
 
 def cache_page_ignore_params(timeout: int):
     """Cache the result of a view while ignoring URL query parameters.
-    Ensuring that the cache  is consistent for different requests with varying
+    Ensuring that the cache is consistent for different requests with varying
     query strings.
 
     WARNING:
