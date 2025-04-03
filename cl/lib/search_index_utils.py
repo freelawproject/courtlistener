@@ -1,6 +1,12 @@
 import re
 from datetime import date
+from typing import Any
 
+from elasticsearch.exceptions import ConflictError
+from elasticsearch.helpers import BulkIndexError, bulk
+from elasticsearch_dsl import connections
+
+from cl.lib.command_utils import logger
 from cl.lib.date_time import midnight_pt
 
 
@@ -104,3 +110,70 @@ def get_parties_from_case_name_bankr(case_name: str) -> list[str]:
         if separator in case_name:
             return cleaned_case_name.split(separator, 1)
     return [cleaned_case_name]
+
+
+def check_bulk_indexing_exceptions(
+    errors: list[dict[str, Any]], error_types: list[str]
+) -> tuple[bool, bool]:
+    """Check for specific exception types in bulk indexing errors.
+    :param errors: A list of dictionaries representing errors from a bulk
+    indexing operation.
+    :param error_types: A list of exception type strings to check for in the
+    error details.
+    :return: A two-tuple: a boolean indicating whether a ConflictError was found,
+     and a boolean indicating whether an unknown error was found.
+    """
+    conflict_found = False
+    raise_error = False
+    for error in errors:
+        error_type = error.get("update", {}).get("error", {}).get("type")
+        match error_type:
+            case "document_missing_exception" if (
+                "document_missing_exception" in error_types
+            ):
+                missing_opinion = error.get("update", {}).get("_id", None)
+                logger.warning(
+                    "Opinion with ID %s is not indexed in ES.", missing_opinion
+                )
+            case "version_conflict_engine_exception" if (
+                "version_conflict_engine_exception" in error_types
+            ):
+                conflict_found = True
+            case _:
+                raise_error = True
+    return conflict_found, raise_error
+
+
+def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
+    """Index documents in Elasticsearch using the bulk API.
+
+    :param documents_to_index: A list of dictionaries representing the documents
+    to be indexed in bulk.
+    :return: None.
+    """
+
+    client = connections.get_connection(alias="no_retry_connection")
+    # Execute the bulk update
+    ids = [doc["_id"] for doc in documents_to_index]
+    try:
+        bulk(client, documents_to_index)
+    except BulkIndexError as exc:
+        # Catch any BulkIndexError exceptions to handle specific error message.
+        # If the error is a version conflict, raise a ConflictError for retrying it.
+        conflict_error, raise_error = check_bulk_indexing_exceptions(
+            exc.errors,
+            [
+                "version_conflict_engine_exception",
+                "document_missing_exception",
+            ],
+        )
+        if conflict_error:
+            raise ConflictError(
+                "ConflictError indexing documents in bulk.",
+                "",
+                {"ids": ids},
+            )
+        elif raise_error:
+            # If the error is of any other type, raises the original
+            # BulkIndexError for debugging.
+            raise exc
