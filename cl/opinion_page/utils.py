@@ -605,6 +605,11 @@ async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
     :param sub_opinion_pks: The sub opinion ids of the cluster
     :return: The count of related cases in elastic
     """
+
+    if not sub_opinion_pks:
+        # Early abort if the cluster doesn't have sub opinions. e.g. cluster id: 3561702
+        return 0
+
     cache = caches["db_cache"]
     cache_related_cases_key = f"related-cases-count-es:{cluster_id}"
     cached_related_cases_count = (

@@ -1,0 +1,62 @@
+@font-face {
+  font-family: 'Cooper Hewitt';
+  src: url('../../static/fonts/cooper-hewitt/CooperHewitt-Thin.woff2') format('woff2'),
+       url('../../static/fonts/cooper-hewitt/CooperHewitt-Thin.woff') format('woff'),
+       url('../../static/fonts/cooper-hewitt/CooperHewitt-Thin.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cooper Hewitt';
+  src:
+    url('../../static/fonts/cooper-hewitt/CooperHewitt-Medium.woff2') format('woff2'),
+    url('../../static/fonts/cooper-hewitt/CooperHewitt-Medium.woff') format('woff'),
+    url('../../static/fonts/cooper-hewitt/CooperHewitt-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src:
+    url('../../static/fonts/inter/Inter-Regular.woff2') format('woff2'),
+    url('../../static/fonts/inter/Inter-Regular.woff') format('woff'),
+    url('../../static/fonts/inter/Inter-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('../../static/fonts/inter/Inter-Medium.woff2') format('woff2'),
+       url('../../static/fonts/inter/Inter-Medium.woff') format('woff'),
+       url('../../static/fonts/inter/Inter-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src:
+    url('../../static/fonts/inter/Inter-SemiBold.woff2') format('woff2'),
+    url('../../static/fonts/inter/Inter-SemiBold.woff') format('woff'),
+    url('../../static/fonts/inter/Inter-SemiBold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('../../static/fonts/inter/Inter-Bold.woff2') format('woff2'),
+       url('../../static/fonts/inter/Inter-Bold.woff') format('woff'),
+       url('../../static/fonts/inter/Inter-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
