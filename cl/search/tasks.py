@@ -3,9 +3,9 @@ import csv
 import io
 import json
 import logging
-import os
 from datetime import date, datetime
 from importlib import import_module
+from pathlib import PurePosixPath
 from random import randint
 from typing import Any, Generator
 
@@ -1674,11 +1674,13 @@ def retrieve_embeddings(
     storage = AWSMediaStorage()
 
     def download_embedding(opinion_id: int) -> dict | None:
-        file_path = os.path.join(
-            "embeddings",
-            directory,
-            settings.NLP_EMBEDDING_MODEL,
-            f"{opinion_id}.json",
+        file_path = str(
+            PurePosixPath(
+                "embeddings",
+                directory,
+                settings.NLP_EMBEDDING_MODEL,
+                f"{opinion_id}.json",
+            )
         )
         logger.info("Attempting to retrieve embedding from: %s", file_path)
         try:
