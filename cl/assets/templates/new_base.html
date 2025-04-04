@@ -1,7 +1,7 @@
 {% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
 {% load static tailwind_tags %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
   <meta charset="utf-8"/>
   <meta http-equiv="Content-Language" content="en"/>
@@ -74,58 +74,58 @@
 </head>
 
 <body class="{% block body-classes %}{% endblock %}">
-<div class="">
   {% block header %}
   <header class="border border-greyscale-200">
   New design MVP
   </header>
   {% endblock %}
 
-  {% block content_wrapper %}
-  <div class="max-w-content mx-auto pt-4 md:pt-20 pb-35 max-lg:px-4">
-    {% block content %}
-      <p>Your content seems to be missing! This is never good.</p>
+  <main>
+    {% block content_wrapper %}
+    <div class="max-w-content mx-auto pt-4 md:pt-20 pb-35 max-lg:px-4">
+      {% block content %}
+        <p>Your content seems to be missing! This is never good.</p>
+      {% endblock %}
+    </div>
     {% endblock %}
-  </div>
-  {% endblock %}
+  </main>
 
   {% block footer %}
   <footer class="">
   </footer>
   {% endblock %}
-</div>
 
-{% if DEBUG %}
-<script type="text/javascript"
-        src="{% static "js/jquery/jquery-3.4.1.js" %}"></script>
-{% else %}
-<script type="text/javascript"
-        src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
-{% endif %}
-
-<script type="text/javascript" src="{% static "js/base.js" %}"></script>
-<script type="text/javascript" nonce="{{ request.csp_nonce }}">
-  {# Default values are to ensure JS parsing even if 500 error thrown #}
-  var isMember = {{ user.profile.is_member|yesno:"true,false" }},
-      userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},
-      priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }}),
-      maxFreeDocketAlerts = {{ MAX_FREE_DOCKET_ALERTS|default:0 }},
-      recapBonusAlerts = {{ DOCKET_ALERT_RECAP_BONUS|default:0 }};
-
-</script>
-
-{# Allows your own scripts in the footer. #}
-{% block footer-scripts %}{% endblock %}
-
-{# Record stats for non-superusers 1/10 times to save money #}
-{% if not user.is_superuser  %}
-  {% random_int 0 9 as rand %}
-  {% if rand == 0 %}
-    <script
-      defer
-      data-domain="courtlistener.com"
-      src="https://plausible.io/js/plausible.js"></script>
+  {% if DEBUG %}
+  <script type="text/javascript"
+          src="{% static "js/jquery/jquery-3.4.1.js" %}"></script>
+  {% else %}
+  <script type="text/javascript"
+          src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
   {% endif %}
-{% endif %}
+
+  <script type="text/javascript" src="{% static "js/base.js" %}"></script>
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+    {# Default values are to ensure JS parsing even if 500 error thrown #}
+    var isMember = {{ user.profile.is_member|yesno:"true,false" }},
+        userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},
+        priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }}),
+        maxFreeDocketAlerts = {{ MAX_FREE_DOCKET_ALERTS|default:0 }},
+        recapBonusAlerts = {{ DOCKET_ALERT_RECAP_BONUS|default:0 }};
+
+  </script>
+
+  {# Allows your own scripts in the footer. #}
+  {% block footer-scripts %}{% endblock %}
+
+  {# Record stats for non-superusers 1/10 times to save money #}
+  {% if not user.is_superuser  %}
+    {% random_int 0 9 as rand %}
+    {% if rand == 0 %}
+      <script
+        defer
+        data-domain="courtlistener.com"
+        src="https://plausible.io/js/plausible.js"></script>
+    {% endif %}
+  {% endif %}
 </body>
 </html>
