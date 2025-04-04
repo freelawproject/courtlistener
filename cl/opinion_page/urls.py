@@ -4,7 +4,6 @@ from cl.opinion_page.views import (
     block_item,
     citation_homepage,
     citation_redirector,
-    cluster_visualizations,
     court_homepage,
     court_publish_page,
     docket_authorities,
@@ -35,11 +34,6 @@ urlpatterns = [
         name="court_publish_page",
     ),
     # Opinion pages
-    path(
-        "opinion/<int:pk>/<blank-slug:slug>/visualizations/",
-        cluster_visualizations,  # type: ignore[arg-type]
-        name="cluster_visualizations",
-    ),
     path(
         "docket/<int:docket_id>/feed/",
         view_docket_feed,  # type: ignore[arg-type]
