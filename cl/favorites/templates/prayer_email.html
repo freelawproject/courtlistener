@@ -65,6 +65,8 @@
       </tbody>
     </table>
 
+    <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
+
     <p>You requested it on {{ date_created|date:"F j, Y" }}.</p>
     <p>{{num_waiting}} {{ num_waiting|pluralize:"person was,people were" }} waiting for it.</p>
     {% if price %}<p>Somebody paid ${{ price }} to make it available to all of us.</p>{% endif %}
