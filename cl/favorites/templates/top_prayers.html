@@ -42,6 +42,7 @@
       <table class="settings-table table">
         <thead>
             <tr>
+              <th></th>
               <th>Court</th>
               <th>Case Name</th>
               <th>Document Number</th>
@@ -55,6 +56,11 @@
         <tbody>
             {% for prayer in top_prayers %}
             <tr>
+              <td>
+                <div class="prayer-button">
+                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=prayer.prayer_exists document_id=prayer.recap_document.id count=prayer.prayer_count regular_size=True%}
+                </div>
+              </td>
               <td>{{ prayer.docket_entry.docket.court.citation_string }}</td>
               {% with docket=prayer.docket_entry.docket %}
               <td>

@@ -2,6 +2,7 @@ import pghistory
 from django.contrib.auth.models import User
 from django.core.validators import MaxLengthValidator
 from django.db import models
+from django.utils import timezone
 
 from cl.audio.models import Audio
 from cl.lib.models import AbstractDateTimeModel
@@ -198,5 +199,28 @@ class Prayer(models.Model):
             models.Index(
                 fields=["date_created", "user", "status"],
                 name="favorites_prayer_date_created_user_id_status_880d7280_idx",
+            ),
+        ]
+
+
+# model to keep track of when we last checked whether a given PACER document was still unavailable for purchase
+class PrayerAvailability(models.Model):
+    recap_document = models.ForeignKey(
+        RECAPDocument,
+        help_text="The document people prayed for.",
+        related_name="prayeravailability",
+        on_delete=models.CASCADE,
+    )
+    last_checked = models.DateTimeField(
+        help_text="The time when the availability of this document was last checked.",
+        default=timezone.now,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recap_document"],
+                name="unique_recap_document",
+                include=["last_checked"],
             ),
         ]
