@@ -7,6 +7,24 @@
 {% load humanize %}
 
 {% block nav-prayer-pending %}active{% endblock %}
+
+{% if is_page_owner %}
+<div class="recap-email-toggle text-center" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <label for="auto-subscribe"><b>Make pending prayers public: </b></label>
+  <div id="switch-button" class="toggle btn {% if auto_subscribe %}btn-primary {% else %} btn-light off {% endif %}"
+       hx-post="{% url "toggle_prayer_public" %}"
+       hx-swap="none" hx-include="[name=current_toggle_status]"
+       data-toggle="toggle" role="button">
+    <input name="current_toggle_status" type="hidden" value="{{ page_public }}"/>
+    <div class="toggle-group">
+      <label for="auto-subscribe" class="btn btn-primary toggle-on">On</label>
+      <label for="auto-subscribe" class="btn btn-light toggle-off">Off</label>
+      <span class="toggle-handle btn btn-light"></span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% block prayer_list %}
   <div class="col-xs-12" id="prayer_list_waiting" hx-swap-oob="true">
     <div class="table-responsive">
