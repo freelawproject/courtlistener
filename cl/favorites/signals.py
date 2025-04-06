@@ -17,9 +17,8 @@ from .utils import prayer_unavailable
 )
 def check_prayer_availability(sender, instance: Prayer, **kwargs):
     """
-    Right now, this receiver exists to enqueue the task to parse RECAPDocuments for caselaw citations.
-    More functionality can be put here later. There may be things currently in the save function
-    of RECAPDocument that would be better placed here for reasons of maintainability and testability.
+    Signal to check if a given RecapDocument is available for purchase after a user has requested it
+    as part of the pray-and-pay project.
     """
 
     rd = instance.recap_document

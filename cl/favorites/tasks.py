@@ -23,11 +23,10 @@ from .utils import prayer_unavailable
     ignore_result=True,
 )
 @transaction.atomic
-def check_prayer_pacer(rd: RECAPDocument, user_pk: int) -> bool:
-    """Helper function for should_check_prayer_availability().
+def check_prayer_pacer(rd: RECAPDocument, user_pk: int):
+    """Celery task for check_prayer_availability().
     :param rd: The RECAPDocument of interest
     :param user_pk: The primary key of the user who requested the document
-    :return: bool that indicates whether document is available
     """
     court_id = rd.docket_entry.docket.court.pk
     pacer_doc_id = rd.pacer_doc_id
