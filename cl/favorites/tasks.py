@@ -2,7 +2,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils.timezone import now
-
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import DownloadConfirmationPage
 from redis import ConnectionError as RedisConnectionError
@@ -10,6 +9,7 @@ from redis import ConnectionError as RedisConnectionError
 from cl.celery_init import app
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.search.models import RECAPDocument
+
 from .models import PrayerAvailability
 from .utils import prayer_unavailable
 
