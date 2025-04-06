@@ -25,10 +25,6 @@ from django.utils import timezone
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.models import Prayer
-from cl.recap.tasks import (
-    check_prayer_availability,
-    should_check_prayer_availability,
-)
 from cl.search.models import RECAPDocument
 
 
@@ -61,9 +57,6 @@ async def create_prayer(
     )
     if not created:
         return None
-
-    if should_check_prayer_availability(recap_document.pk, User.pk):
-        check_prayer_availability.delay(recap_document.pk, User.pk)
 
     return new_prayer
 
