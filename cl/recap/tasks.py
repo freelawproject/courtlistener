@@ -33,7 +33,6 @@ from juriscraper.pacer import (
     ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
-    DownloadConfirmationPage,
     PossibleCaseNumberApi,
     S3NotificationEmail,
 )
