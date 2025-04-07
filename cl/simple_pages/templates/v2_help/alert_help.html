@@ -14,82 +14,24 @@
 {% block content %}
 
 <div class="w-full flex max-md:flex-wrap">
-  <nav class="hidden md:flex flex-col flex-wrap items-start min-w-[222px]">
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-medium font-sans border-l-2 border-l-primary-600"
-      href="#recap-alerts"
-    >Docket Alerts
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#limitations"
-    >Limitations
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#creating-docket-alert"
-    >Creating Alerts
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#disabling-docket-alert"
-    >Disabling Alerts
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#coverage-gaps"
-    >Coverage Gaps
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#search-alerts"
-    >Search Alerts
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#creating-search-alerts"
-    >Creating Alerts
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#enabling-real-time-alerts"
-    >Enabling Real Time Alerts
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#editing-search-alerts"
-    >Editing an Alert
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#editing-search-alerts"
-    >Deleting an Alert
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#disabling-search-alerts"
-    >Disabling an Alert
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#courts"
-    >Supported Courts
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#citation-alerts"
-    >Citation Alerts
-    </a>
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
-      href="#coming-soon"
-    >Coming Soon
-    </a>
-  </nav>
-
-  <div class="md:hidden w-full pb-4">
-    <div class="rounded-[10px] border border-greyscale-200 py-3 px-3.5 text-sm">On this page</div>
-  </div>
+  <c-navigation-menu
+    :nav_items="[
+      {'href': '#recap-alerts', 'text': 'Docket Alerts'},
+      {'href': '#limitations', 'text': 'Limitations'},
+      {'href': '#creating-docket-alert', 'text': 'Creating Alerts'},
+      {'href': '#disabling-docket-alert', 'text': 'Disabling Alerts'},
+      {'href': '#coverage-gaps', 'text': 'Coverage Gaps'},
+      {'href': '#search-alerts', 'text': 'Search Alerts'},
+      {'href': '#creating-search-alerts', 'text': 'Creating Alerts'},
+      {'href': '#enabling-real-time-alerts', 'text': 'Enabling Real Time Alerts'},
+      {'href': '#editing-search-alerts', 'text': 'Editing an Alert'},
+      {'href': '#editing-search-alerts', 'text': 'Deleting an Alert'},
+      {'href': '#disabling-search-alerts', 'text': 'Disabling an Alert'},
+      {'href': '#courts', 'text': 'Supported Courts'},
+      {'href': '#citation-alerts', 'text': 'Citation Alerts'},
+      {'href': '#coming-soon', 'text': 'Coming Soon'},
+    ]"
+  ></c-navigation-menu>
 
   <article class="flex flex-col gap-11 items-start max-md:pt-4">
     <div class="flex flex-col gap-4">
