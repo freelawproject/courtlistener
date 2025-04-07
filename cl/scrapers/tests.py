@@ -1144,6 +1144,13 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             author_str=author_str,
             sha1="22222",
         )
+        # the version cluster may have other opinions linked to it that are
+        # not versions. Ensure we migrate them to the main cluster after this
+        # version cluster is deleted
+        not_a_version_in_version_cluster = OpinionFactory.create(
+            cluster=cluster2,
+            sha1="123456",
+        )
         version2 = OpinionFactory.create(
             cluster=cluster3,
             download_url=download_url,
@@ -1181,10 +1188,6 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             OpinionDocument.exists(id=ES_CHILD_ID(version.id).OPINION),
             "OpinionDocument does not exist",
         )
-        self.assertTrue(
-            DocketDocument.exists(id=version_docket.id),
-            "Docket document does not exist",
-        )
 
         # Function to test
         merge_versions_by_download_url(download_url.rsplit("/", 1)[0])
@@ -1213,6 +1216,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         same_url_different_docket_number.refresh_from_db()
         version_docket_another_cluster.refresh_from_db()
         version_audio.refresh_from_db()
+        not_a_version_in_version_cluster.refresh_from_db()
 
         # Opinions
         self.assertEqual(
@@ -1239,6 +1243,11 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             same_url_different_docket_number.main_version_id,
             None,
             "`same_url_different_docket_number` should not have it's version updated",
+        )
+        self.assertEqual(
+            not_a_version_in_version_cluster.cluster_id,
+            main_cluster.id,
+            "non version opinion in the version cluster should be migrated to the main version cluster",
         )
 
         # Clusters
