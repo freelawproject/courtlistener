@@ -1,0 +1,331 @@
+{% extends "new_base.html" %}
+{% load static humanize partition_util %}
+
+{% block title %}Help with Search and Docket Alerts – CourtListener.com{% endblock %}
+{% block og_title %}Help with Search and Docket Alerts – CourtListener.com{% endblock %}
+
+{% block description %}Get help creating and using search and docket alerts on CourtListener.{% endblock %}
+{% block og_description %}Get help creating and using search and docket alerts on CourtListener.{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+
+<div class="w-full flex max-md:flex-wrap">
+  <nav class="hidden md:flex flex-col flex-wrap items-start min-w-[222px]">
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-medium font-sans border-l-2 border-l-primary-600"
+      href="#recap-alerts"
+    >Docket Alerts
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#limitations"
+    >Limitations
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#creating-docket-alert"
+    >Creating Alerts
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#disabling-docket-alert"
+    >Disabling Alerts
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#coverage-gaps"
+    >Coverage Gaps
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#search-alerts"
+    >Search Alerts
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#creating-search-alerts"
+    >Creating Alerts
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#enabling-real-time-alerts"
+    >Enabling Real Time Alerts
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#editing-search-alerts"
+    >Editing an Alert
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#editing-search-alerts"
+    >Deleting an Alert
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#disabling-search-alerts"
+    >Disabling an Alert
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#courts"
+    >Supported Courts
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#citation-alerts"
+    >Citation Alerts
+    </a>
+    <a
+      class="w-full py-1.5 px-3.5 text-sm font-normal target:font-medium font-sans border-l border-l-greyscale-200"
+      href="#coming-soon"
+    >Coming Soon
+    </a>
+  </nav>
+
+  <div class="md:hidden w-full pb-4">
+    <div class="rounded-[10px] border border-greyscale-200 py-3 px-3.5 text-sm">On this page</div>
+  </div>
+
+  <article class="flex flex-col gap-11 items-start max-md:pt-4">
+    <div class="flex flex-col gap-4">
+      <h1 class="text-display-xs font-semibold md:text-display-lg" id="about">Help with Search and Docket Alerts</h1>
+      <p class="text-xl font-sans font-normal text-greyscale-700">Since 2009, CourtListener has helped people keep up with new cases and legal topics.</p>
+      <p>We currently have three kinds of alerts: Search Alerts, Docket Alerts for PACER, and Citation Alerts.</p>
+    </div>
+
+    {# Docket Alerts for PACER #}
+    <div class="flex flex-col gap-4">
+      <h2 class="text-display-xs font-semibold text-greyscale-900" id="recap-alerts">Docket Alerts for PACER</h2>
+      <p>Docket Alerts allow you to keep up with federal cases and bankruptcies in the PACER system. These alerts monitor tens of thousands of cases across the country for new docket entries and send emails and <a class="underline" href="{% url "webhooks_docs" %}">webhook events</a> whenever new data is found.
+      </p>
+      <p>Our alerts are only as good as our sources. To learn more about the data sources that trigger alerts see our <a class="underline" href="{% url "coverage_recap" %}">coverage page</a>.
+      </p>
+      <p>For active cases, alerts can come within seconds of a new filing. For less active cases, it can take more time or alerts may not arrive at all, if we do not have a source of new information for that case.
+      </p>
+      <p>In the last 24 hours, {{ d_update_count|intcomma }} dockets and {{ de_update_count|intcomma }} docket entries were updated.
+      </p>
+    </div>
+
+    {# Limitations #}
+    <div class="flex flex-col gap-4">
+      <h3 class="text-display-xs font-semibold text-greyscale-900" id="limitations">Limitations</h3>
+      <p>As a non-profit, we aim to provide our services to as many people as possible. We currently allow <span class="bold">{{ MAX_FREE_DOCKET_ALERTS }}</span> docket alerts for free, and give a bonus of <span class="bold">{{ DOCKET_ALERT_RECAP_BONUS }}</span> alerts to anybody with the <a class="underline" href="https://free.law/recap/">RECAP Extension</a> installed.
+      </p>
+      <p>Members can create as many alerts as they need, though we may set up some reasonable limits in the future, based on usage.
+      </p>
+      <p>Corporate rates are available for large organizations needing to provide alerts to many users. This feature is intended for individual users. If you think you may need to use alerts for a commercial endeavor, please <a class="underline" href="{% url "contact" %}">get in touch</a>.
+      </p>
+      <p>We can sometimes provide need-based exceptions to these rates. If you might need an exception, <a class="underline" href="{% url "contact" %}">please let us know</a>.
+      </p>
+      <div class="flex flex-col md:flex-row gap-2">
+        <a href="https://free.law/recap/"
+           class="btn-primary max-md:btn-xl">Install RECAP Extension</a>
+        <a href="https://donate.free.law/forms/membership"
+           class="btn-primary max-md:btn-xl">Join Free.law</a>
+      </div>
+    </div>
+
+    {# Creating a Docket Alert #}
+    <div class="flex flex-col gap-4">
+      <h3 class="text-display-xs font-semibold text-greyscale-900" id="creating-docket-alert">Creating a Docket Alert</h3>
+      <p>To create a RECAP Alert, find the docket you are interested in following, and press the button on the top that says, "Get Alerts":
+      </p>
+      <figure class="bg-greyscale-50 md:py-2 rounded-2xl">
+        <img
+          src="{% static "svg/get_alerts.svg" %}"
+          alt="screenshot of the enable button"
+          class="mx-auto"
+          width="579"
+          height="168">
+      </figure>
+      <p>That's all there is to it. You'll begin getting alerts as soon as the docket has a new docket entry.
+      </p>
+      <p>Here's an example of what an email might look like:</p>
+      <figure class="bg-greyscale-50 md:py-2 pl-9 pt-6 rounded-2xl">
+        <a href="{% static "png/logo.png" %}">
+          <img
+            src="{% static "png/logo.png" %}"
+            alt="screenshot of an alert email"
+            width=""
+            height="529"
+            class="mx-auto">
+        </a>
+      </figure>
+    </div>
+
+    {# Disabling a Docket Alert #}
+    <div class="flex flex-col gap-4">
+      <h3 class="text-display-xs font-semibold text-greyscale-900" id="disabling-docket-alert">Disabling a Docket Alert</h3>
+      <p>To disable a Docket Alert, find the docket you no longer are interested in, and press the button that says "Disable Alerts":
+      </p>
+      <figure class="bg-greyscale-50 p-2 rounded-2xl">
+        <img
+          src="{% static "png/logo.png" %}"
+          alt="screenshot of the disable button"
+          class="max-w-full"
+          height="31"
+          width="119">
+      </figure>
+    </div>
+
+    {# Full RSS Feeds #}
+    <div class="flex flex-col gap-4">
+      <h3 class="text-display-xs font-semibold text-greyscale-900" id="coverage-gaps">Coverage Gaps</h3>
+      <p>A major source we use for our alerts is RSS feeds provided by the courts. Even after supplementing these with <a class="underline" href="{% url "coverage_recap" %}">the sources listed on our coverage page</a>, we are not always able to provide complete coverage of everything new in PACER. The problem is that some courts do not provide RSS feeds, and others only provide partial ones. The lists below are updated around the clock and provide a summary of which courts provide RSS feeds.
+      </p>
+      <h4 class="text-xl font-semibold text-greyscale-900">Full RSS Feeds</h4>
+      <p>The courts below have complete RSS feeds, allowing us to always know when cases in these courts are updated.</p>
+      <div class="bg-greyscale-100 p-20 rounded-2xl">
+        tab component placeholder for full feed courts
+      </div>
+    </div>
+
+    {# Partial RSS Feeds #}
+    <div class="flex flex-col gap-4">
+      <h4 class="text-xl font-semibold text-greyscale-900">Partial RSS Feeds</h4>
+      <p>The courts below only provide some types of documents in their RSS feeds. This means we can send alerts for the types of documents they support and for any content we get from other sources.
+      </p>
+      <p>You can see which docket entry types are provided by these courts below.</p>
+      <div class="bg-greyscale-100 p-20 rounded-2xl">
+        tab component placeholder for partial feed courts
+      </div>
+      <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
+    </div>
+
+    {# No RSS Feeds #}
+    <div class="flex flex-col gap-4">
+      <h4 class="text-xl font-semibold text-greyscale-900">No RSS Feeds</h4>
+      <p>The courts below do not provide RSS feeds of their latest filings. This means our alerts will only be sent when we get updates from other sources.
+      </p>
+      <div class="bg-greyscale-100 p-20 rounded-2xl">
+        tab component placeholder for no feed courts
+      </div>
+      <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
+    </div>
+
+    {# Search Alerts #}
+    <div class="flex flex-col gap-4">
+      <h2 class="text-display-xs font-semibold text-greyscale-900" id="search-alerts">Search Alerts</h2>
+      <p>Search alerts are triggered by our search engine and are a powerful way to get fine-tuned alerts on cases or topics that you are following.
+      </p>
+    </div>
+
+    {# Creating Search Alerts #}
+    <div class="flex flex-col gap-4">
+      <h3 class="text-display-xs font-semibold text-greyscale-900" id="creating-search-alerts">Creating Alerts</h3>
+      <p>To create a Search Alert, begin with a search in CourtListener's Case Law or Oral Argument database. In the results page, click the bell icon in the search bar or click the Get Alerts button in the sidebar on the left.
+      </p>
+      <figure class="bg-greyscale-50 p-2 rounded-2xl">
+        <img
+          src="{% static "png/logo.png" %}"
+          alt="screenshot of the search bar"
+          class="max-w-full"
+          height="76"
+          width="">
+      </figure>
+      <p>After you click the bell icon or the Get Alerts button, you will see a pop-up like this, where you can see the filters applied to your alert, how many results it had over the past 100 days, and give it a name and frequency.
+      </p>
+      <figure class="bg-greyscale-50 p-2 rounded-2xl">
+        <img
+          src="{% static "png/logo.png" %}"
+          alt="screenshot of the create alert form"
+          class="max-w-full"
+          height="400"
+          width="">
+      </figure>
+
+      <p>The available rates are "Real Time," "Daily," "Weekly," "Monthly," or "Off." Real Time alerts are usually delivered within about an hour of when something is published by the court. Daily, weekly, and monthly alerts come at the end of the day, week, and month.
+      </p>
+      <p>Alerts that are Off will not be run. This can be useful for temporarily disabling an alert.
+      </p>
+    </div>
+
+    {# Enabling Real Time Alerts #}
+    <div class="flex flex-col gap-4">
+      <h3 class="text-display-xs font-semibold text-greyscale-900" id="enabling-real-time-alerts">Enabling Real Time Alerts</h3>
+      <p>Real Time alerts are available for Free Law Project members. If you see a message like the one below, you will <a class="underline" href="https://donate.free.law/forms/membership">need to become a member</a> to enable Real Time alerts:
+      </p>
+      <figure class="bg-greyscale-50 p-2 rounded-2xl">
+        <img
+          src="{% static "png/logo.png" %}"
+          alt="screenshot of the please donate for real time notification"
+          class="max-w-full"
+          height="388"
+          width="">
+      </figure>
+      <div>
+        <a
+          href="https://donate.free.law/forms/membership"
+          class="btn-primary max-md:btn-xl">Join Free.law
+        </a>
+      </div>
+    </div>
+
+    {# Editing or Deleting a Search Alert #}
+    <div class="flex flex-col gap-4">
+      <h3 class="text-display-xs font-semibold text-greyscale-900" id="editing-search-alerts">Editing or Deleting a Search Alert</h3>
+      <p>Existing alerts can be edited or deleted from <a class="underline" href="{% url "profile_alerts" %}">your user profile</a>. By clicking the Edit button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
+      </p>
+      <p>From your profile page, you can also delete an alert.</p>
+    </div>
+
+    {# Disabling a Search Alert #}
+    <div class="flex flex-col gap-4">
+      <h3 class="text-display-xs font-semibold text-greyscale-900" id="disabling-search-alerts">Disabling a Search Alert</h3>
+      <p>To temporarily disable an alert, edit it and set the rate to "Off." Every alert email also has a one-click link for disabling the alert that triggered it.
+      </p>
+    </div>
+
+    {# Supported Courts #}
+    <div class="flex flex-col gap-4">
+      <h3 class="text-display-xs font-semibold text-greyscale-900" id="courts">Supported Courts</h3>
+      <p>Search alerts are available for many jurisdictions across the country, and we are frequently expanding our system to support even more locations. To see which courts are currently supported, check <a class="underline" href="{% url "coverage" %}">our coverage pages</a>, where we list the jurisdictions that we regularly scrape for oral arguments or case law.
+      </p>
+      <p>If there is a jurisdiction that is not currently listed, please <a class="underline" href="{% url "contact" %}">express your interest</a>, and we will do our best to add it to our list.
+      </p>
+    </div>
+
+    {# Citation Alerts #}
+    <div class="flex flex-col gap-4">
+      <h2 class="text-display-xs font-semibold text-greyscale-900" id="citation-alerts">Citation Alerts</h2>
+      <p>Citation alerts make it possible to keep up with citations to a case of interest. For example, if you are following election law, you might want an alert whenever a new case cites existing landmark cases in your field.
+      </p>
+      <p>Citation alerts can be configured with custom queries, filters, or jurisdictions. This allows you to set up alerts like:
+
+      </p>
+      <blockquote class="border-l-4 border-l-greyscale-400 pl-4 text-md font-serif">Whenever the Supreme Court cites <em>Roe v. Wade</em> and mentions the First Amendment, send me an email.</blockquote>
+      <p>To create a citation alert, start at webpage for the case that interests you. In this example, we will use <a class="underline" href="/opinion/108713/roe-v-wade/"><em>Roe v. Wade</em></a>.
+      </p>
+      <p>On that page, in the sidebar on the left, any cases that cite it are listed, and there is a button to "Get Citation Alerts":
+      </p>
+      <figure class="bg-greyscale-50 p-2 rounded-2xl">
+        <img
+          src="{% static "png/logo.png" %}"
+          alt="screenshot of the citing opinions sidebar"
+          class=""
+          width=""
+          height="253">
+      </figure>
+
+      <p>Clicking that button will perform a search in CourtListener that <a class="underline" href="/?q=cites%3A(108713)&show_alert_modal=yes" rel="nofollow">shows the case law that cites <em>Roe v. Wade</em></a>, and a dialog will appear where you can save the alert.</p>
+      <p>If you prefer to modify the alert, you can close the dialog that appeared, tweak the query and filters you wish to apply, and then save it as you would any regular alert.
+      </p>
+      <p>For more on citation alerts, <a class="underline" href="https://free.law/2016/01/30/citation-searching/">see our blog post announcing this feature</a>.
+      </p>
+    </div>
+
+    {# Coming Soon #}
+    <div class="flex flex-col gap-4">
+      <h2 class="text-display-xs font-semibold text-greyscale-900" id="coming-soon">Coming Soon</h2>
+      <p>We do not currently support search alerts or citation alerts for PACER filings, but we plan to do so soon.
+      </p>
+      <p>Please stay tuned!</p>
+    </div>
+  </article>
+</div>
+{% endblock %}
