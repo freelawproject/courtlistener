@@ -240,33 +240,49 @@
     <div class="tab-pane fade in active" id="pdf">
         <div>
             <h2 class="opinion-section-title jump-link">
-                Source:
-                <em>
-                    {% if cluster.filepath_pdf_harvard %}
-                        Case Law Access Project
-                    {% elif pdf_path %}
-                        {{ cluster.docket.court }}
-                    {% endif %}
-                </em>
+            {% if pdf_path %}
+                Source: {% if cluster.filepath_pdf_harvard %}Case Law Access Project{% else %}{{ cluster.docket.court }}{% endif %}
+            {% else %}
+                No PDF available
+            {% endif %}
             </h2>
         </div>
         <hr class="hr-opinion">
-        <div class="embed-responsive embed-responsive-8by11">
-            <object data="{% if cluster.filepath_pdf_harvard %}{{ cluster.filepath_pdf_harvard.url }}{% elif pdf_path %}{{ cluster.sub_opinions.all.0.local_path.url }}{% endif %}?no-og=true"
-                    type="application/pdf"
-                    width="100%"
-                    height="100%">
-                <div class="row">
-                    <div class="col-sm-1 col-md-2 col-lg-3"></div>
-                    <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
-                        <p>Oops! Your browser does not support embedded PDF viewing.</p>
-                        <div class="v-offset-below-1 v-offset-above-1">
-                            {% include "includes/rd_download_button.html" %}
+        {% if pdf_path %}
+            <div class="embed-responsive embed-responsive-8by11">
+                <object data="{{ pdf_path }}?no-og=true"
+                        type="application/pdf"
+                        width="100%"
+                        height="100%"
+                        class="hidden-xs hidden-sm hidden-md">
+                    <div class="row">
+                        <div class="col-sm-1 col-md-2 col-lg-3"></div>
+                        <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
+                            <p>Oops! Your browser does not support embedded PDF viewing.</p>
+                            <a href="{{ pdf_path }}"
+                               role="button"
+                               class="btn btn-primary">Download PDF&nbsp;<i
+                              class="fa fa-file-pdf-o"></i>
+                            </a>
+                        </div>
+                    </div>
+                </object>
+
+                <div class="visible-xs-block visible-sm-block visible-md-block hidden-lg">
+                    <div class="row">
+                        <div class="col-sm-1 col-md-2 col-lg-3"></div>
+                        <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
+                            <p>Oops! PDF viewing is not supported on mobile devices.</p>
+                            <a href="{{ pdf_path }}"
+                               role="button"
+                               class="btn btn-primary">Download PDF&nbsp;<i
+                              class="fa fa-file-pdf-o"></i>
+                            </a>
                         </div>
                     </div>
                 </div>
-            </object>
-        </div>
+            </div>
+        {% endif %}
     </div>
 {% else %}
 
