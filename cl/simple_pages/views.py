@@ -59,10 +59,6 @@ async def faq(request: HttpRequest) -> HttpResponse:
             "scraped_court_count": await Court.objects.filter(
                 in_use=True, has_opinion_scraper=True
             ).acount(),
-            "total_opinion_count": await OpinionCluster.objects.all().acount(),
-            "total_recap_count": await RECAPDocument.objects.filter(
-                is_available=True
-            ).acount(),
             "total_oa_minutes": (
                 (await Audio.objects.aaggregate(Sum("duration")))[
                     "duration__sum"
@@ -472,6 +468,10 @@ async def latest_terms(request: HttpRequest) -> HttpResponse:
 
 async def validate_for_wot(request: HttpRequest) -> HttpResponse:
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
+
+
+async def components(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "components.html", {"private": True})
 
 
 async def ratelimited(

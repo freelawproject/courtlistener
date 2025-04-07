@@ -4,7 +4,7 @@ from datetime import datetime
 from django.db import transaction
 
 from cl.lib.command_utils import ScraperCommand, logger
-from cl.scrapers.tasks import update_document_from_text
+from cl.scrapers.tasks import extract_doc_content, update_document_from_text
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
@@ -33,10 +33,17 @@ def rerun_extract_from_text(
         # May be an opinion entirely from a merged corpus
         # or an error during text extraction
         logger.info(
-            "Opinion %s has no `plain_text` or `html` to extract from",
+            "Opinion %s has no `plain_text` or `html`"
+            "to extract from. Executing extraction",
             opinion.id,
         )
         stats["No text to extract from"] += 1
+        extract_doc_content(
+            pk=opinion.pk,
+            ocr_available=True,
+            citation_jitter=True,
+            juriscraper_module=juriscraper_module,
+        )
         return
 
     with transaction.atomic():
@@ -83,16 +90,11 @@ def rerun_extract_from_text(
             logger.debug("Opinion updated with data %s", changes["Opinion"])
             stats["Opinion"] += 1
 
-        if changes.get("Citation"):
-            if changes["Citation"].get("citation_created"):
-                logger.info(
-                    "Citation created with data %s", changes["Citation"]
-                )
-                stats["Citation"] += 1
-            else:
-                logger.debug(
-                    "Citation not created. Data %s", changes["Citation"]
-                )
+        if changes.get("citation_created"):
+            logger.info("Citation created with data %s", changes["Citation"])
+            stats["Citation"] += 1
+        elif changes.get("Citation"):
+            logger.debug("Citation not created. Data %s", changes["Citation"])
 
 
 class Command(ScraperCommand):

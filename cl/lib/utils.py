@@ -5,10 +5,7 @@ from typing import Any
 from typing import Iterable as IterableType
 from typing import Match, Optional, Tuple
 
-from django.core.cache import caches
-
-import cl.search.models as search_model
-from cl.lib.crypto import sha256
+from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData
 from cl.search.exception import DisallowedWildcardPattern, QueryType
@@ -144,38 +141,6 @@ def get_array_of_selected_fields(cd: CleanData, prefix: str) -> list[str]:
     ]
 
 
-def lookup_child_courts(parent_courts: list[str]) -> set[str]:
-    """Recursively fetches child courts for the given parent courts.
-
-    :param parent_courts: List of parent court_ids.
-    :return: Set of all child court IDs.
-    """
-
-    cache = caches["db_cache"]
-    all_child_courts = set()
-    sorted_courts_hash = sha256("-".join(sorted(parent_courts)))
-    cache_key = f"child_courts:{sorted_courts_hash}"
-    cached_result = cache.get(cache_key)
-
-    if cached_result is not None:
-        return set(cached_result)
-
-    child_courts = search_model.Court.objects.filter(
-        parent_court_id__in=parent_courts
-    ).values_list("id", flat=True)
-    all_child_courts.update(child_courts)
-    if not all_child_courts:
-        return set()
-
-    final_results = all_child_courts.union(
-        lookup_child_courts(list(all_child_courts))
-    )
-    sorted_final_results = sorted(final_results)
-    one_month = 60 * 60 * 24 * 30
-    cache.set(cache_key, sorted_final_results, one_month)
-    return set(sorted_final_results)
-
-
 def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
     """
     Retrieves and combines court IDs from both the given parents and their
@@ -185,7 +150,7 @@ def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
     :return: A string containing the unique combination of parent and child courts.
     """
     unique_courts = set(re.findall(r'"(.*?)"', selected_courts_string))
-    unique_courts.update(lookup_child_courts(list(unique_courts)))
+    unique_courts.update(lookup_child_courts_cache(list(unique_courts)))
     courts = [f'"{c}"' for c in sorted(list(unique_courts))]
     return " OR ".join(courts)
 
@@ -330,8 +295,13 @@ def cleanup_main_query(query_string: str) -> str:
         if not item:
             continue
 
-        if item.startswith('"') or item.endswith('"'):
-            # Start or end of a phrase; flip whether we're inside a phrase
+        if (
+            item.startswith('"')
+            or item.endswith('"')
+            or bool(re.match(r'\w+:"[^"]', item))
+        ):
+            # Start or end of a phrase or a fielded query using quotes e.g: field:"test"
+            # flip whether we're inside a phrase
             inside_a_phrase = not inside_a_phrase
             cleaned_items.append(item)
             continue
@@ -345,6 +315,27 @@ def cleanup_main_query(query_string: str) -> str:
         is_date_str = re.match(
             "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", item
         )
+
+        if "docketNumber:" in item:
+            potential_docket_number = item.split("docketNumber:", 1)[1]
+
+            if not potential_docket_number:
+                # The docket_number is wrapped in parentheses
+                cleaned_items.append(item)
+            else:
+                # Improve the docket_number query by:
+                # If it's a known docket_number format, wrap it in quotes and
+                # add a ~1 slop to match slight variations like 1:21-bk-1234-ABC → 1:21-bk-1234
+                # If it's not a known docket_number format, just wrap it in
+                # quotes to avoid syntax errors caused by : in the number.
+                slop_suffix = (
+                    "~1" if is_docket_number(potential_docket_number) else ""
+                )
+                cleaned_items.append(
+                    f'docketNumber:"{potential_docket_number}"{slop_suffix}'
+                )
+            continue
+
         if any([not_numeric, is_date_str]):
             cleaned_items.append(item)
             continue
@@ -356,7 +347,7 @@ def cleanup_main_query(query_string: str) -> str:
 
         # Some sort of number, probably a docket number or other type of number
         # Wrap in quotes to do a phrase search
-        if is_docket_number(item) and "docketNumber:" not in query_string:
+        if is_docket_number(item):
             # Confirm is a docket number and clean it. So docket_numbers with
             # suffixes can be searched: 1:21-bk-1234-ABC -> 1:21-bk-1234,
             item = clean_docket_number(item)

@@ -3,6 +3,7 @@ from typing import Awaitable, Callable
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 from django.http import HttpRequest, HttpResponseBase
 from django.template.response import TemplateResponse
+from waffle import flag_is_active
 
 
 class RobotsHeaderMiddleware:
@@ -55,4 +56,40 @@ class RobotsHeaderMiddleware:
             response.headers["X-Robots-Tag"] = (
                 "noindex, noarchive, noimageindex"
             )
+        return response
+
+
+class IncrementalNewTemplateMiddleware:
+    """
+    Checks waffle flag for new design and changes the old template
+    with the new one if it exists.
+
+    To identify the new template we prepend "v2_" to the old template name.
+    Note this means if the old template_name includes a dir, like
+    "help/index.html", the new template should be in "v2_help/index.html"
+    and NOT in "help/v2_index.html".
+
+    TODO: Remove this middleware once new design is completely rolled out.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        return response
+
+    def process_template_response(self, request, response):
+        use_new_design = flag_is_active(request, "use_new_design")
+
+        if (
+            use_new_design
+            and isinstance(response, TemplateResponse)
+            and not response.is_rendered
+        ):
+            old_template = response.template_name
+            if isinstance(old_template, str):
+                new_template = f"v2_{old_template}"
+                response.template_name = [new_template, old_template]
+
         return response

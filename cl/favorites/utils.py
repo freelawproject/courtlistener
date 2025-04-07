@@ -103,11 +103,13 @@ async def get_existing_prayers_in_bulk(
 
 
 async def get_top_prayers() -> QuerySet[RECAPDocument]:
-    # Calculate the age of each prayer
-    prayer_age = ExpressionWrapper(
-        Extract(Now() - F("prayers__date_created"), "epoch"),
-        output_field=FloatField(),
-    )
+    """Retrieve the most desired documents that have open prayers. It first
+    ranks by the number of requests and then by the number of views the particular
+    docket has received.
+
+    :return: A queryset of RECAPDocuments in descending order of preference.
+    """
+
     waiting_prayers = Prayer.objects.filter(status=Prayer.WAITING).values(
         "recap_document_id"
     )
@@ -144,30 +146,23 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
             prayer_count=Count(
                 "prayers", filter=Q(prayers__status=Prayer.WAITING)
             ),
-            avg_prayer_age=Avg(
-                prayer_age, filter=Q(prayers__status=Prayer.WAITING)
-            ),
+            view_count=F("docket_entry__docket__view_count"),
         )
-        .annotate(
-            geometric_mean=Sqrt(
-                Cast(
-                    F("prayer_count")
-                    * Cast(F("avg_prayer_age"), FloatField()),
-                    FloatField(),
-                )
-            )
-        )
-        .order_by("-geometric_mean")[:50]
+        .order_by("-prayer_count", "-view_count")
     )
 
     return documents
 
 
-async def get_user_prayers(user: User) -> QuerySet[RECAPDocument]:
-    user_prayers = Prayer.objects.filter(user=user).values("recap_document_id")
+async def get_user_prayers(
+    user: User, status: str | None = None
+) -> QuerySet[RECAPDocument]:
+    filters = {"prayers__user": user}
+    if status is not None:
+        filters["prayers__status"] = status
 
     documents = (
-        RECAPDocument.objects.filter(id__in=Subquery(user_prayers))
+        RECAPDocument.objects.filter(**filters)
         .select_related(
             "docket_entry",
             "docket_entry__docket",
@@ -231,7 +226,7 @@ async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
                         F("recap_document__page_count") * Value(0.10),
                     ),
                 ),
-                default=Value(0.0),
+                default=Value(0.91),
             )
         )
         .aaggregate(Sum("price", default=0.0))
@@ -292,7 +287,21 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
         connection.send_messages(messages)
 
 
-async def get_user_prayer_history(user: User) -> tuple[int, float]:
+@dataclass
+class PrayerStats:
+    prayer_count: int
+    distinct_count: int
+    total_cost: str
+
+
+async def get_user_prayer_history(user: User) -> PrayerStats:
+
+    cache_key = f"prayer-stats-{user}"
+
+    data = await cache.aget(cache_key)
+    if data is not None:
+        return PrayerStats(**data)
+
     filtered_list = Prayer.objects.filter(
         user=user, status=Prayer.GRANTED
     ).select_related("recap_document")
@@ -301,14 +310,15 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
 
     total_cost = await compute_prayer_total_cost(filtered_list)
 
-    return count, total_cost
+    data = {
+        "prayer_count": count,
+        "distinct_count": "",
+        "total_cost": f"{total_cost:,.2f}",
+    }
+    one_minute = 60
+    await cache.aset(cache_key, data, one_minute)
 
-
-@dataclass
-class PrayerStats:
-    prayer_count: int
-    distinct_count: int
-    total_cost: str
+    return PrayerStats(**data)
 
 
 async def get_lifetime_prayer_stats(
@@ -340,7 +350,7 @@ async def get_lifetime_prayer_stats(
         "distinct_count": distinct_prayers,
         "total_cost": f"{total_cost:,.2f}",
     }
-    one_day = 60 * 60 * 24
-    await cache.aset(cache_key, data, one_day)
+    one_minute = 60
+    await cache.aset(cache_key, data, one_minute)
 
     return PrayerStats(**data)

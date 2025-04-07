@@ -506,7 +506,8 @@ class OpinionV3APISearchTest(
                 type=cd["type"],
             )
             for result in hits:
-                ids_in_results.add(result.id)
+                if result:
+                    ids_in_results.add(result.id)
         self.assertEqual(
             len(ids_in_results),
             total_opinions,
@@ -1481,15 +1482,54 @@ class OpinionsESSearchTest(
         r = await self._test_article_count(search_params, 1, "filed_range")
         self.assertIn("Honda", r.content.decode())
 
-    async def test_can_filter_using_a_docket_number(self) -> None:
+    def test_can_filter_using_a_docket_number(self) -> None:
         """Can we query by docket number?"""
+
+        # Regular docket_number filtering.
         search_params = {"q": "*", "docket_number": "2"}
 
         # Frontend
-        r = await self._test_article_count(search_params, 1, "docket_number")
+        r = async_to_sync(self._test_article_count)(
+            search_params, 1, "docket_number"
+        )
         self.assertIn(
             "Honda", r.content.decode(), "Result not found by docket number!"
         )
+
+        # Filter by case by docket_number containing repeated numbers like: 1:21-bk-0021
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory(
+                case_name="Strickland v. Lorem.",
+                docket=DocketFactory(
+                    court=self.court_1, docket_number="1:21-bk-0021"
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "docket_number": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # docket_number filter works properly combined with child document fields
+        with self.captureOnCommitCallbacks(execute=True):
+            OpinionFactory.create(cluster=cluster, plain_text="Lorem Ipsum")
+
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Lorem Ipsum",
+            "docket_number": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docket_number and text"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+        self.assertIn("Lorem Ipsum", r.content.decode())
+
+        # Remove factories to prevent affecting other tests.
+        cluster.delete()
 
     async def test_can_filter_by_citation_number(self) -> None:
         """Can we query by citation number?"""
@@ -2985,7 +3025,7 @@ class IndexOpinionDocumentsCommandTest(
         for pk in opinions_pks:
             self.assertTrue(OpinionDocument.exists(id=ES_CHILD_ID(pk).OPINION))
 
-    def test_index_parent_or_child_docs(self):
+    def test_index_parent_or_child_docs_in_es(self):
         """Confirm the command can properly index missing clusters when
         indexing only Opinions.
         """
@@ -3110,6 +3150,45 @@ class IndexOpinionDocumentsCommandTest(
         self.assertEqual(
             s.count(), 6, msg="Wrong number of Opinions returned."
         )
+
+    def test_opinions_indexing_non_null_field(self):
+        """Confirm that the indexing command properly filters out instances to
+        be indexed based on the non-null field value provided as a parameter.
+        """
+
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person_2,
+            plain_text="my plain text secret word for queries",
+            cluster=self.opinion_cluster_1,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+            ordering_key=5,
+        )
+
+        # Call cl_index_parent_and_child_docs command for Opinion.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+            testing_mode=True,
+            non_null_field="ordering_key",
+        )
+
+        # Confirm 1 Opinions is indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_1.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
 
 
 class EsOpinionsIndexingTest(
@@ -3285,11 +3364,16 @@ class EsOpinionsIndexingTest(
                 local_path="test/search/opinion_doc.doc",
                 per_curiam=False,
                 type="020lead",
+                ordering_key=1,
             )
 
         # Two es_save_document task should be called on creation, one for
         # opinion and one for opinion_cluster
         self.reset_and_assert_task_count(expected=2)
+
+        # Confirm the new ordering_key field is indexed upon Opinion creation.
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
 
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
@@ -3302,6 +3386,22 @@ class EsOpinionsIndexingTest(
             opinion.save()
         # One update_es_document task should be called on tracked field update.
         self.reset_and_assert_task_count(expected=1)
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            # Update the ordering_key field in the opinion record.
+            opinion.ordering_key = None
+            opinion.save()
+
+        # One update_es_document task should be called on tracked field update.
+        self.reset_and_assert_task_count(expected=1)
+        # Confirm the ordering_key has been updated.
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.ordering_key, None)
 
         # Update an opinion untracked field.
         with mock.patch(
@@ -3871,13 +3971,13 @@ class EsOpinionsIndexingTest(
         )
         o = OpinionFactory.create(
             author=self.person,
-            plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+            plain_text="Lorem ipsum control chars \x07\x08\x0b.",
             cluster=o_c,
             type="020lead",
         )
         o_2 = OpinionFactory.create(
             author=self.person,
-            html="<p>Lorem html ipsum control chars \x07\x08\x0B.</p>",
+            html="<p>Lorem html ipsum control chars \x07\x08\x0b.</p>",
             cluster=o_c,
             type="020lead",
         )
@@ -4158,7 +4258,7 @@ class OpinionFeedTest(
         """
         with mock.patch(
             "cl.search.documents.escape",
-            return_value="Lorem ipsum control chars \x07\x08\x0B.",
+            return_value="Lorem ipsum control chars \x07\x08\x0b.",
         ), self.captureOnCommitCallbacks(execute=True):
             court = CourtFactory(
                 id="ca1_test",
@@ -4174,7 +4274,7 @@ class OpinionFeedTest(
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
-                    plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+                    plain_text="Lorem ipsum control chars \x07\x08\x0b.",
                 ),
             )
 

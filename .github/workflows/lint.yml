@@ -22,7 +22,7 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: 1.8.4
+          version: 2.1.1
           virtualenvs-create: true
           virtualenvs-in-project: true
 
@@ -92,8 +92,10 @@ jobs:
           cl/users/management/commands/cl_retry_failed_email.py \
           cl/users/tasks.py \
           cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py \
+          cl/recap/utils.py \
           cl/search/management/commands/cl_index_parent_and_child_docs.py \
-          cl/search/management/commands/sweep_indexer.py
+          cl/search/management/commands/sweep_indexer.py \
+          cl/search/management/commands/pacer_bulk_fetch.py
 
 
 

@@ -29,6 +29,7 @@ from cl.favorites.utils import (
     get_prayer_counts_in_bulk,
     get_top_prayers,
     get_user_prayer_history,
+    get_user_prayers,
     prayer_eligible,
 )
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
@@ -797,102 +798,106 @@ class RECAPPrayAndPay(TestCase):
             msg="Wrong top_prayers based on prayers count.",
         )
 
-    async def test_get_top_prayers_by_age(self) -> None:
+    async def test_get_top_prayers_by_views(self) -> None:
         """Does the get_top_prayers method work properly?"""
 
-        # Test top documents based on prayer age.
-        current_time = now()
-        with time_machine.travel(
-            current_time - timedelta(minutes=1), tick=False
-        ):
-            await create_prayer(self.user, self.rd_4)
+        # Test top documents based on docket views.
+        self.rd_2.docket_entry.docket.view_count = 4
+        self.rd_3.docket_entry.docket.view_count = 12
+        self.rd_4.docket_entry.docket.view_count = 6
 
-        with time_machine.travel(
-            current_time - timedelta(minutes=2), tick=False
-        ):
-            await create_prayer(self.user, self.rd_2)
+        await self.rd_2.docket_entry.docket.asave()
+        await self.rd_3.docket_entry.docket.asave()
+        await self.rd_4.docket_entry.docket.asave()
 
-        with time_machine.travel(
-            current_time - timedelta(minutes=3), tick=False
-        ):
-            await create_prayer(self.user_2, self.rd_3)
+        await create_prayer(self.user, self.rd_4)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_3)
 
         top_prayers = await get_top_prayers()
         self.assertEqual(await top_prayers.acount(), 3)
-        expected_top_prayers = [self.rd_3.pk, self.rd_2.pk, self.rd_4.pk]
+        expected_top_prayers = [self.rd_3.pk, self.rd_4.pk, self.rd_2.pk]
         actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
 
         self.assertEqual(
             actual_top_prayers,
             expected_top_prayers,
-            msg="Wrong top_prayers based on prayers age.",
+            msg="Wrong top_prayers based on docket view count.",
         )
 
-    async def test_get_top_prayers_by_number_and_age(self) -> None:
+    async def test_get_top_prayers_by_number_and_views(self) -> None:
         """Does the get_top_prayers method work properly?"""
 
-        # Create prayers with different counts and ages
-        current_time = now()
-        with time_machine.travel(current_time - timedelta(days=5), tick=False):
-            await create_prayer(self.user, self.rd_5)  # 1 prayer, 5 days old
+        self.rd_2.docket_entry.docket.view_count = 4
+        self.rd_3.docket_entry.docket.view_count = 1
+        self.rd_4.docket_entry.docket.view_count = 6
+        self.rd_5.docket_entry.docket.view_count = 8
 
-        with time_machine.travel(current_time - timedelta(days=3), tick=False):
-            await create_prayer(self.user, self.rd_2)
-            await create_prayer(
-                self.user_2, self.rd_2
-            )  # 2 prayers, 3 days old
+        await self.rd_2.docket_entry.docket.asave()
+        await self.rd_3.docket_entry.docket.asave()
+        await self.rd_4.docket_entry.docket.asave()
+        await self.rd_5.docket_entry.docket.asave()
 
-        with time_machine.travel(current_time - timedelta(days=1), tick=False):
-            await create_prayer(self.user, self.rd_3)
-            await create_prayer(self.user_2, self.rd_3)
-            await create_prayer(self.user_3, self.rd_3)  # 3 prayers, 1 day old
+        # Create prayers with different counts and views
 
-        with time_machine.travel(current_time - timedelta(days=4), tick=False):
-            await create_prayer(self.user, self.rd_4)
-            await create_prayer(
-                self.user_2, self.rd_4
-            )  # 2 prayers, 4 days old
+        await create_prayer(self.user, self.rd_5)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+        await create_prayer(self.user, self.rd_3)
+        await create_prayer(self.user_2, self.rd_3)
+        await create_prayer(self.user_3, self.rd_3)
+        await create_prayer(self.user, self.rd_4)
+        await create_prayer(self.user_2, self.rd_4)
 
         top_prayers = await get_top_prayers()
         self.assertEqual(await top_prayers.acount(), 4)
 
         expected_top_prayers = [
+            self.rd_3.pk,
             self.rd_4.pk,
             self.rd_2.pk,
             self.rd_5.pk,
-            self.rd_3.pk,
         ]
         actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
 
         self.assertEqual(
             actual_top_prayers,
             expected_top_prayers,
-            msg="Wrong top_prayers based on combined prayer count and age.",
+            msg="Wrong top_prayers based on combined prayer count and docket view count.",
         )
 
-        # Compute expected geometric means
-        rd_4_score = math.sqrt(2 * (4 * 3600 * 24))
-        rd_2_score = math.sqrt(2 * (3 * 3600 * 24))
-        rd_5_score = math.sqrt(1 * (5 * 3600 * 24))
-        rd_3_score = math.sqrt(3 * (1 * 3600 * 24))
+    async def test_get_user_prayers(self) -> None:
+        """Does the get_user_prayer method work properly?"""
+        # Create prayers for user and user_2 to establish test data.
+        prayer_rd_2 = await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+        await create_prayer(self.user, self.rd_3)
 
-        self.assertAlmostEqual(
-            top_prayers[0].geometric_mean, rd_4_score, places=2
+        user_prayers = await get_user_prayers(user=self.user)
+        user_2_prayers = await get_user_prayers(user=self.user_2)
+
+        # Verify the correct number of prayers are returned for each user
+        self.assertEqual(
+            await user_prayers.acount(), 2, "User 1 should have 2 prayers."
         )
-        self.assertAlmostEqual(
-            top_prayers[1].geometric_mean, rd_2_score, places=2
+        self.assertEqual(
+            await user_2_prayers.acount(), 1, "User 2 should have 1 prayer."
         )
-        self.assertAlmostEqual(
-            top_prayers[2].geometric_mean, rd_5_score, places=2
+
+        # Update the status of one of user's prayers to 'GRANTED'.
+        prayer_rd_2.status = Prayer.GRANTED
+        await prayer_rd_2.asave()
+
+        # Verify only the 'GRANTED' prayer is returned.
+        user_granted_prayers = await get_user_prayers(
+            user=self.user, status=Prayer.GRANTED
         )
-        self.assertAlmostEqual(
-            top_prayers[3].geometric_mean, rd_3_score, places=2
-        )
+        self.assertEqual(await user_granted_prayers.acount(), 1)
 
     async def test_get_user_prayer_history(self) -> None:
         """Does the get_user_prayer_history method work properly?"""
-        # Prayers for user_2
-        await create_prayer(self.user_2, self.rd_4)
+        # # Prayers for user_2
+        # await create_prayer(self.user_2, self.rd_4)
 
         # Prayers for user
         await create_prayer(self.user, self.rd_2)
@@ -900,9 +905,9 @@ class RECAPPrayAndPay(TestCase):
         prayer_rd5 = await create_prayer(self.user, self.rd_5)
 
         # Verify that the initial prayer count and total cost are 0.
-        count, total_cost = await get_user_prayer_history(self.user)
-        self.assertEqual(count, 0)
-        self.assertEqual(total_cost, 0.0)
+        user_history = await get_user_prayer_history(self.user)
+        self.assertEqual(user_history.prayer_count, 0)
+        self.assertEqual(user_history.total_cost, "0.00")
 
         # Update `rd_3`'s page count and set `prayer_rd3`'s status to `GRANTED`
         self.rd_3.page_count = 2
@@ -911,10 +916,13 @@ class RECAPPrayAndPay(TestCase):
         prayer_rd3.status = Prayer.GRANTED
         await prayer_rd3.asave()
 
+        # Clear cache for this specific user
+        await cache.adelete(f"prayer-stats-{self.user}")
+
         # Verify that the count is 1 and total cost is 0.20.
-        count, total_cost = await get_user_prayer_history(self.user)
-        self.assertEqual(count, 1)
-        self.assertEqual(total_cost, 0.20)
+        user_history = await get_user_prayer_history(self.user)
+        self.assertEqual(user_history.prayer_count, 1)
+        self.assertEqual(user_history.total_cost, "0.20")
 
         # Update `rd_5`'s page count and set `prayer_rd5`'s status to `GRANTED`
         self.rd_5.page_count = 40
@@ -923,10 +931,13 @@ class RECAPPrayAndPay(TestCase):
         prayer_rd5.status = Prayer.GRANTED
         await prayer_rd5.asave()
 
+        # Clear cache for this specific user
+        await cache.adelete(f"prayer-stats-{self.user}")
+
         # Verify that the count is 2 and the total cost is now 3.20.
-        count, total_cost = await get_user_prayer_history(self.user)
-        self.assertEqual(count, 2)
-        self.assertEqual(total_cost, 3.20)
+        user_history = await get_user_prayer_history(self.user)
+        self.assertEqual(user_history.prayer_count, 2)
+        self.assertEqual(user_history.total_cost, "3.20")
 
     @patch("cl.favorites.utils.cache.aget")
     async def test_get_lifetime_prayer_stats(self, mock_cache_aget) -> None:

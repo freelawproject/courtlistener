@@ -44,6 +44,15 @@ class FakeDocketReport:
         }
 
 
+class FakeAppellateDocketReport(FakeDocketReport):
+
+    @property
+    def data(self):
+        data = super(FakeAppellateDocketReport, self).data
+        data["court_id"] = "ca1"
+        return data
+
+
 class FakePossibleCaseNumberApi:
     def __init__(self, *args, **kwargs):
         pass
@@ -74,6 +83,25 @@ class FakeAttachmentPage:
     def data(self, *args, **kwargs):
         return {
             "pacer_doc_id": "17711118263",
+            "document_number": "1",
+            "attachments": [],
+        }
+
+
+class FakeAppellateAttachmentPage:
+    response = MagicMock(text="")
+    _parse_text = MagicMock()
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def query(self, *args, **kwargs):
+        pass
+
+    @property
+    def data(self, *args, **kwargs):
+        return {
+            "pacer_doc_id": "1208699339",
             "document_number": "1",
             "attachments": [],
         }
@@ -137,9 +165,18 @@ test_patterns = {
         24: True,
         40: True,
         72: True,
+        104: True,
         136: True,
+        168: True,
+        200: True,
+        232: True,
         264: True,
-        520: True,
+        296: True,
+        328: True,
+        360: True,
+        392: True,
+        424: True,
+        456: True,
     },
     "txed": {
         9: True,
@@ -152,6 +189,15 @@ test_patterns = {
     "gamb": HTTPError,
     "hib": Timeout,
     "cacd": {
+        1: False,
+        2: False,
+        4: False,
+        8: False,
+        16: False,
+        32: False,
+        64: False,
+    },
+    "vib": {
         1: False,
         2: False,
         4: False,

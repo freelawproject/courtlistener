@@ -3,21 +3,19 @@ import sys
 import time
 import traceback
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
-from eyecite.find import get_citations
-from eyecite.tokenizers import HyperscanTokenizer
+from juriscraper.lib.exceptions import InvalidDocumentError
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
 from cl.alerts.models import RealTimeQueue
-from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
@@ -33,6 +31,7 @@ from cl.scrapers.utils import (
     get_binary_content,
     get_child_court,
     get_extension,
+    make_citation,
     save_response,
     signal_handler,
     update_or_create_docket,
@@ -47,38 +46,9 @@ from cl.search.models import (
     OpinionCluster,
 )
 
-HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
-
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
 cnt = CaseNameTweaker()
-
-
-def make_citation(
-    cite_str: str, cluster: OpinionCluster, court_id: str
-) -> Optional[Citation]:
-    """Create and return a citation object for the input values."""
-    citation_objs = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
-    if not citation_objs:
-        logger.error(
-            "Could not parse citation from court '%s'",
-            court_id,
-            extra=dict(
-                cite=cite_str,
-                cluster=cluster,
-                fingerprint=[f"{court_id}-no-citation-found"],
-            ),
-        )
-        return None
-    # Convert the found cite type to a valid cite type for our DB.
-    cite_type_str = citation_objs[0].all_editions[0].reporter.cite_type
-    return Citation(
-        cluster=cluster,
-        volume=citation_objs[0].groups["volume"],
-        reporter=citation_objs[0].corrected_reporter(),
-        page=citation_objs[0].groups["page"],
-        type=map_reporter_db_cite_type(cite_type_str),
-    )
 
 
 @transaction.atomic
@@ -292,7 +262,11 @@ class Command(ScraperCommand):
                 added += 1
             except ConsecutiveDuplicatesError:
                 break
-            except (SingleDuplicateError, BadContentError):
+            except (
+                SingleDuplicateError,
+                BadContentError,
+                InvalidDocumentError,
+            ):
                 pass
 
         # Update the hash if everything finishes properly.

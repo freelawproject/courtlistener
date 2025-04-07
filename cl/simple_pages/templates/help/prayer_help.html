@@ -58,12 +58,13 @@
   </p>
   <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up:</strong> PACER waives the first $30.00 of purchases you make each quarter. By sending reminder emails near the end of each quarter, we encourage users to use this money to contribute the documents other users need.
   </p>
+  <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=32" class="btn btn-primary">Sign Up for Reminders</a>
   <p>Since the project's creation, users have fulfilled <span class="bold">{{ granted_stats.prayer_count|intcomma }}</span> prayers for <span class="bold">{{ granted_stats.distinct_count|intcomma }}</span> documents, for a total contribution of <span class="bold">${{ granted_stats.total_cost }}</span>!
   </p>
 
 
   <h3 id="fulfilling-prayer">Fulfilling a Prayer</h3>
-  <p>The most-wanted documents are shown on a <a href="{% url "top_prayers" %}">leaderboard</a> ranked by how many users have requested a particular document and how old the requests are. As requests are fulfilled, they are removed from the leaderboard.
+  <p>The most-wanted documents are shown on a <a href="{% url "top_prayers" %}">leaderboard</a> ranked by how many users have requested a particular document and how many views their corresponding docket has received. As requests are fulfilled, they are removed from the leaderboard.
   </p>
   <p>Fulfilling somebody's prayer only works if you install the RECAP extension. Once it's installed, all your PACER purchases will be sent to CourtListener automatically — Prayers will be granted!</p>
   <p>
@@ -86,7 +87,7 @@
   </p>
   <p>Here's an example of what an email might look like:</p>
   <p class="v-offset-above-2">
-    <a href="{% static "png/alert-example.png" %}">
+    <a href="{% static "png/prayer-email.png" %}">
       <img src="{% static "png/prayer-email.png" %}"
            width="749"
            height="529"

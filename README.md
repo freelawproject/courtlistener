@@ -13,12 +13,12 @@ This repository is organized in the following way:
 
 ## Getting Involved
 
-If you want to get involved send us an email with your contact info or take a look through the [issues list][issues]. There are innumerable things we need help with, but we especially are looking for help with:
+If you want to get involved, email us with your contact info or take a look through the [issues list][issues]. There are innumerable things we need help with, but we especially are looking for help with:
 
- - legal research in order to fix data errors or other problems (check out the [data-quality label][dq] for some starting points)
+ - legal research, to fix data errors or other problems (check out the [data-quality label][dq] for some starting points)
  - fixing bugs and building features (most things are written in Python)
  - machine learning or natural language problems.
- - test writing -- we always need more and better tests
+ - test writing — we always need more and better tests
 
 In general, we're looking for all kinds of help. Get in touch if you think you have skills we could use or if you have skills you want to learn by improving CourtListener.
 

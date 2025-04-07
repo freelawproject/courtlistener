@@ -4,10 +4,12 @@ from django.conf import settings
 from redis import ConnectionError
 
 from cl.corpus_importer.tasks import probe_iquery_pages
-from cl.corpus_importer.utils import make_iquery_probing_key
+from cl.corpus_importer.utils import (
+    get_iquery_pacer_courts_to_scrape,
+    make_iquery_probing_key,
+)
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
-from cl.search.models import Court
 
 
 def enqueue_iquery_probe(court_id: str) -> bool:
@@ -18,19 +20,6 @@ def enqueue_iquery_probe(court_id: str) -> bool:
     """
     key = make_iquery_probing_key(court_id)
     return create_redis_semaphore("CACHE", key, ttl=60 * 10)
-
-
-def get_all_pacer_courts() -> list[str]:
-    """Retrieve all district and bankruptcy  PACER courts from the database.
-
-    :return: A list of Court IDs.
-    """
-    courts = (
-        Court.federal_courts.district_or_bankruptcy_pacer_courts().exclude(
-            pk__in=["uscfc", "arb", "cit"]
-        )
-    )
-    return list(courts.values_list("pk", flat=True))
 
 
 class Command(VerboseCommand):
@@ -77,13 +66,20 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
 
         testing_iterations = options["testing_iterations"]
         # If a new court is added to the DB. We should restart the daemon.
-        court_ids = get_all_pacer_courts()
+        court_ids = get_iquery_pacer_courts_to_scrape()
         iterations_completed = 0
         r = get_redis_interface("CACHE")
         testing = True if testing_iterations else False
         while True and settings.IQUERY_CASE_PROBE_DAEMON_ENABLED:
             for court_id in court_ids:
-                if r.exists(f"iquery:court_wait:{court_id}"):
+                wait_key = f"iquery:court_wait:{court_id}"
+                if r.exists(wait_key):
+                    ttl = r.ttl(wait_key)
+                    logger.info(
+                        "Skipping court %s for %s hours.",
+                        court_id,
+                        round(ttl / 3600, 2),
+                    )
                     continue
                 try:
                     newly_enqueued = enqueue_iquery_probe(court_id)

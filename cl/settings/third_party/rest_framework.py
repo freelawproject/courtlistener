@@ -28,6 +28,31 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Sock puppets
+        "Kejik5": "1/hour",
+        "PRpl.Kane": "1/hour",
+        "PeterZH": "1/hour",
+        "Bruno_ros": "1/hour",
+        "Aziret": "1/hour",
+        "kokonag227": "1/hour",
+        "dedadi7242": "1/hour",
+        "texoya9545": "1/hour",
+        "nedah94680": "1/hour",
+        "robowiy352": "1/hour",
+        # Multiple accounts
+        "sophia@newyorklawreview.com": "1/hour",
+        "gab@newyorklawreview.com": "1/hour",
+        "james@newyorklawreview.com": "1/hour",
+        "my_yancy_lost": "1/hour",
+        "theworky_1980": "1/hour",
+        "thelaw_2025": "1/hour",
+        "world_over_eggs": "1/hour",
+        "yancy_closer": "1/hour",
+        "phx_major": "1/hour",
+        "giraffe_counsel_2025": "1/hour",
+        "yoway_3897": "1/hour",
+        "deantaylor2025": "1/hour",
+        "yoway_3897": "1/hour",
         # Multiple accounts
         "api_1": "1/hour",
         "api_2": "1/hour",
@@ -48,7 +73,12 @@ REST_FRAMEWORK = {
         "PeterPan": "1/hour",
         "HomerSimpson": "1/hour",
         "BruceWayne": "1/hour",
+        "mibefis809": "1/hour",
         # Unresponsive
+        "bobjase24": "1/hour",
+        "bobjase25": "1/hour",
+        "victorchaps": "1/hour",
+        "AlirezaMirrokni": "1/hour",
         "court_test_account": "1/hour",
         "jmmckinnie": "1/hour",
         "projecttesting": "1/hour",
@@ -86,7 +116,6 @@ REST_FRAMEWORK = {
         # No response
         "commernet": "1/hour",
         "zealousgalileo": "1/hour",
-        "tuhinharit": "1/hour",  # Deep pagination
         "JaneDoe": "1/hour",
         "chinamkm": "1/hour",
         "shreyngd": "100/hour",

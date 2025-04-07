@@ -27,6 +27,9 @@ class SearchAlertSerializer(
     def validate(self, attrs):
         """Validate the query type and set default for alert_type if not
         provided."""
+        if "query" not in attrs:
+            return attrs
+
         qd = QueryDict(attrs.get("query").encode(), mutable=True)
         alert_type = qd.get("type")
         if alert_type:

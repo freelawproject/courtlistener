@@ -12,20 +12,29 @@
 {% block og_description %}CourtListener lets you request the purchase of legal documents. View the community's most wanted documents.{% endblock %}
 
 {% block content %}
-  <div class="col-xs-12">
-    <h1 class="text-center v-offset-below-3">Community's Most Wanted PACER Documents</h1>
-    <h3 class="text-center"><b>{{ granted_stats.prayer_count|intcomma }}</b> prayers granted totaling <b>${{ granted_stats.total_cost }}</b>.</h3>
-    <h3 class="text-center"><b>{{ waiting_stats.prayer_count|intcomma }}</b> prayers pending totaling at least <b>${{ waiting_stats.total_cost }}</b>.</h3>
-  </div>
 
   <div class="col-xs-12">
-    <div class="well well-sm">
-      <p>{% if user.is_authenticated %}
-      <a href="{% url 'user_prayers' user.username %}">View your prayers</a>
-      {% else %}
-        <a href="{% url 'sign-in' %}?next={% url 'top_prayers' %}">Sign in to view your prayers</a>
-      {% endif %}</p>
-    </div>
+    <ul class="prayer-top-buttons nav navbar-nav navbar-right">
+      {% include 'includes/remind_me_modal.html' %}
+      <li class="hidden-xs">
+        <a href="#" class="donate" data-toggle="modal" data-target="#remindMeModal">
+          <i class="fa fa-heart-o"></i>&nbsp;Remind Me to Help
+        </a>
+      </li>
+      <li>
+        <a href={% if user.is_authenticated %}"{% url 'user_prayers' user.username %}"{% else %}"{% url 'sign-in' %}?next={% url 'top_prayers' %}"{% endif %}><div class="fa gray fa-fw">
+          {% include "includes/hand-holding-heart.svg" %}
+        </div> Your Prayers</a>
+      </li>
+      <li><a href="{% url "pray_and_pay_help" %}">Learn More</a></li>
+    </ul>
+  </div>
+
+
+  <div class="col-xs-12">
+    <h1 class="text-center v-offset-below-3">Community's Most Wanted PACER Documents</h1>
+    <h3 class="text-center"><b>{{ granted_stats.prayer_count|intcomma }}</b> {{ granted_stats.prayer_count|pluralize:"prayer,prayers" }} granted totaling <b>${{ granted_stats.total_cost }}</b></h3>
+    <h3 class="text-center v-offset-below-3"><b>{{ waiting_stats.prayer_count|intcomma }}</b> {{ waiting_stats.prayer_count|pluralize:"prayer,prayers" }} pending totaling about <b>${{ waiting_stats.total_cost }}</b></h3>
   </div>
 
   <div class="col-xs-12">
@@ -38,6 +47,9 @@
               <th>Document Number</th>
               <th>Document Description</th>
               <th>Buy on Pacer</th>
+            {% if perms.favorites.change_prayer %}
+              <th>Action</th>
+            {% endif %}
             </tr>
         </thead>
         <tbody>
@@ -51,8 +63,12 @@
                 </a>
               </td>
               <td>
-                <a href="{% url "view_recap_document" docket.pk prayer.docket_entry.entry_number docket.slug %}">
-                  {{ prayer.document_number }}
+                <a href="{{ prayer.get_absolute_url }}" rel="nofollow">
+                  {% if prayer.attachment_number %}
+                    {{ prayer.document_number }}-{{ prayer.attachment_number }}
+                  {% else %}
+                    {{ prayer.document_number }}
+                  {% endif %}
                 </a>
               </td>
               {% endwith %}
@@ -66,6 +82,15 @@
                 {% endif %}
                   target="_blank"
                   rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
+              {% if perms.favorites.change_prayer %}
+                <td>
+                  <div class="flex">
+                    <a href="{% url 'admin:favorites_prayer_changelist' %}?recap_document={{prayer.id}}" class="btn btn-default btn-xs">
+                      <i class="fa fa-pencil"></i>&nbsp;Edit
+                    </a>
+                  </div>
+                </td>
+              {% endif %}
             </tr>
             {% empty %}
             <tr>
@@ -76,6 +101,12 @@
       </table>
     </div>
   </div>
+
+{% if top_prayers.has_other_pages %}
+  <div class="col-xs-12" >
+    {% include "includes/pagination.html" with page_obj=top_prayers %}
+  </div>
+{% endif %}
 {% endblock %}
 
 {% block footer-scripts %}

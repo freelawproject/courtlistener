@@ -5,6 +5,7 @@ import shutil
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
+from pyexpat import ExpatError
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
@@ -32,6 +33,7 @@ from httpx import (
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
+    AppellateAttachmentPage,
     AppellateDocketReport,
     AttachmentPage,
     CaseQuery,
@@ -44,7 +46,6 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
-from pyexpat import ExpatError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
 from requests.exceptions import (
@@ -65,6 +66,8 @@ from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    is_appellate_court,
+    is_long_appellate_document_number,
     make_iquery_probing_key,
     mark_ia_upload_needed,
 )
@@ -1234,7 +1237,7 @@ def make_docket_by_iquery_base(
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = False,
 ) -> int | None:
     """
     Using the iquery endpoint, create or update a docket
@@ -1246,7 +1249,7 @@ def make_docket_by_iquery_base(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep: Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None if failed, else the ID of the created/updated docket
@@ -1299,7 +1302,7 @@ def make_docket_by_iquery_base(
         report_text,
         d,
         tag_names,
-        avoid_trigger_signal=avoid_trigger_signal,
+        skip_iquery_sweep=skip_iquery_sweep,
     )
 
 
@@ -1319,7 +1322,7 @@ def make_docket_by_iquery(
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = True,
 ) -> int | None:
     """
     make_docket_by_iquery_base wrapper without throttling for its use in bulk
@@ -1333,7 +1336,7 @@ def make_docket_by_iquery(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal:  Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep:  Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None if failed, else the ID of the created/updated docket
@@ -1346,7 +1349,7 @@ def make_docket_by_iquery(
         using,
         tag_names,
         log_results_redis,
-        avoid_trigger_signal,
+        skip_iquery_sweep,
     )
 
 
@@ -1366,7 +1369,7 @@ def make_docket_by_iquery_sweep(
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = False,
 ) -> int | None:
     """
      make_docket_by_iquery_base wrapper with court throttling for its use in
@@ -1379,7 +1382,7 @@ def make_docket_by_iquery_sweep(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep: Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None if failed, else the ID of the created/updated docket
@@ -1392,7 +1395,7 @@ def make_docket_by_iquery_sweep(
         using,
         tag_names,
         log_results_redis,
-        avoid_trigger_signal,
+        skip_iquery_sweep,
     )
 
 
@@ -1442,14 +1445,16 @@ def probe_iquery_pages(
     r = get_redis_interface("CACHE")
     probe_iteration = 1
     latest_match = 0
+    probe_offset = 0
     highest_known_pacer_case_id = int(
         r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
     )
     jitter = compute_binary_probe_jitter(testing)
     reports_data = []
     found_match = False
-    while probe_iteration <= settings.IQUERY_PROBE_ITERATIONS:
-        pacer_case_id_to_lookup = compute_next_binary_probe(
+    pacer_case_id_to_lookup = highest_known_pacer_case_id
+    while probe_offset + jitter < settings.IQUERY_PROBE_MAX_OFFSET:
+        pacer_case_id_to_lookup, probe_offset = compute_next_binary_probe(
             highest_known_pacer_case_id, probe_iteration, jitter
         )
         probe_iteration += 1
@@ -1529,15 +1534,32 @@ def probe_iquery_pages(
         )
 
     if not reports_data:
+        logger.info(
+            "No cases were found during this probe for court %s - case IDs from %s to %s.",
+            court_id,
+            str(highest_known_pacer_case_id),
+            str(pacer_case_id_to_lookup),
+        )
         court_empty_probe_attempts = r.incr(
             f"iquery:court_empty_probe_attempts:{court_id}"
         )
-        if court_empty_probe_attempts >= settings.IQUERY_EMPTY_PROBES_LIMIT:
+        # Compute the duration of empty probes in hours based on the number of
+        # court_empty_probe_attempts and the current IQUERY_PROBE_WAIT interval
+        empty_probes_hours = (
+            court_empty_probe_attempts * settings.IQUERY_PROBE_WAIT
+        ) / 3600
+        court_empty_probe_limit_hours = (
+            settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS.get(
+                court_id, settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS["default"]
+            )
+        )
+        if empty_probes_hours >= court_empty_probe_limit_hours:
             logger.error(
-                "The court %s has accumulated %s empty probe attempts. "
-                "Probably the probe got stuck and manual intervention is required.",
+                "Court %s has accumulated many probe attempts over "
+                "approximately %s hours. It appears the probe may be stuck; "
+                "manual intervention may be required.",
                 court_id,
-                settings.IQUERY_EMPTY_PROBES_LIMIT,
+                court_empty_probe_limit_hours,
             )
             # Restart court_blocked_attempts to avoid continue logging the
             # error on next iterations.
@@ -1551,19 +1573,19 @@ def probe_iquery_pages(
 
     # Process all the reports retrieved during the probing.
     # Avoid triggering the iQuery sweep signal except for the latest hit.
-    avoid_trigger_signal = True
+    skip_iquery_sweep = True
     for index, report_content in enumerate(reports_data):
         pacer_case_id, report_data, report_text = report_content
         if index == len(reports_data) - 1:
             # Only trigger the sweep signal on the last hit.
-            avoid_trigger_signal = False
+            skip_iquery_sweep = False
         try:
             process_case_query_report(
                 court_id,
                 pacer_case_id=pacer_case_id,
                 report_data=report_data,
                 report_text=report_text,
-                avoid_trigger_signal=avoid_trigger_signal,
+                skip_iquery_sweep=skip_iquery_sweep,
             )
         except IntegrityError:
             # Individual IntegrityError retries failed for the report. Log the
@@ -1792,7 +1814,10 @@ def get_att_report_by_rd(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    att_report = AttachmentPage(pacer_court_id, s)
+    if is_appellate_court(pacer_court_id):
+        att_report = AppellateAttachmentPage(pacer_court_id, s)
+    else:
+        att_report = AttachmentPage(pacer_court_id, s)
     att_report.query(rd.pacer_doc_id)
     return att_report
 
@@ -1932,13 +1957,38 @@ def get_bankr_claims_registry(
     return data
 
 
+def create_attachment_pq(
+    rd_pk: int,
+    user_pk: int,
+) -> ProcessingQueue:
+    """Create a ProcessingQueue instance for an attachment.
+
+    Note that the PQ returned hasn't been persisted in the database.
+    It must be saved in a subsequent step.
+
+    :param rd_pk: The pk of the RECAPDocument.
+    :param user_pk: The pk of the User uploading the attachment.
+    :return: A ProcessingQueue instance for the attachment upload.
+    """
+
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    user = User.objects.get(pk=user_pk)
+    pq = ProcessingQueue(
+        court_id=rd.docket_entry.docket.court_id,
+        pacer_doc_id=rd.pacer_doc_id,
+        uploader=user,
+        upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+        pacer_case_id=rd.docket_entry.docket.pacer_case_id,
+    )
+    return pq
+
+
 @app.task(bind=True, ignore_result=True)
-def make_attachment_pq_object(
+def save_attachment_pq_object(
     self: Task,
     attachment_report: AttachmentPage,
     rd_pk: int,
     user_pk: int,
-    att_report_text: str | None = None,
 ) -> int:
     """Create an item in the processing queue for an attachment page.
 
@@ -1952,31 +2002,50 @@ def make_attachment_pq_object(
     with
     :param user_pk: The user to associate with the ProcessingQueue object when
     it's created.
-    :param att_report_text: The attachment page report text if we got it from a
-    notification free look link.
     :return: The pk of the ProcessingQueue object that's created.
     """
-    rd = RECAPDocument.objects.get(pk=rd_pk)
-    user = User.objects.get(pk=user_pk)
-    pq = ProcessingQueue(
-        court_id=rd.docket_entry.docket.court_id,
-        uploader=user,
-        upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
-        pacer_case_id=rd.docket_entry.docket.pacer_case_id,
+
+    pq = create_attachment_pq(
+        rd_pk,
+        user_pk,
     )
-    if att_report_text is None:
-        att_report_text = attachment_report.response.text
+    att_report_text = attachment_report.response.text
     pq.filepath_local.save(
         "attachment_page.html", ContentFile(att_report_text.encode())
     )
+    return pq.pk
 
+
+def save_attachment_pq_from_text(
+    rd_pk: int,
+    user_pk: int,
+    att_report_text: str,
+) -> int:
+    """Create an item in the processing queue for an attachment page from the
+    att report text.
+
+    :param rd_pk: The RECAP document that the attachment page is associated
+    with
+    :param user_pk: The user to associate with the ProcessingQueue object when
+    it's created.
+    :param att_report_text: The attachment page report text.
+    :return: The pk of the ProcessingQueue object that's created.
+    """
+
+    pq = create_attachment_pq(
+        rd_pk,
+        user_pk,
+    )
+    pq.filepath_local.save(
+        "attachment_page.html", ContentFile(att_report_text.encode())
+    )
     return pq.pk
 
 
 def download_pacer_pdf_by_rd(
     rd_pk: int,
     pacer_case_id: str,
-    pacer_doc_id: int,
+    pacer_doc_id: str,
     session_data: SessionData,
     magic_number: str | None = None,
     de_seq_num: str | None = None,
@@ -2000,12 +2069,21 @@ def download_pacer_pdf_by_rd(
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
-    report = FreeOpinionReport(pacer_court_id, s)
-
-    r, r_msg = report.download_pdf(
-        pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
-    )
-
+    if is_appellate_court(pacer_court_id):
+        report = AppellateDocketReport(pacer_court_id, s)
+        pacer_doc_id = (
+            pacer_doc_id
+            if not rd.attachment_number
+            else f"{pacer_doc_id[:3]}1{pacer_doc_id[4:]}"
+        )
+        r, r_msg = report.download_pdf(
+            pacer_doc_id=pacer_doc_id, pacer_case_id=pacer_case_id
+        )
+    else:
+        report = FreeOpinionReport(pacer_court_id, s)
+        r, r_msg = report.download_pdf(
+            pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
+        )
     return r, r_msg
 
 
@@ -2110,7 +2188,7 @@ def get_document_number_for_appellate(
     if not len(document_number_split) == 1:
         document_number = document_number_split[0]
 
-    if len(document_number) > 9:
+    if is_long_appellate_document_number(document_number):
         # If the number is really big, it's probably a court that uses
         # pacer_doc_id instead of regular docket entry numbering.
         # Force the fourth-digit to 0:
@@ -2203,8 +2281,13 @@ def update_rd_metadata(
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if pdf_bytes is None:
-        if r_msg:
-            # Send a specific message all the way from Juriscraper
+        if r_msg and "An attachment page was returned instead" in r_msg:
+            msg = (
+                "This PACER document is part of an attachment page. "
+                "Our system currently lacks the metadata for this attachment. "
+                "Please purchase the attachment page and try again."
+            )
+        elif r_msg:
             msg = f"{r_msg}: {court_id=}, {rd_pk=}"
         else:
             msg = (

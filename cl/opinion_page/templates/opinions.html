@@ -137,12 +137,7 @@
         {% if tab == "related-cases" %}
             <div class="col-sm-12 alert-warning alert v-offset-above-2">
                 <p class="bottom">
-                    The Related Cases query is used to find legal cases
-                    related to a given case by analyzing textual similarities.
-                    It identifies and retrieves cases with similar content,
-                    allowing for the generation of a summary of related cases,
-                    including their names, links, and filing dates,
-                    to help users explore precedents or comparable rulings.
+                    The Similar Cases query helps you explore precedents or comparable rulings. It analyzes textual similarities to a given case to build a list of similar cases, their names, links and filing dates.
                 </p>
             </div>
             <div class="clearfix"></div>
@@ -204,12 +199,12 @@
               <div class="flex justify-content-between top-row">
                 <span class="case-date-new">{{ cluster.date_filed }}</span>
                 <div class="action-buttons">
-                  <div id="get-citation-btn-group" class="btn-group hidden-print">
+                  <div class="btn-group hidden-print">
                     <a id="get-citation-alerts" href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
                       rel="nofollow"
-                      class="btn"
+                      class="btn btn-default"
                     ><i class="fa fa-bell-o"></i><span class="hidden-xs">Get Citation Alerts</span></a>
-                    <a class="btn dropdown-toggle"
+                    <a class="btn btn-default dropdown-toggle"
                       data-toggle="dropdown"
                       aria-haspopup="true"
                       aria-expanded="false">
@@ -227,15 +222,23 @@
                 </div>
             </div>
 
-                <h1 class="case-caption jump-link" id="caption">{{ cluster|best_case_name|safe }}</h1>
+                <h1 class="case-caption jump-link select-all" id="caption">{{ cluster|best_case_name|safe }}</h1>
                 <h4 class="case-court">{{ cluster.docket.court }}</h4>
                 <br>
                 <div class="case-details">
                     <ul class="list-unstyled">
-                        <li><strong>Citations:</strong> {{ cluster.citation_string|default:"None known" }}</li>
+                        <li><strong>Citations:</strong>
+                          {% if citations %}
+                            {% for cite in citations %}
+                              <span class="select-all">{{ cite }}</span>{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                          {% else %}
+                            None known
+                          {% endif %}
+                        </li>
                         {% if cluster.case_name_full != cluster|best_case_name %}
                         <li><strong>Full Case Name:</strong>
-                            {{ cluster.case_name_full }}
+                          <span class="select-all">{{ cluster.case_name_full }}</span>
                         </li>
                         {% endif %}
 
@@ -299,38 +302,16 @@
                 </div>
             </div>
 
-            <ul class="nav nav-tabs hidden-print">
-                <li role="presentation" {% if tab == "opinions" or tab == "" %} class="active" {% endif %}>
-                    <a href="{% url 'view_case' cluster.pk cluster.slug %}">Opinion</a>
-                </li>
-                {% if authorities_count > 0 %}
-                    <li role="presentation" {% if tab == "authorities" %} class="active" {% endif %}>
-                        <a href="{% url "view_case_authorities" cluster.pk cluster.slug %}">Auth<span class="hidden-xs hidden-sm hidden-md">orities&nbsp;({{ authorities_count }})</span></a>
-                    </li>
-                {% endif %}
-                {% if cited_by_count > 0 %}
-                    <li role="presentation" {% if tab == "cited-by" %} class="active" {% endif %}>
-                        <a href="{% url "view_case_cited_by" cluster.pk cluster.slug %}">Cited<span class="hidden-xs hidden-sm hidden-md">&nbsp;By&nbsp;({{ cited_by_count }})</span></a>
-                    </li>
-                {% endif %}
-                {% if summaries_count > 0 %}
-                    <li role="presentation" {% if tab == "summaries" %} class="active" {% endif %}>
-                        <a href="{% url "view_case_summaries" cluster.pk cluster.slug %}">Sum<span class="hidden-xs hidden-sm hidden-md">maries&nbsp;({{ summaries_count }})</span></a>
-                    </li>
-                {% endif %}
-                {% if related_cases_count > 0  %}
-                    <li role="presentation" {% if tab == "related-cases" %} class="active" {% endif %}>
-                        <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;<span class="hidden-xs hidden-sm hidden-md">Cases</span></a>
-                    </li>
-                {% endif %}
-                {% if has_downloads and "pdf" in pdf_path or cluster.filepath_pdf_harvard %}
-                    <li role="presentation" {% if tab == "pdf" %} class="active" {% endif %}>
-                        <a rel="nofollow" href="{% url 'view_case_pdf' cluster.pk cluster.slug %}">PDF</a>
-                    </li>
-                {% endif %}
-            </ul>
+            <div id="tabs-container"
+                 hx-get="{% url 'update_opinion_tabs' cluster.pk %}"
+                 hx-trigger="load"
+                 hx-swap="outerHTML"
+                 hx-vals='{"tab": "{{ tab }}"}'>
+                {% include 'includes/opinion_tabs.html' %}
+            </div>
         </div>
-        {% include "includes/opinion_tabs.html" %}
+
+        {% include "includes/opinion_tabs_content.html" %}
         {% include "includes/notes_modal.html" %}
 
     </div>
@@ -349,4 +330,11 @@
         {% endif %}
     {% endif %}
     <script type="text/javascript" src="{% static "js/opinions.js" %}"></script>
+    {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
 {% endblock %}
+
