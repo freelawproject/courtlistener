@@ -1046,6 +1046,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.rebuild_index("search.OpinionCluster")
+        cls.rebuild_index("search.Docket")
 
     def test_merge_versions_by_download_url(self):
         """Can we merge opinion versions and delete ES documents correctly?
