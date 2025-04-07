@@ -75,6 +75,7 @@ REST_FRAMEWORK = {
         "BruceWayne": "1/hour",
         "mibefis809": "1/hour",
         # Unresponsive
+        "courtlistener_api": "1/hour",
         "bobjase24": "1/hour",
         "bobjase25": "1/hour",
         "victorchaps": "1/hour",
