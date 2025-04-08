@@ -54,6 +54,7 @@ def log_db_connection_info(model_name: str, instance_id: int) -> None:
     except Exception as e:
         logger.warning("Error retrieving DB transaction details: %s", e)
 
+    pid = state = backend_start = xact_start = None
     try:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -66,11 +67,8 @@ def log_db_connection_info(model_name: str, instance_id: int) -> None:
             result = cursor.fetchone()
             if result:
                 pid, state, backend_start, xact_start = result
-            else:
-                pid = state = backend_start = xact_start = None
     except Exception as e:
         logger.warning("Error retrieving connection details: %s", e)
-        pid = state = backend_start = xact_start = None
 
     # Log the connection details and current UTC time
     current_time = datetime.now(timezone.utc)
