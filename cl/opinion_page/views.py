@@ -23,6 +23,7 @@ from django.http.response import (
 )
 from django.shortcuts import (  # type: ignore[attr-defined]
     aget_object_or_404,
+    redirect,
     render,
 )
 from django.template.defaultfilters import slugify
