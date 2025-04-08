@@ -23,7 +23,6 @@ from cl.opinion_page.views import (
     view_parties,
     view_recap_authorities,
     view_recap_document,
-    visualizations_deprecation_redirect,
 )
 
 urlpatterns = [
@@ -35,11 +34,6 @@ urlpatterns = [
         name="court_publish_page",
     ),
     # Opinion pages
-    path(
-        "opinion/<int:pk>/<blank-slug:slug>/visualizations/",
-        visualizations_deprecation_redirect,
-        name="cluster_visualizations",
-    ),
     path(
         "docket/<int:docket_id>/feed/",
         view_docket_feed,  # type: ignore[arg-type]
