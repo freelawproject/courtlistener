@@ -1550,3 +1550,11 @@ async def block_item(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(
             permitted_methods=["POST"], content="Not an ajax request"
         )
+
+
+def visualizations_deprecation_redirect(
+    request: HttpRequest, pk: int, slug: str
+) -> HttpResponseRedirect:
+    """Redirects from the old visualizations page to the API help page with a deprecation notice."""
+    url = reverse("visualization_api_help")
+    return redirect(f"{url}#deprecation-notice", permanent=True)
