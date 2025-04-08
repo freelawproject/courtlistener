@@ -207,10 +207,10 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
 
     paginated_entries = await paginate_open_prayers(top_prayers, page)
 
-    recap_documents = list(paginated_entries.object_list)
-    prayer_counts = await get_prayer_counts_in_bulk(recap_documents)
+    recap_documents = paginated_entries.object_list
 
     user = await request.auser()
+    existing_prayers = {}
     if user.is_authenticated:
         # Check prayer existence in bulk.
         existing_prayers = await get_existing_prayers_in_bulk(
@@ -218,8 +218,7 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
         )
 
     # Merge counts and existing prayer status to RECAPDocuments.
-    for rd in recap_documents:
-        rd.prayer_count = prayer_counts.get(rd.id, 0)
+    async for rd in recap_documents:
         rd.prayer_exists = existing_prayers.get(rd.id, False)
 
     granted_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
