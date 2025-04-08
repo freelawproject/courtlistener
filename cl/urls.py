@@ -89,6 +89,14 @@ urlpatterns = [
         "removal/",
         RedirectView.as_view(url="/terms/#removal", permanent=True),
     ),
+    path(
+        "opinion/<int:pk>/<blank-slug:slug>/visualizations/",
+        RedirectView.as_view(
+            url="/help/api/rest/visualizations/#deprecation-notice",
+            permanent=True,
+        ),
+        name="cluster_visualizations",
+    ),
 ]
 
 if settings.DEVELOPMENT:
