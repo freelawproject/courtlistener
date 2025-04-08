@@ -13,7 +13,11 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import IntegerField, Prefetch, QuerySet
 from django.db.models.functions import Cast
-from django.http import HttpRequest, HttpResponseRedirect
+from django.http import (
+    HttpRequest,
+    HttpResponsePermanentRedirect,
+    HttpResponseRedirect,
+)
 from django.http.response import (
     Http404,
     HttpResponse,
@@ -1555,7 +1559,7 @@ async def block_item(request: HttpRequest) -> HttpResponse:
 
 def visualizations_deprecation_redirect(
     request: HttpRequest, pk: int, slug: str
-) -> HttpResponseRedirect:
+) -> HttpResponsePermanentRedirect:
     """Redirects from the old visualizations page to the API help page with a deprecation notice."""
     url = reverse("visualization_api_help")
     return redirect(f"{url}#deprecation-notice", permanent=True)
