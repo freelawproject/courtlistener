@@ -392,12 +392,13 @@ def toggle_prayer_public(
     request: HttpRequest,
 ) -> HttpResponse:
     """Toggle the user's setting to make pending prayers public"""
-
     user = request.user
-    if request.POST["current_toggle_status"] == "True":
-        UserProfile.objects.filter(user=user).update(prayers_public=False)
-        msg = "Pending prayers page is now private"
-    else:
-        UserProfile.objects.filter(user=user).update(prayers_public=True)
-        msg = "Pending prayers page is now public"
-    return HttpResponse(msg)
+    next_toggle_status = not bool(request.POST.get("current_toggle_status"))
+    UserProfile.objects.filter(user=user).update(
+        prayers_public=next_toggle_status
+    )
+    return TemplateResponse(
+        request,
+        "includes/public_prayers_switch.html",
+        {"page_public": next_toggle_status},
+    )
