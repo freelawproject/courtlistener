@@ -649,7 +649,7 @@ class APITests(APITestCase):
         self.assertEqual(response.json()["count"], 1)
 
 
-class RECAPPrayAndPay(TestCase):
+class RECAPPrayAndPay(SimpleUserDataMixin, TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1166,6 +1166,88 @@ class RECAPPrayAndPay(TestCase):
             await top_prayers.afirst(),
             self.rd_4,
             msg="The top prayer didn't match.",
+        )
+
+    async def test_can_we_load_the_top_prayers_page(self) -> None:
+        """Does the 'top prayers' page return a successful response?"""
+        r = await self.async_client.get(reverse("top_prayers"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    async def test_private_user_prayers_redirects_to_top_prayers(self) -> None:
+        """Does accessing a private user's prayer page redirect to the top prayers page?"""
+        # Create a user profile (their prayers are private by default).
+        profile = await sync_to_async(UserProfileWithParentsFactory)()
+        user_prayers_path = reverse(
+            "user_prayers", args=[profile.user.username]
+        )
+
+        # Anonymous user should be redirected.
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertRedirects(
+            r,
+            expected_url=reverse("top_prayers"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+        # Logged-in user should also be redirected when viewing another
+        # user's private prayers.
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertRedirects(
+            r,
+            expected_url=reverse("top_prayers"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+    async def test_get_public_user_prayers_does_not_redirect(self) -> None:
+        """Can we access a public user's prayer page?"""
+        # Create a user profile.
+        profile = await sync_to_async(UserProfileWithParentsFactory)()
+        # Make the user's prayer page public.
+        profile.prayers_public = True
+        await profile.asave()
+
+        user_prayers_path = reverse(
+            "user_prayers", args=[profile.user.username]
+        )
+        # Anonymous user should not be redirected and should be able to load
+        # the list of prayers.
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertContains(r, f"{profile.user.username}")
+
+        # Logged-in user should also be able to load the page.
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertContains(r, f"{profile.user.username}")
+
+    async def test_list_of_granted_prayers_is_always_private(self) -> None:
+        """Does accessing the granted prayers list always redirect to the top prayers page?"""
+        # Create a user profile.
+        profile = await sync_to_async(UserProfileWithParentsFactory)()
+        # Intentionally make the prayers page public to ensure granted prayers
+        # redirection is independent of the user's privacy setting.
+        profile.prayers_public = True
+        await profile.asave()
+
+        user_prayers_path = reverse(
+            "user_prayers_granted", args=[profile.user.username]
+        )
+
+        # Anonymous user should be redirected from the granted prayers list.
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertRedirects(
+            r,
+            expected_url=reverse("top_prayers"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+        # Logged-in user should be redirected from the granted prayers list.
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertRedirects(
+            r,
+            expected_url=reverse("top_prayers"),
+            target_status_code=HTTPStatus.OK,
         )
 
 
