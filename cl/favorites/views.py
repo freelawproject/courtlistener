@@ -295,7 +295,8 @@ async def delete_prayer_view(
 async def user_prayers_view(
     request: HttpRequest, username: str
 ) -> HttpResponse:
-    requested_user = await aget_object_or_404(User, username=username)
+    queryset = User.objects.prefetch_related("profile")
+    requested_user = await aget_object_or_404(queryset, username=username)
     is_page_owner = await request.auser() == requested_user
 
     page_public = requested_user.profile.prayers_public
