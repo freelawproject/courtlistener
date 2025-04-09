@@ -1548,6 +1548,9 @@ emphasis {
   justify-content: space-between;
 }
 
+.justify-content-around{
+  justify-content: space-around;
+}
 
 .justify-content-center{
   justify-content: center;
@@ -1835,8 +1838,7 @@ rect.series-segment {
   gap: 0.5rem
 }
 
-.prayer-top-buttons.nav>li>a,
-.prayer-top-buttons.nav>li>div {
+.prayer-top-buttons.navbar-right {
   right: 15px;
   position: relative;
 }

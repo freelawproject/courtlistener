@@ -18,7 +18,26 @@
 
 {% block content %}
 
-  <div class="col-xs-12">
+  <div class="col-xs-12 hidden-sm hidden-md hidden-lg flex justify-content-around v-offset-below-2">
+    {% include "includes/prayers_leaderboard_button.html" %}
+    <a href="{% url "pray_and_pay_help" %}">
+      <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
+    </a>
+    {% if is_page_owner %}
+      <div>
+        {% include "includes/public_prayers_switch.html" with page_public=page_public %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="col-xs-12 flex {% if is_page_owner %} justify-content-between {% else %} justify-content-end {% endif %} hidden-xs">
+    {% if  is_page_owner %}
+    <ul class="prayer-top-buttons nav navbar-nav navbar-left">
+      <li>
+        {% include "includes/prayers_leaderboard_button.html" %}
+      </li>
+    </ul>
+    {% endif %}
     <ul class="prayer-top-buttons nav navbar-nav navbar-right">
       {% include 'includes/remind_me_modal.html' %}
       <li class="hidden-xs">
@@ -26,23 +45,14 @@
           <i class="fa fa-heart-o"></i>&nbsp;Remind Me to Help
         </a>
       </li>
+      {% if not is_page_owner %}
       <li>
-        <a href="{% url "top_prayers" %}">
-          <div class="flex justify-content-center align-items-center gap-1">
-            <div class="fa gray fa-fw">
-              {% include "includes/hand-holding-heart.svg" %}
-            </div>
-            <div>
-              Leaderboard
-            </div>
-          </div>
-        </a>
+        {% include "includes/prayers_leaderboard_button.html" %}
       </li>
+      {% endif %}
       <li>
         <a href="{% url "pray_and_pay_help" %}">
-          <div class="flex justify-content-center align-items-center">
-            Learn More
-          </div>
+          <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
         </a>
       </li>
       {% if is_page_owner %}
