@@ -113,7 +113,6 @@ class SimpleLoadTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
-@override_flag("ui_flag_for_o", False)
 class OpinionPageLoadTest(
     ESIndexTestCase,
     CourtTestCase,
@@ -650,7 +649,6 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
 
-    @override_flag("ui_flag_for_o", False)
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
@@ -662,7 +660,7 @@ class CitationRedirectorTest(TestCase):
             follow=True,
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        self.assertTemplateUsed(r, "opinion.html")
+        self.assertTemplateUsed(r, "opinions.html")
         self.assertEqual(
             r.context["cluster"].get_absolute_url(),
             "/opinion/2/case-name-cluster/",
