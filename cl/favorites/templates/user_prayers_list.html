@@ -11,6 +11,11 @@
 {% block description %}CourtListener lets you request the purchase of legal documents. View the documents requested by {{ requested_user }}.{% endblock %}
 {% block og_description %}CourtListener lets you request the purchase of legal documents. View the documents requested by {{ requested_user }}.{% endblock %}
 
+{% block head %}
+  <link type="text/css" href="{% static "css/prayer-public-switch.css" %}"
+          rel="stylesheet"/>
+{% endblock %}
+
 {% block content %}
 
   <div class="col-xs-12">
@@ -22,11 +27,23 @@
         </a>
       </li>
       <li>
-        <a href="{% url "top_prayers" %}"><div class="fa gray fa-fw">
-          {% include "includes/hand-holding-heart.svg" %}
-        </div> Leaderboard</a>
+        <a href="{% url "top_prayers" %}">
+          <div class="flex justify-content-center align-items-center gap-1">
+            <div class="fa gray fa-fw">
+              {% include "includes/hand-holding-heart.svg" %}
+            </div>
+            <div>
+              Leaderboard
+            </div>
+          </div>
+        </a>
       </li>
       <li><a href="{% url "pray_and_pay_help" %}">Learn More</a></li>
+      {% if is_page_owner %}
+      <li>
+        {% include "includes/public_prayers_switch.html" with page_public=page_public %}
+      </li>
+      {% endif %}
     </ul>
   </div>
 

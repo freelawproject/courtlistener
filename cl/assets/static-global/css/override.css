@@ -1835,10 +1835,18 @@ rect.series-segment {
   gap: 0.5rem
 }
 
-.prayer-top-buttons.nav > li > a {
-  padding: 10px 15px;
+.prayer-top-buttons.nav>li>a,
+.prayer-top-buttons.nav>li>div {
   right: 15px;
   position: relative;
+}
+
+.prayer-top-buttons.nav>li>a {
+  padding: 11px 15px;
+}
+
+.prayer-top-buttons.nav>li>div {
+  padding: 10px 15px;
 }
 
 .learn-more-prayer-btn {
