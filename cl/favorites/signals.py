@@ -1,6 +1,5 @@
-from datetime import datetime
+from datetime import timedelta
 
-from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
@@ -42,9 +41,7 @@ def check_prayer_availability(sender, instance: Prayer, **kwargs):
         check_prayer_pacer.delay(rd, user.pk)
         return
 
-    if document_availability.last_checked >= (
-        now - datetime.timedelta(weeks=1)
-    ):
+    if document_availability.last_checked >= (now() - timedelta(weeks=1)):
         prayer_unavailable(rd, user.pk)
     else:
         check_prayer_pacer.delay(rd, user.pk)
