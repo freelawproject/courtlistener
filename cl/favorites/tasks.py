@@ -23,12 +23,17 @@ from .utils import prayer_unavailable
     ignore_result=True,
 )
 @transaction.atomic
-def check_prayer_pacer(rd: RECAPDocument, user_pk: int):
+def check_prayer_pacer(rd_pk: int, user_pk: int):
     """Celery task for check_prayer_availability().
-    :param rd: The RECAPDocument of interest
+    :param rd_pk: The primary key of RECAPDocument of interest
     :param user_pk: The primary key of the user who requested the document
     """
-    court_id = rd.docket_entry.docket.court.pk
+    rd = (
+        RECAPDocument.objects.select_related("docket_entry__docket")
+        .get(pk=rd_pk)
+        .defer("plain_text")
+    )
+    court_id = rd.docket_entry.docket.court_id
     pacer_doc_id = rd.pacer_doc_id
 
     recap_user = User.objects.get(username="recap")

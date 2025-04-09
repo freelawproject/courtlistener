@@ -38,10 +38,10 @@ def check_prayer_availability(sender, instance: Prayer, **kwargs):
             recap_document=rd
         )
     except PrayerAvailability.DoesNotExist:
-        check_prayer_pacer.delay(rd, user.pk)
+        check_prayer_pacer.delay(rd.pk, user.pk)
         return
 
     if document_availability.last_checked >= (now() - timedelta(weeks=1)):
         prayer_unavailable(rd, user.pk)
     else:
-        check_prayer_pacer.delay(rd, user.pk)
+        check_prayer_pacer.delay(rd.pk, user.pk)
