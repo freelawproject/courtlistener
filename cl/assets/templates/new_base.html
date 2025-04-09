@@ -98,9 +98,11 @@
   {% if DEBUG %}
   <script type="text/javascript"
           src="{% static "js/jquery/jquery-3.4.1.js" %}"></script>
+  <script src="{% static 'js/alpinejscsp@3.14.8.js' %}" defer init nonce="{{ request.csp_nonce }}"></script>
   {% else %}
   <script type="text/javascript"
-          src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
+        src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
+  <script src="{% static 'js/alpinejscsp@3.14.8.min.js' %}" defer init nonce="{{ request.csp_nonce }}"></script>
   {% endif %}
 
   <script type="text/javascript" src="{% static "js/base.js" %}"></script>
