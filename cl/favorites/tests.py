@@ -20,7 +20,13 @@ from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.factories import NoteFactory, PrayerFactory
-from cl.favorites.models import DocketTag, Note, Prayer, UserTag
+from cl.favorites.models import (
+    DocketTag,
+    Note,
+    Prayer,
+    PrayerAvailability,
+    UserTag,
+)
 from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
@@ -31,6 +37,7 @@ from cl.favorites.utils import (
     get_user_prayer_history,
     get_user_prayers,
     prayer_eligible,
+    prayer_unavailable,
 )
 from cl.lib.test_helpers import (
     AudioTestCase,
@@ -1130,6 +1137,134 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
             await top_prayers.afirst(),
             self.rd_4,
             msg="The top prayer didn't match.",
+        )
+
+
+@patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
+@patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
+class PrayAndPaySignalTests(PrayAndPayTestCase):
+
+    @patch("cl.favorites.signals.check_prayer_pacer")
+    async def test_create_prayer_no_pacer_doc_id(
+        self,
+        mock_check_prayer_task,
+        mock_prayer_unavailable,
+        mock_prayer_eligible,
+    ) -> None:
+        """Does the check_prayer_availability signal handle docs with no pacer_doc_id?"""
+        rd_no_pacer_doc_id = await sync_to_async(RECAPDocumentFactory)(
+            pacer_doc_id="",
+            document_number="1",
+            is_available=False,
+        )
+
+        # Assert that no PrayerAvailability records exist for this document.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=rd_no_pacer_doc_id.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        current_time = now()
+        with time_machine.travel(current_time, tick=False):
+            await create_prayer(self.user, rd_no_pacer_doc_id)
+
+        # Verify a PrayerAvailability record was created and its last_checked
+        # time
+        self.assertEqual(await prayer_availability_query.acount(), 1)
+        prayer_availability_check = await prayer_availability_query.afirst()
+        self.assertEqual(prayer_availability_check.last_checked, current_time)
+
+        # Verify the prayer_unavailable method was called with the correct
+        # arguments
+        mock_prayer_unavailable.assert_called_once_with(
+            rd_no_pacer_doc_id, self.user.pk
+        )
+
+        # Verify an email was sent to the right user
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            "A document you requested is unavailable for purchase",
+        )
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
+
+        # Verify no Celery task was scheduled
+        mock_check_prayer_task.delay.assert_not_called()
+
+    @patch("cl.favorites.signals.check_prayer_pacer")
+    async def test_create_prayer_schedules_task_for_new_document(
+        self,
+        mock_check_prayer_task,
+        mock_prayer_unavailable,
+        mock_prayer_eligible,
+    ):
+        """Does creating a prayer for a new document schedule an availability check?"""
+        # Assert that no PrayerAvailability records exist for this document.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_2.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        # creates a prayer for the same document
+        await create_prayer(self.user_2, self.rd_2)
+
+        # Verify a Celery task was scheduled to check availability
+        mock_check_prayer_task.delay.assert_called_once_with(
+            self.rd_2.pk, self.user_2.pk
+        )
+
+        # Verify the prayer_unavailable method was NOT called directly by the
+        # signal. The method might be called later by the scheduled Celery task.
+        mock_prayer_unavailable.assert_not_called()
+
+    @patch("cl.favorites.signals.check_prayer_pacer")
+    async def test_create_prayer_skips_task_for_recently_checked_document(
+        self,
+        mock_check_prayer_task,
+        mock_prayer_unavailable,
+        mock_prayer_eligible,
+    ):
+        """Does the signal skip scheduling a task for recently checked documents?"""
+        # Create a PrayerAvailability record to simulate a recent availability
+        # check for this document.
+        await PrayerAvailability.objects.acreate(recap_document=self.rd_2)
+
+        # Trigger the creation of a prayer for the same document.
+        await create_prayer(self.user_2, self.rd_2)
+
+        # Check that the prayer_unavailable method got called. This should
+        # happen because we simulated a recent check.
+        mock_prayer_unavailable.assert_called_once_with(
+            self.rd_2, self.user_2.pk
+        )
+        # Verify no celery task was scheduled. Since it was recently checked,
+        # we shouldn't need a background task.
+        mock_check_prayer_task.delay.assert_not_called()
+
+    @patch("cl.favorites.signals.check_prayer_pacer")
+    async def test_create_prayer_schedules_check_for_old_checked_document(
+        self,
+        mock_check_prayer_task,
+        mock_prayer_unavailable,
+        mock_prayer_eligible,
+    ):
+        """Does creating a prayer for an old-checked document schedule a re-check?"""
+        # Create a PrayerAvailability record with an old last_checked time
+        two_weeks_ago = now() - timedelta(weeks=2)
+        await PrayerAvailability.objects.acreate(
+            recap_document=self.rd_2, last_checked=two_weeks_ago
+        )
+
+        await create_prayer(self.user_2, self.rd_2)
+
+        # Verify the prayer_unavailable method was NOT called directly inside
+        # the signal. This method might be called later by the scheduled Celery
+        # task.
+        mock_prayer_unavailable.assert_not_called()
+
+        # Verify a background task was scheduled to re-check availability
+        mock_check_prayer_task.delay.assert_called_once_with(
+            self.rd_2.pk, self.user_2.pk
         )
 
 
