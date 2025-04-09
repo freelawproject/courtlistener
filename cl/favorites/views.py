@@ -23,7 +23,6 @@ from cl.favorites.utils import (
     delete_prayer,
     get_existing_prayers_in_bulk,
     get_lifetime_prayer_stats,
-    get_prayer_counts_in_bulk,
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
