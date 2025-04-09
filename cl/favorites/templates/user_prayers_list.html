@@ -38,7 +38,13 @@
           </div>
         </a>
       </li>
-      <li><a href="{% url "pray_and_pay_help" %}">Learn More</a></li>
+      <li>
+        <a href="{% url "pray_and_pay_help" %}">
+          <div class="flex justify-content-center align-items-center">
+            Learn More
+          </div>
+        </a>
+      </li>
       {% if is_page_owner %}
       <li>
         {% include "includes/public_prayers_switch.html" with page_public=page_public %}
