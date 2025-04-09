@@ -32,7 +32,11 @@ from cl.favorites.utils import (
     get_user_prayers,
     prayer_eligible,
 )
-from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
+from cl.lib.test_helpers import (
+    AudioTestCase,
+    PrayAndPayTestCase,
+    SimpleUserDataMixin,
+)
 from cl.search.factories import RECAPDocumentFactory
 from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -649,47 +653,7 @@ class APITests(APITestCase):
         self.assertEqual(response.json()["count"], 1)
 
 
-class RECAPPrayAndPay(TestCase):
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.user = UserFactory()
-        cls.user_2 = UserFactory()
-        cls.user_3 = UserFactory()
-
-        cls.rd_1 = RECAPDocumentFactory(
-            pacer_doc_id="98763421",
-            document_number="1",
-            is_available=True,
-        )
-        cls.rd_2 = RECAPDocumentFactory(
-            pacer_doc_id="98763422",
-            document_number="2",
-            is_available=False,
-        )
-
-        cls.rd_3 = RECAPDocumentFactory(
-            pacer_doc_id="98763423",
-            document_number="3",
-            is_available=False,
-        )
-        cls.rd_4 = RECAPDocumentFactory(
-            pacer_doc_id="98763424",
-            document_number="4",
-            is_available=False,
-        )
-
-        cls.rd_5 = RECAPDocumentFactory(
-            pacer_doc_id="98763425",
-            document_number="5",
-            is_available=False,
-        )
-
-        cls.rd_6 = RECAPDocumentFactory(
-            pacer_doc_id="98763426",
-            document_number="6",
-            is_available=False,
-        )
+class RECAPPrayAndPay(PrayAndPayTestCase):
 
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
