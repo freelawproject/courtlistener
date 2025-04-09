@@ -48,6 +48,7 @@ from cl.search.factories import RECAPDocumentFactory
 from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
+from cl.tests.fakes import FakeAvailableConfirmationPage, FakeConfirmationPage
 from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -1266,6 +1267,117 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
         mock_check_prayer_task.delay.assert_called_once_with(
             self.rd_2.pk, self.user_2.pk
         )
+
+
+@patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
+@patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
+class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
+
+    @patch(
+        "cl.favorites.tasks.DownloadConfirmationPage", new=FakeConfirmationPage
+    )
+    async def test_user_gets_notification_when_document_is_unavailable(
+        self,
+        mock_prayer_unavailable,
+        mock_get_or_cache_cookie,
+    ):
+        """Does praying for an unavailable document notify the user and mark it as sealed?"""
+        # Assert that no PrayerAvailability records exist for this
+        # document.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_2.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        # Assert that the outbox is empty
+        self.assertEqual(len(mail.outbox), 0)
+
+        await create_prayer(self.user_3, self.rd_2)
+
+        # Verify that a PrayerAvailability record has been created as a result
+        # of the prayer creation.
+        self.assertEqual(await prayer_availability_query.acount(), 1)
+
+        # Verify the prayer_unavailable method was called with the correct
+        # arguments
+        mock_prayer_unavailable.assert_called_once_with(
+            self.rd_2, self.user_3.pk
+        )
+
+        # Assert that the user received the notification email.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            "A document you requested is unavailable for purchase",
+        )
+        self.assertEqual(mail.outbox[0].to, [self.user_3.email])
+
+        # Verify that the document's sealed status is updated.
+        await self.rd_2.arefresh_from_db()
+        self.assertTrue(self.rd_2.is_sealed)
+
+    @patch(
+        "cl.favorites.tasks.DownloadConfirmationPage",
+        new=FakeAvailableConfirmationPage,
+    )
+    async def test_unseals_document_and_removes_past_availability_record(
+        self,
+        mock_prayer_unavailable,
+        mock_get_or_cache_cookie,
+    ):
+        """Does praying for an available document unseal it and remove its availability record?"""
+        # Create a PrayerAvailability record to simulate an old availability
+        # check for this document.
+        two_weeks_ago = now() - timedelta(weeks=2)
+        await PrayerAvailability.objects.acreate(
+            recap_document=self.rd_3, last_checked=two_weeks_ago
+        )
+        # Ensure the document is initially marked as sealed for the test.
+        self.rd_3.is_sealed = True
+        await self.rd_3.asave()
+
+        await create_prayer(self.user_3, self.rd_3)
+
+        mock_prayer_unavailable.assert_not_called()
+
+        # Assert that the PrayerAvailability record for this document was deleted.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_3.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        # Verify that the document is no longer sealed and its page count is updated.
+        await self.rd_3.arefresh_from_db()
+        self.assertFalse(self.rd_3.is_sealed)
+        self.assertEqual(self.rd_3.page_count, 20)
+
+    @patch(
+        "cl.favorites.tasks.DownloadConfirmationPage",
+        new=FakeAvailableConfirmationPage,
+    )
+    async def test_praying_available_document_updates_page_count(
+        self,
+        mock_prayer_unavailable,
+        mock_get_or_cache_cookie,
+    ):
+        """Does praying for an available document update its page count?"""
+        # Ensure no prior PrayerAvailability record exists.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_2.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        await create_prayer(self.user_3, self.rd_2)
+
+        # Verify that no PrayerAvailability record was created for an available document.
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        # Confirm that the unavailable prayer task was not called.
+        mock_prayer_unavailable.assert_not_called()
+
+        # Verify the page count was updated
+        await self.rd_2.arefresh_from_db()
+        self.assertEqual(self.rd_2.page_count, 20)
 
 
 class PrayerAPITests(APITestCase):

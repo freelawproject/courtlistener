@@ -22,20 +22,18 @@ from .utils import prayer_unavailable
     interval_step=5,
     ignore_result=True,
 )
-@transaction.atomic
-def check_prayer_pacer(rd_pk: int, user_pk: int):
+def check_prayer_pacer(self, rd_pk: int, user_pk: int):
     """Celery task for check_prayer_availability().
     :param rd_pk: The primary key of RECAPDocument of interest
     :param user_pk: The primary key of the user who requested the document
     """
     rd = (
         RECAPDocument.objects.select_related("docket_entry__docket")
-        .get(pk=rd_pk)
         .defer("plain_text")
+        .get(pk=rd_pk)
     )
     court_id = rd.docket_entry.docket.court_id
     pacer_doc_id = rd.pacer_doc_id
-
     recap_user = User.objects.get(username="recap")
     session_data = get_or_cache_pacer_cookies(
         recap_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
@@ -61,6 +59,7 @@ def check_prayer_pacer(rd_pk: int, user_pk: int):
         rd.save()
         PrayerAvailability.objects.filter(recap_document=rd).delete()
 
-    if data.billable_pages != 30:
-        rd.page_count = data.billable_pages
+    billable_pages = int(data.get("billable_pages", 0))
+    if billable_pages and billable_pages != 30:
+        rd.page_count = billable_pages
         rd.save()
