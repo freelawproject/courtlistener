@@ -126,7 +126,6 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
         recap_document=OuterRef("pk")
     ).values("last_checked")[:1]
 
-
     # Annotate each RECAPDocument with the number of prayers and the average prayer age
     documents = (
         RECAPDocument.objects.filter(id__in=Subquery(waiting_prayers))
@@ -162,9 +161,13 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
             ),
             view_count=F("docket_entry__docket__view_count"),
             doc_unavailable=Exists(doc_unavailable),
-            last_checked=Subquery(availability_last_checked, output_field=DateTimeField()),
+            last_checked=Subquery(
+                availability_last_checked, output_field=DateTimeField()
+            ),
         )
-        .order_by("doc_unavailable", "last_checked", "-prayer_count", "-view_count")
+        .order_by(
+            "doc_unavailable", "last_checked", "-prayer_count", "-view_count"
+        )
     )
 
     return documents
