@@ -123,7 +123,7 @@
       <h4 class="text-xl font-semibold text-greyscale-900">Full RSS Feeds</h4>
       <p>The courts below have complete RSS feeds, allowing us to always know when cases in these courts are updated.</p>
 
-      {% regroup full_feeds|dictsortreversed:"jurisdiction" by jurisdiction as full_feed_courts %}
+      {% regroup full_feeds by jurisdiction as full_feed_courts %}
       <c-tabs>
         {% for group in full_feed_courts %}
           {% if group.grouper == "FD" or group.grouper == "FB" %}
@@ -142,7 +142,7 @@
       </p>
       <p>You can see which docket entry types are provided by these courts below.</p>
 
-      {% regroup partial_feeds|dictsort:"jurisdiction" by jurisdiction as partial_feed_courts %}
+      {% regroup partial_feeds by jurisdiction as partial_feed_courts %}
       <c-tabs>
         {% for group in partial_feed_courts %}
           <c-tabs.tab name="{% if group.grouper == "FD" %}District Courts{% elif group.grouper == "FB" %}Bankruptcy Courts{% elif group.grouper == "F" %}Appellate Courts{% endif %}">
@@ -167,7 +167,7 @@
       <p>The courts below do not provide RSS feeds of their latest filings. This means our alerts will only be sent when we get updates from other sources.
       </p>
 
-      {% regroup no_feeds|dictsort:"jurisdiction" by jurisdiction as no_feed_courts %}
+      {% regroup no_feeds by jurisdiction as no_feed_courts %}
       <c-tabs>
         {% for group in no_feed_courts %}
           <c-tabs.tab name="{% if group.grouper == "FD" %}District Courts{% elif group.grouper == "FB" %}Bankruptcy Courts{% elif group.grouper == "F" %}Appellate Courts{% endif %}">
