@@ -1,6 +1,6 @@
 <script nonce="{{ request.csp_nonce }}">
-const ACTIVE_TAB_CLASSES = 'bg-greyscale-100 text-greyscale-900';
-const INACTIVE_TAB_CLASSES = 'bg-greyscale-50 text-greyscale-600';
+const ACTIVE_TAB_CLASSES = 'bg-greyscale-100';
+const INACTIVE_TAB_CLASSES = 'bg-greyscale-50';
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('tabsComponent', () => ({
@@ -44,7 +44,7 @@ document.addEventListener('alpine:init', () => {
           x-bind:data-tab-id="tab"
           x-text="tab"
           role="tab"
-          class="px-5 py-3 text-sm font-normal rounded-t-2xl"
+          class="px-5 py-3 text-sm font-normal rounded-t-2xl text-greyscale-600"
         >
         </button>
       </div>
