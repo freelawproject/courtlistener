@@ -235,6 +235,7 @@ def find_and_merge_versions(self, pk: int) -> None:
     Currently only checks for exact `download_url` match, update this when
     different strategies are implemented
 
+    :param self: the celery task
     :param pk: opinion primary key
     :return None:
     """

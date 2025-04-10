@@ -5,7 +5,7 @@ from difflib import Differ, SequenceMatcher
 from typing import Union
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, QuerySet
 from elasticsearch import NotFoundError
 from eyecite import clean_text
 
@@ -114,7 +114,11 @@ models_that_reference_cluster = [
 
 
 def get_separator(name: str) -> str:
-    """Try to find a separator for a list of comma or colon separated names"""
+    """Try to find a separator for a list of comma or colon separated names
+
+    :param name: a judge name string
+    :return: a separator string
+    """
     for sep in ["; ", ";", ", ", ","]:
         if name.count(sep) > 1:
             return sep
@@ -313,9 +317,9 @@ def text_is_similar(text1: str, text2: str) -> bool:
     if ratio < MIN_SEQUENCE_SIMILARITY:
         return (
             SequenceMatcher(None, text2, text1).ratio()
-            > MIN_SEQUENCE_SIMILARITY
+            >= MIN_SEQUENCE_SIMILARITY
         )
-    return ratio > MIN_SEQUENCE_SIMILARITY
+    return ratio >= MIN_SEQUENCE_SIMILARITY
 
 
 def update_referencing_objects(
@@ -532,13 +536,13 @@ def merge_versions_by_download_url(
     seen_urls = set()
     stats = defaultdict(lambda: 0)
     for group in qs:
-        if group["download_url"].replace("https", "http") in seen_urls:
-            continue
-
-        seen_urls.add(group["download_url"].replace("https", "http"))
-
         if limit and len(seen_urls) > limit:
             break
+
+        standard_url = group["download_url"].replace("https", "http")
+        if standard_url in seen_urls:
+            continue
+        seen_urls.add(standard_url)
 
         logger.info("Processing group %s", group)
 
@@ -587,25 +591,28 @@ def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
 
 
 def merge_versions_by_text_similarity(
-    main: Opinion, versions: list[Opinion], stats: dict
+    main_opinion: Opinion,
+    versions: Union[QuerySet[Opinion], list[Opinion]],
+    stats: dict,
 ) -> None:
     """Compare text of main and candidate version opinions; merge if similar
 
     :param main: the opinion that will be the main version
-    :param versions: a list of opinions that will be compared to `main`, in
-        order to decide if they should point to it
+    :param versions: a list or queryset of opinions that will be compared
+        to `main_opinion`, in order to decide if they should point to it
     :param stats: a dictionary to hold stats
 
     :return: None
     """
-    main_text = clean_opinion_text(main)
+    main_text = clean_opinion_text(main_opinion)
     if not main_text:
-        logger.warning("Opinion has no text %s", main.id)
+        logger.warning("Opinion has no text %s", main_opinion.id)
         return
 
     for version in versions:
-        # logger.info("Main %s %s %s version %s %s %s", main.id, main.cluster.id, main.cluster.docket.id, version.id, version.cluster.id, version.cluster.docket.id)
-        if not comparable_dockets(main.cluster.docket, version.cluster.docket):
+        if not comparable_dockets(
+            main_opinion.cluster.docket, version.cluster.docket
+        ):
             stats["different dockets"] += 1
             continue
 
@@ -614,7 +621,7 @@ def merge_versions_by_text_similarity(
             stats["success"] += 1
             if DRY_RUN:
                 continue
-            merge_opinion_versions(main, version)
+            merge_opinion_versions(main_opinion, version)
 
             if not version.versions.exists():
                 continue
@@ -622,14 +629,14 @@ def merge_versions_by_text_similarity(
             # if the opinion that is now a version has versions itself,
             # make them point to the new main
             for version_to_update in version.versions.all():
-                version_to_update.main_version = main
+                version_to_update.main_version = main_opinion
                 version_to_update.save()
                 stats["updated child versions"] += 1
         else:
             stats["text too different"] += 1
             logger.error(
-                "Opinions grouped by URL have disimilar text. Main: %s. Version %s",
-                main.id,
+                "Opinions grouped by URL have dissimilar text. Main: %s. Version %s",
+                main_opinion.id,
                 version.id,
             )
 
