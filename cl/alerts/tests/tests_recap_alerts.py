@@ -1714,9 +1714,13 @@ class RECAPAlertsSweepIndexTest(
 
         # Confirm Stat object is properly created and updated.
         stats_objects = Stat.objects.all()
-        self.assertEqual(stats_objects.count(), 1)
+        self.assertEqual(
+            stats_objects.count(), 1, "Wrong number of stats objects."
+        )
         self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(stats_objects[0].count, 1)
+        self.assertEqual(
+            stats_objects[0].count, 1, "Wrong number of stats alerts sent."
+        )
 
         # Assert webhooks.
         webhook_events = WebhookEvent.objects.all().values_list(
@@ -1865,9 +1869,17 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Confirm Stat object is properly updated.
-        self.assertEqual(stats_objects.count(), 1)
+        self.assertEqual(
+            stats_objects.count(), 2, "Wrong number of stats objects."
+        )
         self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(stats_objects[0].count, 2)
+        self.assertEqual(
+            stats_objects[0].count, 2, "Wrong number of stats alerts sent."
+        )
+        self.assertEqual(stats_objects[1].name, "alerts.sent.dly")
+        self.assertEqual(
+            stats_objects[1].count, 0, "Wrong number of stats alerts sent."
+        )
 
         docket.delete()
 
