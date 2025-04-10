@@ -7,11 +7,15 @@ from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models import (
     Avg,
+    BooleanField,
     Case,
     Count,
+    DateTimeField,
+    Exists,
     ExpressionWrapper,
     F,
     FloatField,
+    OuterRef,
     Q,
     QuerySet,
     Subquery,
@@ -24,7 +28,7 @@ from django.template import loader
 from django.utils import timezone
 
 from cl.custom_filters.templatetags.pacer import price
-from cl.favorites.models import Prayer
+from cl.favorites.models import Prayer, PrayerAvailability
 from cl.search.models import RECAPDocument
 
 
@@ -113,6 +117,16 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
     waiting_prayers = Prayer.objects.filter(status=Prayer.WAITING).values(
         "recap_document_id"
     )
+
+    doc_unavailable = PrayerAvailability.objects.filter(
+        recap_document=OuterRef("pk")
+    )
+
+    availability_last_checked = PrayerAvailability.objects.filter(
+        recap_document=OuterRef("pk")
+    ).values("last_checked")[:1]
+
+
     # Annotate each RECAPDocument with the number of prayers and the average prayer age
     documents = (
         RECAPDocument.objects.filter(id__in=Subquery(waiting_prayers))
@@ -147,8 +161,10 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
                 "prayers", filter=Q(prayers__status=Prayer.WAITING)
             ),
             view_count=F("docket_entry__docket__view_count"),
+            doc_unavailable=Exists(doc_unavailable),
+            last_checked=Subquery(availability_last_checked, output_field=DateTimeField()),
         )
-        .order_by("-prayer_count", "-view_count")
+        .order_by("doc_unavailable", "last_checked", "-prayer_count", "-view_count")
     )
 
     return documents
