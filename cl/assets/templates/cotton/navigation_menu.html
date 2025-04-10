@@ -1,16 +1,14 @@
-<nav class="hidden md:flex flex-col flex-wrap items-start min-w-[222px]">
+<div x-data class="max-md:hidden overflow-y-auto h-[100vh] sticky top-5 min-w-[222px]">
+<nav class="sticky top-0 flex flex-col flex-wrap items-start min-w-[222px]">
   {% for item in nav_items %}
     <a
-      class="w-full py-1.5 px-3.5 text-sm font-sans
-      {% if forloop.first %}
-        font-medium border-l-2 border-l-primary-600
-      {% else %}
-        font-normal target:font-medium border-l border-l-greyscale-200
-      {% endif %}"
+      class="w-full py-1.5 px-3.5 text-sm font-sans"
+      x-bind:class="itemClass"
       href="{{ item.href }}"
     >{{ item.text }}</a>
   {% endfor %}
 </nav>
+</div>
 
 <div class="md:hidden w-full pb-4">
   <div class="rounded-[10px] border border-greyscale-200 py-3 px-3.5 text-sm">On this page</div>
