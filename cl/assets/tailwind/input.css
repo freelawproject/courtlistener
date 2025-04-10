@@ -1,6 +1,13 @@
 @import 'fonts.css';
 
 @tailwind base;
+
+@layer base {
+  select {
+    @apply border bg-white py-3 px-3.5 rounded-[10px] text-sm font-medium text-greyscale-900;
+  }
+}
+
 @tailwind components;
 
 @layer components {

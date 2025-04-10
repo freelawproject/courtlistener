@@ -12,6 +12,9 @@ document.addEventListener('alpine:init', () => {
     setActiveTab() {
         this.activeTab = this.$el.dataset?.tabId;
     },
+    handleChange(event) {
+      this.activeTab = event.target.value;
+    },
     init() {
         this.$watch('tabs', (newVal) => this.activeTab = newVal[0])
     },
@@ -32,7 +35,7 @@ document.addEventListener('alpine:init', () => {
   x-data="tabsComponent"
   class="w-full"
 >
-  <div class="w-full flex gap-1">
+  <div class="w-full gap-1 hidden md:flex">
     <template x-for="tab in tabs">
       <div x-data="tabComponent">
         <button
@@ -47,7 +50,17 @@ document.addEventListener('alpine:init', () => {
       </div>
     </template>
   </div>
-  <div class="w-full bg-greyscale-100 text-greyscale-900 p-4 rounded-2xl rounded-tl-none">
+  <div class="bg-greyscale-100 rounded-t-2xl md:hidden pt-3 px-4">
+    <select @change="handleChange" class="w-full">
+      <template x-for="tab in tabs">
+        <option
+          x-text="tab"
+          class="appearance-none"
+        ></option>
+      </template>
+    </select>
+  </div>
+  <div class="w-full bg-greyscale-100 text-greyscale-900 p-4 rounded-b-2xl md:rounded-tr-2xl rounded-tl-none">
     {{ slot }}
   </div>
 </div>
