@@ -1058,6 +1058,21 @@ asgiref = ">=3.6"
 django = ">=4.2"
 
 [[package]]
+name = "django-cotton"
+version = "2.0.3"
+description = "Bringing component based design to Django templates."
+optional = false
+python-versions = "<4,>=3.8"
+groups = ["main"]
+files = [
+    {file = "django_cotton-2.0.3-py3-none-any.whl", hash = "sha256:53fc1d7756c3728ca9c76c1402758c6778147e0653b12cb3890a5f5e679125e4"},
+    {file = "django_cotton-2.0.3.tar.gz", hash = "sha256:ffce33d8e680718928e67fe7e9c6bc64c9d03fea0098b313863728fc38c049bf"},
+]
+
+[package.dependencies]
+django = ">=4.2,<5.3"
+
+[[package]]
 name = "django-csp"
 version = "3.8"
 description = "Django Content Security Policy support."
@@ -5988,4 +6003,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13, <3.14"
-content-hash = "3c320595a3e43410ef745e025495e3b5fc197e8b8512a12f438f75bc7ba8dc09"
+content-hash = "1e6268ee0834249618da208a8b5aa1c67de26fb3cf9934698495ddc31a03fc32"
