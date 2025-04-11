@@ -13,7 +13,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Create a Sentry.io release
-        uses: getsentry/action-release@v3.0.0
+        uses: getsentry/action-release@v3.1.1
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: freelawproject
