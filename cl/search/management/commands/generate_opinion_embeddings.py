@@ -158,16 +158,16 @@ class Command(VerboseCommand):
 
             current_batch.append(opinion_id)
             current_batch_size += token_count
-            logger.info(
-                "\rProcessed %s/%s, (%s), last ID requested for embedding: %s",
-                processed_count,
-                count,
-                f"{processed_count * 1.0 / count:.0%}",
-                opinion_id,
-            )
             if not processed_count % 1000:
                 # Log every 1000 documents processed.
                 log_last_document_indexed(opinion_id, compose_redis_key())
+                logger.info(
+                    "\rProcessed %s/%s, (%s), last ID requested for embedding: %s",
+                    processed_count,
+                    count,
+                    f"{processed_count * 1.0 / count:.0%}",
+                    opinion_id,
+                )
 
         # Send any remainder
         if current_batch:

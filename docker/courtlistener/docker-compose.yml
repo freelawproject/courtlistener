@@ -191,3 +191,9 @@ services:
       - "9200:9200"
     networks:
       - cl_net_overlay
+
+  cl-inception:
+    image: freelawproject/inception:latest
+    container_name: "cl-inception"
+    networks:
+      - cl_net_overlay

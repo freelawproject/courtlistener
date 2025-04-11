@@ -4,9 +4,7 @@ env = environ.FileAwareEnv()
 
 DISCLOSURE_HOST = env("DISCLOSURE_HOST", default="http://cl-disclosures:5050")
 DOCTOR_HOST = env("DOCTOR_HOST", default="http://cl-doctor:5050")
-INCEPTION_HOST = env(
-    "INCEPTION_HOST", default="http://host.docker.internal:8005"
-)
+INCEPTION_HOST = env("INCEPTION_HOST", default="http://cl-inception:8005")
 
 
 MICROSERVICE_URLS = {
