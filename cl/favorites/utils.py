@@ -47,12 +47,18 @@ async def prayer_eligible(user: User) -> tuple[bool, int]:
 async def create_prayer(
     user: User, recap_document: RECAPDocument
 ) -> Prayer | None:
-    if (await prayer_eligible(user))[0] and not recap_document.is_available:
-        new_prayer, created = await Prayer.objects.aget_or_create(
-            user=user, recap_document=recap_document
-        )
-        return new_prayer if created else None
-    return None
+    is_user_eligible, _ = await prayer_eligible(user)
+
+    if not is_user_eligible or recap_document.is_available:
+        return None
+
+    new_prayer, created = await Prayer.objects.aget_or_create(
+        user=user, recap_document=recap_document
+    )
+    if not created:
+        return None
+
+    return new_prayer
 
 
 async def delete_prayer(user: User, recap_document: RECAPDocument) -> bool:
@@ -354,3 +360,55 @@ async def get_lifetime_prayer_stats(
     await cache.aset(cache_key, data, one_minute)
 
     return PrayerStats(**data)
+
+
+def prayer_unavailable(instance: RECAPDocument, user_pk: int) -> None:
+    open_prayers = Prayer.objects.filter(
+        recap_document=instance, status=Prayer.WAITING
+    ).select_related("user")
+
+    user_prayer = open_prayers.filter(user__pk=user_pk).first()
+
+    email_recipients = [
+        {
+            "email": user_prayer.user.email,
+            "date_created": user_prayer.date_created,
+        }
+    ]
+
+    # Send email notification.
+    if email_recipients:
+        subject = f"A document you requested is unavailable for purchase"
+        txt_template = loader.get_template("prayer_email_unavailable.txt")
+        html_template = loader.get_template("prayer_email_unavailable.html")
+
+        docket = instance.docket_entry.docket
+        docket_entry = instance.docket_entry
+        document_url = instance.get_absolute_url()
+        num_waiting = open_prayers.count()
+        doc_price = price(instance)
+
+        messages = []
+        for email_recipient in email_recipients:
+            context = {
+                "docket": docket,
+                "docket_entry": docket_entry,
+                "rd": instance,
+                "document_url": document_url,
+                "num_waiting": num_waiting,
+                "price": doc_price,
+                "date_created": email_recipient["date_created"],
+            }
+            txt = txt_template.render(context)
+            html = html_template.render(context)
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=txt,
+                from_email=settings.DEFAULT_ALERTS_EMAIL,
+                to=[email_recipient["email"]],
+                headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
+            )
+            msg.attach_alternative(html, "text/html")
+            messages.append(msg)
+        connection = get_connection()
+        connection.send_messages(messages)

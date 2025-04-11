@@ -20,7 +20,13 @@ from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.factories import NoteFactory, PrayerFactory
-from cl.favorites.models import DocketTag, Note, Prayer, UserTag
+from cl.favorites.models import (
+    DocketTag,
+    Note,
+    Prayer,
+    PrayerAvailability,
+    UserTag,
+)
 from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
@@ -31,12 +37,18 @@ from cl.favorites.utils import (
     get_user_prayer_history,
     get_user_prayers,
     prayer_eligible,
+    prayer_unavailable,
 )
-from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
+from cl.lib.test_helpers import (
+    AudioTestCase,
+    PrayAndPayTestCase,
+    SimpleUserDataMixin,
+)
 from cl.search.factories import RECAPDocumentFactory
 from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
+from cl.tests.fakes import FakeAvailableConfirmationPage, FakeConfirmationPage
 from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -649,47 +661,7 @@ class APITests(APITestCase):
         self.assertEqual(response.json()["count"], 1)
 
 
-class RECAPPrayAndPay(TestCase):
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.user = UserFactory()
-        cls.user_2 = UserFactory()
-        cls.user_3 = UserFactory()
-
-        cls.rd_1 = RECAPDocumentFactory(
-            pacer_doc_id="98763421",
-            document_number="1",
-            is_available=True,
-        )
-        cls.rd_2 = RECAPDocumentFactory(
-            pacer_doc_id="98763422",
-            document_number="2",
-            is_available=False,
-        )
-
-        cls.rd_3 = RECAPDocumentFactory(
-            pacer_doc_id="98763423",
-            document_number="3",
-            is_available=False,
-        )
-        cls.rd_4 = RECAPDocumentFactory(
-            pacer_doc_id="98763424",
-            document_number="4",
-            is_available=False,
-        )
-
-        cls.rd_5 = RECAPDocumentFactory(
-            pacer_doc_id="98763425",
-            document_number="5",
-            is_available=False,
-        )
-
-        cls.rd_6 = RECAPDocumentFactory(
-            pacer_doc_id="98763426",
-            document_number="6",
-            is_available=False,
-        )
+class RECAPPrayAndPay(PrayAndPayTestCase):
 
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
@@ -1167,6 +1139,245 @@ class RECAPPrayAndPay(TestCase):
             self.rd_4,
             msg="The top prayer didn't match.",
         )
+
+
+@patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
+@patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
+class PrayAndPaySignalTests(PrayAndPayTestCase):
+
+    @patch("cl.favorites.signals.check_prayer_pacer")
+    async def test_create_prayer_no_pacer_doc_id(
+        self,
+        mock_check_prayer_task,
+        mock_prayer_unavailable,
+        mock_prayer_eligible,
+    ) -> None:
+        """Does the check_prayer_availability signal handle docs with no pacer_doc_id?"""
+        rd_no_pacer_doc_id = await sync_to_async(RECAPDocumentFactory)(
+            pacer_doc_id="",
+            document_number="1",
+            is_available=False,
+        )
+
+        # Assert that no PrayerAvailability records exist for this document.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=rd_no_pacer_doc_id.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        current_time = now()
+        with time_machine.travel(current_time, tick=False):
+            await create_prayer(self.user, rd_no_pacer_doc_id)
+
+        # Verify a PrayerAvailability record was created and its last_checked
+        # time
+        self.assertEqual(await prayer_availability_query.acount(), 1)
+        prayer_availability_check = await prayer_availability_query.afirst()
+        self.assertEqual(prayer_availability_check.last_checked, current_time)
+
+        # Verify the prayer_unavailable method was called with the correct
+        # arguments
+        mock_prayer_unavailable.assert_called_once_with(
+            rd_no_pacer_doc_id, self.user.pk
+        )
+
+        # Verify an email was sent to the right user
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            "A document you requested is unavailable for purchase",
+        )
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
+
+        # Verify no Celery task was scheduled
+        mock_check_prayer_task.delay.assert_not_called()
+
+    @patch("cl.favorites.signals.check_prayer_pacer")
+    async def test_create_prayer_schedules_task_for_new_document(
+        self,
+        mock_check_prayer_task,
+        mock_prayer_unavailable,
+        mock_prayer_eligible,
+    ):
+        """Does creating a prayer for a new document schedule an availability check?"""
+        # Assert that no PrayerAvailability records exist for this document.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_2.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        # creates a prayer for the same document
+        await create_prayer(self.user_2, self.rd_2)
+
+        # Verify a Celery task was scheduled to check availability
+        mock_check_prayer_task.delay.assert_called_once_with(
+            self.rd_2.pk, self.user_2.pk
+        )
+
+        # Verify the prayer_unavailable method was NOT called directly by the
+        # signal. The method might be called later by the scheduled Celery task.
+        mock_prayer_unavailable.assert_not_called()
+
+    @patch("cl.favorites.signals.check_prayer_pacer")
+    async def test_create_prayer_skips_task_for_recently_checked_document(
+        self,
+        mock_check_prayer_task,
+        mock_prayer_unavailable,
+        mock_prayer_eligible,
+    ):
+        """Does the signal skip scheduling a task for recently checked documents?"""
+        # Create a PrayerAvailability record to simulate a recent availability
+        # check for this document.
+        await PrayerAvailability.objects.acreate(recap_document=self.rd_2)
+
+        # Trigger the creation of a prayer for the same document.
+        await create_prayer(self.user_2, self.rd_2)
+
+        # Check that the prayer_unavailable method got called. This should
+        # happen because we simulated a recent check.
+        mock_prayer_unavailable.assert_called_once_with(
+            self.rd_2, self.user_2.pk
+        )
+        # Verify no celery task was scheduled. Since it was recently checked,
+        # we shouldn't need a background task.
+        mock_check_prayer_task.delay.assert_not_called()
+
+    @patch("cl.favorites.signals.check_prayer_pacer")
+    async def test_create_prayer_schedules_check_for_old_checked_document(
+        self,
+        mock_check_prayer_task,
+        mock_prayer_unavailable,
+        mock_prayer_eligible,
+    ):
+        """Does creating a prayer for an old-checked document schedule a re-check?"""
+        # Create a PrayerAvailability record with an old last_checked time
+        two_weeks_ago = now() - timedelta(weeks=2)
+        await PrayerAvailability.objects.acreate(
+            recap_document=self.rd_2, last_checked=two_weeks_ago
+        )
+
+        await create_prayer(self.user_2, self.rd_2)
+
+        # Verify the prayer_unavailable method was NOT called directly inside
+        # the signal. This method might be called later by the scheduled Celery
+        # task.
+        mock_prayer_unavailable.assert_not_called()
+
+        # Verify a background task was scheduled to re-check availability
+        mock_check_prayer_task.delay.assert_called_once_with(
+            self.rd_2.pk, self.user_2.pk
+        )
+
+
+@patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
+@patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
+class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
+
+    @patch(
+        "cl.favorites.tasks.DownloadConfirmationPage", new=FakeConfirmationPage
+    )
+    async def test_user_gets_notification_when_document_is_unavailable(
+        self,
+        mock_prayer_unavailable,
+        mock_get_or_cache_cookie,
+    ):
+        """Does praying for an unavailable document notify the user and mark it as sealed?"""
+        # Assert that no PrayerAvailability records exist for this
+        # document.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_2.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        # Assert that the outbox is empty
+        self.assertEqual(len(mail.outbox), 0)
+
+        await create_prayer(self.user_3, self.rd_2)
+
+        # Verify that a PrayerAvailability record has been created as a result
+        # of the prayer creation.
+        self.assertEqual(await prayer_availability_query.acount(), 1)
+
+        # Verify the prayer_unavailable method was called with the correct
+        # arguments
+        mock_prayer_unavailable.assert_called_once_with(
+            self.rd_2, self.user_3.pk
+        )
+
+        # Assert that the user received the notification email.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            "A document you requested is unavailable for purchase",
+        )
+        self.assertEqual(mail.outbox[0].to, [self.user_3.email])
+
+        # Verify that the document's sealed status is updated.
+        await self.rd_2.arefresh_from_db()
+        self.assertTrue(self.rd_2.is_sealed)
+
+    @patch(
+        "cl.favorites.tasks.DownloadConfirmationPage",
+        new=FakeAvailableConfirmationPage,
+    )
+    async def test_unseals_document_and_removes_past_availability_record(
+        self,
+        mock_prayer_unavailable,
+        mock_get_or_cache_cookie,
+    ):
+        """Does praying for an available document unseal it and remove its availability record?"""
+        # Create a PrayerAvailability record to simulate an old availability
+        # check for this document.
+        two_weeks_ago = now() - timedelta(weeks=2)
+        await PrayerAvailability.objects.acreate(
+            recap_document=self.rd_3, last_checked=two_weeks_ago
+        )
+        # Ensure the document is initially marked as sealed for the test.
+        self.rd_3.is_sealed = True
+        await self.rd_3.asave()
+
+        await create_prayer(self.user_3, self.rd_3)
+
+        mock_prayer_unavailable.assert_not_called()
+
+        # Assert that the PrayerAvailability record for this document was deleted.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_3.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        # Verify that the document is no longer sealed and its page count is updated.
+        await self.rd_3.arefresh_from_db()
+        self.assertFalse(self.rd_3.is_sealed)
+        self.assertEqual(self.rd_3.page_count, 20)
+
+    @patch(
+        "cl.favorites.tasks.DownloadConfirmationPage",
+        new=FakeAvailableConfirmationPage,
+    )
+    async def test_praying_available_document_updates_page_count(
+        self,
+        mock_prayer_unavailable,
+        mock_get_or_cache_cookie,
+    ):
+        """Does praying for an available document update its page count?"""
+        # Ensure no prior PrayerAvailability record exists.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_2.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        await create_prayer(self.user_3, self.rd_2)
+
+        # Verify that no PrayerAvailability record was created for an available document.
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        # Confirm that the unavailable prayer task was not called.
+        mock_prayer_unavailable.assert_not_called()
+
+        # Verify the page count was updated
+        await self.rd_2.arefresh_from_db()
+        self.assertEqual(self.rd_2.page_count, 20)
 
 
 class PrayerAPITests(APITestCase):
