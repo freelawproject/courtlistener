@@ -11,10 +11,6 @@
 {% block description %}CourtListener lets you request the purchase of legal documents. View the community's most wanted documents.{% endblock %}
 {% block og_description %}CourtListener lets you request the purchase of legal documents. View the community's most wanted documents.{% endblock %}
 
-{% block footer-scripts %}
-    <script src="{% static "js/pray_and_pay.js" %}"></script>
-{% endblock %}
-
 {% block content %}
 
   <div class="col-xs-12">
@@ -46,11 +42,11 @@
       <table class="settings-table table">
         <thead>
             <tr>
-              <th></th>
               <th>Court</th>
               <th>Case Name</th>
               <th>Document Number</th>
               <th>Document Description</th>
+              <th></th>
               <th>Buy on Pacer</th>
             {% if perms.favorites.change_prayer %}
               <th>Action</th>
@@ -60,11 +56,6 @@
         <tbody>
             {% for prayer in top_prayers %}
             <tr>
-              <td>
-                <div class="prayer-button">
-                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=prayer.prayer_exists document_id=prayer.recap_document.id count=prayer.prayer_count regular_size=True%}
-                </div>
-              </td>
               <td>{{ prayer.docket_entry.docket.court.citation_string }}</td>
               {% with docket=prayer.docket_entry.docket %}
               <td>
@@ -83,6 +74,11 @@
               </td>
               {% endwith %}
               <td>{{ prayer.description }}</td>
+              <td>
+                <div class="prayer-button">
+                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=prayer.prayer_exists document_id=prayer.id count=prayer.prayer_count regular_size=False%}
+                </div>
+              </td>
               <td><a href="{{ prayer.pacer_url }}"
                 {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                   class="open_buy_pacer_modal btn btn-default btn-xs"
@@ -120,6 +116,13 @@
 {% endblock %}
 
 {% block footer-scripts %}
+  <script src="{% static "js/pray_and_pay.js" %}"></script>
+  {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
   <script defer type="text/javascript"
             src="{% static "js/buy_pacer_modal.js" %}"></script>
   {% include "includes/buy_pacer_modal.html" %}
