@@ -51,6 +51,7 @@ from cl.alerts.tasks import (
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
+from cl.lib.db_tools import log_db_connection_info
 from cl.lib.elasticsearch_utils import build_daterange_query
 from cl.lib.microservice_utils import microservice
 from cl.lib.search_index_utils import (
@@ -160,9 +161,11 @@ def get_instance_from_db(
         return model.objects.get(pk=instance_id)
     except ObjectDoesNotExist:
         logger.warning(
-            f"The {model.__name__} with ID {instance_id} doesn't exists and it"
-            "cannot be updated in ES."
+            f"The %s with ID %s doesn't exists and it cannot be updated in ES.",
+            model.__name__,
+            instance_id,
         )
+        log_db_connection_info(model.__name__, instance_id)
         return None
 
 

@@ -31,6 +31,7 @@ from elasticsearch_dsl.utils import AttrDict, AttrList
 
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
+from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.date_time import midnight_pt
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
@@ -48,7 +49,6 @@ from cl.lib.utils import (
     check_unbalanced_quotes,
     cleanup_main_query,
     get_array_of_selected_fields,
-    lookup_child_courts,
     map_to_docket_entry_sorting,
     perform_special_character_replacements,
 )
@@ -533,6 +533,7 @@ def build_text_filter(field: str, value: str) -> List:
                 query=value,
                 fields=[field],
                 default_operator="AND",
+                quote_field_suffix=".exact",
             )
         ]
     return []
@@ -772,7 +773,7 @@ def extend_selected_courts_with_child_courts(
     """
 
     unique_courts = set(selected_courts)
-    unique_courts.update(lookup_child_courts(list(unique_courts)))
+    unique_courts.update(lookup_child_courts_cache(list(unique_courts)))
     return list(unique_courts)
 
 
