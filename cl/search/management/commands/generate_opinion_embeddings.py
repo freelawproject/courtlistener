@@ -162,7 +162,7 @@ class Command(VerboseCommand):
                 # Log every 1000 documents processed.
                 log_last_document_indexed(opinion_id, compose_redis_key())
                 logger.info(
-                    "\rProcessed %s/%s, (%s), last ID requested for embedding: %s",
+                    "Processed %s/%s, (%s), last ID requested for embedding: %s",
                     processed_count,
                     count,
                     f"{processed_count * 1.0 / count:.0%}",

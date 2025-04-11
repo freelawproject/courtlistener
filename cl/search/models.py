@@ -3324,9 +3324,8 @@ class Opinion(AbstractDateTimeModel):
         using with_best_text like so:
         Opinion.objects.filter(something_here=foo).with_best_text()
         """
-        computed = getattr(self, "best_text", None)
-        if computed:
-            return nh3.clean(computed, tags=set())
+        if hasattr(self, "best_text"):
+            return nh3.clean(self.best_text, tags=set())
 
         for field in OPINION_TEXT_SOURCE_FIELDS:
             value = getattr(self, field, None)
