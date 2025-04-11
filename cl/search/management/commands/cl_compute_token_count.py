@@ -1,11 +1,11 @@
 from math import ceil
 
 import nh3
-import tiktoken
 from django.contrib.humanize.templatetags.humanize import intword
 from django.db.models import QuerySet
 
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.string_utils import get_token_count_from_string
 from cl.search.models import Opinion, RECAPDocument
 
 
@@ -52,13 +52,6 @@ def get_opinions_random_dataset(
     return Opinion.objects.raw(
         f"SELECT * FROM search_opinion TABLESAMPLE SYSTEM ({percentage}) "
     )
-
-
-def get_token_count_from_string(string: str) -> int:
-    """Returns the number of tokens in a text string."""
-    encoding = tiktoken.get_encoding("cl100k_base")
-    num_tokens = len(encoding.encode(string))
-    return num_tokens
 
 
 def get_clean_opinion_text(opinion: Opinion) -> str:
