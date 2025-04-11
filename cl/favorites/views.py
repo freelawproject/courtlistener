@@ -21,6 +21,7 @@ from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
+    get_existing_prayers_in_bulk,
     get_lifetime_prayer_stats,
     get_top_prayers,
     get_user_prayer_history,
@@ -204,6 +205,20 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
             return paginator.page(paginator.num_pages)
 
     paginated_entries = await paginate_open_prayers(top_prayers, page)
+
+    recap_documents = paginated_entries.object_list
+
+    user = await request.auser()
+    existing_prayers = {}
+    if user.is_authenticated:
+        # Check prayer existence in bulk.
+        existing_prayers = await get_existing_prayers_in_bulk(
+            user, recap_documents
+        )
+
+    # Merge counts and existing prayer status to RECAPDocuments.
+    async for rd in recap_documents:
+        rd.prayer_exists = existing_prayers.get(rd.id, False)
 
     granted_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
     waiting_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
