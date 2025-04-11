@@ -3062,9 +3062,9 @@ def sort_cites(c):
 
 OPINION_TEXT_SOURCE_FIELDS = [
     "html_with_citations",
+    "xml_harvard",
     "html_columbia",
     "html_lawbox",
-    "xml_harvard",
     "html_anon_2020",
     "html",
 ]
@@ -3083,9 +3083,9 @@ class OpinionQuerySet(models.QuerySet):
 
         The supported source fields are:
             - html_with_citations (preferred)
+            - xml_harvard
             - html_columbia
             - html_lawbox
-            - xml_harvard
             - html_anon_2020
             - html
         """

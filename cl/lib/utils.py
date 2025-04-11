@@ -6,6 +6,7 @@ from typing import Iterable as IterableType
 from typing import Match, Optional, Tuple
 
 from django.core.cache import cache
+
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData

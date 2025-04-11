@@ -3233,21 +3233,21 @@ class OpinionQuerySetWithBestTextTest(TestCase):
             cluster=cls.opinion_cluster_1,
             plain_text="Plain text fallback 1",
             html_with_citations="HTML with citations content",
-            html_columbia="",
-            html_lawbox="",
-            xml_harvard="",
-            html_anon_2020="",
-            html="",
+            html_columbia="Other version",
+            html_lawbox="Other version",
+            xml_harvard="Other version",
+            html_anon_2020="Other version",
+            html="Other version",
         )
         cls.opinion_html_columbia = OpinionFactory(
             cluster=cls.opinion_cluster_1,
             plain_text="Plain text fallback 2",
             html_with_citations="",
             html_columbia="HTML columbia content",
-            html_lawbox="",
+            html_lawbox="Other version",
             xml_harvard="",
-            html_anon_2020="",
-            html="",
+            html_anon_2020="Other version",
+            html="Other version",
         )
         cls.opinion_html_lawbox = OpinionFactory(
             cluster=cls.opinion_cluster_1,
@@ -3256,18 +3256,18 @@ class OpinionQuerySetWithBestTextTest(TestCase):
             html_columbia="",
             html_lawbox="HTML lawbox content",
             xml_harvard="",
-            html_anon_2020="",
-            html="",
+            html_anon_2020="Other version",
+            html="Other version",
         )
         cls.opinion_xml_harvard = OpinionFactory(
             cluster=cls.opinion_cluster_1,
             plain_text="Plain text fallback 4",
             html_with_citations="",
-            html_columbia="",
-            html_lawbox="",
+            html_columbia="Other version",
+            html_lawbox="Other version",
             xml_harvard="XML harvard content",
-            html_anon_2020="",
-            html="",
+            html_anon_2020="Other version",
+            html="Other version",
         )
         cls.opinion_html_anon_2020 = OpinionFactory(
             cluster=cls.opinion_cluster_1,
@@ -3277,7 +3277,7 @@ class OpinionQuerySetWithBestTextTest(TestCase):
             html_lawbox="",
             xml_harvard="",
             html_anon_2020="HTML anon 2020 content",
-            html="",
+            html="Other version",
         )
         cls.opinion_html = OpinionFactory(
             cluster=cls.opinion_cluster_1,
