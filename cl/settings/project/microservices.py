@@ -7,7 +7,7 @@ DOCTOR_HOST = env("DOCTOR_HOST", default="http://cl-doctor:5050")
 INCEPTION_HOST = env(
     "INCEPTION_HOST", default="http://host.docker.internal:8005"
 )
-
+INCEPTION_TIMEOUT = env.int("INCEPTION_TIMEOUT", default=60)
 
 MICROSERVICE_URLS = {
     # DOCTOR Endpoints
@@ -77,6 +77,6 @@ MICROSERVICE_URLS = {
     },
     "inception-batch": {
         "url": f"{INCEPTION_HOST}/api/v1/embed/batch",
-        "timeout": 10,
+        "timeout": INCEPTION_TIMEOUT,
     },
 }
