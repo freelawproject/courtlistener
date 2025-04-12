@@ -155,14 +155,12 @@
       <c-tabs>
         {% for group in partial_feed_courts %}
           <c-tabs.tab name="{% if group.grouper == "FD" %}District Courts{% elif group.grouper == "FB" %}Bankruptcy Courts{% elif group.grouper == "F" %}Appellate Courts{% endif %}">
-            <table class="w-full">
-              {% for court in group.list %}
-                <tr class="w-full border-b border-greyscale-200">
-                  <td class="p-2.5">{{ court.short_name }}</td>
-                  <td class="p-2.5 capitalize text-wrap">{{ court.pacer_rss_entry_types }}</td>
-                </tr>
-              {% endfor %}
-            </table>
+            {% for court in group.list %}
+              <div class="flex flex-col md:flex-row border-b border-greyscale-200 max-w-full">
+                <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">{{ court.short_name }}</span>
+                <span class="p-2.5 max-md:max-w-full capitalize [overflow-wrap:anywhere]">{{ court.pacer_rss_entry_types }}</span>
+              </div>
+            {% endfor %}
           </c-tabs.tab>
         {% endfor %}
       </c-tabs>
