@@ -1,12 +1,12 @@
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import transaction
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import DownloadConfirmationPage
 from redis import ConnectionError as RedisConnectionError
 
 from cl.celery_init import app
+from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.search.models import RECAPDocument
 
@@ -32,7 +32,7 @@ def check_prayer_pacer(self, rd_pk: int, user_pk: int):
         .defer("plain_text")
         .get(pk=rd_pk)
     )
-    court_id = rd.docket_entry.docket.court_id
+    court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
     pacer_doc_id = rd.pacer_doc_id
     recap_user = User.objects.get(username="recap")
     session_data = get_or_cache_pacer_cookies(
