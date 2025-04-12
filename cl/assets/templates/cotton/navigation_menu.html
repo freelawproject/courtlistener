@@ -74,7 +74,7 @@ document.addEventListener('alpine:init', () => {
   >
     <template x-for="option in options" :key="option.href">
       <li x-data="selectOption" class="relative cursor-default py-[1px] px-1.5 select-none" role="option">
-        <a x-bind:href="option.href" class="py-2.5 px-2 hover:bg-greyscale-100 rounded-md flex flex-row justify-between">
+        <a x-on:click="closeMenu" x-bind:href="option.href" class="py-2.5 px-2 hover:bg-greyscale-100 rounded-md flex flex-row justify-between">
           <span class="truncate font-medium text-sm text-greyscale-600" x-text="option.text"></span>
           <img x-bind:data-intersect-target="option.href" x-show="isVisible" class="" aria-hidden="true" src="{% static "svg/check.svg" %}">
         </a>
