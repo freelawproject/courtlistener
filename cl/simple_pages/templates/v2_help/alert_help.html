@@ -9,35 +9,21 @@
 
 {% block footer-scripts %}
   {% include "includes/anchors.html" %}
+
+  <script nonce="{{ request.csp_nonce }}" type="text/javascript" src="{% static 'js/alpine/components/intersect.js' %}">
+  </script>
 {% endblock %}
 
 {% block content %}
 
-<script nonce="{{ request.csp_nonce }}">
-const ACTIVE_ITEM_CLASSES = 'font-medium border-l-2 border-l-primary-600';
-const INACTIVE_ITEM_CLASSES = 'font-normal target:font-medium border-l border-l-greyscale-200';
-document.addEventListener('alpine:init', () => {
-  Alpine.data('intersect', () => ({
-    visibleSection: '',
-    show() {
-        this.visibleSection = this.$el.id;
-    },
-    get isVisible() {
-        return `#${this.visibleSection}` === this.$el.getAttribute('href');
-    },
-    get itemClass() {
-        return this.isVisible ? ACTIVE_ITEM_CLASSES : INACTIVE_ITEM_CLASSES;
-    },
-    init() {
-        this.$nextTick(() => {
-            this.visibleSection = 'recap-alerts';
-        });
-    },
-  }));
-});
-</script>
-
-<div x-data="intersect" class="w-full flex max-md:flex-wrap">
+<div
+  data-first-active="recap-alerts"
+  x-data="intersect"
+  class="w-full flex max-md:flex-wrap"
+  data-intersect-id-attr="intersectTarget"
+  data-active-item-classes="font-medium border-l-2 border-l-primary-600"
+  data-inactive-item-classes="font-normal target:font-medium border-l border-l-greyscale-200"
+>
   <c-navigation-menu
     :nav_items="[
       {'href': '#recap-alerts', 'text': 'Docket Alerts'},

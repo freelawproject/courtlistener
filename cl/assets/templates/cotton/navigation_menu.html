@@ -1,3 +1,8 @@
+{# Requires Alpine component intersect: {% static 'js/alpine/components/intersect.js' %} #}
+{% load static %}
+<c-vars nav_items ></c-vars>
+
+{# DESKTOP #}
 <div x-data class="max-md:hidden overflow-y-auto h-[100vh] sticky top-5 min-w-[222px]">
 <nav class="sticky top-0 flex flex-col flex-wrap items-start min-w-[222px]">
   {% for item in nav_items %}
@@ -5,11 +10,68 @@
       class="w-full py-1.5 px-3.5 text-sm font-sans"
       x-bind:class="itemClass"
       href="{{ item.href }}"
+      data-intersect-target="{{ item.href }}"
     >{{ item.text }}</a>
   {% endfor %}
 </nav>
 </div>
 
-<div class="md:hidden w-full pb-4">
-  <div class="rounded-[10px] border border-greyscale-200 py-3 px-3.5 text-sm">On this page</div>
+{# MOBILE #}
+
+{{ nav_items|json_script:"nav-items" }}
+
+<script nonce="{{ request.csp_nonce }}" type="application/javascript">
+document.addEventListener('alpine:init', () => {
+  Alpine.data('select', () => ({
+    menuOpen: false,
+    ids: ['listbox-option'],
+    options: '',
+    toggleMenu() {
+        this.menuOpen = !this.menuOpen;
+    },
+    closeMenu() {
+        this.menuOpen = false;
+    },
+    get visibleSectionText() {
+        const index = this.options.findIndex((opt) => opt.href === `#${this.$data.visibleSection}`);
+        return index >= 0 ? this.options[index].text : '';
+    },
+    init() {
+        this.$nextTick(() => {
+            this.options = JSON.parse(document.getElementById('nav-items').textContent);
+        });
+    },
+  }));
+});
+</script>
+
+<div x-data="select" class="relative w-full md:hidden">
+  <button @click="toggleMenu" type="button" class="w-full flex flex-row justify-between border border-greyscale-200 bg-white py-3 px-3.5 rounded-[10px] text-sm font-medium text-greyscale-900" aria-haspopup="listbox" aria-expanded="true" aria-labelledby="listbox-label">
+    <span class="text-sm font-medium text-greyscale-600" x-text="visibleSectionText"></span>
+    <img aria-hidden="true" src="{% static "svg/chevron.svg" %}">
+  </button>
+  <ul
+    x-show="menuOpen"
+    x-on:click.outside="closeMenu"
+    class="absolute z-10 mt-2 max-h-[320px] w-full overflow-auto rounded-lg bg-white py-1 shadow-lg border border-greyscale-200 focus:outline-hidden"
+    tabindex="-1"
+    role="listbox"
+    aria-labelledby="listbox-label"
+    aria-activedescendant="listbox-option-3"
+    x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-100"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+  >
+    <template x-for="option in options" :key="option.href">
+      <li x-data="selectOption" class="relative cursor-default py-[1px] px-1.5 select-none" role="option">
+        <a x-bind:href="option.href" class="py-2.5 px-2 hover:bg-greyscale-100 rounded-md flex flex-row justify-between">
+          <span class="truncate font-medium text-sm text-greyscale-600" x-text="option.text"></span>
+          <img x-bind:data-intersect-target="option.href" x-show="isVisible" class="" aria-hidden="true" src="{% static "svg/check.svg" %}">
+        </a>
+      </li>
+    </template>
+  </ul>
 </div>
