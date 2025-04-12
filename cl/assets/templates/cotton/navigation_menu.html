@@ -46,8 +46,15 @@ document.addEventListener('alpine:init', () => {
 </script>
 
 <div x-data="select" class="relative w-full md:hidden">
-  <button @click="toggleMenu" type="button" class="w-full flex flex-row justify-between border border-greyscale-200 bg-white py-3 px-3.5 rounded-[10px] text-sm font-medium text-greyscale-900" aria-haspopup="listbox" aria-expanded="true" aria-labelledby="listbox-label">
-    <span class="text-sm font-medium text-greyscale-600" x-text="visibleSectionText"></span>
+  <button
+    @click="toggleMenu"
+    type="button"
+    class="w-full flex flex-row justify-between border border-greyscale-200 bg-white py-3 px-3.5 rounded-[10px] text-sm font-medium text-greyscale-900 focus:ring-2 focus:ring-primary-400 focus:outline-none"
+    aria-haspopup="listbox"
+    x-bind:aria-expanded="menuOpen"
+    aria-labelledby="listbox-label"
+  >
+    <span id="listbox-label" class="text-sm font-medium text-greyscale-600" x-text="visibleSectionText"></span>
     <img aria-hidden="true" src="{% static "svg/chevron.svg" %}">
   </button>
   <ul
