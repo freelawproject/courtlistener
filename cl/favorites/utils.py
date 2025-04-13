@@ -366,6 +366,8 @@ async def get_lifetime_prayer_stats(
         await prayer_by_status.values("recap_document").distinct().acount()
     )
 
+    distinct_users = await prayer_by_status.values("user").distinct().acount()
+
     total_cost = await compute_prayer_total_cost(
         prayer_by_status.select_related("recap_document")
     )
@@ -373,8 +375,10 @@ async def get_lifetime_prayer_stats(
     data = {
         "prayer_count": prayer_count,
         "distinct_count": distinct_prayers,
+        "distinct_users": distinct_users,
         "total_cost": f"{total_cost:,.2f}",
     }
+
     one_minute = 60
     await cache.aset(cache_key, data, one_minute)
 
