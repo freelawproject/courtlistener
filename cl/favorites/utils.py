@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -315,7 +316,8 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 @dataclass
 class PrayerStats:
     prayer_count: int
-    distinct_count: int
+    distinct_count: Optional[int] = None
+    distinct_users: Optional[int] = None
     total_cost: str
 
 
@@ -337,9 +339,9 @@ async def get_user_prayer_history(user: User) -> PrayerStats:
 
     data = {
         "prayer_count": count,
-        "distinct_count": "",
         "total_cost": f"{total_cost:,.2f}",
     }
+
     one_minute = 60
     await cache.aset(cache_key, data, one_minute)
 
