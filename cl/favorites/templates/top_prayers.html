@@ -46,6 +46,7 @@
               <th>Case Name</th>
               <th>Document Number</th>
               <th>Document Description</th>
+              <th></th>
               <th>Buy on Pacer</th>
             {% if perms.favorites.change_prayer %}
               <th>Action</th>
@@ -74,24 +75,19 @@
               {% endwith %}
               <td>{{ prayer.description }}</td>
               <td>
-                {% if prayer.doc_unavailable %}
-                  <span class="btn btn-default btn-xs disabled">
-                    Unavailable as of {{ prayer.last_checked|date:"M j, Y" }}
-                  </span>
-                {% else %}
-                  <a href="{{ prayer.pacer_url }}"
-                     {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                       class="open_buy_pacer_modal btn btn-default btn-xs"
-                       data-toggle="modal" data-target="#modal-buy-pacer"
-                     {% else %}
-                       class="btn btn-default btn-xs"
-                     {% endif %}
-                     target="_blank"
-                     rel="nofollow">
-                    Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}
-                  </a>
-                {% endif %}
+                <div class="prayer-button">
+                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=prayer.prayer_exists document_id=prayer.id count=prayer.prayer_count regular_size=False%}
+                </div>
               </td>
+              <td><a href="{{ prayer.pacer_url }}"
+                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                  class="open_buy_pacer_modal btn btn-default btn-xs"
+                  data-toggle="modal" data-target="#modal-buy-pacer"
+                {% else%}
+                  class="btn btn-default btn-xs"
+                {% endif %}
+                  target="_blank"
+                  rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
               {% if perms.favorites.change_prayer %}
                 <td>
                   <div class="flex">
@@ -120,6 +116,13 @@
 {% endblock %}
 
 {% block footer-scripts %}
+  <script src="{% static "js/pray_and_pay.js" %}"></script>
+  {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
   <script defer type="text/javascript"
             src="{% static "js/buy_pacer_modal.js" %}"></script>
   {% include "includes/buy_pacer_modal.html" %}
