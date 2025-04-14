@@ -19,10 +19,9 @@ from django.test import AsyncRequestFactory, RequestFactory, override_settings
 from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils.text import slugify
 from factory import RelatedFactory
-from waffle.testutils import override_flag
 
+from cl.citations.utils import slugify_reporter
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -306,7 +305,7 @@ class CitationRedirectorTest(TestCase):
         f2_cite.cluster_id = 3
         await f2_cite.asave()
 
-        self.citation["reporter"] = slugify(self.citation["reporter"])
+        self.citation["reporter"] = slugify_reporter(self.citation["reporter"])
         r = await self.async_client.get(
             reverse("citation_redirector", kwargs=self.citation)
         )
@@ -499,6 +498,23 @@ class CitationRedirectorTest(TestCase):
             )
         )
         self.assertEqual(r.url, "/c/f2d/56/9/")
+
+    async def test_slugifying_reporters_collision(self) -> None:
+        """Test reporter collision-aware slugification"""
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "Vt."},
+            )
+        )
+        r2 = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "VT"},
+            )
+        )
+
+        self.assertNotEqual(r.url, r2.url)
 
     async def test_reporter_variation_just_reporter(self) -> None:
         """Do we redirect properly when we get reporter variations?"""
