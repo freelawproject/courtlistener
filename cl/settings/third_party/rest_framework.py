@@ -55,7 +55,6 @@ REST_FRAMEWORK = {
         "yoway_3897": "1/hour",
         "deantaylor2025": "1/hour",
         "yoway_3897": "1/hour",
-        # Multiple accounts
         "api_1": "1/hour",
         "api_2": "1/hour",
         "api_account_1": "1/hour",
@@ -77,6 +76,7 @@ REST_FRAMEWORK = {
         "BruceWayne": "1/hour",
         "mibefis809": "1/hour",
         # Unresponsive
+        "rapsanetwork": "1/hour",
         "courtlistener_api": "1/hour",
         "bobjase24": "1/hour",
         "bobjase25": "1/hour",
