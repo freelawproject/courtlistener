@@ -10,9 +10,6 @@ document.addEventListener('alpine:init', () => {
     get isVisible() {
       return `#${this.visibleSection}` === this.$el.dataset[this.intersectIdAttr];
     },
-    get itemClass() {
-      return this.isVisible ? this.activeItemClasses : this.inactiveItemClasses;
-    },
     init() {
       this.activeItemClasses = this.$el.dataset?.activeItemClasses;
       this.inactiveItemClasses = this.$el.dataset?.inactiveItemClasses;

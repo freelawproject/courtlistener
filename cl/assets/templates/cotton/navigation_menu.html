@@ -1,49 +1,65 @@
-{# Requires Alpine component intersect: {% static 'js/alpine/components/intersect.js' %} #}
-{% load static %}
+{# Requires Alpine component intersect in target: {% static 'js/alpine/components/intersect.js' %} #}
+{% load svg_tags static component_tags %}
+{% require_script "js/alpine/components/navigation_menu.js" %}
+
 <c-vars nav_items ></c-vars>
+{{ nav_items|json_script:"nav-items" }}
 
 {# DESKTOP #}
-<div x-data class="max-md:hidden overflow-y-auto h-[100vh] sticky top-5 min-w-[222px]">
+
+<div x-data="navMenu" class="max-md:hidden overflow-y-auto h-[100vh] sticky top-5 min-w-[222px]">
 <nav class="sticky top-0 flex flex-col flex-wrap items-start min-w-[222px]">
+<ul class="list-disc list-inside">
   {% for item in nav_items %}
-    <a
-      class="w-full py-1.5 px-3.5 text-sm font-sans"
-      x-bind:class="itemClass"
-      href="{{ item.href }}"
+    <li
       data-intersect-target="{{ item.href }}"
-    >{{ item.text }}</a>
+      class="pl-3.5 w-full marker:text-greyscale-200"
+      x-bind:class="markerClass"
+    >
+      <div class="-mt-7 ml-4 text-sm font-sans flex justify-start items-center gap-2 flex-wrap">
+        <a
+          x-bind:class="itemClass"
+          href="{{ item.href }}"
+          class="py-1.5 font-semibold"
+          data-intersect-target="{{ item.href }}"
+        >
+          {{ item.text }}
+        </a>
+        <button
+          x-show="hasChildren"
+          x-on:click="toggleExpansion"
+          data-intersect-target="{{ item.href }}"
+        >
+          <div
+            x-bind:class="iconClass"
+            data-intersect-target="{{ item.href }}"
+            class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+          >{% svg 'chevron' css_class="w-full h-full" %}
+          </div>
+        </button>
+      </div>
+      <ul
+        x-show="isExpanded"
+        x-collapse
+        data-intersect-target="{{ item.href }}"
+        class="flex flex-col"
+      >
+        {% for sub_item in item.children %}
+          <a
+            x-bind:class="childClass"
+            href="{{ sub_item.href }}"
+            class="w-full pl-7.5 py-1.5 font-normal text-sm"
+            data-intersect-target="{{ sub_item.href }}"
+          >{{ sub_item.text }}</a>
+        {% endfor %}
+      </ul>
+    </li>
   {% endfor %}
+</ul>
 </nav>
 </div>
 
 {# MOBILE #}
-
-{{ nav_items|json_script:"nav-items" }}
-
-<script nonce="{{ request.csp_nonce }}" type="application/javascript">
-document.addEventListener('alpine:init', () => {
-  Alpine.data('select', () => ({
-    menuOpen: false,
-    ids: ['listbox-option'],
-    options: '',
-    toggleMenu() {
-        this.menuOpen = !this.menuOpen;
-    },
-    closeMenu() {
-        this.menuOpen = false;
-    },
-    get visibleSectionText() {
-        const index = this.options.findIndex((opt) => opt.href === `#${this.$data.visibleSection}`);
-        return index >= 0 ? this.options[index].text : '';
-    },
-    init() {
-        this.$nextTick(() => {
-            this.options = JSON.parse(document.getElementById('nav-items').textContent);
-        });
-    },
-  }));
-});
-</script>
 
 <div x-data="select" class="relative w-full md:hidden">
   <button
