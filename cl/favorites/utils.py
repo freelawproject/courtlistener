@@ -31,6 +31,9 @@ from cl.search.models import RECAPDocument
 async def prayer_eligible(user: User) -> tuple[bool, int]:
     allowed_prayer_count = settings.ALLOWED_PRAYER_COUNT
 
+    if user.profile.is_member:
+        allowed_prayer_count *= 3
+        
     now = timezone.now()
     last_24_hours = now - timedelta(hours=24)
 
