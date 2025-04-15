@@ -579,18 +579,20 @@ def query_and_send_alerts(
     :return: None.
     """
     alert_users: UserProfile.user = User.objects.filter(
-        alerts__rate=rate
+        alerts__rate=rate, alerts__alert_type=SEARCH_TYPES.RECAP
     ).distinct()
-    alerts_sent_count = 0
+    total_alerts_sent_count = 0
     now_time = datetime.datetime.now()
     for user in alert_users:
         if rate == Alert.REAL_TIME and not user.profile.is_member:
             continue
         alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
-        logger.info(f"Running alerts for user '{user}': {alerts}")
+        logger.info(
+            "Running '%s' alerts for user '%s': %s", rate, user, alerts
+        )
 
         hits = []
-        alerts_to_update = []
+        alerts_sent = []
         for alert in alerts:
             search_params = QueryDict(alert.query.encode(), mutable=True)
             results, parent_results, child_results = query_alerts(
@@ -598,13 +600,13 @@ def query_and_send_alerts(
             )
             if not results:
                 continue
-            alerts_to_update.append(alert.pk)
             search_type = search_params.get("type", SEARCH_TYPES.RECAP)
             results_to_send = process_alert_hits(
                 r, results, parent_results, child_results, alert.pk, query_date
             )
             if not results_to_send:
                 continue
+            alerts_sent.append(alert.pk)
             hits.append(
                 [
                     alert,
@@ -621,14 +623,22 @@ def query_and_send_alerts(
 
         if hits:
             send_search_alert_emails.delay([(user.pk, hits)])
-            alerts_sent_count += 1
+            total_alerts_sent_count += 1
+            logger.info(
+                "Sent %s '%s' alerts for user '%s'",
+                len(alerts_sent),
+                rate,
+                user,
+            )
 
         # Update Alert's date_last_hit in bulk.
-        Alert.objects.filter(id__in=alerts_to_update).update(
-            date_last_hit=now_time
-        )
-        async_to_sync(tally_stat)(f"alerts.sent.{rate}", inc=alerts_sent_count)
-        logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
+        Alert.objects.filter(id__in=alerts_sent).update(date_last_hit=now_time)
+
+    # Log and tally the total alerts sent
+    async_to_sync(tally_stat)(
+        f"alerts.sent.{rate}", inc=total_alerts_sent_count
+    )
+    logger.info(f"Sent {total_alerts_sent_count} {rate} email alerts.")
 
 
 def query_and_schedule_alerts(
@@ -643,13 +653,17 @@ def query_and_schedule_alerts(
     :return: None.
     """
 
-    alert_users = User.objects.filter(alerts__rate=rate).distinct()
+    alert_users = User.objects.filter(
+        alerts__rate=rate, alerts__alert_type=SEARCH_TYPES.RECAP
+    ).distinct()
     docket_content_type = ContentType.objects.get(
         app_label="search", model="docket"
     )
     for user in alert_users:
         alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
-        logger.info(f"Running '{rate}' alerts for user '{user}': {alerts}")
+        logger.info(
+            f"Running '%s' alerts for user '%s': %s", rate, user, alerts
+        )
         scheduled_hits_to_create = []
         for alert in alerts:
             search_params = QueryDict(alert.query.encode(), mutable=True)
@@ -694,6 +708,12 @@ def query_and_schedule_alerts(
         # Create scheduled WEEKLY and MONTHLY Alerts in bulk.
         if scheduled_hits_to_create:
             ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
+            logger.info(
+                "Scheduled %s '%s' alerts for user '%s'",
+                len(scheduled_hits_to_create),
+                rate,
+                user,
+            )
 
 
 def get_day_before_query_date() -> datetime.datetime:

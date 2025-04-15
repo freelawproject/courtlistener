@@ -5,6 +5,8 @@ from typing import Any
 from typing import Iterable as IterableType
 from typing import Match, Optional, Tuple
 
+from django.core.cache import cache
+
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData
@@ -468,3 +470,20 @@ def map_to_docket_entry_sorting(sort_string: str) -> str:
         return "entry_date_filed desc"
     else:
         return sort_string
+
+
+def append_value_in_cache(key, value):
+    """Append a value to a cached list associated with the given key.
+    If the key does not exist, a new list is created and the value is added.
+
+    :param key: The cache key to retrieve or store the list.
+    :param value: The value to be appended to the cached list.
+    :return: None.
+    """
+
+    cached_docs = cache.get(key)
+    if cached_docs is None:
+        cached_docs = []
+    cached_docs.append(value)
+    one_month = 60 * 60 * 24 * 7 * 4
+    cache.set(key, cached_docs, timeout=one_month)
