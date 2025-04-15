@@ -1,11 +1,13 @@
 document.addEventListener('alpine:init', () => {
   Alpine.data('navMenu', () => ({
     menuOpen: false,
+    buttonPressed: false,
     expandedSections: [],
     ids: ['listbox-option'],
     options: [],
     toggleMenu() {
       this.menuOpen = !this.menuOpen;
+      this.buttonPressed = true;
     },
     closeMenu() {
       this.menuOpen = false;
@@ -25,6 +27,7 @@ document.addEventListener('alpine:init', () => {
       return this.expandedSections.includes(this.target);
     },
     get visibleSectionText() {
+      if (!this.buttonPressed) return 'On this page';
       const index = this.options.findIndex((opt) => opt.href === `#${this.$data.visibleSection}`);
       return index >= 0 ? this.options[index].text : '';
     },
