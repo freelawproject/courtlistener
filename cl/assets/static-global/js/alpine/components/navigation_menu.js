@@ -50,8 +50,11 @@ document.addEventListener('alpine:init', () => {
       return index > -1 ? this.options[index].children : false;
     },
     init() {
-      this.$nextTick(() => {
-        this.options = JSON.parse(document.getElementById('nav-items').textContent);
+      this.options = JSON.parse(document.getElementById('nav-items').textContent);
+      this.options.forEach((option) => {
+        if (option.children) {
+          this.expandedSections.push(option.href);
+        }
       });
     },
   }));
