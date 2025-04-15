@@ -40,6 +40,8 @@ REST_FRAMEWORK = {
         "nedah94680": "1/hour",
         "robowiy352": "1/hour",
         # Multiple accounts
+        "court_account_n1": "1/hour",
+        "court_account_n2": "1/hour",        
         "sophia@newyorklawreview.com": "1/hour",
         "gab@newyorklawreview.com": "1/hour",
         "james@newyorklawreview.com": "1/hour",
