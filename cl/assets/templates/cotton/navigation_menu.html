@@ -61,9 +61,9 @@
 
 {# MOBILE #}
 
-<div x-data="select" class="relative w-full md:hidden">
+<div x-data="navMenu" class="relative w-full md:hidden">
   <button
-    @click="toggleMenu"
+    x-on:click="toggleMenu"
     type="button"
     class="w-full flex flex-row justify-between border border-greyscale-200 bg-white py-3 px-3.5 rounded-[10px] text-sm font-medium text-greyscale-900 focus:ring-2 focus:ring-primary-400 focus:outline-none"
     aria-haspopup="listbox"
@@ -76,6 +76,7 @@
   <ul
     x-show="menuOpen"
     x-on:click.outside="closeMenu"
+    x-on:keyup.esc="closeMenu"
     class="absolute z-10 mt-2 max-h-[320px] w-full overflow-auto rounded-lg bg-white py-1 shadow-lg border border-greyscale-200 focus:outline-hidden"
     tabindex="-1"
     role="listbox"
@@ -89,11 +90,27 @@
     x-transition:leave-end="opacity-0"
   >
     <template x-for="option in options" :key="option.href">
-      <li x-data="selectOption" class="relative cursor-default py-[1px] px-1.5 select-none" role="option">
+      <li class="relative cursor-default py-[1px] px-1.5 select-none" role="option">
         <a x-on:click="closeMenu" x-bind:href="option.href" class="py-2.5 px-2 hover:bg-greyscale-100 rounded-md flex flex-row justify-between">
           <span class="truncate font-medium text-sm text-greyscale-600" x-text="option.text"></span>
           <img x-bind:data-intersect-target="option.href" x-show="isVisible" class="" aria-hidden="true" src="{% static "svg/check.svg" %}">
         </a>
+        <template
+          x-if="hasChildren"
+          x-bind:data-intersect-target="option.href"
+        >
+          <ul class="flex flex-col w-full">
+            <template x-for="subItem in option.children">
+              <a
+                x-on:click="closeMenu"
+                x-bind:href="subItem.href"
+                class="w-full pl-7.5 py-1.5 font-normal text-sm text-greyscale-600"
+                x-bind:data-intersect-target="subItem.href"
+                x-text="subItem.text"
+              ></a>
+            </template>
+          </ul>
+        </template>
       </li>
     </template>
   </ul>
