@@ -1,5 +1,5 @@
 {% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
-{% load static tailwind_tags %}
+{% load tailwind_tags %}{% load component_tags %}
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
@@ -122,6 +122,9 @@
 
   {# Allows your own scripts in the footer. #}
   {% block footer-scripts %}{% endblock %}
+
+  {# Include component scripts at the end of the <body>. #}
+  {% render_required_scripts %}
 
   {# Record stats for non-superusers 1/10 times to save money #}
   {% if not user.is_superuser  %}
