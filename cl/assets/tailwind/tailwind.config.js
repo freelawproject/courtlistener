@@ -14,6 +14,9 @@ module.exports = {
        * Adjust the following line to match your project structure.
        */
       '../../**/templates/**/*.html',
+
+      /*  Alpine components that could contain Tailwind CSS classes. */
+      '../static-global/js/alpine/components/*.js',
     ],
   },
   theme: {
@@ -23,6 +26,7 @@ module.exports = {
       },
       spacing: {
         4.5: '18px',
+        7.5: '30px',
         13: '52px',
         15: '60px',
         35: '140px',
