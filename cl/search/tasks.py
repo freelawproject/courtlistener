@@ -1,17 +1,22 @@
+import asyncio
 import csv
 import io
+import json
 import logging
 from datetime import date, datetime
 from importlib import import_module
+from pathlib import PurePosixPath
 from random import randint
 from typing import Any, Generator
 
+from botocore import exceptions as botocore_exception
 from celery import Task
 from celery.canvas import chain
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
 from django.http import QueryDict
@@ -31,6 +36,13 @@ from elasticsearch.helpers import (
     streaming_bulk,
 )
 from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
+from httpx import (
+    HTTPStatusError,
+    NetworkError,
+    ReadError,
+    RemoteProtocolError,
+    TimeoutException,
+)
 
 from cl.alerts.tasks import (
     percolator_response_processing,
@@ -41,6 +53,7 @@ from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.lib.db_tools import log_db_connection_info
 from cl.lib.elasticsearch_utils import build_daterange_query
+from cl.lib.microservice_utils import microservice
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
@@ -49,6 +62,7 @@ from cl.lib.search_utils import (
     fetch_es_results_for_csv,
     get_headers_and_transformations_for_search_export,
 )
+from cl.lib.storage import S3IntelligentTieringStorage
 from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
@@ -1684,3 +1698,134 @@ def remove_documents_by_query(
         es_document._index.refresh()
 
     return response
+
+
+def inception_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the inception batch microservice.
+
+    param batch: A list of dictionaries, where each dictionary represents an
+    opinion document with the following keys:
+    "id": The Opinion ID.
+    "text": The content of the opinion.
+    :return: A list of dictionaries, each containing the embeddings for the
+    corresponding opinion document as returned  by the inception microservice.
+    """
+
+    data = json.dumps(batch)
+    response = asyncio.run(
+        microservice(
+            service="inception-batch",
+            method="POST",
+            data=data,
+        )
+    )
+    return response.json()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+        ReadError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
+def create_opinion_text_embeddings(
+    self,
+    batch: list[int],
+    database,
+) -> list[dict]:
+    """Get embeddings for Opinion texts from inception.
+
+    :param self: The Celery task.
+    :param batch: A list of Opinion IDs representing the batch to process.
+    :param database: The database to be used during processing.
+    :return: A list of dictionaries, each containing the opinion embeddings.
+    """
+    opinions = (
+        Opinion.objects.filter(id__in=batch).with_best_text().using(database)
+    )
+    opinions_to_vectorize = [
+        {"id": opinion.pk, "text": opinion.clean_text} for opinion in opinions
+    ]
+    batch_request = {"documents": opinions_to_vectorize}
+    embeddings = inception_batch_request(batch_request)
+    return embeddings
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
+def save_embeddings(
+    self,
+    embeddings: list[dict],
+    directory: str = "opinions",
+) -> None:
+    """Save embeddings to S3.
+
+    The embeddings list is the response from a batch request to the
+    inception microservice, which has the following structure:
+
+    [
+        {
+            'id': 1,
+            'embeddings': [
+                {
+                    'chunk_number': 1,
+                    'chunk': 'search_document: First test document',
+                    'embedding': [-0.01209942298567295...]
+                },
+                {
+                    'chunk_number': 2,
+                    'chunk': 'search_document: First test document',
+                    'embedding': [-1.01200886298552476...]
+                },
+            ]
+        },
+        {
+            'id': 2,
+            'embeddings': [
+                {
+                    'chunk_number': 1,
+                    'chunk': 'search_document: Second test document',
+                    'embedding': [0.07617326825857162...]
+                },
+            ]
+        },
+    ]
+
+    Each object uploaded to S3 is a JSON file containing one of the items
+    in the previous list.
+
+    For example, if uploading a batch of opinion embeddings, each file will
+    be stored embeddings/opinions/freelawproject/modernbert-embed-base_finetune_512/{opinion_id}.json
+
+    :param self: The Celery task.
+    :param embeddings: A list of dictionaries representing the embeddings to
+     be saved.
+    :param directory: The directory where the embeddings will be stored.
+    :return: None.
+    """
+    storage = S3IntelligentTieringStorage()
+    for embedding_record in embeddings:
+        record_id = embedding_record["id"]
+        file_contents = json.dumps(embedding_record)
+        file_path = str(
+            PurePosixPath(
+                "embeddings",
+                directory,
+                settings.NLP_EMBEDDING_MODEL,
+                f"{record_id}.json",
+            )
+        )
+        storage.save(file_path, ContentFile(file_contents))

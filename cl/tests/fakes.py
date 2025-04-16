@@ -126,6 +126,31 @@ class FakeFreeOpinionReport:
         ]
 
 
+class FakeConfirmationPage:
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def query(self, *args, **kwargs):
+        pass
+
+    @property
+    def data(self, *args, **kwargs):
+        return {}
+
+
+class FakeAvailableConfirmationPage(FakeConfirmationPage):
+
+    @property
+    def data(self, *args, **kwargs):
+        return {
+            "docket_number": "2:25-cv-10997-MFL-CI",
+            "cost": "2.00",
+            "billable_pages": "20",
+            "document_description": "Image1-0",
+        }
+
+
 test_patterns = {
     "canb": {
         1: True,

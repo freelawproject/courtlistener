@@ -1,6 +1,8 @@
 import re
 from typing import Optional
 
+import tiktoken
+
 
 def camel_to_snake(key: str) -> str:
     """Converts a camelCase string to snake_case.
@@ -132,3 +134,10 @@ def normalize_dashes(text: str) -> str:
         normal_dash,
         text,
     )
+
+
+def get_token_count_from_string(string: str) -> int:
+    """Returns the number of tokens in a text string."""
+    encoding = tiktoken.get_encoding("cl100k_base")
+    num_tokens = len(encoding.encode(string))
+    return num_tokens

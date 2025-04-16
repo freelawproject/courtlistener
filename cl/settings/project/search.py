@@ -38,3 +38,13 @@ SEARCH_API_PAGE_SIZE = 20
 # The amount of text to return from the beginning of the field if there are no
 # matching fragments to highlight.
 NO_MATCH_HL_SIZE = 500
+
+
+###################
+# SEMANTIC SEARCH #
+###################
+MIN_OPINION_SIZE = env("MIN_OPINION_SIZE", default=100)
+NLP_EMBEDDING_MODEL = env(
+    "NLP_EMBEDDING_MODEL_NAME",
+    default="freelawproject/modernbert-embed-base_finetune_512",
+)
