@@ -33,7 +33,7 @@ async def prayer_eligible(user: User) -> tuple[bool, int]:
 
     if user.profile.is_member:
         allowed_prayer_count *= 3
-        
+
     now = timezone.now()
     last_24_hours = now - timedelta(hours=24)
 
