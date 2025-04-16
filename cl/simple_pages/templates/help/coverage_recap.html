@@ -110,6 +110,11 @@
     <p>For details on which courts have enabled RSS feeds, <a href="{% url "alert_help" %}#coverage-gaps">see the documentation on alerts</a>.
     </p>
 
+    <h4 id="free-pacer-scraper" class="v-offset-above-2">Basic PACER Content Scraper</h4>
+    <p>Basic case metadata is freely available on PACER for all District and Bankruptcy cases. This includes details such as the case name, docket number, date filed, date of last filing, and date terminated.</p>
+    <p>For bankruptcy cases, additional information is available, including the assigned judge, bankruptcy chapter, date the plan was confirmed, and date the debtor was discharged.</p>
+    <p>We regularly scrape these pages for each court, ensuring that we collect basic metadata for all new District and Bankruptcy cases shortly after they are filed. This data can be used to trigger RECAP Search Alerts.</p>
+
     <h4 id="bots" class="v-offset-above-2">Social Media Bots</h4>
     <p>We host a fleet of social media bots</a> that download important documents from PACER so they can be shared with the public. The bots use <a href="{% url "api_index" %}">CourtListener APIs</a> to download content from PACER. As a result, anything the bots buy is automatically contributed to the RECAP Archive.
     </p>
