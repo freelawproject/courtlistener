@@ -7,16 +7,9 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models import (
-    Avg,
-    BooleanField,
     Case,
     Count,
-    DateTimeField,
-    Exists,
-    ExpressionWrapper,
     F,
-    FloatField,
-    OuterRef,
     Q,
     QuerySet,
     Subquery,
@@ -24,7 +17,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Cast, Extract, Least, Now, Sqrt
+from django.db.models.functions import Least
 from django.template import loader
 from django.utils import timezone
 
@@ -125,15 +118,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
         "recap_document_id"
     )
 
-    doc_unavailable = PrayerAvailability.objects.filter(
-        recap_document=OuterRef("pk")
-    )
-
-    availability_last_checked = PrayerAvailability.objects.filter(
-        recap_document=OuterRef("pk")
-    ).values("last_checked")[:1]
-
-    # Annotate each RECAPDocument with the number of prayers and the average prayer age
+    # Annotate each RECAPDocument with the number of prayers and the number of docket views, plus whether it is currently unavailable
     documents = (
         RECAPDocument.objects.filter(id__in=Subquery(waiting_prayers))
         .select_related(
@@ -141,6 +126,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
             "docket_entry__docket",
             "docket_entry__docket__court",
         )
+        .prefetch_related("prayeravailability")
         .only(
             "pk",
             "document_type",
@@ -161,16 +147,19 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
             "docket_entry__docket__court__jurisdiction",
             "docket_entry__docket__court__citation_string",
             "docket_entry__docket__court_id",
+            "prayeravailability__id",
+            "prayeravailability__last_checked",
         )
         .annotate(
             prayer_count=Count(
                 "prayers", filter=Q(prayers__status=Prayer.WAITING)
             ),
             view_count=F("docket_entry__docket__view_count"),
-            doc_unavailable=Exists(doc_unavailable),
-            last_checked=Subquery(
-                availability_last_checked, output_field=DateTimeField()
+            doc_unavailable=Case(
+                When(prayeravailability__id__isnull=False, then=Value(True)),
+                default=Value(False),
             ),
+            last_checked=F("prayeravailability__last_checked"),
         )
         .order_by(
             "doc_unavailable", "last_checked", "-prayer_count", "-view_count"
