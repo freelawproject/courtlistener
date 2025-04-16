@@ -317,8 +317,8 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 class PrayerStats:
     prayer_count: int
     total_cost: str
-    distinct_count: Optional[int] = None
-    distinct_users: Optional[int] = None
+    distinct_count: int | None = None
+    distinct_users: int | None = None
 
 
 async def get_user_prayer_history(user: User) -> PrayerStats:
