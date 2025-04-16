@@ -19,6 +19,7 @@ from timeout_decorator import timeout_decorator
 from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
+from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, PrayerFactory
 from cl.favorites.models import (
     DocketTag,
@@ -666,7 +667,10 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
         """Does the prayer_eligible method work properly?"""
-
+        # Create a membership for one of the users
+        await sync_to_async(NeonMembership.objects.create)(
+            level=NeonMembership.LEGACY, user=self.user_2
+        )
         current_time = now()
         with time_machine.travel(current_time, tick=False):
             # No user prayers in the last 24 hours yet for this user.
@@ -677,6 +681,9 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
             await sync_to_async(PrayerFactory)(
                 user=self.user, recap_document=self.rd_1
             )
+            await sync_to_async(PrayerFactory)(
+                user=self.user_2, recap_document=self.rd_1
+            )
 
             user_prays = Prayer.objects.filter(user=self.user)
             self.assertEqual(await user_prays.acount(), 1)
@@ -686,12 +693,22 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
             await sync_to_async(PrayerFactory)(
                 user=self.user, recap_document=self.rd_2
             )
+            await sync_to_async(PrayerFactory)(
+                user=self.user_2, recap_document=self.rd_2
+            )
             self.assertEqual(await user_prays.acount(), 2)
 
             # After two prays (ALLOWED_PRAYER_COUNT) in the last 24 hours.
             # The user is no longer eligible to create more prays
             user_is_eligible, _ = await prayer_eligible(self.user)
             self.assertFalse(user_is_eligible)
+
+            # Verify that a membership grants triple the prayer allowance
+            user_is_eligible, remaining_prayers = await prayer_eligible(
+                self.user_2
+            )
+            self.assertTrue(user_is_eligible)
+            self.assertEqual(remaining_prayers, 4)
 
         with time_machine.travel(
             current_time + timedelta(hours=25), tick=False
@@ -1380,33 +1397,12 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         self.assertEqual(self.rd_2.page_count, 20)
 
 
-class PrayerAPITests(APITestCase):
+class PrayerAPITests(PrayAndPayTestCase):
     """Check that Prayer API operations work as expected."""
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.user_1 = UserFactory()
-        cls.user_2 = UserFactory()
-
-        cls.rd_1 = RECAPDocumentFactory(
-            pacer_doc_id="98763421",
-            document_number="1",
-            is_available=True,
-        )
-        cls.rd_2 = RECAPDocumentFactory(
-            pacer_doc_id="98763422",
-            document_number="2",
-            is_available=False,
-        )
-        cls.rd_3 = RECAPDocumentFactory(
-            pacer_doc_id="98763423",
-            document_number="3",
-            is_available=False,
-        )
 
     def setUp(self) -> None:
         self.prayer_path = reverse("prayer-list", kwargs={"version": "v4"})
-        self.client = make_client(self.user_1.pk)
+        self.client = make_client(self.user.pk)
         self.client_2 = make_client(self.user_2.pk)
 
     async def make_a_prayer(
