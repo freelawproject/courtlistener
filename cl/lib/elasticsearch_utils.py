@@ -3385,7 +3385,12 @@ def do_es_sweep_alert_query(
         parent_search = parent_search.source(includes=["docket_id"])
         multi_search = multi_search.add(parent_search)
 
-    if child_query:
+    query_with_parties = cd.get("party_name") or cd.get("atty_name")
+    # Avoid performing a child query on the ESRECAPSweepDocument index if the query
+    # contains party-related fields, as they're not compatible with this index.
+    # This query doesn't need to filter out child hits, since a RECAPDocument matched
+    # by a query containing party fields is inherently a cross-object alert.
+    if child_query and not query_with_parties:
         child_search = child_search_query.query(child_query)
         # Ensure accurate tracking of total hit count for up to 10,001 query results
         child_search = child_search.extra(
@@ -3401,7 +3406,7 @@ def do_es_sweep_alert_query(
     docket_results = None
     if parent_query:
         docket_results = responses[1]
-    if child_query:
+    if child_query and not query_with_parties:
         rd_results = responses[2]
 
     # Re-run parent query to fetch potentially missed docket IDs due to large
@@ -3432,7 +3437,7 @@ def do_es_sweep_alert_query(
         and rd_results.hits.total.value
         >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
-    if should_repeat_child_query and child_query:
+    if should_repeat_child_query and child_query and not query_with_parties:
         rd_ids = [
             int(rd["_source"]["id"])
             for docket in main_results
