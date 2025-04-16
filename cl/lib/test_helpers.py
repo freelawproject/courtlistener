@@ -786,6 +786,11 @@ class PrayAndPayTestCase(TestCase):
         cls.user_2 = UserFactory()
         cls.user_3 = UserFactory()
 
+        # Create profile for test user records
+        UserProfileWithParentsFactory(user=cls.user)
+        UserProfileWithParentsFactory(user=cls.user_2)
+        UserProfileWithParentsFactory(user=cls.user_3)
+
         cls.rd_1 = RECAPDocumentFactory(
             pacer_doc_id="98763421",
             document_number="1",
