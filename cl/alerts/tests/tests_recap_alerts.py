@@ -1217,6 +1217,147 @@ class RECAPAlertsSweepIndexTest(
 
         alert_de.delete()
 
+    def test_cross_object_parties_alert_query(self, mock_prefix) -> None:
+        """Test a cross object alert including parties can be properly
+        triggered.
+        """
+
+        cross_object_parties_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Cross",
+            query='party_name="Janet Dolor"&q=MOTION Sed que ipsa&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        with time_machine.travel(
+            self.mock_date_indexing, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            alert_de = DocketEntryWithParentsFactory(
+                docket=self.de.docket,
+                entry_number=2,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION Sed que ipsa quae ab illo inventore",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description=f"Motion to File Party Test",
+                document_number="2",
+                pacer_doc_id=f"01803665243325",
+            )
+            firm = AttorneyOrganizationFactory(
+                name="Associates LLP 3", lookup_key="firm_llp_2"
+            )
+            attorney = AttorneyFactory(
+                name="John Lorem",
+                organizations=[firm],
+                docket=self.de.docket,
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Defendant Janet Dolor",
+                    docket=self.de.docket,
+                    attorneys=[attorney],
+                ),
+                docket=self.de.docket,
+            )
+            index_docket_parties_in_es.delay(self.de.docket.pk)
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+
+        self._confirm_number_of_alerts(html_content, 1)
+        # Only one child hit should be included in the case within the alert.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_parties_alert.name,
+            1,
+            alert_de.docket.case_name,
+            1,
+        )
+        self._assert_child_hits_content(
+            html_content,
+            cross_object_parties_alert.name,
+            alert_de.docket.case_name,
+            [rd.description],
+        )
+
+        # Trigger alert again.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # Shouldn't be sent again.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        alert_de.delete()
+
+    def test_docket_only_parties_alert_query(self, mock_prefix) -> None:
+        """Test a docket only alert including parties can be properly
+        triggered.
+        """
+
+        docket_parties_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Docket Only Parties",
+            query='atty_name="Debbie Russell"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self._confirm_number_of_alerts(html_content, 1)
+        # No child hits in the docket only alert.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_parties_alert.name,
+            1,
+            self.de.docket.case_name,
+            0,
+        )
+
+        # Trigger alert again.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # Shouldn't be sent again.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
     @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
     def test_multiple_alerts_email_hits_limit_per_alert(
         self, mock_prefix
