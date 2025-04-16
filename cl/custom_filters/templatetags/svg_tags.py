@@ -12,8 +12,17 @@ def svg(name, css_class="", **kwargs):
     Include an SVG file directly in the template.
 
     Usage:
+    ```
     {% load svg_tags %}
-    {% svg "icon-name" class="w-6 h-6 text-gray-500" %}
+    {% svg "icon-name" css_class="w-6 h-6 text-gray-500" %}
+    ```
+
+    Note HTML attributes are passed directly with minor adjustments:
+    - Use "css_class" instead of "class", as "class" is reserved in python.
+    - Use snake case instead of kebab, as template tags don't support kebab.
+    - To include Alpine bindings, use "__" instead of ":" (e.g. `x_bind__class="w-full"`)
+
+    These are all handled by the tag under the hood.
     """
     relative_path = f"svg/{name}.svg"
     absolute_path = find(relative_path)
@@ -38,6 +47,7 @@ def svg(name, css_class="", **kwargs):
                 )
 
         for key, value in kwargs.items():
+            key = key.replace("__", ":")  # Convert double underscore to colons
             key = key.replace("_", "-")  # Convert snake_case to kebab-case
             svg_content = svg_content.replace("<svg", f'<svg {key}="{value}"')
 
