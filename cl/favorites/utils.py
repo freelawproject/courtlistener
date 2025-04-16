@@ -1,3 +1,4 @@
+from asgiref.sync import sync_to_async
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -31,7 +32,11 @@ from cl.search.models import RECAPDocument
 async def prayer_eligible(user: User) -> tuple[bool, int]:
     allowed_prayer_count = settings.ALLOWED_PRAYER_COUNT
 
-    if user.profile.is_member:
+    @sync_to_async
+    def is_FLP_member():
+        return user.profile.is_member
+    
+    if await is_FLP_member():
         allowed_prayer_count *= 3
 
     now = timezone.now()
