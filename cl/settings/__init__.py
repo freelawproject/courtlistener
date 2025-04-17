@@ -9,6 +9,7 @@ from .project.money import *
 from .project.search import *
 from .project.security import *
 from .project.testing import *
+from .project.users import *
 from .third_party.aws import *
 from .third_party.celery import *
 from .third_party.elasticsearch import *
