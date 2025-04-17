@@ -856,9 +856,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
         # Test top documents based on document unavailability.
         await sync_to_async(PrayerAvailability.objects.create)(
-                recap_document=self.rd_2,
-            )
-        
+            recap_document=self.rd_2,
+        )
+
         await create_prayer(self.user, self.rd_3)
         await create_prayer(self.user, self.rd_2)
         await create_prayer(self.user_2, self.rd_2)
@@ -885,15 +885,13 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         dt_3 = datetime.combine(d_3, datetime.min.time())
 
         await sync_to_async(PrayerAvailability.objects.create)(
-                recap_document=self.rd_2,
-                last_checked=dt_2
-            )
-        
+            recap_document=self.rd_2, last_checked=dt_2
+        )
+
         await sync_to_async(PrayerAvailability.objects.create)(
-                recap_document=self.rd_3,
-                last_checked=dt_3
-            )
-        
+            recap_document=self.rd_3, last_checked=dt_3
+        )
+
         await create_prayer(self.user, self.rd_3)
         await create_prayer(self.user, self.rd_2)
         await create_prayer(self.user_2, self.rd_2)
@@ -920,20 +918,17 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         dt_3 = datetime.combine(d_3, datetime.min.time())
 
         await sync_to_async(PrayerAvailability.objects.create)(
-                recap_document=self.rd_2,
-                last_checked=dt_2
-            )
-        
+            recap_document=self.rd_2, last_checked=dt_2
+        )
+
         await sync_to_async(PrayerAvailability.objects.create)(
-                recap_document=self.rd_3,
-                last_checked=dt_3
-            )
-        
+            recap_document=self.rd_3, last_checked=dt_3
+        )
+
         await sync_to_async(PrayerAvailability.objects.create)(
-                recap_document=self.rd_4,
-                last_checked=dt_3
-            )
-        
+            recap_document=self.rd_4, last_checked=dt_3
+        )
+
         self.rd_2.docket_entry.docket.view_count = 4
         self.rd_3.docket_entry.docket.view_count = 1
         self.rd_4.docket_entry.docket.view_count = 6
@@ -945,7 +940,7 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         await self.rd_4.docket_entry.docket.asave()
         await self.rd_5.docket_entry.docket.asave()
         await self.rd_6.docket_entry.docket.asave()
-        
+
         await create_prayer(self.user, self.rd_3)
         await create_prayer(self.user, self.rd_2)
         await create_prayer(self.user, self.rd_4)
@@ -955,10 +950,15 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         await create_prayer(self.user_2, self.rd_4)
         await create_prayer(self.user_2, self.rd_6)
 
-
         top_prayers = await get_top_prayers()
         self.assertEqual(await top_prayers.acount(), 5)
-        expected_top_prayers = [self.rd_6.pk, self.rd_5.pk, self.rd_4.pk, self.rd_3.pk, self.rd_2.pk]
+        expected_top_prayers = [
+            self.rd_6.pk,
+            self.rd_5.pk,
+            self.rd_4.pk,
+            self.rd_3.pk,
+            self.rd_2.pk,
+        ]
         actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
 
         self.assertEqual(
