@@ -1071,8 +1071,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         # - Total cost of $5.60 (sum of individual document costs)
         prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
         self.assertEqual(prayer_stats.prayer_count, 6)
-        self.assertEqual(prayer_stats.distinct_count, 4)
         self.assertEqual(prayer_stats.total_cost, "5.60")
+        self.assertEqual(prayer_stats.distinct_count, 4)
+        self.assertEqual(prayer_stats.distinct_users, 2)
 
         # Verify that no prayers have been granted:
         # - Zero count of granted prayers
@@ -1080,8 +1081,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         # - Zero total cost
         prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
         self.assertEqual(prayer_stats.prayer_count, 0)
-        self.assertEqual(prayer_stats.distinct_count, 0)
         self.assertEqual(prayer_stats.total_cost, "0.00")
+        self.assertEqual(prayer_stats.distinct_count, 0)
+        self.assertEqual(prayer_stats.distinct_users, 0)
 
         # rd_2 is granted.
         self.rd_2.is_available = True
@@ -1093,8 +1095,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         # - Total cost should decrease to 5.10 (excluding `rd_2`'s cost)
         prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
         self.assertEqual(prayer_stats.prayer_count, 4)
-        self.assertEqual(prayer_stats.distinct_count, 3)
         self.assertEqual(prayer_stats.total_cost, "5.10")
+        self.assertEqual(prayer_stats.distinct_count, 3)
+        self.assertEqual(prayer_stats.distinct_users, 2)
 
         # Verify that granting `rd_2` increases the number of granted prayers:
         # - Total granted prayers should increase by 2 (as `rd_2` had 2 prayers)
@@ -1102,8 +1105,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         # - Total cost should increase by 0.50 (the cost of granting `rd_2`)
         prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
         self.assertEqual(prayer_stats.prayer_count, 2)
-        self.assertEqual(prayer_stats.distinct_count, 1)
         self.assertEqual(prayer_stats.total_cost, "0.50")
+        self.assertEqual(prayer_stats.distinct_count, 1)
+        self.assertEqual(prayer_stats.distinct_users, 2)
 
         # rd_4 is granted.
         self.rd_4.is_available = True
@@ -1115,8 +1119,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         # - Total cost should decrease to 2.10 (excluding costs of `rd_2` and `rd_4`)
         prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
         self.assertEqual(prayer_stats.prayer_count, 3)
-        self.assertEqual(prayer_stats.distinct_count, 2)
         self.assertEqual(prayer_stats.total_cost, "2.10")
+        self.assertEqual(prayer_stats.distinct_count, 2)
+        self.assertEqual(prayer_stats.distinct_users, 2)
 
         # Verify that granting `rd_4` increases the number of granted prayers:
         # - Total granted prayers should increase by 3 (2 from `rd_2` and 1 from `rd_4`)
@@ -1124,8 +1129,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         # - Total cost should increase by 3.50 (the combined cost of `rd_2` and `rd_4`)
         prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
         self.assertEqual(prayer_stats.prayer_count, 3)
-        self.assertEqual(prayer_stats.distinct_count, 2)
         self.assertEqual(prayer_stats.total_cost, "3.50")
+        self.assertEqual(prayer_stats.distinct_count, 2)
+        self.assertEqual(prayer_stats.distinct_users, 2)
 
         await cache.adelete(f"prayer-stats-{Prayer.WAITING}")
         await cache.adelete(f"prayer-stats-{Prayer.GRANTED}")
