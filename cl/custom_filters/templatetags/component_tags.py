@@ -1,5 +1,6 @@
 from django import template
 from django.templatetags.static import static
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
 register = template.Library()
@@ -32,15 +33,25 @@ def render_required_scripts(context):
     if not request._required_scripts:
         return ""
 
-    nonce = ""
-    if hasattr(request, "csp_nonce"):
-        nonce = f' nonce="{request.csp_nonce}"'
+    nonce = getattr(request, "csp_nonce", "")
 
     script_tags = []
     for script_path in request._required_scripts:
         script_url = static(script_path)
-        script_tags.append(
-            f'<script type="text/javascript" src="{script_url}"{nonce}></script>'
-        )
+        if nonce:
+            script_tags.append(
+                format_html(
+                    '<script type="text/javascript" src="{}" nonce="{}"></script>',
+                    script_url,
+                    nonce,
+                )
+            )
+        else:
+            script_tags.append(
+                format_html(
+                    '<script type="text/javascript" src="{}"></script>',
+                    script_url,
+                )
+            )
 
     return mark_safe("\n".join(script_tags))
