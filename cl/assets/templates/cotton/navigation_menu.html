@@ -8,8 +8,8 @@
 {# DESKTOP #}
 
 <div x-data="navMenu" class="max-md:hidden overflow-y-auto h-[100vh] sticky top-5 min-w-[222px]">
-<nav class="sticky top-0 flex flex-col flex-wrap items-start min-w-[222px]">
-<ul class="list-disc list-inside" role="menu" aria-label="Navigation">
+<nav class="sticky top-0 flex flex-col flex-wrap items-start w-full pr-3">
+<ul class="list-disc list-inside w-full" role="menu" aria-label="Navigation">
   {% for item in nav_items %}
     <li
       data-intersect-target="{{ item.href }}"
@@ -20,8 +20,9 @@
       <div class="-mt-7 ml-4 text-sm font-sans flex justify-start items-center gap-2 flex-wrap">
         <a
           x-bind:class="itemClass"
+          title="{{ item.text }}"
           href="{{ item.href }}"
-          class="py-1.5 font-semibold"
+          class="py-1.5 font-semibold truncate"
           data-intersect-target="{{ item.href }}"
           aria-label="Go to {{ item.text }}"
         >
@@ -57,8 +58,9 @@
         {% for sub_item in item.children %}
           <a
             x-bind:class="childClass"
+            title="{{ sub_item.text }}"
             href="{{ sub_item.href }}"
-            class="w-full pl-7.5 py-1.5 font-normal text-sm"
+            class="w-full pl-7.5 py-1.5 font-normal text-sm truncate"
             data-intersect-target="{{ sub_item.href }}"
             role="menuitem"
             aria-label="Go to {{ sub_item.text }}"
