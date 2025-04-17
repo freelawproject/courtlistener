@@ -21,7 +21,7 @@
         <a
           x-bind:class="itemClass"
           title="{{ item.text }}"
-          href="{{ item.href }}"
+          href="#{{ item.href|slugify }}"
           class="py-1.5 font-semibold truncate"
           data-intersect-target="{{ item.href }}"
           aria-label="Go to {{ item.text }}"
@@ -59,7 +59,7 @@
           <a
             x-bind:class="childClass"
             title="{{ sub_item.text }}"
-            href="{{ sub_item.href }}"
+            href="#{{ sub_item.href|slugify }}"
             class="w-full pl-7.5 py-1.5 font-normal text-sm truncate"
             data-intersect-target="{{ sub_item.href }}"
             role="menuitem"
