@@ -29,9 +29,9 @@
       </div>
     {% endif %}
   </div>
-
+  {% with view_name=request.resolver_match.view_name %}
   <div class="col-xs-12 flex {% if is_page_owner %} justify-content-between {% else %} justify-content-end {% endif %} hidden-xs">
-    {% if  is_page_owner %}
+    {% if is_page_owner %}
     <ul class="prayer-top-buttons nav navbar-nav navbar-left">
       <li>
         {% include "includes/prayers_leaderboard_button.html" %}
@@ -55,13 +55,14 @@
           <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
         </a>
       </li>
-      {% if is_page_owner %}
+      {% if is_page_owner and view_name == 'user_prayers' %}
       <li>
         {% include "includes/public_prayers_switch.html" with page_public=page_public %}
       </li>
       {% endif %}
     </ul>
   </div>
+  {% endwith %}
 
   <div class="col-xs-12">
     <h1 class="text-center v-offset-below-3">{% if is_page_owner %}Your PACER Document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %}</h1>
