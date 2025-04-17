@@ -33,7 +33,7 @@ class Command(VerboseCommand):
             help="Let the user decide which DB name to use",
         )
         parser.add_argument(
-            "--batch-size",
+            "--token-count",
             type=int,
             help="How many tokens per batch.",
             required=True,
@@ -102,7 +102,7 @@ class Command(VerboseCommand):
         embedding_queue = options["embedding_queue"]
         upload_queue = options["upload_queue"]
         database = options["database"]
-        batch_size = options["batch_size"]
+        token_count_limit = options["token_count"]
         count = options.get("count", None)
         auto_resume = options["auto_resume"]
         min_opinion_size = settings.MIN_OPINION_SIZE
@@ -141,7 +141,7 @@ class Command(VerboseCommand):
             token_count = opinion.token_count
             if token_count < min_opinion_size:
                 continue
-            if token_count > batch_size:
+            if token_count > token_count_limit:
                 # Log documents that individually exceed the batch size.
                 logger.error(
                     "The opinion ID:%s exceeds the batch size limit.",
@@ -149,7 +149,7 @@ class Command(VerboseCommand):
                 )
                 continue
             # Check if adding this opinion would exceed the batch size.
-            if current_batch_size + token_count > batch_size:
+            if current_batch_size + token_count > token_count_limit:
 
                 # Send the current batch since adding this opinion would break the limit.
                 self.send_batch(
