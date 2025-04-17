@@ -1375,8 +1375,10 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
     @patch(
         "cl.favorites.tasks.DownloadConfirmationPage", new=FakeConfirmationPage
     )
+    @patch("cl.favorites.tasks.is_pdf", return_value=False)
     async def test_user_gets_notification_when_document_is_unavailable(
         self,
+        mock_is_pdf,
         mock_prayer_unavailable,
         mock_get_or_cache_cookie,
     ):
