@@ -9,12 +9,13 @@
 
 <div x-data="navMenu" class="max-md:hidden overflow-y-auto h-[100vh] sticky top-5 min-w-[222px]">
 <nav class="sticky top-0 flex flex-col flex-wrap items-start min-w-[222px]">
-<ul class="list-disc list-inside">
+<ul class="list-disc list-inside" role="menu" aria-label="Navigation">
   {% for item in nav_items %}
     <li
       data-intersect-target="{{ item.href }}"
       class="pl-3.5 w-full marker:text-greyscale-200"
       x-bind:class="markerClass"
+      role="none"
     >
       <div class="-mt-7 ml-4 text-sm font-sans flex justify-start items-center gap-2 flex-wrap">
         <a
@@ -22,6 +23,7 @@
           href="{{ item.href }}"
           class="py-1.5 font-semibold"
           data-intersect-target="{{ item.href }}"
+          aria-label="Go to {{ item.text }}"
         >
           {{ item.text }}
         </a>
@@ -29,20 +31,28 @@
           x-show="hasChildren"
           x-on:click="toggleExpansion"
           data-intersect-target="{{ item.href }}"
+          aria-haspopup="menu"
+          aria-label="Toggle submenu for {{ item.text }}"
+          x-bind:aria-expanded="isExpanded"
+          type="button"
+          aria-controls="submenu-{{ item.href|slugify }}"
         >
-          <div
+          <span
             x-bind:class="iconClass"
             data-intersect-target="{{ item.href }}"
             class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+            aria-hidden="true"
           >{% svg 'chevron' css_class="w-full h-full" %}
-          </div>
+          </span>
         </button>
       </div>
       <ul
+        id="submenu-{{ item.href|slugify }}"
         x-show="isExpanded"
         x-collapse
         data-intersect-target="{{ item.href }}"
         class="flex flex-col"
+        role="menu"
       >
         {% for sub_item in item.children %}
           <a
@@ -50,6 +60,8 @@
             href="{{ sub_item.href }}"
             class="w-full pl-7.5 py-1.5 font-normal text-sm"
             data-intersect-target="{{ sub_item.href }}"
+            role="menuitem"
+            aria-label="Go to {{ sub_item.text }}"
           >{{ sub_item.text }}</a>
         {% endfor %}
       </ul>
@@ -66,22 +78,31 @@
     x-on:click="toggleMenu"
     type="button"
     class="w-full flex flex-row justify-between border border-greyscale-200 bg-white py-3 px-3.5 rounded-[10px] text-sm font-medium text-greyscale-900 focus:ring-2 focus:ring-primary-400 focus:outline-none"
-    aria-haspopup="listbox"
+    aria-haspopup="menu"
+    aria-controls="mobile-menu-list"
+    aria-label="Toggle navigation menu"
     x-bind:aria-expanded="menuOpen"
-    aria-labelledby="listbox-label"
   >
-    <span id="listbox-label" class="text-sm font-medium text-greyscale-600" x-text="visibleSectionText"></span>
-    <img aria-hidden="true" src="{% static "svg/chevron.svg" %}">
+    <span
+      class="text-sm font-medium text-greyscale-600"
+      x-text="visibleSectionText"
+      aria-hidden="true"
+    ></span>
+    {% svg "chevron" aria_hidden="true" %}
   </button>
+
+  <nav>
   <ul
+    id="mobile-menu-list"
     x-show="menuOpen"
     x-on:click.outside="closeMenu"
     x-on:keyup.esc="closeMenu"
+    x-on:keyup.right="focusNext"
+    x-on:keyup.left="focusPrevious"
     class="absolute z-10 mt-2 max-h-[320px] w-full overflow-auto rounded-lg bg-white py-1 shadow-lg border border-greyscale-200 focus:outline-hidden"
     tabindex="-1"
-    role="listbox"
-    aria-labelledby="listbox-label"
-    aria-activedescendant="listbox-option-3"
+    role="menu"
+    aria-label="Navigation"
     x-transition:enter="transition ease-out duration-300"
     x-transition:enter-start="opacity-0"
     x-transition:enter-end="opacity-100"
@@ -90,28 +111,37 @@
     x-transition:leave-end="opacity-0"
   >
     <template x-for="option in options" :key="option.href">
-      <li class="relative cursor-default py-[1px] px-1.5 select-none" role="option">
-        <a x-on:click="closeMenu" x-bind:href="option.href" class="py-2.5 px-2 hover:bg-greyscale-100 rounded-md flex flex-row justify-between">
+      <li class="relative cursor-default py-[1px] px-1.5 select-none" role="none">
+        <a
+          x-on:click="closeMenu"
+          x-bind:href="option.href"
+          role="menuitem"
+          class="py-2.5 px-2 hover:bg-greyscale-100 rounded-md flex flex-row justify-between"
+        >
           <span class="truncate font-medium text-sm text-greyscale-600" x-text="option.text"></span>
-          <img x-bind:data-intersect-target="option.href" x-show="isVisible" class="" aria-hidden="true" src="{% static "svg/check.svg" %}">
+          {% svg "check" x_show="isVisible" x_bind__data_intersect_target="option.href" aria_hidden="true" %}
         </a>
+
         <template
           x-if="hasChildren"
           x-bind:data-intersect-target="option.href"
         >
-          <ul class="flex flex-col w-full">
+          <ul class="flex flex-col w-full" role="menu">
             <template x-for="subItem in option.children">
-              <a
-                x-on:click="closeMenu"
-                x-bind:href="subItem.href"
-                class="w-full pl-7.5 py-1.5 font-normal text-sm text-greyscale-600"
-                x-bind:data-intersect-target="subItem.href"
-                x-text="subItem.text"
-              ></a>
+              <li class="w-full pl-7.5 py-1.5 font-normal text-sm text-greyscale-600" role="none">
+                <a
+                  x-on:click="closeMenu"
+                  x-bind:href="subItem.href"
+                  x-bind:data-intersect-target="subItem.href"
+                  x-text="subItem.text"
+                  role="menuitem"
+                ></a>
+              </li>
             </template>
           </ul>
         </template>
       </li>
     </template>
   </ul>
+  </nav>
 </div>

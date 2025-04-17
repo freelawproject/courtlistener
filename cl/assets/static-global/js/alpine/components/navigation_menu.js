@@ -52,6 +52,12 @@ document.addEventListener('alpine:init', () => {
       const index = this.options.findIndex((el) => el.href === this.target);
       return index > -1 ? this.options[index].children : false;
     },
+    focusPrevious() {
+      this.$focus.wrap().previous();
+    },
+    focusNext() {
+      this.$focus.wrap().next();
+    },
     init() {
       this.options = JSON.parse(document.getElementById('nav-items').textContent);
       this.options.forEach((option) => {
