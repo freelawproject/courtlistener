@@ -1,6 +1,6 @@
 import math
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest.mock import patch
 
@@ -849,6 +849,122 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             actual_top_prayers,
             expected_top_prayers,
             msg="Wrong top_prayers based on combined prayer count and docket view count.",
+        )
+
+    async def test_get_top_prayers_by_availability(self) -> None:
+        """Does the get_top_prayers method work properly?"""
+
+        # Test top documents based on document unavailability.
+        await sync_to_async(PrayerAvailability.objects.create)(
+                recap_document=self.rd_2,
+            )
+        
+        await create_prayer(self.user, self.rd_3)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+
+        top_prayers = await get_top_prayers()
+        self.assertEqual(await top_prayers.acount(), 2)
+        expected_top_prayers = [self.rd_3.pk, self.rd_2.pk]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
+
+        self.assertEqual(
+            actual_top_prayers,
+            expected_top_prayers,
+            msg="Wrong top_prayers based on document availability.",
+        )
+
+    async def test_get_top_prayers_by_availability_last_checked(self) -> None:
+        """Does the get_top_prayers method work properly?"""
+
+        # Test top documents based on when document availability was last checked.
+        d_2 = date(2024, 4, 15)
+        dt_2 = datetime.combine(d_2, datetime.min.time())
+
+        d_3 = date(2024, 3, 15)
+        dt_3 = datetime.combine(d_3, datetime.min.time())
+
+        await sync_to_async(PrayerAvailability.objects.create)(
+                recap_document=self.rd_2,
+                last_checked=dt_2
+            )
+        
+        await sync_to_async(PrayerAvailability.objects.create)(
+                recap_document=self.rd_3,
+                last_checked=dt_3
+            )
+        
+        await create_prayer(self.user, self.rd_3)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+
+        top_prayers = await get_top_prayers()
+        self.assertEqual(await top_prayers.acount(), 2)
+        expected_top_prayers = [self.rd_3.pk, self.rd_2.pk]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
+
+        self.assertEqual(
+            actual_top_prayers,
+            expected_top_prayers,
+            msg="Wrong top_prayers based on when document availability was last checked.",
+        )
+
+    async def test_get_top_prayers_by_all(self) -> None:
+        """Does the get_top_prayers method work properly?"""
+
+        # Test top documents based on all factors.
+        d_2 = date(2024, 4, 15)
+        dt_2 = datetime.combine(d_2, datetime.min.time())
+
+        d_3 = date(2024, 3, 15)
+        dt_3 = datetime.combine(d_3, datetime.min.time())
+
+        await sync_to_async(PrayerAvailability.objects.create)(
+                recap_document=self.rd_2,
+                last_checked=dt_2
+            )
+        
+        await sync_to_async(PrayerAvailability.objects.create)(
+                recap_document=self.rd_3,
+                last_checked=dt_3
+            )
+        
+        await sync_to_async(PrayerAvailability.objects.create)(
+                recap_document=self.rd_4,
+                last_checked=dt_3
+            )
+        
+        self.rd_2.docket_entry.docket.view_count = 4
+        self.rd_3.docket_entry.docket.view_count = 1
+        self.rd_4.docket_entry.docket.view_count = 6
+        self.rd_5.docket_entry.docket.view_count = 8
+        self.rd_6.docket_entry.docket.view_count = 15
+
+        await self.rd_2.docket_entry.docket.asave()
+        await self.rd_3.docket_entry.docket.asave()
+        await self.rd_4.docket_entry.docket.asave()
+        await self.rd_5.docket_entry.docket.asave()
+        await self.rd_6.docket_entry.docket.asave()
+        
+        await create_prayer(self.user, self.rd_3)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user, self.rd_4)
+        await create_prayer(self.user, self.rd_6)
+        await create_prayer(self.user_2, self.rd_2)
+        await create_prayer(self.user_2, self.rd_5)
+        await create_prayer(self.user_2, self.rd_4)
+        await create_prayer(self.user_2, self.rd_6)
+
+
+        top_prayers = await get_top_prayers()
+        self.assertEqual(await top_prayers.acount(), 5)
+        expected_top_prayers = [self.rd_6.pk, self.rd_5.pk, self.rd_4.pk, self.rd_3.pk, self.rd_2.pk]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
+
+        self.assertEqual(
+            actual_top_prayers,
+            expected_top_prayers,
+            msg="Wrong top_prayers based on all factors.",
         )
 
     async def test_get_user_prayers(self) -> None:
