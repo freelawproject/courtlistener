@@ -761,16 +761,14 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         """Does the get_top_prayers method work properly?"""
 
         # Test top documents based on prayers count.
-        current_time = now()
-        with time_machine.travel(current_time, tick=False):
-            await create_prayer(self.user, self.rd_2)
-            await create_prayer(self.user_2, self.rd_2)
-            await create_prayer(self.user_3, self.rd_2)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+        await create_prayer(self.user_3, self.rd_2)
 
-            await create_prayer(self.user, self.rd_4)
-            await create_prayer(self.user_3, self.rd_4)
+        await create_prayer(self.user, self.rd_4)
+        await create_prayer(self.user_3, self.rd_4)
 
-            await create_prayer(self.user_2, self.rd_3)
+        await create_prayer(self.user_2, self.rd_3)
 
         prays = Prayer.objects.all()
         self.assertEqual(await prays.acount(), 6)
