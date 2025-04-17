@@ -119,7 +119,7 @@ class Command(VerboseCommand):
                 f"Auto-resume enabled starting embedding from ID: {start_id}."
             )
 
-        opinions = Opinion.objects.filter(id__gte=start_id)
+        opinions = Opinion.objects.using(database).filter(id__gte=start_id)
         # Limit opinions to retrieve if count was provided.
         opinions_to_process = (
             opinions[:count] if count is not None else opinions
@@ -129,11 +129,13 @@ class Command(VerboseCommand):
             opinions_with_best_text[:count] if count is not None else opinions
         )
 
+        logger.info("Getting count of opinions to process.")
         count = opinions_to_process.count()
+        logger.info("Count finished.")
         current_batch: list[int] = []
         current_batch_size = 0
         processed_count = 0
-        for opinion in opinions_with_best_text.iterator():
+        for opinion in opinions_with_best_text.iterator(chunk_size=1000):
             opinion_id = opinion.pk
             processed_count += 1
             token_count = opinion.token_count
