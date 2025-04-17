@@ -40,7 +40,7 @@
   {% else %}
     {# We don't have it #}
     {% if rd.is_sealed %}
-      <span class="btn btn-primary disabled">This Item is Sealed</span>
+      <span class="btn btn-primary disabled">This Item is Unavailable</span>
     {% else %}
       {% if rd.pacer_url %}
         <a href="{{ rd.pacer_url }}"
