@@ -1869,6 +1869,6 @@ def save_embeddings(
             )
         )
         storage.save(file_path, ContentFile(file_contents))
-    
+
     # Delete the cache key after the saving process is complete.
     cache.delete(cache_key)
