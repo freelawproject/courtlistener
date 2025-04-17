@@ -33,7 +33,7 @@ class Command(VerboseCommand):
             help="Let the user decide which DB name to use",
         )
         parser.add_argument(
-            "--batch-size",
+            "--token-count",
             type=int,
             help="How many tokens per batch.",
             required=True,
@@ -102,7 +102,7 @@ class Command(VerboseCommand):
         embedding_queue = options["embedding_queue"]
         upload_queue = options["upload_queue"]
         database = options["database"]
-        batch_size = options["batch_size"]
+        token_count_limit = options["token_count"]
         count = options.get("count", None)
         auto_resume = options["auto_resume"]
         min_opinion_size = settings.MIN_OPINION_SIZE
@@ -119,7 +119,7 @@ class Command(VerboseCommand):
                 f"Auto-resume enabled starting embedding from ID: {start_id}."
             )
 
-        opinions = Opinion.objects.filter(id__gte=start_id)
+        opinions = Opinion.objects.using(database).filter(id__gte=start_id)
         # Limit opinions to retrieve if count was provided.
         opinions_to_process = (
             opinions[:count] if count is not None else opinions
@@ -129,17 +129,19 @@ class Command(VerboseCommand):
             opinions_with_best_text[:count] if count is not None else opinions
         )
 
+        logger.info("Getting count of opinions to process.")
         count = opinions_to_process.count()
+        logger.info("Count finished.")
         current_batch: list[int] = []
         current_batch_size = 0
         processed_count = 0
-        for opinion in opinions_with_best_text.iterator():
+        for opinion in opinions_with_best_text.iterator(chunk_size=1000):
             opinion_id = opinion.pk
             processed_count += 1
             token_count = opinion.token_count
             if token_count < min_opinion_size:
                 continue
-            if token_count > batch_size:
+            if token_count > token_count_limit:
                 # Log documents that individually exceed the batch size.
                 logger.error(
                     "The opinion ID:%s exceeds the batch size limit.",
@@ -147,7 +149,7 @@ class Command(VerboseCommand):
                 )
                 continue
             # Check if adding this opinion would exceed the batch size.
-            if current_batch_size + token_count > batch_size:
+            if current_batch_size + token_count > token_count_limit:
 
                 # Send the current batch since adding this opinion would break the limit.
                 self.send_batch(

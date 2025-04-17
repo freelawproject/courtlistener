@@ -173,7 +173,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
         mock_aws_media_storage.return_value = fake_storage
         call_command(
             "generate_opinion_embeddings",
-            batch_size=10000,
+            token_count=10000,
             start_id=0,
             count=3,
         )
@@ -218,7 +218,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
         ) as mock_inception_batch_request:
             call_command(
                 "generate_opinion_embeddings",
-                batch_size=250,
+                token_count=250,
                 start_id=0,
                 count=4,
             )
@@ -268,7 +268,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
         ) as mock_inception_batch_request:
             call_command(
                 "generate_opinion_embeddings",
-                batch_size=250,
+                token_count=250,
                 start_id=0,
             )
             # The embedding generation should be split into two inception
