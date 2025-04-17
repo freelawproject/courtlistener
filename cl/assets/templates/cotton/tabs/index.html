@@ -1,18 +1,22 @@
 {% load component_tags %}
 {% require_script "js/alpine/components/tabs.js" %}
+<c-vars title=""></c-vars>
 
 <div
   x-data="tabsComponent"
   class="w-full"
 >
-  <div class="w-full gap-1 hidden md:flex">
+  {# DESKTOP tabs #}
+  <div aria-label="{{ title }} tabs" role="tablist" class="w-full gap-1 hidden md:flex">
     <template x-for="tab in tabs">
       <div x-data="tabComponent">
         <button
           x-on:click="setActiveTab"
+          x-bind:aria-selected="isActive"
           x-bind:class="tabClass"
           x-bind:data-tab-id="tab"
           x-text="tab"
+          type="button"
           role="tab"
           class="px-5 py-3 text-sm font-normal rounded-t-2xl text-greyscale-600"
         >
@@ -20,17 +24,23 @@
       </div>
     </template>
   </div>
+
+  {# MOBILE tabs #}
   <div class="bg-greyscale-100 rounded-t-2xl md:hidden pt-3 px-4">
-    <select @change="handleChange" class="w-full">
+    <select aria-label="Select {{ title }} tabs" @change="handleChange" class="w-full">
       <template x-for="tab in tabs">
         <option
           x-text="tab"
+          x-bind:aria-selected="isActive"
+          x-bind:data-tab-id="tab"
           class="appearance-none"
         ></option>
       </template>
     </select>
   </div>
-  <div class="w-full bg-greyscale-100 text-greyscale-900 p-4 rounded-b-2xl md:rounded-tr-2xl rounded-tl-none">
+
+  {# Active panel content #}
+  <div aria-label="Active {{ title }} panel" role="tabpanel" class="w-full bg-greyscale-100 text-greyscale-900 p-4 rounded-b-2xl md:rounded-tr-2xl rounded-tl-none">
     {{ slot }}
   </div>
 </div>
