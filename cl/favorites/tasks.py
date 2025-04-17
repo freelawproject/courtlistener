@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import DownloadConfirmationPage
+from juriscraper.pacer.utils import is_pdf
 from redis import ConnectionError as RedisConnectionError
 
 from cl.celery_init import app
@@ -45,7 +46,7 @@ def check_prayer_pacer(self, rd_pk: int, user_pk: int):
     receipt_report.query(pacer_doc_id)
     data = receipt_report.data
 
-    if data == {}:
+    if data == {} and not is_pdf(receipt_report.response):
         rd.is_sealed = True
         rd.save()
         PrayerAvailability.objects.update_or_create(
