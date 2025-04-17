@@ -3,6 +3,7 @@ import csv
 import io
 import json
 import logging
+import uuid
 from datetime import date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
@@ -15,6 +16,7 @@ from celery.canvas import chain
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
@@ -1722,6 +1724,14 @@ def inception_batch_request(batch: dict) -> list[dict]:
     return response.json()
 
 
+def embeddings_cache_key():
+    return "embeddings:"
+
+
+def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
+    return f"{embeddings_cache_key()}{batch_uuid}-{batch_range}"
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -1735,16 +1745,14 @@ def inception_batch_request(batch: dict) -> list[dict]:
     retry_backoff=10,
 )
 def create_opinion_text_embeddings(
-    self,
-    batch: list[int],
-    database,
-) -> list[dict]:
+    self, batch: list[int], database
+) -> str | None:
     """Get embeddings for Opinion texts from inception.
 
     :param self: The Celery task.
     :param batch: A list of Opinion IDs representing the batch to process.
     :param database: The database to be used during processing.
-    :return: A list of dictionaries, each containing the opinion embeddings.
+    :return: The cache key used to temporarily store embeddings.
     """
     opinions = (
         Opinion.objects.filter(id__in=batch).with_best_text().using(database)
@@ -1752,9 +1760,18 @@ def create_opinion_text_embeddings(
     opinions_to_vectorize = [
         {"id": opinion.pk, "text": opinion.clean_text} for opinion in opinions
     ]
+    if not opinions_to_vectorize:
+        self.request.chain = None
+        return None
+
+    batch_range = f"{batch[0]}_{batch[-1]}"
     batch_request = {"documents": opinions_to_vectorize}
     embeddings = inception_batch_request(batch_request)
-    return embeddings
+    # Use a UUID to guarantee the uniqueness of this batch of stored embeddings
+    batch_uuid = str(uuid.uuid4().hex)
+    cache_key = get_embeddings_cache_key(batch_uuid, batch_range)
+    cache.set(cache_key, embeddings, 60 * 30)
+    return cache_key
 
 
 @app.task(
@@ -1768,7 +1785,7 @@ def create_opinion_text_embeddings(
 )
 def save_embeddings(
     self,
-    embeddings: list[dict],
+    cache_key: str,
     directory: str = "opinions",
 ) -> None:
     """Save embeddings to S3.
@@ -1811,11 +1828,34 @@ def save_embeddings(
     be stored embeddings/opinions/freelawproject/modernbert-embed-base_finetune_512/{opinion_id}.json
 
     :param self: The Celery task.
-    :param embeddings: A list of dictionaries representing the embeddings to
-     be saved.
+    :param cache_key: The cache key used to temporarily store the embeddings.
     :param directory: The directory where the embeddings will be stored.
     :return: None.
     """
+
+    embeddings = cache.get(cache_key, None)
+    if embeddings is None:
+        batch_range = cache_key.rsplit("-", 1)[-1]
+        logger.error(
+            "Embeddings for the opinion range %s are missing from Redis",
+            batch_range,
+        )
+        return None
+
+    if not isinstance(embeddings, list):
+        if isinstance(embeddings, dict):
+            logger.error(
+                "Received API error response in embeddings: %s",
+                json.dumps(embeddings, default=str),
+            )
+        else:
+            logger.error(
+                "Unexpected data type for embeddings: %s (%s)",
+                str(embeddings)[:200],
+                type(embeddings),
+            )
+        return None
+
     storage = S3IntelligentTieringStorage()
     for embedding_record in embeddings:
         record_id = embedding_record["id"]
@@ -1829,3 +1869,6 @@ def save_embeddings(
             )
         )
         storage.save(file_path, ContentFile(file_contents))
+
+    # Delete the cache key after the saving process is complete.
+    cache.delete(cache_key)
