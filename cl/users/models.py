@@ -139,6 +139,10 @@ class UserProfile(models.Model):
         help_text="Unique identifier assigned by Neon CRM to a customer record",
         blank=True,
     )
+    prayers_public = models.BooleanField(
+        help_text="If enabled, the user's pending document prayers will be viewable by the public",
+        default=False,
+    )
 
     @property
     def is_member(self) -> bool:

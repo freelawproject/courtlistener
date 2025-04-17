@@ -1,0 +1,111 @@
+.prayers-public-switch {
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+  position: relative;
+  vertical-align: middle;
+  margin-bottom: 0;
+}
+
+.prayers-public-switch:hover {
+  cursor: pointer;
+}
+
+.prayers-public-switch>input {
+  position: absolute;
+  opacity: 0;
+}
+
+.prayers-public-switch>input+.toggle>.switch {
+  background: #fff;
+  display: block;
+  height: 100%;
+  position: absolute;
+  right: 0;
+  z-index: 3;
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  /* Safari */
+  -ms-user-select: none;
+  /* IE 10 and IE 11 */
+  user-select: none;
+  /* Standard syntax */
+}
+
+.prayers-public-switch>input+.toggle .switch {
+  border-radius: 6px;
+}
+
+.prayers-public-switch>input:not(:checked)+.toggle {
+  background: #ccc;
+}
+
+
+.prayers-public-switch>input:not(:checked)+.toggle>.switch {
+  border: 3px solid #ccc;
+}
+
+.prayers-public-switch>input+.toggle {
+  border-radius: 4px;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  width: 30px;
+}
+
+
+.prayers-public-switch>input+.toggle:before {
+  opacity: 0;
+}
+
+/* Color: Red */
+.prayers-public-switch>input:checked+.toggle {
+  background: #B53C2C;
+}
+
+.prayers-public-switch>input:checked+.toggle>.switch {
+  border: 3px solid #B53C2C;
+}
+
+.prayers-public-switch>input:checked+.toggle:before {
+  opacity: 1;
+}
+
+.prayers-public-switch>input:checked+.toggle:after {
+  opacity: 0;
+}
+
+/* Transitions */
+.prayers-public-switch>input+.toggle {
+  width: 35px;
+  height: 20px;
+  transition: background 200ms linear, box-shadow 200ms linear;
+}
+
+.prayers-public-switch>input+.toggle:before,
+.prayers-public-switch>input+.toggle:after {
+  font-size: 0.5rem;
+}
+
+
+.prayers-public-switch>input+.toggle>.switch {
+  width: 20px;
+  transition: right 200ms linear, border-color 200ms linear;
+}
+
+.prayers-public-switch>input:not(:checked)+.toggle>.switch {
+  right: calc(100% - 20px);
+}
+
+/* Style: Rounded */
+.prayers-public-switch>input+.toggle,
+.prayers-public-switch>input+.toggle>.switch {
+  border-radius: 50px;
+}
