@@ -1,7 +1,7 @@
 from django import template
 from django.conf import settings
 from django.contrib.staticfiles.finders import find
-from django.utils.safestring import mark_safe
+from django.utils.html import format_html
 
 register = template.Library()
 
@@ -33,7 +33,7 @@ def svg(name, css_class="", **kwargs):
         return ""
 
     try:
-        with open(absolute_path, "r") as file:
+        with open(absolute_path, "r", encoding="utf-8") as file:
             svg_content = file.read()
 
         if css_class:
@@ -51,7 +51,7 @@ def svg(name, css_class="", **kwargs):
             key = key.replace("_", "-")  # Convert snake_case to kebab-case
             svg_content = svg_content.replace("<svg", f'<svg {key}="{value}"')
 
-        return mark_safe(svg_content)
+        return format_html(svg_content)
 
     except FileNotFoundError:
         if settings.DEBUG:
