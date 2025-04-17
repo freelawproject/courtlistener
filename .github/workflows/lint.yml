@@ -95,7 +95,8 @@ jobs:
           cl/recap/utils.py \
           cl/search/management/commands/cl_index_parent_and_child_docs.py \
           cl/search/management/commands/sweep_indexer.py \
-          cl/search/management/commands/pacer_bulk_fetch.py
+          cl/search/management/commands/pacer_bulk_fetch.py \
+          cl/search/management/commands/generate_opinion_embeddings.py
 
 
 

@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from requests import HTTPError
 
+from cl.lib.utils import append_value_in_cache
 from cl.recap.factories import PacerFetchQueueFactory
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
 from cl.search.factories import (
@@ -18,7 +19,6 @@ from cl.search.factories import (
 )
 from cl.search.management.commands.pacer_bulk_fetch import (
     Command,
-    append_value_in_cache,
     is_retry_interval_elapsed,
 )
 from cl.search.models import RECAPDocument
