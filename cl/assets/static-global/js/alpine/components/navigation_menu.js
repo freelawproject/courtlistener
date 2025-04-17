@@ -1,3 +1,9 @@
+/**
+ * SECURITY NOTE: This component assumes all navigation items are developer-defined
+ * and not influenced by user input or external data sources. If this changes in the future
+ * and navigation items become dynamic or user-influenced, proper URL encoding MUST be
+ * implemented.
+ */
 document.addEventListener('alpine:init', () => {
   Alpine.data('navMenu', () => ({
     menuOpen: false,
