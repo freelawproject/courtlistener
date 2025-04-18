@@ -518,6 +518,9 @@ def process_alert_hits(
                 )
                 if rds_to_send:
                     # Docket OR RECAPDocument alert.
+                    # This includes hits triggered by an alert that can
+                    # match Dockets or RECAPDocuments at the same time.
+                    # e.g: q=docket_id:34238745 OR pacer_doc_id:1014052133
                     hit["child_docs"] = rds_to_send
                     results_to_send.append(hit)
                     if should_docket_hit_be_included(
@@ -531,6 +534,8 @@ def process_alert_hits(
                     r, alert_id, hit.docket_id, query_date
                 ):
                     # Docket-only alert
+                    # This alert query matched only Dockets.
+                    # e.g: docket_number=23-43434
                     hit["child_docs"] = []
                     results_to_send.append(hit)
                     add_document_hit_to_alert_set(
@@ -538,6 +543,10 @@ def process_alert_hits(
                     )
             else:
                 # RECAPDocument-only alerts or cross-object alerts
+                # This alert query matched either only RECAPDocuments
+                # e.g., document_number:1
+                # or a combination of RECAPDocument fields and Docket-level fields,
+                # e.g., document_number:1 & docket_number:23-43434
                 rds_to_send = filter_rd_alert_hits(
                     r, alert_id, hit["child_docs"], rd_ids
                 )

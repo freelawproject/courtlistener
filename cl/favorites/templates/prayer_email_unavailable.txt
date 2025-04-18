@@ -17,7 +17,7 @@ View Community Leaderboard: https://www.courtlistener.com/prayers/top/
 Document Number: {{ docket_entry.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
 Date Filed: {% if docket_entry.datetime_filed %}{{ docket_entry.datetime_filed|utc|date:"M j, Y" }}{% else %}{{ docket_entry.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}
 Description: {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ docket_entry.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}
-View Document: Sealed on PACER
+View Document: Unavailable on PACER
 ~~~
 You requested it on {{ date_created|date:"F j, Y" }}.
 {{num_waiting}} {{ num_waiting|pluralize:"person is,people are" }} waiting for it.

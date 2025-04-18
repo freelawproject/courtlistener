@@ -1,6 +1,6 @@
 import math
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest.mock import patch
 
@@ -19,6 +19,7 @@ from timeout_decorator import timeout_decorator
 from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
+from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, PrayerFactory
 from cl.favorites.models import (
     DocketTag,
@@ -27,6 +28,7 @@ from cl.favorites.models import (
     PrayerAvailability,
     UserTag,
 )
+from cl.favorites.tasks import check_prayer_pacer
 from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
@@ -661,12 +663,15 @@ class APITests(APITestCase):
         self.assertEqual(response.json()["count"], 1)
 
 
-class RECAPPrayAndPay(PrayAndPayTestCase):
+class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
         """Does the prayer_eligible method work properly?"""
-
+        # Create a membership for one of the users
+        await sync_to_async(NeonMembership.objects.create)(
+            level=NeonMembership.LEGACY, user=self.user_2
+        )
         current_time = now()
         with time_machine.travel(current_time, tick=False):
             # No user prayers in the last 24 hours yet for this user.
@@ -677,6 +682,9 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
             await sync_to_async(PrayerFactory)(
                 user=self.user, recap_document=self.rd_1
             )
+            await sync_to_async(PrayerFactory)(
+                user=self.user_2, recap_document=self.rd_1
+            )
 
             user_prays = Prayer.objects.filter(user=self.user)
             self.assertEqual(await user_prays.acount(), 1)
@@ -686,12 +694,22 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
             await sync_to_async(PrayerFactory)(
                 user=self.user, recap_document=self.rd_2
             )
+            await sync_to_async(PrayerFactory)(
+                user=self.user_2, recap_document=self.rd_2
+            )
             self.assertEqual(await user_prays.acount(), 2)
 
             # After two prays (ALLOWED_PRAYER_COUNT) in the last 24 hours.
             # The user is no longer eligible to create more prays
             user_is_eligible, _ = await prayer_eligible(self.user)
             self.assertFalse(user_is_eligible)
+
+            # Verify that a membership grants triple the prayer allowance
+            user_is_eligible, remaining_prayers = await prayer_eligible(
+                self.user_2
+            )
+            self.assertTrue(user_is_eligible)
+            self.assertEqual(remaining_prayers, 4)
 
         with time_machine.travel(
             current_time + timedelta(hours=25), tick=False
@@ -744,16 +762,14 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
         """Does the get_top_prayers method work properly?"""
 
         # Test top documents based on prayers count.
-        current_time = now()
-        with time_machine.travel(current_time, tick=False):
-            await create_prayer(self.user, self.rd_2)
-            await create_prayer(self.user_2, self.rd_2)
-            await create_prayer(self.user_3, self.rd_2)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+        await create_prayer(self.user_3, self.rd_2)
 
-            await create_prayer(self.user, self.rd_4)
-            await create_prayer(self.user_3, self.rd_4)
+        await create_prayer(self.user, self.rd_4)
+        await create_prayer(self.user_3, self.rd_4)
 
-            await create_prayer(self.user_2, self.rd_3)
+        await create_prayer(self.user_2, self.rd_3)
 
         prays = Prayer.objects.all()
         self.assertEqual(await prays.acount(), 6)
@@ -834,6 +850,122 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
             actual_top_prayers,
             expected_top_prayers,
             msg="Wrong top_prayers based on combined prayer count and docket view count.",
+        )
+
+    async def test_get_top_prayers_by_availability(self) -> None:
+        """Does the get_top_prayers method work properly?"""
+
+        # Test top documents based on document unavailability.
+        await sync_to_async(PrayerAvailability.objects.create)(
+            recap_document=self.rd_2,
+        )
+
+        await create_prayer(self.user, self.rd_3)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+
+        top_prayers = await get_top_prayers()
+        self.assertEqual(await top_prayers.acount(), 2)
+        expected_top_prayers = [self.rd_3.pk, self.rd_2.pk]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
+
+        self.assertEqual(
+            actual_top_prayers,
+            expected_top_prayers,
+            msg="Wrong top_prayers based on document availability.",
+        )
+
+    async def test_get_top_prayers_by_availability_last_checked(self) -> None:
+        """Does the get_top_prayers method work properly?"""
+
+        # Test top documents based on when document availability was last checked.
+        d_2 = date(2024, 4, 15)
+        dt_2 = datetime.combine(d_2, datetime.min.time())
+
+        d_3 = date(2024, 3, 15)
+        dt_3 = datetime.combine(d_3, datetime.min.time())
+
+        await sync_to_async(PrayerAvailability.objects.create)(
+            recap_document=self.rd_2, last_checked=dt_2
+        )
+
+        await sync_to_async(PrayerAvailability.objects.create)(
+            recap_document=self.rd_3, last_checked=dt_3
+        )
+
+        await create_prayer(self.user, self.rd_3)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+
+        top_prayers = await get_top_prayers()
+        self.assertEqual(await top_prayers.acount(), 2)
+        expected_top_prayers = [self.rd_3.pk, self.rd_2.pk]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
+
+        self.assertEqual(
+            actual_top_prayers,
+            expected_top_prayers,
+            msg="Wrong top_prayers based on when document availability was last checked.",
+        )
+
+    async def test_get_top_prayers_by_all(self) -> None:
+        """Does the get_top_prayers method work properly?"""
+
+        # Test top documents based on all factors.
+        d_2 = date(2024, 4, 15)
+        dt_2 = datetime.combine(d_2, datetime.min.time())
+
+        d_3 = date(2024, 3, 15)
+        dt_3 = datetime.combine(d_3, datetime.min.time())
+
+        await sync_to_async(PrayerAvailability.objects.create)(
+            recap_document=self.rd_2, last_checked=dt_2
+        )
+
+        await sync_to_async(PrayerAvailability.objects.create)(
+            recap_document=self.rd_3, last_checked=dt_3
+        )
+
+        await sync_to_async(PrayerAvailability.objects.create)(
+            recap_document=self.rd_4, last_checked=dt_3
+        )
+
+        self.rd_2.docket_entry.docket.view_count = 4
+        self.rd_3.docket_entry.docket.view_count = 1
+        self.rd_4.docket_entry.docket.view_count = 6
+        self.rd_5.docket_entry.docket.view_count = 8
+        self.rd_6.docket_entry.docket.view_count = 15
+
+        await self.rd_2.docket_entry.docket.asave()
+        await self.rd_3.docket_entry.docket.asave()
+        await self.rd_4.docket_entry.docket.asave()
+        await self.rd_5.docket_entry.docket.asave()
+        await self.rd_6.docket_entry.docket.asave()
+
+        await create_prayer(self.user, self.rd_3)
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user, self.rd_4)
+        await create_prayer(self.user, self.rd_6)
+        await create_prayer(self.user_2, self.rd_2)
+        await create_prayer(self.user_2, self.rd_5)
+        await create_prayer(self.user_2, self.rd_4)
+        await create_prayer(self.user_2, self.rd_6)
+
+        top_prayers = await get_top_prayers()
+        self.assertEqual(await top_prayers.acount(), 5)
+        expected_top_prayers = [
+            self.rd_6.pk,
+            self.rd_5.pk,
+            self.rd_4.pk,
+            self.rd_3.pk,
+            self.rd_2.pk,
+        ]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
+
+        self.assertEqual(
+            actual_top_prayers,
+            expected_top_prayers,
+            msg="Wrong top_prayers based on all factors.",
         )
 
     async def test_get_user_prayers(self) -> None:
@@ -940,8 +1072,9 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
         # - Total cost of $5.60 (sum of individual document costs)
         prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
         self.assertEqual(prayer_stats.prayer_count, 6)
-        self.assertEqual(prayer_stats.distinct_count, 4)
         self.assertEqual(prayer_stats.total_cost, "5.60")
+        self.assertEqual(prayer_stats.distinct_count, 4)
+        self.assertEqual(prayer_stats.distinct_users, 2)
 
         # Verify that no prayers have been granted:
         # - Zero count of granted prayers
@@ -949,8 +1082,9 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
         # - Zero total cost
         prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
         self.assertEqual(prayer_stats.prayer_count, 0)
-        self.assertEqual(prayer_stats.distinct_count, 0)
         self.assertEqual(prayer_stats.total_cost, "0.00")
+        self.assertEqual(prayer_stats.distinct_count, 0)
+        self.assertEqual(prayer_stats.distinct_users, 0)
 
         # rd_2 is granted.
         self.rd_2.is_available = True
@@ -962,8 +1096,9 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
         # - Total cost should decrease to 5.10 (excluding `rd_2`'s cost)
         prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
         self.assertEqual(prayer_stats.prayer_count, 4)
-        self.assertEqual(prayer_stats.distinct_count, 3)
         self.assertEqual(prayer_stats.total_cost, "5.10")
+        self.assertEqual(prayer_stats.distinct_count, 3)
+        self.assertEqual(prayer_stats.distinct_users, 2)
 
         # Verify that granting `rd_2` increases the number of granted prayers:
         # - Total granted prayers should increase by 2 (as `rd_2` had 2 prayers)
@@ -971,8 +1106,9 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
         # - Total cost should increase by 0.50 (the cost of granting `rd_2`)
         prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
         self.assertEqual(prayer_stats.prayer_count, 2)
-        self.assertEqual(prayer_stats.distinct_count, 1)
         self.assertEqual(prayer_stats.total_cost, "0.50")
+        self.assertEqual(prayer_stats.distinct_count, 1)
+        self.assertEqual(prayer_stats.distinct_users, 2)
 
         # rd_4 is granted.
         self.rd_4.is_available = True
@@ -984,8 +1120,9 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
         # - Total cost should decrease to 2.10 (excluding costs of `rd_2` and `rd_4`)
         prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
         self.assertEqual(prayer_stats.prayer_count, 3)
-        self.assertEqual(prayer_stats.distinct_count, 2)
         self.assertEqual(prayer_stats.total_cost, "2.10")
+        self.assertEqual(prayer_stats.distinct_count, 2)
+        self.assertEqual(prayer_stats.distinct_users, 2)
 
         # Verify that granting `rd_4` increases the number of granted prayers:
         # - Total granted prayers should increase by 3 (2 from `rd_2` and 1 from `rd_4`)
@@ -993,8 +1130,9 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
         # - Total cost should increase by 3.50 (the combined cost of `rd_2` and `rd_4`)
         prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
         self.assertEqual(prayer_stats.prayer_count, 3)
-        self.assertEqual(prayer_stats.distinct_count, 2)
         self.assertEqual(prayer_stats.total_cost, "3.50")
+        self.assertEqual(prayer_stats.distinct_count, 2)
+        self.assertEqual(prayer_stats.distinct_users, 2)
 
         await cache.adelete(f"prayer-stats-{Prayer.WAITING}")
         await cache.adelete(f"prayer-stats-{Prayer.GRANTED}")
@@ -1140,6 +1278,88 @@ class RECAPPrayAndPay(PrayAndPayTestCase):
             msg="The top prayer didn't match.",
         )
 
+    async def test_can_we_load_the_top_prayers_page(self) -> None:
+        """Does the 'top prayers' page return a successful response?"""
+        r = await self.async_client.get(reverse("top_prayers"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    async def test_private_user_prayers_redirects_to_top_prayers(self) -> None:
+        """Does accessing a private user's prayer page redirect to the top prayers page?"""
+        # Create a user profile (their prayers are private by default).
+        profile = await sync_to_async(UserProfileWithParentsFactory)()
+        user_prayers_path = reverse(
+            "user_prayers", args=[profile.user.username]
+        )
+
+        # Anonymous user should be redirected.
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertRedirects(
+            r,
+            expected_url=reverse("top_prayers"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+        # Logged-in user should also be redirected when viewing another
+        # user's private prayers.
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertRedirects(
+            r,
+            expected_url=reverse("top_prayers"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+    async def test_get_public_user_prayers_does_not_redirect(self) -> None:
+        """Can we access a public user's prayer page?"""
+        # Create a user profile.
+        profile = await sync_to_async(UserProfileWithParentsFactory)()
+        # Make the user's prayer page public.
+        profile.prayers_public = True
+        await profile.asave()
+
+        user_prayers_path = reverse(
+            "user_prayers", args=[profile.user.username]
+        )
+        # Anonymous user should not be redirected and should be able to load
+        # the list of prayers.
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertContains(r, f"{profile.user.username}")
+
+        # Logged-in user should also be able to load the page.
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertContains(r, f"{profile.user.username}")
+
+    async def test_list_of_granted_prayers_is_always_private(self) -> None:
+        """Does accessing the granted prayers list always redirect to the top prayers page?"""
+        # Create a user profile.
+        profile = await sync_to_async(UserProfileWithParentsFactory)()
+        # Intentionally make the prayers page public to ensure granted prayers
+        # redirection is independent of the user's privacy setting.
+        profile.prayers_public = True
+        await profile.asave()
+
+        user_prayers_path = reverse(
+            "user_prayers_granted", args=[profile.user.username]
+        )
+
+        # Anonymous user should be redirected from the granted prayers list.
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertRedirects(
+            r,
+            expected_url=reverse("top_prayers"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+        # Logged-in user should be redirected from the granted prayers list.
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(user_prayers_path, follow=True)
+        self.assertRedirects(
+            r,
+            expected_url=reverse("top_prayers"),
+            target_status_code=HTTPStatus.OK,
+        )
+
 
 @patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
 @patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
@@ -1276,8 +1496,10 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
     @patch(
         "cl.favorites.tasks.DownloadConfirmationPage", new=FakeConfirmationPage
     )
+    @patch("cl.favorites.tasks.is_pdf", return_value=False)
     async def test_user_gets_notification_when_document_is_unavailable(
         self,
+        mock_is_pdf,
         mock_prayer_unavailable,
         mock_get_or_cache_cookie,
     ):
@@ -1379,34 +1601,44 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         await self.rd_2.arefresh_from_db()
         self.assertEqual(self.rd_2.page_count, 20)
 
+    @patch(
+        "cl.favorites.tasks.DownloadConfirmationPage",
+        new=FakeAvailableConfirmationPage,
+    )
+    @patch("cl.favorites.signals.check_prayer_pacer", wraps=check_prayer_pacer)
+    async def test_avoid_duplicate_pacer_check_for_same_available_document(
+        self,
+        mock_check_prayer_pacer,
+        mock_prayer_unavailable,
+        mock_get_or_cache_cookie,
+    ):
+        """
+        Make sure that the prayer check is only triggered once for available docs
+        """
+        # Create a prayer for an available document.
+        await create_prayer(self.user_3, self.rd_2)
 
-class PrayerAPITests(APITestCase):
+        # Assert that the pacer check was triggered after the first prayer.
+        mock_check_prayer_pacer.delay.assert_called_once()
+
+        # Refresh the document data from the database to reflect any changes.
+        await self.rd_2.arefresh_from_db()
+        self.assertFalse(self.rd_2.is_sealed)
+
+        # Create another prayer using the same available document.
+        await create_prayer(self.user_2, self.rd_2)
+
+        # Assert that the pacer check was NOT triggered again. The call count
+        # should remain at one, verifying that duplicate checks are avoided.
+        mock_check_prayer_pacer.delay.assert_called_once()
+
+
+class PrayerAPITests(PrayAndPayTestCase):
     """Check that Prayer API operations work as expected."""
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.user_1 = UserFactory()
-        cls.user_2 = UserFactory()
-
-        cls.rd_1 = RECAPDocumentFactory(
-            pacer_doc_id="98763421",
-            document_number="1",
-            is_available=True,
-        )
-        cls.rd_2 = RECAPDocumentFactory(
-            pacer_doc_id="98763422",
-            document_number="2",
-            is_available=False,
-        )
-        cls.rd_3 = RECAPDocumentFactory(
-            pacer_doc_id="98763423",
-            document_number="3",
-            is_available=False,
-        )
 
     def setUp(self) -> None:
         self.prayer_path = reverse("prayer-list", kwargs={"version": "v4"})
-        self.client = make_client(self.user_1.pk)
+        self.client = make_client(self.user.pk)
         self.client_2 = make_client(self.user_2.pk)
 
     async def make_a_prayer(
