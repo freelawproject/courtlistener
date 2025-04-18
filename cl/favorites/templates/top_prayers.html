@@ -17,7 +17,9 @@
     <a href={% if user.is_authenticated %}"{% url 'user_prayers' user.username %}"{% else %}"{% url 'sign-in' %}?next={% url 'top_prayers' %}"{% endif %}><div class="fa gray fa-fw">
       {% include "includes/hand-holding-heart.svg" %}
     </div> Your Prayers</a>
-    <a href="{% url "pray_and_pay_help" %}">Learn More</a>
+    <a href="{% url "pray_and_pay_help" %}">
+      <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
+    </a>
   </div>
 
   <div class="col-xs-12 hidden-xs">
