@@ -8,6 +8,7 @@ from cl.citations.models import UnmatchedCitation
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
+from cl.favorites.models import PrayerAvailability
 from cl.favorites.utils import send_prayer_emails
 from cl.lib.courts import get_cache_key_for_court_list
 from cl.lib.es_signal_processor import ESSignalProcessor
@@ -577,6 +578,11 @@ def handle_recap_doc_change(
         instance.es_rd_field_tracker.has_changed("is_available")
         and instance.is_available == True
     ):
+        # copying code from cl/favorites/tasks.py to account for circumstance where someone buys a document from PACER despite it being marked sealed on RECAP
+        instance.is_sealed = False
+        instance.save()
+        PrayerAvailability.objects.filter(recap_document=instance).delete()
+
         send_prayer_emails(instance)
 
 

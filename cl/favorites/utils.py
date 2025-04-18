@@ -271,11 +271,6 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
     ]
     open_prayers.update(status=Prayer.GRANTED)
 
-    # copying code from cl/favorites/tasks.py to account for circumstance where someone buys a document from PACER despite it being marked sealed on RECAP
-    instance.is_sealed = False
-    instance.save()
-    PrayerAvailability.objects.filter(recap_document=instance).delete()
-
     # Send email notifications in bulk.
     if email_recipients:
         subject = f"A document you requested is now on CourtListener"
