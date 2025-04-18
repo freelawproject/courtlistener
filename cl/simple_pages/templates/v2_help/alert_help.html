@@ -59,7 +59,7 @@
 
     {# Limitations #}
     <div x-intersect.margin.-100px="show" class="flex flex-col gap-4" id="limitations">
-      <h3 class="text-display-xs font-semibold text-greyscale-900">Limitations</h3>
+      <h3 class="text-xl font-semibold text-greyscale-900">Limitations</h3>
       <p>As a non-profit, we aim to provide our services to as many people as possible. We currently allow <span class="bold">{{ MAX_FREE_DOCKET_ALERTS }}</span> docket alerts for free, and give a bonus of <span class="bold">{{ DOCKET_ALERT_RECAP_BONUS }}</span> alerts to anybody with the <a class="underline" href="https://free.law/recap/">RECAP Extension</a> installed.
       </p>
       <p>Members can create as many alerts as they need, though we may set up some reasonable limits in the future, based on usage.
@@ -78,7 +78,7 @@
 
     {# Creating a Docket Alert #}
     <div x-intersect.margin.-100px="show" class="flex flex-col gap-4" id="creating-docket-alert">
-      <h3 class="text-display-xs font-semibold text-greyscale-900">Creating a Docket Alert</h3>
+      <h3 class="text-xl font-semibold text-greyscale-900">Creating a Docket Alert</h3>
       <p>To create a RECAP Alert, find the docket you are interested in following, and press the button on the top that says, "Get Alerts":
       </p>
       <figure class="bg-greyscale-50 md:py-2 rounded-2xl">
@@ -106,7 +106,7 @@
 
     {# Disabling a Docket Alert #}
     <div x-intersect.margin.-100px="show" class="flex flex-col gap-4" id="disabling-docket-alert">
-      <h3 class="text-display-xs font-semibold text-greyscale-900">Disabling a Docket Alert</h3>
+      <h3 class="text-xl font-semibold text-greyscale-900">Disabling a Docket Alert</h3>
       <p>To disable a Docket Alert, find the docket you no longer are interested in, and press the button that says "Disable Alerts":
       </p>
       <figure class="bg-greyscale-50 p-2 rounded-2xl">
@@ -119,14 +119,16 @@
       </figure>
     </div>
 
-    {# Full RSS Feeds #}
+    {# Coverage gaps #}
     <div x-intersect.margin.-100px="show" class="flex flex-col gap-4" id="coverage-gaps">
-      <h3 class="text-display-xs font-semibold text-greyscale-900">Coverage Gaps</h3>
+      <h3 class="text-xl font-semibold text-greyscale-900">Coverage Gaps</h3>
       <p>A major source we use for our alerts is RSS feeds provided by the courts. Even after supplementing these with <a class="underline" href="{% url "coverage_recap" %}">the sources listed on our coverage page</a>, we are not always able to provide complete coverage of everything new in PACER. The problem is that some courts do not provide RSS feeds, and others only provide partial ones. The lists below are updated around the clock and provide a summary of which courts provide RSS feeds.
       </p>
+
       <h4 class="text-xl font-semibold text-greyscale-900">Full RSS Feeds</h4>
       <p>The courts below have complete RSS feeds, allowing us to always know when cases in these courts are updated.</p>
 
+      {# Full RSS Feeds #}
       {% regroup full_feeds by jurisdiction as full_feed_courts %}
       <c-tabs>
         {% for group in full_feed_courts %}
@@ -189,7 +191,7 @@
 
     {# Creating Search Alerts #}
     <div x-intersect.margin.-100px="show" class="flex flex-col gap-4" id="creating-search-alerts">
-      <h3 class="text-display-xs font-semibold text-greyscale-900">Creating Alerts</h3>
+      <h3 class="text-xl font-semibold text-greyscale-900">Creating Alerts</h3>
       <p>To create a Search Alert, begin with a search in CourtListener's Case Law or Oral Argument database. In the results page, click the bell icon in the search bar or click the Get Alerts button in the sidebar on the left.
       </p>
       <figure class="bg-greyscale-50 p-2 rounded-2xl">
@@ -219,7 +221,7 @@
 
     {# Enabling Real Time Alerts #}
     <div x-intersect.margin.-100px="show" class="flex flex-col gap-4" id="enabling-real-time-alerts">
-      <h3 class="text-display-xs font-semibold text-greyscale-900">Enabling Real Time Alerts</h3>
+      <h3 class="text-xl font-semibold text-greyscale-900">Enabling Real Time Alerts</h3>
       <p>Real Time alerts are available for Free Law Project members. If you see a message like the one below, you will <a class="underline" href="https://donate.free.law/forms/membership">need to become a member</a> to enable Real Time alerts:
       </p>
       <figure class="bg-greyscale-50 p-2 rounded-2xl">
@@ -240,7 +242,7 @@
 
     {# Editing or Deleting a Search Alert #}
     <div x-intersect.margin.-100px="show" class="flex flex-col gap-4" id="editing-search-alerts">
-      <h3 class="text-display-xs font-semibold text-greyscale-900">Editing or Deleting a Search Alert</h3>
+      <h3 class="text-xl font-semibold text-greyscale-900">Editing or Deleting a Search Alert</h3>
       <p>Existing alerts can be edited or deleted from <a class="underline" href="{% url "profile_alerts" %}">your user profile</a>. By clicking the Edit button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
       </p>
       <p>From your profile page, you can also delete an alert.</p>
@@ -248,14 +250,14 @@
 
     {# Disabling a Search Alert #}
     <div x-intersect.margin.-100px="show" class="flex flex-col gap-4" id="disabling-search-alerts">
-      <h3 class="text-display-xs font-semibold text-greyscale-900">Disabling a Search Alert</h3>
+      <h3 class="text-xl font-semibold text-greyscale-900">Disabling a Search Alert</h3>
       <p>To temporarily disable an alert, edit it and set the rate to "Off." Every alert email also has a one-click link for disabling the alert that triggered it.
       </p>
     </div>
 
     {# Supported Courts #}
     <div x-intersect.margin.-100px="show" class="flex flex-col gap-4" id="courts">
-      <h3 class="text-display-xs font-semibold text-greyscale-900">Supported Courts</h3>
+      <h3 class="text-xl font-semibold text-greyscale-900">Supported Courts</h3>
       <p>Search alerts are available for many jurisdictions across the country, and we are frequently expanding our system to support even more locations. To see which courts are currently supported, check <a class="underline" href="{% url "coverage" %}">our coverage pages</a>, where we list the jurisdictions that we regularly scrape for oral arguments or case law.
       </p>
       <p>If there is a jurisdiction that is not currently listed, please <a class="underline" href="{% url "contact" %}">express your interest</a>, and we will do our best to add it to our list.
