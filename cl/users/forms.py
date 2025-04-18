@@ -2,6 +2,7 @@ import re
 
 from disposable_email_domains import blocklist
 from django import forms
+from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.forms import (
     PasswordChangeForm,
@@ -89,7 +90,21 @@ class ProfileForm(ModelForm):
         }
 
 
-class UserForm(ModelForm):
+class CleanEmailMixin:
+
+    def clean_email(self):
+        email = self.cleaned_data.get("email")
+        user_part, domain_part = email.rsplit("@", 1)
+        blocklist.update(settings.BLOCKED_DOMAINS)
+        if domain_part in blocklist:
+            raise forms.ValidationError(
+                f"{domain_part} is a blocked email provider",
+                code="bad_email_domain",
+            )
+        return email
+
+
+class UserForm(ModelForm, CleanEmailMixin):
     email = forms.EmailField(
         required=True,
         widget=forms.TextInput(
@@ -121,18 +136,8 @@ class UserForm(ModelForm):
             ),
         }
 
-    def clean_email(self):
-        email = self.cleaned_data.get("email")
-        user_part, domain_part = email.rsplit("@", 1)
-        if domain_part in blocklist:
-            raise forms.ValidationError(
-                f"{domain_part} is a blocked email provider",
-                code="bad_email_domain",
-            )
-        return email
 
-
-class UserCreationFormExtended(UserCreationForm):
+class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     """A bit of an unusual form because instead of creating it ourselves,
     we are overriding the one from Django. Thus, instead of declaring
     everything explicitly like we normally do, we just override the
@@ -179,16 +184,6 @@ class UserCreationFormExtended(UserCreationForm):
             "first_name",
             "last_name",
         )
-
-    def clean_email(self):
-        email = self.cleaned_data.get("email")
-        user_part, domain_part = email.rsplit("@", 1)
-        if domain_part in blocklist:
-            raise forms.ValidationError(
-                f"{domain_part} is a blocked email provider",
-                code="bad_email_domain",
-            )
-        return email
 
     def clean_first_name(self):
         first_name = self.cleaned_data.get("first_name")
