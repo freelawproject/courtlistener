@@ -3211,3 +3211,131 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
         self.assertFalse(
             OpinionClusterDocument.exists(ES_CHILD_ID(opinion_2.pk).OPINION)
         )
+
+
+class OpinionQuerySetWithBestTextTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        court = CourtFactory(
+            id="canb",
+            jurisdiction="FB",
+        )
+        cls.opinion_cluster_1 = OpinionClusterFactory(
+            docket=DocketFactory(
+                court=court,
+                docket_number="1:21-cv-1234",
+                source=Docket.HARVARD,
+            ),
+            date_filed=datetime.date(2020, 8, 15),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        cls.opinion_html_with_citations = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 1",
+            html_with_citations="HTML with citations content",
+            html_columbia="Other version",
+            html_lawbox="Other version",
+            xml_harvard="Other version",
+            html_anon_2020="Other version",
+            html="Other version",
+        )
+        cls.opinion_html_columbia = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 2",
+            html_with_citations="",
+            html_columbia="HTML columbia content",
+            html_lawbox="Other version",
+            xml_harvard="",
+            html_anon_2020="Other version",
+            html="Other version",
+        )
+        cls.opinion_html_lawbox = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 3",
+            html_with_citations="",
+            html_columbia="",
+            html_lawbox="HTML lawbox content",
+            xml_harvard="",
+            html_anon_2020="Other version",
+            html="Other version",
+        )
+        cls.opinion_xml_harvard = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 4",
+            html_with_citations="",
+            html_columbia="Other version",
+            html_lawbox="Other version",
+            xml_harvard="XML harvard content",
+            html_anon_2020="Other version",
+            html="Other version",
+        )
+        cls.opinion_html_anon_2020 = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 5",
+            html_with_citations="",
+            html_columbia="",
+            html_lawbox="",
+            xml_harvard="",
+            html_anon_2020="HTML anon 2020 content",
+            html="Other version",
+        )
+        cls.opinion_html = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 6",
+            html_with_citations="",
+            html_columbia="",
+            html_lawbox="",
+            xml_harvard="",
+            html_anon_2020="",
+            html="HTML content",
+        )
+        cls.opinion_plain_text = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback",
+            html_with_citations="",
+            html_columbia="",
+            html_lawbox="",
+            xml_harvard="",
+            html_anon_2020="",
+            html="",
+        )
+
+    def test_with_best_text_annotation(self):
+        """Test that with_best_text annotates the Opinion queryset with the
+        correct  best_text and best_text_source values based on the
+        prioritization of OPINION_TEXT_SOURCE_FIELDS.
+        """
+        qs = Opinion.objects.all().with_best_text()
+
+        o_html_citations = qs.get(pk=self.opinion_html_with_citations.pk)
+        o_html_columbia = qs.get(pk=self.opinion_html_columbia.pk)
+        o_html_lawbox = qs.get(pk=self.opinion_html_lawbox.pk)
+        o_xml_harvard = qs.get(pk=self.opinion_xml_harvard.pk)
+        o_html_anon = qs.get(pk=self.opinion_html_anon_2020.pk)
+        o_html = qs.get(pk=self.opinion_html.pk)
+        o_plain_text = qs.get(pk=self.opinion_plain_text.pk)
+
+        self.assertEqual(
+            o_html_citations.best_text, "HTML with citations content"
+        )
+        self.assertEqual(
+            o_html_citations.best_text_source, "html_with_citations"
+        )
+
+        self.assertEqual(o_html_columbia.best_text, "HTML columbia content")
+        self.assertEqual(o_html_columbia.best_text_source, "html_columbia")
+
+        self.assertEqual(o_html_lawbox.best_text, "HTML lawbox content")
+        self.assertEqual(o_html_lawbox.best_text_source, "html_lawbox")
+
+        self.assertEqual(o_xml_harvard.best_text, "XML harvard content")
+        self.assertEqual(o_xml_harvard.best_text_source, "xml_harvard")
+
+        self.assertEqual(o_html_anon.best_text, "HTML anon 2020 content")
+        self.assertEqual(o_html_anon.best_text_source, "html_anon_2020")
+
+        self.assertEqual(o_html.best_text, "HTML content")
+        self.assertEqual(o_html.best_text_source, "html")
+
+        self.assertEqual(o_plain_text.best_text, "Plain text fallback")
+        self.assertEqual(o_plain_text.best_text_source, "plain_text")

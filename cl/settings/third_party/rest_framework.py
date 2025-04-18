@@ -39,7 +39,14 @@ REST_FRAMEWORK = {
         "texoya9545": "1/hour",
         "nedah94680": "1/hour",
         "robowiy352": "1/hour",
+        "cl_api_5": "1/hour",
+        "cl_api_4": "1/hour",
+        "cl_api_1": "1/hour",
+        "cl_api_2": "1/hour",
+        "cl_api_3": "1/hour",
         # Multiple accounts
+        "court_account_n1": "1/hour",
+        "court_account_n2": "1/hour",
         "sophia@newyorklawreview.com": "1/hour",
         "gab@newyorklawreview.com": "1/hour",
         "james@newyorklawreview.com": "1/hour",
@@ -53,7 +60,6 @@ REST_FRAMEWORK = {
         "yoway_3897": "1/hour",
         "deantaylor2025": "1/hour",
         "yoway_3897": "1/hour",
-        # Multiple accounts
         "api_1": "1/hour",
         "api_2": "1/hour",
         "api_account_1": "1/hour",
@@ -75,6 +81,9 @@ REST_FRAMEWORK = {
         "BruceWayne": "1/hour",
         "mibefis809": "1/hour",
         # Unresponsive
+        "patrielburger": "1/hour",
+        "redchair255": "1/hour",
+        "rapsanetwork": "1/hour",
         "courtlistener_api": "1/hour",
         "bobjase24": "1/hour",
         "bobjase25": "1/hour",

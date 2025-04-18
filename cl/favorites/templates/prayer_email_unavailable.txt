@@ -2,10 +2,10 @@
 CourtListener.com
 *****************
 -------------------------------------------------------
-Your Wish Has Been Granted!
+Your Request Cannot Be Fulfilled At This Time.
 -------------------------------------------------------
 
-The document you were waiting for is now available in RECAP.
+The document you requested is currently unavailable for purchase on PACER. This may mean it is sealed or a text-only entry. It may also be unavailable for online access pursuant to FRCP 5.2(c).
 -------------------------------------------------------
 
 {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
@@ -17,11 +17,11 @@ View Community Leaderboard: https://www.courtlistener.com/prayers/top/
 Document Number: {{ docket_entry.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
 Date Filed: {% if docket_entry.datetime_filed %}{{ docket_entry.datetime_filed|utc|date:"M j, Y" }}{% else %}{{ docket_entry.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}
 Description: {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ docket_entry.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}
-View Document: https://www.courtlistener.com{{document_url}}
+View Document: Unavailable on PACER
 ~~~
 You requested it on {{ date_created|date:"F j, Y" }}.
-{{num_waiting}} {{ num_waiting|pluralize:"person was,people were" }} waiting for it.
-Somebody paid ${{ price }} to make it available to all of us.
+{{num_waiting}} {{ num_waiting|pluralize:"person is,people are" }} waiting for it.
+It may become available in the future, in which case it will be restored to its position on the leaderboard.
 
 ************************
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
