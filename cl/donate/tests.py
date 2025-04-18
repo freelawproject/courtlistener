@@ -1,7 +1,9 @@
 from collections import defaultdict
+from datetime import timedelta
 from http import HTTPStatus
 from unittest.mock import patch
 
+import time_machine
 from asgiref.sync import sync_to_async
 from django.test import override_settings
 from django.test.client import AsyncClient, Client
@@ -411,3 +413,46 @@ class MembershipWebhookTest(TestCase):
 
         # Verify regular user account is updated with Neon data
         self.assertEqual(user_profile.neon_account_id, "1246")
+
+
+class ProfileMembershipTest(TestCase):
+
+    def setUp(self) -> None:
+        self.user_profile = UserProfileWithParentsFactory()
+
+    def test_is_member_returns_true_until_termination_date_passes(self):
+        """
+        checks the `is_member` property correctly identifies a user as a member
+        until their termination date has passed
+        """
+        termination_date = now().date() + timedelta(weeks=4)
+        NeonMembership.objects.create(
+            level=NeonMembership.LEGACY,
+            user=self.user_profile.user,
+            termination_date=termination_date,
+        )
+        self.user_profile.refresh_from_db()
+
+        # Test just before the termination date
+        with time_machine.travel(
+            termination_date - timedelta(seconds=1), tick=False
+        ):
+            self.assertTrue(self.user_profile.is_member)
+
+        # Test exactly at the termination date
+        with time_machine.travel(termination_date, tick=False):
+            self.assertTrue(self.user_profile.is_member)
+
+        with time_machine.travel(
+            termination_date + timedelta(hours=4), tick=False
+        ):
+            self.assertTrue(self.user_profile.is_member)
+
+        # Test a full day after the termination date
+        with time_machine.travel(
+            termination_date + timedelta(days=1), tick=False
+        ):
+            self.assertFalse(
+                self.user_profile.is_member,
+                "Should not be a member a day after termination.",
+            )
