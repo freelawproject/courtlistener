@@ -28,6 +28,7 @@ from cl.favorites.models import (
     PrayerAvailability,
     UserTag,
 )
+from cl.favorites.tasks import check_prayer_pacer
 from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
@@ -1599,6 +1600,37 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         # Verify the page count was updated
         await self.rd_2.arefresh_from_db()
         self.assertEqual(self.rd_2.page_count, 20)
+
+    @patch(
+        "cl.favorites.tasks.DownloadConfirmationPage",
+        new=FakeAvailableConfirmationPage,
+    )
+    @patch("cl.favorites.signals.check_prayer_pacer", wraps=check_prayer_pacer)
+    async def test_avoid_duplicate_pacer_check_for_same_available_document(
+        self,
+        mock_check_prayer_pacer,
+        mock_prayer_unavailable,
+        mock_get_or_cache_cookie,
+    ):
+        """
+        Make sure that the prayer check is only triggered once for available docs
+        """
+        # Create a prayer for an available document.
+        await create_prayer(self.user_3, self.rd_2)
+
+        # Assert that the pacer check was triggered after the first prayer.
+        mock_check_prayer_pacer.delay.assert_called_once()
+
+        # Refresh the document data from the database to reflect any changes.
+        await self.rd_2.arefresh_from_db()
+        self.assertFalse(self.rd_2.is_sealed)
+
+        # Create another prayer using the same available document.
+        await create_prayer(self.user_2, self.rd_2)
+
+        # Assert that the pacer check was NOT triggered again. The call count
+        # should remain at one, verifying that duplicate checks are avoided.
+        mock_check_prayer_pacer.delay.assert_called_once()
 
 
 class PrayerAPITests(PrayAndPayTestCase):
