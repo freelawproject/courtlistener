@@ -13,10 +13,10 @@ def require_script(context, script_path):
         return ""
 
     request = context["request"]
-    if not hasattr(request, "_required_scripts"):
-        setattr(request, "_required_scripts", set())
+    if not hasattr(request, "required_component_scripts"):
+        setattr(request, "required_component_scripts", set())
 
-    request._required_scripts.add(script_path)
+    request.required_component_scripts.add(script_path)
     return ""
 
 
@@ -27,16 +27,16 @@ def render_required_scripts(context):
         return "NO REQUEST"
 
     request = context["request"]
-    if not hasattr(request, "_required_scripts"):
+    if not hasattr(request, "required_component_scripts"):
         return ""
 
-    if not request._required_scripts:
+    if not request.required_component_scripts:
         return ""
 
     nonce = getattr(request, "csp_nonce", "")
 
     script_tags = []
-    for script_path in request._required_scripts:
+    for script_path in request.required_component_scripts:
         script_url = static(script_path)
         if nonce:
             script_tags.append(

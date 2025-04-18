@@ -7,15 +7,7 @@
 {% block description %}Get help creating and using search and docket alerts on CourtListener.{% endblock %}
 {% block og_description %}Get help creating and using search and docket alerts on CourtListener.{% endblock %}
 
-{% block footer-scripts %}
-  {% include "includes/anchors.html" %}
-
-  <script nonce="{{ request.csp_nonce }}" type="text/javascript" src="{% static 'js/alpine/components/intersect.js' %}">
-  </script>
-{% endblock %}
-
 {% block content %}
-
 <div
   data-first-active="about"
   x-data="intersect"

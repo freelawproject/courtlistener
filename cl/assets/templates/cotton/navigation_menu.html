@@ -1,6 +1,6 @@
-{# Requires Alpine component intersect in target: {% static 'js/alpine/components/intersect.js' %} #}
 {% load svg_tags static component_tags %}
 {% require_script "js/alpine/components/navigation_menu.js" %}
+{% require_script "js/alpine/components/intersect.js" %}
 
 <c-vars nav_items ></c-vars>
 {{ nav_items|json_script:"nav-items" }}
