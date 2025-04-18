@@ -48,6 +48,10 @@ def inception_batch_request_mock(opinions_to_vectorize):
     ]
 
 
+@patch(
+    "cl.search.tasks.embeddings_cache_key",
+    return_value="test_embeddings:",
+)
 class GenerateOpinionEmbeddingTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -162,6 +166,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
         self,
         mock_inception_batch_request,
         mock_aws_media_storage,
+        mock_embeddings_cache_key,
     ):
         """Test that the generate_opinion_embeddings command:
 
@@ -173,7 +178,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
         mock_aws_media_storage.return_value = fake_storage
         call_command(
             "generate_opinion_embeddings",
-            batch_size=10000,
+            token_count=10000,
             start_id=0,
             count=3,
         )
@@ -190,7 +195,12 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 [self.opinion_1.pk, self.opinion_2.pk]
             )
         )
-        self.assertEqual(documents_embedded_count, len(expected_embeddings))
+
+        self.assertEqual(
+            documents_embedded_count,
+            len(expected_embeddings),
+            "Wrong number of documents.",
+        )
         for path, embedding in fake_storage.saved_files.items():
             with self.subTest(embedding):
                 embedding_dict = json.loads(embedding)
@@ -205,7 +215,9 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 self.assertIn(embedding_dict, expected_embeddings)
 
     @patch("cl.search.tasks.S3IntelligentTieringStorage")
-    def test_limit_batch_size(self, mock_aws_media_storage):
+    def test_limit_batch_size(
+        self, mock_aws_media_storage, mock_embeddings_cache_key
+    ):
         """Test generate_opinion_embeddings limit the batch size properly."""
 
         # Create an instance of fake S3IntelligentTieringStorage.
@@ -218,7 +230,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
         ) as mock_inception_batch_request:
             call_command(
                 "generate_opinion_embeddings",
-                batch_size=250,
+                token_count=250,
                 start_id=0,
                 count=4,
             )
@@ -255,7 +267,9 @@ class GenerateOpinionEmbeddingTest(TestCase):
 
     @patch("cl.search.tasks.S3IntelligentTieringStorage")
     @patch("cl.search.management.commands.generate_opinion_embeddings.logger")
-    def test_log_long_documents(self, mock_logger, mock_aws_media_storage):
+    def test_log_long_documents(
+        self, mock_logger, mock_aws_media_storage, mock_embeddings_cache_key
+    ):
         """Test log documents that individually exceed the batch size."""
 
         # Create an instance of fake S3IntelligentTieringStorage.
@@ -268,7 +282,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
         ) as mock_inception_batch_request:
             call_command(
                 "generate_opinion_embeddings",
-                batch_size=250,
+                token_count=250,
                 start_id=0,
             )
             # The embedding generation should be split into two inception

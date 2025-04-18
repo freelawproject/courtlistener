@@ -158,7 +158,7 @@
                   {% else %}
                     {# We don't have it #}
                     {% if rd.is_sealed %}
-                      <span class="btn btn-primary btn-xs disabled">Sealed on PACER</span>
+                      <span class="btn btn-primary btn-xs disabled">Unavailable on PACER</span>
                       <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
                         {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
                       </div>
@@ -193,7 +193,7 @@
                     {# We don't have it #}
                     {% if rd.is_sealed %}
                       <span class="btn btn-default btn-xs disabled"
-                            title="Sealed on PACER">
+                            title="Unavailable on PACER">
                               <i class="fa fa-ban"></i>
                             </span>
                     {% else %}
