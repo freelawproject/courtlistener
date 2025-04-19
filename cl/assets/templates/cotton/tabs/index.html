@@ -9,7 +9,7 @@
   {# DESKTOP tabs #}
   <div aria-label="{{ title }} tabs" role="tablist" class="w-full gap-1 hidden md:flex">
     <template x-for="tab in tabs">
-      <div x-data="tabComponent">
+      <div>
         <button
           x-on:click="setActiveTab"
           x-bind:aria-selected="isActive"
