@@ -1,0 +1,28 @@
+{% load svg_tags component_tags %}
+{% require_script "js/alpine/components/expansion_panel.js" %}
+
+<div x-data="expansionPanel">
+  <h4>
+    {{ title }}
+    <button
+      x-on:click="toggleExpansion"
+      data-target="two-column-code"
+      aria-haspopup="menu"
+      aria-label="Toggle code example for two column list component"
+      x-bind:aria-expanded="isExpanded"
+      type="button"
+      aria-controls="two-column-code"
+    >
+      <span
+        x-bind:class="iconClass"
+        data-target="two-column-code"
+        class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+        aria-hidden="true"
+      >{% svg 'chevron' class="w-full h-full" %}
+      </span>
+    </button>
+  </h4>
+  <div x-collapse x-show="isExpanded">
+    {{ slot }}
+  </div>
+</div>
