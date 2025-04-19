@@ -1,21 +1,118 @@
-{% extends "base.html" %}
-
-{% load static tailwind_tags %}
-
-{% block head %}
-{% tailwind_css %}
-{% tailwind_preload_css %}
-
-<script src="{% static 'js/alpine/alpinejscsp@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
-
-{% endblock %}
+{% extends "new_base.html" %}
+{% load svg_tags %}
 
 {% block title %}Components Library - CourtListener.com{% endblock %}
 
 {% block content %}
-<h1 class="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">H1 Title Component</h1>
-<h2 class="scroll-m-20 text-3xl font-semibold tracking-tight first:mt-0">H2 Title Component</h2>
-<h3 class="scroll-m-20 text-2xl font-semibold tracking-tight">H3 Title Component</h3>
+<div>
+<c-layout-with-navigation
+  :nav_items="[
+      {'href': '#main-title', 'text': 'Component Library'},
+      {'href': '#', 'text': 'Text components', 'children': [
+        {'href': '#two-column-list-component', 'text': 'Two column list'},
+        {'href': '#eyebrow', 'text': 'Eyebrow'},
+      ]},
+      {'href': '#', 'text': 'Layout components', 'children': [
+        {'href': '#navigation-menu', 'text': 'Navigation menu'},
+        {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
+      ]},
+  ]"
+>
+  <section class="max-w-full w-full" x-intersect.margin.-100px="show" id="main-title">
+    <c-eyebrow>'s</c-eyebrow>
+    <h1 class="text-display-md font-cooper font-semibold text-greyscale-800">Component Library</h1>
+    <p class="font-sans text-sm text-greyscale-600 mt-4">Below you will find a display of all reusable components available in our codebase with usage notes to make development easier.</p>
+    <p class="font-sans text-sm text-greyscale-600 my-3">Using these components doesn't require any imports or settings, simply use the tags in your templates and they should just work!</p>
+    <p class="font-sans text-sm text-greyscale-600">We hope you'll find these helpful.</p>
+  </section>
 
-<c-h1>Django Cotton Sample</c-h1>
+  <section class="max-w-full w-full" x-intersect="show" id="two-column-list-component">
+    <h2 class="mt-6">Two column list</h2>
+    <c-two-column-list
+      class="my-4 p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
+      :list="[
+          {'short_name': 'First item'},
+          {'short_name': 'Second item'},
+          {'short_name': 'Third item'},
+          {'short_name': 'Fourth item'},
+      ]"
+    ></c-two-column-list>
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-two-column-list
+  class="p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
+  :list="[
+      {'short_name': 'First item'},
+      {'short_name': 'Second item'},
+      {'short_name': 'Third item'},
+      {'short_name': 'Fourth item'},
+  ]"
+&gt;&lt;/c-two-column-list>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  <section class="max-w-full w-full" x-intersect.margin.-100px="show" id="eyebrow">
+    <h2 class="">Eyebrow</h2>
+    <c-eyebrow class="my-4"></c-eyebrow>
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-eyebrow&gt;&lt;/c-eyebrow>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  <section class="max-w-full w-full" x-intersect.margin.-100px="show" id="navigation-menu">
+    <h2 class="">Navigation menu</h2>
+    <p class="my-4">Shows this page's nav menu.</p>
+    <c-expansion-panel title="Code">
+    <c-code>
+&lt;c-navigation-menu&gt;
+  :nav_items="[
+    {'href': '#main-title', 'text': 'Component Library'},
+    {'href': '#', 'text': 'Text components', 'children': [
+      {'href': '#two-column-list-component', 'text': 'Two column list'},
+      {'href': '#eyebrow', 'text': 'Eyebrow'},
+    ]},
+    {'href': '#', 'text': 'Layout components', 'children': [
+      {'href': '#navigation-menu', 'text': 'Navigation menu'},
+      {'href': '#layout-with-navigation', 'text': 'Layout with navigation'},
+    ]},
+  ]"
+&lt;/c-navigation-menu>
+    </c-code>
+    </c-expansion-panel>
+  </section>
+
+  <section class="max-w-full w-full" x-intersect.margin.-100px="show" id="tabbed-cards">
+    <h2 class="">Tabbed cards</h2>
+    <c-tabs class="my-4" title="My tabs">
+      <c-tabs.tab name="First tab">
+        First tab panel content
+      </c-tabs.tab>
+      <c-tabs.tab name="Second tab">
+        Second tab panel content
+      </c-tabs.tab>
+      <c-tabs.tab name="Third tab">
+        Third tab panel content
+      </c-tabs.tab>
+    </c-tabs>
+    <c-expansion-panel title="Code">
+      <c-code>
+      &lt;c-tabs title="My tabs"&gt;
+        &lt;c-tabs.tab name="First tab"&gt;
+          First tab panel content
+        &lt;/c-tabs.tab&gt;
+        &lt;c-tabs.tab name="Second tab"&gt;
+          Second tab panel content
+        &lt;/c-tabs.tab&gt;
+        &lt;c-tabs.tab name="Third tab"&gt;
+          Third tab panel content
+        &lt;/c-tabs.tab&gt;
+      &lt;/c-tabs&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+</c-layout-with-navigation>
+</div>
 {% endblock %}
