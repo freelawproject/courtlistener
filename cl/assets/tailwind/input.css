@@ -3,8 +3,20 @@
 @tailwind base;
 
 @layer base {
+  :root {
+    --nav-menu-width: 222px;
+  }
   select {
     @apply border bg-white py-3 px-3.5 rounded-[10px] text-sm font-medium text-greyscale-900;
+  }
+  h2 {
+    @apply text-display-xs font-semibold text-greyscale-900;
+  }
+  h3 {
+    @apply text-xl font-semibold text-greyscale-900;
+  }
+  h4 {
+    @apply text-lg font-semibold text-greyscale-900;
   }
 }
 
