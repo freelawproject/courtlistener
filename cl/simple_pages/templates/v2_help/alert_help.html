@@ -130,7 +130,7 @@
 
       {# Full RSS Feeds #}
       {% regroup full_feeds by jurisdiction as full_feed_courts %}
-      <c-tabs>
+      <c-tabs title="Full RSS Feeds Jurisdictions">
         {% for group in full_feed_courts %}
           {% if group.grouper == "FD" or group.grouper == "FB" %}
             <c-tabs.tab name="{% if group.grouper == "FD" %}District Courts{% elif group.grouper == "FB" %}Bankruptcy Courts{% endif %}">
@@ -148,7 +148,7 @@
       <p>You can see which docket entry types are provided by these courts below.</p>
 
       {% regroup partial_feeds by jurisdiction as partial_feed_courts %}
-      <c-tabs>
+      <c-tabs title="Partial RSS Feeds Jurisdictions">
         {% for group in partial_feed_courts %}
           <c-tabs.tab name="{% if group.grouper == "FD" %}District Courts{% elif group.grouper == "FB" %}Bankruptcy Courts{% elif group.grouper == "F" %}Appellate Courts{% endif %}">
             {% for court in group.list %}
@@ -171,7 +171,7 @@
       </p>
 
       {% regroup no_feeds by jurisdiction as no_feed_courts %}
-      <c-tabs>
+      <c-tabs title="No RSS Feeds Jurisdictions">
         {% for group in no_feed_courts %}
           <c-tabs.tab name="{% if group.grouper == "FD" %}District Courts{% elif group.grouper == "FB" %}Bankruptcy Courts{% elif group.grouper == "F" %}Appellate Courts{% endif %}">
             <c-two-column-list :list="group.list"></c-two-column-list>
