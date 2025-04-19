@@ -7,7 +7,7 @@ register = template.Library()
 
 
 @register.simple_tag()
-def svg(name, css_class="", **kwargs):
+def svg(name, **kwargs):
     """
     Include an SVG file directly in the template.
 
@@ -18,11 +18,8 @@ def svg(name, css_class="", **kwargs):
     ```
 
     Note HTML attributes are passed directly with minor adjustments:
-    - Use "css_class" instead of "class", as "class" is reserved in python.
     - Use snake case instead of kebab, as template tags don't support kebab.
     - To include Alpine bindings, use "__" instead of ":" (e.g. `x_bind__class="w-full"`)
-
-    These are all handled by the tag under the hood.
     """
     relative_path = f"svg/{name}.svg"
     absolute_path = find(relative_path)
@@ -36,6 +33,7 @@ def svg(name, css_class="", **kwargs):
         with open(absolute_path, "r", encoding="utf-8") as file:
             svg_content = file.read()
 
+        css_class = kwargs.pop("class", None)
         if css_class:
             if 'class="' in svg_content:
                 svg_content = svg_content.replace(
@@ -51,7 +49,7 @@ def svg(name, css_class="", **kwargs):
             key = key.replace("_", "-")  # Convert snake_case to kebab-case
             svg_content = svg_content.replace("<svg", f'<svg {key}="{value}"')
 
-        return format_html(svg_content)
+        return format_html(svg_content.replace("<svg", f'<svg role="img"'))
 
     except FileNotFoundError:
         if settings.DEBUG:
