@@ -1,5 +1,6 @@
 {% load component_tags %}
 {% require_script "js/alpine/components/tabs.js" %}
+{% require_script "js/alpine/components/focus.js" %}
 <c-vars title=""></c-vars>
 
 <div
@@ -7,7 +8,16 @@
   class="w-full"
 >
   {# DESKTOP tabs #}
-  <div aria-label="{{ title }} tabs" role="tablist" class="w-full gap-1 hidden md:flex">
+  <div
+    data-title="{{ title }}"
+    role="tablist"
+    class="w-full gap-1 hidden md:flex"
+    x-data="focus"
+    x-on:keydown.left="focusPrevious"
+    x-on:keydown.right="focusNext"
+    x-on:keydown.home.prevent="focusFirst"
+    x-on:keydown.end.prevent="focusLast"
+  >
     <template x-for="tab in tabs">
       <div>
         <button
