@@ -1,11 +1,12 @@
 {% load component_tags %}
 {% require_script "js/alpine/components/tabs.js" %}
 {% require_script "js/alpine/components/focus.js" %}
-<c-vars title=""></c-vars>
+<c-vars title="" class=""></c-vars>
 
 <div
   x-data="tabsComponent"
-  class="w-full"
+  class="w-full {{ class }}"
+  {{ attrs }}
 >
   {# DESKTOP tabs #}
   <div
