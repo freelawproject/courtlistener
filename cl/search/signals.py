@@ -8,7 +8,6 @@ from cl.citations.models import UnmatchedCitation
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
-from cl.favorites.models import PrayerAvailability
 from cl.favorites.utils import send_prayer_emails
 from cl.lib.courts import get_cache_key_for_court_list
 from cl.lib.es_signal_processor import ESSignalProcessor
