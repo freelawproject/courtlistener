@@ -579,8 +579,6 @@ def handle_recap_doc_change(
         and instance.is_available == True
     ):
         # copying code from cl/favorites/tasks.py to account for circumstance where someone buys a document from PACER despite it being marked sealed on RECAP
-        instance.is_sealed = False
-        instance.save()
         PrayerAvailability.objects.filter(recap_document=instance).delete()
 
         send_prayer_emails(instance)
