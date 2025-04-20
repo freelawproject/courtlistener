@@ -81,6 +81,7 @@ REST_FRAMEWORK = {
         "BruceWayne": "1/hour",
         "mibefis809": "1/hour",
         # Unresponsive
+        "angelsburger": "1/hour",
         "patrielburger": "1/hour",
         "redchair255": "1/hour",
         "rapsanetwork": "1/hour",
