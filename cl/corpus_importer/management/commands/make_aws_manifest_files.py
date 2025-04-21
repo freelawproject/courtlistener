@@ -188,6 +188,66 @@ def get_custom_query(
     return query, params
 
 
+def upload_manifest(
+    record_ids: list[tuple[int]],
+    base_filename: str,
+    options: dict[str, Any],
+    batch_counter: int | None = None,
+) -> None:
+    """
+    Generates a CSV manifest file containing S3 object keys derived from record
+    ID batches and uploads it to the specified S3 bucket.
+
+    Args:
+        rows (list[tuple[int]]): A list of tuples, where each tuple contains at
+            least the record's unique ID
+        filename (str): The base name for the manifest file in S3.
+        options (dict[str, Any]): A dictionary containing configuration options
+            including:
+            - "bucket_name" (str): The name of the S3 bucket.
+            - "lambda_record_size" (int): The number of records to group into
+                each batch.
+            - "random_sample_percentage" (float, optional): If set, indicates
+                that records are randomly sampled, and manifest should contain
+                all IDs separated by underscores.
+            - "save_ids_as_sequence" (bool, optional): If True, manifest should
+                contain all IDs in the batch separated by underscores.
+        counter (int, optional): An optional integer to append to the filename
+            for distinguishing between multiple manifest files.
+    """
+    bucket_name = options["bucket_name"]
+    # Write the content of the csv file to a buffer and upload it
+    with io.StringIO() as csvfile:
+        writer = csv.DictWriter(
+            csvfile,
+            fieldnames=["bucket", "file_name"],
+            extrasaction="ignore",
+        )
+        for row in batched(record_ids, options["lambda_record_size"]):
+            if (
+                options["random_sample_percentage"]
+                or options["save_ids_as_sequence"]
+            ):
+                # Create an underscore-separated file name that lambda
+                # can split and use as part of batch processing.
+                ids = [str(r[0]) for r in row]
+                content = "_".join(ids)
+            else:
+                content = (
+                    f"{row[0][0]}_{row[-1][0]}"
+                    if len(row) > 1
+                    else f"{row[0][0]}"
+                )
+            query_dict = {"bucket": bucket_name, "file_name": content}
+            writer.writerow(query_dict)
+
+        s3_client.put_object(
+            Key=f"{base_filename}_{batch_counter}.csv",
+            Bucket=bucket_name,
+            Body=csvfile.getvalue().encode("utf-8"),
+        )
+
+
 class Command(VerboseCommand):
     help = (
         "Retrieves data records from the database and creates manifest files"
@@ -276,7 +336,6 @@ class Command(VerboseCommand):
         r = get_redis_interface("CACHE")
 
         record_type = options["record_type"]
-        bucket_name = options["bucket_name"]
         monthly_export = options["monthly_export"]
 
         last_export_key = f"bulk_import:{record_type}"
@@ -332,39 +391,7 @@ class Command(VerboseCommand):
                 logger.info("Finished all the records!")
                 break
 
-            # Write the content of the csv file to a buffer and upload it
-            with io.StringIO() as csvfile:
-                writer = csv.DictWriter(
-                    csvfile,
-                    fieldnames=["bucket", "file_name"],
-                    extrasaction="ignore",
-                )
-                for row in batched(rows, options["lambda_record_size"]):
-                    if (
-                        options["random_sample_percentage"]
-                        or options["save_ids_as_sequence"]
-                    ):
-                        # Create an underscore-separated file name that lambda
-                        # can split and use as part of batch processing.
-                        ids = [str(r[0]) for r in row]
-                        content = "_".join(ids)
-                    else:
-                        content = (
-                            f"{row[0][0]}_{row[-1][0]}"
-                            if len(row) > 1
-                            else f"{row[0][0]}"
-                        )
-                    query_dict = {
-                        "bucket": bucket_name,
-                        "file_name": content,
-                    }
-                    writer.writerow(query_dict)
-
-                s3_client.put_object(
-                    Key=f"{file_name}_{counter}.csv",
-                    Bucket=bucket_name,
-                    Body=csvfile.getvalue().encode("utf-8"),
-                )
+            upload_manifest(rows, file_name, options, counter)
 
             if options["random_sample_percentage"]:
                 # Due to the non-deterministic nature of random sampling,
