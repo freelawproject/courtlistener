@@ -34,6 +34,7 @@ module.exports = {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
         cooper: ['Cooper Hewitt', 'sans-serif'],
+        mono: ['DM Mono', 'mono'],
       },
       colors: {
         greyscale: {
@@ -65,7 +66,9 @@ module.exports = {
           950: '#4E1713',
         },
         brand: {
+          100: '#F4EBFF',
           300: '#D6BBFB',
+          600: '#7F56D9',
           700: '#6941C6',
         },
         yellow: {
