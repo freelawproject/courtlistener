@@ -277,6 +277,14 @@ class Command(VerboseCommand):
 
         record_type = options["record_type"]
         bucket_name = options["bucket_name"]
+        monthly_export = options["monthly_export"]
+
+        last_export_key = f"bulk_import:{record_type}"
+        if monthly_export and not r.get(last_export_key):
+            return logger.info(
+                "Warning: No previous timestamp for bulk import found for "
+                f"record type: {record_type}."
+            )
 
         last_pk = r.hget(f"{record_type}_import_status", "last_pk")
         if last_pk:
@@ -397,8 +405,4 @@ class Command(VerboseCommand):
         r.delete(f"{record_type}_import_status")
         # Store the timestamp of the last successful bulk import for this
         # record type, expiring after 45 days.
-        r.set(
-            f"bulk_import:{record_type}",
-            str(datetime.now()),
-            60 * 60 * 24 * 45,
-        )
+        r.set(last_export_key, str(datetime.now()), 60 * 60 * 24 * 45)
