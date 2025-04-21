@@ -7,6 +7,7 @@ from typing import Any
 import boto3
 from django.core.management import CommandParser  # type: ignore
 from django.db import connections
+from redis import Redis
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import get_redis_interface
@@ -96,7 +97,7 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
 
 
 def get_custom_query(
-    type: str, last_pk: str, options: dict[str, Any]
+    type: str, last_pk: str | None, options: dict[str, Any]
 ) -> tuple[str, list[Any]]:
     """
     Generates a custom SQL query based on the provided type and optional last
@@ -104,7 +105,7 @@ def get_custom_query(
 
     Args:
         type (str): Type of data to retrieve.
-        last_pk (int, optional): Last primary key retrieved in a previous
+        last_pk (str, optional): Last primary key retrieved in a previous
             query. Defaults to None.
         options (dict[str, Any]): A dictionary containing options for filtering
             the results.
@@ -248,6 +249,115 @@ def upload_manifest(
         )
 
 
+def export_records_in_batches(
+    r: Redis, record_type: str, options: dict[str, Any]
+) -> None:
+    """
+    Sequentially exports records of a specific type from the database in batches,
+    uploads manifests of the exported data, and tracks the progress using Redis.
+
+    Args:
+        r: An instance of the Redis client used for caching and progress
+            tracking.
+        record_type: The type of records to export. This is used to generate
+            the database query and prefix for Redis keys.
+        options: A dictionary containing configuration options for the export
+            process:
+            - 'file_name' (str, optional): The base filename for the generated
+                manifest files.
+            - 'query_batch_size' (int): The number of records to fetch from the
+                database in each query.
+            - 'use_replica' (bool): If True, queries will be executed
+                against the 'replica' database connection (if configured).
+            - 'random_sample_percentage' (float): If set (between 0 and 100), the
+              export will retrieve a random sample of records.
+    """
+
+    last_pk = r.hget(f"{record_type}_import_status", "last_pk")
+    if last_pk:
+        logger.info(
+            f"Found a PK in cache, starting import process from record {last_pk}."
+        )
+
+    total_number_of_records = int(
+        r.hget(f"{record_type}_import_status", "total_records") or 0
+    )
+    if not total_number_of_records:
+        total_number_of_records = get_total_number_of_records(
+            record_type, options
+        )
+        r.hset(
+            f"{record_type}_import_status",
+            "total_records",
+            total_number_of_records,
+        )
+
+    counter = int(
+        r.hget(f"{record_type}_import_status", "next_iteration_counter") or 0
+    )
+    file_name = (
+        options["file_name"]
+        if options["file_name"]
+        else f"{record_type}_filelist"
+    )
+    while True:
+        query, params = get_custom_query(
+            options["record_type"], last_pk, options
+        )
+        if not options["random_sample_percentage"]:
+            params.append(options["query_batch_size"])
+
+        with connections[
+            "replica" if options["use_replica"] else "default"
+        ].cursor() as cursor:
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            record_count = cursor.rowcount
+
+        if not record_count:
+            logger.info("Finished all the records!")
+            break
+
+        upload_manifest(rows, file_name, options, counter)
+
+        if options["random_sample_percentage"]:
+            # Due to the non-deterministic nature of random sampling,
+            # storing data to recover the query for future executions
+            # wouldn't be meaningful. Random queries are unlikely to
+            # produce the same results on subsequent runs.
+            logger.info(f"Finished processing {record_count} records")
+            break
+
+        counter += 1
+        last_pk = rows[-1][0]
+        records_processed = int(
+            r.hget(f"{record_type}_import_status", "records_processed") or 0
+        )
+
+        # Store the results of this iteration and log the progress
+        r.hset(
+            f"{record_type}_import_status",
+            mapping={
+                "last_pk": last_pk,
+                "next_iteration_counter": counter,
+                "records_processed": records_processed + record_count,
+            },
+        )
+        logger.info(
+            "\rRetrieved {}/{}, ({:.0%}), last PK processed: {},".format(
+                record_count + records_processed,
+                total_number_of_records,
+                (record_count + records_processed)
+                * 1.0
+                / total_number_of_records,
+                last_pk,
+            )
+        )
+
+    # Removes the key from the cache after a successful execution
+    r.delete(f"{record_type}_import_status")
+
+
 class Command(VerboseCommand):
     help = (
         "Retrieves data records from the database and creates manifest files"
@@ -345,91 +455,8 @@ class Command(VerboseCommand):
                 f"record type: {record_type}."
             )
 
-        last_pk = r.hget(f"{record_type}_import_status", "last_pk")
-        if last_pk:
-            logger.info(
-                f"Found a PK in cache, starting import process from record {last_pk}."
-            )
+        export_records_in_batches(r, record_type, options)
 
-        total_number_of_records = int(
-            r.hget(f"{record_type}_import_status", "total_records") or 0
-        )
-        if not total_number_of_records:
-            total_number_of_records = get_total_number_of_records(
-                record_type, options
-            )
-            r.hset(
-                f"{record_type}_import_status",
-                "total_records",
-                total_number_of_records,
-            )
-
-        counter = int(
-            r.hget(f"{record_type}_import_status", "next_iteration_counter")
-            or 0
-        )
-        file_name = (
-            options["file_name"]
-            if options["file_name"]
-            else f"{record_type}_filelist"
-        )
-        while True:
-            query, params = get_custom_query(
-                options["record_type"], last_pk, options
-            )
-            if not options["random_sample_percentage"]:
-                params.append(options["query_batch_size"])
-
-            with connections[
-                "replica" if options["use_replica"] else "default"
-            ].cursor() as cursor:
-                cursor.execute(query, params)
-                rows = cursor.fetchall()
-                record_count = cursor.rowcount
-
-            if not record_count:
-                logger.info("Finished all the records!")
-                break
-
-            upload_manifest(rows, file_name, options, counter)
-
-            if options["random_sample_percentage"]:
-                # Due to the non-deterministic nature of random sampling,
-                # storing data to recover the query for future executions
-                # wouldn't be meaningful. Random queries are unlikely to
-                # produce the same results on subsequent runs.
-                logger.info(f"Finished processing {record_count} records")
-                break
-
-            counter += 1
-            last_pk = rows[-1][0]
-            records_processed = int(
-                r.hget(f"{record_type}_import_status", "records_processed")
-                or 0
-            )
-
-            # Store the results of this iteration and log the progress
-            r.hset(
-                f"{record_type}_import_status",
-                mapping={
-                    "last_pk": last_pk,
-                    "next_iteration_counter": counter,
-                    "records_processed": records_processed + record_count,
-                },
-            )
-            logger.info(
-                "\rRetrieved {}/{}, ({:.0%}), last PK processed: {},".format(
-                    record_count + records_processed,
-                    total_number_of_records,
-                    (record_count + records_processed)
-                    * 1.0
-                    / total_number_of_records,
-                    last_pk,
-                )
-            )
-
-        # Removes the key from the cache after a successful execution
-        r.delete(f"{record_type}_import_status")
         # Store the timestamp of the last successful bulk import for this
         # record type, expiring after 45 days.
         r.set(last_export_key, str(datetime.now()), 60 * 60 * 24 * 45)
