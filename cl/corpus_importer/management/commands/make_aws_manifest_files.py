@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import datetime
 from itertools import batched
 from typing import Any
 
@@ -387,3 +388,10 @@ class Command(VerboseCommand):
 
         # Removes the key from the cache after a successful execution
         r.delete(f"{record_type}_import_status")
+        # Store the timestamp of the last successful bulk import for this
+        # record type, expiring after 45 days.
+        r.set(
+            f"bulk_import:{record_type}",
+            str(datetime.now()),
+            60 * 60 * 24 * 45,
+        )
