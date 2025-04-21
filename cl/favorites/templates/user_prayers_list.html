@@ -18,17 +18,19 @@
 
 {% block content %}
 
+  {% with view_name=request.resolver_match.view_name %}
   <div class="col-xs-12 hidden-sm hidden-md hidden-lg flex justify-content-around v-offset-below-2">
     {% include "includes/prayers_leaderboard_button.html" %}
     <a href="{% url "pray_and_pay_help" %}">
       <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
     </a>
-    {% if is_page_owner %}
+    {% if is_page_owner and view_name == 'user_prayers' %}
       <div>
         {% include "includes/public_prayers_switch.html" with page_public=page_public %}
       </div>
     {% endif %}
   </div>
+  {% endwith %}
   {% with view_name=request.resolver_match.view_name %}
   <div class="col-xs-12 flex {% if is_page_owner %} justify-content-between {% else %} justify-content-end {% endif %} hidden-xs">
     {% if is_page_owner %}
@@ -70,7 +72,7 @@
   </div>
 
   <div class="col-xs-12" id="prayer_summary" hx-swap-oob="true"
-    {% if request.user.is_authenticated %}
+    {% if request.user.is_authenticated and is_page_owner %}
     hx-get="{% url 'user_prayers' request.user.username %}"
     hx-trigger="prayersListChanged from:body" hx-swap="none"
     {% endif %}

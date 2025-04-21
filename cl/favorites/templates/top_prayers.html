@@ -17,7 +17,9 @@
     <a href={% if user.is_authenticated %}"{% url 'user_prayers' user.username %}"{% else %}"{% url 'sign-in' %}?next={% url 'top_prayers' %}"{% endif %}><div class="fa gray fa-fw">
       {% include "includes/hand-holding-heart.svg" %}
     </div> Your Prayers</a>
-    <a href="{% url "pray_and_pay_help" %}">Learn More</a>
+    <a href="{% url "pray_and_pay_help" %}">
+      <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
+    </a>
   </div>
 
   <div class="col-xs-12 hidden-xs">
@@ -90,15 +92,25 @@
                   {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=prayer.prayer_exists document_id=prayer.id count=prayer.prayer_count regular_size=False%}
                 </div>
               </td>
-              <td><a href="{{ prayer.pacer_url }}"
-                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                  class="open_buy_pacer_modal btn btn-default btn-xs"
-                  data-toggle="modal" data-target="#modal-buy-pacer"
-                {% else%}
-                  class="btn btn-default btn-xs"
+              <td>
+                {% if prayer.doc_unavailable %}
+                  <span class="btn btn-default btn-xs disabled">
+                    Unavailable as of {{ prayer.last_checked|date:"M j, Y" }}
+                  </span>
+                {% else %}
+                  <a href="{{ prayer.pacer_url }}"
+                     {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                       class="open_buy_pacer_modal btn btn-default btn-xs"
+                       data-toggle="modal" data-target="#modal-buy-pacer"
+                     {% else %}
+                       class="btn btn-default btn-xs"
+                     {% endif %}
+                     target="_blank"
+                     rel="nofollow">
+                    Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}
+                  </a>
                 {% endif %}
-                  target="_blank"
-                  rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
+              </td>
               {% if perms.favorites.change_prayer %}
                 <td>
                   <div class="flex">
