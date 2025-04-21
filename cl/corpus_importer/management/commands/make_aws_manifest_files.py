@@ -264,6 +264,13 @@ class Command(VerboseCommand):
             help="Store IDs in manifest files as a string sequence (e.g., '1_2_3') "
             "instead of a range (e.g., '1-3').",
         )
+        parser.add_argument(
+            "--monthly-export",
+            action="store_true",
+            default=False,
+            help="Generate a monthly delta of records by querying changes "
+            "since the previous successful export.",
+        )
 
     def handle(self, *args, **options):
         r = get_redis_interface("CACHE")
