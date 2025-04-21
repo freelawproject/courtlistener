@@ -138,6 +138,10 @@ class FakeConfirmationPage:
     def data(self, *args, **kwargs):
         return {}
 
+    @property
+    def response(self, *args, **kwargs):
+        pass
+
 
 class FakeAvailableConfirmationPage(FakeConfirmationPage):
 

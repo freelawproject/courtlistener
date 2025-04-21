@@ -36,6 +36,7 @@
         <ul>
           <li><a href="#fulfilling-prayer">Fulfilling a Prayer</a></li>
           <li><a href="#creating-prayer">Creating a Prayer</a></li>
+          <li><a href="#public-prayers">Sharing Prayers with Others</a></li>
           <li><a href="#limitations">Limitations</a></li>
           <li><a href="#deleting-prayer">Deleting a Prayer</a></li>
         </ul>
@@ -59,7 +60,7 @@
   <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up:</strong> PACER waives the first $30.00 of purchases you make each quarter. By sending reminder emails near the end of each quarter, we encourage users to use this money to contribute the documents other users need.
   </p>
   <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=32" class="btn btn-primary">Sign Up for Reminders</a>
-  <p>Since the project's creation, users have fulfilled <span class="bold">{{ granted_stats.prayer_count|intcomma }}</span> prayers for <span class="bold">{{ granted_stats.distinct_count|intcomma }}</span> documents, for a total contribution of <span class="bold">${{ granted_stats.total_cost }}</span>!
+  <p>Since the project's creation, users have fulfilled <span class="bold">{{ granted_stats.prayer_count|intcomma }}</span> prayers from <span class="bold">{{ granted_stats.distinct_users|intcomma }}</span> people for <span class="bold">{{ granted_stats.distinct_count|intcomma }}</span> documents, for a total contribution of <span class="bold">${{ granted_stats.total_cost }}</span>!
   </p>
 
 
@@ -99,10 +100,19 @@
     (Click for full size version.)
   </p>
 
+  <h3 id="public-prayers">Sharing Prayers with Others</h3>
+  <p>Via the toggle switch available on their page of requests, users can make their list of pending prayers available to the public. While all requests are anonymously compiled on the leaderboard, journalists and others can share their personal wishlists to help crowdsource documents of interest.</p>
+
   <h3 id="limitations">Limitations</h3>
   <p>Each user can place <span class="bold">{{ daily_quota }}</span> prayers per day. This prevents people from praying for every item on the site.
   </p>
+  <p>Members can place <span class="bold">{% widthratio daily_quota 1 3 %}</span> prayers per day.
+  </p>
   <p>Many documents are unavailable for purchase on PACER. These include sealed filings, transcripts with delayed release dates, and in some cases, filings related to immigration and social security claims. To avoid having unavailable documents remain on the community leaderboard indefinitely, our servers check whether a document is available for purchase after it has been requested. If it is unavailable, users will be notified via email, and their prayer will be demoted on the leaderboard. Users can request the document again in the future in case it is later available.
+  </p>
+  <p>
+    <a href="https://donate.free.law/forms/membership"
+       class="btn btn-danger"><i class="fa fa-heart-o"></i> Join Free.law</a>
   </p>
 
   <h3 id="deleting-prayer">Deleting a Prayer</h3>
@@ -111,8 +121,6 @@
 
   <h2>Coming Soon</h2>
   <p>We do not currently support requests to purchase docket information such as attorneys, parties, or docket text such as minute orders, but we hope to support that in the future.
-  </p>
-  <p>We also hope to allow users (such as freelance journalists) to create public wishlists of documents to share with others.
   </p>
   <p>Please stay tuned!</p>
 
