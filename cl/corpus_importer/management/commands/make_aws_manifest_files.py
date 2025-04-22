@@ -7,12 +7,34 @@ from typing import Any
 import boto3
 from django.core.management import CommandParser  # type: ignore
 from django.db import connections
+from django.db.models import Q
+from django.utils import timezone
 from redis import Redis
 
+from cl.audio.models import Audio
+from cl.disclosures.model import Position as FDPosition
+from cl.disclosures.models import (
+    Agreement,
+    Debt,
+    FinancialDisclosure,
+    Gift,
+    Investment,
+    NonInvestmentIncome,
+    Reimbursement,
+    SpouseIncome,
+)
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.models import AbstractDateTimeModel
 from cl.lib.redis_utils import get_redis_interface
-from cl.people_db.models import Position
-from cl.search.models import SEARCH_TYPES
+from cl.people_db.models import (
+    ABARating,
+    Education,
+    Person,
+    PoliticalAffiliation,
+    Position,
+    Source,
+)
+from cl.search.models import SEARCH_TYPES, Opinion
 
 s3_client = boto3.client("s3")
 
@@ -199,6 +221,15 @@ def upload_manifest(
     Generates a CSV manifest file containing S3 object keys derived from record
     ID batches and uploads it to the specified S3 bucket.
 
+    The S3 object keys within the manifest are constructed based on the
+    provided`record_ids`. When certain conditions are met, the individual
+    record IDs within a batch will be joined by underscores in the object key.
+    These conditions are:
+
+    - When records are randomly sampled.
+    - During monthly export processes.
+    - When explicitly specified through the `options` dictionary.
+
     Args:
         rows (list[tuple[int]]): A list of tuples, where each tuple contains at
             least the record's unique ID
@@ -225,10 +256,14 @@ def upload_manifest(
             extrasaction="ignore",
         )
         for row in batched(record_ids, options["lambda_record_size"]):
-            if (
-                options["random_sample_percentage"]
-                or options["save_ids_as_sequence"]
-            ):
+            should_use_underscores = any(
+                [
+                    options["random_sample_percentage"],
+                    options["save_ids_as_sequence"],
+                    options["monthly_export"],
+                ]
+            )
+            if should_use_underscores:
                 # Create an underscore-separated file name that lambda
                 # can split and use as part of batch processing.
                 ids = [str(r[0]) for r in row]
@@ -242,8 +277,13 @@ def upload_manifest(
             query_dict = {"bucket": bucket_name, "file_name": content}
             writer.writerow(query_dict)
 
+        name = (
+            f"{base_filename}_{batch_counter}.csv"
+            if batch_counter
+            else base_filename
+        )
         s3_client.put_object(
-            Key=f"{base_filename}_{batch_counter}.csv",
+            Key=name,
             Bucket=bucket_name,
             Body=csvfile.getvalue().encode("utf-8"),
         )
@@ -358,6 +398,129 @@ def export_records_in_batches(
     r.delete(f"{record_type}_import_status")
 
 
+def get_records_modified_since(
+    model: type[AbstractDateTimeModel], field_name: str, timestamp: datetime
+) -> list[tuple[int]]:
+    """
+    Retrieves a list of tuples containing the values of a specified field
+    for all instances of a given model that have been created or modified
+    on or after a given timestamp.
+
+    Args:
+        model: The Django model class to query (must inherit from
+            AbstractDateTimeModel and have 'date_created' and 'date_modified'
+            fields).
+        field_name: The name of the field whose values to retrieve.
+        since_timestamp: The datetime object representing the lower bound
+            (inclusive) for filtering based on creation or modification time.
+
+    Returns:
+        A list of tuples, where each tuple contains the value of the specified
+        field for a matching model instance. For example, if 'field_name' is 'id',
+        the return type would be List[(int,)].
+    """
+    # Construct a query to find objects created or modified on or after the given timestamp.
+    queryset = model._default_manager.filter(
+        Q(date_created__gte=timestamp) | Q(date_modified__gte=timestamp)
+    )
+
+    # Extract the values of the specified field from the filtered queryset.
+    return list(queryset.values_list(field_name))
+
+
+def get_monthly_record_ids_by_type(
+    record_type: str, timestamp: datetime
+) -> list[tuple[int]]:
+    """
+    Retrieves a list of unique IDs for records of a specific type that were
+    created or modified after a given timestamp.
+
+    The function handles different record types by querying the main model
+    and any relevant nested/related models that might have been updated.
+
+    Args:
+        record_type: A string identifying the type of records to retrieve.
+        timestamp: A datetime object representing the month for which to
+            retrieve records.
+        options: A dictionary containing any additional options.
+
+    Returns:
+        A list of unique integer IDs for the records of the specified type
+        that were created or modified on or after the given `timestamp`.
+    """
+    related_field = "pk"
+    main_model = None
+    nested_models: list[type[AbstractDateTimeModel]] = []
+    match record_type:
+        case SEARCH_TYPES.OPINION:
+            main_model = Opinion
+            nested_models = []
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            main_model = Audio
+            nested_models = []
+        case SEARCH_TYPES.PEOPLE:
+            main_model = Person
+            nested_models = [
+                Source,
+                ABARating,
+                Education,
+                PoliticalAffiliation,
+                Position,
+            ]
+            related_field = "person_id"
+        case "fd":
+            main_model = FinancialDisclosure
+            nested_models = [
+                Agreement,
+                Debt,
+                Gift,
+                Investment,
+                NonInvestmentIncome,
+                Reimbursement,
+                SpouseIncome,
+                FDPosition,
+            ]
+            related_field = "financial_disclosure_id"
+        case _:
+            raise NotImplementedError(
+                f"Record type '{record_type}' is not supported."
+            )
+
+    record_ids = []
+    # check nested/related models
+    for model in nested_models:
+        record_ids.extend(
+            get_records_modified_since(model, related_field, timestamp)
+        )
+    record_ids.extend(get_records_modified_since(main_model, "pk", timestamp))
+    return list(set(record_ids))
+
+
+def compute_monthly_export(
+    record_type: str, timestamp: datetime, options: dict[str, Any]
+):
+    """
+    Computes and uploads a monthly export manifest for a specified record type.
+
+    The function determines the filename based on the record type and the
+    month of the provided timestamp, retrieves the relevant record IDs, and
+    then uploads the manifest.
+
+    Args:
+        record_type: The type of records to include in the export.
+        export_timestamp: A datetime object representing the month for which
+            to generate the export. The filename will be based on this
+            timestamp.
+        export_options: A dictionary containing options to be passed to the
+            `upload_manifest` function.
+    """
+    filename = (
+        f"{record_type}_monthly_export_{timestamp.month}_{timestamp.year}"
+    )
+    record_ids = get_monthly_record_ids_by_type(record_type, timestamp)
+    upload_manifest(record_ids, filename, options)
+
+
 class Command(VerboseCommand):
     help = (
         "Retrieves data records from the database and creates manifest files"
@@ -448,15 +611,22 @@ class Command(VerboseCommand):
         record_type = options["record_type"]
         monthly_export = options["monthly_export"]
 
-        last_export_key = f"bulk_import:{record_type}"
-        if monthly_export and not r.get(last_export_key):
-            return logger.info(
-                "Warning: No previous timestamp for bulk import found for "
-                f"record type: {record_type}."
+        if monthly_export:
+            last_export_key = f"bulk_import:{record_type}"
+            last_export_timestamp = r.get(last_export_key)
+            if not last_export_timestamp:
+                return logger.info(
+                    "Warning: No previous timestamp for bulk import found for "
+                    f"record type: {record_type}."
+                )
+            compute_monthly_export(
+                record_type,
+                datetime.fromisoformat(last_export_timestamp),
+                options,
             )
-
-        export_records_in_batches(r, record_type, options)
+        else:
+            export_records_in_batches(r, record_type, options)
 
         # Store the timestamp of the last successful bulk import for this
         # record type, expiring after 45 days.
-        r.set(last_export_key, str(datetime.now()), 60 * 60 * 24 * 45)
+        r.set(last_export_key, str(timezone.now()), 60 * 60 * 24 * 45)
