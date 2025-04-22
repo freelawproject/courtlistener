@@ -30,7 +30,10 @@ def fetch_citations(search_query: Search) -> list[Hit]:
     """
 
     citation_hits = []
-    search_query = search_query.sort("id")
+    #  Sorts by id, then ordering_key with missing values sorted last
+    search_query = search_query.sort(
+        "id", {"ordering_key": {"order": "asc", "missing": "_last"}}
+    )
     # Only retrieve fields required for the lookup.
     search_query = search_query.source(
         includes=["id", "caseName", "absolute_url", "dateFiled", "cluster_id"]
@@ -131,13 +134,11 @@ def es_case_name_query(
 
 
 def es_search_db_for_full_citation(
-    full_citation: FullCaseCitation, query_citation: bool = False
+    full_citation: FullCaseCitation,
 ) -> tuple[list[Hit], bool]:
     """For a citation object, try to match it to an item in the database using
     a variety of heuristics.
     :param full_citation: A FullCaseCitation instance.
-    :param query_citation: Whether this is related to es_get_query_citation
-    resolution
     return: A two tuple, the ElasticSearch Result object with the results, or an empty list if
      no hits and a boolean indicating whether the citation was found.
     """
@@ -149,14 +150,8 @@ def es_search_db_for_full_citation(
         Q(
             "term", **{"status.raw": "Published"}
         ),  # Non-precedential documents aren't cited
+        Q("match", cluster_child="opinion"),
     ]
-
-    if query_citation:
-        # If this is related to query citation resolution, look for
-        # opinion_cluster to determine if a citation matched a single cluster.
-        filters.append(Q("match", cluster_child="opinion_cluster"))
-    else:
-        filters.append(Q("match", cluster_child="opinion"))
 
     must_not = []
     if full_citation.citing_opinion is not None:
@@ -238,9 +233,7 @@ def es_get_query_citation(
 
     matches = None
     for citation in citations:
-        matches, citation_found = es_search_db_for_full_citation(
-            citation, query_citation=True
-        )
+        matches, citation_found = es_search_db_for_full_citation(citation)
         if not citation_found:
             missing_citations.append(citation)
 
