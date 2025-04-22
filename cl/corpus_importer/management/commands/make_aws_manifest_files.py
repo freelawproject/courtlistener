@@ -12,7 +12,6 @@ from django.utils import timezone
 from redis import Redis
 
 from cl.audio.models import Audio
-from cl.disclosures.model import Position as FDPosition
 from cl.disclosures.models import (
     Agreement,
     Debt,
@@ -20,9 +19,9 @@ from cl.disclosures.models import (
     Gift,
     Investment,
     NonInvestmentIncome,
-    Reimbursement,
-    SpouseIncome,
 )
+from cl.disclosures.models import Position as FDPosition
+from cl.disclosures.models import Reimbursement, SpouseIncome
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.redis_utils import get_redis_interface
