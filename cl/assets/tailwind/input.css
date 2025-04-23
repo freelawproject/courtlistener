@@ -27,10 +27,10 @@
     @apply text-lg font-semibold text-greyscale-900;
   }
   ul {
-    @apply list-disc pl-5;
+    @apply list-disc pl-6;
   }
   ol {
-    @apply list-decimal pl-5;
+    @apply list-decimal pl-6;
   }
   blockquote {
     @apply border-l-4 border-l-greyscale-200 pl-6 py-2 text-xl font-normal first-of-type:mt-2 [&_blockquote:last-of-type]:-mb-2;
