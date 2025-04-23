@@ -33,7 +33,7 @@ from cl.people_db.models import (
     Position,
     Source,
 )
-from cl.search.models import SEARCH_TYPES, Opinion
+from cl.search.models import SEARCH_TYPES, SOURCES, Opinion
 
 s3_client = boto3.client("s3")
 
@@ -485,14 +485,29 @@ def get_monthly_record_ids_by_type(
                 f"Record type '{record_type}' is not supported."
             )
 
-    record_ids = []
+    record_ids = get_records_modified_since(main_model, "pk", timestamp)
     # check nested/related models
     for model in nested_models:
         record_ids.extend(
             get_records_modified_since(model, related_field, timestamp)
         )
-    record_ids.extend(get_records_modified_since(main_model, "pk", timestamp))
-    return list(set(record_ids))
+
+    match record_type:
+        case SEARCH_TYPES.OPINION:
+            # Apply filters to include only opinions that are either:
+            # 1. Not extracted by OCR.
+            # 2. Associated with a cluster whose source contains HARVARD_CASELAW
+            ids = [x[0] for x in record_ids]
+            return list(
+                Opinion.objects.filter(pk__in=ids)
+                .filter(
+                    Q(extracted_by_ocr=False)
+                    | Q(cluster__source__icontains=SOURCES.HARVARD_CASELAW)
+                )
+                .values_list("pk")
+            )
+        case _:
+            return list(set(record_ids))
 
 
 def compute_monthly_export(

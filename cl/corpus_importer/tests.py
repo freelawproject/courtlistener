@@ -117,6 +117,7 @@ from cl.search.factories import (
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
+    OpinionWithParentsFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -3353,6 +3354,73 @@ class AWSManifestTest(TestCase):
         self.assertIn(person_6.id, record_ids)
         # Assert that the old record that was not updated is NOT included
         self.assertNotIn(person_7.id, record_ids)
+
+    def test_get_monthly_harvard_non_ocr_opinions(self):
+        """Verifies retrieval of Harvard Law, non-OCR opinion IDs"""
+        last_export_timestamp = datetime.now() - timedelta(weeks=1)
+        # Create opinions with different sources and OCR status before the
+        # timestamp
+        with time_machine.travel(
+            last_export_timestamp - timedelta(weeks=1), tick=False
+        ):
+            opinion_1 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                ),
+                extracted_by_ocr=False,
+            )
+            opinion_2 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                ),
+                extracted_by_ocr=False,
+            )
+            opinion_3 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.COURT_WEBSITE, docket=DocketFactory()
+                ),
+                extracted_by_ocr=True,
+            )
+
+        # Create and update opinions after the timestamp
+        with time_machine.travel(
+            last_export_timestamp + timedelta(days=2), tick=False
+        ):
+            opinion_1.author_str = "Author updated"
+            opinion_1.save()
+            opinion_3.author_str = "Author updated"
+            opinion_3.save()
+            opinion_4 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.COLUMBIA_ARCHIVE, docket=DocketFactory()
+                ),
+                extracted_by_ocr=True,
+            )
+            opinion_5 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                ),
+                extracted_by_ocr=False,
+            )
+
+        records = get_monthly_record_ids_by_type(
+            SEARCH_TYPES.OPINION, last_export_timestamp
+        )
+        # Check the total number of returned records
+        print(records)
+        self.assertEqual(len(records), 2)
+
+        record_ids = [x[0] for x in records]
+        # Updated after timestamp, Harvard, not OCR
+        self.assertIn(opinion_1.id, record_ids)
+        # Created after timestamp, Harvard, not OCR
+        self.assertIn(opinion_5.id, record_ids)
+        # Created before timestamp, not updated
+        self.assertNotIn(opinion_2.id, record_ids)
+        # Created after timestamp, but OCR'd and not Harvard
+        self.assertNotIn(opinion_4.id, record_ids)
+        # Updated after timestamp, but OCR'd and Not Harvard
+        self.assertNotIn(opinion_4.id, record_ids)
 
     def test_can_get_recent_records_from_flat_models(self):
         """Verifies get_monthly_record_ids_by_type returns records created or
