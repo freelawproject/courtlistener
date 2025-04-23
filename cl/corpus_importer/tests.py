@@ -52,6 +52,9 @@ from cl.corpus_importer.management.commands.normalize_judges_opinions import (
     normalize_authors_in_opinions,
     normalize_panel_in_opinioncluster,
 )
+from cl.corpus_importer.management.commands.probe_iquery_pages_daemon import (
+    get_latest_pacer_case_id_for_courts,
+)
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
     check_case_names_match,
     parse_citations,
@@ -2190,7 +2193,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_cand.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_cand.pk, "10000", testing=True)
+        probe_iquery_pages.delay(self.court_cand.pk, "0", testing=True)
 
         # New highest_known_pacer_case_id according to the cand test pattern in
         # test_patterns
@@ -2234,7 +2237,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_nysd.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_nysd.pk, "10000",testing=True)
+        probe_iquery_pages.delay(self.court_nysd.pk, None, testing=True)
 
         # New highest_known_pacer_case_id according to the nysd test pattern in
         # cl.tests.fakes.test_patterns
@@ -2311,7 +2314,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_gamb.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_gamb.pk, "10000",testing=True)
+        probe_iquery_pages.delay(self.court_gamb.pk, None, testing=True)
 
         # highest_known_pacer_case_id is not updated due to the block.
         highest_known_pacer_case_id = r.hget(
@@ -2337,7 +2340,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.hset("iquery:test_highest_known_pacer_case_id", self.court_hib.pk, 8)
         # Execute the task
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
-            probe_iquery_pages.delay(self.court_hib.pk, "10000",testing=True)
+            probe_iquery_pages.delay(self.court_hib.pk, None, testing=True)
 
         # 2 sleeps before aborting the task. The probe is retried 2 times
         # independently via the @retry decorator.
@@ -2500,6 +2503,7 @@ class ScrapeIqueryPagesTest(TestCase):
             ):
                 DocketFactory(
                     court=self.court_gand,
+                    appeal_from=None,
                     source=Docket.RECAP,
                     case_name="New Incoming Docket",
                     docket_number="2:20-cv-00601",
@@ -2533,6 +2537,7 @@ class ScrapeIqueryPagesTest(TestCase):
             ):
                 DocketFactory(
                     court=self.court_gand,
+                    appeal_from=None,
                     source=Docket.RECAP,
                     docket_number="2:20-cv-00600",
                     pacer_case_id="4",
@@ -2569,6 +2574,7 @@ class ScrapeIqueryPagesTest(TestCase):
             ):
                 DocketFactory(
                     court=self.court_gand,
+                    appeal_from=None,
                     source=Docket.RECAP,
                     case_name="New Incoming Docket",
                     docket_number="2:20-cv-00601",
@@ -2636,7 +2642,9 @@ class ScrapeIqueryPagesTest(TestCase):
                 execute=True
             ):
                 # Execute the probing task
-                probe_iquery_pages.delay(self.court_cand.pk, "10000",testing=True)
+                probe_iquery_pages.delay(
+                    self.court_cand.pk, None, testing=True
+                )
 
             # update_latest_case_id_and_schedule_iquery_sweep should be called
             # 1 time only for the latest probing hit.
@@ -2666,6 +2674,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 # a sweep task.
                 DocketFactory(
                     court=self.court_txed,
+                    appeal_from=None,
                     source=Docket.RECAP,
                     case_name="New Incoming Docket 12",
                     docket_number="2:10-cv-00602",
@@ -2691,7 +2700,9 @@ class ScrapeIqueryPagesTest(TestCase):
                 execute=True
             ):
                 # Execute the probing task
-                probe_iquery_pages.delay(self.court_txed.pk, "10000",testing=True)
+                probe_iquery_pages.delay(
+                    self.court_txed.pk, None, testing=True
+                )
 
             # update_latest_case_id_and_schedule_iquery_sweep should be called
             # 1 time only for the latest probing hit.
@@ -3001,6 +3012,7 @@ class ScrapeIqueryPagesTest(TestCase):
             docket_gand = DocketFactory(
                 court=self.court_gand,
                 source=Docket.RECAP,
+                appeal_from=None,
                 case_name="GAND Docket",
                 docket_number="2:20-cv-00609",
                 pacer_case_id="8",
@@ -3009,6 +3021,7 @@ class ScrapeIqueryPagesTest(TestCase):
             docket_cand = DocketFactory(
                 court=self.court_cand,
                 source=Docket.RECAP,
+                appeal_from=None,
                 case_name="CAND Docket",
                 docket_number="2:20-cv-00606",
                 pacer_case_id="16",
@@ -3069,6 +3082,7 @@ class ScrapeIqueryPagesTest(TestCase):
         d_1 = DocketFactory(
             source=Docket.RECAP,
             court=self.court_canb,
+            appeal_from=None,
             pacer_case_id="12345",
             date_filed=None,
             date_terminated=None,
@@ -3077,6 +3091,7 @@ class ScrapeIqueryPagesTest(TestCase):
         d_2 = DocketFactory(
             source=Docket.RECAP,
             court=self.court_canb,
+            appeal_from=None,
             pacer_case_id="12346",
             date_filed=None,
             date_terminated=date(2018, 11, 4),
@@ -3086,6 +3101,7 @@ class ScrapeIqueryPagesTest(TestCase):
         with time_machine.travel(two_weeks_ago, tick=False):
             d_3 = DocketFactory(
                 source=Docket.RECAP,
+                appeal_from=None,
                 court=self.court_canb,
                 pacer_case_id="12346",
                 date_filed=date(2018, 11, 4),
@@ -3127,6 +3143,46 @@ class ScrapeIqueryPagesTest(TestCase):
             msg="Wrong IDs returned by get_docket_ids_week_ago_no_case_name",
         )
 
+    def test_get_latest_pacer_case_id_for_courts(self, mock_cookies):
+        """Test get_latest_pacer_case_id_for_courts helper."""
+
+        d_canb_old = DocketFactory(
+            court=self.court_canb,
+            appeal_from=None,
+            source=Docket.RECAP,
+            pacer_case_id="23000",
+        )
+        d_canb_latest = DocketFactory(
+            court=self.court_canb,
+            appeal_from=None,
+            source=Docket.RECAP,
+            pacer_case_id="43000",
+        )
+
+        d_cand_old = DocketFactory(
+            court=self.court_cand,
+            appeal_from=None,
+            source=Docket.RECAP,
+            pacer_case_id="103000",
+        )
+        d_cand_latest = DocketFactory(
+            court=self.court_cand,
+            appeal_from=None,
+            source=Docket.RECAP,
+            pacer_case_id="209000",
+        )
+
+        latest_court_ids = get_latest_pacer_case_id_for_courts(
+            [self.court_cand.pk, self.court_canb.pk, self.court_mowd.pk]
+        )
+        # The latest pacer_case_id from each court should be returned.
+        self.assertEqual(
+            latest_court_ids[self.court_cand.pk], d_cand_latest.pacer_case_id
+        )
+        self.assertEqual(
+            latest_court_ids[self.court_canb.pk], d_canb_latest.pacer_case_id
+        )
+
     @patch(
         "cl.scrapers.tasks.CaseQuery",
         new=FakeCaseQueryReport,
@@ -3143,24 +3199,17 @@ class ScrapeIqueryPagesTest(TestCase):
         """
 
         with override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False):
-            docket_mowd_1 = DocketFactory(
+            DocketFactory(
                 court=self.court_mowd,
-                source=Docket.RECAP,
-                case_name="MOWD Docket",
-                docket_number="2:20-cv-006032",
-                pacer_case_id="200",
-            )
-
-            docket_mowd_last = DocketFactory(
-                court=self.court_mowd,
+                appeal_from=None,
                 source=Docket.RECAP,
                 case_name="MOWD Docket 2",
                 docket_number="2:20-cv-006032",
-                pacer_case_id="3500",
+                pacer_case_id="3021",
             )
 
         dockets = Docket.objects.all()
-        self.assertEqual(dockets.count(), 2)
+        self.assertEqual(dockets.count(), 1)
         r = get_redis_interface("CACHE")
         r.hset("iquery:highest_known_pacer_case_id", self.court_mowd.pk, 3000)
         r.hset("iquery:pacer_case_id_current", self.court_mowd.pk, 3000)
@@ -3194,6 +3243,20 @@ class ScrapeIqueryPagesTest(TestCase):
             "query_iquery_page shouldn't be called.",
         )
 
+        highest_known_pacer_case_id = r.hget(
+            "iquery:highest_known_pacer_case_id", self.court_mowd.pk
+        )
+        pacer_case_id_current = r.hget(
+            "iquery:pacer_case_id_current", self.court_mowd.pk
+        )
+        self.assertEqual(int(highest_known_pacer_case_id), 3010)
+        self.assertEqual(int(pacer_case_id_current), 3009)
+
+        # No additional dockets have been added at this point.
+        self.assertEqual(
+            dockets.count(), 1, msg="Docket number doesn't match."
+        )
+
         with override_settings(
             IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
         ), patch("cl.lib.decorators.time.sleep") as mock_sleep, patch(
@@ -3206,8 +3269,58 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # 3 additional dockets should exist the sweep is completed.
         self.assertEqual(
-            dockets.count(), 5, msg="Docket number doesn't match."
+            dockets.count(), 4, msg="Docket number doesn't match."
         )
+        highest_known_pacer_case_id = r.hget(
+            "iquery:highest_known_pacer_case_id", self.court_mowd.pk
+        )
+        pacer_case_id_current = r.hget(
+            "iquery:pacer_case_id_current", self.court_mowd.pk
+        )
+        self.assertEqual(int(highest_known_pacer_case_id), 3020)
+        self.assertEqual(int(pacer_case_id_current), 3019)
+
+        # Test switching to exploration mode when reaching the latest known PACER case ID.
+        test_dispatch_uid = (
+            "test_fixed_handle_update_latest_case_id_and_schedule_iquery_sweep"
+        )
+        post_save.connect(
+            handle_update_latest_case_id_and_schedule_iquery_sweep,
+            sender=Docket,
+            dispatch_uid=test_dispatch_uid,
+        )
+        try:
+            with override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
+            ), patch(
+                "cl.lib.decorators.time.sleep"
+            ) as mock_sleep, self.captureOnCommitCallbacks(
+                execute=True
+            ):
+                call_command(
+                    "probe_iquery_pages_daemon",
+                    testing_iterations=1,
+                )
+
+            # 1 additional dockets should be added during the exploration mode.
+            self.assertEqual(
+                dockets.count(), 5, msg="Docket number doesn't match."
+            )
+            highest_known_pacer_case_id = r.hget(
+                "iquery:highest_known_pacer_case_id", self.court_mowd.pk
+            )
+            pacer_case_id_current = r.hget(
+                "iquery:pacer_case_id_current", self.court_mowd.pk
+            )
+            self.assertEqual(int(highest_known_pacer_case_id), 3022)
+            self.assertEqual(int(pacer_case_id_current), 3021)
+        finally:
+            # Ensure the signal is disconnected after the test
+            post_save.disconnect(
+                handle_update_latest_case_id_and_schedule_iquery_sweep,
+                sender=Docket,
+                dispatch_uid=test_dispatch_uid,
+            )
 
 
 class WestCitationImportTest(TestCase):

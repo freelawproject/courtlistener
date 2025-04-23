@@ -26,6 +26,11 @@ def enqueue_iquery_probe(court_id: str) -> bool:
 def get_latest_pacer_case_id_for_courts(
     court_ids: list[str],
 ) -> dict[str, str]:
+    """Return the latest pacer_case_id for each given court.
+
+    :param court_ids: List of court IDs to fetch the latest pacer_case_id for.
+    :return: A dict mapping each court_id to its latest pacer_case_id.
+    """
     latest_docket_ids = (
         Docket.objects.filter(
             pacer_case_id__isnull=False,

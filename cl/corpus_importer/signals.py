@@ -24,7 +24,11 @@ def update_latest_case_id_and_schedule_iquery_sweep(
 ) -> None:
     """Updates the latest PACER case ID and schedules iquery retrieval tasks.
 
-    :param docket: The incoming Docket instance.
+    Note: Provide either a Docket instance or a court_id with fixed_case_id_sweep.
+
+    :param docket: The Docket instance, if triggered by a Docket post_save signal.
+    :param court_id: The court ID, if triggered in fixed sweep mode.
+    :param fixed_case_id_sweep: The target case ID for performing a fixed sweep.
     :return: None
     """
 

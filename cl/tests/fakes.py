@@ -241,7 +241,9 @@ test_patterns = {
         3015: True,
         3017: True,
         3019: True,
-        3030: False,
+        3020: False,
+        3021: True,
+        3022: True,
     },
 }
 
