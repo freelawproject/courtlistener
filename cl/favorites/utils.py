@@ -166,7 +166,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
                 When(prayeravailability__id__isnull=False, then=Value(True)),
                 default=Value(False),
             ),
-            last_checked=TruncDate("prayeravailability__last_checked"),
+            last_checked=F("prayeravailability__last_checked__date"),
         )
         .order_by(
             "doc_unavailable", "last_checked", "-prayer_count", "-view_count"
