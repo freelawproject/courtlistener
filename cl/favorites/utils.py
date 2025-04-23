@@ -17,7 +17,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Least, TruncDate
+from django.db.models.functions import Least
 from django.template import loader
 from django.utils import timezone
 
