@@ -5,6 +5,8 @@
 @layer base {
   :root {
     --nav-menu-width: 222px;
+    --mobile-main-padding: theme(spacing.4);
+    --padded-full-width: calc(100vw - (2 * var(--mobile-main-padding)));
   }
   code {
     @apply font-sans text-sm bg-brand-100 text-brand-600 border border-brand-300 rounded-[2px] px-1;
@@ -24,6 +26,27 @@
   h4 {
     @apply text-lg font-semibold text-greyscale-900;
   }
+  ul {
+    @apply list-disc pl-5;
+  }
+  ol {
+    @apply list-decimal pl-5;
+  }
+  blockquote {
+    @apply border-l-4 border-l-greyscale-200 pl-6 py-2 text-xl font-normal first-of-type:mt-2 [&_blockquote:last-of-type]:-mb-2;
+  }
+  table {
+    @apply table;
+  }
+  tr {
+    @apply has-[th[scope="col"]]:bg-greyscale-100 has-[th[scope="col"]]:rounded-lg w-full border-b border-greyscale-200 text-sm font-normal;
+  }
+  th {
+    @apply p-2 text-start text-greyscale-700 font-normal;
+  }
+  td {
+    @apply p-2;
+  }
 }
 
 @tailwind components;
@@ -37,6 +60,9 @@
   }
   .btn-outline {
     @apply btn text-greyscale-700 hover:bg-greyscale-100 outline outline-1 outline-greyscale-300 focus:ring-4 focus:ring-greyscale-200 disabled:outline-greyscale-200 disabled:text-greyscale-400;
+  }
+  .textbox {
+    @apply text-md font-normal py-3 px-4 rounded-[10px] border border-greyscale-300;
   }
 }
 
