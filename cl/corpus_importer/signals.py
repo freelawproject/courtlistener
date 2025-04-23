@@ -19,7 +19,7 @@ from cl.search.models import Docket
 
 def update_latest_case_id_and_schedule_iquery_sweep(
     docket: Docket | None,
-    court_id: str = None,
+    court_pk: str | None = None,
     fixed_case_id_sweep: int | None = None,
 ) -> None:
     """Updates the latest PACER case ID and schedules iquery retrieval tasks.
@@ -27,13 +27,25 @@ def update_latest_case_id_and_schedule_iquery_sweep(
     Note: Provide either a Docket instance or a court_id with fixed_case_id_sweep.
 
     :param docket: The Docket instance, if triggered by a Docket post_save signal.
-    :param court_id: The court ID, if triggered in fixed sweep mode.
+    :param court_pk: The court ID, if triggered in fixed sweep mode.
     :param fixed_case_id_sweep: The target case ID for performing a fixed sweep.
     :return: None
     """
 
     r = get_redis_interface("CACHE")
-    court_id: str = court_id or docket.court_id
+    court_id: str
+    incoming_pacer_case_id: int
+    if docket is not None:
+        court_id = docket.court_id
+        incoming_pacer_case_id = int(docket.pacer_case_id)
+    elif court_pk is not None and fixed_case_id_sweep is not None:
+        court_id = court_pk
+        incoming_pacer_case_id = fixed_case_id_sweep
+    else:
+        raise ValueError(
+            "Provide either a Docket instance or court_id + fixed_case_id_sweep"
+        )
+
     # Get the latest pacer_case_id from Redis using a lock to avoid race conditions
     # when getting and updating it.
     update_lock_key = make_update_pacer_case_id_key(court_id)
@@ -46,7 +58,6 @@ def update_latest_case_id_and_schedule_iquery_sweep(
     iquery_pacer_case_id_current = int(
         r.hget("iquery:pacer_case_id_current", court_id) or 0
     )
-    incoming_pacer_case_id = fixed_case_id_sweep or int(docket.pacer_case_id)
     found_higher_case_id = False
     if incoming_pacer_case_id > highest_known_pacer_case_id:
         found_higher_case_id = True
