@@ -3279,20 +3279,25 @@ class AWSManifestTest(TestCase):
             person_1 = PersonFactory.create(gender="m")
             ABARatingFactory(person=person_1, year_rated=2005)
             EducationFactory(person=person_1, school=school)
+            PositionFactory(person=person_1)
+            PositionFactory(person=person_1)
 
             person_2 = PersonFactory.create()
             rating_person_2 = ABARatingFactory(
                 person=person_2, rating="q", year_rated=2005
             )
             EducationFactory(person=person_2, school=school)
+            PositionFactory(person=person_2)
 
             person_3 = PersonFactory.create(gender="m")
             ABARatingFactory(person=person_3, year_rated=2005)
             EducationFactory(person=person_3, school=school)
+            PositionFactory(person=person_3)
 
             person_4 = PersonFactory.create(gender="m")
             ABARatingFactory(person=person_4, year_rated=2005)
             EducationFactory(person=person_4, school=school)
+            PositionFactory(person=person_4)
 
             person_5 = PersonFactory.create()
             ABARatingFactory(person=person_5, year_rated=2005)
@@ -3300,9 +3305,11 @@ class AWSManifestTest(TestCase):
             position_person_5 = PositionFactory(person=person_5)
 
             person_6 = PersonFactory()
+            PositionFactory(person=person_6)
 
             person_7 = PersonFactory()
             ABARatingFactory(person=person_7, year_rated=2004)
+            PositionFactory(person=person_7)
 
             # Create more older person records
             PersonFactory.create_batch(3)
@@ -3326,6 +3333,9 @@ class AWSManifestTest(TestCase):
 
             PoliticalAffiliationFactory(person=person_6)
 
+            person_8 = PersonFactory()
+            PositionFactory(person=person_8)
+
             # Create new Person records
             PersonFactory.create_batch(10)
 
@@ -3334,9 +3344,9 @@ class AWSManifestTest(TestCase):
         )
 
         # Check the total number of returned records
-        # Should include the 6 updated/affected old records and the 10 newly
-        # created records
-        self.assertEqual(len(records), 16)
+        # Should include the 6 updated/affected old records and 1 newly created
+        # record
+        self.assertEqual(len(records), 7)
 
         record_ids = [x[0] for x in records]
         # Assert that the updated/affected old records are included
@@ -3352,6 +3362,8 @@ class AWSManifestTest(TestCase):
         self.assertIn(person_5.id, record_ids)
         # A new related PoliticalAffiliation was created
         self.assertIn(person_6.id, record_ids)
+        # A new record with a Judge position
+        self.assertIn(person_8.id, record_ids)
         # Assert that the old record that was not updated is NOT included
         self.assertNotIn(person_7.id, record_ids)
 

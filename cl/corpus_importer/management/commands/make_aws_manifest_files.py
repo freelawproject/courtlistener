@@ -505,6 +505,17 @@ def get_monthly_record_ids_by_type(
                     | Q(cluster__source__icontains=SOURCES.HARVARD_CASELAW)
                 )
                 .values_list("pk")
+                .distinct()
+            )
+        case SEARCH_TYPES.PEOPLE:
+            # Filter record IDs for people, including only those who have
+            # judicial positions.
+            ids = [x[0] for x in record_ids]
+            return list(
+                Person.objects.filter(pk__in=ids)
+                .filter(positions__position_type__in=JUDICIAL_POSITIONS)
+                .values_list("pk")
+                .distinct()
             )
         case _:
             return list(set(record_ids))
