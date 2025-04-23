@@ -539,9 +539,8 @@ def compute_monthly_export(
         export_options: A dictionary containing options to be passed to the
             `upload_manifest` function.
     """
-    filename = (
-        f"{record_type}_monthly_export_{timestamp.month}_{timestamp.year}"
-    )
+    current_timestamp = timezone.now()
+    filename = f"{record_type}_monthly_export_{current_timestamp.month}_{current_timestamp.year}"
     record_ids = get_monthly_record_ids_by_type(record_type, timestamp)
     upload_manifest(record_ids, filename, options)
 
