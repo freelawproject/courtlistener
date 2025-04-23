@@ -2100,6 +2100,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:pacer_case_id_current",
             "iquery:court_blocked_attempts:*",
             "iquery:court_empty_probe_attempts:*",
+            "iquery:latest_known_pacer_case_id",
         ]
         for key_to_clean in keys_to_clean:
             key = self.r.keys(key_to_clean)
@@ -3145,42 +3146,54 @@ class ScrapeIqueryPagesTest(TestCase):
 
     def test_get_latest_pacer_case_id_for_courts(self, mock_cookies):
         """Test get_latest_pacer_case_id_for_courts helper."""
-
+        today = date.today()
         d_canb_old = DocketFactory(
             court=self.court_canb,
             appeal_from=None,
             source=Docket.RECAP,
             pacer_case_id="23000",
+            date_filed=date(2018, 11, 4),
         )
         d_canb_latest = DocketFactory(
             court=self.court_canb,
             appeal_from=None,
             source=Docket.RECAP,
             pacer_case_id="43000",
+            date_filed=today,
         )
-
         d_cand_old = DocketFactory(
             court=self.court_cand,
             appeal_from=None,
             source=Docket.RECAP,
             pacer_case_id="103000",
+            date_filed=date(2018, 11, 4),
         )
         d_cand_latest = DocketFactory(
             court=self.court_cand,
             appeal_from=None,
             source=Docket.RECAP,
             pacer_case_id="209000",
+            date_filed=today,
         )
 
+        call_command(
+            "ready_mix_cases_project",
+            task="set-latest-case-ids",
+            court_type="all",
+        )
+
+        r = get_redis_interface("CACHE")
         latest_court_ids = get_latest_pacer_case_id_for_courts(
-            [self.court_cand.pk, self.court_canb.pk, self.court_mowd.pk]
+            [self.court_cand.pk, self.court_canb.pk, self.court_mowd.pk], r
         )
         # The latest pacer_case_id from each court should be returned.
         self.assertEqual(
-            latest_court_ids[self.court_cand.pk], d_cand_latest.pacer_case_id
+            latest_court_ids[self.court_cand.pk],
+            int(d_cand_latest.pacer_case_id),
         )
         self.assertEqual(
-            latest_court_ids[self.court_canb.pk], d_canb_latest.pacer_case_id
+            latest_court_ids[self.court_canb.pk],
+            int(d_canb_latest.pacer_case_id),
         )
 
     @patch(
@@ -3199,6 +3212,7 @@ class ScrapeIqueryPagesTest(TestCase):
         """
 
         with override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False):
+            today = date.today()
             DocketFactory(
                 court=self.court_mowd,
                 appeal_from=None,
@@ -3206,7 +3220,15 @@ class ScrapeIqueryPagesTest(TestCase):
                 case_name="MOWD Docket 2",
                 docket_number="2:20-cv-006032",
                 pacer_case_id="3021",
+                date_filed=today,
             )
+
+        # Set latest know pacer_case_ids and store in Redis.
+        call_command(
+            "ready_mix_cases_project",
+            task="set-latest-case-ids",
+            court_type="all",
+        )
 
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 1)

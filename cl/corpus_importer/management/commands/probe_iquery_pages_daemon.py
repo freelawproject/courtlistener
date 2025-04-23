@@ -10,7 +10,6 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
-from cl.search.models import Docket
 
 
 def enqueue_iquery_probe(court_id: str) -> bool:
@@ -23,31 +22,21 @@ def enqueue_iquery_probe(court_id: str) -> bool:
     return create_redis_semaphore("CACHE", key, ttl=60 * 10)
 
 
-def get_latest_pacer_case_id_for_courts(
-    court_ids: list[str],
-) -> dict[str, str]:
-    """Return the latest pacer_case_id for each given court.
+def get_latest_pacer_case_id_for_courts(court_ids: list[str], r) -> dict:
+    """Return the latest pacer_case_id for each given court from Redis.
 
     :param court_ids: List of court IDs to fetch the latest pacer_case_id for.
+    :param r: The redis connection to use.
     :return: A dict mapping each court_id to its latest pacer_case_id.
     """
-    latest_docket_ids = (
-        Docket.objects.filter(
-            pacer_case_id__isnull=False,
-            court_id__in=court_ids,
+    latest_case_ids = {}
+    for court_id in court_ids:
+        latest_known_pacer_case_id = r.hget(
+            "iquery:latest_known_pacer_case_id", court_id
         )
-        .order_by("court_id", "-pacer_case_id")
-        .distinct("court_id")
-        .values_list("id", flat=True)
-    )
-
-    latest_dockets = (
-        Docket.objects.filter(id__in=latest_docket_ids)
-        .only("court_id", "pacer_case_id")
-        .values_list("court_id", "pacer_case_id")
-    )
-
-    return dict(latest_dockets)
+        if latest_known_pacer_case_id:
+            latest_case_ids[court_id] = int(latest_known_pacer_case_id)
+    return latest_case_ids
 
 
 class Command(VerboseCommand):
@@ -98,7 +87,7 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
         iterations_completed = 0
         r = get_redis_interface("CACHE")
         testing = True if testing_iterations else False
-        latest_case_ids = get_latest_pacer_case_id_for_courts(court_ids)
+        latest_case_ids = get_latest_pacer_case_id_for_courts(court_ids, r)
 
         while True and settings.IQUERY_CASE_PROBE_DAEMON_ENABLED:
             for court_id in court_ids:
