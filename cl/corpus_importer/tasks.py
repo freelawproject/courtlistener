@@ -1430,6 +1430,7 @@ def query_iquery_page(
 def probe_iquery_pages(
     self: Task,
     court_id: str,
+    latest_know_case_id_db: str | None,
     testing: bool = False,
 ) -> None:
     """
@@ -1438,9 +1439,13 @@ def probe_iquery_pages(
 
     :param self: The celery task
     :param court_id: A CL court ID where we'll look things up.
+    :param latest_know_case_id_db: The latest known pacer case ID from DB.
     :param testing: A boolean indicating whether this was called from tests.
     :return: None
     """
+    from cl.corpus_importer.signals import (
+        update_latest_case_id_and_schedule_iquery_sweep,
+    )
 
     r = get_redis_interface("CACHE")
     probe_iteration = 1
@@ -1449,11 +1454,25 @@ def probe_iquery_pages(
     highest_known_pacer_case_id = int(
         r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
     )
+    do_fixed_sweep = (
+        (
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP
+            < int(latest_know_case_id_db)
+        )
+        if latest_know_case_id_db
+        else False
+    )
+
     jitter = compute_binary_probe_jitter(testing)
     reports_data = []
     found_match = False
     pacer_case_id_to_lookup = highest_known_pacer_case_id
-    while probe_offset + jitter < settings.IQUERY_PROBE_MAX_OFFSET:
+
+    probe_iteration_limit = (
+        1 if do_fixed_sweep else settings.IQUERY_PROBE_MAX_OFFSET
+    )
+
+    while probe_offset + jitter < probe_iteration_limit:
         pacer_case_id_to_lookup, probe_offset = compute_next_binary_probe(
             highest_known_pacer_case_id, probe_iteration, jitter
         )
@@ -1533,7 +1552,7 @@ def probe_iquery_pages(
             "iquery:test_highest_known_pacer_case_id", court_id, latest_match
         )
 
-    if not reports_data:
+    if not reports_data and not do_fixed_sweep:
         logger.info(
             "No cases were found during this probe for court %s - case IDs from %s to %s.",
             court_id,
@@ -1570,6 +1589,15 @@ def probe_iquery_pages(
                 3600,
                 ex=3600,
             )
+
+    if do_fixed_sweep:
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None,
+            court_id,
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
+        )
+        delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
+        return None
 
     # Process all the reports retrieved during the probing.
     # Avoid triggering the iQuery sweep signal except for the latest hit.

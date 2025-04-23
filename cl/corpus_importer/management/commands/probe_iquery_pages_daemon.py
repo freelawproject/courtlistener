@@ -10,6 +10,7 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
+from cl.search.models import Docket
 
 
 def enqueue_iquery_probe(court_id: str) -> bool:
@@ -20,6 +21,28 @@ def enqueue_iquery_probe(court_id: str) -> bool:
     """
     key = make_iquery_probing_key(court_id)
     return create_redis_semaphore("CACHE", key, ttl=60 * 10)
+
+
+def get_latest_pacer_case_id_for_courts(
+    court_ids: list[str],
+) -> dict[str, str]:
+    latest_docket_ids = (
+        Docket.objects.filter(
+            pacer_case_id__isnull=False,
+            court_id__in=court_ids,
+        )
+        .order_by("court_id", "-pacer_case_id")
+        .distinct("court_id")
+        .values_list("id", flat=True)
+    )
+
+    latest_dockets = (
+        Docket.objects.filter(id__in=latest_docket_ids)
+        .only("court_id", "pacer_case_id")
+        .values_list("court_id", "pacer_case_id")
+    )
+
+    return dict(latest_dockets)
 
 
 class Command(VerboseCommand):
@@ -70,6 +93,8 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
         iterations_completed = 0
         r = get_redis_interface("CACHE")
         testing = True if testing_iterations else False
+        latest_case_ids = get_latest_pacer_case_id_for_courts(court_ids)
+
         while True and settings.IQUERY_CASE_PROBE_DAEMON_ENABLED:
             for court_id in court_ids:
                 wait_key = f"iquery:court_wait:{court_id}"
@@ -86,8 +111,9 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
                     if newly_enqueued:
                         # No other probing being conducted for the court.
                         # Enqueue it.
+                        latest_know_case_id_db = latest_case_ids.get(court_id)
                         probe_iquery_pages.apply_async(
-                            args=(court_id, testing),
+                            args=(court_id, latest_know_case_id_db, testing),
                             queue=settings.CELERY_IQUERY_QUEUE,
                         )
                         logger.info(

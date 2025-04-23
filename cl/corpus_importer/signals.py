@@ -14,10 +14,14 @@ from cl.lib.redis_utils import (
     make_update_pacer_case_id_key,
     release_redis_lock,
 )
-from cl.search.models import Court, Docket
+from cl.search.models import Docket
 
 
-def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
+def update_latest_case_id_and_schedule_iquery_sweep(
+    docket: Docket | None,
+    court_id: str = None,
+    fixed_case_id_sweep: int | None = None,
+) -> None:
     """Updates the latest PACER case ID and schedules iquery retrieval tasks.
 
     :param docket: The incoming Docket instance.
@@ -25,7 +29,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     """
 
     r = get_redis_interface("CACHE")
-    court_id: str = docket.court_id
+    court_id: str = court_id or docket.court_id
     # Get the latest pacer_case_id from Redis using a lock to avoid race conditions
     # when getting and updating it.
     update_lock_key = make_update_pacer_case_id_key(court_id)
@@ -38,7 +42,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     iquery_pacer_case_id_current = int(
         r.hget("iquery:pacer_case_id_current", court_id) or 0
     )
-    incoming_pacer_case_id = int(docket.pacer_case_id)
+    incoming_pacer_case_id = fixed_case_id_sweep or int(docket.pacer_case_id)
     found_higher_case_id = False
     if incoming_pacer_case_id > highest_known_pacer_case_id:
         found_higher_case_id = True

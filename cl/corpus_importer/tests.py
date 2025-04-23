@@ -2085,6 +2085,7 @@ class ScrapeIqueryPagesTest(TestCase):
         cls.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
         cls.court_cacd = CourtFactory(id="cacd", jurisdiction="FB")
         cls.court_vib = CourtFactory(id="vib", jurisdiction="FB")
+        cls.court_mowd = CourtFactory(id="mowd", jurisdiction="FB")
 
     def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
@@ -2189,7 +2190,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_cand.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_cand.pk, testing=True)
+        probe_iquery_pages.delay(self.court_cand.pk, "10000", testing=True)
 
         # New highest_known_pacer_case_id according to the cand test pattern in
         # test_patterns
@@ -2233,7 +2234,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_nysd.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_nysd.pk, testing=True)
+        probe_iquery_pages.delay(self.court_nysd.pk, "10000",testing=True)
 
         # New highest_known_pacer_case_id according to the nysd test pattern in
         # cl.tests.fakes.test_patterns
@@ -2310,7 +2311,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_gamb.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_gamb.pk, testing=True)
+        probe_iquery_pages.delay(self.court_gamb.pk, "10000",testing=True)
 
         # highest_known_pacer_case_id is not updated due to the block.
         highest_known_pacer_case_id = r.hget(
@@ -2336,7 +2337,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.hset("iquery:test_highest_known_pacer_case_id", self.court_hib.pk, 8)
         # Execute the task
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
-            probe_iquery_pages.delay(self.court_hib.pk, testing=True)
+            probe_iquery_pages.delay(self.court_hib.pk, "10000",testing=True)
 
         # 2 sleeps before aborting the task. The probe is retried 2 times
         # independently via the @retry decorator.
@@ -2375,6 +2376,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -2419,6 +2421,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -2633,7 +2636,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 execute=True
             ):
                 # Execute the probing task
-                probe_iquery_pages.delay(self.court_cand.pk, testing=True)
+                probe_iquery_pages.delay(self.court_cand.pk, "10000",testing=True)
 
             # update_latest_case_id_and_schedule_iquery_sweep should be called
             # 1 time only for the latest probing hit.
@@ -2688,7 +2691,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 execute=True
             ):
                 # Execute the probing task
-                probe_iquery_pages.delay(self.court_txed.pk, testing=True)
+                probe_iquery_pages.delay(self.court_txed.pk, "10000",testing=True)
 
             # update_latest_case_id_and_schedule_iquery_sweep should be called
             # 1 time only for the latest probing hit.
@@ -2775,6 +2778,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
         tests = [600, 1200, 2400, 4800, 9600, 19200]
         for expected_wait in tests:
@@ -2846,6 +2850,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 100, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
         self.assertEqual(court_wait_cacd, None)
@@ -2926,6 +2931,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_vib.pk}")
         self.assertEqual(court_wait_cacd, None)
@@ -3119,6 +3125,88 @@ class ScrapeIqueryPagesTest(TestCase):
             set(docket_ids_no_case_name),
             {d_1.pk, d_2.pk},
             msg="Wrong IDs returned by get_docket_ids_week_ago_no_case_name",
+        )
+
+    @patch(
+        "cl.scrapers.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    def test_perform_fixed_sweeps_when_court_is_not_up_to_date(
+        self, mock_cookies
+    ):
+        """Confirm that the iquery probe command performs a fixed sweep when it
+        is known that there is a more recent pacer_case_id in DB.
+        """
+
+        with override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False):
+            docket_mowd_1 = DocketFactory(
+                court=self.court_mowd,
+                source=Docket.RECAP,
+                case_name="MOWD Docket",
+                docket_number="2:20-cv-006032",
+                pacer_case_id="200",
+            )
+
+            docket_mowd_last = DocketFactory(
+                court=self.court_mowd,
+                source=Docket.RECAP,
+                case_name="MOWD Docket 2",
+                docket_number="2:20-cv-006032",
+                pacer_case_id="3500",
+            )
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 2)
+        r = get_redis_interface("CACHE")
+        r.hset("iquery:highest_known_pacer_case_id", self.court_mowd.pk, 3000)
+        r.hset("iquery:pacer_case_id_current", self.court_mowd.pk, 3000)
+
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
+
+        with override_settings(
+            IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
+        ), patch("cl.lib.decorators.time.sleep") as mock_sleep, patch(
+            "cl.corpus_importer.tasks.query_iquery_page", return_value=({}, "")
+        ) as mock_query_iquery_page:
+            call_command(
+                "probe_iquery_pages_daemon",
+                testing_iterations=1,
+            )
+
+        # query_iquery_page should be called only one time on fixed sweep mode.
+        self.assertEqual(
+            mock_query_iquery_page.call_count,
+            1,
+            "query_iquery_page shouldn't be called.",
+        )
+
+        with override_settings(
+            IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
+        ), patch("cl.lib.decorators.time.sleep") as mock_sleep, patch(
+            "cl.corpus_importer.tasks.query_iquery_page", return_value=({}, "")
+        ) as mock_query_iquery_page:
+            call_command(
+                "probe_iquery_pages_daemon",
+                testing_iterations=1,
+            )
+
+        # 3 additional dockets should exist the sweep is completed.
+        self.assertEqual(
+            dockets.count(), 5, msg="Docket number doesn't match."
         )
 
 
