@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -23,7 +22,7 @@ from django.template import loader
 from django.utils import timezone
 
 from cl.custom_filters.templatetags.pacer import price
-from cl.favorites.models import Prayer, PrayerAvailability
+from cl.favorites.models import Prayer
 from cl.search.models import RECAPDocument
 
 
@@ -167,7 +166,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
                 When(prayeravailability__id__isnull=False, then=Value(True)),
                 default=Value(False),
             ),
-            last_checked=F("prayeravailability__last_checked"),
+            last_checked=F("prayeravailability__last_checked__date"),
         )
         .order_by(
             "doc_unavailable", "last_checked", "-prayer_count", "-view_count"
