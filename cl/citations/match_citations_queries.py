@@ -32,13 +32,13 @@ def fetch_citations(search_query: Search) -> list[Hit]:
     citation_hits = []
     #  Sorts by id, then ordering_key with missing values sorted last
     search_query = search_query.sort(
-        "id", {"ordering_key": {"order": "asc", "missing": "_last"}}
+        {"ordering_key": {"order": "asc", "missing": "_last"}}, "id"
     )
     # Only retrieve fields required for the lookup.
     search_query = search_query.source(
         includes=["id", "caseName", "absolute_url", "dateFiled", "cluster_id"]
     )
-    # Citation resolution aims for a single match. Setting up a size of 2 is
+    # Citation resolution aims for a single match to show the tip. Setting up a size of 2 is
     # enough to determine if there is more than one match after cluster collapse
     search_query = search_query.extra(size=2, collapse={"field": "cluster_id"})
     response = search_query.execute()
@@ -139,7 +139,7 @@ def es_search_db_for_full_citation(
     """For a citation object, try to match it to an item in the database using
     a variety of heuristics.
     :param full_citation: A FullCaseCitation instance.
-    return: A two tuple, the ElasticSearch Result object with the results, or an empty list if
+    :return: A two tuple, the ElasticSearch Result object with the results, or an empty list if
      no hits and a boolean indicating whether the citation was found.
     """
 
@@ -205,6 +205,8 @@ def es_search_db_for_full_citation(
             full_citation.citing_opinion is not None
             and full_citation.metadata.defendant
         ):
+            # We get to this part when we are resolving full case citations to annotate them
+            # e.g. "People v. Williams, 307 Ill. Dec. 312" and being cited in an opinion
             results = es_case_name_query(
                 query,
                 full_citation,
@@ -222,7 +224,7 @@ def es_get_query_citation(
      it into ES, and if found, return it.
 
     :param cd: A CleanData instance.
-    :param return: A two tuple the ES Hit object or None and the list of
+    :return: A two tuple the ES Hit object or None and the list of
     missing citations from the query.
     """
     missing_citations: list[FullCaseCitation] = []
