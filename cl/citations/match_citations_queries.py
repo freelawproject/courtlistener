@@ -3,7 +3,7 @@
 from django_elasticsearch_dsl.search import Search
 from elasticsearch_dsl import Q
 from elasticsearch_dsl.query import Query
-from elasticsearch_dsl.response import Hit, Response
+from elasticsearch_dsl.response import Hit
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
@@ -89,14 +89,17 @@ def es_reverse_match(
         new_response = fetch_citations(search)
         if len(new_response) == 1:
             return [result]
-    return []
+
+    # Reverse match failed, return all the possible results based on case name and citation from es_case_name_query
+    # query, if a citation is being annotated it will be linked to citation lookup page
+    return results
 
 
 def es_case_name_query(
     search_query: Query,
     citation: SupportedCitationType,
-    citing_opinion: Opinion,
-) -> Response | list[Hit]:
+    citing_opinion: Opinion | None = None,
+) -> list[Hit]:
     """Execute an Elasticsearch query to find case names based on a given
     citation and citing opinion.
 
@@ -114,7 +117,7 @@ def es_case_name_query(
     # all words to match and decreasing by one word each time until a match is
     # found
     opinion_document = OpinionDocument.search()
-    new_response = []
+    results = []
     for num_words in range(length, 0, -1):
         case_name_query = Q(
             "match",
@@ -124,13 +127,16 @@ def es_case_name_query(
         # clause
         combined_query = search_query & case_name_query
         search = opinion_document.query(combined_query)
-        new_response = fetch_citations(search)
-        if len(new_response) >= 1:
+        results = fetch_citations(search)
+        if len(results) == 1 and not citing_opinion:
+            # We found an unique match using citation and case name
+            return results
+        if len(results) >= 1 and citing_opinion:
             # For 1 result, make sure case name of match actually appears in
             # citing doc. For multiple results, use same technique to
             # potentially narrow down
-            return es_reverse_match(new_response, citing_opinion)
-    return new_response
+            return es_reverse_match(results, citing_opinion)
+    return results
 
 
 def es_search_db_for_full_citation(
@@ -201,10 +207,7 @@ def es_search_db_for_full_citation(
     if len(results) == 1:
         return results, citation_found
     if len(results) > 1:
-        if (
-            full_citation.citing_opinion is not None
-            and full_citation.metadata.defendant
-        ):
+        if full_citation.metadata.defendant:
             # We get to this part when we are resolving full case citations to annotate them
             # e.g. "People v. Williams, 307 Ill. Dec. 312" and being cited in an opinion
             results = es_case_name_query(
