@@ -194,7 +194,7 @@ def get_absolute_latest_pacer_case_id(
         .filter(
             court_id=court_id, date_filed__isnull=False, date_filed__lte=today
         )
-        .order_by("-date_filed")
+        .order_by("-date_filed", "-pacer_case_id")
         .values_list("pacer_case_id", flat=True)
         .first()
     )
