@@ -230,9 +230,9 @@ def upload_manifest(
     - When explicitly specified through the `options` dictionary.
 
     Args:
-        rows (list[tuple[int]]): A list of tuples, where each tuple contains at
-            least the record's unique ID
-        filename (str): The base name for the manifest file in S3.
+        record_ids (list[tuple[int]]): A list of tuples, where each tuple
+            contains at least the record's unique ID
+        base_filename (str): The base name for the manifest file in S3.
         options (dict[str, Any]): A dictionary containing configuration options
             including:
             - "bucket_name" (str): The name of the S3 bucket.
@@ -243,8 +243,8 @@ def upload_manifest(
                 all IDs separated by underscores.
             - "save_ids_as_sequence" (bool, optional): If True, manifest should
                 contain all IDs in the batch separated by underscores.
-        counter (int, optional): An optional integer to append to the filename
-            for distinguishing between multiple manifest files.
+        batch_counter (int, optional): An optional integer to append to the
+            filename for distinguishing between multiple manifest files.
     """
     bucket_name = options["bucket_name"]
     # Write the content of the csv file to a buffer and upload it
@@ -410,7 +410,7 @@ def get_records_modified_since(
             AbstractDateTimeModel and have 'date_created' and 'date_modified'
             fields).
         field_name: The name of the field whose values to retrieve.
-        since_timestamp: The datetime object representing the lower bound
+        timestamp: The datetime object representing the lower bound
             (inclusive) for filtering based on creation or modification time.
 
     Returns:
@@ -448,7 +448,6 @@ def get_monthly_record_ids_by_type(
         that were created or modified on or after the given `timestamp`.
     """
     related_field = "pk"
-    main_model = None
     nested_models: list[type[AbstractDateTimeModel]] = []
     match record_type:
         case SEARCH_TYPES.OPINION:
@@ -533,10 +532,10 @@ def compute_monthly_export(
 
     Args:
         record_type: The type of records to include in the export.
-        export_timestamp: A datetime object representing the month for which
+        timestamp: A datetime object representing the month for which
             to generate the export. The filename will be based on this
             timestamp.
-        export_options: A dictionary containing options to be passed to the
+        options: A dictionary containing options to be passed to the
             `upload_manifest` function.
     """
     current_timestamp = timezone.now()
