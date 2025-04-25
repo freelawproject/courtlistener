@@ -2,6 +2,7 @@ import copy
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Set
+from urllib.parse import parse_qs
 
 from django.apps import apps
 from django.conf import settings
@@ -52,6 +53,8 @@ from cl.search.types import (
     PercolatorResponses,
     SearchAlertHitType,
 )
+
+COMMON_QUERY_PARAMS = {"type", "order_by"}
 
 
 @dataclass
@@ -555,7 +558,9 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
 
             match parent_filters, string_query:
                 case [], []:
-                    pass
+                    NotImplementedError(
+                        "Indexing match-all queries is not supported."
+                    )
                 case [], _:
                     plain_query = Q(
                         "bool",
@@ -749,3 +754,20 @@ def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:
     # Truncate the subject to a maximum length of 935 characters, which is
     # Gmail's allowed subject size for display and also below RFC2822  line limit specs
     return trunc(alert_subject, 935, ellipsis="...")
+
+
+def is_match_all_query(qs: str) -> bool:
+    """Determine whether a given query string is a match-all query.
+
+    :param qs: The raw query string to evaluate.
+    :return: True if the query string has no parameters other than those in
+    COMMON_QUERY_PARAMS or if all remaining values are empty; False otherwise.
+    """
+
+    parsed = parse_qs(qs, keep_blank_values=True)
+    # Drop common query params
+    for key in COMMON_QUERY_PARAMS:
+        parsed.pop(key, None)
+
+    # If any remaining value is not empty, it is not a match-all query.
+    return not any(val.strip() for vals in parsed.values() for val in vals)

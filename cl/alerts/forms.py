@@ -1,11 +1,11 @@
 from django import forms
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from django.forms.widgets import HiddenInput, Select, TextInput
 from hcaptcha.fields import hCaptchaField
 
 from cl.alerts.models import Alert
+from cl.alerts.utils import is_match_all_query
 
 
 class CreateAlertForm(ModelForm):
@@ -24,6 +24,19 @@ class CreateAlertForm(ModelForm):
             )
         else:
             return rate
+
+    def clean_query(self):
+        """Validate that the query is not a match-all query, as these alerts
+        would trigger for every new document ingested or updated.
+        """
+        query = self.cleaned_data["query"]
+        match_all_query = is_match_all_query(query)
+        if match_all_query:
+            raise ValidationError(
+                "You can't create a match-all alert. Please try narrowing your query."
+            )
+        else:
+            return query
 
     class Meta:
         model = Alert
