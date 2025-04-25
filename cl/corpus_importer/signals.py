@@ -147,7 +147,7 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
         return None
 
     if getattr(instance, "skip_iquery_sweep", False):
-        # This is an instance added by the probe_iquery_pages task
+        # This is an instance added by the probe_or_scrape_iquery_pages task
         # or the iquery sweep scraper that should be ignored (no the highest
         # pacer_case_id)
         return None
@@ -156,7 +156,7 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
     # - The docket belongs to a RECAP district or bankruptcy court,
     # - The docket has a pacer_case_id,
     # - The docket was newly created (when IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True), or
-    # - The docket was created or updated by the last probe iteration from probe_iquery_pages.
+    # - The docket was created or updated by the last probe iteration from probe_or_scrape_iquery_pages.
     check_probe_or_created = (
         not getattr(instance, "skip_iquery_sweep", False) or created
     )

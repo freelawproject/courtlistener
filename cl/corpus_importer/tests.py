@@ -66,7 +66,7 @@ from cl.corpus_importer.signals import (
 from cl.corpus_importer.tasks import (
     generate_ia_json,
     get_and_save_free_document_report,
-    probe_iquery_pages,
+    probe_or_scrape_iquery_pages,
 )
 from cl.corpus_importer.utils import (
     ClusterSourceException,
@@ -2183,7 +2183,7 @@ class ScrapeIqueryPagesTest(TestCase):
         new=FakeCaseQueryReport,
     )
     def test_iquery_pages_probe_task(self, mock_cookies):
-        """Test probe_iquery_pages task."""
+        """Test probe_or_scrape_iquery_pages task."""
 
         dockets = Docket.objects.filter(court_id=self.court_cand.pk)
         self.assertEqual(dockets.count(), 0)
@@ -2194,7 +2194,9 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_cand.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_cand.pk, "0", testing=True)
+        probe_or_scrape_iquery_pages.delay(
+            self.court_cand.pk, "0", testing=True
+        )
 
         # New highest_known_pacer_case_id according to the cand test pattern in
         # test_patterns
@@ -2227,7 +2229,7 @@ class ScrapeIqueryPagesTest(TestCase):
         new=FakeCaseQueryReport,
     )
     def test_iquery_pages_probe_nysd(self, mock_cookies):
-        """Test probe_iquery_pages."""
+        """Test probe_or_scrape_iquery_pages."""
 
         dockets = Docket.objects.filter(court_id=self.court_nysd.pk)
         self.assertEqual(dockets.count(), 0)
@@ -2238,7 +2240,9 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_nysd.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_nysd.pk, None, testing=True)
+        probe_or_scrape_iquery_pages.delay(
+            self.court_nysd.pk, None, testing=True
+        )
 
         # New highest_known_pacer_case_id according to the nysd test pattern in
         # cl.tests.fakes.test_patterns
@@ -2315,7 +2319,9 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_gamb.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_gamb.pk, None, testing=True)
+        probe_or_scrape_iquery_pages.delay(
+            self.court_gamb.pk, None, testing=True
+        )
 
         # highest_known_pacer_case_id is not updated due to the block.
         highest_known_pacer_case_id = r.hget(
@@ -2341,7 +2347,9 @@ class ScrapeIqueryPagesTest(TestCase):
         r.hset("iquery:test_highest_known_pacer_case_id", self.court_hib.pk, 8)
         # Execute the task
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
-            probe_iquery_pages.delay(self.court_hib.pk, None, testing=True)
+            probe_or_scrape_iquery_pages.delay(
+                self.court_hib.pk, None, testing=True
+            )
 
         # 2 sleeps before aborting the task. The probe is retried 2 times
         # independently via the @retry decorator.
@@ -2643,7 +2651,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 execute=True
             ):
                 # Execute the probing task
-                probe_iquery_pages.delay(
+                probe_or_scrape_iquery_pages.delay(
                     self.court_cand.pk, None, testing=True
                 )
 
@@ -2701,7 +2709,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 execute=True
             ):
                 # Execute the probing task
-                probe_iquery_pages.delay(
+                probe_or_scrape_iquery_pages.delay(
                     self.court_txed.pk, None, testing=True
                 )
 

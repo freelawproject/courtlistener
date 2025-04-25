@@ -3,7 +3,7 @@ import time
 from django.conf import settings
 from redis import ConnectionError
 
-from cl.corpus_importer.tasks import probe_iquery_pages
+from cl.corpus_importer.tasks import probe_or_scrape_iquery_pages
 from cl.corpus_importer.utils import (
     get_iquery_pacer_courts_to_scrape,
     make_iquery_probing_key,
@@ -106,7 +106,7 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
                         # No other probing being conducted for the court.
                         # Enqueue it.
                         latest_know_case_id_db = latest_case_ids.get(court_id)
-                        probe_iquery_pages.apply_async(
+                        probe_or_scrape_iquery_pages.apply_async(
                             args=(court_id, latest_know_case_id_db, testing),
                             queue=settings.CELERY_IQUERY_QUEUE,
                         )

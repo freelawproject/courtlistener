@@ -1423,6 +1423,7 @@ def query_iquery_page(
     return report_data, report_text
 
 
+# TODO: Remove after possible tasks in the queue have been processed.
 @app.task(
     bind=True,
     ignore_result=True,
@@ -1430,12 +1431,190 @@ def query_iquery_page(
 def probe_iquery_pages(
     self: Task,
     court_id: str,
-    latest_know_case_id_db: str | None,
     testing: bool = False,
 ) -> None:
     """
     Using the iquery endpoint, to perform forward probing and retrieve the
     highest watermark we can scrape.
+
+    :param self: The celery task
+    :param court_id: A CL court ID where we'll look things up.
+    :param testing: A boolean indicating whether this was called from tests.
+    :return: None
+    """
+
+    r = get_redis_interface("CACHE")
+    probe_iteration = 1
+    latest_match = 0
+    probe_offset = 0
+    highest_known_pacer_case_id = int(
+        r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
+    )
+    jitter = compute_binary_probe_jitter(testing)
+    reports_data = []
+    found_match = False
+    pacer_case_id_to_lookup = highest_known_pacer_case_id
+    while probe_offset + jitter < settings.IQUERY_PROBE_MAX_OFFSET:
+        pacer_case_id_to_lookup, probe_offset = compute_next_binary_probe(
+            highest_known_pacer_case_id, probe_iteration, jitter
+        )
+        probe_iteration += 1
+        try:
+            report_data, report_text = query_iquery_page(
+                court_id, pacer_case_id_to_lookup
+            )
+        except HTTPError:
+            # Set expiration accordingly and value to 2 to difference from
+            # other waiting times.
+            court_blocked_attempts = r.incr(
+                f"iquery:court_blocked_attempts:{court_id}"
+            )
+            if (
+                court_blocked_attempts
+                > settings.IQUERY_COURT_BLOCKED_MAX_ATTEMPTS
+            ):
+                court_blocked_time, total_accumulated_time = (
+                    compute_blocked_court_wait(court_blocked_attempts - 1)
+                )
+                logger.error(
+                    "The court %s has blocked the iquery page probing "
+                    "for around %s hours.",
+                    court_id,
+                    total_accumulated_time / 3600,
+                )
+                # Restart court_blocked attempts.
+                r.set(f"iquery:court_blocked_attempts:{court_id}", 0)
+                r.set(
+                    f"iquery:court_wait:{court_id}",
+                    settings.IQUERY_COURT_BLOCKED_WAIT,
+                    ex=settings.IQUERY_COURT_BLOCKED_WAIT,
+                )
+            else:
+                next_blocked_court_wait, _ = compute_blocked_court_wait(
+                    court_blocked_attempts
+                )
+                r.set(
+                    f"iquery:court_wait:{court_id}",
+                    next_blocked_court_wait,
+                    ex=next_blocked_court_wait,
+                )
+                logger.warning(
+                    "HTTPError occurred when crawling iquery. The court %s website "
+                    "is probably down or has blocked us. Abort probing for %s hours ",
+                    court_id,
+                    next_blocked_court_wait / 3600,
+                )
+            delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
+            return None
+
+        except requests.Timeout:
+            logger.warning(
+                "The court %s website is probably down. Aborting the probe task.",
+                court_id,
+            )
+            break
+
+        if report_data:
+            # Find and update/store the Docket.
+            reports_data.append(
+                (pacer_case_id_to_lookup, report_data, report_text)
+            )
+            latest_match = pacer_case_id_to_lookup
+            found_match = True
+            # Restart court_blocked_attempts and court_empty_probe_attempts.
+            r.set(f"iquery:court_blocked_attempts:{court_id}", 0)
+            r.set(f"iquery:court_empty_probe_attempts:{court_id}", 0)
+        elif found_match:
+            # If a match has been found and this is a blank hit, abort it.
+            break
+
+    if latest_match > highest_known_pacer_case_id and testing:
+        # For testing purposes update iquery:test_highest_known_pacer_case_id
+        r.hset(
+            "iquery:test_highest_known_pacer_case_id", court_id, latest_match
+        )
+
+    if not reports_data:
+        logger.info(
+            "No cases were found during this probe for court %s - case IDs from %s to %s.",
+            court_id,
+            str(highest_known_pacer_case_id),
+            str(pacer_case_id_to_lookup),
+        )
+        court_empty_probe_attempts = r.incr(
+            f"iquery:court_empty_probe_attempts:{court_id}"
+        )
+        # Compute the duration of empty probes in hours based on the number of
+        # court_empty_probe_attempts and the current IQUERY_PROBE_WAIT interval
+        empty_probes_hours = (
+            court_empty_probe_attempts * settings.IQUERY_PROBE_WAIT
+        ) / 3600
+        court_empty_probe_limit_hours = (
+            settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS.get(
+                court_id, settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS["default"]
+            )
+        )
+        if empty_probes_hours >= court_empty_probe_limit_hours:
+            logger.error(
+                "Court %s has accumulated many probe attempts over "
+                "approximately %s hours. It appears the probe may be stuck; "
+                "manual intervention may be required.",
+                court_id,
+                court_empty_probe_limit_hours,
+            )
+            # Restart court_blocked_attempts to avoid continue logging the
+            # error on next iterations.
+            r.set(f"iquery:court_empty_probe_attempts:{court_id}", 0)
+            # Add a court wait time of one hour so the problem can be manually handled.
+            r.set(
+                f"iquery:court_wait:{court_id}",
+                3600,
+                ex=3600,
+            )
+
+    # Process all the reports retrieved during the probing.
+    # Avoid triggering the iQuery sweep signal except for the latest hit.
+    skip_iquery_sweep = True
+    for index, report_content in enumerate(reports_data):
+        pacer_case_id, report_data, report_text = report_content
+        if index == len(reports_data) - 1:
+            # Only trigger the sweep signal on the last hit.
+            skip_iquery_sweep = False
+        try:
+            process_case_query_report(
+                court_id,
+                pacer_case_id=pacer_case_id,
+                report_data=report_data,
+                report_text=report_text,
+                skip_iquery_sweep=skip_iquery_sweep,
+            )
+        except IntegrityError:
+            # Individual IntegrityError retries failed for the report. Log the
+            # error and try the next report.
+            logger.error(
+                "IntegrityError occurred when processing iquery page for "
+                "court: %s and pacer_case_id: %s",
+                court_id,
+                report_data[0],
+            )
+            continue
+    delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+)
+def probe_or_scrape_iquery_pages(
+    self: Task,
+    court_id: str,
+    latest_know_case_id_db: str | None,
+    testing: bool = False,
+) -> None:
+    """
+    Using the iquery endpoint, to perform forward probing and retrieve the
+    highest watermark we can scrape. Or perform a fixed sweep in case the
+    court hasn't caught up yet.
 
     :param self: The celery task
     :param court_id: A CL court ID where we'll look things up.
