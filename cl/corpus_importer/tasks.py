@@ -1477,7 +1477,8 @@ def probe_iquery_pages(
         if latest_know_case_id_db
         else False
     )
-    jitter = compute_binary_probe_jitter(testing)
+    # Avoid random jitter when performing a fixed sweep.
+    jitter = 0 if do_fixed_sweep else compute_binary_probe_jitter(testing)
     reports_data = []
     found_match = False
     pacer_case_id_to_lookup = highest_known_pacer_case_id
