@@ -10,10 +10,7 @@ from eyecite.models import CitationBase, FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.celery_init import app
-from cl.citations.annotate_citations import (
-    create_cited_html,
-    get_and_clean_opinion_text,
-)
+from cl.citations.annotate_citations import create_cited_html
 from cl.citations.filter_parentheticals import (
     clean_parenthetical_text,
     is_parenthetical_descriptive,
@@ -28,7 +25,7 @@ from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.types import MatchedResourceType, SupportedCitationType
-from cl.citations.utils import get_markup_kwargs
+from cl.citations.utils import make_get_citations_kwargs
 from cl.search.models import (
     Opinion,
     OpinionCluster,
@@ -143,17 +140,12 @@ def store_opinion_citations_and_update_parentheticals(
     :param opinion: A search.Opinion object.
     :return: None
     """
-
-    # Memoize parsed versions of the opinion's text
-    get_and_clean_opinion_text(opinion)
-
     # Extract the citations from the opinion's text
     # If the source has marked up text, pass it so it can be used to find
-    # ReferenceCitations. This is handled by `get_markup_kwargs`
+    # ReferenceCitations. This is handled by `make_get_citations_kwargs`
     citations: List[CitationBase] = get_citations(
-        opinion.cleaned_text,
         tokenizer=HYPERSCAN_TOKENIZER,
-        **get_markup_kwargs(opinion),
+        **make_get_citations_kwargs(opinion),
     )
 
     # Resolve all those different citation objects to Opinion objects,
@@ -163,9 +155,7 @@ def store_opinion_citations_and_update_parentheticals(
     ] = do_resolve_citations(citations, opinion)
 
     # Generate the citing opinion's new HTML with inline citation links
-    opinion.html_with_citations = create_cited_html(
-        opinion, citation_resolutions
-    )
+    opinion.html_with_citations = create_cited_html(citation_resolutions)
 
     if not citations:
         opinion.save()
