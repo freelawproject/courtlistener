@@ -428,7 +428,7 @@ def get_records_modified_since(
 
 
 def get_monthly_record_ids_by_type(
-    record_type: str, timestamp: datetime
+    record_type: str, timestamp: datetime, all_records: bool = False
 ) -> list[tuple[int]]:
     """
     Retrieves a list of unique IDs for records of a specific type that were
@@ -441,7 +441,9 @@ def get_monthly_record_ids_by_type(
         record_type: A string identifying the type of records to retrieve.
         timestamp: A datetime object representing the month for which to
             retrieve records.
-        options: A dictionary containing any additional options.
+        all_records: Optional boolean flag. If True, all records of the
+            specified `record_type` modified on or after the `timestamp`
+            will be returned, bypassing filters.
 
     Returns:
         A list of unique integer IDs for the records of the specified type
@@ -492,7 +494,7 @@ def get_monthly_record_ids_by_type(
         )
 
     match record_type:
-        case SEARCH_TYPES.OPINION:
+        case SEARCH_TYPES.OPINION if not all_records:
             # Apply filters to include only opinions that are either:
             # 1. Not extracted by OCR.
             # 2. Associated with a cluster whose source contains HARVARD_CASELAW
@@ -506,7 +508,7 @@ def get_monthly_record_ids_by_type(
                 .values_list("pk")
                 .distinct()
             )
-        case SEARCH_TYPES.PEOPLE:
+        case SEARCH_TYPES.PEOPLE if not all_records:
             # Filter record IDs for people, including only those who have
             # judicial positions.
             ids = [x[0] for x in record_ids]
@@ -540,7 +542,9 @@ def compute_monthly_export(
     """
     current_timestamp = timezone.now()
     filename = f"{record_type}_monthly_export_{current_timestamp.month}_{current_timestamp.year}"
-    record_ids = get_monthly_record_ids_by_type(record_type, timestamp)
+    record_ids = get_monthly_record_ids_by_type(
+        record_type, timestamp, all_records=options["all_records"]
+    )
     upload_manifest(record_ids, filename, options)
 
 
