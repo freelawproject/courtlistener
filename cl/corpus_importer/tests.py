@@ -88,7 +88,7 @@ from cl.people_db.lookup_utils import (
     find_just_name,
 )
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
-from cl.recap.management.commands.pacer_iquery_scraper import (
+from cl.recap.management.commands.nightly_pacer_updates import (
     get_docket_ids_docket_alerts,
     get_docket_ids_missing_info,
     get_docket_ids_week_ago_no_case_name,
