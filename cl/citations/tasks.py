@@ -1,3 +1,4 @@
+import html
 import logging
 from http.client import ResponseNotReady
 from typing import Dict, List, Set, Tuple
@@ -143,10 +144,22 @@ def store_opinion_citations_and_update_parentheticals(
     # Extract the citations from the opinion's text
     # If the source has marked up text, pass it so it can be used to find
     # ReferenceCitations. This is handled by `make_get_citations_kwargs`
+    cite_dict = make_get_citations_kwargs(opinion)
     citations: List[CitationBase] = get_citations(
         tokenizer=HYPERSCAN_TOKENIZER,
-        **make_get_citations_kwargs(opinion),
+        **cite_dict,
     )
+
+    if not citations:
+        # No citations found make html with citations
+        if cite_dict.get("markup_text"):
+            new_html = cite_dict.get("markup_text")
+        else:
+            plain_text = cite_dict.get("plain_text", "")
+            new_html = f'<pre class="inline">{ html.escape(plain_text)}</pre>'
+        opinion.html_with_citations = new_html
+        opinion.save()
+        return
 
     # Resolve all those different citation objects to Opinion objects,
     # using a variety of heuristics.
@@ -156,10 +169,6 @@ def store_opinion_citations_and_update_parentheticals(
 
     # Generate the citing opinion's new HTML with inline citation links
     opinion.html_with_citations = create_cited_html(citation_resolutions)
-
-    if not citations:
-        opinion.save()
-        return
 
     # Put apart the unmatched citations
     unmatched_citations = citation_resolutions.pop(NO_MATCH_RESOURCE, [])
