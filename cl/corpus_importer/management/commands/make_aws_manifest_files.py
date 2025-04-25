@@ -633,9 +633,9 @@ class Command(VerboseCommand):
 
         record_type = options["record_type"]
         monthly_export = options["monthly_export"]
+        last_export_key = f"bulk_import:{record_type}"
 
         if monthly_export:
-            last_export_key = f"bulk_import:{record_type}"
             last_export_timestamp = r.get(last_export_key)
             if not last_export_timestamp:
                 return logger.info(

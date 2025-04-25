@@ -3243,7 +3243,7 @@ class AWSManifestTest(TestCase):
     @patch(
         "cl.corpus_importer.management.commands.make_aws_manifest_files.compute_monthly_export"
     )
-    def test_command_stores_current_timestamp_after_export(
+    def test_command_stores_current_timestamp_after_delta_export(
         self, mock_compute_monthly_export
     ):
         """Verifies the command stores the current timestamp after an export."""
@@ -3261,6 +3261,38 @@ class AWSManifestTest(TestCase):
             )
         # Assert that compute_monthly_export was called
         mock_compute_monthly_export.assert_called_once()
+
+        # Assert that the timestamp retrieved from Redis is the expected current
+        # timestamp
+        timestamp_from_cache = self.r.get(export_key)
+        self.assertEqual(str(timestamp_now), timestamp_from_cache)
+
+    @patch(
+        "cl.corpus_importer.management.commands.make_aws_manifest_files.export_records_in_batches"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.make_aws_manifest_files.compute_monthly_export"
+    )
+    def test_command_stores_current_timestamp_after_full_export(
+        self, mock_compute_monthly_export, mock_compute_full_export
+    ):
+        """Verifies the command stores the current timestamp after a full export."""
+        timestamp_two_weeks_ago = datetime.now() - timedelta(weeks=2)
+        export_key = f"bulk_import:{SEARCH_TYPES.ORAL_ARGUMENT}"
+        self.r.set(export_key, str(timestamp_two_weeks_ago), 60 * 60)
+
+        timestamp_now = timezone.now()
+        with time_machine.travel(timestamp_now, tick=False):
+            call_command(
+                "make_aws_manifest_files",
+                record_type=SEARCH_TYPES.ORAL_ARGUMENT,
+                bucket_name="test-bucket",
+                all_records=True,
+            )
+        # Assert that compute_monthly_export was not called
+        mock_compute_monthly_export.assert_not_called()
+
+        mock_compute_full_export.assert_called_once()
 
         # Assert that the timestamp retrieved from Redis is the expected current
         # timestamp
