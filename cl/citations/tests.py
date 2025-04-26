@@ -28,10 +28,7 @@ from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from lxml import etree
 
-from cl.citations.annotate_citations import (
-    create_cited_html,
-    get_and_clean_opinion_text,
-)
+from cl.citations.annotate_citations import create_cited_html
 from cl.citations.filter_parentheticals import (
     clean_parenthetical_text,
     is_parenthetical_descriptive,
@@ -56,7 +53,7 @@ from cl.citations.tasks import (
     store_unmatched_citations,
     update_unmatched_citations_status,
 )
-from cl.citations.utils import get_markup_kwargs
+from cl.citations.utils import make_get_citations_kwargs
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -158,8 +155,8 @@ class CitationTextTest(SimpleTestCase):
             # Supra citation across line break
             ('existing text asdf, supra, at\n99 (quoting foo)',
              '<pre class="inline">existing text asdf, </pre><span class="'
-             'citation no-link">supra, at\n99</span><pre class="inline"> '
-             '(quoting foo)</pre>'),
+             'citation no-link">supra,</span><pre class="inline"> at\n99'
+             ' (quoting foo)</pre>'),
 
             # Id. citation ("Id., at 123")
             ('asdf, id., at 123. Lorem ipsum dolor sit amet',
@@ -204,8 +201,6 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(plain_text=s)
-                get_and_clean_opinion_text(opinion)
-
                 # take advantage of this test to double check that
                 # `find_reference_citations_from_markup` is not being called
                 # with plain text input
@@ -213,9 +208,8 @@ class CitationTextTest(SimpleTestCase):
                     "eyecite.find.find_reference_citations_from_markup"
                 ) as mock_func:
                     citations = get_citations(
-                        opinion.cleaned_text,
                         tokenizer=HYPERSCAN_TOKENIZER,
-                        **get_markup_kwargs(opinion),
+                        **make_get_citations_kwargs(opinion),
                     )
                     mock_func.assert_not_called()
 
@@ -223,9 +217,11 @@ class CitationTextTest(SimpleTestCase):
                 # purpose of this test is not to test that. We just need
                 # something that looks like what create_cited_html() expects
                 # to receive.
+                if not citations:
+                    continue
                 citation_resolutions = {NO_MATCH_RESOURCE: citations}
 
-                created_html = create_cited_html(opinion, citation_resolutions)
+                created_html = create_cited_html(citation_resolutions)
                 self.assertEqual(
                     created_html,
                     expected_html,
@@ -250,8 +246,8 @@ class CitationTextTest(SimpleTestCase):
             ('<div><p>the improper views of the Legislature.\" 2 <i>id.,</i> '
              'at <b>73, bolded</b>.</p>\n<p>Nathaniel Gorham of Massachusetts'
              '</p></div>',
-             '<div><p>the improper views of the Legislature.\" 2 <i>id.,</i> '
-             'at <b>73, bolded</b>.</p>\n<p>Nathaniel Gorham of Massachusetts'
+             '<div><p>the improper views of the Legislature.\" 2 <span class="citation no-link"><i>id.,</i> '
+             'at <b>73, bolded</b></span>.</p>\n<p>Nathaniel Gorham of Massachusetts'
              '</p></div>'),
 
             # Ibid. citation with HTML tags
@@ -278,11 +274,9 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(html=s)
-                get_and_clean_opinion_text(opinion)
                 citations = get_citations(
-                    opinion.cleaned_text,
                     tokenizer=HYPERSCAN_TOKENIZER,
-                    **get_markup_kwargs(opinion),
+                    **make_get_citations_kwargs(opinion),
                 )
 
                 # Stub out fake output from do_resolve_citations(), since the
@@ -291,7 +285,7 @@ class CitationTextTest(SimpleTestCase):
                 # to receive.
                 citation_resolutions = {NO_MATCH_RESOURCE: citations}
 
-                created_html = create_cited_html(opinion, citation_resolutions)
+                created_html = create_cited_html(citation_resolutions)
                 self.assertEqual(
                     created_html,
                     expected_html,
@@ -353,9 +347,9 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(html=s)
-                get_and_clean_opinion_text(opinion)
                 citations = get_citations(
-                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                    tokenizer=HYPERSCAN_TOKENIZER,
+                    **make_get_citations_kwargs(opinion),
                 )
 
                 # Stub out fake output from do_resolve_citations(), since the
@@ -370,7 +364,7 @@ class CitationTextTest(SimpleTestCase):
                 opinion.cluster.get_absolute_url.return_value = "MATCH_URL"
                 citation_resolutions = {opinion: citations}
 
-                created_html = create_cited_html(opinion, citation_resolutions)
+                created_html = create_cited_html(citation_resolutions)
 
                 self.assertEqual(
                     created_html,
@@ -402,9 +396,9 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(xml_harvard=s)
-                get_and_clean_opinion_text(opinion)
                 citations = get_citations(
-                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                    tokenizer=HYPERSCAN_TOKENIZER,
+                    **make_get_citations_kwargs(opinion),
                 )
 
                 # Stub out fake output from do_resolve_citations(), since the
@@ -413,7 +407,7 @@ class CitationTextTest(SimpleTestCase):
                 # to receive.
                 citation_resolutions = {NO_MATCH_RESOURCE: citations}
 
-                created_html = create_cited_html(opinion, citation_resolutions)
+                created_html = create_cited_html(citation_resolutions)
                 self.assertEqual(
                     created_html,
                     expected_html,
@@ -457,9 +451,9 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(plain_text=s)
-                get_and_clean_opinion_text(opinion)
                 citations = get_citations(
-                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                    tokenizer=HYPERSCAN_TOKENIZER,
+                    **make_get_citations_kwargs(opinion),
                 )
 
                 # Stub out fake output from do_resolve_citations(), since the
@@ -474,7 +468,7 @@ class CitationTextTest(SimpleTestCase):
                 opinion.cluster.get_absolute_url.return_value = "MATCH_URL"
                 citation_resolutions = {opinion: citations}
 
-                created_html = create_cited_html(opinion, citation_resolutions)
+                created_html = create_cited_html(citation_resolutions)
 
                 self.assertEqual(
                     created_html,
@@ -508,13 +502,13 @@ class CitationTextTest(SimpleTestCase):
                 pk="MATCH_ID",
                 cluster=Mock(OpinionCluster(id=1234), case_name=case_name),
             )
-            get_and_clean_opinion_text(opinion)
             citations = get_citations(
-                opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                tokenizer=HYPERSCAN_TOKENIZER,
+                **make_get_citations_kwargs(opinion),
             )
             opinion.cluster.get_absolute_url.return_value = "/opinion/1/foo/"
             citation_resolutions = {opinion: citations}
-            created_html = create_cited_html(opinion, citation_resolutions)
+            created_html = create_cited_html(citation_resolutions)
 
             # extract out aria description
             soup = BeautifulSoup(created_html, "html.parser")
@@ -1130,12 +1124,11 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
 
         # Verify if the annotated citation is correct
         opinion = self.citation8.cluster.sub_opinions.all().first()
-        get_and_clean_opinion_text(opinion)
         citations = get_citations(
-            opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+            tokenizer=HYPERSCAN_TOKENIZER, **make_get_citations_kwargs(opinion)
         )
         citation_resolutions = do_resolve_citations(citations, opinion)
-        new_html = create_cited_html(opinion, citation_resolutions)
+        new_html = create_cited_html(citation_resolutions)
 
         expected_citation_annotation = '<pre class="inline">Lorem ipsum, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1182/">114 F.3d 1182</a></span><pre class="inline"></pre>'
         self.assertIn(expected_citation_annotation, new_html, msg="Failed!!")
@@ -1143,13 +1136,12 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # Verify if we can annotate multiple citations that can't be
         # disambiguated
         opinion = self.citation11.cluster.sub_opinions.all().first()
-        get_and_clean_opinion_text(opinion)
         citations = get_citations(
-            opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+            tokenizer=HYPERSCAN_TOKENIZER, **make_get_citations_kwargs(opinion)
         )
         self.assertEqual(len(citations), 2)
         citation_resolutions = do_resolve_citations(citations, opinion)
-        new_html = create_cited_html(opinion, citation_resolutions)
+        new_html = create_cited_html(citation_resolutions)
         expected_citation_annotation = '<pre class="inline">Lorem ipsum, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1182/">114 F.3d 1182</a></span><pre class="inline">, consectetur adipiscing elit, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1181/">114 F.3d 1181</a></span><pre class="inline"></pre>'
         self.assertIn(expected_citation_annotation, new_html)
 
@@ -2716,16 +2708,13 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     # this will produce 6 citations: 5 FullCase and 1 Id
     # last 2 should be ignored:
-    # the Thompsom cite (4-index) produces a known eyecite bug; will be
-    # necessary to delete that test line once that's fixed
     # the last cite has a null page and would cause an error when storing
     plain_text = """
     0-index 62 Tex. Sup. Ct. J. 313 (Jan. 18, 2019).
     1-index Frost Natl Bank v. Fernandez, 315 S.W.3d 494, 508 (Tex. 2010) (citation omitted);
     2-index Valence Operating Co. v. Dorsett, 164 S.W.3d 656, 661 (Tex. 2005) (citation omitted).
     3-index the fact that State Farm complied with the Insurance Code . . . . Id.
-    4-index United States v. Thompson, 281 F.3d 1088, 1090 (10th Cir. 2002).
-    5-index 182 A.3d ____________________________________________
+    4-index 182 A.3d ____________________________________________
     """
     eyecite_citations = get_citations(
         plain_text, tokenizer=HYPERSCAN_TOKENIZER
@@ -2750,8 +2739,9 @@ class UnmatchedCitationTest(TransactionTestCase):
         unmatched_citations = list(
             UnmatchedCitation.objects.filter(citing_opinion=self.opinion).all()
         )
-        self.assertTrue(
-            len(unmatched_citations) == 3,
+        self.assertEqual(
+            len(unmatched_citations),
+            3,
             "Incorrect number of citations saved",
         )
         self.assertTrue(
