@@ -103,10 +103,14 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
         percentage = options["random_sample_percentage"]
         base_query = f"{base_query} TABLESAMPLE SYSTEM ({percentage})"
 
+    if options["all_records"]:
+        filter_clause = ""
+        params = []
+
     query = (
-        f"{base_query}\n"
-        if options["all_records"]
-        else f"{base_query}\n {filter_clause}\n"
+        f"{base_query}\n {filter_clause}\n"
+        if filter_clause
+        else f"{base_query}\n"
     )
     with connections[
         "replica" if options["use_replica"] else "default"
@@ -181,6 +185,7 @@ def get_custom_query(
 
     if options["all_records"]:
         filter_clause = ""
+        params = []
 
     # Using a WHERE clause with `id > last_pk` and a LIMIT clause for batch
     # retrieval is not suitable for random sampling. The following logic
