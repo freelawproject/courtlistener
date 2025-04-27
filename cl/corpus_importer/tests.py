@@ -26,9 +26,6 @@ from cl.corpus_importer.factories import (
     CitationFactory,
 )
 from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
-from cl.corpus_importer.import_columbia.parse_opinions import (
-    get_state_court_object,
-)
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
@@ -48,6 +45,7 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     parse_harvard_opinions,
     validate_dt,
 )
+from cl.corpus_importer.management.commands.import_columbia import get_court_id
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
     normalize_authors_in_opinions,
     normalize_panel_in_opinioncluster,
@@ -152,213 +150,115 @@ class CourtMatchingTest(SimpleTestCase):
         """
         pairs = (
             {
-                "args": (
-                    "California Superior Court  "
-                    "Appellate Division, Kern County.",
-                    "california/supreme_court_opinions/documents"
-                    "/0dc538c63bd07a28.xml",
-                    # noqa
-                ),
-                "answer": "calappdeptsuperct",
+                "name": "Appellate Court of Connecticut",
+                "answer": "connappct",
+                # noqa
             },
             {
-                "args": (
-                    "California Superior Court  "
-                    "Appellate Department, Sacramento.",
-                    "california/supreme_court_opinions/documents"
-                    "/0dc538c63bd07a28.xml",
-                    # noqa
-                ),
-                "answer": "calappdeptsuperct",
+                "name": "Before the Arkansas Workers' Compensation Commission",
+                "answer": "arkworkcompcom",
+                # noqa
             },
             {
-                "args": (
-                    "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents"
-                    "/0412a06c60a7c2a2.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
+                "name": "Court of Appeal of California",
+                "answer": "calctapp",
+                # noqa
             },
             {
-                "args": (
-                    "Court of Errors and Appeals.",
-                    "new_jersey/supreme_court_opinions/documents"
-                    "/0032e55e607f4525.xml",
-                    # noqa
-                ),
-                "answer": "nj",
+                "name": "Court of Appeals of Alaska",
+                "answer": "alaskactapp",
+                # noqa
             },
             {
-                "args": (
-                    "Court of Chancery",
-                    "new_jersey/supreme_court_opinions/documents"
-                    "/0032e55e607f4525.xml",
-                    # noqa
-                ),
-                "answer": "njch",
+                "name": "Court of Chancery",
+                "answer": "nychanct",
+                # noqa
             },
             {
-                "args": (
-                    "Workers' Compensation Commission",
-                    "connecticut/workers_compensation_commission/documents"
-                    "/0902142af68ef9df.xml",
-                    # noqa
-                ),
-                "answer": "connworkcompcom",
+                "name": "Court of Appeals of Arizona, Division One. Department A",
+                "answer": "arizctapp",
+                # noqa
             },
             {
-                "args": (
-                    "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents"
-                    "/00ea30ce0e26a5fd.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
+                "name": "Court of Appeals of Arkansas",
+                "answer": "arkctapp",
+                # noqa
             },
             {
-                "args": (
-                    "Superior Court  New Haven County",
-                    "connecticut/superior_court_opinions/documents"
-                    "/0218655b78d2135b.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
+                "name": "Court of Chancery of Delaware",
+                "answer": "delch",
+                # noqa
             },
             {
-                "args": (
-                    "Superior Court, Hartford County",
-                    "connecticut/superior_court_opinions/documents"
-                    "/0218655b78d2135b.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
+                "name": "Court of Civil Appeals of Alabama",
+                "answer": "alacivapp",
+                # noqa
             },
             {
-                "args": (
-                    "Compensation Review Board  "
-                    "WORKERS' COMPENSATION COMMISSION",
-                    "connecticut/workers_compensation_commission/documents"
-                    "/00397336451f6659.xml",
-                    # noqa
-                ),
-                "answer": "connworkcompcom",
+                "name": "Court of Criminal Appeals of Alabama",
+                "answer": "alacrimapp",
+                # noqa
             },
             {
-                "args": (
-                    "Appellate Division Of The Circuit Court",
-                    "connecticut/superior_court_opinions/documents"
-                    "/03dd9ec415bf5bf4.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
+                "name": "Industrial Claim Appeals Office",
+                "answer": "coloworkcompcom",
+                # noqa
             },
             {
-                "args": (
-                    "Superior Court for Law and Equity",
-                    "tennessee/court_opinions/documents/01236c757d1128fd.xml",
-                ),
-                "answer": "tennsuperct",
+                "name": "Orphans' Court of Delaware",
+                "answer": "paorphct",
+                # noqa
             },
             {
-                "args": (
-                    "Courts of General Sessions and Oyer and Terminer "
-                    "of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
+                "name": "Superior Court of Delaware, Sussex County",
                 "answer": "delsuperct",
+                # noqa
             },
             {
-                "args": (
-                    "Circuit Court of the United States of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
+                "name": "Supreme Court of Alabama",
+                "answer": "ala",
+                # noqa
+            },
+            {
+                "name": "Circuit Court of Delaware",
                 "answer": "circtdel",
+                # noqa
             },
             {
-                "args": (
-                    "Circuit Court of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
+                "name": "Appellate Court of Illinois, First District",
+                "answer": "illappct",
+                # noqa
+            },
+            {
+                "name": "District Court of Appeal, Lakeland, Florida.",
+                "answer": "fladistctapp",
+                # noqa
+            },
+            {
+                "name": "District Court of Appeal, Florida.",
+                "answer": "fladistctapp",
+                # noqa
+            },
+            {
+                "name": "District Court of Appeal of Florida, Second District.",
+                "answer": "fladistctapp2",
+                # noqa
+            },
+            {
+                "name": "U.S. Circuit Court",
+                "answer": "uscirct",
+                # noqa
+            },
+            {
+                "name": "United States Circuit Court,  Delaware District.",
                 "answer": "circtdel",
-            },
-            {
-                "args": (
-                    "Court of Quarter Sessions "
-                    "Court of Delaware,  Kent County.",
-                    "delaware/court_opinions/documents/f01f1724cc350bb9.xml",
-                ),
-                "answer": "delsuperct",
-            },
-            {
-                "args": (
-                    "District Court of Appeal.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal, Lakeland, Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal, Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal of Florida, Second District.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal of Florida, Second District.",
-                    "/data/dumps/florida/court_opinions/documents"
-                    "/25ce1e2a128df7ff.xml",
-                    # noqa
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "U.S. Circuit Court",
-                    "north_carolina/court_opinions/documents"
-                    "/fa5b96d590ae8d48.xml",
-                    # noqa
-                ),
-                "answer": "circtnc",
-            },
-            {
-                "args": (
-                    "United States Circuit Court,  Delaware District.",
-                    "delaware/court_opinions/documents/6abba852db7c12a1.xml",
-                ),
-                "answer": "circtdel",
-            },
-            {
-                "args": ("Court of Common Pleas  Hartford County", "asdf"),
-                "answer": "connsuperct",
+                # noqa
             },
         )
         for d in pairs:
-            got = get_state_court_object(*d["args"])
+            got = get_court_id(d["name"])
             self.assertEqual(
-                got,
+                got[0],
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
                 "               Instead we got: '%s'" % (d["answer"], got),
@@ -958,6 +858,31 @@ label="194">*194</page-number>
         self.read_json_func.return_value = case_law
         self.assertSuccessfulParse(1)
 
+    def test_winnow_case_name(self):
+        """Can the winnow_case_name function reduce the case names correctly to a set
+        of relevant words?"""
+        case_names = [
+            ("D.L.M. v. T.J.S.", {"dlm", "tjs"}),
+            ("In the Matter of E. B.", {"eb"}),
+            ("R. L. C. R. v. L. Z. S.", {"rlcr", "lzs"}),
+            ("J. B. v. C. E.", {"jb", "ce"}),
+            ("County v. A. D. B. County", {"adb"}),
+            ("United States v. Frank Esquivel", {"frank", "esquivel"}),
+            (
+                "UNITED STATES of America, Plaintiff-Appellee, v. Wayne VINSON, "
+                "Defendant-Appellant",
+                {"wayne", "vinson"},
+            ),
+        ]
+
+        for case_name in case_names:
+            result_set = winnow_case_name(case_name[0])
+            self.assertEqual(
+                result_set,
+                case_name[1],
+                msg="Case name can't be " "reduced correctly",
+            )
+
     def test_case_name_winnowing_comparison(self):
         """
         Test removing "United States" from case names and check if there is an
@@ -1461,7 +1386,7 @@ class HarvardMergerTests(TestCase):
             cluster_id=cluster.id
         ).values_list("author_str", flat=True)
 
-        authors = list(author_query)
+        authors = list(sorted(author_query))
 
         self.assertEqual(
             Opinion.objects.filter(cluster_id=cluster.id).count(),

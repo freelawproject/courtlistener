@@ -245,7 +245,9 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
                 found_overlaps.append(subset)
             matched_substring = ""
             start = stop - 1
-    if len(matched_substring) > 5:
+    if len(matched_substring) > 2:
+        # smallest possible opinion is Aff. in
+        # florida/court_opinions/documents/55615439f76c66d3.xml
         subset = make_subset_range(cl_characters, matched_substring)
         found_overlaps.append(subset)
 
@@ -795,10 +797,14 @@ def winnow_case_name(case_name: str) -> Set:
         "st",
         "ex",
         "rel",
+        "people",
+        "debtor",
+        "debtors",
+        "commonwealth",
     }
 
     # strings where order matters
-    false_positive_strings = ["united states"]
+    false_positive_strings = ["united states", "in re"]
 
     false_positive_strings_regex = re.compile(
         "|".join(map(re.escape, false_positive_strings))
@@ -814,11 +820,16 @@ def winnow_case_name(case_name: str) -> Set:
     # "R. L. C. R. v. L. Z. S." -> "RLCR v. LZS"
     # "J. B. v. C. E." -> "JB v. CE"
     # "County v. A. D. B. County" -> "County v. ADB County"
-    case_name = re.sub(
-        r"\b[A-Z][A-Z\.\s]*[A-Z]\b\.?",
-        lambda m: m.group().replace(".", "").replace(" ", ""),
-        case_name,
-    )
+    tokens = re.findall(r"(?:[A-Z][.] ?){2,}|.", case_name)
+    new_tokens = []
+    for token in tokens:
+        if "." in token and len(token) > 1:
+            add_space = token[-1] == " "
+            token = token.replace(". ", ".").replace(".", "")
+            if add_space:
+                token = f"{token} "
+        new_tokens.append(token)
+    case_name = "".join(new_tokens)
 
     # Remove all non-alphanumeric characters
     case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())
@@ -923,6 +934,11 @@ def content_too_different(
     :return: Whether the opinion content is too dissimilar
     """
 
+    if len(file_characters) == len(cl_characters):
+        # the simplest case, both opinions are exactly the same
+        if file_characters == cl_characters:
+            return False
+
     if len(file_characters) > 10000:
         cosine_sim = get_cosine_similarity(file_characters, cl_characters)
         if cosine_sim > 0.97:
@@ -931,6 +947,13 @@ def content_too_different(
             return True
 
     percent_match = compare_documents(file_characters, cl_characters)
+
+    if percent_match > 96:
+        # Both are exactly the same or one is exactly inside the other but with some
+        # extra data
+        # e.g. cluster: 5241280 and texas/court_opinions/documents/85b3a250014745a2.xml
+        return False
+
     if percent_match < 60:
         return True
 
