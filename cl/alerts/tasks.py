@@ -2,7 +2,7 @@ import copy
 from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
-from typing import Dict, List, Tuple, Union, cast
+from typing import List
 from urllib.parse import urlencode
 
 from asgiref.sync import async_to_sync
@@ -20,13 +20,11 @@ from elasticsearch.exceptions import ConnectionError
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
-    alert_hits_limit_reached,
     build_alert_email_subject,
     fetch_all_search_alerts_results,
     has_document_alert_hit_been_triggered,
     include_recap_document_hit,
     override_alert_query,
-    percolate_document,
     percolate_es_document,
     prepare_percolator_content,
     scheduled_alert_hits_limit_reached,
@@ -41,7 +39,6 @@ from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import fetch_all_search_results
 from cl.lib.redis_utils import (
     create_redis_semaphore,
     delete_redis_semaphore,
@@ -52,8 +49,6 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
     ESDocumentNameType,
-    PercolatorResponseType,
-    SaveDocumentResponseType,
     SaveESDocumentReturn,
     SearchAlertHitType,
     SendAlertsResponse,
@@ -537,105 +532,6 @@ def send_search_alert_emails(
     connection.send_messages(messages)
 
 
-# TODO: Remove after scheduled OA alerts have been processed.
-@app.task(ignore_result=True)
-def process_percolator_response(response: PercolatorResponseType) -> None:
-    """Process the response from the percolator and handle alerts triggered by
-     the percolator query.
-
-    :param response: A two tuple, a list of Alerts triggered and the document
-    data that triggered the alert.
-    :return: None
-    """
-
-    if not response:
-        return None
-
-    scheduled_hits_to_create = []
-    email_alerts_to_send = []
-    rt_alerts_to_send = []
-    alerts_triggered, document_content = response
-    for hit in alerts_triggered:
-        # Create a deep copy of the original 'document_content' to allow
-        # independent highlighting for each alert triggered.
-        document_content_copy = copy.deepcopy(document_content)
-
-        alert_triggered = (
-            Alert.objects.filter(pk=hit.meta.id).select_related("user").first()
-        )
-        if not alert_triggered:
-            continue
-
-        alert_user: UserProfile.user = alert_triggered.user
-        # Set highlight if available in response.
-        if hasattr(hit.meta, "highlight"):
-            document_content_copy["meta"] = {}
-            document_content_copy["meta"][
-                "highlight"
-            ] = hit.meta.highlight.to_dict()
-
-        # Override order_by to show the latest items when clicking the
-        # "View Full Results" button.
-        qd = override_alert_query(alert_triggered)
-        alert_triggered.query_run = qd.urlencode()  # type: ignore
-
-        # Compose RT hit to send.
-        hits = [
-            (
-                alert_triggered,
-                alert_triggered.alert_type,
-                [document_content_copy],
-                1,
-            )
-        ]
-        # Send real time Webhooks for all users regardless of alert rate and
-        # user's donations.
-        send_webhook_alert_hits(alert_user, hits)
-
-        # Send RT Alerts
-        if alert_triggered.rate == Alert.REAL_TIME:
-            if not alert_user.profile.is_member:
-                continue
-
-            # Append alert RT email to be sent.
-            email_alerts_to_send.append((alert_user.pk, hits))
-            rt_alerts_to_send.append(alert_triggered.pk)
-
-        else:
-            # Schedule DAILY, WEEKLY and MONTHLY Alerts
-            if alert_hits_limit_reached(
-                alert_triggered.pk, alert_triggered.user.pk
-            ):
-                # Skip storing hits for this alert-user combination because
-                # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
-                continue
-            scheduled_hits_to_create.append(
-                ScheduledAlertHit(
-                    user=alert_triggered.user,
-                    alert=alert_triggered,
-                    document_content=document_content_copy,
-                )
-            )
-
-    # Create scheduled DAILY, WEEKLY and MONTHLY Alerts in bulk.
-    if scheduled_hits_to_create:
-        ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
-    # Sent all the related document RT emails.
-    if email_alerts_to_send:
-        send_search_alert_emails.delay(email_alerts_to_send)
-
-    # Update RT Alerts date_last_hit, increase stats and log RT alerts sent.
-    if rt_alerts_to_send:
-        Alert.objects.filter(pk__in=rt_alerts_to_send).update(
-            date_last_hit=now()
-        )
-        alerts_sent = len(rt_alerts_to_send)
-        async_to_sync(tally_stat)(
-            f"alerts.sent.{Alert.REAL_TIME}", inc=alerts_sent
-        )
-        logger.info(f"Sent {alerts_sent} {Alert.REAL_TIME} email alerts.")
-
-
 @app.task(ignore_result=True)
 def percolator_response_processing(response: SendAlertsResponse) -> None:
     """Process the response from the percolator and handle alerts triggered by
@@ -776,60 +672,6 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     # Create scheduled RT, DAILY, WEEKLY and MONTHLY Alerts in bulk.
     if scheduled_hits_to_create:
         ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
-
-
-# TODO: Remove after scheduled OA alerts have been processed.
-@app.task(
-    bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
-)
-def send_or_schedule_alerts(
-    self: Task, response: SaveDocumentResponseType, document_index: str
-) -> PercolatorResponseType | None:
-    """Send real-time alerts based on the Elasticsearch search response.
-
-    Or schedule other rates alerts to send them later.
-
-    Iterates through each hit in the search response, checks if the alert rate
-    is real-time, and if the user has donated enough. If so it sends an email
-    alert and triggers webhooks.
-    The process begins with an initial percolator query and continues to fetch
-    additional results in chunks determined by settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE,
-    until all results are retrieved or no more results are available.
-
-    :param self: The celery task
-    :param response: A two tuple, the document ID to be percolated in
-    ES index and the document data that triggered the alert.
-    :param document_index: The ES document index where the document lives.
-    :return: A two tuple, a list of Alerts triggered and the document data that
-    triggered the alert.
-    """
-
-    if not response:
-        self.request.chain = None
-        return None
-
-    document_id, document_content = response
-    # Perform an initial percolator query and process its response.
-    percolator_response = percolate_document(document_id, document_index)
-    if not percolator_response:
-        self.request.chain = None
-        return None
-
-    # Check if the query contains more documents than ELASTICSEARCH_PAGINATION_BATCH_SIZE.
-    # If so, return additional results until there are not more.
-    # Remember, percolator results are alerts, not documents, so what you're
-    # paginating are user alerts that the document matched, not documents that
-    # an alert matched. 🙃.
-    alerts_triggered = fetch_all_search_results(
-        percolate_document,
-        percolator_response,
-        document_id,
-        document_index,
-    )
-    return alerts_triggered, document_content
 
 
 @app.task(
