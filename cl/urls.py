@@ -12,7 +12,6 @@ from cl.lib.converters import BlankSlugConverter
 from cl.opinion_page.sitemap import (
     BlockedDocketSitemap,
     BlockedOpinionSitemap,
-    DocketSitemap,
     OpinionSitemap,
 )
 from cl.people_db.sitemap import PersonSitemap
@@ -33,10 +32,6 @@ sitemaps = {
     "blocked-audio": BlockedAudioSitemap,
     "blocked-dockets": BlockedDocketSitemap,
     "blocked-opinions": BlockedOpinionSitemap,
-}
-
-pregenerated_sitemaps = {
-    SEARCH_TYPES.RECAP: DocketSitemap,
 }
 
 urlpatterns = [
@@ -74,21 +69,8 @@ urlpatterns = [
         {"sitemaps": sitemaps},
         name="sitemaps",
     ),
-    # Pregenerated sitemaps, shorter cache time for sitemap index
-    path(
-        "large-sitemap.xml",
-        cache_page(60 * 60 * 24, cache="db_cache")(sitemaps_views.index),
-        {
-            "sitemaps": pregenerated_sitemaps,
-            "sitemap_url_name": "sitemaps-pregenerated",
-        },
-    ),
-    path(
-        "large-sitemap-<str:section>.xml",
-        cached_sitemap,
-        {"sitemaps": pregenerated_sitemaps},
-        name="sitemaps-pregenerated",
-    ),
+    # Pregenerated sitemaps
+    path("", include("cl.sitemaps_infinite.urls")),
     # Redirects
     path(
         "donate/",
