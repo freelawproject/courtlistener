@@ -30,19 +30,15 @@ This command should be called periodically to make sure the new pages are added 
 ### Settings
 
 The main settings are:
-`cl/settings/sitemaps.py`:
-
-  - `SITEMAPS_GENERATED_OFFLINE` has the list of the infinite sitemaps that should be iterated.
-  - `SITEMAPS_FILES_PER_CALL` - limits the number of pages generated per a single command call (10 by default)
-
-`cl/urls.py`:
-  - `pregenerated_sitemaps` contains the list of infinite sitemaps classes that are used in the `large-sitemap*` routes.
+`cl/sitemaps_infinite/urls.py`:
+  - `pregenerated_sitemaps` contains the list of infinite sitemaps classes that should use pregenerated approach, they are served via the `large-sitemap*` routes.
 
 `.env`:
-  - `SITEMAPS_URL_SCHEME` - set to `http` (default) or `https`, it is not determined automatically because the sitemap generation is called in the CLI
+  - `SITEMAPS_FILES_PER_CALL` - The number of sitemap 'files' (pages) to cache per single sitemap generation call (10 by default)
+  - `SITEMAPS_TASK_REPEAT_SEC` - call sitemap file generation every `SITEMAPS_TASK_REPEAT_SEC` seconds via celery, set 0 to disable task (default)
 
 The domain of the sitemap urls is retrieved from the `django.contrib.sites` current site.
 
-The `DocketSitemap` in `cl/opinion_page` app is currently implemented as an example.
+The `DocketSitemap` from `cl/opinion_page` app is currently implemented as an example.
 
 You need to submit the new `/large-sitemap.xml` url to google.com in order to index all the large sitemaps, generated using this module.

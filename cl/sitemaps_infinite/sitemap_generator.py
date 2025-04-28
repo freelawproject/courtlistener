@@ -12,7 +12,7 @@ from django.utils.timezone import now as tz_now
 from redis import Redis
 
 from cl.lib.redis_utils import get_redis_interface
-from cl.sitemaps_infinite import conf
+from cl.sitemaps_infinite.urls import pregenerated_sitemaps
 from cl.sitemaps_infinite.base_sitemap import (
     CacheableList,
     InfinitePaginatorSitemap,
@@ -87,7 +87,7 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
     forced_exit = False
 
     # Iterate over the sitemap sections, find the place where we left off, and continue from there
-    for section, sitemapClass in conf.SITEMAPS.items():
+    for section, sitemapClass in pregenerated_sitemaps.items():
 
         # Get from the cache the cursor value for the sitemap section, processed last time
         cursor_section: str | None = cursor_data.get("section")
@@ -112,9 +112,9 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
         # Pre-generate sitemap pages in the current section
         while True:
 
-            if num_files >= conf.FILES_PER_CALL:
+            if num_files >= settings.SITEMAPS_FILES_PER_CALL:
                 logger.info(
-                    f"Reached the limit of {conf.FILES_PER_CALL} files per call for section: {section} and page: {cursor_data.get('last_page')}."
+                    f"Reached the limit of {settings.SITEMAPS_FILES_PER_CALL} files per call for section: {section} and page: {cursor_data.get('last_page')}."
                 )
 
                 forced_exit = True
