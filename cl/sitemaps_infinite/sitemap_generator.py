@@ -44,11 +44,21 @@ long_cache_timeout = 60 * 60 * 24 * 180
 # Set up a task if repetition period is set in conf
 @transaction.atomic
 def generate_urls_chunk(force_regenerate: bool = False) -> None:
-    """Generates the next chunk of URLs for the sitemap. This function is responsible for managing the sitemap generation process, including caching, cursor handling, and limiting the number of files generated per call.
+    """Generates the next chunk of URLs for the sitemap. This function is
+    responsible for managing the sitemap generation process, including caching,
+    cursor handling, and limiting the number of files generated per call.
 
-    The function iterates over the configured sitemap sections, loading the appropriate `InfinitePaginatorSitemap` class for each section. It then generates the sitemap pages for each section, caching the results and updating the cursor data in Redis. The function stops generating new pages once the configured limit of files per call has been reached.
+    The function iterates over the configured sitemap sections, loading the
+    appropriate `InfinitePaginatorSitemap` class for each section. It then
+    generates the sitemap pages for each section, caching the results and
+    updating the cursor data in Redis. The function stops generating new pages
+    once the configured limit of files per call has been reached.
 
-    The function uses the `make_cache_key()` and `make_expiration_time()` helper functions to generate the cache keys and expiration times for the sitemap pages. It also handles cases where the cached cursor data does not match the current cursor, indicating that the sitemap data may have changed and needs to be regenerated.
+    The function uses the `make_cache_key()` and `make_expiration_time()` helper
+    functions to generate the cache keys and expiration times for the sitemap
+    pages. It also handles cases where the cached cursor data does not match
+    the current cursor, indicating that the sitemap data may have changed and
+    needs to be regenerated.
     """
 
     redis_db: Redis = get_redis_interface(REDIS_DB)
@@ -268,7 +278,6 @@ def make_cache_key(
 
     uri = f"{scheme}://{host}{reverse('sitemaps-pregenerated', kwargs={"section": section})}?p={page}"
     url = hashlib.md5(force_bytes(iri_to_uri(uri)))
-    # logger.debug(f'Cache key: {uri} sitemap.{section}.{url.hexdigest()}')
 
     return f"sitemap.{section}.{url.hexdigest()}"
 
