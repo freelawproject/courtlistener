@@ -1007,7 +1007,6 @@ class DocketSitemapTest(SitemapTest):
         SiteModel.objects.update_or_create(
             pk=settings.SITE_ID, defaults={"domain": domain, "name": domain}
         )
-        settings.SITEMAPS_URL_SCHEME = "http"
 
     def setUp(self) -> None:
         self.sitemap_url = reverse(
@@ -1024,7 +1023,6 @@ class DocketSitemapTest(SitemapTest):
             msg="Did not get a '400 Page not found' status code before generating the sitemap.",
         )
 
-        # call_command("generate_sitemaps", "--force-regenerate")
         generate_urls_chunk()
 
         response = self.client.get(self.sitemap_url)

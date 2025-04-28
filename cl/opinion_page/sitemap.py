@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Tuple
 
 from django.contrib import sitemaps
 from django.db.models import Q, QuerySet
@@ -74,7 +73,7 @@ class DocketSitemap(InfinitePaginatorSitemap):
         return SEARCH_TYPES.RECAP
 
     @property
-    def ordering(self) -> Tuple[str]:
+    def ordering(self) -> tuple[str]:
         return ("pk",)
 
     def items(self) -> QuerySet:
@@ -89,8 +88,7 @@ class DocketSitemap(InfinitePaginatorSitemap):
                 source__in=Docket.RECAP_SOURCES(),
                 blocked=False,
             )
-            # .order_by("pk")
-            .only("case_name", "view_count", "date_modified", "pk", "slug")
+            .only("view_count", "date_modified", "pk", "slug")
         )
 
     def lastmod(self, obj: Docket) -> datetime:

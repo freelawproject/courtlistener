@@ -9,14 +9,13 @@ The keys in this TypedDict are:
 - `last_page`: The index of the last page in the section, as an integer or string.
 - `has_next`: A boolean indicating whether there are more pages available after this one.
 """
-TaskCursorData = TypedDict(
-    "CursorData",
-    {
-        "section": str | bytes,
-        "last_page": int | str,
-        "has_next": int,
-    },
-)
+
+
+class TaskCursorData(TypedDict):
+    section: str | bytes
+    last_page: int | str
+    has_next: int
+
 
 """
 A dictionary mapping sitemap section names to the number of pages in that section.
