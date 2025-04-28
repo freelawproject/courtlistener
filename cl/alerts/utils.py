@@ -9,7 +9,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from elasticsearch_dsl import MultiSearch, Q, Search
 from elasticsearch_dsl.query import Query
-from elasticsearch_dsl.response import Hit, Response
+from elasticsearch_dsl.response import Hit
 from redis import Redis
 
 from cl.alerts.models import (
@@ -117,45 +117,6 @@ def create_percolator_search_query(
     if search_after:
         s = s.extra(search_after=search_after)
     return s
-
-
-# TODO: Remove after scheduled OA alerts have been processed.
-def percolate_document(
-    document_id: str,
-    document_index: str,
-    search_after: int = 0,
-) -> Response:
-    """Percolate a document against a defined Elasticsearch Percolator query.
-
-    :param document_id: The document ID in ES index to be percolated.
-    :param document_index: The ES document index where the document lives.
-    :param search_after: The ES search_after param for deep pagination.
-    :return: The response from the Elasticsearch query.
-    """
-
-    s = Search(index=AudioPercolator._index._name)
-    percolate_query = Q(
-        "percolate",
-        field="percolator_query",
-        index=document_index,
-        id=document_id,
-    )
-    exclude_rate_off = Q("term", rate=Alert.OFF)
-    final_query = Q(
-        "bool",
-        must=[percolate_query],
-        must_not=[exclude_rate_off],
-    )
-    s = s.query(final_query)
-    s = add_es_highlighting(
-        s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
-    )
-    s = s.source(excludes=["percolator_query"])
-    s = s.sort("date_created")
-    s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
-    if search_after:
-        s = s.extra(search_after=search_after)
-    return s.execute()
 
 
 def percolate_es_document(
@@ -390,30 +351,6 @@ def override_alert_query(
             qd["filed_after"] = cut_off_date.strftime("%m/%d/%Y")
 
     return qd
-
-
-# TODO: Remove after scheduled OA alerts have been processed.
-def alert_hits_limit_reached(alert_pk: int, user_pk: int) -> bool:
-    """Check if the alert hits limit has been reached for a specific alert-user
-     combination.
-
-    :param alert_pk: The alert_id.
-    :param user_pk: The user_id.
-    :return: True if the limit has been reached, otherwise False.
-    """
-
-    stored_hits = ScheduledAlertHit.objects.filter(
-        alert_id=alert_pk,
-        user_id=user_pk,
-        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-    )
-    hits_count = stored_hits.count()
-    if hits_count >= settings.SCHEDULED_ALERT_HITS_LIMIT:
-        logger.info(
-            f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} hits stored for this alert."
-        )
-        return True
-    return False
 
 
 def scheduled_alert_hits_limit_reached(
