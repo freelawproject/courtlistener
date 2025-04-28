@@ -22,6 +22,7 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
+from cl.alerts.forms import CreateAlertForm
 from cl.alerts.management.commands.cl_send_alerts import (
     get_cut_off_end_date,
     get_cut_off_start_date,
@@ -48,6 +49,7 @@ from cl.alerts.tasks import (
 from cl.alerts.utils import (
     InvalidDateError,
     build_alert_email_subject,
+    is_match_all_query,
     percolate_es_document,
 )
 from cl.api.factories import WebhookFactory
@@ -728,6 +730,50 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         self.assertEqual(response.json()["id"], alert_1_data["id"])
         self.assertEqual(response.json()["name"], "alert_1_updated")
         self.assertEqual(response.json()["rate"], "wly")
+
+    async def test_avoid_saving_match_all_alerts(self) -> None:
+        """Confirm that creating/updating a match-all alert query is rejected."""
+
+        # Match all alert fails on creation:
+        match_all_alert = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=&type={SEARCH_TYPES.RECAP}",
+        )
+        self.assertEqual(match_all_alert.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "You can't create a match-all alert. Please try narrowing your query.",
+            match_all_alert.json()["query"],
+        )
+
+        # Try validation on update. Create a valid alert first.
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+        )
+
+        alert_1_data = alert_1.json()
+        # Try to update the alert to a match-all query
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1_data["id"], "version": "v4"},
+        )
+        data_updated = {
+            "name": "alert_1_updated",
+            "query": "type=r&order_by=score+desc&",
+            "rate": Alert.DAILY,
+            "alert_type": SEARCH_TYPES.RECAP,
+        }
+        response = await self.client.put(
+            alert_1_path_detail, data_updated, format="json"
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "You can't create a match-all alert. Please try narrowing your query.",
+            response.json()["query"],
+        )
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
@@ -1670,6 +1716,53 @@ class SearchAlertsUtilsTest(SimpleTestCase):
 
                     self.assertEqual(date_start, expected_date_start)
                     self.assertEqual(date_end, expected_date_end)
+
+    def test_is_match_all_query(self):
+        """Confirm is_match_all_query correctly detects match-all
+        or non-match-all queries based on the input query string.
+        """
+
+        test_cases = {
+            "type=o&docket_number=&order_by=score+desc&stat_Published=": True,
+            "type=r&order_by=score+desc&": True,
+            "type=r&q=&order_by=score+desc&": True,
+            "filter=": True,
+            "type=r": True,
+            "type=o&order_by=score+desc&q=    ": True,
+            "order_by=score+desc": True,
+            "": True,
+            "q=People%20v%20Martinez&type=o&order_by=score%20desc&stat_Published=on": False,
+            "type=oa&docket_number=19-1010&order_by=score+desc&": False,
+            "type=oa&docket_number=19-1010&order_by=score+desc&stat_Published=": False,
+            "q=hello": False,
+            "filter=value": False,
+        }
+
+        for query_string, expected in test_cases.items():
+            with self.subTest(query_string=query_string):
+                self.assertEqual(is_match_all_query(query_string), expected)
+
+    def test_clean_query_raises_validation_error_for_match_all(self):
+        """Confirm CreateAlertForm.clean_query raises ValidationError
+        when the query is a match-all query.
+        """
+        test_user = UserProfileWithParentsFactory()
+        form = CreateAlertForm(
+            data={
+                "name": "Test Alert",
+                "query": "type=r&order_by=score+desc",
+                "rate": Alert.DAILY,
+                "alert_type": SEARCH_TYPES.RECAP,
+            },
+            user=test_user.user,
+        )
+        is_valid = form.is_valid()
+        self.assertFalse(is_valid)
+        self.assertIn("query", form.errors)
+        self.assertIn(
+            "You can't create a match-all alert. Please try narrowing your query.",
+            form.errors["query"],
+        )
 
 
 class DocketAlertAPITests(APITestCase):

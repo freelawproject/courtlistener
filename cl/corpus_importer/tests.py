@@ -11,6 +11,7 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
 from django.test import override_settings
+from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
@@ -18,6 +19,7 @@ from juriscraper.lib.string_utils import harmonize, titlecase
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
+from cl.audio.factories import AudioFactory
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
     CaseBodyFactory,
@@ -47,6 +49,9 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
     parse_harvard_opinions,
     validate_dt,
+)
+from cl.corpus_importer.management.commands.make_aws_manifest_files import (
+    get_monthly_record_ids_by_type,
 )
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
     normalize_authors_in_opinions,
@@ -84,13 +89,21 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import get_redis_interface
-from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
+from cl.people_db.factories import (
+    ABARatingFactory,
+    EducationFactory,
+    PersonFactory,
+    PersonWithChildrenFactory,
+    PoliticalAffiliationFactory,
+    PositionFactory,
+    SchoolFactory,
+)
 from cl.people_db.lookup_utils import (
     extract_judge_last_name,
     find_all_judges,
     find_just_name,
 )
-from cl.people_db.models import Attorney, AttorneyOrganization, Party
+from cl.people_db.models import Attorney, AttorneyOrganization, Party, Position
 from cl.recap.management.commands.nightly_pacer_updates import (
     get_docket_ids_docket_alerts,
     get_docket_ids_missing_info,
@@ -107,8 +120,10 @@ from cl.search.factories import (
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
+    OpinionWithParentsFactory,
 )
 from cl.search.models import (
+    SEARCH_TYPES,
     SOURCES,
     Citation,
     Court,
@@ -3428,3 +3443,299 @@ class CaseNamesTest(SimpleTestCase):
                 overlap,
                 msg=f"Case names don't match: {wl_casename} - {cl_casename}",
             )
+
+
+class AWSManifestTest(TestCase):
+
+    def setUp(self) -> None:
+        self.r = get_redis_interface("CACHE")
+
+    @patch(
+        "cl.corpus_importer.management.commands.make_aws_manifest_files.compute_monthly_export"
+    )
+    def test_skips_export_if_previous_timestamp_doesnt_exists(
+        self, mock_compute_monthly_export
+    ):
+        """Verifies the command skips monthly export if no previous timestamp is found."""
+        # Ensure no previous timestamp exists in redis
+        export_key = f"bulk_import:{SEARCH_TYPES.OPINION}"
+        self.r.delete(export_key)
+
+        call_command(
+            "make_aws_manifest_files",
+            record_type=SEARCH_TYPES.OPINION,
+            bucket_name="test-bucket",
+            monthly_export=True,
+        )
+        # Assert that compute_monthly_export was NOT called,
+        # indicating the timestamp check prevented execution.
+        mock_compute_monthly_export.assert_not_called()
+
+    @patch(
+        "cl.corpus_importer.management.commands.make_aws_manifest_files.compute_monthly_export"
+    )
+    def test_command_stores_current_timestamp_after_delta_export(
+        self, mock_compute_monthly_export
+    ):
+        """Verifies the command stores the current timestamp after an export."""
+        timestamp_two_weeks_ago = datetime.now() - timedelta(weeks=2)
+        export_key = f"bulk_import:{SEARCH_TYPES.ORAL_ARGUMENT}"
+        self.r.set(export_key, str(timestamp_two_weeks_ago), 60 * 60)
+
+        timestamp_now = timezone.now()
+        with time_machine.travel(timestamp_now, tick=False):
+            call_command(
+                "make_aws_manifest_files",
+                record_type=SEARCH_TYPES.ORAL_ARGUMENT,
+                bucket_name="test-bucket",
+                monthly_export=True,
+            )
+        # Assert that compute_monthly_export was called
+        mock_compute_monthly_export.assert_called_once()
+
+        # Assert that the timestamp retrieved from Redis is the expected current
+        # timestamp
+        timestamp_from_cache = self.r.get(export_key)
+        self.assertEqual(str(timestamp_now), timestamp_from_cache)
+
+    @patch(
+        "cl.corpus_importer.management.commands.make_aws_manifest_files.export_records_in_batches"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.make_aws_manifest_files.compute_monthly_export"
+    )
+    def test_command_stores_current_timestamp_after_full_export(
+        self, mock_compute_monthly_export, mock_compute_full_export
+    ):
+        """Verifies the command stores the current timestamp after a full export."""
+        timestamp_two_weeks_ago = datetime.now() - timedelta(weeks=2)
+        export_key = f"bulk_import:{SEARCH_TYPES.ORAL_ARGUMENT}"
+        self.r.set(export_key, str(timestamp_two_weeks_ago), 60 * 60)
+
+        timestamp_now = timezone.now()
+        with time_machine.travel(timestamp_now, tick=False):
+            call_command(
+                "make_aws_manifest_files",
+                record_type=SEARCH_TYPES.ORAL_ARGUMENT,
+                bucket_name="test-bucket",
+                all_records=True,
+            )
+        # Assert that compute_monthly_export was not called
+        mock_compute_monthly_export.assert_not_called()
+
+        mock_compute_full_export.assert_called_once()
+
+        # Assert that the timestamp retrieved from Redis is the expected current
+        # timestamp
+        timestamp_from_cache = self.r.get(export_key)
+        self.assertEqual(str(timestamp_now), timestamp_from_cache)
+
+    def test_can_get_recent_records_from_nested_models(self):
+        """Verifies get_monthly_record_ids_by_type returns records updated
+        directly or through related models."""
+        last_export_timestamp = datetime.now() - timedelta(weeks=1)
+        school = SchoolFactory(name="New York Law School")
+        # Create older Person records with associated nested objects
+        with time_machine.travel(
+            last_export_timestamp - timedelta(weeks=1), tick=False
+        ):
+            person_1 = PersonFactory.create(gender="m")
+            ABARatingFactory(person=person_1, year_rated=2005)
+            EducationFactory(person=person_1, school=school)
+            PositionFactory(person=person_1)
+            PositionFactory(person=person_1)
+
+            person_2 = PersonFactory.create()
+            rating_person_2 = ABARatingFactory(
+                person=person_2, rating="q", year_rated=2005
+            )
+            EducationFactory(person=person_2, school=school)
+            PositionFactory(person=person_2)
+
+            person_3 = PersonFactory.create(gender="m")
+            ABARatingFactory(person=person_3, year_rated=2005)
+            EducationFactory(person=person_3, school=school)
+            PositionFactory(person=person_3)
+
+            person_4 = PersonFactory.create(gender="m")
+            ABARatingFactory(person=person_4, year_rated=2005)
+            EducationFactory(person=person_4, school=school)
+            PositionFactory(person=person_4)
+
+            person_5 = PersonFactory.create()
+            ABARatingFactory(person=person_5, year_rated=2005)
+            EducationFactory(person=person_5, school=school)
+            position_person_5 = PositionFactory(person=person_5)
+
+            person_6 = PersonFactory()
+            PositionFactory(person=person_6)
+
+            person_7 = PersonFactory()
+            ABARatingFactory(person=person_7, year_rated=2004)
+            PositionFactory(person=person_7)
+
+            # Create more older person records
+            PersonFactory.create_batch(3)
+
+        school_2 = SchoolFactory(name="American University")
+        # Update existing Person records or their related nested objects
+        with time_machine.travel(
+            last_export_timestamp + timedelta(days=2), tick=False
+        ):
+            person_1.name_first = "New name"
+            person_1.save()
+
+            rating_person_2.rating = "wq"
+            rating_person_2.save()
+
+            ABARatingFactory(person=person_3, year_rated=2020)
+            EducationFactory(person=person_4, school=school_2)
+
+            position_person_5.position_type = Position.JUSTICE
+            position_person_5.save()
+
+            PoliticalAffiliationFactory(person=person_6)
+
+            person_8 = PersonFactory()
+            PositionFactory(person=person_8)
+
+            # Create new Person records
+            PersonFactory.create_batch(10)
+
+        records = get_monthly_record_ids_by_type(
+            SEARCH_TYPES.PEOPLE, last_export_timestamp
+        )
+
+        # Check the total number of returned records
+        # Should include the 6 updated/affected old records and 1 newly created
+        # record
+        self.assertEqual(len(records), 7)
+
+        record_ids = [x[0] for x in records]
+        # Assert that the updated/affected old records are included
+        # Person_1's name was updated
+        self.assertIn(person_1.id, record_ids)
+        # A related ABARating was updated
+        self.assertIn(person_2.id, record_ids)
+        # A new related ABARating was created
+        self.assertIn(person_3.id, record_ids)
+        # A new related Education was created
+        self.assertIn(person_4.id, record_ids)
+        # A related Position was updated
+        self.assertIn(person_5.id, record_ids)
+        # A new related PoliticalAffiliation was created
+        self.assertIn(person_6.id, record_ids)
+        # A new record with a Judge position
+        self.assertIn(person_8.id, record_ids)
+        # Assert that the old record that was not updated is NOT included
+        self.assertNotIn(person_7.id, record_ids)
+
+    def test_get_monthly_harvard_non_ocr_opinions(self):
+        """Verifies retrieval of Harvard Law, non-OCR opinion IDs"""
+        last_export_timestamp = datetime.now() - timedelta(weeks=1)
+        # Create opinions with different sources and OCR status before the
+        # timestamp
+        with time_machine.travel(
+            last_export_timestamp - timedelta(weeks=1), tick=False
+        ):
+            opinion_1 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                ),
+                extracted_by_ocr=False,
+            )
+            opinion_2 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                ),
+                extracted_by_ocr=False,
+            )
+            opinion_3 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.COURT_WEBSITE, docket=DocketFactory()
+                ),
+                extracted_by_ocr=True,
+            )
+
+        # Create and update opinions after the timestamp
+        with time_machine.travel(
+            last_export_timestamp + timedelta(days=2), tick=False
+        ):
+            opinion_1.author_str = "Author updated"
+            opinion_1.save()
+            opinion_3.author_str = "Author updated"
+            opinion_3.save()
+            opinion_4 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.COLUMBIA_ARCHIVE, docket=DocketFactory()
+                ),
+                extracted_by_ocr=True,
+            )
+            opinion_5 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                ),
+                extracted_by_ocr=False,
+            )
+
+        records = get_monthly_record_ids_by_type(
+            SEARCH_TYPES.OPINION, last_export_timestamp
+        )
+        # Check the total number of returned records
+        print(records)
+        self.assertEqual(len(records), 2)
+
+        record_ids = [x[0] for x in records]
+        # Updated after timestamp, Harvard, not OCR
+        self.assertIn(opinion_1.id, record_ids)
+        # Created after timestamp, Harvard, not OCR
+        self.assertIn(opinion_5.id, record_ids)
+        # Created before timestamp, not updated
+        self.assertNotIn(opinion_2.id, record_ids)
+        # Created after timestamp, but OCR'd and not Harvard
+        self.assertNotIn(opinion_4.id, record_ids)
+        # Updated after timestamp, but OCR'd and Not Harvard
+        self.assertNotIn(opinion_4.id, record_ids)
+
+    def test_can_get_recent_records_from_flat_models(self):
+        """Verifies get_monthly_record_ids_by_type returns records created or
+        updated after a timestamp for flat models."""
+        last_export_timestamp = datetime.now() - timedelta(weeks=1)
+
+        # Create some old audio records
+        with time_machine.travel(
+            last_export_timestamp - timedelta(weeks=1), tick=False
+        ):
+            old_audio_1 = AudioFactory()
+            old_audio_2 = AudioFactory()
+            old_audio_3 = AudioFactory()
+            for _ in range(4):
+                AudioFactory()
+
+        # Update two of the older records and create new ones after the
+        # timestamp
+        with time_machine.travel(
+            last_export_timestamp + timedelta(days=2), tick=False
+        ):
+            old_audio_1.case_name = "Oral argument updated 1"
+            old_audio_1.save()
+
+            old_audio_2.case_name = "Oral argument updated 2"
+            old_audio_2.save()
+            for _ in range(8):
+                AudioFactory()
+
+        records = get_monthly_record_ids_by_type(
+            SEARCH_TYPES.ORAL_ARGUMENT, last_export_timestamp
+        )
+        # Check the total number of returned records
+        # Should include the 2 updated old records and the 8 newly created
+        # records
+        self.assertEqual(len(records), 10)
+
+        record_ids = [x[0] for x in records]
+        # Verify that the updated records are included
+        self.assertIn(old_audio_1.id, record_ids)
+        self.assertIn(old_audio_2.id, record_ids)
+        # Verify that the old record that was not updated is NOT included
+        self.assertNotIn(old_audio_3.id, record_ids)
