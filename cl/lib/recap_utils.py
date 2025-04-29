@@ -120,19 +120,33 @@ def needs_ocr(content):
         "Appellate",
         "Appeal",
         "Case",
+        "Desc",
+        "Main Document",
         "Page",
+        "Received:",
         "USCA",
     )
     pagination_re = re.compile(r"Page\s+\d+\s+of\s+\d+")
+    doc_filed_re = re.compile(r"Doc\s+\d+\s+Filed")
+    case_num_re = re.compile(r"^\d+:\d+-CV-\d+$")
+
     for line in content.splitlines():
         line = line.strip()
+        if not line:
+            # skip empty lines
+            continue
+
         if line.startswith(bad_starters):
             continue
-        elif pagination_re.search(line):
+        if pagination_re.search(line):
             continue
-        elif line:
-            # We found a line with good content. No OCR needed.
-            return False
+        if doc_filed_re.search(line):
+            continue
+        if case_num_re.match(line):
+            continue
+        
+        # if we get here, we have found a line that is not a "bad" line, meaning we do NOT need OCR.
+        return False
 
     # We arrive here if no line was found containing good content.
     return True
