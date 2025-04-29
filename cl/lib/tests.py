@@ -42,6 +42,7 @@ from cl.lib.pacer_session import (
 )
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
+from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import (
     acquire_redis_lock,
     get_redis_interface,
@@ -65,7 +66,6 @@ from cl.search.factories import (
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.lib.recap_utils import needs_ocr
 
 
 class TestPacerUtils(TestCase):
@@ -1548,7 +1548,7 @@ class TestRecapUtils(SimpleTestCase):
     def test_needs_ocr_cacb_example(self):
         """Test needs_ocr function with multi-line headers from cacb example provided in issue #598
 
-        This text contains headers like 'Case...', 'Doc...Filed...', 
+        This text contains headers like 'Case...', 'Doc...Filed...',
         'Main Document', and 'Desc'. The function should recognize these
         as non-content lines and return True (needs OCR).
         """
@@ -1572,13 +1572,15 @@ Desc
 
 
 """
-        self.assertTrue(needs_ocr(cacb_text), msg="cacb example should need OCR")
+        self.assertTrue(
+            needs_ocr(cacb_text), msg="cacb example should need OCR"
+        )
 
     def test_needs_ocr_wvnd_example(self):
         """Test needs_ocr with specific case number format from wvnd example.
 
-        This text contains a case number line ('1:16-CV-107') and a 
-        'Received:' line. The function should recognize these as 
+        This text contains a case number line ('1:16-CV-107') and a
+        'Received:' line. The function should recognize these as
         non-content lines and return True (needs OCR).
         """
         wvnd_text = """
@@ -1588,12 +1590,14 @@ Received: 06/03/2016
 
 
 """
-        self.assertTrue(needs_ocr(wvnd_text), msg="wvnd example should need OCR")
+        self.assertTrue(
+            needs_ocr(wvnd_text), msg="wvnd example should need OCR"
+        )
 
     def test_needs_ocr_with_good_content(self):
         """Test needs_ocr returns False when substantive content is present.
 
-        This text includes standard headers but also lines like 
+        This text includes standard headers but also lines like
         'This is the first line of actual content.', which should cause
         the function to return False (doesn't need OCR).
         """
@@ -1606,11 +1610,13 @@ Here is another line.
 Page 2 of 5
 Some more content here.
 """
-        self.assertFalse(needs_ocr(good_text), msg="Should not need OCR with good content")
+        self.assertFalse(
+            needs_ocr(good_text), msg="Should not need OCR with good content"
+        )
 
     def test_needs_ocr_only_standard_headers(self):
         """Test needs_ocr returns True for text with only basic headers/pagination.
-        
+
         This tests the original scenario where only 'Case...' lines and
         'Page X of Y' lines are present. Should return True (needs OCR).
         """
@@ -1621,7 +1627,10 @@ Page 1 of 1
 Case 2:06-cv-00376-SRW Document 1-2 Filed 04/25/2006 Page 2 of 2
 Page 2 of 2
 """
-        self.assertTrue(needs_ocr(header_text), msg="Should need OCR with only headers/pagination")
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
 
     def test_needs_ocr_empty_string(self):
         """Test needs_ocr returns True when the input content is an empty string."""
@@ -1629,8 +1638,11 @@ Page 2 of 2
 
     def test_needs_ocr_only_whitespace(self):
         """Test needs_ocr returns True for content containing only whitespace.
-        
+
         The function should strip lines, so whitespace-only lines are treated
         as empty, resulting in True (needs OCR).
         """
-        self.assertTrue(needs_ocr("  \n\t\n  "), msg="Whitespace-only content should need OCR")
+        self.assertTrue(
+            needs_ocr("  \n\t\n  "),
+            msg="Whitespace-only content should need OCR",
+        )

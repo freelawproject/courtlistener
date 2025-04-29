@@ -144,7 +144,7 @@ def needs_ocr(content):
             continue
         if case_num_re.match(line):
             continue
-        
+
         # if we get here, we have found a line that is not a "bad" line, meaning we do NOT need OCR.
         return False
 
