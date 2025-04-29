@@ -90,13 +90,25 @@ def create_cited_html(
     citation_resolutions: Dict[
         MatchedResourceType, List[SupportedCitationType]
     ],
+    get_citations_kwargs: dict[str, str],
 ) -> str:
     """Using the opinion itself and a list of citations found within it, make
     the citations into links to the correct citations.
 
     :param citation_resolutions: A map of lists of citations in the opinion
+    :param get_citations_kwargs: contains the original citation text,
+        used as a fallback when there were no resolutions
+
     :return The new HTML containing citations
     """
+    if not citation_resolutions:
+        if get_citations_kwargs.get("markup_text"):
+            new_html = get_citations_kwargs["markup_text"]
+        else:
+            plain_text = get_citations_kwargs.get("plain_text") or ""
+            new_html = f'<pre class="inline">{html.escape(plain_text)}</pre>'
+        return new_html
+
     document = list(citation_resolutions.values())[0][0].document
 
     if document.markup_text:  # If opinion was originally HTML...
