@@ -33,25 +33,25 @@ def svg(name, **kwargs):
         with open(absolute_path, "r", encoding="utf-8") as file:
             svg_content = file.read()
 
-        css_class = kwargs.pop("class", None)
-        if css_class:
-            if 'class="' in svg_content:
-                svg_content = svg_content.replace(
-                    'class="', f'class="{css_class} '
-                )
-            else:
-                svg_content = svg_content.replace(
-                    "<svg", f'<svg class="{css_class}"'
-                )
-
-        for key, value in kwargs.items():
-            key = key.replace("__", ":")  # Convert double underscore to colons
-            key = key.replace("_", "-")  # Convert snake_case to kebab-case
-            svg_content = svg_content.replace("<svg", f'<svg {key}="{value}"')
-
-        return format_html(svg_content.replace("<svg", f'<svg role="img"'))
-
     except FileNotFoundError:
         if settings.DEBUG:
             return f"SVG '{name}' file found but couldn't be opened at '{absolute_path}'"
         return ""
+
+    css_class = kwargs.pop("class", None)
+    if css_class:
+        if 'class="' in svg_content:
+            svg_content = svg_content.replace(
+                'class="', f'class="{css_class} '
+            )
+        else:
+            svg_content = svg_content.replace(
+                "<svg", f'<svg class="{css_class}"'
+            )
+
+    for key, value in kwargs.items():
+        key = key.replace("__", ":")  # Convert double underscore to colons
+        key = key.replace("_", "-")  # Convert snake_case to kebab-case
+        svg_content = svg_content.replace("<svg", f'<svg {key}="{value}"')
+
+    return format_html(svg_content.replace("<svg", f'<svg role="img"'))
