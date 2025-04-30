@@ -1,5 +1,5 @@
-import datetime
 from collections import defaultdict
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, DefaultDict
 
 from asgiref.sync import async_to_sync
@@ -24,13 +24,13 @@ def json_date_parser(dct):
     for key, value in dct.items():
         if isinstance(value, str):
             try:
-                dct[key] = datetime.datetime.fromisoformat(value)
+                dct[key] = datetime.fromisoformat(value)
             except ValueError:
                 pass
     return dct
 
 
-def get_cut_off_date(rate: str, d: datetime.date) -> datetime.date | None:
+def get_cut_off_date(rate: str, d: date) -> date | datetime | None:
     """Given a rate of dly, wly or mly and a date, returns the date after for
     building a daterange filter.
     :param rate: The alert rate to send Alerts.
@@ -38,15 +38,19 @@ def get_cut_off_date(rate: str, d: datetime.date) -> datetime.date | None:
     :return: The cut-off date or None.
     """
     cut_off_date = None
-    if rate == Alert.DAILY:
+    if rate == Alert.REAL_TIME:
+        cut_off_date = datetime.now(timezone.utc) - timedelta(
+            seconds=settings.REAL_TIME_ALERTS_SENDING_RATE
+        )
+    elif rate == Alert.DAILY:
         cut_off_date = d
     elif rate == Alert.WEEKLY:
-        cut_off_date = d - datetime.timedelta(days=7)
+        cut_off_date = d - timedelta(days=7)
     elif rate == Alert.MONTHLY:
         # Get the first of the month of the previous month regardless of the
         # current date
-        early_last_month = d - datetime.timedelta(days=28)
-        cut_off_date = datetime.datetime(
+        early_last_month = d - timedelta(days=28)
+        cut_off_date = datetime(
             early_last_month.year, early_last_month.month, 1
         ).date()
     return cut_off_date
@@ -84,7 +88,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     """
 
     alerts_sent_count = 0
-    now_time = datetime.datetime.now()
+    now_time = datetime.now()
     # Get unique alert users with scheduled alert hits
     user_ids = (
         ScheduledAlertHit.objects.filter(
@@ -170,7 +174,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
 def send_scheduled_alerts(rate: str) -> None:
     if rate == Alert.MONTHLY:
-        if datetime.date.today().day > 28:
+        if date.today().day > 28:
             raise InvalidDateError(
                 "Monthly alerts cannot be run on the 29th, 30th or 31st."
             )
@@ -184,18 +188,14 @@ def delete_old_scheduled_alerts() -> int:
     """
 
     # Delete SENT ScheduledAlertHits after DAYS_TO_DELETE
-    sent_older_than = datetime.datetime.now() - datetime.timedelta(
-        days=DAYS_TO_DELETE
-    )
+    sent_older_than = datetime.now() - timedelta(days=DAYS_TO_DELETE)
     scheduled_sent_hits_to_delete = ScheduledAlertHit.objects.filter(
         date_created__lt=sent_older_than,
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT,
     ).delete()
 
     # Delete SCHEDULED ScheduledAlertHits after 2 * DAYS_TO_DELETE
-    unsent_older_than = datetime.datetime.now() - datetime.timedelta(
-        days=2 * DAYS_TO_DELETE
-    )
+    unsent_older_than = datetime.now() - timedelta(days=2 * DAYS_TO_DELETE)
     scheduled_unsent_hits_to_delete = ScheduledAlertHit.objects.filter(
         date_created__lt=unsent_older_than,
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,

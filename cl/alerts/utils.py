@@ -1,6 +1,6 @@
 import copy
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Set
 from urllib.parse import parse_qs
 
@@ -332,6 +332,25 @@ def fetch_all_search_alerts_results(
     return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
 
+def add_cutoff_timestamp_filter(
+    query: str, cut_off_date: date | datetime | None
+) -> str:
+    """Append a timestamp range filter to an existing Elasticsearch query.
+
+    :param query: The original query string.
+    :param cut_off_date: The lower bound datetime for the timestamp filter.
+    :return: The query string with the appended timestamp range filter.
+    """
+    if not cut_off_date:
+        return query
+
+    if isinstance(cut_off_date, datetime):
+        iso_datetime = cut_off_date.strftime("%Y-%m-%dT%H:%M:%S")
+    else:
+        iso_datetime = cut_off_date.strftime("%Y-%m-%d")
+    return f"({query}) AND timestamp:[{iso_datetime} TO *]"
+
+
 def override_alert_query(
     alert: Alert, cut_off_date: date | None = None
 ) -> QueryDict:
@@ -344,15 +363,7 @@ def override_alert_query(
     """
 
     qd = QueryDict(alert.query.encode(), mutable=True)
-    if alert.alert_type == SEARCH_TYPES.ORAL_ARGUMENT:
-        qd["order_by"] = "dateArgued desc"
-        if cut_off_date:
-            qd["argued_after"] = cut_off_date.strftime("%m/%d/%Y")
-    else:
-        qd["order_by"] = "dateFiled desc"
-        if cut_off_date:
-            qd["filed_after"] = cut_off_date.strftime("%m/%d/%Y")
-
+    qd["q"] = add_cutoff_timestamp_filter(qd["q"], cut_off_date)
     return qd
 
 
