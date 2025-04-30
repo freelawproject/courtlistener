@@ -17,7 +17,7 @@ from cl.lib.types import OptionsType
 from cl.search.models import Courthouse, Opinion
 
 DEFAULT_THROTTLE_MIN_ITEMS = 50
-DEFAULT_OPINIONS_PER_TASK = 50
+DEFAULT_OPINIONS_PER_TASK = 100
 
 
 class Command(VerboseCommand):
@@ -98,6 +98,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--opinions-per-task",
             default=DEFAULT_OPINIONS_PER_TASK,
+            type=int,
             help="Number of opinions in a single parent task",
         )
 
