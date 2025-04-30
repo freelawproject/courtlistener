@@ -154,7 +154,10 @@ class RECAPAlertsSweepIndexTest(
         # Confirm that query overridden in the 'View Full Results' URL to
         # include a filter by timestamp.
         self._assert_timestamp_filter(
-            html_content, Alert.REAL_TIME, alerts_runtime_naive
+            html_content,
+            Alert.REAL_TIME,
+            alerts_runtime_naive,
+            sweep_index=True,
         )
 
         # Confirm Alert date_last_hit is updated.

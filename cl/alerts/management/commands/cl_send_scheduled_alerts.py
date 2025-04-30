@@ -32,15 +32,23 @@ def json_date_parser(dct):
     return dct
 
 
-def get_cut_off_date(rate: str, d: datetime) -> date | datetime | None:
+def get_cut_off_date(
+    rate: str,
+    d: datetime,
+    sweep_index: bool = False,
+    custom_date: bool = False,
+) -> date | datetime | None:
     """Given a rate of dly, wly or mly and a date, returns the date after for
     building a daterange filter.
     :param rate: The alert rate to send Alerts.
     :param d: The datetime alerts are run.
+    :param sweep_index: True if this is being used to trigger alerts using the
+    sweep index.
+    :param custom_date: If true, send alerts on a custom date.
     :return: The cut-off date or None.
     """
-    cut_off_date: date | datetime | None = None
-    if rate == Alert.REAL_TIME:
+
+    if rate == Alert.REAL_TIME and not sweep_index:
         # Set cut_off_date to the datetime when RT alerts are sent minus
         # (REAL_TIME_ALERTS_SENDING_RATE + 1) seconds, considering that RT alerts
         # are sent every REAL_TIME_ALERTS_SENDING_RATE seconds.
@@ -51,22 +59,26 @@ def get_cut_off_date(rate: str, d: datetime) -> date | datetime | None:
         # are in UTC.
         local_tz = get_default_timezone()
         aware_local_dt = make_aware(cut_off_date, timezone=local_tz)
-        cut_off_date = aware_local_dt.astimezone(pytz.UTC)
-    elif rate == Alert.DAILY:
+        return aware_local_dt.astimezone(pytz.UTC)
+    elif rate == Alert.DAILY or (rate == Alert.REAL_TIME and sweep_index):
         # Since scheduled daily alerts run early the next day, set cut_off_date
-        # to the previous day.
-        cut_off_date = d.date() - timedelta(days=1)
+        # to the previous day unless a custom date is used.
+        # When sending alerts using the sweep index, real-time alert hits are
+        # ingested throughout the day, so the timestamp filter should behave
+        # the same as for daily alerts.
+        return d.date() - timedelta(days=1) if not custom_date else d.date()
     elif rate == Alert.WEEKLY:
         # For weekly alerts, set cut_off_date to 7 days earlier.
-        cut_off_date = d.date() - timedelta(days=7)
+        return d.date() - timedelta(days=7)
     elif rate == Alert.MONTHLY:
         # Get the first of the month of the previous month regardless of the
         # current date
         early_last_month = d.date() - timedelta(days=28)
-        cut_off_date = datetime(
+        return datetime(
             early_last_month.year, early_last_month.month, 1
         ).date()
-    return cut_off_date
+
+    return None
 
 
 def merge_alert_child_documents(

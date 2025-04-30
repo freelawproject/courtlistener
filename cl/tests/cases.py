@@ -746,7 +746,9 @@ class SearchAlertsAssertions:
                         % field_name,
                     )
 
-    def _assert_timestamp_filter(self, html_content, rate, date):
+    def _assert_timestamp_filter(
+        self, html_content, rate, date, sweep_index=False
+    ):
         """Confirm that timestamp filter is properly set in the
         'View Full Results' URL.
         """
@@ -755,7 +757,7 @@ class SearchAlertsAssertions:
         )
         parsed_url = urlparse(view_results_url[0])
         params = parse_qs(parsed_url.query)
-        cut_off_date = get_cut_off_date(rate, date)
+        cut_off_date = get_cut_off_date(rate, date, sweep_index)
         iso_datetime = (
             cut_off_date.strftime("%Y-%m-%dT%H:%M:%S")
             if isinstance(cut_off_date, datetime)

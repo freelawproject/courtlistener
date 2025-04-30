@@ -1508,7 +1508,7 @@ class SearchAlertsWebhooksTest(
 class SearchAlertsUtilsTest(SimpleTestCase):
 
     def test_get_cut_off_dates(self):
-        """Confirm get_cut_off_date and get_cut_off_end_date return the right
+        """Confirm get_cut_off_start_date and get_cut_off_end_date return the right
         values according to the input date.
         """
 
@@ -1718,7 +1718,7 @@ class SearchAlertsUtilsTest(SimpleTestCase):
 
     @override_settings(REAL_TIME_ALERTS_SENDING_RATE=60)
     def test_cut_off_date_for_scheduled_alerts(self):
-        """Confirm get_cut_off_date and get_cut_off_end_date return the right
+        """Confirm get_cut_off_date return the right
         values according to the input date.
         """
         test_cases = {
@@ -1726,10 +1726,22 @@ class SearchAlertsUtilsTest(SimpleTestCase):
                 {
                     "input_dt": datetime(2025, 5, 1, 12, 0, 0),
                     "expected": date(2025, 4, 30),
+                    "custom_date": False,
                 },
                 {
                     "input_dt": datetime(2025, 3, 1, 0, 0, 0),
                     "expected": date(2025, 2, 28),
+                    "custom_date": False,
+                },
+                {
+                    "input_dt": datetime(2025, 5, 1, 12, 0, 0),
+                    "expected": date(2025, 5, 1),
+                    "custom_date": True,
+                },
+                {
+                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
+                    "expected": date(2025, 3, 1),
+                    "custom_date": True,
                 },
             ],
             Alert.WEEKLY: [
@@ -1779,13 +1791,37 @@ class SearchAlertsUtilsTest(SimpleTestCase):
                         2025, 5, 1, 0, 58, 59, tzinfo=pytz.UTC
                     ),
                 },
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": date(2025, 5, 1),
+                    "sweep_index": True,
+                    "custom_date": False,
+                },
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": date(2025, 5, 2),
+                    "sweep_index": True,
+                    "custom_date": True,
+                },
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": datetime(
+                        2025, 5, 2, 12, 1, 0, tzinfo=pytz.UTC
+                    ),
+                    "sweep_index": False,
+                    "custom_date": True,
+                },
             ],
         }
         for rate, cases in test_cases.items():
             for case in cases:
                 with self.subTest(rate=rate, case=case):
                     dt = case["input_dt"]
-                    result = get_cut_off_date(rate, dt)
+                    custom_date = case.get("custom_date", False)
+                    sweep_index = case.get("sweep_index", False)
+                    result = get_cut_off_date(
+                        rate, dt, sweep_index, custom_date
+                    )
                     expected = case["expected"]
                     self.assertEqual(result, expected)
 
