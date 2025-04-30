@@ -11,7 +11,6 @@ from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import connections
 from lxml import html
-from waffle.testutils import override_flag
 
 from cl.alerts.models import Alert
 from cl.alerts.utils import add_cutoff_timestamp_filter, percolate_es_document

@@ -344,11 +344,13 @@ def add_cutoff_timestamp_filter(
     if not cut_off_date:
         return query
 
-    if isinstance(cut_off_date, datetime):
-        iso_datetime = cut_off_date.strftime("%Y-%m-%dT%H:%M:%S")
-    else:
-        iso_datetime = cut_off_date.strftime("%Y-%m-%d")
-    return f"({query}) AND timestamp:[{iso_datetime} TO *]"
+    iso_datetime = (
+        cut_off_date.strftime("%Y-%m-%dT%H:%M:%S")
+        if isinstance(cut_off_date, datetime)
+        else cut_off_date.strftime("%Y-%m-%d")
+    )
+    base_filter = f"timestamp:[{iso_datetime} TO *]"
+    return f"({query}) AND {base_filter}" if query else base_filter
 
 
 def override_alert_query(
@@ -363,7 +365,7 @@ def override_alert_query(
     """
 
     qd = QueryDict(alert.query.encode(), mutable=True)
-    qd["q"] = add_cutoff_timestamp_filter(qd["q"], cut_off_date)
+    qd["q"] = add_cutoff_timestamp_filter(qd.get("q", ""), cut_off_date)
     return qd
 
 

@@ -17,12 +17,16 @@ from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrList
 from redis import Redis
 
+from cl.alerts.management.commands.cl_send_scheduled_alerts import (
+    get_cut_off_date,
+)
 from cl.alerts.models import Alert, ScheduledAlertHit
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import (
     TaskCompletionStatus,
     add_document_hit_to_alert_set,
     has_document_alert_hit_been_triggered,
+    override_alert_query,
     scheduled_alert_hits_limit_reached,
 )
 from cl.api.models import WebhookEventType
@@ -616,6 +620,12 @@ def query_and_send_alerts(
             if not results_to_send:
                 continue
             alerts_sent.append(alert.pk)
+
+            # Override query n in the 'View Full Results' URL to
+            # include a filter by timestamp.
+            cut_off_date = get_cut_off_date(rate, now_time)
+            qd = override_alert_query(alert, cut_off_date)
+            alert.query_run = qd.urlencode()  # type: ignore
             hits.append(
                 [
                     alert,
@@ -624,9 +634,6 @@ def query_and_send_alerts(
                     len(results_to_send),
                 ]
             )
-            alert.query_run = search_params.urlencode()  # type: ignore
-            alert.date_last_hit = timezone.now()
-            alert.save()
             # Send webhooks
             send_search_alert_webhooks(user, results_to_send, alert.pk)
 

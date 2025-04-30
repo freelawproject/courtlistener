@@ -1,9 +1,11 @@
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any, DefaultDict
 
+import pytz
 from asgiref.sync import async_to_sync
 from django.conf import settings
+from django.utils.timezone import get_default_timezone, make_aware
 
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
@@ -30,26 +32,37 @@ def json_date_parser(dct):
     return dct
 
 
-def get_cut_off_date(rate: str, d: date) -> date | datetime | None:
+def get_cut_off_date(rate: str, d: datetime) -> date | datetime | None:
     """Given a rate of dly, wly or mly and a date, returns the date after for
     building a daterange filter.
     :param rate: The alert rate to send Alerts.
-    :param d: The date alerts are run.
+    :param d: The datetime alerts are run.
     :return: The cut-off date or None.
     """
-    cut_off_date = None
+    cut_off_date: date | datetime | None = None
     if rate == Alert.REAL_TIME:
-        cut_off_date = datetime.now(timezone.utc) - timedelta(
-            seconds=settings.REAL_TIME_ALERTS_SENDING_RATE
+        # Set cut_off_date to the datetime when RT alerts are sent minus
+        # (REAL_TIME_ALERTS_SENDING_RATE + 1) seconds, considering that RT alerts
+        # are sent every REAL_TIME_ALERTS_SENDING_RATE seconds.
+        cut_off_date = d - timedelta(
+            seconds=settings.REAL_TIME_ALERTS_SENDING_RATE + 1
         )
+        # Convert cut_off_date to UTC. This is important since hit timestamps
+        # are in UTC.
+        local_tz = get_default_timezone()
+        aware_local_dt = make_aware(cut_off_date, timezone=local_tz)
+        cut_off_date = aware_local_dt.astimezone(pytz.UTC)
     elif rate == Alert.DAILY:
-        cut_off_date = d
+        # Since scheduled daily alerts run early the next day, set cut_off_date
+        # to the previous day.
+        cut_off_date = d.date() - timedelta(days=1)
     elif rate == Alert.WEEKLY:
-        cut_off_date = d - timedelta(days=7)
+        # For weekly alerts, set cut_off_date to 7 days earlier.
+        cut_off_date = d.date() - timedelta(days=7)
     elif rate == Alert.MONTHLY:
         # Get the first of the month of the previous month regardless of the
         # current date
-        early_last_month = d - timedelta(days=28)
+        early_last_month = d.date() - timedelta(days=28)
         cut_off_date = datetime(
             early_last_month.year, early_last_month.month, 1
         ).date()
@@ -140,9 +153,9 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
         for alert, documents in merged_hits.items():
             search_type = alert.alert_type
 
-            # Override order_by to show the latest items when clicking the
-            # "View Full Results" button.
-            cut_off_date = get_cut_off_date(rate, now_time.date())
+            # Override query n in the 'View Full Results' URL to
+            # include a filter by timestamp.
+            cut_off_date = get_cut_off_date(rate, now_time)
             qd = override_alert_query(alert, cut_off_date)
             alert.query_run = qd.urlencode()  # type: ignore
             hits.append((alert, search_type, documents, len(documents)))
