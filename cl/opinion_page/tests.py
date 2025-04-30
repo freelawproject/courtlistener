@@ -501,20 +501,21 @@ class CitationRedirectorTest(TestCase):
 
     async def test_slugifying_reporters_collision(self) -> None:
         """Test reporter collision-aware slugification"""
-        r = await self.async_client.get(
-            reverse(
-                "citation_redirector",
-                kwargs={"reporter": "Vt."},
+        test_pairs = [("Vt.", "VT"), ("La.", "LA"), ("MSPB", "M.S.P.B.")]
+        for r1, r2 in test_pairs:
+            response1 = await self.async_client.get(
+                reverse(
+                    "citation_redirector",
+                    kwargs={"reporter": r1},
+                )
             )
-        )
-        r2 = await self.async_client.get(
-            reverse(
-                "citation_redirector",
-                kwargs={"reporter": "VT"},
+            response2 = await self.async_client.get(
+                reverse(
+                    "citation_redirector",
+                    kwargs={"reporter": r2},
+                )
             )
-        )
-
-        self.assertNotEqual(r.url, r2.url)
+            self.assertNotEqual(response1.url, response2.url)
 
     async def test_reporter_variation_just_reporter(self) -> None:
         """Do we redirect properly when we get reporter variations?"""
