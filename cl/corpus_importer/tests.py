@@ -11,6 +11,7 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
 from django.test import override_settings
+from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
@@ -18,6 +19,7 @@ from juriscraper.lib.string_utils import harmonize, titlecase
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
+from cl.audio.factories import AudioFactory
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
     CaseBodyFactory,
@@ -48,9 +50,15 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     parse_harvard_opinions,
     validate_dt,
 )
+from cl.corpus_importer.management.commands.make_aws_manifest_files import (
+    get_monthly_record_ids_by_type,
+)
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
     normalize_authors_in_opinions,
     normalize_panel_in_opinioncluster,
+)
+from cl.corpus_importer.management.commands.probe_iquery_pages_daemon import (
+    get_latest_pacer_case_id_for_courts,
 )
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
     check_case_names_match,
@@ -63,7 +71,7 @@ from cl.corpus_importer.signals import (
 from cl.corpus_importer.tasks import (
     generate_ia_json,
     get_and_save_free_document_report,
-    probe_iquery_pages,
+    probe_or_scrape_iquery_pages,
 )
 from cl.corpus_importer.utils import (
     ClusterSourceException,
@@ -81,13 +89,21 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import get_redis_interface
-from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
+from cl.people_db.factories import (
+    ABARatingFactory,
+    EducationFactory,
+    PersonFactory,
+    PersonWithChildrenFactory,
+    PoliticalAffiliationFactory,
+    PositionFactory,
+    SchoolFactory,
+)
 from cl.people_db.lookup_utils import (
     extract_judge_last_name,
     find_all_judges,
     find_just_name,
 )
-from cl.people_db.models import Attorney, AttorneyOrganization, Party
+from cl.people_db.models import Attorney, AttorneyOrganization, Party, Position
 from cl.recap.management.commands.pacer_iquery_scraper import (
     get_docket_ids_docket_alerts,
     get_docket_ids_missing_info,
@@ -104,8 +120,10 @@ from cl.search.factories import (
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
+    OpinionWithParentsFactory,
 )
 from cl.search.models import (
+    SEARCH_TYPES,
     SOURCES,
     Citation,
     Court,
@@ -2085,6 +2103,7 @@ class ScrapeIqueryPagesTest(TestCase):
         cls.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
         cls.court_cacd = CourtFactory(id="cacd", jurisdiction="FB")
         cls.court_vib = CourtFactory(id="vib", jurisdiction="FB")
+        cls.court_mowd = CourtFactory(id="mowd", jurisdiction="FB")
 
     def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
@@ -2096,6 +2115,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:pacer_case_id_current",
             "iquery:court_blocked_attempts:*",
             "iquery:court_empty_probe_attempts:*",
+            "iquery:latest_known_pacer_case_id",
         ]
         for key_to_clean in keys_to_clean:
             key = self.r.keys(key_to_clean)
@@ -2178,7 +2198,7 @@ class ScrapeIqueryPagesTest(TestCase):
         new=FakeCaseQueryReport,
     )
     def test_iquery_pages_probe_task(self, mock_cookies):
-        """Test probe_iquery_pages task."""
+        """Test probe_or_scrape_iquery_pages task."""
 
         dockets = Docket.objects.filter(court_id=self.court_cand.pk)
         self.assertEqual(dockets.count(), 0)
@@ -2189,7 +2209,9 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_cand.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_cand.pk, testing=True)
+        probe_or_scrape_iquery_pages.delay(
+            self.court_cand.pk, "0", testing=True
+        )
 
         # New highest_known_pacer_case_id according to the cand test pattern in
         # test_patterns
@@ -2222,7 +2244,7 @@ class ScrapeIqueryPagesTest(TestCase):
         new=FakeCaseQueryReport,
     )
     def test_iquery_pages_probe_nysd(self, mock_cookies):
-        """Test probe_iquery_pages."""
+        """Test probe_or_scrape_iquery_pages."""
 
         dockets = Docket.objects.filter(court_id=self.court_nysd.pk)
         self.assertEqual(dockets.count(), 0)
@@ -2233,7 +2255,9 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_nysd.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_nysd.pk, testing=True)
+        probe_or_scrape_iquery_pages.delay(
+            self.court_nysd.pk, None, testing=True
+        )
 
         # New highest_known_pacer_case_id according to the nysd test pattern in
         # cl.tests.fakes.test_patterns
@@ -2310,7 +2334,9 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_gamb.pk, 8
         )
         # Execute the task
-        probe_iquery_pages.delay(self.court_gamb.pk, testing=True)
+        probe_or_scrape_iquery_pages.delay(
+            self.court_gamb.pk, None, testing=True
+        )
 
         # highest_known_pacer_case_id is not updated due to the block.
         highest_known_pacer_case_id = r.hget(
@@ -2336,7 +2362,9 @@ class ScrapeIqueryPagesTest(TestCase):
         r.hset("iquery:test_highest_known_pacer_case_id", self.court_hib.pk, 8)
         # Execute the task
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
-            probe_iquery_pages.delay(self.court_hib.pk, testing=True)
+            probe_or_scrape_iquery_pages.delay(
+                self.court_hib.pk, None, testing=True
+            )
 
         # 2 sleeps before aborting the task. The probe is retried 2 times
         # independently via the @retry decorator.
@@ -2375,6 +2403,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -2419,6 +2448,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -2497,6 +2527,7 @@ class ScrapeIqueryPagesTest(TestCase):
             ):
                 DocketFactory(
                     court=self.court_gand,
+                    appeal_from=None,
                     source=Docket.RECAP,
                     case_name="New Incoming Docket",
                     docket_number="2:20-cv-00601",
@@ -2530,6 +2561,7 @@ class ScrapeIqueryPagesTest(TestCase):
             ):
                 DocketFactory(
                     court=self.court_gand,
+                    appeal_from=None,
                     source=Docket.RECAP,
                     docket_number="2:20-cv-00600",
                     pacer_case_id="4",
@@ -2566,6 +2598,7 @@ class ScrapeIqueryPagesTest(TestCase):
             ):
                 DocketFactory(
                     court=self.court_gand,
+                    appeal_from=None,
                     source=Docket.RECAP,
                     case_name="New Incoming Docket",
                     docket_number="2:20-cv-00601",
@@ -2633,7 +2666,9 @@ class ScrapeIqueryPagesTest(TestCase):
                 execute=True
             ):
                 # Execute the probing task
-                probe_iquery_pages.delay(self.court_cand.pk, testing=True)
+                probe_or_scrape_iquery_pages.delay(
+                    self.court_cand.pk, None, testing=True
+                )
 
             # update_latest_case_id_and_schedule_iquery_sweep should be called
             # 1 time only for the latest probing hit.
@@ -2663,6 +2698,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 # a sweep task.
                 DocketFactory(
                     court=self.court_txed,
+                    appeal_from=None,
                     source=Docket.RECAP,
                     case_name="New Incoming Docket 12",
                     docket_number="2:10-cv-00602",
@@ -2688,7 +2724,9 @@ class ScrapeIqueryPagesTest(TestCase):
                 execute=True
             ):
                 # Execute the probing task
-                probe_iquery_pages.delay(self.court_txed.pk, testing=True)
+                probe_or_scrape_iquery_pages.delay(
+                    self.court_txed.pk, None, testing=True
+                )
 
             # update_latest_case_id_and_schedule_iquery_sweep should be called
             # 1 time only for the latest probing hit.
@@ -2775,6 +2813,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
         tests = [600, 1200, 2400, 4800, 9600, 19200]
         for expected_wait in tests:
@@ -2846,6 +2885,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 100, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
         self.assertEqual(court_wait_cacd, None)
@@ -2926,6 +2966,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_vib.pk}")
         self.assertEqual(court_wait_cacd, None)
@@ -2995,6 +3036,7 @@ class ScrapeIqueryPagesTest(TestCase):
             docket_gand = DocketFactory(
                 court=self.court_gand,
                 source=Docket.RECAP,
+                appeal_from=None,
                 case_name="GAND Docket",
                 docket_number="2:20-cv-00609",
                 pacer_case_id="8",
@@ -3003,6 +3045,7 @@ class ScrapeIqueryPagesTest(TestCase):
             docket_cand = DocketFactory(
                 court=self.court_cand,
                 source=Docket.RECAP,
+                appeal_from=None,
                 case_name="CAND Docket",
                 docket_number="2:20-cv-00606",
                 pacer_case_id="16",
@@ -3063,6 +3106,7 @@ class ScrapeIqueryPagesTest(TestCase):
         d_1 = DocketFactory(
             source=Docket.RECAP,
             court=self.court_canb,
+            appeal_from=None,
             pacer_case_id="12345",
             date_filed=None,
             date_terminated=None,
@@ -3071,6 +3115,7 @@ class ScrapeIqueryPagesTest(TestCase):
         d_2 = DocketFactory(
             source=Docket.RECAP,
             court=self.court_canb,
+            appeal_from=None,
             pacer_case_id="12346",
             date_filed=None,
             date_terminated=date(2018, 11, 4),
@@ -3080,6 +3125,7 @@ class ScrapeIqueryPagesTest(TestCase):
         with time_machine.travel(two_weeks_ago, tick=False):
             d_3 = DocketFactory(
                 source=Docket.RECAP,
+                appeal_from=None,
                 court=self.court_canb,
                 pacer_case_id="12346",
                 date_filed=date(2018, 11, 4),
@@ -3120,6 +3166,206 @@ class ScrapeIqueryPagesTest(TestCase):
             {d_1.pk, d_2.pk},
             msg="Wrong IDs returned by get_docket_ids_week_ago_no_case_name",
         )
+
+    def test_get_latest_pacer_case_id_for_courts(self, mock_cookies):
+        """Test get_latest_pacer_case_id_for_courts helper."""
+        today = date.today()
+        d_canb_old = DocketFactory(
+            court=self.court_canb,
+            appeal_from=None,
+            source=Docket.RECAP,
+            pacer_case_id="23000",
+            date_filed=date(2018, 11, 4),
+        )
+        d_canb_latest = DocketFactory(
+            court=self.court_canb,
+            appeal_from=None,
+            source=Docket.RECAP,
+            pacer_case_id="43000",
+            date_filed=today,
+        )
+        d_cand_old = DocketFactory(
+            court=self.court_cand,
+            appeal_from=None,
+            source=Docket.RECAP,
+            pacer_case_id="103000",
+            date_filed=date(2018, 11, 4),
+        )
+        d_cand_latest = DocketFactory(
+            court=self.court_cand,
+            appeal_from=None,
+            source=Docket.RECAP,
+            pacer_case_id="209000",
+            date_filed=today,
+        )
+
+        call_command(
+            "ready_mix_cases_project",
+            task="set-latest-case-ids",
+            court_type="all",
+        )
+
+        r = get_redis_interface("CACHE")
+        latest_court_ids = get_latest_pacer_case_id_for_courts(
+            [self.court_cand.pk, self.court_canb.pk, self.court_mowd.pk], r
+        )
+        # The latest pacer_case_id from each court should be returned.
+        self.assertEqual(
+            latest_court_ids[self.court_cand.pk],
+            int(d_cand_latest.pacer_case_id),
+        )
+        self.assertEqual(
+            latest_court_ids[self.court_canb.pk],
+            int(d_canb_latest.pacer_case_id),
+        )
+
+    @patch(
+        "cl.scrapers.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    def test_perform_fixed_sweeps_when_court_is_not_up_to_date(
+        self, mock_cookies
+    ):
+        """Confirm that the iquery probe command performs a fixed sweep when it
+        is known that there is a more recent pacer_case_id in DB.
+        """
+
+        with override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False):
+            today = date.today()
+            DocketFactory(
+                court=self.court_mowd,
+                appeal_from=None,
+                source=Docket.RECAP,
+                case_name="MOWD Docket 2",
+                docket_number="2:20-cv-006032",
+                pacer_case_id="3021",
+                date_filed=today,
+            )
+
+        # Set latest know pacer_case_ids and store in Redis.
+        call_command(
+            "ready_mix_cases_project",
+            task="set-latest-case-ids",
+            court_type="all",
+        )
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 1)
+        r = get_redis_interface("CACHE")
+        r.hset("iquery:highest_known_pacer_case_id", self.court_mowd.pk, 3000)
+        r.hset("iquery:pacer_case_id_current", self.court_mowd.pk, 3000)
+
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
+
+        with override_settings(
+            IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
+        ), patch("cl.lib.decorators.time.sleep") as mock_sleep, patch(
+            "cl.corpus_importer.tasks.query_iquery_page", return_value=({}, "")
+        ) as mock_query_iquery_page:
+            call_command(
+                "probe_iquery_pages_daemon",
+                testing_iterations=1,
+            )
+
+        # query_iquery_page should be called only one time on fixed sweep mode.
+        self.assertEqual(
+            mock_query_iquery_page.call_count,
+            1,
+            "query_iquery_page shouldn't be called.",
+        )
+
+        highest_known_pacer_case_id = r.hget(
+            "iquery:highest_known_pacer_case_id", self.court_mowd.pk
+        )
+        pacer_case_id_current = r.hget(
+            "iquery:pacer_case_id_current", self.court_mowd.pk
+        )
+        self.assertEqual(int(highest_known_pacer_case_id), 3010)
+        self.assertEqual(int(pacer_case_id_current), 3009)
+
+        # No additional dockets have been added at this point.
+        self.assertEqual(
+            dockets.count(), 1, msg="Docket number doesn't match."
+        )
+
+        with override_settings(
+            IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
+        ), patch("cl.lib.decorators.time.sleep") as mock_sleep, patch(
+            "cl.corpus_importer.tasks.query_iquery_page", return_value=({}, "")
+        ) as mock_query_iquery_page:
+            call_command(
+                "probe_iquery_pages_daemon",
+                testing_iterations=1,
+            )
+
+        # 3 additional dockets should exist the sweep is completed.
+        self.assertEqual(
+            dockets.count(), 4, msg="Docket number doesn't match."
+        )
+        highest_known_pacer_case_id = r.hget(
+            "iquery:highest_known_pacer_case_id", self.court_mowd.pk
+        )
+        pacer_case_id_current = r.hget(
+            "iquery:pacer_case_id_current", self.court_mowd.pk
+        )
+        self.assertEqual(int(highest_known_pacer_case_id), 3020)
+        self.assertEqual(int(pacer_case_id_current), 3019)
+
+        # Test switching to exploration mode when reaching the latest known PACER case ID.
+        test_dispatch_uid = (
+            "test_fixed_handle_update_latest_case_id_and_schedule_iquery_sweep"
+        )
+        post_save.connect(
+            handle_update_latest_case_id_and_schedule_iquery_sweep,
+            sender=Docket,
+            dispatch_uid=test_dispatch_uid,
+        )
+        try:
+            with override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
+            ), patch(
+                "cl.lib.decorators.time.sleep"
+            ) as mock_sleep, self.captureOnCommitCallbacks(
+                execute=True
+            ):
+                call_command(
+                    "probe_iquery_pages_daemon",
+                    testing_iterations=1,
+                )
+
+            # 1 additional dockets should be added during the exploration mode.
+            self.assertEqual(
+                dockets.count(), 5, msg="Docket number doesn't match."
+            )
+            highest_known_pacer_case_id = r.hget(
+                "iquery:highest_known_pacer_case_id", self.court_mowd.pk
+            )
+            pacer_case_id_current = r.hget(
+                "iquery:pacer_case_id_current", self.court_mowd.pk
+            )
+            self.assertEqual(int(highest_known_pacer_case_id), 3022)
+            self.assertEqual(int(pacer_case_id_current), 3021)
+        finally:
+            # Ensure the signal is disconnected after the test
+            post_save.disconnect(
+                handle_update_latest_case_id_and_schedule_iquery_sweep,
+                sender=Docket,
+                dispatch_uid=test_dispatch_uid,
+            )
 
 
 class WestCitationImportTest(TestCase):
@@ -3197,3 +3443,299 @@ class CaseNamesTest(SimpleTestCase):
                 overlap,
                 msg=f"Case names don't match: {wl_casename} - {cl_casename}",
             )
+
+
+class AWSManifestTest(TestCase):
+
+    def setUp(self) -> None:
+        self.r = get_redis_interface("CACHE")
+
+    @patch(
+        "cl.corpus_importer.management.commands.make_aws_manifest_files.compute_monthly_export"
+    )
+    def test_skips_export_if_previous_timestamp_doesnt_exists(
+        self, mock_compute_monthly_export
+    ):
+        """Verifies the command skips monthly export if no previous timestamp is found."""
+        # Ensure no previous timestamp exists in redis
+        export_key = f"bulk_import:{SEARCH_TYPES.OPINION}"
+        self.r.delete(export_key)
+
+        call_command(
+            "make_aws_manifest_files",
+            record_type=SEARCH_TYPES.OPINION,
+            bucket_name="test-bucket",
+            monthly_export=True,
+        )
+        # Assert that compute_monthly_export was NOT called,
+        # indicating the timestamp check prevented execution.
+        mock_compute_monthly_export.assert_not_called()
+
+    @patch(
+        "cl.corpus_importer.management.commands.make_aws_manifest_files.compute_monthly_export"
+    )
+    def test_command_stores_current_timestamp_after_delta_export(
+        self, mock_compute_monthly_export
+    ):
+        """Verifies the command stores the current timestamp after an export."""
+        timestamp_two_weeks_ago = datetime.now() - timedelta(weeks=2)
+        export_key = f"bulk_import:{SEARCH_TYPES.ORAL_ARGUMENT}"
+        self.r.set(export_key, str(timestamp_two_weeks_ago), 60 * 60)
+
+        timestamp_now = timezone.now()
+        with time_machine.travel(timestamp_now, tick=False):
+            call_command(
+                "make_aws_manifest_files",
+                record_type=SEARCH_TYPES.ORAL_ARGUMENT,
+                bucket_name="test-bucket",
+                monthly_export=True,
+            )
+        # Assert that compute_monthly_export was called
+        mock_compute_monthly_export.assert_called_once()
+
+        # Assert that the timestamp retrieved from Redis is the expected current
+        # timestamp
+        timestamp_from_cache = self.r.get(export_key)
+        self.assertEqual(str(timestamp_now), timestamp_from_cache)
+
+    @patch(
+        "cl.corpus_importer.management.commands.make_aws_manifest_files.export_records_in_batches"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.make_aws_manifest_files.compute_monthly_export"
+    )
+    def test_command_stores_current_timestamp_after_full_export(
+        self, mock_compute_monthly_export, mock_compute_full_export
+    ):
+        """Verifies the command stores the current timestamp after a full export."""
+        timestamp_two_weeks_ago = datetime.now() - timedelta(weeks=2)
+        export_key = f"bulk_import:{SEARCH_TYPES.ORAL_ARGUMENT}"
+        self.r.set(export_key, str(timestamp_two_weeks_ago), 60 * 60)
+
+        timestamp_now = timezone.now()
+        with time_machine.travel(timestamp_now, tick=False):
+            call_command(
+                "make_aws_manifest_files",
+                record_type=SEARCH_TYPES.ORAL_ARGUMENT,
+                bucket_name="test-bucket",
+                all_records=True,
+            )
+        # Assert that compute_monthly_export was not called
+        mock_compute_monthly_export.assert_not_called()
+
+        mock_compute_full_export.assert_called_once()
+
+        # Assert that the timestamp retrieved from Redis is the expected current
+        # timestamp
+        timestamp_from_cache = self.r.get(export_key)
+        self.assertEqual(str(timestamp_now), timestamp_from_cache)
+
+    def test_can_get_recent_records_from_nested_models(self):
+        """Verifies get_monthly_record_ids_by_type returns records updated
+        directly or through related models."""
+        last_export_timestamp = datetime.now() - timedelta(weeks=1)
+        school = SchoolFactory(name="New York Law School")
+        # Create older Person records with associated nested objects
+        with time_machine.travel(
+            last_export_timestamp - timedelta(weeks=1), tick=False
+        ):
+            person_1 = PersonFactory.create(gender="m")
+            ABARatingFactory(person=person_1, year_rated=2005)
+            EducationFactory(person=person_1, school=school)
+            PositionFactory(person=person_1)
+            PositionFactory(person=person_1)
+
+            person_2 = PersonFactory.create()
+            rating_person_2 = ABARatingFactory(
+                person=person_2, rating="q", year_rated=2005
+            )
+            EducationFactory(person=person_2, school=school)
+            PositionFactory(person=person_2)
+
+            person_3 = PersonFactory.create(gender="m")
+            ABARatingFactory(person=person_3, year_rated=2005)
+            EducationFactory(person=person_3, school=school)
+            PositionFactory(person=person_3)
+
+            person_4 = PersonFactory.create(gender="m")
+            ABARatingFactory(person=person_4, year_rated=2005)
+            EducationFactory(person=person_4, school=school)
+            PositionFactory(person=person_4)
+
+            person_5 = PersonFactory.create()
+            ABARatingFactory(person=person_5, year_rated=2005)
+            EducationFactory(person=person_5, school=school)
+            position_person_5 = PositionFactory(person=person_5)
+
+            person_6 = PersonFactory()
+            PositionFactory(person=person_6)
+
+            person_7 = PersonFactory()
+            ABARatingFactory(person=person_7, year_rated=2004)
+            PositionFactory(person=person_7)
+
+            # Create more older person records
+            PersonFactory.create_batch(3)
+
+        school_2 = SchoolFactory(name="American University")
+        # Update existing Person records or their related nested objects
+        with time_machine.travel(
+            last_export_timestamp + timedelta(days=2), tick=False
+        ):
+            person_1.name_first = "New name"
+            person_1.save()
+
+            rating_person_2.rating = "wq"
+            rating_person_2.save()
+
+            ABARatingFactory(person=person_3, year_rated=2020)
+            EducationFactory(person=person_4, school=school_2)
+
+            position_person_5.position_type = Position.JUSTICE
+            position_person_5.save()
+
+            PoliticalAffiliationFactory(person=person_6)
+
+            person_8 = PersonFactory()
+            PositionFactory(person=person_8)
+
+            # Create new Person records
+            PersonFactory.create_batch(10)
+
+        records = get_monthly_record_ids_by_type(
+            SEARCH_TYPES.PEOPLE, last_export_timestamp
+        )
+
+        # Check the total number of returned records
+        # Should include the 6 updated/affected old records and 1 newly created
+        # record
+        self.assertEqual(len(records), 7)
+
+        record_ids = [x[0] for x in records]
+        # Assert that the updated/affected old records are included
+        # Person_1's name was updated
+        self.assertIn(person_1.id, record_ids)
+        # A related ABARating was updated
+        self.assertIn(person_2.id, record_ids)
+        # A new related ABARating was created
+        self.assertIn(person_3.id, record_ids)
+        # A new related Education was created
+        self.assertIn(person_4.id, record_ids)
+        # A related Position was updated
+        self.assertIn(person_5.id, record_ids)
+        # A new related PoliticalAffiliation was created
+        self.assertIn(person_6.id, record_ids)
+        # A new record with a Judge position
+        self.assertIn(person_8.id, record_ids)
+        # Assert that the old record that was not updated is NOT included
+        self.assertNotIn(person_7.id, record_ids)
+
+    def test_get_monthly_harvard_non_ocr_opinions(self):
+        """Verifies retrieval of Harvard Law, non-OCR opinion IDs"""
+        last_export_timestamp = datetime.now() - timedelta(weeks=1)
+        # Create opinions with different sources and OCR status before the
+        # timestamp
+        with time_machine.travel(
+            last_export_timestamp - timedelta(weeks=1), tick=False
+        ):
+            opinion_1 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                ),
+                extracted_by_ocr=False,
+            )
+            opinion_2 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                ),
+                extracted_by_ocr=False,
+            )
+            opinion_3 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.COURT_WEBSITE, docket=DocketFactory()
+                ),
+                extracted_by_ocr=True,
+            )
+
+        # Create and update opinions after the timestamp
+        with time_machine.travel(
+            last_export_timestamp + timedelta(days=2), tick=False
+        ):
+            opinion_1.author_str = "Author updated"
+            opinion_1.save()
+            opinion_3.author_str = "Author updated"
+            opinion_3.save()
+            opinion_4 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.COLUMBIA_ARCHIVE, docket=DocketFactory()
+                ),
+                extracted_by_ocr=True,
+            )
+            opinion_5 = OpinionWithParentsFactory(
+                cluster=OpinionClusterFactory(
+                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                ),
+                extracted_by_ocr=False,
+            )
+
+        records = get_monthly_record_ids_by_type(
+            SEARCH_TYPES.OPINION, last_export_timestamp
+        )
+        # Check the total number of returned records
+        print(records)
+        self.assertEqual(len(records), 2)
+
+        record_ids = [x[0] for x in records]
+        # Updated after timestamp, Harvard, not OCR
+        self.assertIn(opinion_1.id, record_ids)
+        # Created after timestamp, Harvard, not OCR
+        self.assertIn(opinion_5.id, record_ids)
+        # Created before timestamp, not updated
+        self.assertNotIn(opinion_2.id, record_ids)
+        # Created after timestamp, but OCR'd and not Harvard
+        self.assertNotIn(opinion_4.id, record_ids)
+        # Updated after timestamp, but OCR'd and Not Harvard
+        self.assertNotIn(opinion_4.id, record_ids)
+
+    def test_can_get_recent_records_from_flat_models(self):
+        """Verifies get_monthly_record_ids_by_type returns records created or
+        updated after a timestamp for flat models."""
+        last_export_timestamp = datetime.now() - timedelta(weeks=1)
+
+        # Create some old audio records
+        with time_machine.travel(
+            last_export_timestamp - timedelta(weeks=1), tick=False
+        ):
+            old_audio_1 = AudioFactory()
+            old_audio_2 = AudioFactory()
+            old_audio_3 = AudioFactory()
+            for _ in range(4):
+                AudioFactory()
+
+        # Update two of the older records and create new ones after the
+        # timestamp
+        with time_machine.travel(
+            last_export_timestamp + timedelta(days=2), tick=False
+        ):
+            old_audio_1.case_name = "Oral argument updated 1"
+            old_audio_1.save()
+
+            old_audio_2.case_name = "Oral argument updated 2"
+            old_audio_2.save()
+            for _ in range(8):
+                AudioFactory()
+
+        records = get_monthly_record_ids_by_type(
+            SEARCH_TYPES.ORAL_ARGUMENT, last_export_timestamp
+        )
+        # Check the total number of returned records
+        # Should include the 2 updated old records and the 8 newly created
+        # records
+        self.assertEqual(len(records), 10)
+
+        record_ids = [x[0] for x in records]
+        # Verify that the updated records are included
+        self.assertIn(old_audio_1.id, record_ids)
+        self.assertIn(old_audio_2.id, record_ids)
+        # Verify that the old record that was not updated is NOT included
+        self.assertNotIn(old_audio_3.id, record_ids)
