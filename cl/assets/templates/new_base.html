@@ -95,6 +95,8 @@
   </footer>
   {% endblock %}
 
+  {% render_required_scripts %}
+
   {% if DEBUG %}
   <script type="text/javascript"
           src="{% static "js/jquery/jquery-3.4.1.js" %}"></script>
@@ -124,9 +126,6 @@
 
   {# Allows your own scripts in the footer. #}
   {% block footer-scripts %}{% endblock %}
-
-  {# Include component scripts at the end of the <body>. #}
-  {% render_required_scripts %}
 
   {# Record stats for non-superusers 1/10 times to save money #}
   {% if not user.is_superuser  %}
