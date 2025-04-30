@@ -190,18 +190,36 @@ def filter_out_non_case_law_and_non_valid_citations(
     ]
 
 
-def get_markup_kwargs(opinion) -> dict:
+def make_get_citations_kwargs(document) -> dict:
     """Prepare markup kwargs for `get_citations`
 
-    This is done outside `get_citations` because the specific opinion
+    This is done outside `get_citations` because it uses specific Opinion
     attributes used are set in Courtlistener, not in eyecite.
 
-    This is a convenience function to save a few lines
+    :param document: The Opinion or RECAPDocument whose text should be parsed
 
-    :param opinion: the opinion that has been processed by
-        `get_and_clean_opinion_text`
     :return: a dictionary with kwargs for `get_citations`
     """
-    if opinion.source_is_html:
-        return {"markup_text": opinion.source_text}
-    return {}
+    kwargs = {}
+    # We prefer CAP data (xml_harvard) first.
+    for attr in [
+        "xml_harvard",
+        "html_anon_2020",
+        "html_columbia",
+        "html_lawbox",
+        "html",
+    ]:
+        text = getattr(document, attr, None)
+        if text:
+            kwargs = {
+                "markup_text": text,
+                "clean_steps": ["xml", "html", "all_whitespace"],
+            }
+            break
+    else:
+        kwargs = {
+            "plain_text": getattr(document, "plain_text"),
+            "clean_steps": ["all_whitespace"],
+        }
+
+    return kwargs

@@ -33,6 +33,10 @@ def check_prayer_availability(sender, instance: Prayer, **kwargs):
         prayer_unavailable(rd, user.pk)
         return
 
+    # stopping the check early to prevent us from repeatedly crawling PACER to confirm an available document still remains available
+    if rd.is_sealed == False:
+        return
+
     try:
         document_availability = PrayerAvailability.objects.get(
             recap_document=rd

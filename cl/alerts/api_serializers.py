@@ -4,6 +4,7 @@ from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
 from cl.alerts.models import Alert, DocketAlert, validate_alert_type
+from cl.alerts.utils import is_match_all_query
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.search.models import SEARCH_TYPES
 
@@ -29,6 +30,14 @@ class SearchAlertSerializer(
         provided."""
         if "query" not in attrs:
             return attrs
+
+        match_all_query = is_match_all_query(attrs.get("query", ""))
+        if match_all_query:
+            raise serializers.ValidationError(
+                {
+                    "query": "You can't create a match-all alert. Please try narrowing your query."
+                }
+            )
 
         qd = QueryDict(attrs.get("query").encode(), mutable=True)
         alert_type = qd.get("type")

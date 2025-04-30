@@ -5,13 +5,13 @@ from eyecite import get_citations
 from eyecite.models import CitationBase
 from eyecite.tokenizers import HyperscanTokenizer
 
-from cl.citations.annotate_citations import get_and_clean_opinion_text
 from cl.citations.match_citations import (
     MULTIPLE_MATCHES_RESOURCE,
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
 from cl.citations.types import MatchedResourceType, SupportedCitationType
+from cl.citations.utils import make_get_citations_kwargs
 from cl.search.models import OpinionsCitedByRECAPDocument, RECAPDocument
 from cl.search.tasks import index_related_cites_fields
 
@@ -26,14 +26,9 @@ def store_recap_citations(document: RECAPDocument) -> None:
 
     :return: None
     """
-
-    get_and_clean_opinion_text(
-        document
-    )  # even though this function assumes the input is an opinion, it will work for RECAP documents.
-
     # Extract the citations from the document's text
     citations: List[CitationBase] = get_citations(
-        document.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+        tokenizer=HYPERSCAN_TOKENIZER, **make_get_citations_kwargs(document)
     )
 
     # If no citations are found, then there is nothing else to do for now.

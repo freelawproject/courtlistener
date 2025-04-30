@@ -1,17 +1,15 @@
 from dataclasses import dataclass
 from datetime import timedelta
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models import (
-    Avg,
     Case,
     Count,
-    ExpressionWrapper,
     F,
-    FloatField,
     Q,
     QuerySet,
     Subquery,
@@ -19,7 +17,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Cast, Extract, Least, Now, Sqrt
+from django.db.models.functions import Least
 from django.template import loader
 from django.utils import timezone
 
@@ -30,6 +28,13 @@ from cl.search.models import RECAPDocument
 
 async def prayer_eligible(user: User) -> tuple[bool, int]:
     allowed_prayer_count = settings.ALLOWED_PRAYER_COUNT
+
+    @sync_to_async
+    def is_FLP_member():
+        return user.profile.is_member
+
+    if await is_FLP_member():
+        allowed_prayer_count *= 3
 
     now = timezone.now()
     last_24_hours = now - timedelta(hours=24)
@@ -119,7 +124,8 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
     waiting_prayers = Prayer.objects.filter(status=Prayer.WAITING).values(
         "recap_document_id"
     )
-    # Annotate each RECAPDocument with the number of prayers and the average prayer age
+
+    # Annotate each RECAPDocument with the number of prayers and the number of docket views, plus whether it is currently unavailable
     documents = (
         RECAPDocument.objects.filter(id__in=Subquery(waiting_prayers))
         .select_related(
@@ -127,6 +133,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
             "docket_entry__docket",
             "docket_entry__docket__court",
         )
+        .prefetch_related("prayeravailability")
         .only(
             "pk",
             "document_type",
@@ -147,14 +154,23 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
             "docket_entry__docket__court__jurisdiction",
             "docket_entry__docket__court__citation_string",
             "docket_entry__docket__court_id",
+            "prayeravailability__id",
+            "prayeravailability__last_checked",
         )
         .annotate(
             prayer_count=Count(
                 "prayers", filter=Q(prayers__status=Prayer.WAITING)
             ),
             view_count=F("docket_entry__docket__view_count"),
+            doc_unavailable=Case(
+                When(prayeravailability__id__isnull=False, then=Value(True)),
+                default=Value(False),
+            ),
+            last_checked=F("prayeravailability__last_checked__date"),
         )
-        .order_by("-prayer_count", "-view_count")
+        .order_by(
+            "doc_unavailable", "last_checked", "-prayer_count", "-view_count"
+        )
     )
 
     return documents
@@ -296,8 +312,9 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 @dataclass
 class PrayerStats:
     prayer_count: int
-    distinct_count: int
     total_cost: str
+    distinct_count: int | None = None
+    distinct_users: int | None = None
 
 
 async def get_user_prayer_history(user: User) -> PrayerStats:
@@ -318,9 +335,9 @@ async def get_user_prayer_history(user: User) -> PrayerStats:
 
     data = {
         "prayer_count": count,
-        "distinct_count": "",
         "total_cost": f"{total_cost:,.2f}",
     }
+
     one_minute = 60
     await cache.aset(cache_key, data, one_minute)
 
@@ -347,6 +364,8 @@ async def get_lifetime_prayer_stats(
         await prayer_by_status.values("recap_document").distinct().acount()
     )
 
+    distinct_users = await prayer_by_status.values("user").distinct().acount()
+
     total_cost = await compute_prayer_total_cost(
         prayer_by_status.select_related("recap_document")
     )
@@ -354,8 +373,10 @@ async def get_lifetime_prayer_stats(
     data = {
         "prayer_count": prayer_count,
         "distinct_count": distinct_prayers,
+        "distinct_users": distinct_users,
         "total_cost": f"{total_cost:,.2f}",
     }
+
     one_minute = 60
     await cache.aset(cache_key, data, one_minute)
 

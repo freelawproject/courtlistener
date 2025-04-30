@@ -138,6 +138,10 @@ class FakeConfirmationPage:
     def data(self, *args, **kwargs):
         return {}
 
+    @property
+    def response(self, *args, **kwargs):
+        pass
+
 
 class FakeAvailableConfirmationPage(FakeConfirmationPage):
 
@@ -230,6 +234,16 @@ test_patterns = {
         16: False,
         32: False,
         64: False,
+    },
+    "mowd": {
+        3000: False,
+        3008: False,
+        3015: True,
+        3017: True,
+        3019: True,
+        3020: False,
+        3021: True,
+        3022: True,
     },
 }
 
