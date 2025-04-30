@@ -527,6 +527,65 @@ def get_monthly_record_ids_by_type(
             return list(set(record_ids))
 
 
+def upload_list_of_records_for_users(
+    record_type: str, bucket_name: str, record_ids: list[tuple[int]]
+):
+    """
+    Uploads a CSV file containing record IDs and corresponding S3 keys.
+
+    This CSV file serves as a manifest for users to easily retrieve the new or
+    updated records. Each row in the CSV provides the original record ID and
+    the S3 key where the corresponding record data can be downloaded.
+
+    Args:
+        record_type: The type of records being uploaded. This determines the
+            prefix used in the S3 key.
+        bucket_name: The name of the S3 bucket where the CSV file will be
+            uploaded.
+        record_ids: A list of tuples, where each tuple contains a single integer
+            representing the ID of a record.
+
+    Raises:
+        NotImplementedError: If the provided `record_type` is not supported.
+    """
+    timestamp = timezone.now()
+    filename = (
+        f"{record_type}_new_or_updated_{timestamp.month}_{timestamp.year}"
+    )
+    match record_type:
+        case SEARCH_TYPES.OPINION:
+            prefix = "ai_case_law_dataset"
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            prefix = "ai_audio_dataset"
+        case SEARCH_TYPES.PEOPLE:
+            prefix = "ai_judges_dataset"
+        case "fd":
+            prefix = "ai_financial_disclosure_dataset/"
+        case _:
+            raise NotImplementedError(
+                f"Record type '{record_type}' is not supported."
+            )
+
+    with io.StringIO() as csvfile:
+        writer = csv.DictWriter(
+            csvfile,
+            fieldnames=["id", "key"],
+            extrasaction="ignore",
+        )
+        for row in record_ids:
+            query_dict = {
+                "id": row[0],
+                "key": f"{prefix}/{record_type}_{row[0]}.json",
+            }
+            writer.writerow(query_dict)
+
+        s3_client.put_object(
+            Key=f"{prefix}/{filename}.csv",
+            Bucket=bucket_name,
+            Body=csvfile.getvalue().encode("utf-8"),
+        )
+
+
 def compute_monthly_export(
     record_type: str, timestamp: datetime, options: dict[str, Any]
 ):
@@ -551,6 +610,9 @@ def compute_monthly_export(
         record_type, timestamp, all_records=options["all_records"]
     )
     upload_manifest(record_ids, filename, options)
+    upload_list_of_records_for_users(
+        record_type, options["bucket_name"], record_ids
+    )
 
 
 class Command(VerboseCommand):
