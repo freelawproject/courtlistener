@@ -630,7 +630,7 @@ def query_and_send_alerts(
                 continue
             alerts_sent.append(alert.pk)
 
-            # Override query n in the 'View Full Results' URL to
+            # Override query in the 'View Full Results' URL to
             # include a filter by timestamp.
             cut_off_date = get_cut_off_date(rate, sent_time, True, custom_date)
             qd = override_alert_query(alert, cut_off_date)
