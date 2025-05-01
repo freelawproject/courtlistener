@@ -48,3 +48,10 @@ NLP_EMBEDDING_MODEL = env(
     "NLP_EMBEDDING_MODEL_NAME",
     default="freelawproject/modernbert-embed-base_finetune_512",
 )
+
+#################
+# SEARCH ALERTS #
+#################
+REAL_TIME_ALERTS_SENDING_RATE = env(
+    "REAL_TIME_ALERTS_SENDING_RATE", default=300
+)

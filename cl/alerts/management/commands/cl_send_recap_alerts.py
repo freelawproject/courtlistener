@@ -17,12 +17,16 @@ from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrList
 from redis import Redis
 
+from cl.alerts.management.commands.cl_send_scheduled_alerts import (
+    get_cut_off_date,
+)
 from cl.alerts.models import Alert, ScheduledAlertHit
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import (
     TaskCompletionStatus,
     add_document_hit_to_alert_set,
     has_document_alert_hit_been_triggered,
+    override_alert_query,
     scheduled_alert_hits_limit_reached,
 )
 from cl.api.models import WebhookEventType
@@ -577,21 +581,25 @@ def send_search_alert_webhooks(
 
 
 def query_and_send_alerts(
-    r: Redis, rate: Literal["rt", "dly"], query_date: datetime.date
+    r: Redis,
+    rate: Literal["rt", "dly"],
+    query_date: datetime.datetime,
+    custom_date: bool = False,
 ) -> None:
     """Query the sweep index and send alerts based on the specified rate
     and date.
 
     :param r: The Redis interface.
     :param rate: The rate at which to query alerts.
-    :param query_date: The daily re_index query date.
+    :param query_date: The daily re_index query datetime.
+    :param custom_date: If true, send alerts on a custom date.
     :return: None.
     """
     alert_users: UserProfile.user = User.objects.filter(
         alerts__rate=rate, alerts__alert_type=SEARCH_TYPES.RECAP
     ).distinct()
     total_alerts_sent_count = 0
-    now_time = datetime.datetime.now()
+    sent_time = datetime.datetime.now() if not custom_date else query_date
     for user in alert_users:
         if rate == Alert.REAL_TIME and not user.profile.is_member:
             continue
@@ -611,11 +619,22 @@ def query_and_send_alerts(
                 continue
             search_type = search_params.get("type", SEARCH_TYPES.RECAP)
             results_to_send = process_alert_hits(
-                r, results, parent_results, child_results, alert.pk, query_date
+                r,
+                results,
+                parent_results,
+                child_results,
+                alert.pk,
+                query_date.date(),
             )
             if not results_to_send:
                 continue
             alerts_sent.append(alert.pk)
+
+            # Override query in the 'View Full Results' URL to
+            # include a filter by timestamp.
+            cut_off_date = get_cut_off_date(rate, sent_time, True, custom_date)
+            qd = override_alert_query(alert, cut_off_date)
+            alert.query_run = qd.urlencode()  # type: ignore
             hits.append(
                 [
                     alert,
@@ -624,9 +643,6 @@ def query_and_send_alerts(
                     len(results_to_send),
                 ]
             )
-            alert.query_run = search_params.urlencode()  # type: ignore
-            alert.date_last_hit = timezone.now()
-            alert.save()
             # Send webhooks
             send_search_alert_webhooks(user, results_to_send, alert.pk)
 
@@ -641,7 +657,9 @@ def query_and_send_alerts(
             )
 
         # Update Alert's date_last_hit in bulk.
-        Alert.objects.filter(id__in=alerts_sent).update(date_last_hit=now_time)
+        Alert.objects.filter(id__in=alerts_sent).update(
+            date_last_hit=sent_time
+        )
 
     # Log and tally the total alerts sent
     async_to_sync(tally_stat)(
@@ -765,6 +783,7 @@ class Command(VerboseCommand):
         testing_mode = options["testing_mode"]
         r = get_redis_interface("CACHE")
         query_date: datetime.datetime | None = options["query_date"]
+        custom_date = True if query_date else False
 
         if query_date is not None:
             # Convert the provided query_date to midnight.
@@ -800,10 +819,9 @@ class Command(VerboseCommand):
             # can be omitted in case of a failure.
             r.set("alert_sweep:rd_re_index_completed", 1, ex=3600 * 12)
 
-        date_to_query = query_date.date()
-        query_and_send_alerts(r, Alert.REAL_TIME, date_to_query)
-        query_and_send_alerts(r, Alert.DAILY, date_to_query)
-        query_and_schedule_alerts(r, Alert.WEEKLY, date_to_query)
-        query_and_schedule_alerts(r, Alert.MONTHLY, date_to_query)
+        query_and_send_alerts(r, Alert.REAL_TIME, query_date, custom_date)
+        query_and_send_alerts(r, Alert.DAILY, query_date, custom_date)
+        query_and_schedule_alerts(r, Alert.WEEKLY, query_date.date())
+        query_and_schedule_alerts(r, Alert.MONTHLY, query_date.date())
         r.delete("alert_sweep:main_re_index_completed")
         r.delete("alert_sweep:rd_re_index_completed")
