@@ -3120,7 +3120,7 @@ class OpinionQuerySet(models.QuerySet):
         )
 
 
-@pghistory.track()
+@pghistory.track(exclude=["html_with_citations"])
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
