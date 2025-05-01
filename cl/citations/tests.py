@@ -45,6 +45,7 @@ from cl.citations.match_citations import (
     do_resolve_citations,
     resolve_fullcase_citation,
 )
+from cl.citations.match_citations_queries import es_search_db_for_full_citation
 from cl.citations.models import UnmatchedCitation
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
@@ -61,6 +62,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionClusterFactoryMultipleOpinions,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionWithChildrenFactory,
     RECAPDocumentFactory,
@@ -660,6 +662,9 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         cls.court_scotus = CourtFactory(id="scotus")
         court_ca1 = CourtFactory(id="ca1")
         cls.court_ca5 = CourtFactory(id="ca5")
+        cls.court_illappct = CourtFactory(id="illappct")
+        cls.court_nj = CourtFactory(id="nj")
+        cls.court_dc = CourtFactory(id="dc")
 
         # Citation 1
         cls.citation1 = CitationWithParentsFactory.create(
@@ -827,6 +832,117 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 ),
             ),
         )
+
+        cls.cluster_1 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_illappct,
+                case_name="People v. Williams",
+            ),
+            case_name="People v. Williams",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+                {"type": "020lead", "ordering_key": 1},
+                {"type": "030concurrence", "ordering_key": 2},
+            ],
+        )
+
+        cls.cluster_2 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_illappct,
+                case_name="People v. Jackson",
+            ),
+            case_name="People v. Jackson",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+                {"type": "020lead", "ordering_key": 1},
+                {"type": "030concurrence", "ordering_key": 2},
+            ],
+        )
+
+        cls.cluster_3 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_nj,
+                case_name="State v. Gatson",
+            ),
+            case_name="State v. Gatson",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+                {"type": "020lead", "ordering_key": 1},
+                {"type": "030concurrence", "ordering_key": 2},
+            ],
+        )
+
+        cls.cluster_4 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_nj,
+                case_name="State v. Gerrard",
+            ),
+            case_name="State v. Gerrard",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+            ],
+        )
+
+        cls.cluster_5 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_dc,
+                case_name="Good v. United States",
+            ),
+            case_name="Good v. United States",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+            ],
+        )
+
+        cls.cluster_6 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_dc,
+                case_name="Duncan v. United States",
+            ),
+            case_name="Duncan v. United States",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+            ],
+        )
+
+        cls.same_citation_1_clusters = [cls.cluster_1, cls.cluster_2]
+
+        cls.same_citation_2_clusters = [cls.cluster_3, cls.cluster_4]
+
+        cls.same_citation_3_clusters = [cls.cluster_5, cls.cluster_6]
+
+        for cluster in cls.same_citation_1_clusters:
+            Citation.objects.create(
+                cluster=cluster,
+                volume=307,
+                reporter="Ill. Dec.",
+                page=312,
+                type=Citation.STATE,
+            )
+
+        for cluster in cls.same_citation_2_clusters:
+            Citation.objects.create(
+                cluster=cluster,
+                volume=203,
+                reporter="N.J.",
+                page=92,
+                type=Citation.STATE,
+            )
+
+        for cluster in cls.same_citation_3_clusters:
+            Citation.objects.create(
+                cluster=cluster,
+                volume=172,
+                reporter="A.3d",
+                page=459,
+                type=Citation.STATE_REGIONAL,
+            )
 
         call_command(
             "cl_index_parent_and_child_docs",
@@ -1301,6 +1417,99 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 describing_opinion=citing, described_opinion=cited
             ).count(),
             1,
+        )
+
+    def test_citation_results_ordering(self) -> None:
+        """Test opinion matching prioritization logic.
+
+        Verifies:
+        1. Documents with ordering_key appear before those without
+        2. When ordering_key exists, documents are sorted by its value (ascending)
+        3. When ordering_key is missing, documents fall back to ID-based sorting
+        4. Cluster deduplication returns at most 2 results (size=2)
+        """
+
+        # Test Case 1: Both results have ordering_key (should sort by ordering_key)
+        full_citation = case_citation(
+            volume="307",
+            reporter="Ill. Dec.",
+            page="312",
+            index=1,
+            reporter_found="Ill. Dec.",
+        )
+
+        results, citation_found = es_search_db_for_full_citation(full_citation)
+
+        # Should return exactly 2 results due to size=2 in fetch_citations
+        self.assertEqual(len(results), 2)
+
+        # Get expected opinions in correct order
+        opinion_cluster1 = Opinion.objects.get(
+            cluster=self.cluster_1, ordering_key=1
+        )
+        opinion_cluster2 = Opinion.objects.get(
+            cluster=self.cluster_2, ordering_key=1
+        )
+
+        expected_ids = [opinion_cluster1.pk, opinion_cluster2.pk]
+
+        self.assertEqual(
+            [r["id"] for r in results],
+            expected_ids,
+            "Should sort by ordering_key when both documents have it",
+        )
+
+        # Test case 2: Mixed case - one result with ordering_key, one without
+        full_citation = case_citation(
+            volume="203",
+            reporter="N.J.",
+            page="92",
+            index=1,
+            reporter_found="N.J.",
+        )
+
+        results, citation_found = es_search_db_for_full_citation(full_citation)
+
+        # Verify documents with ordering_key appear before those without
+        opinion_cluster3 = Opinion.objects.get(
+            cluster=self.cluster_3, ordering_key=1
+        )
+        opinion_cluster4 = Opinion.objects.get(
+            cluster=self.cluster_4, ordering_key=None
+        )
+
+        expected_ids = [opinion_cluster3.pk, opinion_cluster4.pk]
+
+        self.assertEqual(
+            [r["id"] for r in results],
+            expected_ids,
+            "Document with ordering_key should always appear first",
+        )
+
+        # Test Case 3: No ordering_keys exist (should fall back to ID sorting)
+        full_citation = case_citation(
+            volume="172",
+            reporter="A.3d",
+            page="459",
+            index=1,
+            reporter_found="A.3d",
+        )
+
+        results, citation_found = es_search_db_for_full_citation(full_citation)
+
+        opinion_cluster5 = Opinion.objects.get(
+            cluster=self.cluster_5, ordering_key=None
+        )
+        opinion_cluster6 = Opinion.objects.get(
+            cluster=self.cluster_6, ordering_key=None
+        )
+
+        expected_ids = [opinion_cluster5.pk, opinion_cluster6.pk]
+
+        self.assertEqual(
+            [r["id"] for r in results],
+            expected_ids,
+            "Should fall back to ID sorting when no ordering_keys exist",
         )
 
 
