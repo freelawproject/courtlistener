@@ -1427,32 +1427,69 @@ def query_iquery_page(
     bind=True,
     ignore_result=True,
 )
-def probe_iquery_pages(
+def probe_or_scrape_iquery_pages(
     self: Task,
     court_id: str,
+    latest_know_case_id_db: str | None,
     testing: bool = False,
 ) -> None:
     """
     Using the iquery endpoint, to perform forward probing and retrieve the
-    highest watermark we can scrape.
+    highest watermark we can scrape. Or perform a fixed sweep in case the
+    court hasn't caught up yet.
 
     :param self: The celery task
     :param court_id: A CL court ID where we'll look things up.
+    :param latest_know_case_id_db: The latest known pacer case ID from DB if available.
     :param testing: A boolean indicating whether this was called from tests.
     :return: None
     """
+    from cl.corpus_importer.signals import (
+        update_latest_case_id_and_schedule_iquery_sweep,
+    )
 
     r = get_redis_interface("CACHE")
     probe_iteration = 1
     latest_match = 0
+    probe_offset = 0
     highest_known_pacer_case_id = int(
         r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
     )
-    jitter = compute_binary_probe_jitter(testing)
+
+    # latest_known_case_id_db represents the latest known PACER case ID from a
+    # court. If it's greater than the current highest_known_pacer_case_id in
+    # Redis, we can conclude that the court hasn't caught up yet. In this
+    # scenario, instead of performing the regular exploration mode which can be
+    # slow we can switch to a fixed sweep mode. This mode will process
+    # IQUERY_FIXED_SWEEP case IDs per cycle and update the
+    # highest_known_pacer_case_id so the scraper can continue progressing at
+    # a fixed pace each cycle until
+    # highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP is equal to or
+    # greater than latest_known_case_id_db.
+    # Note that including settings.IQUERY_FIXED_SWEEP in the comparison is important
+    # so that the fixed sweep mode runs only up to latest_known_case_id_db.
+    # Otherwise, we might miss a few cases during the transition from fixed sweep
+    # back to regular exploration mode.
+    do_fixed_sweep = (
+        (
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP
+            < int(latest_know_case_id_db)
+        )
+        if latest_know_case_id_db
+        else False
+    )
+    # Avoid random jitter when performing a fixed sweep.
+    jitter = 0 if do_fixed_sweep else compute_binary_probe_jitter(testing)
     reports_data = []
     found_match = False
-    while probe_iteration <= settings.IQUERY_PROBE_ITERATIONS:
-        pacer_case_id_to_lookup = compute_next_binary_probe(
+    pacer_case_id_to_lookup = highest_known_pacer_case_id
+    # In fixed sweep mode, probing is not required, but we perform one iteration
+    # just to verify that the court is not down or that we haven't been blocked.
+    probe_iteration_limit = (
+        1 if do_fixed_sweep else settings.IQUERY_PROBE_MAX_OFFSET
+    )
+    while probe_offset + jitter < probe_iteration_limit:
+        pacer_case_id_to_lookup, probe_offset = compute_next_binary_probe(
             highest_known_pacer_case_id, probe_iteration, jitter
         )
         probe_iteration += 1
@@ -1531,16 +1568,49 @@ def probe_iquery_pages(
             "iquery:test_highest_known_pacer_case_id", court_id, latest_match
         )
 
+    if do_fixed_sweep:
+        # The court hasn't caught up; perform a fixed sweep.
+        logger.info(
+            "Scheduling a fixed sweep for court %s — case IDs from %s to %s.",
+            court_id,
+            highest_known_pacer_case_id,
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
+        )
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None,
+            court_id,
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
+        )
+        delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
+        return None
+
     if not reports_data:
+        logger.info(
+            "No cases were found during this probe for court %s - case IDs from %s to %s.",
+            court_id,
+            str(highest_known_pacer_case_id),
+            str(pacer_case_id_to_lookup),
+        )
         court_empty_probe_attempts = r.incr(
             f"iquery:court_empty_probe_attempts:{court_id}"
         )
-        if court_empty_probe_attempts >= settings.IQUERY_EMPTY_PROBES_LIMIT:
+        # Compute the duration of empty probes in hours based on the number of
+        # court_empty_probe_attempts and the current IQUERY_PROBE_WAIT interval
+        empty_probes_hours = (
+            court_empty_probe_attempts * settings.IQUERY_PROBE_WAIT
+        ) / 3600
+        court_empty_probe_limit_hours = (
+            settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS.get(
+                court_id, settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS["default"]
+            )
+        )
+        if empty_probes_hours >= court_empty_probe_limit_hours:
             logger.error(
-                "The court %s has accumulated %s empty probe attempts. "
-                "Probably the probe got stuck and manual intervention is required.",
+                "Court %s has accumulated many probe attempts over "
+                "approximately %s hours. It appears the probe may be stuck; "
+                "manual intervention may be required.",
                 court_id,
-                settings.IQUERY_EMPTY_PROBES_LIMIT,
+                court_empty_probe_limit_hours,
             )
             # Restart court_blocked_attempts to avoid continue logging the
             # error on next iterations.

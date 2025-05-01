@@ -936,6 +936,45 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket.delete()
             docket_2.delete()
 
+    def test_cause_filter(self) -> None:
+        """Confirm cause filter works properly"""
+        # Confirm parties extracted from case_name are available in filters.
+        with self.captureOnCommitCallbacks(execute=True):
+            d = DocketFactory(
+                court=self.court,
+                docket_number="23-cv-12335",
+                case_name="Lockhart v. Gainwell Technologies LLC",
+                cause="31:3730 Qui Tam False Claims Act",
+                source=Docket.RECAP,
+            )
+            d_2 = DocketFactory(
+                court=self.court,
+                docket_number="22-cv-00526",
+                case_name="Schermerhorn v. Quality Enterprises USA, Inc.",
+                cause="31:3730 Qui Tam False Claims Act",
+                source=Docket.RECAP,
+            )
+
+        cause_str = "31:3730 Qui Tam False Claims Act"
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            # Do it in main query box
+            "q": f'cause:"{cause_str}"',
+        }
+        async_to_sync(self._test_article_count)(
+            params, 2, "faceted_cause_query_string"
+        )
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            # Do it in the cause field as a phrase
+            "cause": f'"{cause_str}"',
+        }
+        async_to_sync(self._test_article_count)(params, 2, "cause_filter")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            d.delete()
+            d_2.delete()
+
     def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
 
@@ -2655,7 +2694,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         for docket in dockets_to_remove:
             docket.delete()
 
-    @mock.patch("cl.search.views.fetch_es_results")
+    @mock.patch("cl.lib.search_utils.fetch_es_results")
     @override_settings(
         RECAP_SEARCH_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
     )
@@ -7335,7 +7374,7 @@ class RECAPIndexingTest(
         # 100 results, 10 pages.
         total_results = 100
         with mock.patch(
-            "cl.search.views.fetch_es_results",
+            "cl.lib.search_utils.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
@@ -7355,7 +7394,7 @@ class RECAPIndexingTest(
         # 101 results, 11 pages.
         total_results = 101
         with mock.patch(
-            "cl.search.views.fetch_es_results",
+            "cl.lib.search_utils.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
@@ -7375,7 +7414,7 @@ class RECAPIndexingTest(
         # 20,000 results, 2,000 pages.
         total_results = 20_000
         with mock.patch(
-            "cl.search.views.fetch_es_results",
+            "cl.lib.search_utils.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,

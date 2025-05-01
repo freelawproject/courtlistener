@@ -1,4 +1,5 @@
 import itertools
+import math
 import random
 import re
 from collections import defaultdict
@@ -1106,31 +1107,45 @@ def compute_binary_probe_jitter(testing: bool) -> int:
     :return: An integer representing the jitter value for binary probes.
     """
 
-    # Probe limit e.g: 9 probe iterations -> 256
-    probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
-    return random.randint(1, round(probe_limit * 0.05)) if not testing else 0
+    # The jitter will be a random value between 1 and half of IQUERY_MAX_PROBE.
+    return (
+        random.randint(1, round(settings.IQUERY_MAX_PROBE * 0.5))
+        if not testing
+        else 0
+    )
 
 
 def compute_next_binary_probe(
     highest_known_pacer_case_id: int, iteration: int, jitter: int
-) -> int:
+) -> tuple[int, int]:
     """Compute the next binary probe target for a given PACER case ID.
 
-    This computes the next value of a geometric binary sequence (2 ** (N - 1))
-    where N is the current probe iteration. In non-testing mode a jitter is
-    added to the next value to ensure probing values are not the same from the
-    previous iteration to increase the possibility of getting a hit.
+    This computes the next probe target using a geometric sequence
+    based on the current iteration (2 ** (iteration - 1)), with the increase
+    capped by the IQUERY_MAX_PROBE setting. Once the geometric value reaches
+    this cap, subsequent increments grow linearly by the cap value.
+    In non-testing mode, and except for the first iteration, a jitter is added
+    to the next value to ensure that probing values are not the same as in the
+    previous iteration, increasing the chances of getting a hit.
 
     :param highest_known_pacer_case_id: The final PACER case ID.
     :param iteration: The current probe iteration number.
     :param jitter: The jitter value to apply.
-    :return: The updated probe_iteration and the PACER case ID to lookup.
+    :return: The updated probe_iteration and the PACER case ID to lookup and
+    the probe offset + jitter computed.
     """
 
-    pacer_case_id_to_lookup = (
-        highest_known_pacer_case_id + (2 ** (iteration - 1)) + jitter
-    )
-    return pacer_case_id_to_lookup
+    # Avoid applying jitter on the first iteration to speed up
+    # the detection of new cases once courts catch up.
+    jitter = 0 if iteration == 1 else jitter
+    max_probe = settings.IQUERY_MAX_PROBE
+    cap_iteration = int(math.log2(max_probe)) + 1
+    if iteration < cap_iteration:
+        offset = 2 ** (iteration - 1)
+    else:
+        offset = ((iteration - cap_iteration) + 1) * max_probe
+    pacer_case_id_to_lookup = highest_known_pacer_case_id + offset + jitter
+    return pacer_case_id_to_lookup, offset + jitter
 
 
 def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:

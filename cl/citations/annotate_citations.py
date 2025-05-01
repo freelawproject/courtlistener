@@ -3,7 +3,7 @@ import re
 from typing import Dict, List
 
 from django.urls import reverse
-from eyecite import annotate_citations, clean_text
+from eyecite import annotate_citations
 from eyecite.models import IdCitation, SupraCitation
 
 from cl.citations.match_citations import (
@@ -13,41 +13,6 @@ from cl.citations.match_citations import (
 from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import trunc
-from cl.search.models import Opinion, RECAPDocument
-
-
-def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
-    """Memoize useful versions of an opinion's text as additional properties
-    on the Opinion object. This should be done before performing citation
-    extraction and annotation on an opinion.
-
-    :param document: The Opinion or RECAPDocument whose text should be parsed
-    """
-
-    # We prefer CAP data (xml_harvard) first.
-    for attr in [
-        "xml_harvard",
-        "html_anon_2020",
-        "html_columbia",
-        "html_lawbox",
-        "html",
-    ]:
-        text = getattr(document, attr, None)
-        if text:
-            document.source_text = text
-            # Remove XML encodings from xml_harvard
-            text = re.sub(r"^<\?xml.*?\?>", "", text, count=1)
-            document.cleaned_text = clean_text(
-                text, ["html", "all_whitespace"]
-            )
-            document.source_is_html = True
-            break
-    else:
-        # Didn't hit the break; use plain text
-        text = getattr(document, "plain_text")
-        document.source_text = text
-        document.cleaned_text = clean_text(text, ["all_whitespace"])
-        document.source_is_html = False
 
 
 def generate_annotations(
@@ -76,10 +41,14 @@ def generate_annotations(
             for c in citations:
                 # Annotate all citations can't be disambiguated to citation
                 # lookup page
-                if not (c.groups and c.groups.get("reporter")):
+                if not c.groups or not c.groups.get("reporter"):
                     continue
 
-                kwargs = make_citation_url_dict(**c.groups)
+                kwargs = make_citation_url_dict(
+                    c.groups["reporter"],
+                    c.groups.get("volume"),
+                    c.groups.get("page"),
+                )
                 citation_url = reverse("citation_redirector", kwargs=kwargs)
                 annotation = [
                     '<span class="citation multiple-matches">'
@@ -118,33 +87,46 @@ def generate_annotations(
 
 
 def create_cited_html(
-    opinion: Opinion,
     citation_resolutions: Dict[
         MatchedResourceType, List[SupportedCitationType]
     ],
+    get_citations_kwargs: dict[str, str],
 ) -> str:
     """Using the opinion itself and a list of citations found within it, make
     the citations into links to the correct citations.
 
-    :param opinion: The opinion to enhance
     :param citation_resolutions: A map of lists of citations in the opinion
+    :param get_citations_kwargs: contains the original citation text,
+        used as a fallback when there were no resolutions
+
     :return The new HTML containing citations
     """
-    if opinion.source_is_html:  # If opinion was originally HTML...
+    if not citation_resolutions:
+        if get_citations_kwargs.get("markup_text"):
+            new_html = get_citations_kwargs["markup_text"]
+        else:
+            plain_text = get_citations_kwargs.get("plain_text") or ""
+            new_html = f'<pre class="inline">{html.escape(plain_text)}</pre>'
+        return new_html
+
+    document = list(citation_resolutions.values())[0][0].document
+
+    if document.markup_text:  # If opinion was originally HTML...
         new_html = annotate_citations(
-            plain_text=opinion.cleaned_text,
+            plain_text=document.plain_text,
             annotations=generate_annotations(citation_resolutions),
-            source_text=opinion.source_text,
+            source_text=document.markup_text,
             unbalanced_tags="skip",  # Don't risk overwriting existing tags
+            offset_updater=document.plain_to_markup,
         )
     else:  # Else, present `source_text` wrapped in <pre> HTML tags...
         new_html = annotate_citations(
-            plain_text=opinion.cleaned_text,
+            plain_text=document.plain_text,
             annotations=[
                 [a[0], f"</pre>{a[1]}", f'{a[2]}<pre class="inline">']
                 for a in generate_annotations(citation_resolutions)
             ],
-            source_text=f'<pre class="inline">{html.escape(opinion.source_text)}</pre>',
+            source_text=f'<pre class="inline">{html.escape(document.source_text)}</pre>',
         )
 
     # Return the newly-annotated text

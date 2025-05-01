@@ -34,6 +34,13 @@
           </div>
           <form action="" method="post">{% csrf_token %}
             {{ alert_form.query }}
+           {% if alert_form.query.errors %}
+              <p class="help-block">
+                {% for error in alert_form.query.errors %}
+                  {{ error|escape }}
+                {% endfor %}
+              </p>
+            {% endif %}
             {{ alert_form.alert_type}}
             {% if alert_form.alert_type.errors %}
               <p class="help-block">

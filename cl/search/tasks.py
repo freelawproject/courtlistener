@@ -1,15 +1,28 @@
+import asyncio
+import csv
+import io
+import json
 import logging
-from datetime import date
+import uuid
+from datetime import date, datetime
 from importlib import import_module
+from pathlib import PurePosixPath
 from random import randint
 from typing import Any, Generator
 
+from botocore import exceptions as botocore_exception
 from celery import Task
 from celery.canvas import chain
 from django.apps import apps
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.files.base import ContentFile
+from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
+from django.http import QueryDict
+from django.template import loader
 from elasticsearch.exceptions import (
     ApiError,
     ConflictError,
@@ -25,6 +38,13 @@ from elasticsearch.helpers import (
     streaming_bulk,
 )
 from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
+from httpx import (
+    HTTPStatusError,
+    NetworkError,
+    ReadError,
+    RemoteProtocolError,
+    TimeoutException,
+)
 
 from cl.alerts.tasks import (
     percolator_response_processing,
@@ -33,11 +53,19 @@ from cl.alerts.tasks import (
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
+from cl.lib.db_tools import log_db_connection_info
 from cl.lib.elasticsearch_utils import build_daterange_query
+from cl.lib.microservice_utils import microservice
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
 )
+from cl.lib.search_utils import (
+    fetch_es_results_for_csv,
+    get_headers_and_transformations_for_search_export,
+)
+from cl.lib.storage import S3IntelligentTieringStorage
+from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
@@ -49,6 +77,7 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
     Docket,
@@ -134,9 +163,11 @@ def get_instance_from_db(
         return model.objects.get(pk=instance_id)
     except ObjectDoesNotExist:
         logger.warning(
-            f"The {model.__name__} with ID {instance_id} doesn't exists and it"
-            "cannot be updated in ES."
+            f"The %s with ID %s doesn't exists and it cannot be updated in ES.",
+            model.__name__,
+            instance_id,
         )
+        log_db_connection_info(model.__name__, instance_id)
         return None
 
 
@@ -349,6 +380,97 @@ def document_fields_to_update(
             field_value = prepare_timestamp(main_instance)
             fields_to_update["timestamp"] = field_value
     return fields_to_update
+
+
+@app.task(
+    bind=True,
+    max_retries=3,
+    ignore_result=True,
+)
+def email_search_results(self: Task, user_id: int, query: str):
+    """Sends an email to the user with their search results as a CSV attachment.
+
+    :param user_id: The ID of the user to send the email to.
+    :param query: The user's search query string.
+    """
+    user = User.objects.get(pk=user_id)
+    # Parse the query string into a dictionary
+    qd = QueryDict(query.encode(), mutable=True)
+
+    # Create a search form instance and validate the query data
+    search_form = SearchForm(qd)
+    if not search_form.is_valid():
+        return
+
+    # Get the cleaned data from the validated form
+    cd = search_form.cleaned_data
+
+    # Fetch search results from Elasticsearch based on query and search type
+    search_results, error = fetch_es_results_for_csv(
+        queryset=qd, search_type=cd["type"]
+    )
+
+    # Retry task if an error occurred and retry limit not reached.
+    if error:
+        if self.request.retries == self.max_retries:
+            return None
+        raise self.retry()
+
+    if not search_results:
+        return
+
+    # Get the headers and basic transformation for the CSV file based on the
+    # search type
+    csv_headers, csv_transformations = (
+        get_headers_and_transformations_for_search_export(cd["type"])
+    )
+    if not csv_headers:
+        return
+
+    # Create the CSV content and store in a StringIO object
+    with io.StringIO() as output:
+        csvwriter = csv.DictWriter(
+            output,
+            fieldnames=csv_headers,
+            extrasaction="ignore",
+            quotechar='"',
+            quoting=csv.QUOTE_ALL,
+        )
+        csvwriter.writeheader()
+        for row in search_results:
+            if csv_transformations:
+                for key, function in csv_transformations.items():
+                    row[key] = function(row[key] if key in row else row)
+
+            clean_dict = {
+                camel_to_snake(key): value for key, value in row.items()
+            }
+            csvwriter.writerow(clean_dict)
+
+        csv_content: str = output.getvalue()
+
+    # Prepare email content
+    txt_template = loader.get_template("search_results_email.txt")
+    email_context = {
+        "username": user.username,
+        "query_link": f"https://www.courtlistener.com/?{query}",
+    }
+
+    # Create email object
+    message = EmailMessage(
+        subject="Your Search Results are Ready!",
+        body=txt_template.render(email_context),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+
+    # Generate a filename for the CSV attachment with timestamp
+    now = datetime.now()
+    filename = f'search_results_{now.strftime("%Y%m%d_%H%M%S")}.csv'
+
+    # Send email with attachments
+    message.attach(filename, csv_content, "text/csv")
+    message.send(fail_silently=False)
 
 
 @app.task(
@@ -1578,3 +1700,175 @@ def remove_documents_by_query(
         es_document._index.refresh()
 
     return response
+
+
+def inception_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the inception batch microservice.
+
+    param batch: A list of dictionaries, where each dictionary represents an
+    opinion document with the following keys:
+    "id": The Opinion ID.
+    "text": The content of the opinion.
+    :return: A list of dictionaries, each containing the embeddings for the
+    corresponding opinion document as returned  by the inception microservice.
+    """
+
+    data = json.dumps(batch)
+    response = asyncio.run(
+        microservice(
+            service="inception-batch",
+            method="POST",
+            data=data,
+        )
+    )
+    return response.json()
+
+
+def embeddings_cache_key():
+    return "embeddings:"
+
+
+def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
+    return f"{embeddings_cache_key()}{batch_uuid}-{batch_range}"
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+        ReadError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
+def create_opinion_text_embeddings(
+    self, batch: list[int], database
+) -> str | None:
+    """Get embeddings for Opinion texts from inception.
+
+    :param self: The Celery task.
+    :param batch: A list of Opinion IDs representing the batch to process.
+    :param database: The database to be used during processing.
+    :return: The cache key used to temporarily store embeddings.
+    """
+    opinions = (
+        Opinion.objects.filter(id__in=batch).with_best_text().using(database)
+    )
+    opinions_to_vectorize = [
+        {"id": opinion.pk, "text": opinion.clean_text} for opinion in opinions
+    ]
+    if not opinions_to_vectorize:
+        self.request.chain = None
+        return None
+
+    batch_range = f"{batch[0]}_{batch[-1]}"
+    batch_request = {"documents": opinions_to_vectorize}
+    embeddings = inception_batch_request(batch_request)
+    # Use a UUID to guarantee the uniqueness of this batch of stored embeddings
+    batch_uuid = str(uuid.uuid4().hex)
+    cache_key = get_embeddings_cache_key(batch_uuid, batch_range)
+    cache.set(cache_key, embeddings, 60 * 30)
+    return cache_key
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
+def save_embeddings(
+    self,
+    cache_key: str,
+    directory: str = "opinions",
+) -> None:
+    """Save embeddings to S3.
+
+    The embeddings list is the response from a batch request to the
+    inception microservice, which has the following structure:
+
+    [
+        {
+            'id': 1,
+            'embeddings': [
+                {
+                    'chunk_number': 1,
+                    'chunk': 'search_document: First test document',
+                    'embedding': [-0.01209942298567295...]
+                },
+                {
+                    'chunk_number': 2,
+                    'chunk': 'search_document: First test document',
+                    'embedding': [-1.01200886298552476...]
+                },
+            ]
+        },
+        {
+            'id': 2,
+            'embeddings': [
+                {
+                    'chunk_number': 1,
+                    'chunk': 'search_document: Second test document',
+                    'embedding': [0.07617326825857162...]
+                },
+            ]
+        },
+    ]
+
+    Each object uploaded to S3 is a JSON file containing one of the items
+    in the previous list.
+
+    For example, if uploading a batch of opinion embeddings, each file will
+    be stored embeddings/opinions/freelawproject/modernbert-embed-base_finetune_512/{opinion_id}.json
+
+    :param self: The Celery task.
+    :param cache_key: The cache key used to temporarily store the embeddings.
+    :param directory: The directory where the embeddings will be stored.
+    :return: None.
+    """
+
+    embeddings = cache.get(cache_key, None)
+    if embeddings is None:
+        batch_range = cache_key.rsplit("-", 1)[-1]
+        logger.error(
+            "Embeddings for the opinion range %s are missing from Redis",
+            batch_range,
+        )
+        return None
+
+    if not isinstance(embeddings, list):
+        if isinstance(embeddings, dict):
+            logger.error(
+                "Received API error response in embeddings: %s",
+                json.dumps(embeddings, default=str),
+            )
+        else:
+            logger.error(
+                "Unexpected data type for embeddings: %s (%s)",
+                str(embeddings)[:200],
+                type(embeddings),
+            )
+        return None
+
+    storage = S3IntelligentTieringStorage()
+    for embedding_record in embeddings:
+        record_id = embedding_record["id"]
+        file_contents = json.dumps(embedding_record)
+        file_path = str(
+            PurePosixPath(
+                "embeddings",
+                directory,
+                settings.NLP_EMBEDDING_MODEL,
+                f"{record_id}.json",
+            )
+        )
+        storage.save(file_path, ContentFile(file_contents))
+
+    # Delete the cache key after the saving process is complete.
+    cache.delete(cache_key)

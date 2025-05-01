@@ -7,6 +7,7 @@ from django.forms import ChoiceField, DateField
 from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
 
+from cl.lib.courts import get_active_court_from_cache
 from cl.lib.model_helpers import flatten_choices
 from cl.people_db.models import PoliticalAffiliation, Position
 from cl.search.fields import (
@@ -469,7 +470,7 @@ class SearchForm(forms.Form):
         status_index = 0
 
         if not self.courts:
-            self.courts = Court.objects.filter(in_use=True)
+            self.courts = get_active_court_from_cache()
         for court in self.courts:
             self.fields[f"court_{court.pk}"] = forms.BooleanField(
                 label=court.short_name,

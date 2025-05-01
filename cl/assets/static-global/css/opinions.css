@@ -388,7 +388,6 @@ div.footnote:first-of-type {
     background-color: #e7e7e7;
     border-top-right-radius: 5px 5px; /* Rounds the corners */
     border-top-left-radius: 5px 5px; /* Rounds the corners */
-    margin-left: 4px;
   }
 
   #caption-square > ul > li.active {
@@ -453,29 +452,6 @@ div.footnote:first-of-type {
     font-style: italic;
   }
 
-  .opinion-button-row {
-    padding-top: 40px;
-  }
-
-  #download-original {
-    color: black;
-    border-color: black;
-    background-color: white;
-  }
-
-
-  #btn-group-download-original {
-    float:right;
-    margin-top: 0px;
-    margin-left:10px;
-    padding-right: 10px;
-  }
-  #add-note-button {
-    color: black;
-    border-color: black;
-    background-color: white;
-  }
-
   .top-row {
     height: 32px;
     line-height:28px
@@ -485,19 +461,6 @@ div.footnote:first-of-type {
     display: flex;
     column-gap: 5px;
   }
-
-  #get-citation-btn-group {
-    float:right;
-  }
-
-  #get-citation-btn-group > a {
-
-    color: black;
-    border-color: black;
-    background-color: white;
-    vertical-align: top;
-  }
-
 
   p > span.star-pagination::after {
     display: inline;
@@ -670,7 +633,11 @@ div.footnote:first-of-type {
   }
 
   .meta-data-header {
-      font-size:15px;
+      font-size:14px;
+  }
+
+  .meta-data-value {
+      font-size:14px;
   }
 
   .case-details {
@@ -698,6 +665,23 @@ div.footnote:first-of-type {
     }
   }
 
+/* Stack tabs starting at 991px resolution */
+@media (max-width: 991px) {
+    .nav-tabs.nav-justified {
+      width: 100%;
+      border-bottom: 0;
+    }
+    .nav-tabs.nav-justified > li {
+      float: none;
+      display: block;
+      width: 100%;
+    }
+    .nav-tabs.nav-justified > li > a {
+      text-align: center;
+      margin-bottom: 5px;
+    }
+}
+
   .scraped-html p {
     display: block;
     text-indent: 1em;
@@ -706,4 +690,8 @@ div.footnote:first-of-type {
 
 html {
     scroll-behavior: smooth;
+}
+
+#all-summaries {
+    margin-top: 20px;
 }

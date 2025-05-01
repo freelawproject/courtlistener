@@ -7,6 +7,7 @@
 {% load humanize %}
 
 {% block nav-prayer-pending %}active{% endblock %}
+
 {% block prayer_list %}
   <div class="col-xs-12" id="prayer_list_waiting" hx-swap-oob="true">
     <div class="table-responsive">
@@ -32,8 +33,12 @@
                 </a>
               </td>
               <td>
-                <a href="{% url "view_recap_document" docket.pk rd.docket_entry.entry_number docket.slug %}">
-                  {{ rd.document_number }}
+                <a href="{{ rd.get_absolute_url }}" rel="nofollow">
+                  {% if rd.attachment_number %}
+                    {{ rd.document_number }}-{{ rd.attachment_number }}
+                  {% else %}
+                    {{ rd.document_number }}
+                  {% endif %}
                 </a>
               </td>
               {% endwith %}

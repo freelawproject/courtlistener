@@ -126,6 +126,35 @@ class FakeFreeOpinionReport:
         ]
 
 
+class FakeConfirmationPage:
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def query(self, *args, **kwargs):
+        pass
+
+    @property
+    def data(self, *args, **kwargs):
+        return {}
+
+    @property
+    def response(self, *args, **kwargs):
+        pass
+
+
+class FakeAvailableConfirmationPage(FakeConfirmationPage):
+
+    @property
+    def data(self, *args, **kwargs):
+        return {
+            "docket_number": "2:25-cv-10997-MFL-CI",
+            "cost": "2.00",
+            "billable_pages": "20",
+            "document_description": "Image1-0",
+        }
+
+
 test_patterns = {
     "canb": {
         1: True,
@@ -165,9 +194,18 @@ test_patterns = {
         24: True,
         40: True,
         72: True,
+        104: True,
         136: True,
+        168: True,
+        200: True,
+        232: True,
         264: True,
-        520: True,
+        296: True,
+        328: True,
+        360: True,
+        392: True,
+        424: True,
+        456: True,
     },
     "txed": {
         9: True,
@@ -187,6 +225,25 @@ test_patterns = {
         16: False,
         32: False,
         64: False,
+    },
+    "vib": {
+        1: False,
+        2: False,
+        4: False,
+        8: False,
+        16: False,
+        32: False,
+        64: False,
+    },
+    "mowd": {
+        3000: False,
+        3008: False,
+        3015: True,
+        3017: True,
+        3019: True,
+        3020: False,
+        3021: True,
+        3022: True,
     },
 }
 

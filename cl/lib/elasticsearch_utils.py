@@ -31,6 +31,7 @@ from elasticsearch_dsl.utils import AttrDict, AttrList
 
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
+from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.date_time import midnight_pt
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
@@ -48,7 +49,6 @@ from cl.lib.utils import (
     check_unbalanced_quotes,
     cleanup_main_query,
     get_array_of_selected_fields,
-    lookup_child_courts,
     map_to_docket_entry_sorting,
     perform_special_character_replacements,
 )
@@ -103,6 +103,40 @@ def elasticsearch_enabled(func: Callable) -> Callable:
             func(*args, **kwargs)
 
     return wrapper_func
+
+
+class CSVSerializableDocumentMixin:
+
+    @classmethod
+    def get_csv_headers(cls) -> list[str]:
+        """
+        Returns a list of strings representing the headers for a CSV file.
+
+        This method defines the column headers for a CSV representation of the
+        data associated with this class.
+
+        :return: A list of strings, where each string is a column header.
+        """
+        raise NotImplementedError(
+            "Subclass must implement get_csv_headers method"
+        )
+
+    @classmethod
+    def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        """
+        Generates a dictionary of transformation functions for CSV export.
+
+        This method defines how specific fields in a data structure should be
+        transformed before being written to a CSV file. It covers
+        transformations for various fields, including those from list of fields
+        with highlights, file paths, URLs, and renamed fields.
+
+        :return: A dictionary where keys are field names and values are lambda
+        functions that define the transformations.
+        """
+        raise NotImplementedError(
+            "Subclass must implement get_csv_transformations method"
+        )
 
 
 def build_numeric_range_query(
@@ -499,6 +533,7 @@ def build_text_filter(field: str, value: str) -> List:
                 query=value,
                 fields=[field],
                 default_operator="AND",
+                quote_field_suffix=".exact",
             )
         ]
     return []
@@ -738,7 +773,7 @@ def extend_selected_courts_with_child_courts(
     """
 
     unique_courts = set(selected_courts)
-    unique_courts.update(lookup_child_courts(list(unique_courts)))
+    unique_courts.update(lookup_child_courts_cache(list(unique_courts)))
     return list(unique_courts)
 
 
@@ -3022,46 +3057,6 @@ def make_es_stats_variable(
     return facet_fields
 
 
-# TODO: Remove after scheduled OA alerts have been processed.
-def fetch_all_search_results(
-    fetch_method: Callable, initial_response: Response, *args
-) -> list[Hit]:
-    """Fetches all search results based on a given search method and an
-    initial response. It retrieves all the search results that exceed the
-    initial batch size by iteratively calling the provided fetch method with
-    the necessary pagination parameters.
-
-    :param fetch_method: A callable that executes the search query.
-    :param initial_response: The initial ES Response object.
-    :param args: Additional arguments to pass to the fetch method.
-
-    :return: A list of `Hit` objects representing all search results.
-    """
-
-    all_search_hits = []
-    all_search_hits.extend(initial_response.hits)
-    total_hits = initial_response.hits.total.value
-    results_returned = len(initial_response.hits.hits)
-    if total_hits > settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE:
-        documents_retrieved = results_returned
-        search_after = initial_response.hits[-1].meta.sort
-        while True:
-            response = fetch_method(*args, search_after=search_after)
-            if not response:
-                break
-
-            all_search_hits.extend(response.hits)
-            results_returned = len(response.hits.hits)
-            documents_retrieved += results_returned
-            # Check if all results have been retrieved. If so break the loop
-            # Otherwise, increase search_after.
-            if documents_retrieved >= total_hits or results_returned == 0:
-                break
-            else:
-                search_after = response.hits[-1].meta.sort
-    return all_search_hits
-
-
 def do_es_api_query(
     search_query: Search,
     cd: CleanData,
@@ -3350,7 +3345,12 @@ def do_es_sweep_alert_query(
         parent_search = parent_search.source(includes=["docket_id"])
         multi_search = multi_search.add(parent_search)
 
-    if child_query:
+    query_with_parties = cd.get("party_name") or cd.get("atty_name")
+    # Avoid performing a child query on the ESRECAPSweepDocument index if the query
+    # contains party-related fields, as they're not compatible with this index.
+    # This query doesn't need to filter out child hits, since a RECAPDocument matched
+    # by a query containing party fields is inherently a cross-object alert.
+    if child_query and not query_with_parties:
         child_search = child_search_query.query(child_query)
         # Ensure accurate tracking of total hit count for up to 10,001 query results
         child_search = child_search.extra(
@@ -3366,7 +3366,7 @@ def do_es_sweep_alert_query(
     docket_results = None
     if parent_query:
         docket_results = responses[1]
-    if child_query:
+    if child_query and not query_with_parties:
         rd_results = responses[2]
 
     # Re-run parent query to fetch potentially missed docket IDs due to large
@@ -3376,7 +3376,7 @@ def do_es_sweep_alert_query(
         and docket_results.hits.total.value
         >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
-    if should_repeat_parent_query:
+    if should_repeat_parent_query and parent_query:
         docket_ids = [int(d.docket_id) for d in main_results]
         # Adds extra filter to refine results.
         parent_query.filter.append(Q("terms", docket_id=docket_ids))
@@ -3397,7 +3397,7 @@ def do_es_sweep_alert_query(
         and rd_results.hits.total.value
         >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
-    if should_repeat_child_query:
+    if should_repeat_child_query and child_query and not query_with_parties:
         rd_ids = [
             int(rd["_source"]["id"])
             for docket in main_results
