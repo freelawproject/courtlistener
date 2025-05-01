@@ -328,12 +328,15 @@ class OpinionClusterFactoryMultipleOpinions(
 ):
     """Make an OpinionCluster with Docket parent and multiple opinions"""
 
+    class Meta:
+        skip_postgeneration_save = True
+
     sub_opinions = RelatedFactoryVariableList(
         factory=OpinionWithChildrenFactory,
         factory_related_name="cluster",
         size=3,  # by default create 3 opinions
     )
-    precedential_status = ("Published", "Precedential")
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
 
 
 class OpinionsCitedWithParentsFactory(DjangoModelFactory):
