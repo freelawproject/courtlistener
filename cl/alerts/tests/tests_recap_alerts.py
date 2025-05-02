@@ -7,6 +7,7 @@ from django.core import mail
 from django.core.management import call_command
 from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils.dateformat import format
 from django.utils.timezone import now
 from elasticsearch_dsl import Q, connections
 
@@ -2646,6 +2647,7 @@ class RECAPAlertsPercolatorTest(
     def test_percolate_document_on_ingestion(self, mock_prefix) -> None:
         """Confirm a Docket or RECAPDocument is percolated upon ingestion."""
 
+        docket_indexing_time = self.mock_date - datetime.timedelta(seconds=15)
         with self.captureOnCommitCallbacks(execute=True):
             docket_only_alert = AlertFactory(
                 user=self.user_profile.user,
@@ -2659,9 +2661,14 @@ class RECAPAlertsPercolatorTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+        ), time_machine.travel(
+            docket_indexing_time, tick=False
+        ), self.captureOnCommitCallbacks(
+            execute=True
+        ):
             docket = DocketFactory(
                 court=self.court,
+                date_filed=datetime.date(2024, 8, 19),
                 case_name="SUBPOENAS SERVED CASE",
                 docket_number="1:21-bk-1234",
                 source=Docket.RECAP,
@@ -2673,6 +2680,8 @@ class RECAPAlertsPercolatorTest(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
         html_content = self.get_html_content_from_email(mail.outbox[0])
+        txt_content = mail.outbox[0].body
+
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 1)
         # The docket-only alert doesn't contain any nested child hits.
@@ -2682,6 +2691,14 @@ class RECAPAlertsPercolatorTest(
             1,
             docket.case_name,
             0,
+        )
+
+        # Confirm that the Docket timestamp "Date Updated" is rendered in the alert
+        self.assertIn(
+            format(docket_indexing_time, "F jS, Y h:i a T"), html_content
+        )
+        self.assertIn(
+            format(docket_indexing_time, "F jS, Y h:i a T"), txt_content
         )
 
         with self.captureOnCommitCallbacks(execute=True):

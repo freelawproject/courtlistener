@@ -340,16 +340,23 @@ def format_date(date_str: str) -> str:
 
 
 @register.filter
-def parse_utc_date(date_str: str) -> datetime:
-    """Parse an ISO-8601 UTC datetime string and return a timezone-aware
-    datetime in UTC.
+def parse_utc_date(datetime_object: str | datetime) -> datetime:
+    """Parse an ISO-8601 UTC datetime string or a naive datetime UTC object
+    and return a timezone-aware datetime in UTC.
 
-    :param date_str: A string representing a UTC datetime in ISO 8601 format.
+    :param datetime_object: A string representing a UTC datetime in ISO 8601
+    format or a naive UTC datetime object.
     :return: A timezone-aware datetime object with UTC as the timezone.
     """
-    dt = parse_datetime(date_str)
-    aware_local_dt = make_aware(dt, timezone=timezone.utc)
-    return aware_local_dt
+
+    return make_aware(
+        (
+            parse_datetime(datetime_object)
+            if isinstance(datetime_object, str)
+            else datetime_object
+        ),
+        timezone.utc,
+    )
 
 
 @register.filter

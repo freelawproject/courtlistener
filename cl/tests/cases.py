@@ -770,9 +770,11 @@ class SearchAlertsAssertions:
         """Confirm that date_updated is properly set in the alert email."""
 
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, "F jS, Y")}", html_content
+            f"Date Updated: {format(date_to_compare, "F jS, Y h:i a T")}",
+            html_content,
         )
 
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, "F jS, Y")}", txt_content
+            f"Date Updated: {format(date_to_compare, "F jS, Y h:i a T")}",
+            txt_content,
         )
