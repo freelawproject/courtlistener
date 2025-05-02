@@ -568,6 +568,16 @@ class RECAPAlertsSweepIndexTest(
             self.mock_date_indexing, html_content, txt_email
         )
 
+        # Confirm docket entries are sorted by order_by=desc in the docket URL
+        self.assertIn(
+            f"https://www.courtlistener.com{alert_de.docket.get_absolute_url()}?order_by=desc",
+            html_content,
+        )
+        self.assertIn(
+            f"https://www.courtlistener.com{alert_de.docket.get_absolute_url()}?order_by=desc",
+            txt_email,
+        )
+
         # Trigger the same alert again to confirm that no new alert is
         # triggered because previous hits have already triggered the same alert
         with mock.patch(
