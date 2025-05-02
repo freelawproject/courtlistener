@@ -436,11 +436,6 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             docket=DocketFactory(court=cls.court, docket_number="123456"),
-            sub_opinions=RelatedFactory(
-                OpinionWithChildrenFactory,
-                factory_related_name="cluster",
-                plain_text="Random plain_text",
-            ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
@@ -454,16 +449,11 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             docket=DocketFactory(
                 court=cls.child_court_1, docket_number="34-2535"
             ),
-            sub_opinions=RelatedFactory(
-                OpinionWithChildrenFactory,
-                factory_related_name="cluster",
-                plain_text="Lorem 247",
-            ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                plain_text="Strickland Motion",
+                plain_text="Strickland Motion 247",
             ),
         )
         OpinionClusterFactoryWithChildrenAndParents(
@@ -893,7 +883,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
-    async def test_avoid_splitting_terms_on_special_chars(self) -> None:
+    async def test_avoid_splitting_terms_on_special_chars(
+        self, court_cache_key_mock
+    ) -> None:
         """Can we avoid splitting words in queries such as §247 and phrases
         like "§247"?
         """
@@ -945,7 +937,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             actual, 1, msg="Didn't get the right number of results"
         )
         self.assertIn("34-2535", r.content.decode())
-        
+
     def test_query_cleanup_function(self, court_cache_key_mock) -> None:
         # Send string of search_query to the function and expect it
         # to be encoded properly
@@ -1065,6 +1057,10 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 'docketNumber:"docket number 2"',
                 'docketNumber:"docket number 2"',
             ),
+            ("§242", "§242"),
+            ("$242", "$242"),
+            ("%242", "%242"),
+            ("¶242", "¶242"),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
