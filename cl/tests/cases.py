@@ -10,6 +10,7 @@ from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
 from django.urls import reverse
+from django.utils.dateformat import format
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
@@ -764,3 +765,16 @@ class SearchAlertsAssertions:
             else cut_off_date.strftime("%Y-%m-%d")
         )
         self.assertIn(f"timestamp:[{iso_datetime} TO *]", params["q"][0])
+
+    def _assert_date_updated(self, date_to_compare, html_content, txt_content):
+        """Confirm that date_updated is properly set in the alert email."""
+
+        self.assertIn(
+            f"Date Updated: {format(date_to_compare, "F jS, Y h:i a T")}",
+            html_content,
+        )
+
+        self.assertIn(
+            f"Date Updated: {format(date_to_compare, "F jS, Y h:i a T")}",
+            txt_content,
+        )

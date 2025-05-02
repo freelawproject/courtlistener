@@ -1,6 +1,7 @@
 {% load extras %}
 {% load text_filters %}
 {% load humanize %}
+{% load tz %}
 
 <!DOCTYPE html>
 <html style="font-size: 100.01%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
@@ -51,12 +52,16 @@
                     {% else %}
                       Unknown Date
                     {% endif %}
+                    <br>
+                    <strong style="font-weight: bold; font-size: 1.1em;">Date Updated: </strong>
+                    <span style="font-size: 1.1em;">{{ result.timestamp|parse_utc_date|localtime|date:"F jS, Y h:i a T" }}</span>
                     <ul style="padding-left: 0;">
                       {% for doc in result.child_docs %}
                         {% with doc=doc|get_es_doc_content:scheduled_alert %}
                           <li>
                             <a href="https://www.courtlistener.com{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}#minute-entry-{{ doc.docket_entry_id }}{% endif %}" style="font-weight: bold; font-size: 1.2em;" class="visitable">{% if doc.short_description %}{{ doc.short_description|render_string_or_list|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{% if doc.document_number %}{{ doc.document_number }}{% endif %}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
                             </a>
+                            <span style="display: block; margin-top: 5px; font-size: 1.1em;">Date Updated: {{ doc.timestamp|parse_utc_date|localtime|date:"F jS, Y h:i a T" }}</span>
                             {% if doc.description %}
                                 <span style="display: block; margin-top: 5px; font-size: 1.1em;">Description: {{ doc.description|render_string_or_list|safe }}</span>
                             {% endif %}
