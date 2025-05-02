@@ -117,7 +117,7 @@ class RECAPAlertsSweepIndexTest(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test RT RECAP Alert",
-            query='q="401 Civil"&type=r',
+            query="docket_number=1:21-bk-1234&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
         dly_recap_alert = AlertFactory(
@@ -142,6 +142,7 @@ class RECAPAlertsSweepIndexTest(
             ),
         ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
+            alerts_runtime_naive = datetime.datetime.now()
 
         # Only the RECAP RT alert for a member and the RECAP DLY alert are sent.
         self.assertEqual(
@@ -150,7 +151,38 @@ class RECAPAlertsSweepIndexTest(
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(rt_recap_alert.name, html_content)
 
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content,
+            Alert.REAL_TIME,
+            alerts_runtime_naive,
+            sweep_index=True,
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        rt_recap_alert.refresh_from_db()
+        self.assertEqual(
+            rt_recap_alert.date_last_hit,
+            self.mock_date,
+            msg="Alert date of last hit didn't match.",
+        )
+
         html_content = self.get_html_content_from_email(mail.outbox[1])
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.DAILY, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        dly_recap_alert.refresh_from_db()
+        self.assertEqual(
+            dly_recap_alert.date_last_hit,
+            self.mock_date,
+            msg="Alert date of last hit didn't match.",
+        )
+
         self.assertIn(dly_recap_alert.name, html_content)
 
     def test_index_daily_recap_documents(self, mock_prefix) -> None:
@@ -1653,13 +1685,33 @@ class RECAPAlertsSweepIndexTest(
         )
         self.assertEqual(len(webhook_events), 3)
 
-        # Send scheduled Weekly alerts and check assertions.
-        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+        week_ago = self.mock_date + datetime.timedelta(days=7)
+        with time_machine.travel(week_ago, tick=False):
+            # Send scheduled Weekly alerts and check assertions.
+            call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+            alerts_runtime_naive = datetime.datetime.now()
+
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
+
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
+
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.WEEKLY, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        docket_only_alert.refresh_from_db()
+        self.assertEqual(
+            docket_only_alert.date_last_hit,
+            week_ago,
+            msg="Alert date of last hit didn't match.",
+        )
+
         self._count_alert_hits_and_child_hits(
             html_content,
             docket_only_alert.name,
@@ -1686,14 +1738,31 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(cross_object_alert_with_hl.name, txt_email)
         self.assertIn(self.rd.description, txt_email)
 
-        # Send  scheduled Monthly alerts and check assertions.
-        current_date = now().replace(day=28, hour=0)
+        # Send scheduled Monthly alerts and check assertions.
+        current_date = now().replace(day=1, hour=8)
         with time_machine.travel(current_date, tick=False):
             call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
+            alerts_runtime_naive = datetime.datetime.now()
+
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
         html_content = self.get_html_content_from_email(mail.outbox[1])
+
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.MONTHLY, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        recap_only_alert.refresh_from_db()
+        self.assertEqual(
+            recap_only_alert.date_last_hit,
+            current_date,
+            msg="Alert date of last hit didn't match.",
+        )
+
         self._count_alert_hits_and_child_hits(
             html_content,
             recap_only_alert.name,
@@ -2954,7 +3023,7 @@ class RECAPAlertsPercolatorTest(
     def test_group_percolator_alerts(self, mock_prefix) -> None:
         """Test group Percolator RECAP Alerts in an email and hits."""
 
-        with mock.patch(
+        with time_machine.travel(self.mock_date, tick=False), mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
@@ -3088,7 +3157,12 @@ class RECAPAlertsPercolatorTest(
             None,
         )
 
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        rt_mock_date_sent = self.mock_date + datetime.timedelta(
+            seconds=settings.REAL_TIME_ALERTS_SENDING_RATE
+        )
+        with time_machine.travel(rt_mock_date_sent, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+            alerts_runtime_naive = datetime.datetime.now()
 
         # Only one email should be triggered because email alerts for
         # non-members are omitted.
@@ -3098,6 +3172,21 @@ class RECAPAlertsPercolatorTest(
 
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
+
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.REAL_TIME, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        docket_only_alert.refresh_from_db()
+        self.assertEqual(
+            docket_only_alert.date_last_hit,
+            rt_mock_date_sent,
+            msg="Alert date of last hit didn't match.",
+        )
+
         txt_email = mail.outbox[0].body
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 3)

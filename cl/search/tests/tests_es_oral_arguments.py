@@ -11,10 +11,9 @@ from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import connections
 from lxml import html
-from waffle.testutils import override_flag
 
 from cl.alerts.models import Alert
-from cl.alerts.utils import percolate_es_document
+from cl.alerts.utils import add_cutoff_timestamp_filter, percolate_es_document
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import (
@@ -1296,6 +1295,65 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         # Remove factories to prevent affecting other tests.
         docket.delete()
+
+    def test_timestamp_filtering(self) -> None:
+        """Confirm the timestamp fielded filter works properly"""
+
+        mock_date = now().replace(
+            day=29, hour=0, minute=0, second=0, microsecond=0
+        )
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            with mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ), self.captureOnCommitCallbacks(execute=True):
+                audio = AudioFactory.create(
+                    case_name="Lorem Ipsum Natural Gas",
+                    docket_id=self.docket_2.pk,
+                    duration=420,
+                    local_path_original_file="test/audio/ander_v._leo.mp3",
+                    local_path_mp3=self.filepath_local,
+                    sha1="a49ada009774496ac01fb49818837e2296705c97",
+                    stt_status=Audio.STT_COMPLETE,
+                )
+
+        params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(params["q"], mock_date)
+        # Audio with mock_date as timestamp should be found.
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertEqual(
+            self.get_article_count(r),
+            1,
+            msg="Did not get expected number of results when filtering by timestamp.",
+        )
+
+        params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date + datetime.timedelta(seconds=1)
+        )
+        # Querying for a timestamp one second greater than mock_date shouldn't return any results.
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertEqual(
+            self.get_article_count(r),
+            0,
+            msg="Did not get expected number of results when filtering by timestamp.",
+        )
+
+        audio.delete()
 
     def test_oa_jurisdiction_filtering(self) -> None:
         """Filter by court"""

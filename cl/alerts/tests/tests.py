@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest import mock
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import urlencode
 
 import pytz
 import time_machine
@@ -17,7 +17,6 @@ from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
-from lxml import html
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -1517,7 +1516,7 @@ class SearchAlertsWebhooksTest(
 class SearchAlertsUtilsTest(SimpleTestCase):
 
     def test_get_cut_off_dates(self):
-        """Confirm get_cut_off_date and get_cut_off_end_date return the right
+        """Confirm get_cut_off_start_date and get_cut_off_end_date return the right
         values according to the input date.
         """
 
@@ -1724,6 +1723,115 @@ class SearchAlertsUtilsTest(SimpleTestCase):
 
                     self.assertEqual(date_start, expected_date_start)
                     self.assertEqual(date_end, expected_date_end)
+
+    @override_settings(REAL_TIME_ALERTS_SENDING_RATE=60)
+    def test_cut_off_date_for_scheduled_alerts(self):
+        """Confirm get_cut_off_date return the right
+        values according to the input date.
+        """
+        test_cases = {
+            Alert.DAILY: [
+                {
+                    "input_dt": datetime(2025, 5, 1, 12, 0, 0),
+                    "expected": date(2025, 4, 30),
+                    "custom_date": False,
+                },
+                {
+                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
+                    "expected": date(2025, 2, 28),
+                    "custom_date": False,
+                },
+                {
+                    "input_dt": datetime(2025, 5, 1, 12, 0, 0),
+                    "expected": date(2025, 5, 1),
+                    "custom_date": True,
+                },
+                {
+                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
+                    "expected": date(2025, 3, 1),
+                    "custom_date": True,
+                },
+            ],
+            Alert.WEEKLY: [
+                {
+                    "input_dt": datetime(2025, 5, 8, 9, 30, 0),
+                    "expected": date(2025, 5, 1),
+                },
+                {
+                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
+                    "expected": date(2025, 2, 22),
+                },
+            ],
+            Alert.MONTHLY: [
+                {
+                    "input_dt": datetime(2025, 5, 1, 0, 0, 0),
+                    "expected": date(2025, 4, 1),
+                },
+                {
+                    "input_dt": datetime(2025, 1, 1, 0, 0, 0),
+                    "expected": date(2024, 12, 1),
+                },
+            ],
+            Alert.REAL_TIME: [
+                # Consider multiple test cases for timezone differences
+                # and daylight saving time.
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": datetime(
+                        2025, 5, 2, 12, 1, 0, tzinfo=pytz.UTC
+                    ),
+                },
+                {
+                    "input_dt": datetime(2025, 3, 2, 5, 2, 1),
+                    "expected": datetime(
+                        2025, 3, 2, 13, 1, 0, tzinfo=pytz.UTC
+                    ),
+                },
+                {
+                    "input_dt": datetime(2025, 5, 1, 0, 0, 0),
+                    "expected": datetime(
+                        2025, 5, 1, 6, 58, 59, tzinfo=pytz.UTC
+                    ),
+                },
+                {
+                    "input_dt": datetime(2025, 4, 30, 18, 0, 0),
+                    "expected": datetime(
+                        2025, 5, 1, 0, 58, 59, tzinfo=pytz.UTC
+                    ),
+                },
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": date(2025, 5, 1),
+                    "sweep_index": True,
+                    "custom_date": False,
+                },
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": date(2025, 5, 2),
+                    "sweep_index": True,
+                    "custom_date": True,
+                },
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": datetime(
+                        2025, 5, 2, 12, 1, 0, tzinfo=pytz.UTC
+                    ),
+                    "sweep_index": False,
+                    "custom_date": True,
+                },
+            ],
+        }
+        for rate, cases in test_cases.items():
+            for case in cases:
+                with self.subTest(rate=rate, case=case):
+                    dt = case["input_dt"]
+                    custom_date = case.get("custom_date", False)
+                    sweep_index = case.get("sweep_index", False)
+                    result = get_cut_off_date(
+                        rate, dt, sweep_index, custom_date
+                    )
+                    expected = case["expected"]
+                    self.assertEqual(result, expected)
 
     def test_is_match_all_query(self):
         """Confirm is_match_all_query correctly detects match-all
@@ -2670,13 +2778,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     def test_send_oa_search_alert_webhooks(self, mock_abort_audio):
         """Can we send RT OA search alerts?"""
 
+        mock_date = now().replace(day=1, hour=5)
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(day=1, hour=5)
             with time_machine.travel(
                 mock_date, tick=False
             ), self.captureOnCommitCallbacks(execute=True):
@@ -2696,6 +2804,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         # Send RT alerts
         with time_machine.travel(mock_date, tick=False):
             call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+            alerts_runtime_naive = datetime.now()
         # Confirm Alert date_last_hit is updated.
         self.search_alert.refresh_from_db()
         self.search_alert_2.refresh_from_db()
@@ -2751,12 +2860,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertIn("<strong>19-5735</strong>", html_content)
         self.assertIn("<strong>RT Test OA</strong>", html_content)
 
-        # Confirm that order_by is overridden in the 'View Full Results' URL by
-        # dateArgued+desc.
-        view_results_url = html.fromstring(str(html_content)).xpath(
-            '//a[text()="View Full Results / Edit this Alert"]/@href'
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.REAL_TIME, alerts_runtime_naive
         )
-        self.assertIn("order_by=dateArgued+desc", view_results_url[0])
 
         # The right alert type template is used.
         self.assertIn("oral argument", html_content)
@@ -3004,28 +3112,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 html_content = content
                 break
 
-        # Confirm that order_by is overridden in the 'View Full Results'
-        # URL by dateArgued+desc.
-        view_results_url = html.fromstring(str(html_content)).xpath(
-            '//a[text()="View Full Results / Edit this Alert"]/@href'
-        )
-
-        parsed_url = urlparse(view_results_url[0])
-        params = parse_qs(parsed_url.query)
-        self.assertEqual("dateArgued desc", params["order_by"][0])
-
         if previous_date:
             self.assertEqual(search_alert.date_last_hit, previous_date)
         else:
             self.assertEqual(search_alert.date_last_hit, mock_date)
-
-            # Confirm that argued_after is properly set in the
+            # Confirm that timestamp filter is properly set in the
             # 'View Full Results' URL.
-            cut_off_date = get_cut_off_date(rate, mock_date.date())
-            date_in_query = datetime.strptime(
-                params["argued_after"][0], "%m/%d/%Y"
-            ).date()
-            self.assertEqual(cut_off_date, date_in_query)
+            self._assert_timestamp_filter(html_content, rate, mock_date)
 
         # Confirm stored alerts instances status is set to SENT.
         scheduled_hits = ScheduledAlertHit.objects.filter(alert__rate=rate)
