@@ -33,7 +33,7 @@ Disable this Alert (one click): https://www.courtlistener.com{% url "disable_ale
 {% endwith %}{% endfor %}
 {% if result.child_docs and result.child_remaining %}{% extract_q_value alert.query_run as q_value %}View Additional Results for this Case: https://www.courtlistener.com/?type={{ type|urlencode }}&q={% if q_value %}({{ q_value|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}{% endif %}
 {% endif %}~~~~~
- - View this item on our site: https://www.courtlistener.com{% if type == 'r' %}{{result.docket_absolute_url}}{% else %}{{result.absolute_url}}{% endif %}
+ - View this item on our site: https://www.courtlistener.com{% if type == 'r' %}{{result.docket_absolute_url}}?order_by=desc{% else %}{{result.absolute_url}}{% endif %}
 {% if type == 'oa' %}{% if result.download_url %} - Download original from the court: {{result.download_url}}
 {% endif %}{% if result.local_path %} - Download the original from our backup: https://storage.courtlistener.com/{{ result.local_path }}{% endif %}{% endif %}{% endfor %}
 {% endfor %}
