@@ -1,7 +1,8 @@
 import copy
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Set
+from urllib.parse import parse_qs
 
 from django.apps import apps
 from django.conf import settings
@@ -9,7 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from elasticsearch_dsl import MultiSearch, Q, Search
 from elasticsearch_dsl.query import Query
-from elasticsearch_dsl.response import Hit, Response
+from elasticsearch_dsl.response import Hit
 from redis import Redis
 
 from cl.alerts.models import (
@@ -28,6 +29,7 @@ from cl.lib.elasticsearch_utils import (
     build_join_es_filters,
     merge_highlights_into_result,
 )
+from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
 from cl.search.constants import (
     ALERTS_HL_TAG,
@@ -49,7 +51,10 @@ from cl.search.types import (
     ESDictDocument,
     ESModelClassType,
     PercolatorResponses,
+    SearchAlertHitType,
 )
+
+COMMON_QUERY_PARAMS = {"type", "order_by"}
 
 
 @dataclass
@@ -115,45 +120,6 @@ def create_percolator_search_query(
     if search_after:
         s = s.extra(search_after=search_after)
     return s
-
-
-# TODO: Remove after scheduled OA alerts have been processed.
-def percolate_document(
-    document_id: str,
-    document_index: str,
-    search_after: int = 0,
-) -> Response:
-    """Percolate a document against a defined Elasticsearch Percolator query.
-
-    :param document_id: The document ID in ES index to be percolated.
-    :param document_index: The ES document index where the document lives.
-    :param search_after: The ES search_after param for deep pagination.
-    :return: The response from the Elasticsearch query.
-    """
-
-    s = Search(index=AudioPercolator._index._name)
-    percolate_query = Q(
-        "percolate",
-        field="percolator_query",
-        index=document_index,
-        id=document_id,
-    )
-    exclude_rate_off = Q("term", rate=Alert.OFF)
-    final_query = Q(
-        "bool",
-        must=[percolate_query],
-        must_not=[exclude_rate_off],
-    )
-    s = s.query(final_query)
-    s = add_es_highlighting(
-        s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
-    )
-    s = s.source(excludes=["percolator_query"])
-    s = s.sort("date_created")
-    s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
-    if search_after:
-        s = s.extra(search_after=search_after)
-    return s.execute()
 
 
 def percolate_es_document(
@@ -366,6 +332,27 @@ def fetch_all_search_alerts_results(
     return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
 
+def add_cutoff_timestamp_filter(
+    query: str, cut_off_date: date | datetime | None
+) -> str:
+    """Append a timestamp range filter to an existing Elasticsearch query.
+
+    :param query: The original query string.
+    :param cut_off_date: The lower bound datetime for the timestamp filter.
+    :return: The query string with the appended timestamp range filter.
+    """
+    if not cut_off_date:
+        return query
+
+    iso_datetime = (
+        cut_off_date.strftime("%Y-%m-%dT%H:%M:%S")
+        if isinstance(cut_off_date, datetime)
+        else cut_off_date.strftime("%Y-%m-%d")
+    )
+    base_filter = f"timestamp:[{iso_datetime} TO *]"
+    return f"({query}) AND {base_filter}" if query else base_filter
+
+
 def override_alert_query(
     alert: Alert, cut_off_date: date | None = None
 ) -> QueryDict:
@@ -378,40 +365,8 @@ def override_alert_query(
     """
 
     qd = QueryDict(alert.query.encode(), mutable=True)
-    if alert.alert_type == SEARCH_TYPES.ORAL_ARGUMENT:
-        qd["order_by"] = "dateArgued desc"
-        if cut_off_date:
-            qd["argued_after"] = cut_off_date.strftime("%m/%d/%Y")
-    else:
-        qd["order_by"] = "dateFiled desc"
-        if cut_off_date:
-            qd["filed_after"] = cut_off_date.strftime("%m/%d/%Y")
-
+    qd["q"] = add_cutoff_timestamp_filter(qd.get("q", ""), cut_off_date)
     return qd
-
-
-# TODO: Remove after scheduled OA alerts have been processed.
-def alert_hits_limit_reached(alert_pk: int, user_pk: int) -> bool:
-    """Check if the alert hits limit has been reached for a specific alert-user
-     combination.
-
-    :param alert_pk: The alert_id.
-    :param user_pk: The user_id.
-    :return: True if the limit has been reached, otherwise False.
-    """
-
-    stored_hits = ScheduledAlertHit.objects.filter(
-        alert_id=alert_pk,
-        user_id=user_pk,
-        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-    )
-    hits_count = stored_hits.count()
-    if hits_count >= settings.SCHEDULED_ALERT_HITS_LIMIT:
-        logger.info(
-            f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} hits stored for this alert."
-        )
-        return True
-    return False
 
 
 def scheduled_alert_hits_limit_reached(
@@ -553,7 +508,9 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
 
             match parent_filters, string_query:
                 case [], []:
-                    pass
+                    NotImplementedError(
+                        "Indexing match-all queries is not supported."
+                    )
                 case [], _:
                     plain_query = Q(
                         "bool",
@@ -726,3 +683,41 @@ def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
             )
 
     return percolator_index, es_document_index, documents_to_percolate
+
+
+def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:
+    """Build the email subject line for search alert emails.
+
+    "X Alert(s) have hits: alert_name_1, alert_name_2 ..."
+
+    :param hits: A list of search alert hits, where each hit contains the
+    alert details.
+    :return: A string representing the email subject line.
+    """
+
+    alert_count = len(hits)
+    alert_names_str = ", ".join(alert_hit[0].name for alert_hit in hits)
+    if alert_count > 1:
+        alert_subject = f"{alert_count} Alerts have hits: {alert_names_str}"
+    else:
+        alert_subject = f"{alert_count} Alert has hits: {alert_names_str}"
+    # Truncate the subject to a maximum length of 935 characters, which is
+    # Gmail's allowed subject size for display and also below RFC2822  line limit specs
+    return trunc(alert_subject, 935, ellipsis="...")
+
+
+def is_match_all_query(qs: str) -> bool:
+    """Determine whether a given query string is a match-all query.
+
+    :param qs: The raw query string to evaluate.
+    :return: True if the query string has no parameters other than those in
+    COMMON_QUERY_PARAMS or if all remaining values are empty; False otherwise.
+    """
+
+    parsed = parse_qs(qs, keep_blank_values=True)
+    # Drop common query params
+    for key in COMMON_QUERY_PARAMS:
+        parsed.pop(key, None)
+
+    # If any remaining value is not empty, it is not a match-all query.
+    return not any(val.strip() for vals in parsed.values() for val in vals)

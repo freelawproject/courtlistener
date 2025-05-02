@@ -45,7 +45,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.users.factories import UserProfileWithParentsFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 def midnight_pt_test(d: datetime.date) -> datetime.datetime:
@@ -190,6 +190,7 @@ opinion_document_v3_v4_common_fields = {
     "snippet": lambda x: (
         x["snippet"] if x.get("snippet") else x["result"].plain_text or ""
     ),
+    "ordering_key": lambda x: x["result"].ordering_key,
 }
 
 opinion_cluster_v3_fields = opinion_cluster_v3_v4_common_fields.copy()
@@ -774,6 +775,56 @@ audio_v4_fields.update(
         "meta": [],  # type: ignore
     }
 )
+
+
+class PrayAndPayTestCase(TestCase):
+    """Pray And Pay test case factories"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.user_2 = UserFactory()
+        cls.user_3 = UserFactory()
+
+        # Create profile for test user records
+        UserProfileWithParentsFactory(user=cls.user)
+        UserProfileWithParentsFactory(user=cls.user_2)
+        UserProfileWithParentsFactory(user=cls.user_3)
+
+        cls.rd_1 = RECAPDocumentFactory(
+            pacer_doc_id="98763421",
+            document_number="1",
+            is_available=True,
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            pacer_doc_id="98763422",
+            document_number="2",
+            is_available=False,
+        )
+
+        cls.rd_3 = RECAPDocumentFactory(
+            pacer_doc_id="98763423",
+            document_number="3",
+            is_available=False,
+        )
+        cls.rd_4 = RECAPDocumentFactory(
+            pacer_doc_id="98763424",
+            document_number="4",
+            is_available=False,
+        )
+
+        cls.rd_5 = RECAPDocumentFactory(
+            pacer_doc_id="98763425",
+            document_number="5",
+            is_available=False,
+        )
+
+        cls.rd_6 = RECAPDocumentFactory(
+            pacer_doc_id="98763426",
+            document_number="6",
+            is_available=False,
+        )
+        super().setUpTestData()
 
 
 class CourtTestCase(SimpleTestCase):

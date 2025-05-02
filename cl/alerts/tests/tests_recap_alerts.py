@@ -12,6 +12,7 @@ from elasticsearch_dsl import Q, connections
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.management.commands.cl_send_recap_alerts import (
+    get_day_before_query_date,
     index_daily_recap_documents,
 )
 from cl.alerts.models import (
@@ -29,6 +30,7 @@ from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.api.utils import get_webhook_deprecation_date
 from cl.donate.models import NeonMembership
+from cl.lib.date_time import midnight_pt
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
 from cl.people_db.factories import (
@@ -71,9 +73,13 @@ class RECAPAlertsSweepIndexTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
-        cls.mock_date = now()
+        # Mock indexing date to the previous day since the command currently
+        # runs early each day.
+        date_now = midnight_pt(now().date())
+        cls.mock_date_indexing = date_now - datetime.timedelta(days=1)
+        cls.mock_date = date_now
         with time_machine.travel(
-            cls.mock_date, tick=False
+            cls.mock_date_indexing, tick=False
         ), cls.captureOnCommitCallbacks(execute=True):
             super().setUpTestData()
 
@@ -95,7 +101,6 @@ class RECAPAlertsSweepIndexTest(
 
     def setUp(self):
         self.r = get_redis_interface("CACHE")
-        self.r.delete("alert_sweep:query_date")
         self.r.delete("alert_sweep:task_id")
         keys = self.r.keys("alert_hits_sweep:*")
         if keys:
@@ -112,7 +117,7 @@ class RECAPAlertsSweepIndexTest(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test RT RECAP Alert",
-            query='q="401 Civil"&type=r',
+            query="docket_number=1:21-bk-1234&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
         dly_recap_alert = AlertFactory(
@@ -135,8 +140,9 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
+            alerts_runtime_naive = datetime.datetime.now()
 
         # Only the RECAP RT alert for a member and the RECAP DLY alert are sent.
         self.assertEqual(
@@ -145,7 +151,38 @@ class RECAPAlertsSweepIndexTest(
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(rt_recap_alert.name, html_content)
 
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content,
+            Alert.REAL_TIME,
+            alerts_runtime_naive,
+            sweep_index=True,
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        rt_recap_alert.refresh_from_db()
+        self.assertEqual(
+            rt_recap_alert.date_last_hit,
+            self.mock_date,
+            msg="Alert date of last hit didn't match.",
+        )
+
         html_content = self.get_html_content_from_email(mail.outbox[1])
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.DAILY, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        dly_recap_alert.refresh_from_db()
+        self.assertEqual(
+            dly_recap_alert.date_last_hit,
+            self.mock_date,
+            msg="Alert date of last hit didn't match.",
+        )
+
         self.assertIn(dly_recap_alert.name, html_content)
 
     def test_index_daily_recap_documents(self, mock_prefix) -> None:
@@ -170,13 +207,15 @@ class RECAPAlertsSweepIndexTest(
             msg="Wrong number of documents in the sweep index.",
         )
 
-        # Index documents based Dockets changed today + all their
-        # RECAPDocuments indexed the same day.
+        # Index documents based Dockets changed yesterday + all their
+        # RECAPDocuments indexed.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
@@ -195,7 +234,7 @@ class RECAPAlertsSweepIndexTest(
         # Index Docket changed today + their RECAPDocuments indexed on
         # previous days
         with time_machine.travel(
-            self.mock_date, tick=False
+            self.mock_date_indexing, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
@@ -205,8 +244,7 @@ class RECAPAlertsSweepIndexTest(
             )
 
         # Its related RD is ingested two days before.
-        two_days_before = now() - datetime.timedelta(days=2)
-        mock_two_days_before = two_days_before.replace(hour=5)
+        mock_two_days_before = self.mock_date - datetime.timedelta(days=2)
         with time_machine.travel(
             mock_two_days_before, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
@@ -225,10 +263,12 @@ class RECAPAlertsSweepIndexTest(
 
         # Run the indexer.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
@@ -247,9 +287,9 @@ class RECAPAlertsSweepIndexTest(
                 source=Docket.RECAP,
             )
 
-        # Its related RD is ingested today.
+        # Its related RD is ingested yesterday.
         with time_machine.travel(
-            self.mock_date, tick=False
+            self.mock_date_indexing, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             alert_de_2 = DocketEntryWithParentsFactory(
                 docket=docket_2,
@@ -265,10 +305,12 @@ class RECAPAlertsSweepIndexTest(
 
         # Run the indexer.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
@@ -277,10 +319,9 @@ class RECAPAlertsSweepIndexTest(
 
         # Docket and RD created on previous days, will be used later to confirm
         # documents got indexed into the sweep index after partial updates.
-        three_days_before = now() - datetime.timedelta(days=5)
-        mock_three_days_before = three_days_before.replace(hour=5)
+        mock_five_days_before = self.mock_date - datetime.timedelta(days=5)
         with time_machine.travel(
-            mock_three_days_before, tick=False
+            mock_five_days_before, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             docket_old = DocketFactory(
                 court=self.court,
@@ -309,48 +350,54 @@ class RECAPAlertsSweepIndexTest(
 
         # Run the indexer. No new documents re_indexed.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
             documents_indexed, 9, msg="Wrong number of documents indexed."
         )
 
-        # Update the documents today:
+        # Update the documents yesterday:
         with time_machine.travel(
-            self.mock_date, tick=False
+            self.mock_date_indexing, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             rd_old_2.document_number = 3
             rd_old_2.save()
 
         # Run the indexer. No new documents re_indexed.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
             documents_indexed, 11, msg="Wrong number of documents indexed."
         )
 
-        # Update the Docket today:
+        # Update the Docket yesterday:
         with time_machine.travel(
-            self.mock_date, tick=False
+            self.mock_date_indexing, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             docket_old.case_name = "SUBPOENAS SERVED LOREM OFF UPDATED"
             docket_old.save()
 
         # Run the indexer. No new documents re_indexed.
         with time_machine.travel(self.mock_date, tick=False):
+            query_date = get_day_before_query_date()
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument,
+                query_date,
                 testing=True,
             )
         self.assertEqual(
@@ -427,7 +474,7 @@ class RECAPAlertsSweepIndexTest(
             alert_type=SEARCH_TYPES.RECAP,
         )
         # Simulate docket is ingested a day before.
-        one_day_before = self.mock_date - datetime.timedelta(days=1)
+        one_day_before = self.mock_date_indexing - datetime.timedelta(days=1)
         with time_machine.travel(
             one_day_before, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
@@ -443,9 +490,9 @@ class RECAPAlertsSweepIndexTest(
                 jury_demand="1,000,000",
             )
 
-        # Its related RD is ingested today.
+        # Its related RD is ingested yesterday.
         with time_machine.travel(
-            self.mock_date, tick=False
+            self.mock_date_indexing, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
@@ -530,7 +577,7 @@ class RECAPAlertsSweepIndexTest(
         )
 
         with time_machine.travel(
-            self.mock_date, tick=False
+            self.mock_date_indexing, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             # Create a new RD for the same DocketEntry to confirm this new RD is
             # properly included in the alert email.
@@ -760,8 +807,9 @@ class RECAPAlertsSweepIndexTest(
             query=f'q="United states"&type=r',
             alert_type=SEARCH_TYPES.RECAP,
         )
-        two_days_before = self.mock_date - datetime.timedelta(days=2)
-        mock_two_days_before = two_days_before.replace(hour=5)
+        mock_two_days_before = self.mock_date_indexing - datetime.timedelta(
+            days=2
+        )
         with time_machine.travel(
             mock_two_days_before, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
@@ -789,7 +837,7 @@ class RECAPAlertsSweepIndexTest(
         # Index new documents that match cross_object_alert_text, an RD, and
         # an empty docket.
         with time_machine.travel(
-            self.mock_date, tick=False
+            self.mock_date_indexing, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
@@ -850,7 +898,7 @@ class RECAPAlertsSweepIndexTest(
         )
         # Modify 1:21-bk-1009 docket today:
         with time_machine.travel(
-            self.mock_date, tick=False
+            self.mock_date_indexing, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             docket.cause = "405 Civil"
             docket.save()
@@ -901,7 +949,7 @@ class RECAPAlertsSweepIndexTest(
         # Index new documents that match cross_object_alert_text, an RD, and
         # an empty docket.
         with time_machine.travel(
-            self.mock_date, tick=False
+            self.mock_date_indexing, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             rd_4 = RECAPDocumentFactory(
                 docket_entry=alert_de,
@@ -1020,6 +1068,105 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
         docket_2.delete()
 
+    @mock.patch("cl.alerts.management.commands.cl_send_recap_alerts.logger")
+    def test_alert_fails_gracefully(self, mock_logger, mock_prefix) -> None:
+        """This test confirms that if an alert has bad syntax or another
+        Elasticsearch issue that prevents it from being sent, it fails
+        gracefully by logging the error and continuing with the remaining alerts.
+        """
+
+        AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Failing Alert query",
+            query="q=test :&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Good query",
+            query="q=SUBPOENAS SERVED OFF&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+        error = "ApiError(200, 'N/A', 'Failed to parse query [test AND :]')"
+        mock_logger.warning.assert_called_with(
+            "ApiError when querying an alert from the sweep index: %s", error
+        )
+        # Confirm remaining alert was properly sent.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        # Confirm alert_sweep keys are removed from Redis.
+        self.assertFalse(self.r.exists("alert_sweep:main_re_index_completed"))
+        self.assertFalse(self.r.exists("alert_sweep:rd_re_index_completed"))
+
+    def test_send_alerts_on_custom_date(self, mock_prefix) -> None:
+        """This test confirms that the cl_send_recap_alerts --query-date
+        argument works correctly to send alerts for the specified date.
+        """
+
+        indexing_date = self.mock_date - datetime.timedelta(days=5)
+        with time_machine.travel(
+            indexing_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 5 Days Ago",
+                docket_number="1:21-bk-1239",
+                source=Docket.RECAP,
+            )
+
+        AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert 5 days ago",
+            query="q=SUBPOENAS SERVED 5 Days Ago&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        # Run the command using a date that should not trigger any alerts.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command(
+                "cl_send_recap_alerts",
+                query_date=indexing_date - datetime.timedelta(days=1),
+                testing_mode=True,
+            )
+        # No alerts should be triggered.
+        self.assertEqual(
+            len(mail.outbox), 0, msg="Outgoing emails don't match."
+        )
+
+        # Run the command on the same date the documents were indexed.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command(
+                "cl_send_recap_alerts",
+                query_date=indexing_date,
+                testing_mode=True,
+            )
+        # Confirm remaining alert was properly sent.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
     def test_limit_alert_case_child_hits(self, mock_prefix) -> None:
         """Test limit case child hits up to 5 and display the "View additional
         results for this Case" button.
@@ -1059,7 +1206,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -1102,6 +1249,147 @@ class RECAPAlertsSweepIndexTest(
 
         alert_de.delete()
 
+    def test_cross_object_parties_alert_query(self, mock_prefix) -> None:
+        """Test a cross object alert including parties can be properly
+        triggered.
+        """
+
+        cross_object_parties_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Cross",
+            query='party_name="Janet Dolor"&q=MOTION Sed que ipsa&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        with time_machine.travel(
+            self.mock_date_indexing, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            alert_de = DocketEntryWithParentsFactory(
+                docket=self.de.docket,
+                entry_number=2,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION Sed que ipsa quae ab illo inventore",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description=f"Motion to File Party Test",
+                document_number="2",
+                pacer_doc_id=f"01803665243325",
+            )
+            firm = AttorneyOrganizationFactory(
+                name="Associates LLP 3", lookup_key="firm_llp_2"
+            )
+            attorney = AttorneyFactory(
+                name="John Lorem",
+                organizations=[firm],
+                docket=self.de.docket,
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Defendant Janet Dolor",
+                    docket=self.de.docket,
+                    attorneys=[attorney],
+                ),
+                docket=self.de.docket,
+            )
+            index_docket_parties_in_es.delay(self.de.docket.pk)
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+
+        self._confirm_number_of_alerts(html_content, 1)
+        # Only one child hit should be included in the case within the alert.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_parties_alert.name,
+            1,
+            alert_de.docket.case_name,
+            1,
+        )
+        self._assert_child_hits_content(
+            html_content,
+            cross_object_parties_alert.name,
+            alert_de.docket.case_name,
+            [rd.description],
+        )
+
+        # Trigger alert again.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # Shouldn't be sent again.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        alert_de.delete()
+
+    def test_docket_only_parties_alert_query(self, mock_prefix) -> None:
+        """Test a docket only alert including parties can be properly
+        triggered.
+        """
+
+        docket_parties_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Docket Only Parties",
+            query='atty_name="Debbie Russell"&type=r',
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self._confirm_number_of_alerts(html_content, 1)
+        # No child hits in the docket only alert.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_parties_alert.name,
+            1,
+            self.de.docket.case_name,
+            0,
+        )
+
+        # Trigger alert again.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # Shouldn't be sent again.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
     @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
     def test_multiple_alerts_email_hits_limit_per_alert(
         self, mock_prefix
@@ -1110,7 +1398,9 @@ class RECAPAlertsSweepIndexTest(
         alert are limited to SCHEDULED_ALERT_HITS_LIMIT (3) hits.
         """
 
-        with self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date_indexing, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name=f"SUBPOENAS SERVED CASE",
@@ -1189,7 +1479,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -1378,7 +1668,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # Weekly and monthly alerts are not sent right away but are scheduled as
@@ -1395,13 +1685,33 @@ class RECAPAlertsSweepIndexTest(
         )
         self.assertEqual(len(webhook_events), 3)
 
-        # Send scheduled Weekly alerts and check assertions.
-        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+        week_ago = self.mock_date + datetime.timedelta(days=7)
+        with time_machine.travel(week_ago, tick=False):
+            # Send scheduled Weekly alerts and check assertions.
+            call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+            alerts_runtime_naive = datetime.datetime.now()
+
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
+
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
+
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.WEEKLY, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        docket_only_alert.refresh_from_db()
+        self.assertEqual(
+            docket_only_alert.date_last_hit,
+            week_ago,
+            msg="Alert date of last hit didn't match.",
+        )
+
         self._count_alert_hits_and_child_hits(
             html_content,
             docket_only_alert.name,
@@ -1428,14 +1738,31 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(cross_object_alert_with_hl.name, txt_email)
         self.assertIn(self.rd.description, txt_email)
 
-        # Send  scheduled Monthly alerts and check assertions.
-        current_date = now().replace(day=28, hour=0)
+        # Send scheduled Monthly alerts and check assertions.
+        current_date = now().replace(day=1, hour=8)
         with time_machine.travel(current_date, tick=False):
             call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
+            alerts_runtime_naive = datetime.datetime.now()
+
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
         html_content = self.get_html_content_from_email(mail.outbox[1])
+
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.MONTHLY, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        recap_only_alert.refresh_from_db()
+        self.assertEqual(
+            recap_only_alert.date_last_hit,
+            current_date,
+            msg="Alert date of last hit didn't match.",
+        )
+
         self._count_alert_hits_and_child_hits(
             html_content,
             recap_only_alert.name,
@@ -1558,12 +1885,16 @@ class RECAPAlertsSweepIndexTest(
                 version=2,
             )
 
-        with mock.patch(
+        with time_machine.travel(
+            self.mock_date_indexing, tick=False
+        ), mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+        ), self.captureOnCommitCallbacks(
+            execute=True
+        ):
             docket = DocketFactory(
                 court=self.court,
                 case_name=f"SUBPOENAS SERVED CASE",
@@ -1585,17 +1916,21 @@ class RECAPAlertsSweepIndexTest(
                 pacer_doc_id="0190645981",
                 plain_text="plain text lorem",
             )
-
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
 
         # Confirm Stat object is properly created and updated.
         stats_objects = Stat.objects.all()
-        self.assertEqual(stats_objects.count(), 1)
+        self.assertEqual(
+            stats_objects.count(), 1, "Wrong number of stats objects."
+        )
         self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(stats_objects[0].count, 1)
+        self.assertEqual(
+            stats_objects[0].count, 1, "Wrong number of stats alerts sent."
+        )
 
         # Assert webhooks.
         webhook_events = WebhookEvent.objects.all().values_list(
@@ -1622,6 +1957,11 @@ class RECAPAlertsSweepIndexTest(
             msg="Wrong number of V1 webhook events.",
         )
 
+        subject = mail.outbox[0].subject
+        self.assertIn("2 Alerts have hits:", subject)
+        self.assertIn(docket_only_alert.name, subject)
+        self.assertIn(cross_object_alert.name, subject)
+
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 2)
@@ -1644,12 +1984,16 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Now update the docket case_name to match cross_object_alert_after_update
-        with time_machine.travel(self.mock_date, tick=False), mock.patch(
+        with time_machine.travel(
+            self.mock_date_indexing, tick=False
+        ), mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+        ), self.captureOnCommitCallbacks(
+            execute=True
+        ):
             docket.case_name = "SUBPOENAS SERVED CASE UPDATED"
             docket.save()
 
@@ -1657,7 +2001,8 @@ class RECAPAlertsSweepIndexTest(
         # cross_object_alert_after_update alert is missed by the percolator.
         # due to the related RECAPDocument is not being percolated after the
         # Docket field update.
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
@@ -1715,6 +2060,11 @@ class RECAPAlertsSweepIndexTest(
             v2_webhook_event.content["webhook"]["deprecation_date"], None
         )
 
+        self.assertEqual(
+            mail.outbox[1].subject,
+            f"1 Alert has hits: {cross_object_alert_after_update.name}",
+        )
+
         html_content = self.get_html_content_from_email(mail.outbox[1])
         self.assertIn(cross_object_alert_after_update.name, html_content)
         self._confirm_number_of_alerts(html_content, 1)
@@ -1729,9 +2079,17 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Confirm Stat object is properly updated.
-        self.assertEqual(stats_objects.count(), 1)
+        self.assertEqual(
+            stats_objects.count(), 2, "Wrong number of stats objects."
+        )
         self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(stats_objects[0].count, 2)
+        self.assertEqual(
+            stats_objects[0].count, 2, "Wrong number of stats alerts sent."
+        )
+        self.assertEqual(stats_objects[1].name, "alerts.sent.dly")
+        self.assertEqual(
+            stats_objects[1].count, 0, "Wrong number of stats alerts sent."
+        )
 
         docket.delete()
 
@@ -2221,13 +2579,19 @@ class RECAPAlertsPercolatorTest(
             user=self.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert Docket Only",
-            query='q="401 Civil"&type=r',
+            query='q="401 Civil"&type=r&order_by=score desc',
             alert_type=SEARCH_TYPES.RECAP,
         )
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert.pk),
             msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
         )
+        alert_doc = RECAPPercolator.get(id=docket_only_alert.pk)
+        response_str = str(alert_doc.to_dict())
+        self.assertIn("401 Civil", response_str)
+        self.assertIn("'rate': 'wly'", response_str)
+        # function_score breaks percolator queries. Ensure it is never indexed.
+        self.assertNotIn("function_score", response_str)
 
         docket_only_alert_id = docket_only_alert.pk
         # Remove the alert.
@@ -2647,7 +3011,7 @@ class RECAPAlertsPercolatorTest(
     def test_group_percolator_alerts(self, mock_prefix) -> None:
         """Test group Percolator RECAP Alerts in an email and hits."""
 
-        with mock.patch(
+        with time_machine.travel(self.mock_date, tick=False), mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
@@ -2779,7 +3143,12 @@ class RECAPAlertsPercolatorTest(
             None,
         )
 
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        rt_mock_date_sent = self.mock_date + datetime.timedelta(
+            seconds=settings.REAL_TIME_ALERTS_SENDING_RATE
+        )
+        with time_machine.travel(rt_mock_date_sent, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+            alerts_runtime_naive = datetime.datetime.now()
 
         # Only one email should be triggered because email alerts for
         # non-members are omitted.
@@ -2789,6 +3158,21 @@ class RECAPAlertsPercolatorTest(
 
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
+
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.REAL_TIME, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        docket_only_alert.refresh_from_db()
+        self.assertEqual(
+            docket_only_alert.date_last_hit,
+            rt_mock_date_sent,
+            msg="Alert date of last hit didn't match.",
+        )
+
         txt_email = mail.outbox[0].body
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 3)

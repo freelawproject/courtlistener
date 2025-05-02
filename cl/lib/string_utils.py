@@ -1,6 +1,17 @@
 import re
 from typing import Optional
 
+import tiktoken
+
+
+def camel_to_snake(key: str) -> str:
+    """Converts a camelCase string to snake_case.
+
+    :param key: The camelCase string to convert.
+    :return: The snake_case version of the input string.
+    """
+    return re.sub(r"([a-z])([A-Z])", r"\1_\2", key).lower()
+
 
 def trunc(s: str, length: int, ellipsis: Optional[str] = None) -> str:
     """Truncates a string at a good length.
@@ -45,8 +56,8 @@ def filter_invalid_XML_chars(input: str) -> str:
     if isinstance(input, str):
         # Only do str, unicode, etc.
         return re.sub(
-            "[^\u0020-\uD7FF\u0009\u000A\u000D\uE000-\uFFFD"
-            "\U00010000-\U0010FFFF]+",
+            "[^\u0020-\ud7ff\u0009\u000a\u000d\ue000-\ufffd"
+            "\U00010000-\U0010ffff]+",
             "",
             input,
         )
@@ -123,3 +134,10 @@ def normalize_dashes(text: str) -> str:
         normal_dash,
         text,
     )
+
+
+def get_token_count_from_string(string: str) -> int:
+    """Returns the number of tokens in a text string."""
+    encoding = tiktoken.get_encoding("cl100k_base")
+    num_tokens = len(encoding.encode(string))
+    return num_tokens

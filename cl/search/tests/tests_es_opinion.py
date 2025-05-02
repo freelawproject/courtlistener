@@ -21,7 +21,6 @@ from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
-from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import do_es_api_query
@@ -506,7 +505,8 @@ class OpinionV3APISearchTest(
                 type=cd["type"],
             )
             for result in hits:
-                ids_in_results.add(result.id)
+                if result:
+                    ids_in_results.add(result.id)
         self.assertEqual(
             len(ids_in_results),
             total_opinions,
@@ -1481,15 +1481,54 @@ class OpinionsESSearchTest(
         r = await self._test_article_count(search_params, 1, "filed_range")
         self.assertIn("Honda", r.content.decode())
 
-    async def test_can_filter_using_a_docket_number(self) -> None:
+    def test_can_filter_using_a_docket_number(self) -> None:
         """Can we query by docket number?"""
+
+        # Regular docket_number filtering.
         search_params = {"q": "*", "docket_number": "2"}
 
         # Frontend
-        r = await self._test_article_count(search_params, 1, "docket_number")
+        r = async_to_sync(self._test_article_count)(
+            search_params, 1, "docket_number"
+        )
         self.assertIn(
             "Honda", r.content.decode(), "Result not found by docket number!"
         )
+
+        # Filter by case by docket_number containing repeated numbers like: 1:21-bk-0021
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory(
+                case_name="Strickland v. Lorem.",
+                docket=DocketFactory(
+                    court=self.court_1, docket_number="1:21-bk-0021"
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "docket_number": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # docket_number filter works properly combined with child document fields
+        with self.captureOnCommitCallbacks(execute=True):
+            OpinionFactory.create(cluster=cluster, plain_text="Lorem Ipsum")
+
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Lorem Ipsum",
+            "docket_number": "1:21-bk-0021",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "docket_number and text"
+        )
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+        self.assertIn("Lorem Ipsum", r.content.decode())
+
+        # Remove factories to prevent affecting other tests.
+        cluster.delete()
 
     async def test_can_filter_by_citation_number(self) -> None:
         """Can we query by citation number?"""
@@ -1815,10 +1854,6 @@ class OpinionsESSearchTest(
         self.assertIn("1 Opinion", r.content.decode())
 
         search_params["q"] = "Howard NOT Honda"
-        r = await self._test_article_count(search_params, 0, "negation query")
-        self.assertIn("had no results", r.content.decode())
-
-        search_params["q"] = "Howard !Honda"
         r = await self._test_article_count(search_params, 0, "negation query")
         self.assertIn("had no results", r.content.decode())
 
@@ -2269,7 +2304,271 @@ class OpinionsESSearchTest(
         cluster_2.delete()
 
 
-@override_flag("ui_flag_for_o", False)
+class OpinionSearchDecayRelevancyTest(
+    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+):
+    """
+    Opinion Search Decay Relevancy Tests
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        # Rebuild the Opinion index
+        cls.rebuild_index("search.OpinionCluster")
+
+        # Same keywords but different dateFiled
+        cls.opinion_old = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(1832, 2, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-old",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1235",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_old = OpinionFactory.create(
+            cluster=cls.opinion_old, plain_text="", author_str=""
+        )
+
+        cls.opinion_recent = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2024, 2, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-recent",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1236",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_recent = OpinionFactory.create(
+            cluster=cls.opinion_recent, plain_text="", author_str=""
+        )
+
+        # Different relevance with same dateFiled
+        cls.opinion_high_relevance = OpinionClusterFactory.create(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2022, 2, 23),
+            procedural_history="More Highly Relevant Keywords",
+            source="C",
+            attorneys="More Highly Relevant Keywords",
+            slug="opinion-high-rel",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1237",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_high_relevance = OpinionFactory.create(
+            cluster=cls.opinion_high_relevance, plain_text="", author_str=""
+        )
+
+        cls.opinion_low_relevance = OpinionClusterFactory.create(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2022, 2, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-low-rel",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1238",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_low_relevance = OpinionFactory.create(
+            cluster=cls.opinion_low_relevance, plain_text="", author_str=""
+        )
+
+        # Different relevance with different dateFiled
+        cls.opinion_high_relevance_old_date = OpinionClusterFactory.create(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(1900, 2, 23),
+            procedural_history="More Ipsum Dolor Terms",
+            source="C",
+            attorneys="More Ipsum Dolor Terms",
+            slug="opinion-high-rel-old",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1239",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_high_relevance_old_date = OpinionFactory.create(
+            cluster=cls.opinion_high_relevance_old_date,
+            plain_text="",
+            author_str="",
+        )
+
+        cls.opinion_low_relevance_new_date = OpinionClusterFactory.create(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2024, 12, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-low-rel-new",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1241",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_low_relevance_new_date = OpinionFactory.create(
+            cluster=cls.opinion_low_relevance_new_date,
+            plain_text="",
+            author_str="",
+        )
+
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+        cls.test_cases = [
+            {
+                "name": "Same keywords, different dateFiled",
+                "search_params": {
+                    "q": "Keyword Match",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    cls.opinion_recent.docket.docket_number,  # Most recent dateFiled
+                    cls.opinion_old.docket.docket_number,  # Oldest dateFiled
+                ],
+                "expected_order": [  # API
+                    cls.opinion_recent.pk,
+                    cls.opinion_old.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy same dateFiled",
+                "search_params": {
+                    "q": "Highly Relevant Keywords",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    cls.opinion_high_relevance.docket.docket_number,  # Most relevant by keywords
+                    cls.opinion_low_relevance.docket.docket_number,  # Less relevant by keywords
+                ],
+                "expected_order": [  # API
+                    cls.opinion_high_relevance.pk,  # Most relevant by keywords
+                    cls.opinion_low_relevance.pk,  # Less relevant by keywords
+                ],
+            },
+            {
+                "name": "Different relevancy and different dateFiled",
+                "search_params": {
+                    "q": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    cls.opinion_low_relevance_new_date.docket.docket_number,  # Combination of relevance and date rank it first.
+                    cls.opinion_high_relevance_old_date.docket.docket_number,
+                ],
+                "expected_order": [  # API
+                    cls.opinion_low_relevance_new_date.pk,
+                    cls.opinion_high_relevance_old_date.pk,
+                ],
+            },
+            {
+                "name": "Match all query decay relevancy.",
+                "search_params": {
+                    "q": "",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                # Order by recency and then by relevancy as per decay scoring logic
+                "expected_order_frontend": [
+                    cls.opinion_low_relevance_new_date.docket.docket_number,  # 2024-12-23 1:21-bk-1241
+                    cls.opinion_recent.docket.docket_number,  # 2024-02-23 1:21-bk-1236
+                    cls.opinion_high_relevance.docket.docket_number,  # 2022-02-23 1:21-bk-1237 Indexed first, displayed first.
+                    cls.opinion_low_relevance.docket.docket_number,  # 2022-02-23 1:21-bk-1238
+                    cls.opinion_high_relevance_old_date.docket.docket_number,  # 1800-02-23 1:21-bk-1239
+                    cls.opinion_old.docket.docket_number,  # 1732-02-23 1:21-bk-1235
+                ],
+                "expected_order": [  # V4 API
+                    cls.opinion_low_relevance_new_date.pk,  # 2024-12-23
+                    cls.opinion_recent.pk,  # 2024-02-23
+                    cls.opinion_low_relevance.pk,  # 2022-02-23 Higher PK in V4, API pk is a secondary sorting key.
+                    cls.opinion_high_relevance.pk,  # 2022-02-23 Lower PK
+                    cls.opinion_high_relevance_old_date.pk,  # 1800-02-23
+                    cls.opinion_old.pk,  # 1732-02-23
+                ],
+                "expected_order_v3": [  # V3 API
+                    cls.opinion_low_relevance_new_date.pk,  # 2024-12-23
+                    cls.opinion_recent.pk,  # 2024-02-23
+                    cls.opinion_high_relevance.pk,  # 2022-02-23 Indexed first, displayed first.
+                    cls.opinion_low_relevance.pk,  # 2022-02-23
+                    cls.opinion_high_relevance_old_date.pk,  # 1800-02-23
+                    cls.opinion_old.pk,  # 1732-02-23
+                ],
+            },
+        ]
+
+    def test_relevancy_decay_scoring_frontend(self) -> None:
+        """Test relevancy decay scoring for Opinion search Frontend"""
+
+        for test in self.test_cases:
+            with self.subTest(test["name"]):
+                r = async_to_sync(self._test_article_count)(
+                    test["search_params"],
+                    len(test["expected_order_frontend"]),
+                    f"Failed count {test['name']}",
+                )
+                self._assert_order_in_html(
+                    r.content.decode(), test["expected_order_frontend"]
+                )
+
+    def test_relevancy_decay_scoring_v4_api(self) -> None:
+        """Test relevancy decay scoring for Opinion search V4 API"""
+
+        for test in self.test_cases:
+            self._test_results_ordering(test, "cluster_id")
+
+    def test_relevancy_decay_scoring_v3_api(self) -> None:
+        """Test relevancy decay scoring for Opinion search V3 API"""
+
+        for test in self.test_cases:
+            self._test_results_ordering(test, "cluster_id", version="v3")
+
+
 @override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
@@ -2402,14 +2701,16 @@ class RelatedSearchTest(
             )
         )
 
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
 
-        recomendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        recommendations_actual = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
         recommendations_expected = [
             (
@@ -2428,7 +2729,7 @@ class RelatedSearchTest(
         # Test if related opinion exist in expected order
         self.assertEqual(
             recommendations_expected,
-            recomendations_actual,
+            recommendations_actual,
             msg="Unexpected opinion recommendations.",
         )
         await sync_to_async(self.async_client.logout)()
@@ -2445,17 +2746,19 @@ class RelatedSearchTest(
             )
         )
 
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
 
-        recomendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        current_related_cases = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
 
-        recommendations_expected = [
+        expected_related_cases = [
             (
                 f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
                 "Howard v. Honda",
@@ -2472,9 +2775,9 @@ class RelatedSearchTest(
 
         # Test if related opinion exist in expected order
         self.assertEqual(
-            recommendations_expected,
-            recomendations_actual,
-            msg="Unexpected opinion recommendations.",
+            expected_related_cases,
+            current_related_cases,
+            msg="Unexpected related cases.",
         )
         await sync_to_async(self.async_client.logout)()
 
@@ -2492,16 +2795,18 @@ class RelatedSearchTest(
             )
         )
 
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
 
-        recommendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        current_related_cases = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
-        recommendations_expected = [
+        expected_related_cases = [
             (
                 f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
                 "Debbas v. Franklin",
@@ -2517,17 +2822,18 @@ class RelatedSearchTest(
         ]
         # Test if related opinion exist in expected order
         self.assertEqual(
-            recommendations_expected,
-            recommendations_actual,
-            msg="Unexpected opinion recommendations.",
+            expected_related_cases,
+            current_related_cases,
+            msg="Unexpected related cases.",
         )
         await sync_to_async(self.async_client.logout)()
 
+    @override_settings(RELATED_USE_CACHE=False)
     async def test_es_get_citing_and_related_clusters_no_cache_timeout(
         self,
     ) -> None:
         """Confirm that 'Unable to retrieve clusters...' message is shown if
-        the MLT and citing query time out."""
+        the MLT and citing query time out and there is no cache available."""
         seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
@@ -2537,30 +2843,64 @@ class RelatedSearchTest(
             )
         )
 
+        # Timeout Request for related cases and there is no cache
         with mock.patch(
-            "elasticsearch_dsl.MultiSearch.execute"
+            "elasticsearch_dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionTimeout(
                 "Connection timeout"
             )
-            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/related-cases/" % seed_pk
+            )
 
         self.assertEqual(r.status_code, 200)
         tree = html.fromstring(r.content.decode())
-        recommendations_text = tree.xpath("//*[@id='recommendations']")[
-            0
-        ].text_content()
-        citing_text = tree.xpath("//*[@id='cited-by']")[0].text_content()
-        self.assertIn(
-            "Unable to retrieve related clusters.", recommendations_text
+
+        # Results are returned from cache.
+        current_related_cases = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
+        ]
+        expected_related_cases = []
+        self.assertEqual(
+            expected_related_cases,
+            current_related_cases,
+            msg="Unexpected related cases.",
         )
-        self.assertIn("Unable to retrieve citing clusters.", citing_text)
+
+        # Timeout Request for cited by cases and there is no cache
+        with mock.patch(
+            "elasticsearch_dsl.Search.execute"
+        ) as mock_m_search_execute:
+            mock_m_search_execute.side_effect = ConnectionTimeout(
+                "Connection timeout"
+            )
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/cited-by/" % seed_pk
+            )
+
+        self.assertEqual(r.status_code, 200)
+        tree = html.fromstring(r.content.decode())
+
+        current_cited_by = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='cited-by']/article/h3/a")
+        ]
+
+        expected_cited_by = []
+        self.assertEqual(
+            expected_cited_by,
+            current_cited_by,
+            msg="Unexpected opinion cited.",
+        )
         await sync_to_async(self.async_client.logout)()
 
+    @override_settings(RELATED_USE_CACHE=False)
     async def test_es_get_citing_and_related_clusters_no_cache_connection_error(
         self,
     ) -> None:
-        """Confirm that there are no related clusters, and display 'This case
+        """Confirm that there are no related clusters, no cached results, and display 'This case
         has not yet been cited in our system.' if the query raised a
         connection error."""
 
@@ -2574,16 +2914,16 @@ class RelatedSearchTest(
         )
 
         with mock.patch(
-            "elasticsearch_dsl.MultiSearch.execute"
+            "elasticsearch_dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionError()
-            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/cited-by/" % seed_pk
+            )
 
         self.assertEqual(r.status_code, 200)
         tree = html.fromstring(r.content.decode())
-        recommendations_text = tree.xpath("//*[@id='recommendations']")
         citing_text = tree.xpath("//*[@id='cited-by']")[0].text_content()
-        self.assertEqual([], recommendations_text)
         self.assertIn(
             "This case has not yet been cited in our system.", citing_text
         )
@@ -2604,31 +2944,33 @@ class RelatedSearchTest(
             )
         )
         # Initial successful request. Results are cached.
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
+        self.assertEqual(r.status_code, 200)
+        r = await self.async_client.get("/opinion/%i/asdf/cited-by/" % seed_pk)
         self.assertEqual(r.status_code, 200)
 
-        # Timeout Request.
+        # Timeout Request for related cases
         with mock.patch(
-            "elasticsearch_dsl.MultiSearch.execute"
+            "elasticsearch_dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionTimeout(
                 "Connection timeout"
             )
-            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/related-cases/" % seed_pk
+            )
 
         self.assertEqual(r.status_code, 200)
         tree = html.fromstring(r.content.decode())
 
         # Results are returned from cache.
-        recommendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        current_related_cases = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
-        citing_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='cited-by']/ul/li/a")
-        ]
-        recommendations_expected = [
+        expected_related_cases = [
             (
                 f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
                 "Debbas v. Franklin",
@@ -2643,12 +2985,31 @@ class RelatedSearchTest(
             ),
         ]
         self.assertEqual(
-            recommendations_expected,
-            recommendations_actual,
-            msg="Unexpected opinion recommendations.",
+            expected_related_cases,
+            current_related_cases,
+            msg="Unexpected related cases.",
         )
 
-        citing_expected = [
+        # Timeout Request for cited by cases
+        with mock.patch(
+            "elasticsearch_dsl.Search.execute"
+        ) as mock_m_search_execute:
+            mock_m_search_execute.side_effect = ConnectionTimeout(
+                "Connection timeout"
+            )
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/cited-by/" % seed_pk
+            )
+
+        self.assertEqual(r.status_code, 200)
+        tree = html.fromstring(r.content.decode())
+
+        current_cited_by = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='cited-by']/article/h3/a")
+        ]
+
+        expected_cited_by = [
             (
                 f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
                 f"Howard v. Honda (1895)",
@@ -2659,8 +3020,8 @@ class RelatedSearchTest(
             ),
         ]
         self.assertEqual(
-            citing_expected,
-            citing_actual,
+            expected_cited_by,
+            current_cited_by,
             msg="Unexpected opinion cited.",
         )
         await sync_to_async(self.async_client.logout)()
@@ -2724,7 +3085,7 @@ class IndexOpinionDocumentsCommandTest(
         for pk in opinions_pks:
             self.assertTrue(OpinionDocument.exists(id=ES_CHILD_ID(pk).OPINION))
 
-    def test_index_parent_or_child_docs(self):
+    def test_index_parent_or_child_docs_in_es(self):
         """Confirm the command can properly index missing clusters when
         indexing only Opinions.
         """
@@ -2849,6 +3210,45 @@ class IndexOpinionDocumentsCommandTest(
         self.assertEqual(
             s.count(), 6, msg="Wrong number of Opinions returned."
         )
+
+    def test_opinions_indexing_non_null_field(self):
+        """Confirm that the indexing command properly filters out instances to
+        be indexed based on the non-null field value provided as a parameter.
+        """
+
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person_2,
+            plain_text="my plain text secret word for queries",
+            cluster=self.opinion_cluster_1,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+            ordering_key=5,
+        )
+
+        # Call cl_index_parent_and_child_docs command for Opinion.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+            testing_mode=True,
+            non_null_field="ordering_key",
+        )
+
+        # Confirm 1 Opinions is indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_1.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
 
 
 class EsOpinionsIndexingTest(
@@ -3024,11 +3424,16 @@ class EsOpinionsIndexingTest(
                 local_path="test/search/opinion_doc.doc",
                 per_curiam=False,
                 type="020lead",
+                ordering_key=1,
             )
 
         # Two es_save_document task should be called on creation, one for
         # opinion and one for opinion_cluster
         self.reset_and_assert_task_count(expected=2)
+
+        # Confirm the new ordering_key field is indexed upon Opinion creation.
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
 
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
@@ -3041,6 +3446,22 @@ class EsOpinionsIndexingTest(
             opinion.save()
         # One update_es_document task should be called on tracked field update.
         self.reset_and_assert_task_count(expected=1)
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            # Update the ordering_key field in the opinion record.
+            opinion.ordering_key = None
+            opinion.save()
+
+        # One update_es_document task should be called on tracked field update.
+        self.reset_and_assert_task_count(expected=1)
+        # Confirm the ordering_key has been updated.
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.ordering_key, None)
 
         # Update an opinion untracked field.
         with mock.patch(
@@ -3610,13 +4031,13 @@ class EsOpinionsIndexingTest(
         )
         o = OpinionFactory.create(
             author=self.person,
-            plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+            plain_text="Lorem ipsum control chars \x07\x08\x0b.",
             cluster=o_c,
             type="020lead",
         )
         o_2 = OpinionFactory.create(
             author=self.person,
-            html="<p>Lorem html ipsum control chars \x07\x08\x0B.</p>",
+            html="<p>Lorem html ipsum control chars \x07\x08\x0b.</p>",
             cluster=o_c,
             type="020lead",
         )
@@ -3897,7 +4318,7 @@ class OpinionFeedTest(
         """
         with mock.patch(
             "cl.search.documents.escape",
-            return_value="Lorem ipsum control chars \x07\x08\x0B.",
+            return_value="Lorem ipsum control chars \x07\x08\x0b.",
         ), self.captureOnCommitCallbacks(execute=True):
             court = CourtFactory(
                 id="ca1_test",
@@ -3913,7 +4334,7 @@ class OpinionFeedTest(
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
-                    plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+                    plain_text="Lorem ipsum control chars \x07\x08\x0b.",
                 ),
             )
 

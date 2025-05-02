@@ -658,7 +658,9 @@ mark {
 }
 
 .select-all {
-  user-select: all;
+    -webkit-user-select: all;
+    user-select: all;
+    cursor: text;
 }
 
 /* layout */
@@ -766,11 +768,6 @@ div.shown ul {
   /* Use > b/c we don't want rule applying to drop downs */
   list-style-type: none;
   padding: 3px 0 5px 0;
-}
-
-#summaries ul {
-  padding-inline-start: 15px;
-  border-bottom: 1pt solid #DDD;
 }
 
 #summaries li {
@@ -1551,6 +1548,9 @@ emphasis {
   justify-content: space-between;
 }
 
+.justify-content-around{
+  justify-content: space-around;
+}
 
 .justify-content-center{
   justify-content: center;
@@ -1836,4 +1836,29 @@ rect.series-segment {
 
 .gap-2 {
   gap: 0.5rem
+}
+
+.prayer-top-buttons.navbar-right {
+  right: 15px;
+  position: relative;
+}
+
+.prayer-top-buttons.nav>li>a {
+  padding: 11px 15px;
+}
+
+.prayer-top-buttons.nav>li>div {
+  padding: 10px 15px;
+}
+
+.learn-more-prayer-btn {
+  margin-right: auto;
+}
+
+.row-gap-3 {
+  row-gap: 1rem;
+}
+
+#doc-no-available-warning a.btn {
+  height: 28px;
 }

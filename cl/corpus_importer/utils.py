@@ -1,4 +1,5 @@
 import itertools
+import math
 import random
 import re
 from collections import defaultdict
@@ -26,7 +27,7 @@ from cl.people_db.lookup_utils import (
     lookup_judges_by_last_name_list,
 )
 from cl.people_db.models import Person
-from cl.search.models import Citation, Docket, Opinion, OpinionCluster
+from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -105,6 +106,47 @@ async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
         d.ia_date_first_change = now()
     if save_docket:
         await d.asave()
+
+
+def is_bankruptcy_court(court_id: str) -> bool:
+    """Checks if a given court ID corresponds to a bankruptcy court.
+
+    This function queries the database to determine if the provided court
+    ID is associated with a federal bankruptcy court.
+
+    Args:
+        court_id: The ID of the court to check (string).
+
+    Returns:
+        True if the court ID corresponds to a bankruptcy court, False otherwise
+        (boolean).
+    """
+    bankr_court_ids = Court.federal_courts.bankruptcy_pacer_courts()
+    return bankr_court_ids.filter(pk=court_id).exists()
+
+
+def is_appellate_court(court_id: str) -> bool:
+    """Checks if the given court_id belongs to an appellate court.
+
+    :param court_id: The unique identifier of the court.
+
+    :return: True if the court_id corresponds to an appellate court,
+        False otherwise.
+    """
+    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    return appellate_court_ids.filter(pk=court_id).exists()
+
+
+async def ais_appellate_court(court_id: str) -> bool:
+    """Checks if the given court_id belongs to an appellate court.
+
+    :param court_id: The unique identifier of the court.
+
+    :return: True if the court_id corresponds to an appellate court,
+        False otherwise.
+    """
+    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    return await appellate_court_ids.filter(pk=court_id).aexists()
 
 
 def get_start_of_quarter(d: Optional[date] = None) -> date:
@@ -1065,31 +1107,45 @@ def compute_binary_probe_jitter(testing: bool) -> int:
     :return: An integer representing the jitter value for binary probes.
     """
 
-    # Probe limit e.g: 9 probe iterations -> 256
-    probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
-    return random.randint(1, round(probe_limit * 0.05)) if not testing else 0
+    # The jitter will be a random value between 1 and half of IQUERY_MAX_PROBE.
+    return (
+        random.randint(1, round(settings.IQUERY_MAX_PROBE * 0.5))
+        if not testing
+        else 0
+    )
 
 
 def compute_next_binary_probe(
     highest_known_pacer_case_id: int, iteration: int, jitter: int
-) -> int:
+) -> tuple[int, int]:
     """Compute the next binary probe target for a given PACER case ID.
 
-    This computes the next value of a geometric binary sequence (2 ** (N - 1))
-    where N is the current probe iteration. In non-testing mode a jitter is
-    added to the next value to ensure probing values are not the same from the
-    previous iteration to increase the possibility of getting a hit.
+    This computes the next probe target using a geometric sequence
+    based on the current iteration (2 ** (iteration - 1)), with the increase
+    capped by the IQUERY_MAX_PROBE setting. Once the geometric value reaches
+    this cap, subsequent increments grow linearly by the cap value.
+    In non-testing mode, and except for the first iteration, a jitter is added
+    to the next value to ensure that probing values are not the same as in the
+    previous iteration, increasing the chances of getting a hit.
 
     :param highest_known_pacer_case_id: The final PACER case ID.
     :param iteration: The current probe iteration number.
     :param jitter: The jitter value to apply.
-    :return: The updated probe_iteration and the PACER case ID to lookup.
+    :return: The updated probe_iteration and the PACER case ID to lookup and
+    the probe offset + jitter computed.
     """
 
-    pacer_case_id_to_lookup = (
-        highest_known_pacer_case_id + (2 ** (iteration - 1)) + jitter
-    )
-    return pacer_case_id_to_lookup
+    # Avoid applying jitter on the first iteration to speed up
+    # the detection of new cases once courts catch up.
+    jitter = 0 if iteration == 1 else jitter
+    max_probe = settings.IQUERY_MAX_PROBE
+    cap_iteration = int(math.log2(max_probe)) + 1
+    if iteration < cap_iteration:
+        offset = 2 ** (iteration - 1)
+    else:
+        offset = ((iteration - cap_iteration) + 1) * max_probe
+    pacer_case_id_to_lookup = highest_known_pacer_case_id + offset + jitter
+    return pacer_case_id_to_lookup, offset + jitter
 
 
 def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:
@@ -1171,3 +1227,29 @@ class CycleChecker:
             # when self.court_counts[court_id] != self.current_iteration
             self.prev_iteration_courts.add(court_id)
             return True
+
+
+def is_long_appellate_document_number(
+    document_number: str | int | None,
+) -> bool:
+    """Check whether this docket_number is longer than 9 digits, indicating that it
+    comes from a court that doesn't use regular numbering.
+
+    :param document_number: The document number
+    :return: A boolean indicating whether this is a long appellate document number.
+    """
+    return isinstance(document_number, str) and len(document_number) >= 9
+
+
+def get_iquery_pacer_courts_to_scrape() -> list[str]:
+    """Retrieve all district and bankruptcy PACER courts for the iquery scraper.
+
+    :return: A list of Court IDs.
+    """
+    return list(
+        Court.federal_courts.district_or_bankruptcy_pacer_courts()
+        .exclude(
+            in_use=False,
+        )
+        .values_list("pk", flat=True)
+    )

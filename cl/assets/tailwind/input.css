@@ -1,0 +1,24 @@
+@import 'fonts.css';
+
+@tailwind base;
+@tailwind components;
+
+@layer components {
+  .btn {
+    @apply py-2.5 px-3.5 rounded-lg w-fit text-sm font-normal;
+  }
+  .btn-primary {
+    @apply btn text-white bg-primary-600 hover:bg-primary-700 outline-none focus:ring-4 focus:ring-primary-200 disabled:bg-primary-100 disabled:text-primary-400;
+  }
+  .btn-outline {
+    @apply btn text-greyscale-700 hover:bg-greyscale-100 outline outline-1 outline-greyscale-300 focus:ring-4 focus:ring-greyscale-200 disabled:outline-greyscale-200 disabled:text-greyscale-400;
+  }
+}
+
+@tailwind utilities;
+
+@layer utilities {
+  .btn-xl {
+    @apply py-3 px-4.5;
+  }
+}

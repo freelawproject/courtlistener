@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% load static tailwind_tags %}
+
+{% block head %}
+{% tailwind_css %}
+{% tailwind_preload_css %}
+
+<script src="{% static 'js/alpinejscsp@3.14.8.min.js' %}" defer init nonce="{{ request.csp_nonce }}"></script>
+
+{% endblock %}
+
+{% block title %}Components Library - CourtListener.com{% endblock %}
+
+{% block content %}
+<h1 class="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">H1 Title Component</h1>
+<h2 class="scroll-m-20 text-3xl font-semibold tracking-tight first:mt-0">H2 Title Component</h2>
+<h3 class="scroll-m-20 text-2xl font-semibold tracking-tight">H3 Title Component</h3>
+
+<c-h1>Django Cotton Sample</c-h1>
+{% endblock %}

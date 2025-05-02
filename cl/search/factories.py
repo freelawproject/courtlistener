@@ -284,6 +284,7 @@ class DocketFactory(DjangoModelFactory):
     docket_number = Faker("federal_district_docket_number")
     slug = Faker("slug")
     date_argued = Faker("date_object")
+    view_count = 0
 
     """
     This hook is necessary to make this factory compatible with the
@@ -307,7 +308,12 @@ class DocketFactory(DjangoModelFactory):
             self.filepath_local = FileField().evaluate(None, None, kwargs)
 
         if create:
-            self.save(update_fields=["filepath_local"])
+            # Use a Docket queryset to persist filepath_local instead of calling
+            # save(), which can trigger duplicate post_save signals, potentially
+            # causing issues in certain testing scenarios.
+            Docket.objects.filter(pk=self.pk).update(
+                filepath_local=self.filepath_local
+            )
 
 
 class DocketWithChildrenFactory(DocketFactory):
@@ -322,12 +328,15 @@ class OpinionClusterFactoryMultipleOpinions(
 ):
     """Make an OpinionCluster with Docket parent and multiple opinions"""
 
+    class Meta:
+        skip_postgeneration_save = True
+
     sub_opinions = RelatedFactoryVariableList(
         factory=OpinionWithChildrenFactory,
         factory_related_name="cluster",
         size=3,  # by default create 3 opinions
     )
-    precedential_status = ("Published", "Precedential")
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
 
 
 class OpinionsCitedWithParentsFactory(DjangoModelFactory):

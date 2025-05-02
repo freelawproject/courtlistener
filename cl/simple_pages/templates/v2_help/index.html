@@ -1,0 +1,164 @@
+{% extends "new_base.html" %}
+
+{% block title %}Getting Help – CourtListener.com{% endblock %}
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+{% block sidebar %}{% endblock %}
+
+
+{% block content %}
+  <div class="pb-11">
+    <div class="flex flex-col gap-4 pr-13">
+      <div class="text-sm font-semibold text-primary-600 uppercase">CourtListener</div>
+      <h1 class="font-cooper font-medium text-display-xs md:font-semibold md:text-display-lg">
+        Getting Help on CourtListener
+      </h1>
+      <p class="font-normal text-greyscale-600">The following help articles are currently available</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-11 md:gap-y-20 md:gap-x-5">
+
+    <div class="flex flex-col gap-6">
+      <div class="flex flex-col gap-2">
+        <h2 class="text-display-xs font-semibold text-greyscale-900">Getting Help on</h2>
+        <p class="text-sm font-normal text-greyscale-600">The following help articles are currently available:</p>
+      </div>
+      <div class="pl-4">
+        <ol
+          class="list-decimal text-primary-600 marker:text-greyscale-800 marker:font-normal text-sm font-normal space-y-2">
+          <li><a href="{% url "alert_help" %}">Help with search and docket alerts</a></li>
+          <li><a href="{% url "recap_email_help" %}">Help with @recap.email</a></li>
+          <li><a href="{% url "advanced_search" %}">Help with advanced search parameters</a></li>
+          <li><a href="{% url "tag_notes_help" %}">Learn how to tag dockets and save notes</a></li>
+          <li><a href="{% url "feeds_info" %}">Learn about RSS feeds</a></li>
+          <li><a href="{% url "podcasts" %}">Learn about our Podcasts</a></li>
+          <li><a href="{% url "markdown_help" %}">Help formatting with Markdown</a></li>
+          <li><a href="{% url "donation_help" %}">Help with your donations</a></li>
+          <li><a href="{% url "delete_help" %}">Help deleting your account</a></li>
+          <li><a href="{% url "pray_and_pay_help" %}">Help with Pray and Pay project</a></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-6">
+      <div class="flex flex-col gap-2">
+        <h2 class="text-display-xs font-semibold text-greyscale-900">About our Data</h2>
+        <p class="text-sm font-normal text-greyscale-600">We've built some of the biggest open datasets in the world. Learn more about them:</p>
+      </div>
+      <div class="pl-4">
+        <ol class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal text-primary-600 space-y-2">
+          <li><a href="{% url "coverage" %}">Coverage Homepage</a></li>
+          <li><a href="{% url "coverage_recap" %}">PACER Data Coverage</a></li>
+          <li><a href="{% url "coverage_opinions" %}">Case Law Coverage</a></li>
+          <li><a href="{% url "coverage_fds" %}">Financial Disclosure Coverage</a></li>
+          <li><a href="https://free.law/projects/judge-db" target="_blank">Judge Coverage</a></li>
+          <li><a href="{% url "coverage_oa" %}">Oral Argument Recording Coverage</a></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-6">
+      <div class="flex flex-col gap-2">
+        <h2 class="text-display-xs font-semibold text-greyscale-900">Developer Documentation</h2>
+        <p class="text-sm font-normal text-greyscale-600">The following documentation is available for developers:</p>
+      </div>
+      <div class="pl-4">
+        <ol
+            class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal
+             text-primary-600 space-y-4">
+          <li>
+            <p class="mb-2 text-greyscale-800">API Documentation</p>
+            <ul class="list-disc pl-3 space-y-2">
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "rest_docs" %}">REST API Overview</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "citation_lookup_api" %}">Citation Lookup API</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "search_api_help" %}">Search API</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "case_law_api_help" %}">Case Law APIs</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "pacer_api_help" %}">PACER Data APIs</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "recap_api_help" %}">RECAP APIs</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "judge_api_help" %}">Judge APIs</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "financial_disclosures_api_help" %}">Financial Disclosure APIs</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "citation_api_help" %}">Citation APIs</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "alert_api_help" %}">Alert APIs</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "visualization_api_help" %}">Supreme Court Visualization APIs</a>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <p class="mb-2 text-greyscale-800">Webhook Documentation</p>
+            <ul class="list-disc pl-3 space-y-2">
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "webhooks_docs" %}">Webhook Overview</a>
+              </li>
+              <li class="marker:text-greyscale-200">
+                <a href="{% url "webhooks_getting_started" %}">Getting Started</a>
+              </li>
+            </ul>
+          </li>
+          <li><a href="{% url "bulk_data_index" %}">Bulk Data Documentation</a></li>
+          <li><a href="{% url "replication_docs" %}">Replication Documentation</a></li>
+          <li><a href="{% url "api_index" %}">Data Services on CourtListener</a></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-20">
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-2">
+          <h2 class="text-display-xs font-semibold text-greyscale-900">Removing Content</h2>
+          <p class="text-sm font-normal text-greyscale-600">We will not remove content from our systems absent a valid court order, but we will usually remove content from public search engines like Google, upon request.
+          </p>
+        </div>
+        <a
+          href="{% url "terms" %}#removal"
+          class="py-2.5 px-3.5 rounded-lg outline outline-1 outline-greyscale-300 w-fit text-sm font-normal text-greyscale-700"
+        >
+          Read our Removal Policy to Learn More
+        </a>
+      </div>
+
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-4">
+          <h2 class="text-display-xs font-semibold text-greyscale-900">More Help?</h2>
+          <p class="text-sm font-normal text-greyscale-600">If you're unable to find what you're looking for above you have a few more options:</p>
+        </div>
+        <div class="flex items-start gap-4">
+          <a
+            href="{% url "faq" %}"
+            class="py-2.5 px-3.5 rounded-lg outline outline-1 outline-greyscale-300 w-fit text-sm font-normal text-greyscale-700"
+          >
+            Try our FAQs
+          </a>
+          <a
+            href="{% url "contact" %}"
+            class="py-2.5 px-3.5 rounded-lg w-fit text-sm font-normal text-white bg-primary-600"
+          >
+            Contact Us
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

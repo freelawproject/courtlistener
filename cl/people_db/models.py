@@ -65,6 +65,11 @@ class Person(AbstractDateTimeModel):
         ("mo", "Mormon"),
         ("bu", "Buddhist"),
         ("hi", "Hindu"),
+        ("ep", "Episcopalian"),
+        ("ro", "Roman Catholic"),
+        ("me", "Methodist"),
+        ("pe", "Presbyterian"),
+        ("un", "Unitarian"),
     )
     race = models.ManyToManyField(
         "Race",
@@ -339,6 +344,7 @@ class Position(AbstractDateTimeModel):
     CHIEF_JUSTICE = "c-jus"
     CHIEF_SPECIAL_MASTER = "c-spec-m"
     CHIEF_ADMINISTRATIVE_JUSTICE = "c-admin-jus"
+    CHIEF_SPECIAL_TRIAL_JUDGE = "c-spec-tr-jud"
     PRESIDING_JUDGE = "pres-jud"
     PRESIDING_JUSTICE = "pres-jus"
     SUPERVISING_JUDGE = "sup-jud"
@@ -370,6 +376,7 @@ class Position(AbstractDateTimeModel):
     SPECIAL_JUDGE = "spec-jud"
     SPECIAL_MASTER = "spec-m"
     SPECIAL_SUPERIOR_COURT_JUDGE_FOR_COMPLEX_BUSINESS_CASES = "spec-scjcbc"
+    SPECIAL_TRIAL_JUDGE = "spec-tr-jud"
     # Other
     CHAIRMAN = "chair"
     CHANCELLOR = "chan"
@@ -429,6 +436,7 @@ class Position(AbstractDateTimeModel):
                 (CHIEF_JUSTICE, "Chief Justice"),
                 (CHIEF_SPECIAL_MASTER, "Chief Special Master"),
                 (CHIEF_ADMINISTRATIVE_JUSTICE, "Chief Administrative Justice"),
+                (CHIEF_SPECIAL_TRIAL_JUDGE, "Chief Special Trial Judge"),
                 (PRESIDING_JUDGE, "Presiding Judge"),
                 (PRESIDING_JUSTICE, "Presiding Justice"),
                 (SUPERVISING_JUDGE, "Supervising Judge"),
@@ -468,6 +476,7 @@ class Position(AbstractDateTimeModel):
                     "Special Superior Court Judge for Complex Business "
                     "Cases",
                 ),
+                (SPECIAL_TRIAL_JUDGE, "Special Trial Judge"),
                 # Other
                 (CHAIRMAN, "Chairman"),
                 (CHANCELLOR, "Chancellor"),

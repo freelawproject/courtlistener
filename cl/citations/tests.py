@@ -4,10 +4,12 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import List, Tuple
+from unittest import mock
 from unittest.mock import Mock, patch
 
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
+from bs4 import BeautifulSoup
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
 from django.core.management import call_command
@@ -26,10 +28,7 @@ from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from lxml import etree
 
-from cl.citations.annotate_citations import (
-    create_cited_html,
-    get_and_clean_opinion_text,
-)
+from cl.citations.annotate_citations import create_cited_html
 from cl.citations.filter_parentheticals import (
     clean_parenthetical_text,
     is_parenthetical_descriptive,
@@ -41,27 +40,36 @@ from cl.citations.group_parentheticals import (
     get_representative_parenthetical,
 )
 from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_RESOURCE,
     NO_MATCH_RESOURCE,
     do_resolve_citations,
     resolve_fullcase_citation,
 )
+from cl.citations.match_citations_queries import es_search_db_for_full_citation
+from cl.citations.models import UnmatchedCitation
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
+    store_opinion_citations_and_update_parentheticals,
     store_recap_citations,
+    store_unmatched_citations,
+    update_unmatched_citations_status,
 )
+from cl.citations.utils import make_get_citations_kwargs
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionClusterFactoryMultipleOpinions,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionWithChildrenFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
+    Citation,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -70,7 +78,12 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
-from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.tests.cases import (
+    ESIndexTestCase,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -145,8 +158,8 @@ class CitationTextTest(SimpleTestCase):
             # Supra citation across line break
             ('existing text asdf, supra, at\n99 (quoting foo)',
              '<pre class="inline">existing text asdf, </pre><span class="'
-             'citation no-link">supra, at\n99</span><pre class="inline"> '
-             '(quoting foo)</pre>'),
+             'citation no-link">supra,</span><pre class="inline"> at\n99'
+             ' (quoting foo)</pre>'),
 
             # Id. citation ("Id., at 123")
             ('asdf, id., at 123. Lorem ipsum dolor sit amet',
@@ -183,7 +196,6 @@ class CitationTextTest(SimpleTestCase):
             ('<script async src="//www.instagram.com/embed.js"></script>',
              '<pre class="inline">&lt;script async src=&quot;//www.instagram.com/embed.js&quot;&gt;&lt;/script&gt;</pre>'),
         ]
-
         # fmt: on
         for s, expected_html in test_pairs:
             with self.subTest(
@@ -192,23 +204,67 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(plain_text=s)
-                get_and_clean_opinion_text(opinion)
-                citations = get_citations(
-                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
-                )
+                # take advantage of this test to double check that
+                # `find_reference_citations_from_markup` is not being called
+                # with plain text input
+                with mock.patch(
+                    "eyecite.find.find_reference_citations_from_markup"
+                ) as mock_func:
+                    get_citations_kwargs = make_get_citations_kwargs(opinion)
+                    citations = get_citations(
+                        tokenizer=HYPERSCAN_TOKENIZER,
+                        **get_citations_kwargs,
+                    )
+                    mock_func.assert_not_called()
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
                 # something that looks like what create_cited_html() expects
                 # to receive.
+                if not citations:
+                    continue
                 citation_resolutions = {NO_MATCH_RESOURCE: citations}
 
-                created_html = create_cited_html(opinion, citation_resolutions)
+                created_html = create_cited_html(citation_resolutions, {})
                 self.assertEqual(
                     created_html,
                     expected_html,
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
+
+    def test_no_citations_found_or_resolved(self) -> None:
+        """Ensure that we get `html_with_citations` when no citations are found"""
+        # when no citations were found in `get_citations`
+        self.assertEqual(do_resolve_citations([], None), {})
+
+        # citations may be found, but there were no resolutions
+        get_citations_kwargs = {"markup_text": "<html>Something</html>"}
+        self.assertEqual(
+            create_cited_html({}, get_citations_kwargs),
+            get_citations_kwargs["markup_text"],
+        )
+
+        get_citations_kwargs = {"plain_text": "A Plain Text"}
+        self.assertEqual(
+            create_cited_html({}, get_citations_kwargs),
+            '<pre class="inline">A Plain Text</pre>',
+        )
+
+        # end to end
+        opinion = OpinionWithChildrenFactory(
+            plain_text="No citations found here",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="ca")),
+                case_name="Some placeholder",
+                date_filed=date(2025, 4, 25),
+            ),
+        )
+        store_opinion_citations_and_update_parentheticals(opinion)
+        opinion.refresh_from_db()
+        self.assertEqual(
+            opinion.html_with_citations,
+            '<pre class="inline">No citations found here</pre>',
+        )
 
     def test_make_html_from_html(self) -> None:
         """Can we convert the HTML of an opinion into modified HTML?"""
@@ -228,8 +284,8 @@ class CitationTextTest(SimpleTestCase):
             ('<div><p>the improper views of the Legislature.\" 2 <i>id.,</i> '
              'at <b>73, bolded</b>.</p>\n<p>Nathaniel Gorham of Massachusetts'
              '</p></div>',
-             '<div><p>the improper views of the Legislature.\" 2 <i>id.,</i> '
-             'at <b>73, bolded</b>.</p>\n<p>Nathaniel Gorham of Massachusetts'
+             '<div><p>the improper views of the Legislature.\" 2 <span class="citation no-link"><i>id.,</i> '
+             'at <b>73, bolded</b></span>.</p>\n<p>Nathaniel Gorham of Massachusetts'
              '</p></div>'),
 
             # Ibid. citation with HTML tags
@@ -239,6 +295,13 @@ class CitationTextTest(SimpleTestCase):
              '<div><p>possess any peculiar knowledge of the mere policy of '
              'public measures." <i><span class="citation no-link">Ibid.'
              '</span></i> Gerry of Massachusetts like</p></div>'),
+
+            # test that reference extraction from HTML is working
+            ('<div>In Jones v. Smith, 1 U.S. 1 ... . As said in <em>Jones</em>'
+             '...</div>',
+             '<div>In Jones v. Smith, <span class="citation no-link">1 U.S. 1'
+             '</span> ... . As said in <em><span class="citation no-link">'
+             'Jones</span></em>...</div>'),
         ]
 
         # fmt: on
@@ -249,9 +312,10 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(html=s)
-                get_and_clean_opinion_text(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)
                 citations = get_citations(
-                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                    tokenizer=HYPERSCAN_TOKENIZER,
+                    **get_citations_kwargs,
                 )
 
                 # Stub out fake output from do_resolve_citations(), since the
@@ -260,7 +324,92 @@ class CitationTextTest(SimpleTestCase):
                 # to receive.
                 citation_resolutions = {NO_MATCH_RESOURCE: citations}
 
-                created_html = create_cited_html(opinion, citation_resolutions)
+                created_html = create_cited_html(
+                    citation_resolutions, get_citations_kwargs
+                )
+                self.assertEqual(
+                    created_html,
+                    expected_html,
+                    msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
+                )
+
+    def test_pincite_annotation(self) -> None:
+        """Can we render matched citation objects as HTML?"""
+        # This test case is similar to the above tests, except it tests our
+        # ability to annotate citations in unbalanced html tags and adds a test
+        # for reference cite. (No matching is performed in the previous cases.)
+        # fmt: off
+        case_name = "Example vs. Example"
+        aria_description = f'aria-description="Citation for case: {case_name}"'
+        test_pairs = [
+            # full span helps with unbalanced tags issue in supra citation
+            ('Something. In <em>Twombly, supra, </em>at 553-554, the Court found it...</p>',
+             'Something. In <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#553" '
+             f'{aria_description}>'
+             '<em>Twombly, supra, </em>at 553-554</a></span>, the Court found it...</p>'),
+
+            # Pincited reference
+            ('See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>403 U. S. 388 (1971). '
+             ' The legal issue there was whether a <em>Bivens </em> at 122 action can be employed...',
+
+             'See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>'
+             '<span class="citation" data-id="MATCH_ID">'
+             f'<a href="MATCH_URL" {aria_description}>403 U. S. 388</a></span> (1971).  '
+             'The legal issue there was whether a <span class="citation" data-id="MATCH_ID">'
+             f'<a href="MATCH_URL#122" {aria_description}>'
+             '<em>Bivens </em> at 122</a></span> action can be employed...'
+            ),
+            # pin cite before citation with S.Ct.
+            (
+                "something Something; In <em>Nobelman </em>at 332, 113 S.Ct. 2106 (2010); Something else",
+                f'something Something; In <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#332" {aria_description}>'
+                '<em>Nobelman </em>at 332, 113 S.Ct. 2106'
+                '</a></span> (2010); Something else'
+            ),
+            # Pincited full citation, pincite after nucleus
+            (
+                "Something. Jones v. Smith, 2023 CO 11 at 322 (Colo. 2012). Something else...",
+                f'Something. Jones v. Smith, <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#322" {aria_description}>'
+                '2023 CO 11 at 322</a></span> (Colo. 2012). Something else...'
+            ),
+            # Pincited ShortCase Citation
+            (
+                "See also <em>Wilkie, </em>551 U. S., at 549-550. That",
+                'See also <em>Wilkie, </em><span class="citation" data-id="MATCH_ID">'
+                f'<a href="MATCH_URL#549" {aria_description}>551 U. S., at 549-550</a></span>. That'
+            )
+        ]
+
+        # fmt: on
+        for s, expected_html in test_pairs:
+            with self.subTest(
+                f"Testing object to HTML rendering for {s}...",
+                s=s,
+                expected_html=expected_html,
+            ):
+                opinion = Opinion(html=s)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                citations = get_citations(
+                    tokenizer=HYPERSCAN_TOKENIZER,
+                    **get_citations_kwargs,
+                )
+
+                # Stub out fake output from do_resolve_citations(), since the
+                # purpose of this test is not to test that. We just need
+                # something that looks like what create_cited_html() expects
+                # to receive. Also make sure that the "matched" opinion is
+                # mocked appropriately.
+                opinion.pk = "MATCH_ID"
+                opinion.cluster = Mock(
+                    OpinionCluster(id=24601), case_name=case_name
+                )
+                opinion.cluster.get_absolute_url.return_value = "MATCH_URL"
+                citation_resolutions = {opinion: citations}
+
+                created_html = create_cited_html(
+                    citation_resolutions, get_citations_kwargs
+                )
+
                 self.assertEqual(
                     created_html,
                     expected_html,
@@ -291,9 +440,10 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(xml_harvard=s)
-                get_and_clean_opinion_text(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)
                 citations = get_citations(
-                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                    tokenizer=HYPERSCAN_TOKENIZER,
+                    **get_citations_kwargs,
                 )
 
                 # Stub out fake output from do_resolve_citations(), since the
@@ -302,7 +452,9 @@ class CitationTextTest(SimpleTestCase):
                 # to receive.
                 citation_resolutions = {NO_MATCH_RESOURCE: citations}
 
-                created_html = create_cited_html(opinion, citation_resolutions)
+                created_html = create_cited_html(
+                    citation_resolutions, get_citations_kwargs
+                )
                 self.assertEqual(
                     created_html,
                     expected_html,
@@ -315,24 +467,26 @@ class CitationTextTest(SimpleTestCase):
         # test the rendering of citation objects that we assert are correctly
         # matched. (No matching is performed in the previous cases.)
         # fmt: off
-
+        case_name = "Example vs. Example"
+        aria_description = f'aria-description="Citation for case: {case_name}"'
         test_pairs = [
             # Id. citation with page number ("Id., at 123, 124")
             ('asdf, Id., at 123, 124. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id="'
-             'MATCH_ID"><a href="MATCH_URL">Id., at 123, 124</a></span><pre '
-             'class="inline">. Lorem ipsum dolor sit amet</pre>'),
+             f'MATCH_ID"><a href="MATCH_URL#123" {aria_description}>'
+             'Id., at 123, 124</a></span><pre class="inline">. '
+             'Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation with complex page number ("Id. @ 123:1, ¶¶ 124")
             ('asdf, Id. @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id='
-             '"MATCH_ID"><a href="MATCH_URL">Id.</a></span><pre class='
+             f'"MATCH_ID"><a href="MATCH_URL" {aria_description}>Id.</a></span><pre class='
              '"inline"> @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation without page number ("Id. Something else")
             ('asdf, Id. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation" data-id="'
-             'MATCH_ID"><a href="MATCH_URL">Id.</a></span><pre class="inline">'
+             f'MATCH_ID"><a href="MATCH_URL" {aria_description}>Id.</a></span><pre class="inline">'
              ' Lorem ipsum dolor sit amet</pre>'),
         ]
 
@@ -344,9 +498,10 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(plain_text=s)
-                get_and_clean_opinion_text(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)
                 citations = get_citations(
-                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                    tokenizer=HYPERSCAN_TOKENIZER,
+                    **get_citations_kwargs,
                 )
 
                 # Stub out fake output from do_resolve_citations(), since the
@@ -355,17 +510,71 @@ class CitationTextTest(SimpleTestCase):
                 # to receive. Also make sure that the "matched" opinion is
                 # mocked appropriately.
                 opinion.pk = "MATCH_ID"
-                opinion.cluster = Mock(OpinionCluster(id=24601))
+                opinion.cluster = Mock(
+                    OpinionCluster(id=24601), case_name=case_name
+                )
                 opinion.cluster.get_absolute_url.return_value = "MATCH_URL"
                 citation_resolutions = {opinion: citations}
 
-                created_html = create_cited_html(opinion, citation_resolutions)
+                created_html = create_cited_html(
+                    citation_resolutions, get_citations_kwargs
+                )
 
                 self.assertEqual(
                     created_html,
                     expected_html,
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
+
+    def test_unsafe_case_names(self) -> None:
+        """Test unsafe characters in aria descriptions"""
+        case_names = [
+            (
+                # ampersand
+                "Farmers ' High Line Canal & Reservoir Co. v. New Hampshire Real Estate Co.",
+                "Citation for case: Farmers ' High Line Canal & Reservoir Co. v. New...",
+            ),
+            (
+                # single quote
+                "Barmore v '",
+                "Citation for case: Barmore v '",
+            ),
+            (
+                # Question mark, and double quotes
+                """Shamokin, Pa.", (Leaflet in Case) Misnamed? ',""",  # Question marks and double quotes with single quotes
+                """Citation for case: Shamokin, Pa.", (Leaflet in Case) Misnamed? ',""",
+            ),
+        ]
+        for case_name, expected_aria in case_names:
+            html_opinion = "foo v. bar, 1 U.S. 1 baz"
+            opinion = Opinion(
+                plain_text=html_opinion,
+                pk="MATCH_ID",
+                cluster=Mock(OpinionCluster(id=1234), case_name=case_name),
+            )
+            get_citations_kwargs = make_get_citations_kwargs(opinion)
+            citations = get_citations(
+                tokenizer=HYPERSCAN_TOKENIZER,
+                **get_citations_kwargs,
+            )
+            opinion.cluster.get_absolute_url.return_value = "/opinion/1/foo/"
+            citation_resolutions = {opinion: citations}
+            created_html = create_cited_html(
+                citation_resolutions, get_citations_kwargs
+            )
+
+            # extract out aria description
+            soup = BeautifulSoup(created_html, "html.parser")
+            citation_link = soup.find("a", {"aria-description": True})
+            aria_description = (
+                citation_link["aria-description"] if citation_link else None
+            )
+
+            self.assertEqual(
+                aria_description,
+                expected_aria,
+                msg=f"\n{aria_description}\n\n    !=\n\n{expected_aria}",
+            )
 
 
 class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
@@ -452,6 +661,10 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # Courts
         cls.court_scotus = CourtFactory(id="scotus")
         court_ca1 = CourtFactory(id="ca1")
+        cls.court_ca5 = CourtFactory(id="ca5")
+        cls.court_illappct = CourtFactory(id="illappct")
+        cls.court_nj = CourtFactory(id="nj")
+        cls.court_dc = CourtFactory(id="dc")
 
         # Citation 1
         cls.citation1 = CitationWithParentsFactory.create(
@@ -528,6 +741,209 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 ),
             ),
         )
+
+        cls.citation6 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1182",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Foo v. Bar",
+                date_filed=date(1997, 4, 10),
+            ),
+        )
+
+        cls.citation7 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1182",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Lorem v. Ipsum",
+                date_filed=date(1997, 4, 8),
+            ),
+        )
+
+        cls.citation8 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="John v. Doe",
+                date_filed=date(1997, 4, 9),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="""Lorem ipsum, 114 F.3d 1182""",
+                ),
+            ),
+        )
+
+        cls.citation9 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1181",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Lorem v. Ipsum",
+                date_filed=date(1997, 4, 8),
+            ),
+        )
+
+        cls.citation10 = CitationWithParentsFactory.create(
+            volume="114",
+            reporter="F.3d",
+            page="1181",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Lorem v. Ipsum",
+                date_filed=date(1997, 4, 8),
+            ),
+        )
+
+        cls.citation11 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.court_ca5),
+                case_name="Foo v. Bar",
+                date_filed=date(1997, 4, 9),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="""Lorem ipsum, 114 F.3d 1182, consectetur adipiscing elit, 114 F.3d 1181""",
+                ),
+            ),
+        )
+
+        cls.citation12 = CitationWithParentsFactory.create(
+            volume="8",
+            reporter="Barb.",
+            page="415",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                case_name="Shaffer v. Lee",
+                date_filed=date(1850, 4, 9),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    xml_harvard="""Lorem ipsum,*415 114 F.3d 1182, consectetur *416 adipiscing elit, 114 F.3d 1181""",
+                ),
+            ),
+        )
+
+        cls.cluster_1 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_illappct,
+                case_name="People v. Williams",
+            ),
+            case_name="People v. Williams",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+                {"type": "020lead", "ordering_key": 1},
+                {"type": "030concurrence", "ordering_key": 2},
+            ],
+        )
+
+        cls.cluster_2 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_illappct,
+                case_name="People v. Jackson",
+            ),
+            case_name="People v. Jackson",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+                {"type": "020lead", "ordering_key": 1},
+                {"type": "030concurrence", "ordering_key": 2},
+            ],
+        )
+
+        cls.cluster_3 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_nj,
+                case_name="State v. Gatson",
+            ),
+            case_name="State v. Gatson",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+                {"type": "020lead", "ordering_key": 1},
+                {"type": "030concurrence", "ordering_key": 2},
+            ],
+        )
+
+        cls.cluster_4 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_nj,
+                case_name="State v. Gerrard",
+            ),
+            case_name="State v. Gerrard",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+            ],
+        )
+
+        cls.cluster_5 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_dc,
+                case_name="Good v. United States",
+            ),
+            case_name="Good v. United States",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+            ],
+        )
+
+        cls.cluster_6 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=cls.court_dc,
+                case_name="Duncan v. United States",
+            ),
+            case_name="Duncan v. United States",
+            date_filed=date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+            ],
+        )
+
+        cls.same_citation_1_clusters = [cls.cluster_1, cls.cluster_2]
+
+        cls.same_citation_2_clusters = [cls.cluster_3, cls.cluster_4]
+
+        cls.same_citation_3_clusters = [cls.cluster_5, cls.cluster_6]
+
+        for cluster in cls.same_citation_1_clusters:
+            Citation.objects.create(
+                cluster=cluster,
+                volume=307,
+                reporter="Ill. Dec.",
+                page=312,
+                type=Citation.STATE,
+            )
+
+        for cluster in cls.same_citation_2_clusters:
+            Citation.objects.create(
+                cluster=cluster,
+                volume=203,
+                reporter="N.J.",
+                page=92,
+                type=Citation.STATE,
+            )
+
+        for cluster in cls.same_citation_3_clusters:
+            Citation.objects.create(
+                cluster=cluster,
+                volume=172,
+                reporter="A.3d",
+                page=459,
+                type=Citation.STATE_REGIONAL,
+            )
+
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.OPINION,
@@ -846,6 +1262,62 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         results = resolve_fullcase_citation(citation)
         self.assertEqual(NO_MATCH_RESOURCE, results)
 
+    def test_citation_resolve_with_corrected_reporter(self) -> None:
+        """Resolve to corrected reporter"""
+        cite_str = "8 B. 415"
+        citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
+        citation.citing_opinion = Opinion.objects.all()[0]
+        results = resolve_fullcase_citation(citation)
+        opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        self.assertEqual(results.pk, opinion12.pk, msg=results)
+
+    def test_citation_resolve_to_pincite(self) -> None:
+        """Resolve to corrected reporter and pin cite inside xml harvard?"""
+        cite_str = "8 B. 416"
+        citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
+        citation.citing_opinion = Opinion.objects.all()[0]
+        results = resolve_fullcase_citation(citation)
+        opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        self.assertEqual(results.pk, opinion12.pk, msg=results)
+
+    def test_citation_multiple_matches(self) -> None:
+        """Make sure that we can identify multiple matches for a single citation"""
+        citation_str = "114 F.3d 1182"
+        citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
+            0
+        ]
+        results = resolve_fullcase_citation(citation)
+        self.assertEqual(MULTIPLE_MATCHES_RESOURCE, results)
+
+        # Verify if the annotated citation is correct
+        opinion = self.citation8.cluster.sub_opinions.all().first()
+        get_citations_kwargs = make_get_citations_kwargs(opinion)
+        citations = get_citations(
+            tokenizer=HYPERSCAN_TOKENIZER, **get_citations_kwargs
+        )
+        citation_resolutions = do_resolve_citations(citations, opinion)
+        new_html = create_cited_html(
+            citation_resolutions, get_citations_kwargs
+        )
+
+        expected_citation_annotation = '<pre class="inline">Lorem ipsum, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1182/">114 F.3d 1182</a></span><pre class="inline"></pre>'
+        self.assertIn(expected_citation_annotation, new_html, msg="Failed!!")
+
+        # Verify if we can annotate multiple citations that can't be
+        # disambiguated
+        opinion = self.citation11.cluster.sub_opinions.all().first()
+        get_citations_kwargs = make_get_citations_kwargs(opinion)
+        citations = get_citations(
+            tokenizer=HYPERSCAN_TOKENIZER, **get_citations_kwargs
+        )
+        self.assertEqual(len(citations), 2)
+        citation_resolutions = do_resolve_citations(citations, opinion)
+        new_html = create_cited_html(
+            citation_resolutions, get_citations_kwargs
+        )
+        expected_citation_annotation = '<pre class="inline">Lorem ipsum, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1182/">114 F.3d 1182</a></span><pre class="inline">, consectetur adipiscing elit, </pre><span class="citation multiple-matches"><a href="/c/F.3d/114/1181/">114 F.3d 1181</a></span><pre class="inline"></pre>'
+        self.assertIn(expected_citation_annotation, new_html)
+
     def test_citation_increment(self) -> None:
         """Make sure that found citations update the increment on the cited
         opinion's citation count"""
@@ -947,6 +1419,99 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             1,
         )
 
+    def test_citation_results_ordering(self) -> None:
+        """Test opinion matching prioritization logic.
+
+        Verifies:
+        1. Documents with ordering_key appear before those without
+        2. When ordering_key exists, documents are sorted by its value (ascending)
+        3. When ordering_key is missing, documents fall back to ID-based sorting
+        4. Cluster deduplication returns at most 2 results (size=2)
+        """
+
+        # Test Case 1: Both results have ordering_key (should sort by ordering_key)
+        full_citation = case_citation(
+            volume="307",
+            reporter="Ill. Dec.",
+            page="312",
+            index=1,
+            reporter_found="Ill. Dec.",
+        )
+
+        results, citation_found = es_search_db_for_full_citation(full_citation)
+
+        # Should return exactly 2 results due to size=2 in fetch_citations
+        self.assertEqual(len(results), 2)
+
+        # Get expected opinions in correct order
+        opinion_cluster1 = Opinion.objects.get(
+            cluster=self.cluster_1, ordering_key=1
+        )
+        opinion_cluster2 = Opinion.objects.get(
+            cluster=self.cluster_2, ordering_key=1
+        )
+
+        expected_ids = [opinion_cluster1.pk, opinion_cluster2.pk]
+
+        self.assertEqual(
+            [r["id"] for r in results],
+            expected_ids,
+            "Should sort by ordering_key when both documents have it",
+        )
+
+        # Test case 2: Mixed case - one result with ordering_key, one without
+        full_citation = case_citation(
+            volume="203",
+            reporter="N.J.",
+            page="92",
+            index=1,
+            reporter_found="N.J.",
+        )
+
+        results, citation_found = es_search_db_for_full_citation(full_citation)
+
+        # Verify documents with ordering_key appear before those without
+        opinion_cluster3 = Opinion.objects.get(
+            cluster=self.cluster_3, ordering_key=1
+        )
+        opinion_cluster4 = Opinion.objects.get(
+            cluster=self.cluster_4, ordering_key=None
+        )
+
+        expected_ids = [opinion_cluster3.pk, opinion_cluster4.pk]
+
+        self.assertEqual(
+            [r["id"] for r in results],
+            expected_ids,
+            "Document with ordering_key should always appear first",
+        )
+
+        # Test Case 3: No ordering_keys exist (should fall back to ID sorting)
+        full_citation = case_citation(
+            volume="172",
+            reporter="A.3d",
+            page="459",
+            index=1,
+            reporter_found="A.3d",
+        )
+
+        results, citation_found = es_search_db_for_full_citation(full_citation)
+
+        opinion_cluster5 = Opinion.objects.get(
+            cluster=self.cluster_5, ordering_key=None
+        )
+        opinion_cluster6 = Opinion.objects.get(
+            cluster=self.cluster_6, ordering_key=None
+        )
+
+        expected_ids = [opinion_cluster5.pk, opinion_cluster6.pk]
+
+        self.assertEqual(
+            [r["id"] for r in results],
+            expected_ids,
+            "Should fall back to ID sorting when no ordering_keys exist",
+        )
+
 
 class CitationFeedTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
@@ -1021,6 +1586,10 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="Yeates",
             page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                # Yeates was published from 1791 to 1808
+                date_filed=date(1800, 1, 1),
+            ),
         )
 
         # Citation 2 - citing opinion
@@ -2398,3 +2967,125 @@ class CitationLookUpApiTest(
             # times the allowed number of citations.
             expected_time = test_date + timedelta(minutes=3)
             self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+
+class UnmatchedCitationTest(TransactionTestCase):
+    """Test UnmatchedCitation model and related logic"""
+
+    # this will produce 6 citations: 5 FullCase and 1 Id
+    # last 2 should be ignored:
+    # the last cite has a null page and would cause an error when storing
+    plain_text = """
+    0-index 62 Tex. Sup. Ct. J. 313 (Jan. 18, 2019).
+    1-index Frost Natl Bank v. Fernandez, 315 S.W.3d 494, 508 (Tex. 2010) (citation omitted);
+    2-index Valence Operating Co. v. Dorsett, 164 S.W.3d 656, 661 (Tex. 2005) (citation omitted).
+    3-index the fact that State Farm complied with the Insurance Code . . . . Id.
+    4-index 182 A.3d ____________________________________________
+    """
+    eyecite_citations = get_citations(
+        plain_text, tokenizer=HYPERSCAN_TOKENIZER
+    )
+    # select one to mark as ambiguous; as happens on the resolution flow
+    # to MULTIPLE_RESOURCE_MATCH citations
+    ambiguous_citations = [eyecite_citations.pop(2)]
+    cluster = None
+    opinion = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cluster = OpinionClusterFactoryWithChildrenAndParents()
+        cls.opinion = cls.cluster.sub_opinions.first()
+        UnmatchedCitation.objects.all().delete()
+
+    def test_1st_creation(self) -> None:
+        """Can we save unmatched citations?"""
+        store_unmatched_citations(
+            self.eyecite_citations, self.ambiguous_citations, self.opinion
+        )
+        unmatched_citations = list(
+            UnmatchedCitation.objects.filter(citing_opinion=self.opinion).all()
+        )
+        self.assertEqual(
+            len(unmatched_citations),
+            3,
+            "Incorrect number of citations saved",
+        )
+        self.assertTrue(
+            unmatched_citations[1].court_id == "tex",
+            "court_id was not saved",
+        )
+        self.assertTrue(
+            unmatched_citations[0].year == 2019, "year was not saved"
+        )
+        self.assertEqual(
+            unmatched_citations[-1].status,
+            UnmatchedCitation.FAILED_AMBIGUOUS,
+            "ambiguous UnmatchedCitation was not marked properly",
+        )
+
+        # Test signal on matching Citation created
+        unmatched_citation = UnmatchedCitation.objects.first()
+        Citation.objects.create(
+            cluster=self.cluster,
+            reporter=unmatched_citation.reporter,
+            volume=unmatched_citation.volume,
+            page=unmatched_citation.page,
+            type=unmatched_citation.type,
+        )
+
+        unmatched_citation.refresh_from_db()
+        self.assertTrue(
+            unmatched_citation.status == UnmatchedCitation.FOUND,
+            "`update_unmatched_citation` was not executed on post_save signal",
+        )
+
+        # Simulate that only 1 citation was resolved
+        citation_resolutions = {1: [self.eyecite_citations[0]]}
+
+        should_resolve = UnmatchedCitation.objects.first()
+        should_not_resolve = UnmatchedCitation.objects.last()
+        should_not_resolve.status = UnmatchedCitation.FOUND
+        should_not_resolve.save()
+
+        found_count = UnmatchedCitation.objects.filter(
+            status=UnmatchedCitation.FOUND
+        ).count()
+        self.assertTrue(
+            found_count == 2,
+            f"There should be 2 found UnmatchedCitations, there are {found_count}",
+        )
+
+        update_unmatched_citations_status(citation_resolutions, self.opinion)
+        should_resolve.refresh_from_db()
+        should_not_resolve.refresh_from_db()
+
+        self.assertTrue(
+            should_resolve.status == UnmatchedCitation.RESOLVED,
+            f"UnmatchedCitation.status should be UnmatchedCitation.RESOLVED, is {should_resolve.status}",
+        )
+        self.assertTrue(
+            should_not_resolve.status == UnmatchedCitation.FAILED,
+            f"UnmatchedCitation.status should be UnmatchedCitation.FAILED is {should_not_resolve.status}",
+        )
+
+    def test_self_citation(self) -> None:
+        """Can we prevent a self citation being stored as UnmatchedCitation?"""
+        cluster = OpinionClusterFactoryWithChildrenAndParents()
+        CitationWithParentsFactory.create(
+            volume="948",
+            reporter="F.3d",
+            page="593",
+            cluster=cluster,
+        )
+        eyecite_citations = get_citations(
+            "something... 948 F.3d 593 something more...",
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
+        opinion = cluster.sub_opinions.first()
+        store_unmatched_citations(eyecite_citations, [], opinion)
+        count = UnmatchedCitation.objects.filter(
+            citing_opinion=opinion
+        ).count()
+        self.assertEqual(
+            count, 0, "Self-cite has been stored as UnmatchedCitation"
+        )

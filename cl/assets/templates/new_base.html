@@ -1,0 +1,133 @@
+{% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
+{% load static tailwind_tags %}
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="Content-Language" content="en"/>
+  <meta name="language" content="en_us"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+
+  {% block meta %}
+  <meta name="description" content="{% block description %}Create alerts, search for and browse the latest case law, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
+
+  {# Open Search Plugin #}
+  <link rel="search"
+        type="application/opensearchdescription+xml"
+        title="CourtListener"
+        href="{% static "xml/opensearch.xml" %}" />
+
+  {# MS Application Icons #}
+  <meta name="application-name" content="CourtListener"/>
+  <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest case law."/>
+  <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
+  <meta name="msapplication-navbutton-color" content="#6683B7"/>
+
+  {# Twitter #}
+  <meta name="twitter:card" content="{% block twitter_card_type %}summary{% endblock %}">
+  <meta name="twitter:creator" content="@freelawproject">
+  <meta name="twitter:site" content="@courtlistener">
+
+  {# Facebook #}
+  <meta property="og:type" content="website"/>
+  <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
+  <meta property="og:description"
+        content="{% block og_description %}Create alerts, search for and browse the latest case law, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
+  <meta property="og:url" content="{% block og_url %}{% get_full_host %}{{ request.path }}{% endblock %}"/>
+  <meta property="og:site_name" content="CourtListener"/>
+  <meta property="og:image"
+        content="{% block og_image %}{% static "png/og-image-1200x630.png" %}{% endblock %}"/>
+  <meta property="og:image:type" content="{% block og_image_type %}image/png{% endblock %}"/>
+  <meta property="twitter:image:alt"
+        content="{% block og_image_alt %}The CourtListener logo{% endblock %}"/>
+  <meta property="og:image:width" content="{% block og_image_width %}1200{% endblock %}"/>
+  <meta property="og:image:height" content="{% block og_image_height %}630{% endblock %}"/>
+  {% endblock %}
+
+  {% tailwind_css %}
+  {% tailwind_preload_css %}
+
+  {% block icons %}
+  {# Touch icons, etc from: https://evilmartians.com/chronicles/how-to-favicon-in-2021-six-files-that-fit-most-needs #}
+  <link rel="icon" href="{% static "ico/favicon.ico" %}" sizes="32x32">
+  <link rel="icon" href="{% static "svg/favicon.svg" %}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{% static "png/apple-touch-icon.png" %}">
+  {# Add hashes to manifest by hand. They're the first 12 chars of the MD5 of the file. #}
+  <link rel="manifest" href="{% static "json/manifest.json" %}">
+  {% endblock %}
+
+  <link href="{% static "css/font-awesome.css" %}" rel="stylesheet">
+
+  {% block privacy %}
+    {% if private %}
+      <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
+    {% elif private == None %}
+      <!-- This bit of invalid HTML is to give developers a loud warning. -->
+      <h1>You did not supply the "private" variable to your template.
+          Please indicate if it is True or False to remove this
+          awful message.</h1>
+    {% endif %}
+  {% endblock %}
+  <title>{% block title %}CourtListener.com{% endblock %}</title>
+  {% block head %}{% endblock %}
+  {% block canonical %}{% endblock %}
+</head>
+
+<body class="{% block body-classes %}{% endblock %}">
+  {% block header %}
+  <header class="border border-greyscale-200">
+  New design MVP
+  </header>
+  {% endblock %}
+
+  <main>
+    {% block content_wrapper %}
+    <div class="max-w-content mx-auto pt-4 md:pt-20 pb-35 max-lg:px-4">
+      {% block content %}
+        <p>Your content seems to be missing! This is never good.</p>
+      {% endblock %}
+    </div>
+    {% endblock %}
+  </main>
+
+  {% block footer %}
+  <footer class="">
+  </footer>
+  {% endblock %}
+
+  {% if DEBUG %}
+  <script type="text/javascript"
+          src="{% static "js/jquery/jquery-3.4.1.js" %}"></script>
+  <script src="{% static 'js/alpinejscsp@3.14.8.js' %}" defer init nonce="{{ request.csp_nonce }}"></script>
+  {% else %}
+  <script type="text/javascript"
+        src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
+  <script src="{% static 'js/alpinejscsp@3.14.8.min.js' %}" defer init nonce="{{ request.csp_nonce }}"></script>
+  {% endif %}
+
+  <script type="text/javascript" src="{% static "js/base.js" %}"></script>
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+    {# Default values are to ensure JS parsing even if 500 error thrown #}
+    var isMember = {{ user.profile.is_member|yesno:"true,false" }},
+        userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},
+        priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }}),
+        maxFreeDocketAlerts = {{ MAX_FREE_DOCKET_ALERTS|default:0 }},
+        recapBonusAlerts = {{ DOCKET_ALERT_RECAP_BONUS|default:0 }};
+
+  </script>
+
+  {# Allows your own scripts in the footer. #}
+  {% block footer-scripts %}{% endblock %}
+
+  {# Record stats for non-superusers 1/10 times to save money #}
+  {% if not user.is_superuser  %}
+    {% random_int 0 9 as rand %}
+    {% if rand == 0 %}
+      <script
+        defer
+        data-domain="courtlistener.com"
+        src="https://plausible.io/js/plausible.js"></script>
+    {% endif %}
+  {% endif %}
+</body>
+</html>

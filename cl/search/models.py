@@ -1,20 +1,31 @@
 import logging
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Tuple, TypeVar
+from typing import Dict, List, Tuple, TypeVar
 
+import nh3
 import pghistory
 import pytz
+import tiktoken
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
-from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
-from django.db.models import Q, QuerySet
-from django.db.models.functions import MD5
-from django.urls import NoReverseMatch, reverse
+from django.db.models import (
+    Case,
+    CharField,
+    F,
+    Prefetch,
+    Q,
+    QuerySet,
+    Value,
+    When,
+)
+from django.db.models.aggregates import Count, Sum
+from django.db.models.functions import MD5, Coalesce, NullIf
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.functional import cached_property
@@ -28,7 +39,6 @@ from model_utils import FieldTracker
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
-from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     CSVExportMixin,
     linkify_orig_docket_number,
@@ -37,9 +47,8 @@ from cl.lib.model_helpers import (
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
-from cl.lib.search_index_utils import InvalidDocumentError
 from cl.lib.storage import IncrementingAWSMediaStorage
-from cl.lib.string_utils import trunc
+from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.docket_sources import DocketSources
 from cl.users.models import User
 
@@ -870,6 +879,22 @@ class Docket(AbstractDateTimeModel, DocketSources):
         """
         return build_authorities_query(self.authorities)
 
+    @property
+    def authority_opinions(self):
+        """Return a queryset of Opinions cited by this docket's RDs.
+
+        This is similar to the authorities property, but instead of
+        listing OpinionsCitedByRECAPDocuments, it lists Opinions.
+
+        The returned queryset is annotated with the number of filings
+        and the total depth across references, and optimized by prefetching
+        related data.
+        """
+        opinions = Opinion.objects.filter(
+            citing_documents__citing_document__docket_entry__docket_id=self.pk
+        )
+        return build_authority_opinions_query(opinions)
+
     def add_idb_source(self):
         if self.source in self.NON_IDB_SOURCES():
             self.source = self.source + self.IDB
@@ -1383,6 +1408,19 @@ class RECAPDocument(
                 },
             )
 
+    def is_acms_document(self) -> bool:
+        """
+        Checks if the document is from ACMS based on the presence of hyphens
+        in the pacer_doc_id.
+
+        ACMS documents are currently the only ones using hyphens in their
+        doc_id.
+
+        :return: True if the doc_id contains more than one hyphen, False
+            otherwise.
+        """
+        return self.pacer_doc_id.count("-") > 1
+
     @property
     def pacer_url(self) -> str | None:
         """Construct a doc1 URL for any item, if we can. Else, return None."""
@@ -1391,7 +1429,7 @@ class RECAPDocument(
         court = self.docket_entry.docket.court
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
-            if self.pacer_doc_id.count("-") > 1:
+            if self.is_acms_document():
                 return (
                     f"https://{court_id}-showdoc.azurewebsites.us/docs/"
                     f"{self.docket_entry.docket.pacer_case_id}/"
@@ -2880,8 +2918,7 @@ class OpinionClusterNonParticipatingJudges(
         proxy = True
 
 
-@pghistory.track()
-class Citation(models.Model):
+class BaseCitation(models.Model):
     """A simple class to hold citations."""
 
     FEDERAL = 1
@@ -2921,12 +2958,6 @@ class Citation(models.Model):
             "72 Soc.Sec.Rep.Serv. 318)",
         ),
     )
-    cluster = models.ForeignKey(
-        OpinionCluster,
-        help_text="The cluster that the citation applies to",
-        related_name="citations",
-        on_delete=models.CASCADE,
-    )
     volume = models.SmallIntegerField(help_text="The volume of the reporter")
     reporter = models.TextField(
         help_text="The abbreviation for the reporter",
@@ -2947,9 +2978,24 @@ class Citation(models.Model):
         help_text="The type of citation that this is.", choices=CITATION_TYPES
     )
 
+    class Meta:
+        abstract = True
+
     def __str__(self) -> str:
         # Note this representation is used in the front end.
         return "{volume} {reporter} {page}".format(**self.__dict__)
+
+
+@pghistory.track()
+class Citation(BaseCitation):
+    """A citation to an OpinionCluster"""
+
+    cluster = models.ForeignKey(
+        OpinionCluster,
+        help_text="The cluster that the citation applies to",
+        related_name="citations",
+        on_delete=models.CASCADE,
+    )
 
     def get_absolute_url(self) -> str:
         return self.cluster.get_absolute_url()
@@ -3014,7 +3060,67 @@ def sort_cites(c):
         return 8
 
 
-@pghistory.track()
+OPINION_TEXT_SOURCE_FIELDS = [
+    "html_with_citations",
+    "xml_harvard",
+    "html_columbia",
+    "html_lawbox",
+    "html_anon_2020",
+    "html",
+]
+
+
+class OpinionQuerySet(models.QuerySet):
+    def with_best_text(self):
+        """Annotates an Opinion QuerySet with best_text and best_text_source.
+
+        To determine the best text, we get the first non-empty value from
+        various source fields, prioritizing HTML formats with citations
+        over plain text.
+
+        The best_text_source is a CharField that indicates
+        the name of the field from which the best_text was retrieved.
+
+        The supported source fields are:
+            - html_with_citations (preferred)
+            - xml_harvard
+            - html_columbia
+            - html_lawbox
+            - html_anon_2020
+            - html
+        """
+        source_fields = OPINION_TEXT_SOURCE_FIELDS
+        # To populate best_text we get the first non-empty value
+        # from the list of possible text sources:
+        coalesce_args = [
+            NullIf(F(field), Value("")) for field in source_fields
+        ]
+        # And we fall back to plain_text if all of the above are empty:
+        coalesce_args.append(F("plain_text"))
+
+        # We use When clauses to determine the name of the field that was used
+        # as the source for the best text:
+        when_clauses = [
+            When(
+                Q(**{f"{field}__isnull": False}) & ~Q(**{field: ""}),
+                then=Value(field),
+            )
+            for field in source_fields
+        ]
+
+        deferred_fields = source_fields + ["plain_text"]
+
+        return self.defer(*deferred_fields).annotate(
+            best_text=Coalesce(*coalesce_args, output_field=CharField()),
+            best_text_source=Case(
+                *when_clauses,
+                default=Value("plain_text"),
+                output_field=CharField(),
+            ),
+        )
+
+
+@pghistory.track(exclude=["html_with_citations"])
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
@@ -3185,9 +3291,12 @@ class Opinion(AbstractDateTimeModel):
             "html",
             "plain_text",
             "sha1",
+            "ordering_key",
         ]
     )
     ordering_key = models.IntegerField(null=True, blank=True)
+
+    objects = OpinionQuerySet.as_manager()
 
     class Meta:
         constraints = [
@@ -3201,6 +3310,34 @@ class Opinion(AbstractDateTimeModel):
     def siblings(self) -> QuerySet:
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
+
+    @property
+    def clean_text(self) -> str:
+        """
+        Returns the cleaned opinion text by using the annotated `best_text`
+        if it exists; otherwise, it falls back to computing the value in Python.
+
+        The retrieved text is then cleaned using the `nh3.clean`. This cleaning
+        process removes all HTML tags while preserving the content.
+
+        The annotated field `best_text` is added when calling the QuerySet
+        using with_best_text like so:
+        Opinion.objects.filter(something_here=foo).with_best_text()
+        """
+        if hasattr(self, "best_text"):
+            return nh3.clean(self.best_text, tags=set())
+
+        for field in OPINION_TEXT_SOURCE_FIELDS:
+            value = getattr(self, field, None)
+            if value and value.strip():
+                return nh3.clean(value, tags=set())
+
+        return nh3.clean(self.plain_text, tags=set())
+
+    @property
+    def token_count(self) -> int:
+        """Returns the number of tokens in this opinion text."""
+        return get_token_count_from_string(self.clean_text)
 
     def __str__(self) -> str:
         try:
@@ -3288,6 +3425,51 @@ class OpinionsCitedByRECAPDocument(models.Model):
         verbose_name_plural = "Opinions cited by RECAP document"
         unique_together = ("citing_document", "cited_opinion")
         indexes = [models.Index(fields=["depth"])]
+
+
+def build_authority_opinions_query(
+    base_queryset: QuerySet[Opinion],
+) -> QuerySet[Opinion]:
+    """Annotates a queryset of Opinions and optimizes related queries.
+
+    The annotated queryset includes the number of filings (total number of
+    RECAPDocuments that cite each opinion) and the total depth (total
+    number of references across documents).
+    """
+    return (
+        base_queryset.select_related("cluster__docket__court")
+        .prefetch_related(
+            "cluster__citations",
+            "citing_documents",
+            Prefetch(
+                "cluster__sub_opinions",
+                queryset=Opinion.objects.only("pk", "cluster_id"),
+            ),
+        )
+        .annotate(
+            num_filings=Count(
+                "citing_documents__citing_document", distinct=True
+            ),
+            total_depth=Sum("citing_documents__depth"),
+        )
+        .only(
+            "cluster__id",
+            "cluster__blocked",
+            "cluster__case_name",
+            "cluster__case_name_full",
+            "cluster__case_name_short",
+            "cluster__docket_id",
+            "cluster__docket__court__full_name",
+            "cluster__docket__docket_number",
+            "cluster__docket__court_id",
+            "cluster__docket__court__citation_string",
+            "cluster__slug",
+            "cluster__citation_count",
+            "cluster__docket_id",
+            "cluster__date_filed",
+        )
+        .order_by("-num_filings", "-total_depth")
+    )
 
 
 def build_authorities_query(

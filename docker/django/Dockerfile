@@ -24,7 +24,7 @@ ENV PGSSLCERT=/tmp/postgresql.crt
 
 # poetry
 # https://python-poetry.org/docs/configuration/#using-environment-variables
-ENV POETRY_VERSION=1.8.4 \
+ENV POETRY_VERSION=2.1.1 \
     # make poetry install to this location
     POETRY_HOME="/opt/poetry" \
     # Don't build a virtualenv to save space
@@ -57,6 +57,7 @@ COPY . /opt/courtlistener
 WORKDIR /opt/courtlistener/cl
 RUN npm install
 RUN npx webpack --mode=production --no-devtool
+RUN npm run build --no-input
 
 WORKDIR /opt
 

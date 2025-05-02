@@ -256,4 +256,4 @@ class NeonMembership(AbstractDateTimeModel):
         if not self.termination_date:
             return True
 
-        return self.termination_date > timezone.now()
+        return self.termination_date.date() >= timezone.now().date()

@@ -158,7 +158,10 @@
                   {% else %}
                     {# We don't have it #}
                     {% if rd.is_sealed %}
-                      <span class="btn btn-primary btn-xs disabled">Sealed on PACER</span>
+                      <span class="btn btn-primary btn-xs disabled">Unavailable on PACER</span>
+                      <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
+                        {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
+                      </div>
                     {% else %}
                       {% if rd.pacer_url %}
                         <a href="{{ rd.pacer_url }}"
@@ -171,11 +174,9 @@
                             target="_blank"
                             rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
                         </a>
-                        {% flag "pray-and-pay" %}
                           <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
                             {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
                           </div>
-                        {% endflag %}
                       {% endif %}
                     {% endif %}
                   {% endif %}
@@ -192,7 +193,7 @@
                     {# We don't have it #}
                     {% if rd.is_sealed %}
                       <span class="btn btn-default btn-xs disabled"
-                            title="Sealed on PACER">
+                            title="Unavailable on PACER">
                               <i class="fa fa-ban"></i>
                             </span>
                     {% else %}
