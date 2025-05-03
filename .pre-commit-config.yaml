@@ -7,7 +7,7 @@ ci:
   autoupdate_schedule: quarterly
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
      - id: check-added-large-files
      - id: check-ast
@@ -38,7 +38,7 @@ repos:
      - id: black
 
   - repo: https://github.com/PyCQA/isort
-    rev: 6.0.0
+    rev: 6.0.1
     hooks:
      - id: isort
        name: isort (python)
