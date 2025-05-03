@@ -2745,7 +2745,7 @@ class RECAPAlertsPercolatorTest(
         txt_email = mail.outbox[1].body
         # Confirm that the document timestamp "Date Updated" is rendered in the alert
         self._assert_date_updated(self.mock_date, html_content, txt_email)
-        
+
         with self.captureOnCommitCallbacks(execute=True):
             # Related DE. RD creation.
             de_entry_field_alert = AlertFactory(
