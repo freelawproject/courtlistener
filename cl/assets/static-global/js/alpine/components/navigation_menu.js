@@ -49,7 +49,7 @@ document.addEventListener('alpine:init', () => {
       return this.options[index].children.some((child) => `#${this.visibleSection}` === child.href);
     },
     get markerClass() {
-      return this.isVisible || this.hasVisibleChild ? 'marker:text-primary-600' : 'marker:text-greyscale-200';
+      return this.isVisible || this.hasVisibleChild ? '#B5362D' : '#E8E4DE';
     },
     get childClass() {
       return this.isVisible ? this.activeItemClasses : this.inactiveItemClasses;

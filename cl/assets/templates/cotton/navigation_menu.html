@@ -11,20 +11,24 @@
 
 <div x-data="navMenu" class="max-md:hidden overflow-y-auto h-[100vh] sticky top-5 min-w-[var(--nav-menu-width)]">
 <nav class="sticky top-0 flex flex-col flex-wrap items-start w-full pr-3">
-<ul class="list-disc list-inside w-full" role="menu" aria-label="Navigation">
+<ul
+  class="list-none w-full"
+  role="menu"
+  aria-label="Navigation"
+>
   {% for item in nav_items %}
     <li
       data-intersect-target="{{ item.href }}"
-      class="pl-3.5 w-full marker:text-greyscale-200"
-      x-bind:class="markerClass"
+      class="w-full"
       role="none"
     >
-      <div class="-mt-7 ml-4 text-sm font-sans flex justify-start items-center gap-2 flex-wrap">
+      <div class="ml-1 text-sm font-sans flex justify-start items-center flex-wrap">
+        {% svg "ellipse" x_bind__fill="markerClass" data_intersect_target=item.href aria_hidden="true" %}
         <a
           x-bind:class="itemClass"
           title="{{ item.text }}"
           href="#{{ item.href|slugify }}"
-          class="py-1.5 font-semibold truncate"
+          class="pl-3.5 pr-2 py-1.5 font-semibold truncate"
           data-intersect-target="{{ item.href }}"
           aria-label="Go to {{ item.text }}"
         >
@@ -54,7 +58,7 @@
         x-show="isExpanded"
         x-collapse
         data-intersect-target="{{ item.href }}"
-        class="flex flex-col pl-[3px]"
+        class="flex flex-col pl-1.5"
         role="menu"
       >
         {% for sub_item in item.children %}
@@ -62,7 +66,7 @@
             x-bind:class="childClass"
             title="{{ sub_item.text }}"
             href="#{{ sub_item.href|slugify }}"
-            class="w-full pl-7.5 py-1.5 font-normal text-sm truncate"
+            class="w-full pl-8 py-1.5 font-normal text-sm truncate"
             data-intersect-target="{{ sub_item.href }}"
             role="menuitem"
             aria-label="Go to {{ sub_item.text }}"
