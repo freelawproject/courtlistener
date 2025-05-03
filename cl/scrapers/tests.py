@@ -73,13 +73,14 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             url="https://example.com/",
             enabled=True,
         )
-        cls.search_alert_oa = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA",
-            query="type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
+        with cls.captureOnCommitCallbacks(execute=True):
+            cls.search_alert_oa = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA",
+                query="type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
 
     def test_extension(self):
         r = async_to_sync(microservice)(
