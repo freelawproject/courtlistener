@@ -562,6 +562,11 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(recap_only_alert.name, txt_email)
         self.assertIn(rd.description, txt_email)
 
+        # Confirm that the document timestamp "Date Updated" is rendered in the alert
+        self._assert_date_updated(
+            self.mock_date_indexing, html_content, txt_email
+        )
+
         # Trigger the same alert again to confirm that no new alert is
         # triggered because previous hits have already triggered the same alert
         with mock.patch(
@@ -1738,6 +1743,11 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(cross_object_alert_with_hl.name, txt_email)
         self.assertIn(self.rd.description, txt_email)
 
+        # Confirm that the document timestamp "Date Updated" is rendered in the alert
+        self._assert_date_updated(
+            self.mock_date_indexing, html_content, txt_email
+        )
+
         # Send scheduled Monthly alerts and check assertions.
         current_date = now().replace(day=1, hour=8)
         with time_machine.travel(current_date, tick=False):
@@ -1781,6 +1791,11 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(recap_only_alert.name, txt_email)
         self.assertIn(self.rd.description, txt_email)
         self.assertIn(self.rd_att.description, txt_email)
+
+        # Confirm that the document timestamp "Date Updated" is rendered in the alert
+        self._assert_date_updated(
+            self.mock_date_indexing, html_content, txt_email
+        )
 
     def test_alert_frequency_estimation(self, mock_prefix) -> None:
         """Test alert frequency ES API endpoint for RECAP Alerts."""
@@ -1974,7 +1989,7 @@ class RECAPAlertsSweepIndexTest(
             0,
         )
 
-        # The cross_object_alert-only alert contain q nested child hits.
+        # The cross_object_alert-only alert contain 1 nested child hits.
         self._count_alert_hits_and_child_hits(
             html_content,
             cross_object_alert.name,
@@ -2110,7 +2125,10 @@ class RECAPAlertsPercolatorTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
-        cls.mock_date = now()
+        date_now = midnight_pt(now().date())
+        cls.mock_date = date_now.replace(
+            hour=20, minute=0, second=0, microsecond=0
+        )
         with time_machine.travel(cls.mock_date, tick=False):
             super().setUpTestData()
             cls.docket_3 = DocketFactory(
@@ -2674,7 +2692,11 @@ class RECAPAlertsPercolatorTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+        ), time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(
+            execute=True
+        ):
             alert_de = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2714,6 +2736,10 @@ class RECAPAlertsPercolatorTest(
             alert_de.docket.case_name,
             1,
         )
+
+        txt_email = mail.outbox[1].body
+        # Confirm that the document timestamp "Date Updated" is rendered in the alert
+        self._assert_date_updated(self.mock_date, html_content, txt_email)
 
         # Related DE. RD creation.
         de_entry_field_alert = AlertFactory(
