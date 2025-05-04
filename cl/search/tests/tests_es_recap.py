@@ -19,6 +19,7 @@ from elasticsearch_dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
 
+from cl.alerts.utils import add_cutoff_timestamp_filter
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     compute_lowest_possible_estimate,
@@ -2963,6 +2964,102 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         de.docket.delete()
         docket_2.delete()
+
+    def test_timestamp_filtering(self) -> None:
+        """Confirm the timestamp fielded filter works properly"""
+
+        # Add docket with no document
+        mock_date = now().replace(
+            day=29, hour=0, minute=0, second=0, microsecond=0
+        )
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Lorem vs Natural Gas ",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="5:90-cv-04007",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(params["q"], mock_date)
+        # Docket with mock_date as timestamp should be found.
+        async_to_sync(self._test_article_count)(params, 1, "timestamp")
+
+        # Filter by date:
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date.date()
+        )
+        # Docket with mock_date as timestamp should be found.
+        async_to_sync(self._test_article_count)(params, 1, "timestamp")
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date + datetime.timedelta(seconds=1)
+        )
+        # Querying for a timestamp one second greater than mock_date shouldn't return any results.
+        async_to_sync(self._test_article_count)(params, 0, "timestamp")
+
+        # Test timestamp filter for RDs.
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            entry = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="1",
+                is_available=False,
+                page_count=5,
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="2",
+                is_available=True,
+                page_count=5,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "New File",
+            "available_only": True,
+        }
+        params["q"] = add_cutoff_timestamp_filter(params["q"], mock_date)
+        # RECAPDocument with mock_date as timestamp should be found.
+        r = async_to_sync(self._test_article_count)(params, 1, "timestamp")
+        self._count_child_documents(0, r.content.decode(), 1, "timestamp")
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "New File",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date + datetime.timedelta(seconds=1)
+        )
+        # Querying for a timestamp one second greater than mock_date shouldn't return any results.
+        async_to_sync(self._test_article_count)(params, 0, "timestamp")
+
+        docket.delete()
 
 
 class RECAPSearchDecayRelevancyTest(

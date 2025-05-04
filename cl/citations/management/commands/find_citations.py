@@ -16,6 +16,9 @@ from cl.lib.command_utils import VerboseCommand
 from cl.lib.types import OptionsType
 from cl.search.models import Courthouse, Opinion
 
+DEFAULT_THROTTLE_MIN_ITEMS = 50
+DEFAULT_OPINIONS_PER_TASK = 100
+
 
 class Command(VerboseCommand):
     help = "Parse citations and parentheticals from court opinions."
@@ -82,6 +85,21 @@ class Command(VerboseCommand):
             "--queue",
             default="batch1",
             help="The celery queue where the tasks should be processed.",
+        )
+        parser.add_argument(
+            "--throttle-min-items",
+            default=DEFAULT_THROTTLE_MIN_ITEMS,
+            type=int,
+            help=(
+                "Control the max number of tasks sent to Celery. To be used "
+                "on `CeleryThrottle.update_min_items`"
+            ),
+        )
+        parser.add_argument(
+            "--opinions-per-task",
+            default=DEFAULT_OPINIONS_PER_TASK,
+            type=int,
+            help="Number of opinions in a single parent task",
         )
 
     def handle(self, *args: List[str], **options: OptionsType) -> None:
@@ -155,7 +173,12 @@ class Command(VerboseCommand):
         self.average_per_s = 0.0
         self.timings: List[float] = []
         opinion_pks = query.values_list("pk", flat=True).iterator()
-        self.update_documents(opinion_pks, cast(str, options["queue"]))
+        self.update_documents(
+            opinion_pks,
+            cast(str, options["queue"]),
+            cast(int, options["throttle_min_items"]),
+            cast(int, options["opinions_per_task"]),
+        )
 
     def log_progress(self, processed_count: int, last_pk: int) -> None:
         if processed_count % 1000 == 1:
@@ -181,20 +204,27 @@ class Command(VerboseCommand):
         )
         sys.stdout.flush()
 
-    def update_documents(self, opinion_pks: Iterable, queue_name: str) -> None:
+    def update_documents(
+        self,
+        opinion_pks: Iterable,
+        queue_name: str,
+        throttle_min_items: int = DEFAULT_THROTTLE_MIN_ITEMS,
+        opinions_per_task: int = DEFAULT_OPINIONS_PER_TASK,
+    ) -> None:
         sys.stdout.write(f"Graph size is {self.count:d} nodes.\n")
         sys.stdout.flush()
 
         chunk = []
-        chunk_size = 100
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue_name)
+        throttle.update_min_items(throttle_min_items)
+
         for opinion_pk in opinion_pks:
             throttle.maybe_wait()
             processed_count += 1
             last_item = self.count == processed_count
             chunk.append(opinion_pk)
-            if processed_count % chunk_size == 0 or last_item:
+            if processed_count % opinions_per_task == 0 or last_item:
                 find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
                     args=(chunk,),
                     queue=queue_name,
