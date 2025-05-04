@@ -40,6 +40,7 @@
         <li><a href="#fields">Fields</a></li>
         <li><a href="#highlighting">Highlighting</a></li>
         <li><a href="#counts">Result Counts</a></li>
+        <li><a href="#searching-by-court">Searching by Court</a></li>
         <li><a href="#notes">Special Notes</a></li>
       </ul>
       <li><a href="#monitoring">Monitoring a Query</a></li>
@@ -236,6 +237,16 @@
   <p><code>type=d</code> and <code>type=r</code> use cardinality aggregation to compute the result count. This enhances performance, but has an error of ±6% if results are over 2000. We recommend noting this in your interface by saying something like, "About 10,000 results."
   </p>
 
+  <h3 id="searching-by-court">Searching by Court</h3>
+  <p>When filering by courts, it’s important to understand how court data is organized and how parent-child relationships between courts work in our system.</p>
+  <p>For instance, Massachusetts has multiple Superior Courts, but you may only be interested in opinions from the Suffolk County branch located in Boston.</p>
+  <p>To search specifically for opinions from the Massachusetts Superior Court, Suffolk County, you can include the court ID <code>masssuperctsuff</code> in your query:</p>
+  <pre class="pre-scrollable">http://localhost:8000/q=foo&court=masssuperctsuff</pre>
+  <p>If instead you want all opinions from any Massachusetts Superior Court, regardless of the county, use should use the parent court ID <code>masssuperct</code>:</p>
+  <pre class="pre-scrollable">http://localhost:8000/q=foo&court=masssuperct</pre>
+  <p>This query will return opinions from all Massachusetts Superior Courts in our database.</p>
+  <p>The is possible by a parent-child relationship in some courts. Here, <code>masssuperctsuff</code> (Suffolk County) is a child of <code>masssuperct</code>. By using the appropriate court ID in your query, you can tailor your search to be as broad or specific as needed.</p>
+  <p>This approach allows you to refine your results to match your exact requirements, whether you need comprehensive coverage or a focused subset of opinions.</p>
 
   <h3 id="notes">Special Notes</h3>
   <p>A few fields deserve special consideration:</p>
