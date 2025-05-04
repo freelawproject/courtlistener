@@ -1,8 +1,8 @@
-import html
 import logging
 from http.client import ResponseNotReady
 from typing import Dict, List, Set, Tuple
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
@@ -125,7 +125,14 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     )
     for opinion in opinions:
         try:
-            store_opinion_citations_and_update_parentheticals(opinion)
+            # delivery_info does not exist in test environment
+            children_queue = (self.request.delivery_info or {}).get(
+                "routing_key", settings.CELERY_ETL_TASK_QUEUE
+            )
+            store_opinion_citations_and_update_parentheticals(
+                opinion,
+                children_queue,
+            )
         except ResponseNotReady as e:
             # Threading problem in httplib.
             raise self.retry(exc=e, countdown=2)
@@ -133,12 +140,14 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
 
 def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion,
+    queue_for_children: str = settings.CELERY_ETL_TASK_QUEUE,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion,
     parenthetical info for the cited opinions, and stores unmatched citations
 
     :param opinion: A search.Opinion object.
+    :param queue: celery queue to send the child tasks to
     :return: None
     """
     # Extract the citations from the opinion's text
@@ -267,8 +276,13 @@ def store_opinion_citations_and_update_parentheticals(
     cluster_ids_to_update = list(
         opinion_clusters_to_update.values_list("id", flat=True)
     )
-    index_related_cites_fields.delay(
-        OpinionsCited.__name__, opinion.pk, cluster_ids_to_update
+    index_related_cites_fields.apply_async(
+        args=(
+            OpinionsCited.__name__,
+            opinion.pk,
+            cluster_ids_to_update,
+        ),
+        queue=queue_for_children,
     )
 
 

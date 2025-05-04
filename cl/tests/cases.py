@@ -1,19 +1,25 @@
 import re
 import sys
+from datetime import datetime
 from io import StringIO
 from unittest import mock
+from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
 from django.urls import reverse
+from django.utils.dateformat import format
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
 from rest_framework.test import APITestCase
 from rest_framework.utils.serializer_helpers import ReturnList
 
+from cl.alerts.management.commands.cl_send_scheduled_alerts import (
+    get_cut_off_date,
+)
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
 
@@ -740,3 +746,35 @@ class SearchAlertsAssertions:
                         msg=f"Did not get the HL content in field: %s. "
                         % field_name,
                     )
+
+    def _assert_timestamp_filter(
+        self, html_content, rate, date, sweep_index=False
+    ):
+        """Confirm that timestamp filter is properly set in the
+        'View Full Results' URL.
+        """
+        view_results_url = html.fromstring(str(html_content)).xpath(
+            '//a[text()="View Full Results / Edit this Alert"]/@href'
+        )
+        parsed_url = urlparse(view_results_url[0])
+        params = parse_qs(parsed_url.query)
+        cut_off_date = get_cut_off_date(rate, date, sweep_index)
+        iso_datetime = (
+            cut_off_date.strftime("%Y-%m-%dT%H:%M:%S")
+            if isinstance(cut_off_date, datetime)
+            else cut_off_date.strftime("%Y-%m-%d")
+        )
+        self.assertIn(f"timestamp:[{iso_datetime} TO *]", params["q"][0])
+
+    def _assert_date_updated(self, date_to_compare, html_content, txt_content):
+        """Confirm that date_updated is properly set in the alert email."""
+
+        self.assertIn(
+            f"Date Updated: {format(date_to_compare, "F jS, Y h:i a T")}",
+            html_content,
+        )
+
+        self.assertIn(
+            f"Date Updated: {format(date_to_compare, "F jS, Y h:i a T")}",
+            txt_content,
+        )

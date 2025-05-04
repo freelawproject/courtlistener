@@ -30,7 +30,6 @@ from django.shortcuts import (  # type: ignore[attr-defined]
     redirect,
     render,
 )
-from django.template.defaultfilters import slugify
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
@@ -50,6 +49,7 @@ from cl.citations.utils import (
     SLUGIFIED_EDITIONS,
     filter_out_non_case_law_citations,
     get_canonicals_from_reporter,
+    slugify_reporter,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
@@ -1428,7 +1428,7 @@ async def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
-    reporter_slug = slugify(reporter)
+    reporter_slug = slugify_reporter(reporter)
 
     if reporter != reporter_slug:
         # Reporter provided in non-slugified form. Redirect to slugified
