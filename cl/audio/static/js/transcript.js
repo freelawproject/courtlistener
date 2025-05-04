@@ -23,7 +23,7 @@ $(document).ready(function() {
     const $player = $(playerSelector);
     const transcriptTextEl = $('#transcript-text');
     let transcriptSegments = [];
-    
+
     // Create a map to track which segments are currently in view
     const segmentInViewMap = new Map();
     // Initialize IntersectionObserver to update our map on visibility changes
@@ -54,7 +54,7 @@ $(document).ready(function() {
         let foundSegment = null;
         // Add a small buffer time to highlight segments slightly early (in seconds)
         const LOOK_AHEAD_BUFFER = 0.3;
-        
+
         transcriptTextEl.find('.transcript-segment').each(function() {
             const $segmentDiv = $(this);
             const startTime = $segmentDiv.data('start-time');
@@ -67,7 +67,7 @@ $(document).ready(function() {
                 return false; // Exit .each() loop once found
             }
         });
-        
+
         return foundSegment;
     }
 
@@ -76,16 +76,16 @@ $(document).ready(function() {
         if ($oldSegment) {
             $oldSegment.removeClass('transcript-current-segment');
         }
-        
+
         if ($newSegment) {
             // Don't apply current-segment if it's also the current search match
             if (!$newSegment.hasClass('transcript-search-current-match')) {
                 $newSegment.addClass('transcript-current-segment');
             }
-            
+
             // Check if element is in view using our map
             const isInView = segmentInViewMap.get($newSegment[0]) || false;
-            
+
             // Don't autoscroll if there's search text or element is already in view
             const hasSearchText = $('#transcript-search').val().trim().length > 0;
             if (!hasSearchText && !isInView) {
@@ -175,7 +175,7 @@ $(document).ready(function() {
                 // Check if it's the first segment and playback just started
                 const isFirstSegment = foundSegmentDiv.is(':first-child');
                 const isPlaybackJustStarted = typeof lastPlayPosition === 'undefined' || lastPlayPosition < 3;
-                
+
                 // Don't auto-scroll at beginning of playback
                 if (isFirstSegment && isPlaybackJustStarted) {
                     // Just update highlighting without scrolling
@@ -184,9 +184,9 @@ $(document).ready(function() {
                     // Update highlighting with scrolling
                     updateSegmentHighlighting(foundSegmentDiv, currentSegmentDiv);
                 }
-                
+
                 currentSegmentDiv = foundSegmentDiv;
-                
+
                 // Store current playback position for next update
                 lastPlayPosition = currentTime;
             } else if (!foundSegmentDiv && currentSegmentDiv) {
@@ -242,7 +242,7 @@ $(document).ready(function() {
                     currentSegmentDiv.addClass('transcript-current-segment');
                     // If not in view, scroll to it
                     const isInView = segmentInViewMap.get(currentSegmentDiv[0]) || false;
-                    
+
                     if (!isInView) {
                         scrollToElement(currentSegmentDiv);
                     }
@@ -251,13 +251,13 @@ $(document).ready(function() {
         }
 
         function highlightCurrentMatch() {
-            $('.transcript-search-current-match').removeClass('transcript-search-current-match');            
+            $('.transcript-search-current-match').removeClass('transcript-search-current-match');
             if (currentMatchIndex >= 0 && currentMatchIndex < searchMatches.length) {
                 const $currentMatch = searchMatches[currentMatchIndex];
                 $currentMatch.addClass('transcript-search-current-match');
                 // Remove karaoke highlight only from this specific element
                 $currentMatch.removeClass('transcript-current-segment');
-                
+
                 // Scroll the current match into view
                 scrollToElement($currentMatch);
             }
@@ -294,4 +294,4 @@ $(document).ready(function() {
     initTranscriptRendering(transcriptContainer, transcriptTextEl, transcriptSegments, segmentObserver);
     initKaraokeHighlighting($player, findSegmentAtTime, updateSegmentHighlighting);
     initTranscriptSearch(transcriptTextEl, segmentObserver, scrollToElement, updateSegmentHighlighting);
-}); 
+});
