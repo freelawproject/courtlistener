@@ -44,7 +44,7 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import Docket, DocketEntry, RECAPDocument
-from cl.tests.cases import TestCase
+from cl.tests.cases import SearchAlertsAssertions, TestCase
 from cl.tests.utils import AsyncAPIClient, MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -140,7 +140,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
     "cl.recap.tasks.is_docket_entry_sealed",
     return_value=False,
 )
-class RecapEmailDocketAlerts(TestCase):
+class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
     """Test recap email docket alerts"""
 
     @classmethod
@@ -1125,6 +1125,14 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertIn("[Sign-Up Needed]:", message_sent.subject)
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 
+        # Assert that the document page URL is present in the HTML email.
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(recap_document_first.get_absolute_url(), html_content)
+
+        # Assert that the document page URL is present in the TXT email.
+        txt_content = mail.outbox[0].body
+        self.assertIn(recap_document_first.get_absolute_url(), txt_content)
+
         webhook_triggered = WebhookEvent.objects.all()
         # No webhook should be triggered.
         self.assertEqual(await webhook_triggered.acount(), 0)
@@ -1371,6 +1379,25 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         message_sent = mail.outbox[0]
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
+
+        # Assert that the Main document page URL is present in the HTML email.
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(recap_document_first.get_absolute_url(), html_content)
+        # Assert that the Main document page URL is present in the TXT email.
+        txt_content = mail.outbox[0].body
+        self.assertIn(recap_document_first.get_absolute_url(), txt_content)
+
+        recap_document_attachment = await recap_document.filter(
+            attachment_number__isnull=False
+        ).afirst()
+        # Assert that an Attachment document page URL is present in the HTML email.
+        self.assertIn(
+            recap_document_attachment.get_absolute_url(), html_content
+        )
+        # Assert that an Attachment page URL is present in the TXT email.
+        self.assertIn(
+            recap_document_attachment.get_absolute_url(), txt_content
+        )
 
         # Webhook should be triggered
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
@@ -2128,6 +2155,15 @@ class RecapEmailDocketAlerts(TestCase):
 
         # A DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 1)
+
+        # Assert that the minute entry URL is present in the HTML email.
+        minute_entry_url = f"{docket.get_absolute_url()}#minute-entry-{recap_document_first.docket_entry.pk}"
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(minute_entry_url, html_content)
+
+        # Assert that the minute entry URL is present in the TXT email.
+        txt_content = mail.outbox[0].body
+        self.assertIn(minute_entry_url, txt_content)
 
         # We can't set the seal status of a minute entry.
         self.assertEqual(recap_document_first.is_sealed, None)
