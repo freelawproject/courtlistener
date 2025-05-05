@@ -195,8 +195,6 @@ if DEVELOPMENT:
     MIDDLEWARE.append(
         "django_browser_reload.middleware.BrowserReloadMiddleware"
     )
-    if not TESTING:
-        MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
 
 # TODO: Shift to a global Tailwind config and pull out of simple_pages app
 TAILWIND_APP_NAME = "cl.simple_pages"
