@@ -2,6 +2,7 @@ import logging
 from http.client import ResponseNotReady
 from typing import Dict, List, Set, Tuple
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
@@ -10,10 +11,7 @@ from eyecite.models import CitationBase, FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.celery_init import app
-from cl.citations.annotate_citations import (
-    create_cited_html,
-    get_and_clean_opinion_text,
-)
+from cl.citations.annotate_citations import create_cited_html
 from cl.citations.filter_parentheticals import (
     clean_parenthetical_text,
     is_parenthetical_descriptive,
@@ -28,7 +26,7 @@ from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.types import MatchedResourceType, SupportedCitationType
-from cl.citations.utils import get_markup_kwargs
+from cl.citations.utils import make_get_citations_kwargs
 from cl.search.models import (
     Opinion,
     OpinionCluster,
@@ -127,7 +125,14 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     )
     for opinion in opinions:
         try:
-            store_opinion_citations_and_update_parentheticals(opinion)
+            # delivery_info does not exist in test environment
+            children_queue = (self.request.delivery_info or {}).get(
+                "routing_key", settings.CELERY_ETL_TASK_QUEUE
+            )
+            store_opinion_citations_and_update_parentheticals(
+                opinion,
+                children_queue,
+            )
         except ResponseNotReady as e:
             # Threading problem in httplib.
             raise self.retry(exc=e, countdown=2)
@@ -135,25 +140,23 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
 
 def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion,
+    queue_for_children: str = settings.CELERY_ETL_TASK_QUEUE,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion,
     parenthetical info for the cited opinions, and stores unmatched citations
 
     :param opinion: A search.Opinion object.
+    :param queue: celery queue to send the child tasks to
     :return: None
     """
-
-    # Memoize parsed versions of the opinion's text
-    get_and_clean_opinion_text(opinion)
-
     # Extract the citations from the opinion's text
     # If the source has marked up text, pass it so it can be used to find
-    # ReferenceCitations. This is handled by `get_markup_kwargs`
+    # ReferenceCitations. This is handled by `make_get_citations_kwargs`
+    get_citations_kwargs = make_get_citations_kwargs(opinion)
     citations: List[CitationBase] = get_citations(
-        opinion.cleaned_text,
         tokenizer=HYPERSCAN_TOKENIZER,
-        **get_markup_kwargs(opinion),
+        **get_citations_kwargs,
     )
 
     # Resolve all those different citation objects to Opinion objects,
@@ -164,10 +167,10 @@ def store_opinion_citations_and_update_parentheticals(
 
     # Generate the citing opinion's new HTML with inline citation links
     opinion.html_with_citations = create_cited_html(
-        opinion, citation_resolutions
+        citation_resolutions, get_citations_kwargs
     )
-
-    if not citations:
+    if not citation_resolutions:
+        # there was nothing to annotate, just save the `html_with_citations`
         opinion.save()
         return
 
@@ -273,8 +276,13 @@ def store_opinion_citations_and_update_parentheticals(
     cluster_ids_to_update = list(
         opinion_clusters_to_update.values_list("id", flat=True)
     )
-    index_related_cites_fields.delay(
-        OpinionsCited.__name__, opinion.pk, cluster_ids_to_update
+    index_related_cites_fields.apply_async(
+        args=(
+            OpinionsCited.__name__,
+            opinion.pk,
+            cluster_ids_to_update,
+        ),
+        queue=queue_for_children,
     )
 
 

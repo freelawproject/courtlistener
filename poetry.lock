@@ -1619,14 +1619,14 @@ files = [
 
 [[package]]
 name = "eyecite"
-version = "2.6.11"
+version = "2.7.1"
 description = "Tool for extracting legal citations from text strings."
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "eyecite-2.6.11-py3-none-any.whl", hash = "sha256:ff7b3dad3df523d03c8bb82312d9bb680d77e8f3606d0ad871a093c5f3862095"},
-    {file = "eyecite-2.6.11.tar.gz", hash = "sha256:2b9cf2a8f3cb5e1f438b2f832c43b281991f6cdd9b9aff9bb9fbc294a672edd4"},
+    {file = "eyecite-2.7.1-py3-none-any.whl", hash = "sha256:0fd662bb5deab494888e43c77a2d97a3448c979ba73b52123c3f98f39539cda2"},
+    {file = "eyecite-2.7.1.tar.gz", hash = "sha256:1e92868abaa737d011542e0fcd5bd24d111de5ae7fe6bdf5cdf3e27cd70f6552"},
 ]
 
 [package.dependencies]
@@ -2478,14 +2478,14 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.6.65"
+version = "2.6.66"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "juriscraper-2.6.65-py27-none-any.whl", hash = "sha256:7e349d98c0e48c128f8156db50bb322a459c99d314101bd94ecac438d608ef89"},
-    {file = "juriscraper-2.6.65.tar.gz", hash = "sha256:cecb2af5c956de70ab24617574ac0465a6f046dbe7d69bd4d975a21d8e8155a8"},
+    {file = "juriscraper-2.6.66-py27-none-any.whl", hash = "sha256:8646a6c3be1a45cb18ea5e13a4535f4928202557bbb45013081be5026e51861d"},
+    {file = "juriscraper-2.6.66.tar.gz", hash = "sha256:fb5caf50850efc235365dddd1df484cb9c8932a11e314146703d32cb2bbc3700"},
 ]
 
 [package.dependencies]

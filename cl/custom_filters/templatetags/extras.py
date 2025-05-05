@@ -9,10 +9,12 @@ from django.core.exceptions import ValidationError
 from django.template import Context
 from django.template.context import RequestContext
 from django.template.defaultfilters import date as date_filter
+from django.utils.dateparse import parse_datetime
 from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
+from django.utils.timezone import make_aware
 from elasticsearch_dsl import AttrDict, AttrList
 
 from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
@@ -335,6 +337,26 @@ def format_date(date_str: str) -> str:
         return date_filter(date_obj, "F jS, Y")
     except (ValueError, TypeError):
         return date_str
+
+
+@register.filter
+def parse_utc_date(datetime_object: str | datetime) -> datetime:
+    """Parse an ISO-8601 UTC datetime string or a naive datetime UTC object
+    and return a timezone-aware datetime in UTC.
+
+    :param datetime_object: A string representing a UTC datetime in ISO 8601
+    format or a naive UTC datetime object.
+    :return: A timezone-aware datetime object with UTC as the timezone.
+    """
+
+    return make_aware(
+        (
+            parse_datetime(datetime_object)
+            if isinstance(datetime_object, str)
+            else datetime_object
+        ),
+        timezone.utc,
+    )
 
 
 @register.filter
