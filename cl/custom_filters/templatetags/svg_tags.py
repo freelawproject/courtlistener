@@ -14,7 +14,7 @@ def svg(name, **kwargs):
     Usage:
     ```
     {% load svg_tags %}
-    {% svg "icon-name" css_class="w-6 h-6 text-gray-500" %}
+    {% svg "icon-name" class="w-6 h-6 text-gray-500" %}
     ```
 
     Note HTML attributes are passed directly with minor adjustments:
@@ -50,8 +50,8 @@ def svg(name, **kwargs):
             )
 
     for key, value in kwargs.items():
-        key = key.replace("__", ":")  # Convert double underscore to colons
-        key = key.replace("_", "-")  # Convert snake_case to kebab-case
+        key = key.replace("__", ":")
+        key = key.replace("_", "-")
         svg_content = svg_content.replace("<svg", f'<svg {key}="{value}"')
 
     return format_html(svg_content.replace("<svg", f'<svg role="img"'))
