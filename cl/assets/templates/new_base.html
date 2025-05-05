@@ -104,9 +104,6 @@
   {% else %}
   <script type="text/javascript"
           src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
-  <script src="{% static 'js/alpine/intersect@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
-  <script src="{% static 'js/alpine/collapse@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
-  <script src="{% static 'js/alpine/focus@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   <script src="{% static 'js/alpine/alpinejscsp@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% endif %}
 
