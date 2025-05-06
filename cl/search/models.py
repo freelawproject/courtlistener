@@ -3090,6 +3090,12 @@ class OpinionQuerySet(models.QuerySet):
             - html
         """
         source_fields = OPINION_TEXT_SOURCE_FIELDS
+
+        original_source_fields = OPINION_TEXT_SOURCE_FIELDS.copy()
+        if "html_with_citations" in original_source_fields:
+            # Exclude the generated field: html_with_citations to find the original best source
+            original_source_fields.remove("html_with_citations")
+
         # To populate best_text we get the first non-empty value
         # from the list of possible text sources:
         coalesce_args = [
@@ -3108,12 +3114,25 @@ class OpinionQuerySet(models.QuerySet):
             for field in source_fields
         ]
 
+        when_clauses_original_sources = [
+            When(
+                Q(**{f"{field}__isnull": False}) & ~Q(**{field: ""}),
+                then=Value(field),
+            )
+            for field in original_source_fields
+        ]
+
         deferred_fields = source_fields + ["plain_text"]
 
         return self.defer(*deferred_fields).annotate(
             best_text=Coalesce(*coalesce_args, output_field=CharField()),
             best_text_source=Case(
                 *when_clauses,
+                default=Value("plain_text"),
+                output_field=CharField(),
+            ),
+            original_text_source=Case(
+                *when_clauses_original_sources,
                 default=Value("plain_text"),
                 output_field=CharField(),
             ),
