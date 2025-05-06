@@ -56,7 +56,7 @@ document.addEventListener('alpine:init', () => {
     },
     get hasChildren() {
       const index = this.options.findIndex((el) => el.href === this.target);
-      return index > -1 ? this.options[index].children : false;
+      return index > -1 && this.options[index].children?.length > 0;
     },
     focusPrevious() {
       this.$focus.wrap().previous();
