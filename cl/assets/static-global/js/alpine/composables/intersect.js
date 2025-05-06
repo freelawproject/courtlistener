@@ -6,7 +6,7 @@ Usage:
 
 ```
 {% load component_tags %}
-{% require_script "js/alpine/components/intersect.js" %}
+{% require_script "js/alpine/composables/intersect.js" %}
 {% require_script "js/alpine/plugins/intersect@3.14.8" defer=True %}
 ```
 */

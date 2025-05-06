@@ -6,7 +6,7 @@ Usage:
 
 ```
 {% load component_tags %}
-{% require_script "js/alpine/components/focus.js" %}
+{% require_script "js/alpine/composables/focus.js" %}
 {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 ```
 */
