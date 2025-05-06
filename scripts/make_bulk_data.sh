@@ -366,6 +366,7 @@ pg_dump \
     --table 'audio_*' \
 	--table 'recap_*' \
 	--table 'disclosures_*' \
+	--table 'citations_unmatchedcitations' \
     --no-privileges \
     --no-publications \
     --no-subscriptions courtlistener | \
