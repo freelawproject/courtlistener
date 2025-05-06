@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
+from django.db.utils import OperationalError
 from eyecite import get_citations
 from eyecite.models import CitationBase, FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
@@ -22,7 +23,11 @@ from cl.citations.match_citations import (
     do_resolve_citations,
 )
 from cl.citations.models import UnmatchedCitation
-from cl.citations.parenthetical_utils import create_parenthetical_groups
+from cl.citations.parenthetical_utils import (
+    create_parenthetical_groups,
+    disconnect_parenthetical_group_signals,
+    reconnect_parenthetical_group_signals,
+)
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.types import MatchedResourceType, SupportedCitationType
@@ -36,7 +41,7 @@ from cl.search.models import (
 )
 from cl.search.tasks import index_related_cites_fields
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
@@ -114,21 +119,30 @@ def find_citations_and_parantheticals_for_recap_documents(
 def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
     opinion_pks: List[int],
+    disconnect_pg_signals: bool = False,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
+    :param disconnect_pg_signals: True if ParentheticalGroup post_save and
+        post_delete signals should be disconnected; useful in batch jobs
+        from the `find_citations` command
+
     :return: None
     """
     opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
         pk__in=opinion_pks
     )
-    for opinion in opinions:
+    # delivery_info does not exist in test environment
+    children_queue = (self.request.delivery_info or {}).get(
+        "routing_key", settings.CELERY_ETL_TASK_QUEUE
+    )
+
+    for index, opinion in enumerate(opinions):
+        if disconnect_pg_signals:
+            disconnect_parenthetical_group_signals()
+
         try:
-            # delivery_info does not exist in test environment
-            children_queue = (self.request.delivery_info or {}).get(
-                "routing_key", settings.CELERY_ETL_TASK_QUEUE
-            )
             store_opinion_citations_and_update_parentheticals(
                 opinion,
                 children_queue,
@@ -136,20 +150,44 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         except ResponseNotReady as e:
             # Threading problem in httplib.
             raise self.retry(exc=e, countdown=2)
+        except OperationalError:
+            # delay deadlocked tasks, and continue regular process
+            store_opinion_citations_and_update_parentheticals.apply_async(
+                (opinion.id, children_queue), countdown=60
+            )
+        except Exception as e:
+            # do not retry the whole loop on an unknown exception
+            end_index = max(len(opinions) - 1, index + 1)
+            ids = [o.id for o in opinions[end_index:]]
+            if ids:
+                raise self.retry(
+                    exc=e, countdown=60, kwargs={"opinion_pks": ids}
+                )
+        finally:
+            if disconnect_pg_signals:
+                reconnect_parenthetical_group_signals()
 
 
+@app.task(bind=False, max_retries=5, ignore_result=True)
 def store_opinion_citations_and_update_parentheticals(
-    opinion: Opinion,
+    opinion_or_pk: Opinion | int,
     queue_for_children: str = settings.CELERY_ETL_TASK_QUEUE,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion,
     parenthetical info for the cited opinions, and stores unmatched citations
 
-    :param opinion: A search.Opinion object.
+    :param opinion: A search.Opinion object, or its primary key
+        If this is called as a celery task, using a Opinion object uses too
+        much memory on object piclking, should pass a primary key
     :param queue: celery queue to send the child tasks to
     :return: None
     """
+    if isinstance(opinion_or_pk, Opinion):
+        opinion = opinion_or_pk
+    else:
+        opinion = Opinion.objects.get(id=opinion_or_pk)
+
     # Extract the citations from the opinion's text
     # If the source has marked up text, pass it so it can be used to find
     # ReferenceCitations. This is handled by `make_get_citations_kwargs`

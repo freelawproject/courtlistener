@@ -1,6 +1,7 @@
 from asgiref.sync import sync_to_async
 from django.db import transaction
 from django.db.models import QuerySet
+from django.db.models.signals import post_delete, post_save
 
 from cl.citations.group_parentheticals import compute_parenthetical_groups
 from cl.search.models import OpinionCluster, ParentheticalGroup
@@ -47,3 +48,43 @@ def create_parenthetical_groups(cluster: OpinionCluster) -> None:
         )
         group_to_create.save()
         group_to_create.parentheticals.set(cg.parentheticals)
+
+
+def disconnect_parenthetical_group_signals():
+    """Disconnect ParentheticalGroup ES indexing on save and delete
+
+    Useful for batch `find_citations` jobs
+    """
+    from cl.search.signals import pa_signal_processor
+
+    model_name = ParentheticalGroup.__name__.lower()
+    save_uid = pa_signal_processor.save_uid_template.format(model_name)
+    delete_uid = pa_signal_processor.save_uid_template.format(model_name)
+    post_save.disconnect(
+        sender=ParentheticalGroup, dispatch_uid=f"{save_uid}_{model_name}"
+    )
+    post_delete.disconnect(
+        sender=ParentheticalGroup, dispatch_uid=f"{delete_uid}_{model_name}"
+    )
+
+
+def reconnect_parenthetical_group_signals():
+    """Reconnect ParentheticalGroup ES indexing on save and delete
+
+    Useful for batch `find_citations` jobs
+    """
+    from cl.search.signals import pa_signal_processor
+
+    model_name = ParentheticalGroup.__name__.lower()
+    save_uid = pa_signal_processor.save_uid_template.format(model_name)
+    delete_uid = pa_signal_processor.save_uid_template.format(model_name)
+    post_save.connect(
+        pa_signal_processor.handle_save,
+        sender=ParentheticalGroup,
+        dispatch_uid=f"{save_uid}_{model_name}",
+    )
+    post_delete.connect(
+        pa_signal_processor.handle_delete,
+        sender=ParentheticalGroup,
+        dispatch_uid=f"{delete_uid}_{model_name}",
+    )
