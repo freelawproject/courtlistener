@@ -1,8 +1,10 @@
 {% load svg_tags static component_tags %}
 {% require_script "js/alpine/components/navigation_menu.js" %}
 {% require_script "js/alpine/composables/intersect.js" %}
+{% require_script "js/alpine/composables/focus.js" %}
 {% require_script "js/alpine/plugins/intersect@3.14.8" defer=True %}
 {% require_script "js/alpine/plugins/collapse@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 
 <c-vars nav_items ></c-vars>
 {{ nav_items|json_script:"nav-items" }}
@@ -103,6 +105,7 @@
   <ul
     id="mobile-menu-list"
     x-show="menuOpen"
+    x-data="focus"
     x-on:click.outside="closeMenu"
     x-on:keyup.esc="closeMenu"
     x-on:keyup.right="focusNext"
