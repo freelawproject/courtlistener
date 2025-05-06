@@ -1,11 +1,14 @@
 /*
-To use this component, add this to your template right after `{% extends "new_base.html" %}`
+API for the intersect plugin in Alpine's CSP-friendly build,
+which doesn't support inline JavaScript.
 
+Usage:
+
+```
 {% load component_tags %}
 {% require_script "js/alpine/components/intersect.js" %}
 {% require_script "js/alpine/plugins/intersect@3.14.8" defer=True %}
-
-Note we need to also register the Alpine plugin intersect for this to work.
+```
 */
 
 document.addEventListener('alpine:init', () => {
