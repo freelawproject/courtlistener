@@ -106,7 +106,6 @@ def elasticsearch_enabled(func: Callable) -> Callable:
 
 
 class CSVSerializableDocumentMixin:
-
     @classmethod
     def get_csv_headers(cls) -> list[str]:
         """
@@ -159,9 +158,9 @@ def build_numeric_range_query(
     params: ESRangeQueryParams = {"gte": lower_bound, "lte": upper_bound}
     if relation is not None:
         allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-        assert (
-            relation in allowed_relations
-        ), f"'{relation}' is not an allowed relation."
+        assert relation in allowed_relations, (
+            f"'{relation}' is not an allowed relation."
+        )
         params["relation"] = relation
 
     return [Q("range", **{field: params})]
@@ -191,9 +190,9 @@ def build_daterange_query(
             params["lte"] = f"{before.isoformat()}T23:59:59Z"
         if relation is not None:
             allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-            assert (
-                relation in allowed_relations
-            ), f"'{relation}' is not an allowed relation."
+            assert relation in allowed_relations, (
+                f"'{relation}' is not an allowed relation."
+            )
             params["relation"] = relation
 
     if params:
@@ -223,7 +222,7 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
 
     document_list = [
         {
-            "_id": f'o_{pair["pk"]}',
+            "_id": f"o_{pair['pk']}",
             "routing": pair["cluster_id"],
             # Important to match documents in the production cluster
         }
@@ -2754,9 +2753,9 @@ def build_full_join_es_queries(
 
         # Build the child query based on child_filters and child child_text_query
         match child_filters, child_text_query:
-            case [], []:
+            case [[], []]:
                 pass
-            case [], _:
+            case [[], _]:
                 child_docs_query = Q(
                     "bool",
                     should=child_text_query,
@@ -2837,9 +2836,9 @@ def build_full_join_es_queries(
         }
         default_parent_filter = parent_filter_dict[child_type]
         match parent_filters, string_query:
-            case [], []:
+            case [[], []]:
                 pass
-            case [], _:
+            case [[], _]:
                 parent_query = Q(
                     "bool",
                     filter=default_parent_filter,

@@ -554,7 +554,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         alert_1_id = alert_1.json()["id"]
         self.assertTrue(
             AudioPercolator.exists(id=alert_1_id),
-            msg=f"Alert id: {alert_1.json()["id"]} was not indexed.",
+            msg=f"Alert id: {alert_1.json()['id']} was not indexed.",
         )
 
         alert_1_path_detail = reverse(
@@ -570,7 +570,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         # Confirm alert was removed from ES
         self.assertFalse(
             AudioPercolator.exists(id=alert_1_id),
-            msg=f"Alert id: {alert_1.json()["id"]} shouldn't be indexed.",
+            msg=f"Alert id: {alert_1.json()['id']} shouldn't be indexed.",
         )
 
         alert_2_path_detail = reverse(
@@ -988,12 +988,17 @@ class SearchAlertsWebhooksTest(
                 type=Opinion.LEAD,
             )
 
-            with mock.patch(
-                "cl.scrapers.tasks.microservice",
-                side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
-            ), mock.patch(
-                "cl.lib.es_signal_processor.allow_es_audio_indexing",
-                side_effect=lambda x, y: True,
+            with (
+                mock.patch(
+                    "cl.scrapers.tasks.microservice",
+                    side_effect=lambda *args, **kwargs: MockResponse(
+                        200, b"10"
+                    ),
+                ),
+                mock.patch(
+                    "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                    side_effect=lambda x, y: True,
+                ),
             ):
                 cls.dly_oral_argument = AudioWithParentsFactory.create(
                     case_name="Dly Test OA",
@@ -1037,12 +1042,15 @@ class SearchAlertsWebhooksTest(
         search_alerts = Alert.objects.all()
         self.assertEqual(len(search_alerts), 9, msg="Alerts doesn't match.")
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             # Send Opinion Alerts
             call_command("cl_send_alerts", rate="dly")
             # Send ES Alerts (Only OA for now)
@@ -1360,9 +1368,10 @@ class SearchAlertsWebhooksTest(
             msg="mly error",
         )
 
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # Get ready the RT opinion for the test.
             rt_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
@@ -1479,9 +1488,10 @@ class SearchAlertsWebhooksTest(
         self.assertEqual(r.json()["count"], 0)
 
         mock_date = now().replace(day=1, hour=5)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             frequency_o = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 cluster__case_name="Frequency Test O",
@@ -1514,7 +1524,6 @@ class SearchAlertsWebhooksTest(
 
 
 class SearchAlertsUtilsTest(SimpleTestCase):
-
     def test_get_cut_off_dates(self):
         """Confirm get_cut_off_start_date and get_cut_off_end_date return the right
         values according to the input date.
@@ -1699,9 +1708,10 @@ class SearchAlertsUtilsTest(SimpleTestCase):
         mock_date = now().replace(day=27, hour=5)
         for rate, test_cases in test_cases.items():
             for test_case in test_cases:
-                with self.subTest(
-                    rate=rate, test_case=test_case
-                ), time_machine.travel(mock_date, tick=False):
+                with (
+                    self.subTest(rate=rate, test_case=test_case),
+                    time_machine.travel(mock_date, tick=False),
+                ):
                     expected_date_start = date(
                         test_case["year"],
                         test_case["cut_off_month"],
@@ -2025,7 +2035,8 @@ class DocketAlertAPITests(APITestCase):
         self.assertEqual(await docket_alert.acount(), 1)
         docket_alert_first = await docket_alert.afirst()
         self.assertEqual(
-            docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION  # type: ignore[union-attr]
+            docket_alert_first.alert_type,  # type: ignore[union-attr]
+            DocketAlert.SUBSCRIPTION,
         )
         docket_alert_1_path_detail = reverse(
             "docket-alert-detail",
@@ -2064,7 +2075,8 @@ class DocketAlertAPITests(APITestCase):
         self.assertEqual(await docket_alert.acount(), 1)
         docket_alert_first = await docket_alert.afirst()
         self.assertEqual(
-            docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION  # type: ignore[union-attr]
+            docket_alert_first.alert_type,  # type: ignore[union-attr]
+            DocketAlert.SUBSCRIPTION,
         )
         docket_alert_1_path_detail = reverse(
             "docket-alert-detail",
@@ -2755,9 +2767,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertEqual(r.json()["count"], 0)
 
         mock_date = now().replace(day=1, hour=5)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="Frequency Test OA",
@@ -2785,9 +2798,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 200, mock_raw=True
             ),
         ):
-            with time_machine.travel(
-                mock_date, tick=False
-            ), self.captureOnCommitCallbacks(execute=True):
+            with (
+                time_machine.travel(mock_date, tick=False),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
                 # When the Audio object is created it should trigger an alert.
                 transcript = "RT Test OA transcript."
                 rt_oral_argument = AudioWithParentsFactory.create(
@@ -2920,9 +2934,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             ),
         ):
             mock_date = now().replace(day=1, hour=5)
-            with time_machine.travel(
-                mock_date, tick=False
-            ), self.captureOnCommitCallbacks(execute=True):
+            with (
+                time_machine.travel(mock_date, tick=False),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
                 # When the Audio object is created it should trigger an alert.
                 transcript = "This a different transcript."
                 rt_oral_argument_2 = AudioWithParentsFactory.create(
@@ -2970,12 +2985,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
 
     def test_send_alert_on_document_creation(self, mock_abort_audio):
         """Avoid sending Search Alerts on document updates."""
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="RT Test OA",
@@ -3001,12 +3019,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 4)
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # Audio object is updated.
             rt_oral_argument.sha1 = "12345"
             rt_oral_argument.save()
@@ -3258,12 +3279,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 query="q=docketNumber:19-5741&type=oa",
                 alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
             )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument_1 = AudioWithParentsFactory.create(
                 case_name="DLY Test OA",
@@ -3487,12 +3511,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         mail.outbox = []
 
         # Trigger RT alerts adding a document that matches the alerts.
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="RT Test OA",
                 docket__court=self.court_1,
@@ -3557,12 +3584,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 alerts_created.append(alert)
             # Create a new document that triggers each existing alert created
             # at this stage.
-            with mock.patch(
-                "cl.api.webhooks.requests.post",
-                side_effect=lambda *args, **kwargs: MockResponse(
-                    200, mock_raw=True
+            with (
+                mock.patch(
+                    "cl.api.webhooks.requests.post",
+                    side_effect=lambda *args, **kwargs: MockResponse(
+                        200, mock_raw=True
+                    ),
                 ),
-            ), self.captureOnCommitCallbacks(execute=True):
+                self.captureOnCommitCallbacks(execute=True),
+            ):
                 audio = AudioWithParentsFactory.create(
                     case_name="Test OA",
                     docket__court=self.court_1,
@@ -3635,12 +3665,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 alerts_created.append(alert)
 
         # Save a document to percolate it later.
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="Lorem Ipsum",
                 docket__court=self.court_1,
@@ -3740,12 +3773,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 query="q=Scheduled+Alert&type=oa",
                 alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
             )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # When the Audio object is created it should trigger an alert.
             oral_argument = AudioWithParentsFactory.create(
                 case_name="Scheduled+Alert",
@@ -3785,9 +3821,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
 
         # Create a new Audio Document which will schedule a new DLY Alert hit.
         mock_date = now() + timedelta(days=DAYS_TO_DELETE - 5)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             oral_argument_2 = AudioWithParentsFactory.create(
                 case_name="Scheduled+Alert",
                 docket__court=self.court_1,
@@ -3837,12 +3874,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 query="q=Monthly+Hit&type=oa",
                 alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
             )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # Schedule the MONTHLY Alert hit.
             oral_argument_3 = AudioWithParentsFactory.create(
                 case_name="Monthly+Hit",
@@ -4131,7 +4171,6 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
 
 
 class OneClickUnsubscribeTests(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.user_profile = UserProfileWithParentsFactory()
@@ -4162,7 +4201,6 @@ class OneClickUnsubscribeTests(TestCase):
 
 @override_settings(EMAIL_BACKEND="cl.lib.email_backends.EmailBackend")
 class EmailWithSurrogatesTest(TestCase):
-
     def setUp(self):
         EmailSent.objects.all().delete()
 

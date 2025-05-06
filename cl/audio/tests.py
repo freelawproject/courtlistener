@@ -38,10 +38,13 @@ class PodcastTest(ESIndexTestCase, TestCase):
             jurisdiction="F",
             citation_string="Appeals. CA8.",
         )
-        with mock.patch(
-            "cl.lib.es_signal_processor.allow_es_audio_indexing",
-            side_effect=lambda x, y: True,
-        ), cls.captureOnCommitCallbacks(execute=True):
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ),
+            cls.captureOnCommitCallbacks(execute=True),
+        ):
             cls.audio = AudioWithParentsFactory.create(
                 docket=DocketFactory(
                     court=cls.court_1, date_argued=datetime.date(2014, 8, 16)

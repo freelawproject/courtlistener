@@ -156,7 +156,6 @@ from cl.users.factories import (
 
 
 class RecapUtilsTest(TestCase):
-
     def setUp(self) -> None:
         self.court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
         self.docket = DocketFactory(
@@ -3205,7 +3204,6 @@ class RecapPdfFetchApiTest(TestCase):
     side_effect=lambda a: True,
 )
 class RecapAttPageFetchApiTest(TestCase):
-
     def setUp(self) -> None:
         self.district_court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
         self.district_docket = DocketFactory(
@@ -4436,7 +4434,6 @@ class DescriptionCleanupTest(SimpleTestCase):
 
 
 class RecapDocketTaskTest(TestCase):
-
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="scotus", jurisdiction="F")
@@ -8105,15 +8102,15 @@ class RemoveDuplicatedMinuteEntries(TestCase):
 
         data_history = deepcopy(docket_data)
         # Add short descriptions to entries, simulating a docket history report.
-        data_history["docket_entries"][0][
-            "short_description"
-        ] = "Order on Motion for Extension of Time to Complete Discovery"
-        data_history["docket_entries"][1][
-            "short_description"
-        ] = "Set/Reset Deadlines"
-        data_history["docket_entries"][2][
-            "short_description"
-        ] = "Set/Reset Deadlines"
+        data_history["docket_entries"][0]["short_description"] = (
+            "Order on Motion for Extension of Time to Complete Discovery"
+        )
+        data_history["docket_entries"][1]["short_description"] = (
+            "Set/Reset Deadlines"
+        )
+        data_history["docket_entries"][2]["short_description"] = (
+            "Set/Reset Deadlines"
+        )
         # Merge docket history report entries.
         async_to_sync(add_docket_entries)(
             self.d, data_history["docket_entries"]
@@ -8184,12 +8181,12 @@ class RemoveDuplicatedMinuteEntries(TestCase):
         # without duplicates.
         data_history = deepcopy(docket_data)
         docket_entries_history = data_history["docket_entries"][0:3]
-        docket_entries_history[0][
-            "short_description"
-        ] = "Order on Motion for Extension of Time to Complete Discovery"
-        docket_entries_history[1][
-            "description"
-        ] = "Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)"
+        docket_entries_history[0]["short_description"] = (
+            "Order on Motion for Extension of Time to Complete Discovery"
+        )
+        docket_entries_history[1]["description"] = (
+            "Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)"
+        )
         docket_entries_history[2]["short_description"] = "Set/Reset Deadlines"
         # Merge docket history report entries.
         async_to_sync(add_docket_entries)(self.d, docket_entries_history)

@@ -53,7 +53,9 @@ async def get_cached_court_counts(courts_queryset: QuerySet) -> dict[str, int]:
     )
     if court_counts:
         cache.set(
-            cache_key, court_counts, timeout=settings.QUERY_RESULTS_CACHE  # type: ignore
+            cache_key,
+            court_counts,
+            timeout=settings.QUERY_RESULTS_CACHE,  # type: ignore
         )
     return court_counts or {}
 
@@ -140,7 +142,6 @@ def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
 async def citation_lookup_api(
     request: HttpRequest, version=None
 ) -> HttpResponse:
-
     cite_count = await Citation.objects.acount()
     rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore
     default_throttle_rate = parse_throttle_rate_for_template(rate)

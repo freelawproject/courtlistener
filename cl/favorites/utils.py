@@ -318,7 +318,6 @@ class PrayerStats:
 
 
 async def get_user_prayer_history(user: User) -> PrayerStats:
-
     cache_key = f"prayer-stats-{user}"
 
     data = await cache.aget(cache_key)
@@ -349,7 +348,6 @@ async def get_lifetime_prayer_stats(
 ) -> (
     PrayerStats
 ):  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
-
     cache_key = f"prayer-stats-{status}"
 
     data = await cache.aget(cache_key)

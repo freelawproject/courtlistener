@@ -507,11 +507,11 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
             )
 
             match parent_filters, string_query:
-                case [], []:
+                case [[], []]:
                     NotImplementedError(
                         "Indexing match-all queries is not supported."
                     )
-                case [], _:
+                case [[], _]:
                     plain_query = Q(
                         "bool",
                         should=string_query,
@@ -618,7 +618,9 @@ def select_es_document_fields(
     }
 
 
-def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
+def prepare_percolator_content(
+    app_label: str, document_id: str
+) -> tuple[
     str,
     str | None,
     tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None,

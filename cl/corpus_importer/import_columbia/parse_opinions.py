@@ -66,7 +66,7 @@ def parse_file(file_path):
     )
     if not info["court_id"]:
         raise Exception(
-            f"Failed to find a court ID for \"{''.join(raw_info.get('court', []))}\"."
+            f'Failed to find a court ID for "{"".join(raw_info.get("court", []))}".'
         )
 
     # get the full panel text and extract judges from it

@@ -203,7 +203,6 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
 
 
 class CoverageTests(ESIndexTestCase, TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
@@ -591,7 +590,8 @@ class ApiEventCreationTestCase(TestCase):
     # run in parallel do not affect this one.
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args, **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args,
+        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
     )
     async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
@@ -622,7 +622,8 @@ class ApiEventCreationTestCase(TestCase):
 
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args, **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args,
+        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
     )
     async def test_api_logged_correctly_v4(self, mock_logging_prefix) -> None:
         # Global stats
@@ -2214,7 +2215,7 @@ class V4DRFPaginationTest(TestCase):
             await sync_to_async(DocketFactory)(
                 court=self.court,
                 source=Docket.HARVARD,
-                pacer_case_id=f"1234{i+1}",
+                pacer_case_id=f"1234{i + 1}",
                 date_filed=date(2015, 8, i + 1),
             )
 

@@ -1878,7 +1878,7 @@ async def merge_attachment_page_data(
                             rd.description = ""
                             logger.info(
                                 f"Failed to migrate description for "
-                                f"{attachment["pacer_doc_id"]}, "
+                                f"{attachment['pacer_doc_id']}, "
                                 f"multiple source documents found."
                             )
                         rd.attachment_number = None
@@ -1901,7 +1901,7 @@ async def merge_attachment_page_data(
                             rd.description = ""
                             logger.info(
                                 f"Failed to migrate description for "
-                                f"{attachment["pacer_doc_id"]}, "
+                                f"{attachment['pacer_doc_id']}, "
                                 f"multiple source documents found."
                             )
                     rds_created.append(rd)

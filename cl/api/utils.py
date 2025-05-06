@@ -272,9 +272,7 @@ class SimpleMetadataWithFilters(SimpleMetadata):
             else:
                 # Exact match or RelatedFilter
                 if isinstance(filter_type, RelatedFilter):
-                    model_name = (
-                        filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
-                    )
+                    model_name = filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
                     attrs["lookup_types"] = (
                         f"See available filters for '{model_name}'"
                     )

@@ -27,7 +27,8 @@ async def view_audio_file(
 
     try:
         note = await Note.objects.aget(
-            audio_id=af.pk, user=await request.auser()  # type: ignore[attr-defined]
+            audio_id=af.pk,
+            user=await request.auser(),  # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
         # Not note or anonymous user
