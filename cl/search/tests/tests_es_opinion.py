@@ -3014,7 +3014,7 @@ class RelatedSearchTest(
         expected_cited_by = [
             (
                 f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
-                f"Howard v. Honda (1895)",
+                "Howard v. Honda (1895)",
             ),
             (
                 f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",

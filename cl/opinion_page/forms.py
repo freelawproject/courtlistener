@@ -1,6 +1,7 @@
 import logging
+from collections.abc import MutableMapping
 from datetime import datetime
-from typing import Any, MutableMapping
+from typing import Any
 
 from django import forms
 from django.core.exceptions import ValidationError

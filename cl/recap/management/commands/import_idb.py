@@ -1,7 +1,7 @@
 import re
 import sys
 from datetime import date
-from typing import Dict, Optional
+from typing import Optional
 
 from dateutil import parser
 from django.core.management import CommandError
@@ -23,7 +23,7 @@ from cl.search.models import Court
 
 
 def create_or_update_row(
-    values: Dict[str, str],
+    values: dict[str, str],
 ) -> Optional[FjcIntegratedDatabase]:
     fjc_filters = [
         {
@@ -188,7 +188,7 @@ class Command(VerboseCommand, CommandUtils):
 
         logger.info(f"Importing IDB file at: {options['input_file']}")
         with open(
-            options["input_file"], mode="r", encoding="cp1252", newline="\r\n"
+            options["input_file"], encoding="cp1252", newline="\r\n"
         ) as f:
             col_headers = f.readline().strip().split("\t")
             for i, line in enumerate(f):

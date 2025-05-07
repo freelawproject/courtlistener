@@ -1,11 +1,10 @@
 # !/usr/bin/python
-# -*- coding: utf-8 -*-
 
 import json
 import os
 import re
 from pathlib import Path
-from typing import List, Optional, TypedDict
+from typing import Optional, TypedDict
 
 import internetarchive as ia
 import requests
@@ -27,7 +26,7 @@ class OptionsType(TypedDict):
 def fetch_ia_volumes(
     ia_session: ArchiveSession,
     options: OptionsType,
-) -> List[str]:
+) -> list[str]:
     """Find and order volumes for a reporter (if found).
 
     :param ia_session: The IA archive session object
@@ -56,7 +55,7 @@ def fetch_ia_volumes(
 
     # Return only the volumes requested, if specified
     vol_pattern = "|".join(
-        f"(.*{reporter}.{volume}(_\d+)?$)" for volume in volumes
+        rf"(.*{reporter}.{volume}(_\d+)?$)" for volume in volumes
     )
     results = [
         res

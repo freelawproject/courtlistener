@@ -279,7 +279,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
             )
             for score_value in meta_value.values():
                 self.assertIsNotNone(
-                    score_value, f"The score value can't be None."
+                    score_value, "The score value can't be None."
                 )
 
         else:
@@ -632,7 +632,7 @@ class SearchAlertsAssertions:
                 self.assertEqual(
                     len(webhook_cases),
                     expected_hits,
-                    msg=f"Did not get the right number of hits for the alert %s. "
+                    msg="Did not get the right number of hits for the alert %s. "
                     % alert_title,
                 )
                 matched_alert_name = True
@@ -645,7 +645,7 @@ class SearchAlertsAssertions:
                         self.assertEqual(
                             len(case[nested_field]),
                             expected_child_hits,
-                            msg=f"Did not get the right number of child documents for the case %s. "
+                            msg="Did not get the right number of child documents for the case %s. "
                             % case_title,
                         )
         self.assertTrue(matched_alert_name, msg="Alert name didn't match")
@@ -678,7 +678,7 @@ class SearchAlertsAssertions:
                 self.assertEqual(
                     1,
                     len(hits),
-                    msg=f"Did not get the right number of hits for the case %s. "
+                    msg="Did not get the right number of hits for the case %s. "
                     % webhook["payload"]["results"][0]["caseName"],
                 )
                 alert_child_hits = alert_child_hits + len(
@@ -690,20 +690,20 @@ class SearchAlertsAssertions:
         self.assertEqual(
             alert_title_webhooks,
             expected_hits,
-            msg=f"Did not get the right number of webhooks for alert %s. "
+            msg="Did not get the right number of webhooks for alert %s. "
             % alert_title,
         )
         self.assertEqual(
             alert_child_hits,
             expected_child_hits,
-            msg=f"Did not get the right number of child hits for alert %s. "
+            msg="Did not get the right number of child hits for alert %s. "
             % alert_title,
         )
         if expected_child_descriptions:
             self.assertEqual(
                 alert_child_ids,
                 set(expected_child_descriptions),
-                msg=f"Did not get the right child hits IDs for alert %s. "
+                msg="Did not get the right child hits IDs for alert %s. "
                 % alert_title,
             )
 
@@ -730,7 +730,7 @@ class SearchAlertsAssertions:
                     self.assertIn(
                         hl_expected,
                         child_field_content,
-                        msg=f"Did not get the HL content in field: %s. "
+                        msg="Did not get the HL content in field: %s. "
                         % field_name,
                     )
                 else:
@@ -743,7 +743,7 @@ class SearchAlertsAssertions:
                     self.assertIn(
                         hl_expected,
                         parent_field_content,
-                        msg=f"Did not get the HL content in field: %s. "
+                        msg="Did not get the HL content in field: %s. "
                         % field_name,
                     )
 

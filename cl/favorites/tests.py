@@ -1,4 +1,3 @@
-import math
 import time
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
@@ -16,7 +15,6 @@ from django.utils import timezone
 from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.donate.models import NeonMembership

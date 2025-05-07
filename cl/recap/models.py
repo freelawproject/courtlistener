@@ -234,7 +234,7 @@ class ProcessingQueue(AbstractDateTimeModel):
 
     @property
     def file_contents(self) -> str:
-        with open(self.filepath_local.path, "r") as f:
+        with open(self.filepath_local.path) as f:
             return f.read()
 
     def print_file_contents(self) -> None:

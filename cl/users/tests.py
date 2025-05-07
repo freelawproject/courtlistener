@@ -1,5 +1,4 @@
 import json
-import logging
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
@@ -103,8 +102,8 @@ class UserTest(LiveServerTestCase):
             self.assertEqual(
                 r.status_code,
                 HTTPStatus.OK,
-                msg="Got wrong status code for page at: {path}. "
-                "Status Code: {code}".format(path=path, code=r.status_code),
+                msg=f"Got wrong status code for page at: {path}. "
+                f"Status Code: {r.status_code}",
             )
 
     @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)

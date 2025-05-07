@@ -1,7 +1,8 @@
 import datetime
 import unittest
+from collections.abc import Sized
 from functools import wraps
-from typing import Sized, cast
+from typing import cast
 
 from django.contrib.auth.hashers import make_password
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -24,7 +25,7 @@ from cl.people_db.factories import (
     PositionFactory,
     SchoolFactory,
 )
-from cl.people_db.models import Person, Race
+from cl.people_db.models import Race
 from cl.search.constants import o_type_index_map
 from cl.search.docket_sources import DocketSources
 from cl.search.documents import DocketDocument

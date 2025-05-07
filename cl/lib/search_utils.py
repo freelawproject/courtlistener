@@ -2,7 +2,7 @@ import logging
 import pickle
 import re
 from collections.abc import Callable
-from typing import Any, Dict, List, Optional, Tuple, TypedDict
+from typing import Any, Optional, TypedDict
 from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -80,7 +80,7 @@ def check_pagination_depth(page_number):
 
 def make_get_string(
     request: HttpRequest,
-    nuke_fields: Optional[List[str]] = None,
+    nuke_fields: Optional[list[str]] = None,
 ) -> str:
     """Makes a get string from the request object. If necessary, it removes
     the pagination parameters.
@@ -100,9 +100,9 @@ def make_get_string(
 
 
 def merge_form_with_courts(
-    courts: Dict,
+    courts: dict,
     search_form: SearchForm,
-) -> Tuple[Dict[str, List], str, str]:
+) -> tuple[dict[str, list], str, str]:
     """Merges the courts dict with the values from the search form.
 
     Final value is like (note that order is significant):
@@ -164,7 +164,7 @@ def merge_form_with_courts(
                     break
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
-    court_tabs: Dict[str, List] = {
+    court_tabs: dict[str, list] = {
         "federal": [],
         "district": [],
         "state": [],

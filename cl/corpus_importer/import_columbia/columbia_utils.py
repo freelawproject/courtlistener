@@ -4,7 +4,11 @@ from datetime import date
 from typing import Any, Optional
 
 import dateutil.parser as dparser
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import (
+    BeautifulSoup,
+    NavigableString,
+    Tag,  # noqa: F401
+)
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
 from cl.people_db.lookup_utils import extract_judge_last_name
@@ -168,7 +172,7 @@ def read_xml_to_soup(filepath: str) -> BeautifulSoup:
     :param filepath: path to xml file
     :return: BeautifulSoup object of parsed content
     """
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         file_content = f.read()
         file_content = fix_xml_tags(file_content)
 

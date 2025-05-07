@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import boto3
 import pytz
@@ -168,7 +168,7 @@ class Command(CommandUtils, BaseCommand):
             self.generate_crosswalk_for_reporter(reporter, i)
 
     def generate_crosswalk_for_reporter(
-        self, reporter: Dict[str, Any], index: int
+        self, reporter: dict[str, Any], index: int
     ) -> None:
         """Generate crosswalk for a specific reporter.
 
@@ -232,7 +232,7 @@ class Command(CommandUtils, BaseCommand):
                 f"Processed {self.total_cases_processed} cases for {reporter_name}({reporter_slug}), found {self.total_matches_found} matches"
             )
 
-    def fetch_volumes_for_reporter(self, reporter_slug: str) -> List[str]:
+    def fetch_volumes_for_reporter(self, reporter_slug: str) -> list[str]:
         """Fetch volume directories for a given reporter from R2 using a paginator.
 
         :param reporter_slug: The slug of the reporter.
@@ -270,7 +270,7 @@ class Command(CommandUtils, BaseCommand):
         return sorted(volume_directories)
 
     def find_matching_case(
-        self, case_meta: Dict[str, Any], reporter_slug: str, volume: str
+        self, case_meta: dict[str, Any], reporter_slug: str, volume: str
     ) -> Optional[OpinionCluster]:
         """Find a matching case in CourtListener database using the filepath_json_harvard field.
 
@@ -310,7 +310,7 @@ class Command(CommandUtils, BaseCommand):
 
     def fetch_cases_metadata(
         self, reporter_slug: str, volume: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Fetch CasesMetadata.json for a specific reporter and volume from R2.
 
         :param reporter_slug: The slug of the reporter.
@@ -344,7 +344,7 @@ class Command(CommandUtils, BaseCommand):
             )
             return []
 
-    def fetch_reporters_metadata(self) -> List[Dict[str, Any]]:
+    def fetch_reporters_metadata(self) -> list[dict[str, Any]]:
         """Fetch ReportersMetadata.json from R2.
 
         :return: A list of reporter metadata dictionaries.
@@ -358,7 +358,7 @@ class Command(CommandUtils, BaseCommand):
             logger.error(f"Error fetching ReportersMetadata.json: {str(e)}")
             return []
 
-    def is_valid_case_metadata(self, case_meta: Dict[str, Any]) -> bool:
+    def is_valid_case_metadata(self, case_meta: dict[str, Any]) -> bool:
         """Check if case metadata contains all required fields.
 
         :param case_meta: Case metadata dictionary.
@@ -402,7 +402,7 @@ class Command(CommandUtils, BaseCommand):
             self.stdout.write(self.style.WARNING("No cases processed"))
 
     def save_crosswalk(
-        self, crosswalk: List[Dict[str, Any]], reporter_name: str, index: int
+        self, crosswalk: list[dict[str, Any]], reporter_name: str, index: int
     ) -> None:
         """Save the generated crosswalk to a JSON file.
 

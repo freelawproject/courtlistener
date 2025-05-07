@@ -277,7 +277,7 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 
     # Send email notifications in bulk.
     if email_recipients:
-        subject = f"A document you requested is now on CourtListener"
+        subject = "A document you requested is now on CourtListener"
         txt_template = loader.get_template("prayer_email.txt")
         html_template = loader.get_template("prayer_email.html")
 
@@ -401,7 +401,7 @@ def prayer_unavailable(instance: RECAPDocument, user_pk: int) -> None:
 
     # Send email notification.
     if email_recipients:
-        subject = f"A document you requested is unavailable for purchase"
+        subject = "A document you requested is unavailable for purchase"
         txt_template = loader.get_template("prayer_email_unavailable.txt")
         html_template = loader.get_template("prayer_email_unavailable.html")
 
