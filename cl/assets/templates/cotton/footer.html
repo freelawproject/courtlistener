@@ -1,0 +1,69 @@
+{% load svg_tags static %}
+
+<footer class="w-full pt-14 lg:pt-18 px-4 lg:px-10 flex flex-col gap-18 border-t border-greyscale-200">
+  <div class="flex flex-col lg:flex-row justify-between gap-y-11">
+    <div class="flex flex-col md:flex-row gap-x-4 gap-y-11 md:gap-x-11 2xl:gap-[80px]">
+      {#   DONATE BANNER   #}
+      <div class="p-4 banner w-full md:min-w-70 md:w-70 max-md:mx-auto h-53">
+        <div class="w-5 h-5">
+          {% svg "donate" aria_hidden="true" %}
+        </div>
+        <div class="flex flex-col gap-1">
+          <h3 class="text-greyscale-800 text-md font-medium">Donate to Support Our Work</h3>
+          <p class="text-greyscale-600 text-sm text-normal">
+            Your generosity allows us to expand our work, helping us reach even more communities.
+          </p>
+        </div>
+        <a href="https://donate.free.law/forms/membership" class="py-2 btn-primary text-md text-center w-full font-medium">
+          Donate Now
+        </a>
+      </div>
+
+      {#   NAVIGATION LINKS   #}
+      <nav class="flex flex-wrap gap-y-11 gap-x-2">
+        <div class="flex flex-col w-41 lg:w-28 xl:w-42 gap-4">
+          <h5 class="text-sm font-normal text-greyscale-600">Organization</h5>
+          <a href="" class="text-sm font-medium">About Us</a>
+          <a href="" class="text-sm font-medium">Blog Posts</a>
+          <a href="" class="text-sm font-medium">Help & FAQ</a>
+          <a href="" class="text-sm font-medium">Contact</a>
+          <a href="" class="text-sm font-medium">Contribute</a>
+        </div>
+        <div class="flex flex-col w-41 lg:w-30 xl:w-42 gap-4">
+          <h5 class="text-sm font-normal text-greyscale-600">Data</h5>
+          <a href="" class="text-sm font-medium">About Our Data</a>
+          <a href="" class="text-sm font-medium">Data Consulting</a>
+          <a href="" class="text-sm font-medium">Install RECAP</a>
+          <a href="" class="text-sm font-medium">APIs & Bulk Data</a>
+        </div>
+        <div class="flex flex-col w-41 lg:w-28 xl:w-42 gap-4">
+          <h5 class="text-sm font-normal text-greyscale-600">Legal</h5>
+          <a href="" class="text-sm font-medium">Terms & Privacy</a>
+          <a href="" class="text-sm font-medium">Removal</a>
+          <a href="" class="text-sm font-medium">Vulnerability  Policies</a>
+        </div>
+      </nav>
+    </div>
+
+    {#  NEWSLETTER  #}
+    <div class="flex flex-col xl:max-w-[343px] lg:max-w-72 gap-6">
+      <div class="sm:block hidden">
+        <img height="84" src="{% static "png/logo.png" %}" alt="CourtListener logo">
+      </div>
+      <p class="text-sm text-greyscale-600">Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
+      <a href="" class="btn-dark">Subscribe</a>
+    </div>
+  </div>
+
+  <div class="flex flex-col lg:flex-row justify-between py-4 max-lg:gap-9 border-t">
+    <div class="text-greyscale-600 text-sm" role="text">
+      CourtListener is sponsored by the non&#8209;profit&nbsp;<a class="text-primary-600 underline">Free Law Project</a>.
+    </div>
+    <div class="gap-5 flex">
+      <a href="">{% svg "logos/linkedin" %}</a>
+      <a href="">{% svg "logos/bluesky" %}</a>
+      <a href="">{% svg "logos/github" %}</a>
+      <a href="">{% svg "newspaper" %}</a>
+    </div>
+  </div>
+</footer>
