@@ -29,6 +29,7 @@ REST_FRAMEWORK = {
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
         # Sock puppets
+        "bobjase27": "1/hour",
         "Kejik5": "1/hour",
         "PRpl.Kane": "1/hour",
         "PeterZH": "1/hour",

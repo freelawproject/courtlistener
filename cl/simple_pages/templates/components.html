@@ -1,21 +1,276 @@
-{% extends "base.html" %}
-
-{% load static tailwind_tags %}
-
-{% block head %}
-{% tailwind_css %}
-{% tailwind_preload_css %}
-
-<script src="{% static 'js/alpinejscsp@3.14.8.min.js' %}" defer init nonce="{{ request.csp_nonce }}"></script>
-
-{% endblock %}
+{% extends "new_base.html" %}
+{% load svg_tags %}
 
 {% block title %}Components Library - CourtListener.com{% endblock %}
 
 {% block content %}
-<h1 class="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">H1 Title Component</h1>
-<h2 class="scroll-m-20 text-3xl font-semibold tracking-tight first:mt-0">H2 Title Component</h2>
-<h3 class="scroll-m-20 text-2xl font-semibold tracking-tight">H3 Title Component</h3>
+<div>
+<c-layout-with-navigation
+  :nav_items="[
+      {'href': '#main-title', 'text': 'Component Library'},
+      {'href': '#text-components', 'text': 'Text components', 'children': [
+        {'href': '#code-block', 'text': 'Code blocks'},
+        {'href': '#two-column-list', 'text': 'Two column list'},
+        {'href': '#eyebrow', 'text': 'Eyebrow'},
+      ]},
+      {'href': '#layout-components', 'text': 'Layout components', 'children': [
+        {'href': '#expansion', 'text': 'Expansion panel'},
+        {'href': '#navigation-menu', 'text': 'Navigation menu'},
+        {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
+      ]},
+  ]"
+>
+  <section class="max-w-full w-full" x-intersect.margin.-100px="show" id="main-title">
+    <c-eyebrow>CourtListener's</c-eyebrow>
+    <h1 class="">Component Library</h1>
+    <p class="mt-4">Below you will find a display of the components available in our codebase with usage notes to make development easier.</p>
+    <p class="my-3">These components are available to all templates that extend from <code>new_base.html</code>. Using them doesn't require any imports or settings, they should just work!</p>
+    <p class="my-3">If these aren't enough for your needs and you make a new component or tweak one of the existing ones, make sure to:</p>
+    <ul class="list-disc pl-4">
+      <li>Save the html in one of the <code>/templates/cotton/</code> directories for Django to pick it up automatically.</li>
+      <li>Read the docs! We use <a class="underline" href="https://django-cotton.com/docs/usage-patterns" target="_blank">Django Cotton</a> for components,
+        <a class="underline" href="https://alpinejs.dev/directives/data" target="_blank">AlpineJS</a> for interactivity, and
+        <a class="underline" href="https://v3.tailwindcss.com/docs/utility-first" target="_blank">Tailwind CSS</a> for styling.</li>
+      <li>Add your new component to this page with some helpful notes so other developers know to use it!</li>
+    </ul>
+  </section>
 
-<c-h1>Django Cotton Sample</c-h1>
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect="show" id="code-block">
+    <h2 class="mt-6 mb-3">Code blocks</h2>
+    <p>Note this component uses <code>&lt;pre&gt;</code> tags so all whitespace will be preserved.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <c-code>
+Sample code here.
+    </c-code>
+
+    <h4 class="mt-3">Props</h4>
+    <p>No props</p>
+
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Text that will be displayed in the code block.</span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-code&gt;
+    Sample code here.
+&lt;/c-code&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect="show" id="two-column-list">
+    <h2 class="mt-6 mb-3">Two column list</h2>
+    <h4 class="mt-3">Demo</h4>
+    <c-two-column-list
+      class="my-4 p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
+      :list="[
+          {'short_name': 'First item'},
+          {'short_name': 'Second item'},
+          {'short_name': 'Third item'},
+          {'short_name': 'Fourth item'},
+      ]"
+    ></c-two-column-list>
+
+    <h4>Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>list</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">List of strings that will be displayed in two even columns.</span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <p class="mb-3">No slot</p>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-two-column-list
+  class="p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
+  :list="[
+      {'short_name': 'First item'},
+      {'short_name': 'Second item'},
+      {'short_name': 'Third item'},
+      {'short_name': 'Fourth item'},
+  ]"
+&gt;&lt;/c-two-column-list>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="eyebrow">
+    <h2 class="mt-6 mb-3">Eyebrow</h2>
+    <h4 class="mt-3">Demo</h4>
+    <c-eyebrow class="my-4">CourtListener</c-eyebrow>
+
+    <h4 class="mt-3">Props</h4>
+    <p>No props</p>
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Eyebrow's content.</span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-eyebrow&gt;CourtListener&lt;/c-eyebrow>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="expansion">
+    <h2 class="mt-6 mb-3">Expansion panel</h2>
+    <h4 class="mt-3">Demo</h4>
+    <c-expansion-panel title="This is a demo" class="my-4 text-primary-600 font-bold">
+      Hello!
+    </c-expansion-panel>
+
+    <h4 class="mt-3">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>title</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Title displayed.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Collapsible content.</span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-expansion-panel title="This is a demo" class="my-4 text-primary-600 font-bold"&gt;
+  Hello!
+&lt;/c-expansion-panel>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="navigation-menu">
+    <h2 class="mt-6 mb-3">Navigation menu</h2>
+    <p>The desktop version of this component highlights the currently visible section on scroll.
+      For this feature to work, the elements referenced need to implement the intersect listener with the <code>show</code> method.
+    </p>
+    <p>This uses Alpine's intersect plugin, so the x-intersect directive can be used with
+    <a class="underline" href="https://alpinejs.dev/plugins/intersect#modifiers" target="_blank">modifiers</a> for more control;
+    see <code>x-intersect.margin.-100px="show"</code> in the new alerts help page, which adds a negative margin to the
+    intersect handler, preventing the event to be fired immediately when the element enters the viewport.</p>
+    <h4 class="mt-3">Demo</h4>
+    <p>See this page's navigation menu.</p>
+
+    <h4 class="mt-3">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>nav_items</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          List of navigation items, where each item is a dictionary with <code>href</code> and <code>text</code>.
+        </span>
+      </div>
+    </div>
+    <h4 class="mt-3">Slot</h4>
+    <p class="mb-3">No slot</p>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-navigation-menu
+  :nav_items="[
+    {'href': '#main-title', 'text': 'Component Library'},
+    {'href': '#', 'text': 'Text components', 'children': [
+      {'href': '#two-column-list-component', 'text': 'Two column list'},
+      {'href': '#eyebrow', 'text': 'Eyebrow'},
+    ]},
+    {'href': '#', 'text': 'Layout components', 'children': [
+      {'href': '#expansion', 'text': 'Expansion panel'},
+      {'href': '#navigation-menu', 'text': 'Navigation menu'},
+      {'href': '#layout-with-navigation', 'text': 'Layout with navigation'},
+    ]},
+  ]"
+&gt;&lt;/c-navigation-menu>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="tabbed-cards">
+    <h2 class="mt-6 mb-3">Tabbed cards</h2>
+    <p>The tabbed component is composed of two elements: the <code>c-tabs</code> element and the <code>c-tabs.tab</code> element.
+    Include a <code>c-tabs.tab</code> element for each tab in the <code>c-tabs</code> slot.
+    </p>
+
+    <h4 class="mt-3">Demo</h4>
+    <c-tabs class="my-4" title="My tabs">
+      <c-tabs.tab name="First tab">
+        First tab panel content
+      </c-tabs.tab>
+      <c-tabs.tab name="Second tab">
+        Second tab panel content
+      </c-tabs.tab>
+      <c-tabs.tab name="Third tab">
+        Third tab panel content
+      </c-tabs.tab>
+    </c-tabs>
+
+    <h4 class="mt-3">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs</code>: <code>title</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Component title used for accessibility.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs.tab</code>: <code>name</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Tab label displayed in selector.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs</code> default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Add as many <code>c-tabs.tab</code> elements as needed.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs.tab</code> default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Content displayed when this tab is active.
+        </span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-tabs title="My tabs"&gt;
+  &lt;c-tabs.tab name="First tab"&gt;
+    First tab panel content
+  &lt;/c-tabs.tab&gt;
+  &lt;c-tabs.tab name="Second tab"&gt;
+    Second tab panel content
+  &lt;/c-tabs.tab&gt;
+  &lt;c-tabs.tab name="Third tab"&gt;
+    Third tab panel content
+  &lt;/c-tabs.tab&gt;
+&lt;/c-tabs&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+</c-layout-with-navigation>
+</div>
 {% endblock %}

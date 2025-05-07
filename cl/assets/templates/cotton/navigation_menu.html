@@ -1,0 +1,158 @@
+{% load svg_tags static component_tags %}
+{% require_script "js/alpine/components/navigation_menu.js" %}
+{% require_script "js/alpine/composables/intersect.js" %}
+{% require_script "js/alpine/composables/focus.js" %}
+{% require_script "js/alpine/plugins/intersect@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/collapse@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+
+<c-vars nav_items ></c-vars>
+{{ nav_items|json_script:"nav-items" }}
+
+{# DESKTOP #}
+
+<div x-data="navMenu" class="max-md:hidden overflow-y-auto h-[100vh] sticky top-5 min-w-[var(--nav-menu-width)]">
+<nav class="sticky top-0 flex flex-col flex-wrap items-start w-full pr-3">
+<ul
+  class="list-none w-full"
+  role="menu"
+  aria-label="Navigation"
+>
+  {% for item in nav_items %}
+    <li
+      data-intersect-target="{{ item.href }}"
+      class="w-full"
+      role="none"
+    >
+      <div class="ml-1 text-sm font-sans flex justify-start items-center flex-wrap">
+        {% svg "ellipse" x_bind__fill="markerClass" data_intersect_target=item.href aria_hidden="true" %}
+        <a
+          x-bind:class="itemClass"
+          title="{{ item.text }}"
+          href="#{{ item.href|slugify }}"
+          class="pl-3.5 pr-2 py-1.5 font-semibold truncate"
+          data-intersect-target="{{ item.href }}"
+          aria-label="Go to {{ item.text }}"
+        >
+          {{ item.text }}
+        </a>
+        <button
+          x-show="hasChildren"
+          x-on:click="toggleExpansion"
+          data-intersect-target="{{ item.href }}"
+          aria-haspopup="menu"
+          aria-label="Toggle submenu for {{ item.text }}"
+          x-bind:aria-expanded="isExpanded"
+          type="button"
+          aria-controls="submenu-{{ item.href|slugify }}"
+        >
+          <span
+            x-bind:class="iconClass"
+            data-intersect-target="{{ item.href }}"
+            class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+            aria-hidden="true"
+          >{% svg 'chevron' class="w-full h-full" %}
+          </span>
+        </button>
+      </div>
+      <ul
+        id="submenu-{{ item.href|slugify }}"
+        x-show="isExpanded"
+        x-collapse
+        data-intersect-target="{{ item.href }}"
+        class="flex flex-col pl-1.5"
+        role="menu"
+      >
+        {% for sub_item in item.children %}
+          <a
+            x-bind:class="childClass"
+            title="{{ sub_item.text }}"
+            href="#{{ sub_item.href|slugify }}"
+            class="w-full pl-8 py-1.5 font-normal text-sm truncate"
+            data-intersect-target="{{ sub_item.href }}"
+            role="menuitem"
+            aria-label="Go to {{ sub_item.text }}"
+          >{{ sub_item.text }}</a>
+        {% endfor %}
+      </ul>
+    </li>
+  {% endfor %}
+</ul>
+</nav>
+</div>
+
+{# MOBILE #}
+
+<div x-data="navMenu" class="relative w-full md:hidden">
+  <button
+    x-on:click="toggleMenu"
+    type="button"
+    class="w-full flex flex-row justify-between border border-greyscale-200 bg-white py-3 px-3.5 rounded-[10px] text-sm font-medium text-greyscale-900 focus:ring-2 focus:ring-primary-400 focus:outline-none"
+    aria-haspopup="menu"
+    aria-controls="mobile-menu-list"
+    aria-label="Toggle navigation menu"
+    x-bind:aria-expanded="menuOpen"
+  >
+    <span
+      class="text-sm font-medium text-greyscale-600"
+      x-text="visibleSectionText"
+      aria-hidden="true"
+    ></span>
+    {% svg "chevron" aria_hidden="true" %}
+  </button>
+
+  <nav>
+  <ul
+    id="mobile-menu-list"
+    x-show="menuOpen"
+    x-data="focus"
+    x-on:click.outside="closeMenu"
+    x-on:keyup.esc="closeMenu"
+    x-on:keyup.right="focusNext"
+    x-on:keyup.left="focusPrevious"
+    class="absolute z-10 mt-2 max-h-[320px] w-full overflow-auto rounded-lg bg-white py-1 shadow-lg border border-greyscale-200 focus:outline-hidden"
+    tabindex="-1"
+    role="menu"
+    aria-label="Navigation"
+    x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-100"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+  >
+    <template x-for="option in options" :key="option.href">
+      <li class="relative cursor-default py-[1px] px-1.5 select-none" role="none">
+        <a
+          x-on:click="closeMenu"
+          x-bind:href="option.href"
+          role="menuitem"
+          class="py-2.5 px-2 hover:bg-greyscale-100 rounded-md flex flex-row justify-between"
+        >
+          <span class="truncate font-medium text-sm text-greyscale-600" x-text="option.text"></span>
+          {% svg "check" x_show="isVisible" x_bind__data_intersect_target="option.href" aria_hidden="true" %}
+        </a>
+
+        <template
+          x-if="hasChildren"
+          x-bind:data-intersect-target="option.href"
+        >
+          <ul class="flex flex-col w-full" role="menu">
+            <template x-for="subItem in option.children">
+              <li class="w-full pl-7.5 py-1.5 font-normal text-sm text-greyscale-600" role="none">
+                <a
+                  x-on:click="closeMenu"
+                  x-bind:href="subItem.href"
+                  x-bind:data-intersect-target="subItem.href"
+                  x-text="subItem.text"
+                  role="menuitem"
+                ></a>
+              </li>
+            </template>
+          </ul>
+        </template>
+      </li>
+    </template>
+  </ul>
+  </nav>
+</div>

@@ -4,6 +4,7 @@ from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import DownloadConfirmationPage
 from juriscraper.pacer.utils import is_pdf
+from lxml.etree import ParserError
 from redis import ConnectionError as RedisConnectionError
 
 from cl.celery_init import app
@@ -17,7 +18,7 @@ from .utils import prayer_unavailable
 
 @app.task(
     bind=True,
-    autoretry_for=(RedisConnectionError, PacerLoginException),
+    autoretry_for=(RedisConnectionError, PacerLoginException, ParserError),
     max_retries=5,
     interval_start=5,
     interval_step=5,
