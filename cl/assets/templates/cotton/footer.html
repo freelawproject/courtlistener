@@ -14,7 +14,11 @@
             Your generosity allows us to expand our work, helping us reach even more communities.
           </p>
         </div>
-        <a href="https://donate.free.law/forms/membership" class="py-2 btn-primary text-md text-center w-full font-medium">
+        <a
+          href="https://donate.free.law/forms/membership"
+          class="py-2 btn-primary text-md text-center w-full font-medium"
+          target="_blank"
+        >
           Donate Now
         </a>
       </div>
@@ -23,24 +27,28 @@
       <nav class="flex flex-wrap gap-y-11 gap-x-2">
         <div class="flex flex-col w-41 lg:w-28 xl:w-42 gap-4">
           <h5 class="text-sm font-normal text-greyscale-600">Organization</h5>
-          <a href="" class="text-sm font-medium">About Us</a>
-          <a href="" class="text-sm font-medium">Blog Posts</a>
-          <a href="" class="text-sm font-medium">Help & FAQ</a>
-          <a href="" class="text-sm font-medium">Contact</a>
-          <a href="" class="text-sm font-medium">Contribute</a>
+          <a href="https://free.law/about/" class="text-sm font-medium" target="_blank">About Us</a>
+          <a href="https://free.law/blog" class="text-sm font-medium" target="_blank">Blog Posts</a>
+          <a href="{% url "help_home" %}" class="text-sm font-medium">Help & FAQ</a>
+          <a href="{% url "contact" %}" class="text-sm font-medium">Contact</a>
+          <a href="{% url "contribute" %}" class="text-sm font-medium">Contribute</a>
         </div>
         <div class="flex flex-col w-41 lg:w-30 xl:w-42 gap-4">
           <h5 class="text-sm font-normal text-greyscale-600">Data</h5>
-          <a href="" class="text-sm font-medium">About Our Data</a>
-          <a href="" class="text-sm font-medium">Data Consulting</a>
-          <a href="" class="text-sm font-medium">Install RECAP</a>
-          <a href="" class="text-sm font-medium">APIs & Bulk Data</a>
+          <a href="{% url "coverage" %}" class="text-sm font-medium">About Our Data</a>
+          <a href="https://free.law/data-consulting/" class="text-sm font-medium" target="_blank">
+            Data Consulting
+          </a>
+          <a href="https://free.law/recap/" class="text-sm font-medium" target="_blank">Install RECAP</a>
+          <a href="{% url "api_index" %}" class="text-sm font-medium">APIs & Bulk Data</a>
         </div>
         <div class="flex flex-col w-41 lg:w-28 xl:w-42 gap-4">
           <h5 class="text-sm font-normal text-greyscale-600">Legal</h5>
-          <a href="" class="text-sm font-medium">Terms & Privacy</a>
-          <a href="" class="text-sm font-medium">Removal</a>
-          <a href="" class="text-sm font-medium">Vulnerability  Policies</a>
+          <a href="{% url "terms" %}" class="text-sm font-medium">Terms & Privacy</a>
+          <a href="{% url "terms" %}#removal" class="text-sm font-medium">Removal</a>
+          <a href="https://free.law/vulnerability-disclosure-policy/" class="text-sm font-medium" target="_blank">
+            Vulnerability  Policies
+          </a>
         </div>
       </nav>
     </div>
@@ -51,7 +59,11 @@
         <img height="84" src="{% static "png/logo.png" %}" alt="CourtListener logo">
       </div>
       <p class="text-sm text-greyscale-600">Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
-      <a href="" class="btn-dark">Subscribe</a>
+      <a
+        href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9"
+        target="_blank"
+        class="btn-dark"
+      >Subscribe</a>
     </div>
   </div>
 
@@ -60,10 +72,29 @@
       CourtListener is sponsored by the non&#8209;profit&nbsp;<a class="text-primary-600 underline">Free Law Project</a>.
     </div>
     <div class="gap-5 flex">
-      <a href="">{% svg "logos/linkedin" %}</a>
-      <a href="">{% svg "logos/bluesky" %}</a>
-      <a href="">{% svg "logos/github" %}</a>
-      <a href="">{% svg "newspaper" %}</a>
+      <a
+        aria-label="LinkedIn"
+        target="_blank"
+        rel="noopener noreferrer"
+        href="https://www.linkedin.com/company/free-law-project/"
+      >{% svg "logos/linkedin" aria_hidden="true" %}</a>
+      <a
+        aria-label="Bluesky"
+        target="_blank"
+        rel="noopener noreferrer"
+        href="https://bsky.app/profile/free.law"
+      >{% svg "logos/bluesky" aria_hidden="true" %}</a>
+      <a
+        aria-label="CourtListener GitHub repository"
+        target="_blank"
+        rel="noopener noreferrer"
+        href="https://github.com/freelawproject/courtlistener"
+      >{% svg "logos/github" aria_hidden="true" %}</a>
+      <a
+        aria-label="Newsletter subscription"
+        target="_blank"
+        href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9"
+      >{% svg "newspaper" aria_hidden="true" %}</a>
     </div>
   </div>
 </footer>
