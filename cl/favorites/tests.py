@@ -1278,6 +1278,33 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             msg="The top prayer didn't match.",
         )
 
+    async def test_granting_prayers_clears_availability_checks(self) -> None:
+        """Tests that granting a prayer deletes prior PrayerAvailability records"""
+        # Create a PrayerAvailability record to simulate a recent availability
+        # check for this document 4.
+        await PrayerAvailability.objects.acreate(recap_document=self.rd_4)
+
+        # Trigger the creation of a prayer for the same document.
+        await create_prayer(self.user, self.rd_4)
+
+        # Simulate the document becoming available (prayer granted).
+        self.rd_4.is_available = True
+        await self.rd_4.asave()
+
+        # Verify that one prayer has been granted.
+        granted_prays = Prayer.objects.filter(status=Prayer.GRANTED)
+        self.assertEqual(
+            await granted_prays.acount(),
+            1,
+            msg="Wrong number of granted prayers",
+        )
+
+        # Assert that no PrayerAvailability records remain for the now-available document.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_4.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
     async def test_can_we_load_the_top_prayers_page(self) -> None:
         """Does the 'top prayers' page return a successful response?"""
         r = await self.async_client.get(reverse("top_prayers"))

@@ -271,7 +271,8 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
     ]
     open_prayers.update(status=Prayer.GRANTED)
 
-    # copying code from cl/favorites/tasks.py to account for circumstance where someone buys a document from PACER despite it being marked sealed on RECAP
+    # copying code from cl/favorites/tasks.py to account for circumstance where
+    # someone buys a document from PACER despite it being marked sealed on RECAP
     PrayerAvailability.objects.filter(recap_document=instance).delete()
 
     # Send email notifications in bulk.
