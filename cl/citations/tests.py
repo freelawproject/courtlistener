@@ -13,8 +13,10 @@ from bs4 import BeautifulSoup
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
 from django.core.management import call_command
+from django.db.models.signals import post_delete, post_save
 from django.test import override_settings
 from django.urls import reverse
+from elasticsearch import NotFoundError
 from eyecite import get_citations
 from eyecite.test_factories import (
     case_citation,
@@ -57,6 +59,7 @@ from cl.citations.tasks import (
 )
 from cl.citations.utils import make_get_citations_kwargs
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
+from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -657,6 +660,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.rebuild_index("search.OpinionCluster")
+        cls.rebuild_index("search.ParentheticalGroup")
         super().setUpTestData()
         # Courts
         cls.court_scotus = CourtFactory(id="scotus")
@@ -1511,6 +1515,49 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             expected_ids,
             "Should fall back to ID sorting when no ordering_keys exist",
         )
+
+    def test_signal_disconnection(self) -> None:
+        """Can ParentheticalGroup signals be disconnected and reconnected?"""
+
+        # from `test_opinionscited_creation` we know that opinion5 should
+        # have Parentheticals for
+        opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
+        find_citations_and_parentheticals_for_opinion_by_pks(
+            opinion_pks=[opinion5.pk], disconnect_pg_signals=True
+        )
+        self.assertEqual(
+            post_save.receivers[-1][0][0],
+            "update_related_parentheticalgroup_documents_in_es_index_parentheticalgroup",
+        )
+        self.assertEqual(
+            post_delete.receivers[-1][0][0],
+            "remove_parentheticalgroup_from_es_index_parentheticalgroup",
+        )
+        par = Parenthetical.objects.first()
+        pg = ParentheticalGroup(
+            opinion=par.described_opinion,
+            representative=par,
+            score=0.5,
+            size=1,
+        )
+        pg.save()
+        pg_id = pg.id
+        self.rebuild_index("search.ParentheticalGroup")
+        try:
+            ParentheticalGroupDocument.get(id=pg_id)
+        except NotFoundError:
+            self.fail(
+                "Signal should create a ParentheticalGroupDocument on ParentheticalGroup save"
+            )
+
+        pg.delete()
+        try:
+            ParentheticalGroupDocument.get(id=pg_id)
+            self.fail(
+                "Signal should delete the ParentheticalGroupDocument on ParentheticalGroup delete"
+            )
+        except NotFoundError:
+            pass
 
 
 class CitationFeedTest(

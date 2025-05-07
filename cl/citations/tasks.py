@@ -152,42 +152,39 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
             raise self.retry(exc=e, countdown=2)
         except OperationalError:
             # delay deadlocked tasks, and continue regular process
-            store_opinion_citations_and_update_parentheticals.apply_async(
-                (opinion.id, children_queue), countdown=60
+            find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
+                ([opinion.id], disconnect_pg_signals), countdown=60
             )
         except Exception as e:
             # do not retry the whole loop on an unknown exception
-            end_index = max(len(opinions) - 1, index + 1)
+            end_index = min(len(opinions) - 1, index + 1)
             ids = [o.id for o in opinions[end_index:]]
             if ids:
                 raise self.retry(
-                    exc=e, countdown=60, kwargs={"opinion_pks": ids}
+                    exc=e,
+                    countdown=60,
+                    kwargs={
+                        "opinion_pks": ids,
+                        "disconnect_pg_signals": disconnect_pg_signals,
+                    },
                 )
         finally:
             if disconnect_pg_signals:
                 reconnect_parenthetical_group_signals()
 
 
-@app.task(bind=False, max_retries=5, ignore_result=True)
 def store_opinion_citations_and_update_parentheticals(
-    opinion_or_pk: Opinion | int,
+    opinion: Opinion,
     queue_for_children: str = settings.CELERY_ETL_TASK_QUEUE,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion,
     parenthetical info for the cited opinions, and stores unmatched citations
 
-    :param opinion: A search.Opinion object, or its primary key
-        If this is called as a celery task, using a Opinion object uses too
-        much memory on object piclking, should pass a primary key
+    :param opinion: A search.Opinion object
     :param queue: celery queue to send the child tasks to
     :return: None
     """
-    if isinstance(opinion_or_pk, Opinion):
-        opinion = opinion_or_pk
-    else:
-        opinion = Opinion.objects.get(id=opinion_or_pk)
-
     # Extract the citations from the opinion's text
     # If the source has marked up text, pass it so it can be used to find
     # ReferenceCitations. This is handled by `make_get_citations_kwargs`

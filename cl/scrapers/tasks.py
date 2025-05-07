@@ -16,7 +16,7 @@ from redis import ConnectionError as RedisConnectionError
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.citations.tasks import (
-    store_opinion_citations_and_update_parentheticals,
+    find_citations_and_parentheticals_for_opinion_by_pks,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
@@ -213,7 +213,7 @@ def extract_doc_content(
         return
 
     # Identify and link citations within the document content
-    store_opinion_citations_and_update_parentheticals.apply_async(
+    find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
         (opinion.pk,), countdown=random.randint(0, 3600)
     )
 
