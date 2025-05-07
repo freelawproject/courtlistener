@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
 
@@ -52,3 +52,25 @@ def check_prayer_availability(sender, instance: Prayer, **kwargs):
         prayer_unavailable(rd, user.pk)
     else:
         check_prayer_pacer.delay(rd.pk, user.pk)
+
+
+@receiver(
+    post_delete,
+    sender=PrayerAvailability,
+    dispatch_uid="mark_document_accessible_on_prayer_availability_deletion",
+)
+def mark_document_accessible_after_prayer_availability_deletion(
+    sender, instance: PrayerAvailability, **kwargs
+):
+    """
+    Signal to to mark the associated RecapDocument as accessible when a
+    PrayerAvailability instance is deleted.
+    """
+    recap_document = instance.recap_document
+
+    # No need to update if already marked as accessible
+    if not recap_document.is_sealed:
+        return
+
+    recap_document.is_sealed = False
+    recap_document.save()

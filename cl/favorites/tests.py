@@ -1283,6 +1283,8 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         # Create a PrayerAvailability record to simulate a recent availability
         # check for this document 4.
         await PrayerAvailability.objects.acreate(recap_document=self.rd_4)
+        self.rd_4.is_sealed = True
+        await self.rd_4.asave()
 
         # Trigger the creation of a prayer for the same document.
         await create_prayer(self.user, self.rd_4)
@@ -1304,6 +1306,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             recap_document_id=self.rd_4.pk
         )
         self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        await self.rd_4.arefresh_from_db()
+        self.assertEqual(self.rd_4.is_sealed, False)
 
     async def test_can_we_load_the_top_prayers_page(self) -> None:
         """Does the 'top prayers' page return a successful response?"""
