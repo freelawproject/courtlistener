@@ -241,6 +241,8 @@ MESSAGE_TAGS = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
+FORMS_URLFIELD_ASSUME_HTTPS = True
+
 SILENCED_SYSTEM_CHECKS = [
     # Allow index names >30 characters, because we aren’t using Oracle
     "models.E034",
