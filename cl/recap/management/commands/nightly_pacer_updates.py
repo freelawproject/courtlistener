@@ -94,7 +94,8 @@ def get_rd_ids_pray_and_pray() -> set[int]:
     # - we have not checked them after the embargo passed
     queryset = PrayerAvailability.objects.filter(
         recap_document__docket_entry__date_filed__lte=cutoff_date,
-        last_checked__lt=F("recap_document__docket_entry__date_filed") + timedelta(days=90),
+        last_checked__lt=F("recap_document__docket_entry__date_filed")
+        + timedelta(days=90),
     )
 
     return set(queryset.values_list("recap_document_id", flat=True))
