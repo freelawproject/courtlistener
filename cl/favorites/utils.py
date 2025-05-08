@@ -394,12 +394,14 @@ def prayer_unavailable(instance: RECAPDocument, user_pk: int) -> None:
 
     user_prayer = open_prayers.filter(user__pk=user_pk).first()
 
-    email_recipients = [
-        {
-            "email": user_prayer.user.email,
-            "date_created": user_prayer.date_created,
-        }
-    ]
+    email_recipients = []
+    if user_prayer:
+        email_recipients = [
+            {
+                "email": user_prayer.user.email,
+                "date_created": user_prayer.date_created,
+            }
+        ]
 
     # Send email notification.
     if email_recipients:
