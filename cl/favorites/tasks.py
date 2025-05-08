@@ -29,7 +29,7 @@ def check_prayer_pacer(self, rd_pk: int, user_pk: int):
     :param rd_pk: The primary key of RECAPDocument of interest
     :param user_pk: The primary key of the user who requested the document
     """
-    rd = RECAPDocument.objects.select_related("docket_entry__docket").get(
+    rd = RECAPDocument.objects.select_related("docket_entry__docket").defer("plain_text").get(
         pk=rd_pk
     )
 
