@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytz
 import requests
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 from requests import RequestException
 from simplejson import JSONDecodeError
@@ -94,7 +94,7 @@ def get_rd_ids_pray_and_pray() -> set[int]:
     # - we have not checked them after the embargo passed
     queryset = PrayerAvailability.objects.filter(
         recap_document__docket_entry__date_filed__lte=cutoff_date,
-        last_checked__lt=cutoff_date,
+        last_checked__lt=F("recap_document__docket_entry__date_filed") + timedelta(days=90),
     )
 
     return set(queryset.values_list("recap_document_id", flat=True))
