@@ -22,7 +22,7 @@ from django.template import loader
 from django.utils import timezone
 
 from cl.custom_filters.templatetags.pacer import price
-from cl.favorites.models import Prayer
+from cl.favorites.models import Prayer, PrayerAvailability
 from cl.search.models import RECAPDocument
 
 
@@ -270,6 +270,10 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
         for prayer in open_prayers.values("user__email", "date_created")
     ]
     open_prayers.update(status=Prayer.GRANTED)
+
+    # copying code from cl/favorites/tasks.py to account for circumstance where
+    # someone buys a document from PACER despite it being marked sealed on RECAP
+    PrayerAvailability.objects.filter(recap_document=instance).delete()
 
     # Send email notifications in bulk.
     if email_recipients:
