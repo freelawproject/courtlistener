@@ -3,7 +3,7 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import Dict, Tuple, Union
+from typing import Union
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -62,7 +62,7 @@ def make_docket_title(docket: Docket) -> str:
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, NoteForm]]]:
+) -> tuple[Docket, dict[str, Union[bool, str, Docket, NoteForm]]]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     title = make_docket_title(docket)
@@ -334,7 +334,7 @@ async def es_get_related_clusters_with_cache(
     related_cluster_result.timeout = False
     related_cluster_result.sub_opinion_pks = list(map(int, sub_opinion_pks))
 
-    if timeout_related == False:
+    if not timeout_related:
         await cache.aset(
             mlt_cache_key,
             (related_cluster_result.related_clusters, timeout_related),

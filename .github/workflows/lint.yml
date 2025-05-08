@@ -99,27 +99,3 @@ jobs:
           cl/search/management/commands/sweep_indexer.py \
           cl/search/management/commands/pacer_bulk_fetch.py \
           cl/search/management/commands/generate_opinion_embeddings.py
-
-
-
-      - name: Flynt f-string Formatter
-        run: >
-          flynt .
-          --line-length=79
-          --transform-concats
-          --fail-on-change
-
-  lint-isort:
-    # This is an unfortunate necessity because the latest version of isort
-    # doesn't work with Python 3.10. To work around that, we simply run this
-    # in version 3.9, but someday we hope to simplify this again.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-
-      - name: isort Import Sorter
-        uses: isort/isort-action@v1

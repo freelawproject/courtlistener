@@ -1,7 +1,7 @@
 # Functions to parse court data in XML format into a list of dictionaries.
 import os
 import re
-import xml.etree.cElementTree as ET
+import xml.etree.ElementTree as ET
 
 import dateutil.parser as dparser
 from juriscraper.lib.string_utils import (
@@ -205,7 +205,7 @@ def get_text(file_path):
 
     :param file_path: A path the file to be parsed.
     """
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         file_string = f.read()
     raw_info = {}
 

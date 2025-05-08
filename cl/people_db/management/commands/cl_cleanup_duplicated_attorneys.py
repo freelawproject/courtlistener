@@ -2,9 +2,8 @@ from django.db import transaction
 from django.db.models import Count
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.people_db.models import Attorney
+from cl.people_db.models import Attorney, Role
 from cl.people_db.models import AttorneyOrganizationAssociation as AttyOrgAss
-from cl.people_db.models import Role
 from cl.search.models import Docket
 
 

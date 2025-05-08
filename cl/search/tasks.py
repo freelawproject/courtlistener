@@ -4,11 +4,12 @@ import io
 import json
 import logging
 import uuid
+from collections.abc import Generator
 from datetime import date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Generator
+from typing import Any
 
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -82,7 +83,6 @@ from cl.search.models import (
     SEARCH_TYPES,
     Docket,
     DocketEntry,
-    DocketEvent,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -163,7 +163,7 @@ def get_instance_from_db(
         return model.objects.get(pk=instance_id)
     except ObjectDoesNotExist:
         logger.warning(
-            f"The %s with ID %s doesn't exists and it cannot be updated in ES.",
+            "The %s with ID %s doesn't exists and it cannot be updated in ES.",
             model.__name__,
             instance_id,
         )
@@ -375,7 +375,7 @@ def document_fields_to_update(
 
     if fields_to_update:
         # If fields to update, append the timestamp to be updated too.
-        prepare_timestamp = getattr(es_document(), f"prepare_timestamp", None)
+        prepare_timestamp = getattr(es_document(), "prepare_timestamp", None)
         if prepare_timestamp:
             field_value = prepare_timestamp(main_instance)
             fields_to_update["timestamp"] = field_value
@@ -1257,8 +1257,8 @@ def remove_document_from_es_index(
             es_document._index.refresh()
     except NotFoundError:
         logger.info(
-            f"The document with ID: %s can't be deleted from the %s index,"
-            f" it doesn't exist.",
+            "The document with ID: %s can't be deleted from the %s index,"
+            " it doesn't exist.",
             instance_id,
             es_document._index._name,
         )

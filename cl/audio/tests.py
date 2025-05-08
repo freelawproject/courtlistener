@@ -162,10 +162,8 @@ class PodcastTest(ESIndexTestCase, TestCase):
         self.assertEqual(
             node_count,
             expected_item_count,
-            msg="Did not get {expected} node(s) during search podcast "
-            "generation. Instead found: {actual}".format(
-                expected=expected_item_count, actual=node_count
-            ),
+            msg=f"Did not get {expected_item_count} node(s) during search podcast "
+            f"generation. Instead found: {node_count}",
         )
         # pubDate key must be present in Audios with date_argued.
         pubdate_present = xml_tree.xpath(

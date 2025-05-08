@@ -861,7 +861,7 @@ class RECAPAlertsSweepIndexTest(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object text query",
-            query=f'q="United states"&type=r',
+            query='q="United states"&type=r',
             alert_type=SEARCH_TYPES.RECAP,
         )
         mock_two_days_before = self.mock_date_indexing - datetime.timedelta(
@@ -1361,9 +1361,9 @@ class RECAPAlertsSweepIndexTest(
             )
             rd = RECAPDocumentFactory(
                 docket_entry=alert_de,
-                description=f"Motion to File Party Test",
+                description="Motion to File Party Test",
                 document_number="2",
-                pacer_doc_id=f"01803665243325",
+                pacer_doc_id="01803665243325",
             )
             firm = AttorneyOrganizationFactory(
                 name="Associates LLP 3", lookup_key="firm_llp_2"
@@ -1504,8 +1504,8 @@ class RECAPAlertsSweepIndexTest(
         ):
             docket = DocketFactory(
                 court=self.court,
-                case_name=f"SUBPOENAS SERVED CASE",
-                docket_number=f"1:21-bk-123",
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-123",
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
@@ -1984,14 +1984,14 @@ class RECAPAlertsSweepIndexTest(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert Cross-object",
-                query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE"&type=r',
+                query='q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE"&type=r',
                 alert_type=SEARCH_TYPES.RECAP,
             )
             cross_object_alert_after_update = AlertFactory(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert Cross-object 2",
-                query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE UPDATED"&type=r',
+                query='q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE UPDATED"&type=r',
                 alert_type=SEARCH_TYPES.RECAP,
             )
 
@@ -2016,8 +2016,8 @@ class RECAPAlertsSweepIndexTest(
         ):
             docket = DocketFactory(
                 court=self.court,
-                case_name=f"SUBPOENAS SERVED CASE",
-                docket_number=f"1:21-bk-227",
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-227",
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
@@ -3207,8 +3207,8 @@ class RECAPAlertsPercolatorTest(
         ):
             docket = DocketFactory(
                 court=self.court,
-                case_name=f"SUBPOENAS SERVED CASE",
-                docket_number=f"1:21-bk-123",
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-123",
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
@@ -3574,14 +3574,14 @@ class RECAPAlertsPercolatorTest(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert Cross-object query AND",
-                query=f'q="405 Civil" AND pacer_doc_id:018036652436&type=r',
+                query='q="405 Civil" AND pacer_doc_id:018036652436&type=r',
                 alert_type=SEARCH_TYPES.RECAP,
             )
             cross_object_alert_d_or_rd_field = AlertFactory(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert Cross-object query OR",
-                query=f'q="018036652436" OR cause:405&type=r',
+                query='q="018036652436" OR cause:405&type=r',
                 alert_type=SEARCH_TYPES.RECAP,
             )
         # RD ingestion.

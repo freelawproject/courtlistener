@@ -3,7 +3,7 @@ import datetime
 import inspect
 import math
 import time
-from typing import Callable, Dict, List, Optional, cast
+from typing import Callable, Optional, cast
 
 from celery.canvas import chain
 from django.db.models import F, Q, Window
@@ -478,7 +478,7 @@ class Command(VerboseCommand):
             help="Date when the query should end.",
         )
 
-    def handle(self, *args: List[str], **options: OptionsType) -> None:
+    def handle(self, *args: list[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
 
         if not self.validate_date_args(options):
@@ -488,7 +488,7 @@ class Command(VerboseCommand):
         filtered_kwargs = self.filter_kwargs(action, options)
         action(**filtered_kwargs)
 
-    VALID_ACTIONS: Dict[str, Callable] = {
+    VALID_ACTIONS: dict[str, Callable] = {
         "do-everything": do_everything,
         "get-report-results": get_and_save_free_document_reports,
         "get-pdfs": get_pdfs,

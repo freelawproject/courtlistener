@@ -26,21 +26,11 @@ repos:
        args: [--markdown-linebreak-ext=md]
        exclude: '^cl/recap/test_assets/.*\.html$'
 
-  - repo: https://github.com/ikamensh/flynt/
-    rev: '1.0.1'
-    hooks:
-     - id: flynt
-       args: [--line-length=79, --transform-concats]
-
-  - repo: https://github.com/PyCQA/isort
-    rev: 6.0.0
-    hooks:
-     - id: isort
-       name: isort (python)
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.11.8
     hooks:
+      - id: ruff
+        args: [ --fix ]
       - id: ruff-format
 
 #
@@ -48,6 +38,4 @@ repos:
 #
 # 1. I tried doing mypy too, but it was a mess because it runs in its own
 #   isolated environment, that lacks all our dependencies.
-# 2. We might want flake8 someday. It's easy to turn on, but it's so noisy on
-#    our current code that it'd take some fine-tuning to get it right.
-# 3. semgrep was too slow and had to be moved to a github action.
+# 2. semgrep was too slow and had to be moved to a github action.

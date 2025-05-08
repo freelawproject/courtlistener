@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY, MagicMock
 
+import requests
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.tz import tzutc
@@ -23,7 +24,6 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
-from requests import ConnectionError
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.api.factories import (
@@ -100,7 +100,6 @@ from cl.recap.models import (
     PROCESSING_STATUS,
     REQUEST_TYPE,
     UPLOAD_TYPE,
-    EmailProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
     PacerHtmlFiles,
@@ -112,7 +111,6 @@ from cl.recap.tasks import (
     download_pacer_pdf_by_rd,
     fetch_appellate_docket,
     fetch_pacer_doc_by_rd,
-    get_and_copy_recap_attachment_docs,
     process_recap_acms_appellate_attachment,
     process_recap_acms_docket,
     process_recap_appellate_attachment,
@@ -2636,7 +2634,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         )
         self.assertFalse(
             serialized_fq.is_valid(),
-            msg=f"Serializer should be invalid due to missing 'docket' field.",
+            msg="Serializer should be invalid due to missing 'docket' field.",
         )
 
         self.assertEqual(
@@ -3802,16 +3800,12 @@ class RecapAddAttorneyTest(TestCase):
         self.atty_email = "jamiesonb@lanepowell.com"
         self.atty_name = "Brewster H. Jamieson"
         self.atty = {
-            "contact": "{org_name}\n"
+            "contact": f"{self.atty_org_name}\n"
             "301 W. Nothern Lights Blvd., Suite 301\n"
             "Anchorage, AK 99503-2648\n"
-            "{phone}\n"
+            f"{self.atty_phone}\n"
             "Fax: 907-276-2631\n"
-            "Email: {email}\n".format(
-                org_name=self.atty_org_name,
-                phone=self.atty_phone,
-                email=self.atty_email,
-            ),
+            f"Email: {self.atty_email}\n",
             "name": self.atty_name,
             "roles": [
                 {"role": Role.ATTORNEY_LEAD, "date_action": None},
@@ -6155,9 +6149,7 @@ class WebhooksRetries(TestCase):
 
         with mock.patch(
             "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: exec(
-                "raise ConnectionError('Connection Error')"
-            ),
+            side_effect=requests.ConnectionError("Connection Error"),
         ):
             fake_now_0 = now()
             with time_machine.travel(fake_now_0, tick=False):

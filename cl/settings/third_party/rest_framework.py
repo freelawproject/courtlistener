@@ -58,7 +58,6 @@ REST_FRAMEWORK = {
         "yancy_closer": "1/hour",
         "phx_major": "1/hour",
         "giraffe_counsel_2025": "1/hour",
-        "yoway_3897": "1/hour",
         "deantaylor2025": "1/hour",
         "yoway_3897": "1/hour",
         "api_1": "1/hour",

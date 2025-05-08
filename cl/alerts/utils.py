@@ -1,7 +1,7 @@
 import copy
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any, Set
+from typing import Any
 from urllib.parse import parse_qs
 
 from django.apps import apps
@@ -596,7 +596,7 @@ def get_field_names(mapping_dict):
 def select_es_document_fields(
     es_document_class: ESModelClassType,
     main_document: ESDictDocument,
-    fields_to_ignore: Set[str],
+    fields_to_ignore: set[str],
 ) -> ESDictDocument:
     """Select specific required fields from an Elasticsearch document.
 

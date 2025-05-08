@@ -4,7 +4,7 @@ import os
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 import boto3
 from django.conf import settings
@@ -90,7 +90,7 @@ class Command(BaseCommand):
 
         if self.resume and self.start_from_reporter:
             logger.warning(
-                f"You can't combine --resume and --start-from-reporter arguments."
+                "You can't combine --resume and --start-from-reporter arguments."
             )
             return
 
@@ -140,7 +140,7 @@ class Command(BaseCommand):
         # Load the last completed reporter if resuming
         if resume:
             try:
-                with open(last_reporter_file, "r") as f:
+                with open(last_reporter_file) as f:
                     last_completed_reporter = f.read().strip()
                 resume = True
             except FileNotFoundError:
@@ -201,7 +201,7 @@ class Command(BaseCommand):
                 with open(last_reporter_file, "w") as f:
                     f.write(reporter)
 
-    def process_entry(self, entry: Dict[str, Any]) -> int:
+    def process_entry(self, entry: dict[str, Any]) -> int:
         """Processes a single entry by attempting to download and store its associated
         PDF file
         :param entry: A dictionary containing details about the case entry.
@@ -272,7 +272,7 @@ class Command(BaseCommand):
 
         start_time = time.time()
 
-        with open(crosswalk_file, "r") as f:
+        with open(crosswalk_file) as f:
             crosswalk_data = json.load(f)
             logger.info(f"Documents to download: {len(crosswalk_data)}")
 
@@ -298,7 +298,7 @@ class Command(BaseCommand):
             f"Finished processing all entries in the crosswalk file: {crosswalk_file} - Total time: {total_time:.2f} seconds. Total files downloaded: {total_downloaded}."
         )
 
-    def parse_cap_path(self, cap_path: str) -> Tuple[str, str, str]:
+    def parse_cap_path(self, cap_path: str) -> tuple[str, str, str]:
         """Extract data from CAP path.
 
         :param cap_path: CAP path string.

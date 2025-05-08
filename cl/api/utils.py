@@ -2,7 +2,7 @@ import logging
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from itertools import batched, chain
-from typing import Any, Dict, List, Set, TypedDict, Union
+from typing import Any, TypedDict, Union
 
 import eyecite
 from dateutil import parser
@@ -682,7 +682,7 @@ class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
 def make_date_str_list(
     start: Union[str, datetime],
     end: Union[str, datetime],
-) -> List[str]:
+) -> list[str]:
     """Make a list of date strings for a date span
 
     :param start: The beginning date, as a string or datetime object
@@ -702,7 +702,7 @@ def invert_user_logs(
     start: Union[str, datetime],
     end: Union[str, datetime],
     add_usernames: bool = True,
-) -> Dict[str, Dict[str, int]]:
+) -> dict[str, dict[str, int]]:
     """Aggregate API usage statistics per user over a date range.
 
     - Anonymous users are aggregated under the key 'AnonymousUser'.
@@ -785,7 +785,7 @@ def invert_user_logs(
 def get_user_ids_for_date_range(
     start: Union[str, datetime],
     end: Union[str, datetime],
-) -> Set[int]:
+) -> set[int]:
     """Get a list of user IDs that used the API during a span of time
 
     :param start: The beginning of when you want to find users. A str to be
