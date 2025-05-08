@@ -9,7 +9,7 @@ from django.contrib.auth.hashers import make_password
 from django.core import mail
 from django.core.cache import cache
 from django.template.defaultfilters import date as template_date
-from django.test import AsyncClient, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_naive, now
