@@ -30,15 +30,7 @@ def check_prayer_pacer(self, rd_pk: int, user_pk: int):
     :param user_pk: The primary key of the user who requested the document
     """
     rd = (
-        RECAPDocument.objects.select_related("docket_entry__docket")
-        .only(
-            "pacer_doc_id",
-            "docket_entry_id",
-            "docket_entry__docket_id",
-            "docket_entry__docket__court_id",
-            "is_sealed",
-        )
-        .get(pk=rd_pk)
+        RECAPDocument.objects.select_related("docket_entry__docket").get(pk=rd_pk)
     )
 
     court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
