@@ -185,9 +185,9 @@ def extract_doc_content(
     if data["page_count"]:
         opinion.page_count = data["page_count"]
 
-    assert isinstance(
-        content, str
-    ), f"content must be of type str, not {type(content)}"
+    assert isinstance(content, str), (
+        f"content must be of type str, not {type(content)}"
+    )
 
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion, juriscraper_module)

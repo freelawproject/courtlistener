@@ -696,7 +696,8 @@ async def view_recap_document(
     rd = await make_thumb_if_needed(request, rd)
     try:
         note = await Note.objects.aget(
-            recap_doc_id=rd.pk, user=await request.auser()  # type: ignore[attr-defined]
+            recap_doc_id=rd.pk,
+            user=await request.auser(),  # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
         # Not saved in notes or anonymous user
@@ -768,7 +769,8 @@ async def view_recap_authorities(
 
     try:
         note = await Note.objects.aget(
-            recap_doc_id=rd.pk, user=await request.auser()  # type: ignore[attr-defined]
+            recap_doc_id=rd.pk,
+            user=await request.auser(),  # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
         # Not saved in notes or anonymous user
@@ -1540,7 +1542,9 @@ async def block_item(request: HttpRequest) -> HttpResponse:
         docket_pk = (
             pk
             if obj_type == "docket"
-            else cluster.docket_id if cluster is not None else None
+            else cluster.docket_id
+            if cluster is not None
+            else None
         )
         if not docket_pk:
             return HttpResponse("It worked")

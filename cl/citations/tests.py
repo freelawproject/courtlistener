@@ -1553,7 +1553,7 @@ class CitationFeedTest(
         case name?
         """
         new_case_name = (
-            "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & " "CO., \u2014"
+            "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & CO., \u2014"
         )
         await OpinionCluster.objects.filter(
             pk=self.opinion_cluster_1.pk
@@ -2282,7 +2282,6 @@ class GroupParentheticalsTest(SimpleTestCase):
 class CitationLookUpApiTest(
     CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
-
     @classmethod
     def setUpTestData(cls) -> None:
         UserProfileWithParentsFactory.create(
@@ -2493,7 +2492,6 @@ class CitationLookUpApiTest(
     async def test_can_handle_ambiguous_reporter_variations(
         self, cache_key_mock
     ) -> None:
-
         handy_citation = await sync_to_async(
             CitationWithParentsFactory.create
         )(volume=1, reporter="Handy", page="150", type=1)

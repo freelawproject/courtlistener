@@ -415,8 +415,7 @@ async def contact(
 
             default_from = settings.DEFAULT_FROM_EMAIL
             message = EmailMessage(
-                subject="[CourtListener] Contact: "
-                "{phone_number}".format(**cd),
+                subject="[CourtListener] Contact: {phone_number}".format(**cd),
                 body="Subject: {phone_number}\n"
                 "From: {name}\n"
                 "User Email: <{email}>\n"

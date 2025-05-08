@@ -35,8 +35,9 @@ class OutputBlockerTestMixin:
         try:
             out = StringIO()
             err = StringIO()
-            with mock.patch.object(sys, "stdout", new=out), mock.patch.object(
-                sys, "stderr", new=err
+            with (
+                mock.patch.object(sys, "stdout", new=out),
+                mock.patch.object(sys, "stderr", new=err),
             ):
                 super()._callTestMethod(method)
         except Exception:
@@ -248,9 +249,9 @@ class CountESTasksTestCase(SimpleTestCase):
     def reset_and_assert_task_count(self, expected) -> None:
         """Resets the task call count and asserts the expected number of calls."""
 
-        assert (
-            self.task_call_count == expected
-        ), f"Expected {expected} task calls, but got {self.task_call_count}"
+        assert self.task_call_count == expected, (
+            f"Expected {expected} task calls, but got {self.task_call_count}"
+        )
         self.task_call_count = 0
 
 
@@ -355,7 +356,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
     def _test_results_ordering(self, test, field, version="v4"):
         """Ensure dockets appear in the response in a specific order."""
 
-        with self.subTest(test=test, msg=f'{test["name"]}'):
+        with self.subTest(test=test, msg=f"{test['name']}"):
             r = self.client.get(
                 reverse("search-list", kwargs={"version": version}),
                 test["search_params"],
@@ -379,7 +380,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
                 actual_order,
                 test[expected_order_key],
                 msg=f"Expected order {test[expected_order_key]}, but got {actual_order} for "
-                f"Search type: {test["search_params"]["type"]}",
+                f"Search type: {test['search_params']['type']}",
             )
 
     def _assert_order_in_html(
@@ -464,7 +465,6 @@ class V4SearchAPIAssertions(SimpleTestCase):
 
 
 class SearchAlertsAssertions:
-
     @staticmethod
     def get_html_content_from_email(email_content):
         html_content = None
@@ -770,11 +770,11 @@ class SearchAlertsAssertions:
         """Confirm that date_updated is properly set in the alert email."""
 
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, "F jS, Y h:i a T")}",
+            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
             html_content,
         )
 
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, "F jS, Y h:i a T")}",
+            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
             txt_content,
         )

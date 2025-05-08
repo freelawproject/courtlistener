@@ -187,7 +187,16 @@ def update_es_documents(
             # No fields from the current mapping need updating. Omit it.
             continue
         match instance:
-            case RECAPDocument() | Docket() | ParentheticalGroup() | Audio() | Person() | Position() | OpinionCluster() | Opinion() if mapping_fields.get("self", None):  # type: ignore
+            case (
+                RECAPDocument()
+                | Docket()
+                | ParentheticalGroup()
+                | Audio()
+                | Person()
+                | Position()
+                | OpinionCluster()
+                | Opinion()
+            ) if mapping_fields.get("self", None):  # type: ignore
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
                 transaction.on_commit(
@@ -232,7 +241,9 @@ def update_es_documents(
                             fields_map,
                         )
                     )
-            case Person() if es_document is PositionDocument and query == "person":  # type: ignore
+            case Person() if (
+                es_document is PositionDocument and query == "person"
+            ):  # type: ignore
                 """
                 This case handles the update of one or more fields that belongs to
                 the parent model(The person model).
@@ -448,7 +459,9 @@ def update_reverse_related_documents(
         )
 
     match instance:
-        case ABARating() | PoliticalAffiliation() | Education() if es_document is PersonDocument:  # type: ignore
+        case ABARating() | PoliticalAffiliation() | Education() if (
+            es_document is PersonDocument
+        ):  # type: ignore
             # bulk update position documents when a reverse related record is created/updated.
             related_record = Person.objects.filter(**{query_string: instance})
             for person in related_record:
@@ -836,7 +849,9 @@ class ESSignalProcessor:
         mapping_fields = self.documents_model_mapping["reverse"][sender]
         for query_string, fields_map in mapping_fields.items():
             match instance:
-                case BankruptcyInformation() if self.es_document is DocketDocument:  # type: ignore
+                case BankruptcyInformation() if (
+                    self.es_document is DocketDocument
+                ):  # type: ignore
                     # BankruptcyInformation is a one-to-one relation that can
                     # be re-saved many times without changes. It's better to
                     # check if the indexed fields have changed before

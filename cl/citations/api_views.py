@@ -54,7 +54,6 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
                 return Response([])
 
             for idx, citation in enumerate(self.citation_list):
-
                 start_index, end_index = citation.span()
                 citation_data = {
                     "citation": citation.matched_text(),
@@ -184,7 +183,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
             return {
                 "normalized_citations": normalized_citations,
                 "status": HTTPStatus.NOT_FOUND,
-                "error_message": f"Citation not found: '{ citation_str }'",
+                "error_message": f"Citation not found: '{citation_str}'",
             }
 
         return {
