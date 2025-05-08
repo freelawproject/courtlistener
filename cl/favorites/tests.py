@@ -1,4 +1,3 @@
-import math
 import time
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
@@ -16,7 +15,6 @@ from django.utils import timezone
 from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.donate.models import NeonMembership
@@ -660,7 +658,6 @@ class APITests(APITestCase):
 
 
 class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
-
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
         """Does the prayer_eligible method work properly?"""
@@ -1392,7 +1389,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 @patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
 @patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPaySignalTests(PrayAndPayTestCase):
-
     @patch("cl.favorites.signals.check_prayer_pacer")
     async def test_create_prayer_no_pacer_doc_id(
         self,
@@ -1520,7 +1516,6 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
 @patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
 @patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
-
     @patch(
         "cl.favorites.tasks.DownloadConfirmationPage", new=FakeConfirmationPage
     )

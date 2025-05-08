@@ -26,7 +26,6 @@ from typing import Any, Optional
 import pandas as pd
 from bs4 import BeautifulSoup
 from django.db import transaction
-from django.db.models import Q
 from juriscraper.lib.string_utils import titlecase
 
 from cl.corpus_importer.import_columbia.columbia_utils import (

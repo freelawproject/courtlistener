@@ -1,8 +1,5 @@
 import re
-import sys
 from datetime import datetime
-from io import StringIO
-from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
@@ -22,27 +19,6 @@ from cl.alerts.management.commands.cl_send_scheduled_alerts import (
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
-
-
-class OutputBlockerTestMixin:
-    """Block the output of tests so that they run a bit faster.
-
-    This is pulled from Speed Up Your Django Tests, Chapter, 4.9 "Prevent
-    Output". In Django 3.2, this should be easier via a new --buffer argument.
-    """
-
-    def _callTestMethod(self, method):
-        try:
-            out = StringIO()
-            err = StringIO()
-            with mock.patch.object(sys, "stdout", new=out), mock.patch.object(
-                sys, "stderr", new=err
-            ):
-                super()._callTestMethod(method)
-        except Exception:
-            print(out.getvalue(), end="")
-            print(err.getvalue(), end="", file=sys.stderr)
-            raise
 
 
 class OneDatabaseMixin:
@@ -93,7 +69,6 @@ class RestartSentEmailQuotaMixin:
 
 
 class SimpleTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     test.SimpleTestCase,
 ):
@@ -101,7 +76,6 @@ class SimpleTestCase(
 
 
 class TestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TestCase,
@@ -110,7 +84,6 @@ class TestCase(
 
 
 class TransactionTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TransactionTestCase,
@@ -119,7 +92,6 @@ class TransactionTestCase(
 
 
 class LiveServerTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     test.LiveServerTestCase,
@@ -128,7 +100,6 @@ class LiveServerTestCase(
 
 
 class StaticLiveServerTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     testing.StaticLiveServerTestCase,
@@ -137,7 +108,6 @@ class StaticLiveServerTestCase(
 
 
 class APITestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     APITestCase,
@@ -248,9 +218,9 @@ class CountESTasksTestCase(SimpleTestCase):
     def reset_and_assert_task_count(self, expected) -> None:
         """Resets the task call count and asserts the expected number of calls."""
 
-        assert (
-            self.task_call_count == expected
-        ), f"Expected {expected} task calls, but got {self.task_call_count}"
+        assert self.task_call_count == expected, (
+            f"Expected {expected} task calls, but got {self.task_call_count}"
+        )
         self.task_call_count = 0
 
 
@@ -278,7 +248,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
             )
             for score_value in meta_value.values():
                 self.assertIsNotNone(
-                    score_value, f"The score value can't be None."
+                    score_value, "The score value can't be None."
                 )
 
         else:
@@ -355,7 +325,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
     def _test_results_ordering(self, test, field, version="v4"):
         """Ensure dockets appear in the response in a specific order."""
 
-        with self.subTest(test=test, msg=f'{test["name"]}'):
+        with self.subTest(test=test, msg=f"{test['name']}"):
             r = self.client.get(
                 reverse("search-list", kwargs={"version": version}),
                 test["search_params"],
@@ -379,7 +349,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
                 actual_order,
                 test[expected_order_key],
                 msg=f"Expected order {test[expected_order_key]}, but got {actual_order} for "
-                f"Search type: {test["search_params"]["type"]}",
+                f"Search type: {test['search_params']['type']}",
             )
 
     def _assert_order_in_html(
@@ -464,7 +434,6 @@ class V4SearchAPIAssertions(SimpleTestCase):
 
 
 class SearchAlertsAssertions:
-
     @staticmethod
     def get_html_content_from_email(email_content):
         html_content = None
@@ -632,7 +601,7 @@ class SearchAlertsAssertions:
                 self.assertEqual(
                     len(webhook_cases),
                     expected_hits,
-                    msg=f"Did not get the right number of hits for the alert %s. "
+                    msg="Did not get the right number of hits for the alert %s. "
                     % alert_title,
                 )
                 matched_alert_name = True
@@ -645,7 +614,7 @@ class SearchAlertsAssertions:
                         self.assertEqual(
                             len(case[nested_field]),
                             expected_child_hits,
-                            msg=f"Did not get the right number of child documents for the case %s. "
+                            msg="Did not get the right number of child documents for the case %s. "
                             % case_title,
                         )
         self.assertTrue(matched_alert_name, msg="Alert name didn't match")
@@ -678,7 +647,7 @@ class SearchAlertsAssertions:
                 self.assertEqual(
                     1,
                     len(hits),
-                    msg=f"Did not get the right number of hits for the case %s. "
+                    msg="Did not get the right number of hits for the case %s. "
                     % webhook["payload"]["results"][0]["caseName"],
                 )
                 alert_child_hits = alert_child_hits + len(
@@ -690,20 +659,20 @@ class SearchAlertsAssertions:
         self.assertEqual(
             alert_title_webhooks,
             expected_hits,
-            msg=f"Did not get the right number of webhooks for alert %s. "
+            msg="Did not get the right number of webhooks for alert %s. "
             % alert_title,
         )
         self.assertEqual(
             alert_child_hits,
             expected_child_hits,
-            msg=f"Did not get the right number of child hits for alert %s. "
+            msg="Did not get the right number of child hits for alert %s. "
             % alert_title,
         )
         if expected_child_descriptions:
             self.assertEqual(
                 alert_child_ids,
                 set(expected_child_descriptions),
-                msg=f"Did not get the right child hits IDs for alert %s. "
+                msg="Did not get the right child hits IDs for alert %s. "
                 % alert_title,
             )
 
@@ -730,7 +699,7 @@ class SearchAlertsAssertions:
                     self.assertIn(
                         hl_expected,
                         child_field_content,
-                        msg=f"Did not get the HL content in field: %s. "
+                        msg="Did not get the HL content in field: %s. "
                         % field_name,
                     )
                 else:
@@ -743,7 +712,7 @@ class SearchAlertsAssertions:
                     self.assertIn(
                         hl_expected,
                         parent_field_content,
-                        msg=f"Did not get the HL content in field: %s. "
+                        msg="Did not get the HL content in field: %s. "
                         % field_name,
                     )
 
@@ -770,11 +739,11 @@ class SearchAlertsAssertions:
         """Confirm that date_updated is properly set in the alert email."""
 
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, "F jS, Y h:i a T")}",
+            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
             html_content,
         )
 
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, "F jS, Y h:i a T")}",
+            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
             txt_content,
         )

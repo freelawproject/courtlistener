@@ -3,6 +3,7 @@
 Test Issue 412: Add admin-visible notice to various pages showing if they are
 blocked from search engines
 """
+
 from django.contrib.auth.hashers import make_password
 from django.urls import reverse
 from selenium.webdriver.common.by import By

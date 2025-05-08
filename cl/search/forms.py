@@ -15,7 +15,7 @@ from cl.search.fields import (
     FloorDateField,
     RandomChoiceField,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Court
+from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES
 
 OPINION_ORDER_BY_CHOICES = (
     ("score desc", "Relevance"),

@@ -1,7 +1,7 @@
 import fnmatch
 import os
 import re
-import xml.etree.cElementTree as ET
+import xml.etree.ElementTree as ET
 from glob import glob
 from random import shuffle
 
@@ -545,7 +545,7 @@ def get_text(file_path):
 
     :param file_path: A path the file to be parsed.
     """
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         file_string = f.read()
     raw_info = {}
     # used when associating a byline of an opinion with the opinion's text
@@ -700,7 +700,7 @@ for folder in folders:
         newname = path.replace("/", "_")
         if len(parsed["dates"]) == 0:
             print(path)
-            print(open(path).read(), file=open(f"_nodate/{newname}", "wt"))
+            print(open(path).read(), file=open(f"_nodate/{newname}", "w"))
             continue
 
         if len(parsed["dates"][0]) == 0:

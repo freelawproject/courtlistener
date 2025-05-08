@@ -6,4 +6,4 @@ class AlertsConfig(AppConfig):
 
     def ready(self):
         # Implicitly connect a signal handlers decorated with @receiver.
-        from cl.alerts import signals
+        from cl.alerts import signals  # noqa: F401

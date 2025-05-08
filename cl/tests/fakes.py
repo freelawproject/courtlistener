@@ -45,7 +45,6 @@ class FakeDocketReport:
 
 
 class FakeAppellateDocketReport(FakeDocketReport):
-
     @property
     def data(self):
         data = super(FakeAppellateDocketReport, self).data
@@ -127,7 +126,6 @@ class FakeFreeOpinionReport:
 
 
 class FakeConfirmationPage:
-
     def __init__(self, *args, **kwargs):
         pass
 
@@ -144,7 +142,6 @@ class FakeConfirmationPage:
 
 
 class FakeAvailableConfirmationPage(FakeConfirmationPage):
-
     @property
     def data(self, *args, **kwargs):
         return {
@@ -256,7 +253,6 @@ class FakeCaseQueryResponse:
 
 
 class FakeCaseQueryReport:
-
     def __init__(self, court_id, pacer_session=None):
         self.pacer_case_id = None
         self.court_id = court_id

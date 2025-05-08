@@ -1,5 +1,4 @@
 import time
-from typing import Dict
 
 from django.conf import settings
 from django.contrib import messages
@@ -50,7 +49,7 @@ async def build_visualization(viz):
     return "success", viz
 
 
-emails: Dict[str, EmailType] = {
+emails: dict[str, EmailType] = {
     "referer_detected": {
         "subject": "Somebody seems to have embedded a viz somewhere.",
         "body": "Hey admins,\n\n"
