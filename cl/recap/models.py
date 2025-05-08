@@ -158,8 +158,9 @@ class ProcessingQueue(AbstractDateTimeModel):
     )
     status = models.SmallIntegerField(
         help_text="The current status of this upload. Possible values "
-        "are: %s"
-        % ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUS.NAMES),
+        "are: {}".format(
+            ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUS.NAMES)
+        ),
         default=PROCESSING_STATUS.ENQUEUED,
         choices=PROCESSING_STATUS.NAMES,
         db_index=True,
@@ -209,21 +210,9 @@ class ProcessingQueue(AbstractDateTimeModel):
             UPLOAD_TYPE.ACMS_DOCKET_JSON,
             UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
         ]:
-            return "ProcessingQueue %s: %s case #%s (%s)" % (
-                self.pk,
-                self.court_id,
-                self.pacer_case_id,
-                self.get_upload_type_display(),
-            )
+            return f"ProcessingQueue {self.pk}: {self.court_id} case #{self.pacer_case_id} ({self.get_upload_type_display()})"
         elif self.upload_type == UPLOAD_TYPE.PDF:
-            return "ProcessingQueue: %s: %s.%s.%s.%s (%s)" % (
-                self.pk,
-                self.court_id,
-                self.pacer_case_id or None,
-                self.document_number or None,
-                self.attachment_number or 0,
-                self.get_upload_type_display(),
-            )
+            return f"ProcessingQueue: {self.pk}: {self.court_id}.{self.pacer_case_id or None}.{self.document_number or None}.{self.attachment_number or 0} ({self.get_upload_type_display()})"
         else:
             return f"ProcessingQueue: {self.pk} ({self.get_upload_type_display()})"
 
@@ -274,8 +263,9 @@ class EmailProcessingQueue(AbstractDateTimeModel):
     )
     status = models.SmallIntegerField(
         help_text="The current status of this upload. Possible values "
-        "are: %s"
-        % ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUS.NAMES),
+        "are: {}".format(
+            ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUS.NAMES)
+        ),
         default=PROCESSING_STATUS.ENQUEUED,
         choices=PROCESSING_STATUS.NAMES,
         db_index=True,
@@ -325,8 +315,9 @@ class PacerFetchQueue(AbstractDateTimeModel):
     )
     status = models.SmallIntegerField(
         help_text="The current status of this request. Possible values "
-        "are: %s"
-        % ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUS.NAMES),
+        "are: {}".format(
+            ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUS.NAMES)
+        ),
         default=PROCESSING_STATUS.ENQUEUED,
         choices=PROCESSING_STATUS.NAMES,
         db_index=True,
