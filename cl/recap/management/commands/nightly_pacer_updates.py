@@ -266,7 +266,7 @@ class Command(VerboseCommand):
                 args=(d.pk, d.court_id), queue=queue
             )
 
-        for i, rd_id in enumerate(get_rd_ids_pray_and_pray()):
+        for i, rd_id in enumerate(get_rd_ids_pray_and_pay()):
 
             if i % 10 == 0:
                 logger.info(
