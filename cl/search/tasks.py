@@ -466,7 +466,7 @@ def email_search_results(self: Task, user_id: int, query: str):
 
     # Generate a filename for the CSV attachment with timestamp
     now = datetime.now()
-    filename = f'search_results_{now.strftime("%Y%m%d_%H%M%S")}.csv'
+    filename = f"search_results_{now.strftime('%Y%m%d_%H%M%S')}.csv"
 
     # Send email with attachments
     message.attach(filename, csv_content, "text/csv")

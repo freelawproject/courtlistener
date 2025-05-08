@@ -59,7 +59,9 @@ def fetch_ia_volumes(
         f"(.*{reporter}.{volume}(_\d+)?$)" for volume in volumes
     )
     results = [
-        res for res in results if re.match(vol_pattern, res["identifier"])  # type: ignore
+        res
+        for res in results
+        if re.match(vol_pattern, res["identifier"])  # type: ignore
     ]
     return results
 

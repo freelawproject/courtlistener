@@ -93,13 +93,13 @@ def find_citations_and_parantheticals_for_recap_documents(
 
     :return: None
     """
-    documents: QuerySet[
-        RECAPDocument, RECAPDocument
-    ] = RECAPDocument.objects.filter(pk__in=doc_ids).filter(
-        ocr_status__in=[
-            RECAPDocument.OCR_UNNECESSARY,
-            RECAPDocument.OCR_COMPLETE,
-        ]
+    documents: QuerySet[RECAPDocument, RECAPDocument] = (
+        RECAPDocument.objects.filter(pk__in=doc_ids).filter(
+            ocr_status__in=[
+                RECAPDocument.OCR_UNNECESSARY,
+                RECAPDocument.OCR_COMPLETE,
+            ]
+        )
     )
 
     for d in documents:

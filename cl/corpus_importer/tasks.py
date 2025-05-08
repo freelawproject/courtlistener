@@ -426,12 +426,11 @@ def get_and_save_free_document_report(
 
     document_rows_to_create = []
     for row in results:
-
         # There is a document without a case number in pacer, skip it (issue #4547)
         if not row["docket_number"]:
             logger.warning(
-                f"No case number for document, court: {row["court_id"]}, "
-                f"date_filed: {row["date_filed"]}"
+                f"No case number for document, court: {row['court_id']}, "
+                f"date_filed: {row['date_filed']}"
             )
             continue
 
@@ -840,8 +839,7 @@ def upload_to_ia(
             return None
         raise self.retry(exc=exc)
     logger.info(
-        "Uploading file to Internet Archive with identifier: %s and "
-        "files %s",
+        "Uploading file to Internet Archive with identifier: %s and files %s",
         identifier,
         files,
     )
@@ -1958,8 +1956,7 @@ def get_bankr_claims_registry(
     )
     if data is None or data.get("docket_pk") is None:
         logger.warning(
-            "Empty data argument or parameter. Terminating chains "
-            "and exiting."
+            "Empty data argument or parameter. Terminating chains and exiting."
         )
         self.request.chain = None
         return None
@@ -2367,9 +2364,9 @@ def update_rd_metadata(
     if response.is_success:
         rd.page_count = int(response.text)
 
-    assert isinstance(
-        rd.page_count, (int, type(None))
-    ), "page_count must be an int or None."
+    assert isinstance(rd.page_count, (int, type(None))), (
+        "page_count must be an int or None."
+    )
 
     # Save and extract, skipping OCR.
     rd.save()

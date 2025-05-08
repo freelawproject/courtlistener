@@ -302,7 +302,7 @@ class Command(CommandUtils, BaseCommand):
 
         except Exception as e:
             logger.error(
-                f"Error processing case {str(case_meta["id"])}: {str(e)}",
+                f"Error processing case {str(case_meta['id'])}: {str(e)}",
                 exc_info=True,
             )
 

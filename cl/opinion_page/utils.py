@@ -69,7 +69,8 @@ async def core_docket_data(
 
     try:
         note = await Note.objects.aget(
-            docket_id=docket.pk, user=await request.auser()  # type: ignore[attr-defined]
+            docket_id=docket.pk,
+            user=await request.auser(),  # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
         # Not saved in notes or anonymous user

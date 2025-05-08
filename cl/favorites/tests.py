@@ -664,7 +664,6 @@ class APITests(APITestCase):
 
 
 class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
-
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
         """Does the prayer_eligible method work properly?"""
@@ -1278,6 +1277,38 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             msg="The top prayer didn't match.",
         )
 
+    async def test_granting_prayers_clears_availability_checks(self) -> None:
+        """Tests that granting a prayer deletes prior PrayerAvailability records"""
+        # Create a PrayerAvailability record to simulate a recent availability
+        # check for this document 4.
+        await PrayerAvailability.objects.acreate(recap_document=self.rd_4)
+        self.rd_4.is_sealed = True
+        await self.rd_4.asave()
+
+        # Trigger the creation of a prayer for the same document.
+        await create_prayer(self.user, self.rd_4)
+
+        # Simulate the document becoming available (prayer granted).
+        self.rd_4.is_available = True
+        await self.rd_4.asave()
+
+        # Verify that one prayer has been granted.
+        granted_prays = Prayer.objects.filter(status=Prayer.GRANTED)
+        self.assertEqual(
+            await granted_prays.acount(),
+            1,
+            msg="Wrong number of granted prayers",
+        )
+
+        # Assert that no PrayerAvailability records remain for the now-available document.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_4.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        await self.rd_4.arefresh_from_db()
+        self.assertEqual(self.rd_4.is_sealed, False)
+
     async def test_can_we_load_the_top_prayers_page(self) -> None:
         """Does the 'top prayers' page return a successful response?"""
         r = await self.async_client.get(reverse("top_prayers"))
@@ -1364,7 +1395,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 @patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
 @patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPaySignalTests(PrayAndPayTestCase):
-
     @patch("cl.favorites.signals.check_prayer_pacer")
     async def test_create_prayer_no_pacer_doc_id(
         self,
@@ -1492,7 +1522,6 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
 @patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
 @patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
-
     @patch(
         "cl.favorites.tasks.DownloadConfirmationPage", new=FakeConfirmationPage
     )
