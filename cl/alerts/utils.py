@@ -517,12 +517,12 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
                         should=string_query,
                         minimum_should_match=1,
                     )
-                case _, []:
+                case [_, []]:
                     plain_query = Q(
                         "bool",
                         filter=parent_filters,
                     )
-                case _, _:
+                case [_, _]:
                     plain_query = Q(
                         "bool",
                         filter=parent_filters,

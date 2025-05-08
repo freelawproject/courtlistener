@@ -2761,12 +2761,12 @@ def build_full_join_es_queries(
                     should=child_text_query,
                     minimum_should_match=1,
                 )
-            case _, []:
+            case [_, []]:
                 child_docs_query = Q(
                     "bool",
                     filter=child_filters,
                 )
-            case _, _:
+            case [_, _]:
                 child_docs_query = Q(
                     "bool",
                     filter=child_filters,
