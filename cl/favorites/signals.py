@@ -1,5 +1,7 @@
 from datetime import timedelta
+from functools import partial
 
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
@@ -21,7 +23,7 @@ def check_prayer_availability(sender, instance: Prayer, **kwargs):
     """
 
     rd = instance.recap_document
-    user = instance.user
+    user_id = instance.user_id
 
     pacer_doc_id = rd.pacer_doc_id
 
@@ -30,11 +32,11 @@ def check_prayer_availability(sender, instance: Prayer, **kwargs):
             recap_document=rd, defaults={"last_checked": now}
         )
 
-        prayer_unavailable(rd, user.pk)
+        prayer_unavailable(rd, user_id)
         return
 
     # stopping the check early to prevent us from repeatedly crawling PACER to confirm an available document still remains available
-    if rd.is_sealed == False:
+    if not rd.is_sealed:
         return
 
     try:
@@ -42,10 +44,22 @@ def check_prayer_availability(sender, instance: Prayer, **kwargs):
             recap_document=rd
         )
     except PrayerAvailability.DoesNotExist:
-        check_prayer_pacer.delay(rd.pk, user.pk)
+        transaction.on_commit(
+            partial(
+                check_prayer_pacer.delay,
+                rd.pk,
+                user_id,
+            )
+        )
         return
 
     if document_availability.last_checked >= (now() - timedelta(weeks=1)):
-        prayer_unavailable(rd, user.pk)
+        prayer_unavailable(rd, user_id)
     else:
-        check_prayer_pacer.delay(rd.pk, user.pk)
+        transaction.on_commit(
+            partial(
+                check_prayer_pacer.delay,
+                rd.pk,
+                user_id,
+            )
+        )

@@ -1427,7 +1427,8 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
         self.assertEqual(await prayer_availability_query.acount(), 0)
 
         # creates a prayer for the same document
-        await create_prayer(self.user_2, self.rd_2)
+        with self.captureOnCommitCallbacks(execute=True):
+            await create_prayer(self.user_2, self.rd_2)
 
         # Verify a Celery task was scheduled to check availability
         mock_check_prayer_task.delay.assert_called_once_with(
@@ -1451,7 +1452,8 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
         await PrayerAvailability.objects.acreate(recap_document=self.rd_2)
 
         # Trigger the creation of a prayer for the same document.
-        await create_prayer(self.user_2, self.rd_2)
+        with self.captureOnCommitCallbacks(execute=True):
+            await create_prayer(self.user_2, self.rd_2)
 
         # Check that the prayer_unavailable method got called. This should
         # happen because we simulated a recent check.
@@ -1476,7 +1478,8 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
             recap_document=self.rd_2, last_checked=two_weeks_ago
         )
 
-        await create_prayer(self.user_2, self.rd_2)
+        with self.captureOnCommitCallbacks(execute=True):
+            await create_prayer(self.user_2, self.rd_2)
 
         # Verify the prayer_unavailable method was NOT called directly inside
         # the signal. This method might be called later by the scheduled Celery
@@ -1514,7 +1517,8 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         # Assert that the outbox is empty
         self.assertEqual(len(mail.outbox), 0)
 
-        await create_prayer(self.user_3, self.rd_2)
+        with self.captureOnCommitCallbacks(execute=True):
+            await create_prayer(self.user_3, self.rd_2)
 
         # Verify that a PrayerAvailability record has been created as a result
         # of the prayer creation.
@@ -1558,7 +1562,8 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         self.rd_3.is_sealed = True
         await self.rd_3.asave()
 
-        await create_prayer(self.user_3, self.rd_3)
+        with self.captureOnCommitCallbacks(execute=True):
+            await create_prayer(self.user_3, self.rd_3)
 
         mock_prayer_unavailable.assert_not_called()
 
@@ -1589,7 +1594,8 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         )
         self.assertEqual(await prayer_availability_query.acount(), 0)
 
-        await create_prayer(self.user_3, self.rd_2)
+        with self.captureOnCommitCallbacks(execute=True):
+            await create_prayer(self.user_3, self.rd_2)
 
         # Verify that no PrayerAvailability record was created for an available document.
         self.assertEqual(await prayer_availability_query.acount(), 0)
@@ -1616,7 +1622,8 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         Make sure that the prayer check is only triggered once for available docs
         """
         # Create a prayer for an available document.
-        await create_prayer(self.user_3, self.rd_2)
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            await create_prayer(self.user_3, self.rd_2)
 
         # Assert that the pacer check was triggered after the first prayer.
         mock_check_prayer_pacer.delay.assert_called_once()
@@ -1626,7 +1633,8 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         self.assertFalse(self.rd_2.is_sealed)
 
         # Create another prayer using the same available document.
-        await create_prayer(self.user_2, self.rd_2)
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            await create_prayer(self.user_2, self.rd_2)
 
         # Assert that the pacer check was NOT triggered again. The call count
         # should remain at one, verifying that duplicate checks are avoided.
