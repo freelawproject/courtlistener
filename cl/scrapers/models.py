@@ -101,9 +101,4 @@ class PACERMobilePageData(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "<%s: Docket %s crawled at %s with %s results>" % (
-            self.pk,
-            self.docket_id,
-            self.date_last_mobile_crawl,
-            self.count_last_mobile_crawl,
-        )
+        return f"<{self.pk}: Docket {self.docket_id} crawled at {self.date_last_mobile_crawl} with {self.count_last_mobile_crawl} results>"

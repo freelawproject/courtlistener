@@ -701,10 +701,8 @@ def clean_up_date_formats(
         if get_params.get(field) and cd.get(field) is not None:
             # Don't use strftime. It'll fail before 1900
             before = cd[field]
-            get_params[field] = "%02d/%02d/%s" % (
-                before.month,
-                before.day,
-                before.year,
+            get_params[field] = (
+                f"{before.month:02d}/{before.day:02d}/{before.year}"
             )
 
 

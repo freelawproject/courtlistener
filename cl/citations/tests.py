@@ -1334,8 +1334,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             cited.cluster.citation_count,
             expected_count,
             msg="'cited' was not updated by a citation found in 'citing', or "
-            "the citation was not found. Count was: %s instead of %s"
-            % (cited.cluster.citation_count, expected_count),
+            f"the citation was not found. Count was: {cited.cluster.citation_count} instead of {expected_count}",
         )
 
     def test_opinionscited_creation(self) -> None:
@@ -1639,8 +1638,7 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             cited.cluster.citation_count,
             expected_count,
             msg="'cited' was not updated by a citation found in 'citing', or "
-            "the citation was not found. Count was: %s instead of %s"
-            % (cited.cluster.citation_count, expected_count),
+            f"the citation was not found. Count was: {cited.cluster.citation_count} instead of {expected_count}",
         )
 
     def test_index_by_doc_id(self) -> None:

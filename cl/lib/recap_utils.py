@@ -13,7 +13,7 @@ def get_bucket_name(court, pacer_case_id):
 
 
 def get_docketxml_url(court, pacer_case_id):
-    return "%s/%s/%s" % (
+    return "{}/{}/{}".format(
         BASE_DOWNLOAD_URL,
         get_bucket_name(court, pacer_case_id),
         get_docket_filename(court, pacer_case_id, "xml"),

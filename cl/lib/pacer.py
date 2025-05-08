@@ -243,8 +243,8 @@ def process_docket_data(
         report = ClaimsRegister(court_id)
     else:
         raise NotImplementedError(
-            "The report type with id '%s' is not yet "
-            "supported. Perhaps you need to add it?" % report_type
+            f"The report type with id '{report_type}' is not yet "
+            "supported. Perhaps you need to add it?"
         )
 
     if filepath:
@@ -516,8 +516,9 @@ def normalize_attorney_contact(c, fallback_name=""):
         # See https://github.com/datamade/probableparsing/issues/2 for why we
         # catch the UnicodeEncodeError. Oy.
         logger.warning(
-            "Unable to parse address (RepeatedLabelError): %s"
-            % ", ".join(c.split("\n"))
+            "Unable to parse address (RepeatedLabelError): {}".format(
+                ", ".join(c.split("\n"))
+            )
         )
         return {}, atty_info
 
@@ -526,8 +527,9 @@ def normalize_attorney_contact(c, fallback_name=""):
 
     if any([address_type == "Ambiguous", "CountryName" in address_info]):
         logger.warning(
-            "Unable to parse address (Ambiguous address type): %s"
-            % ", ".join(c.split("\n"))
+            "Unable to parse address (Ambiguous address type): {}".format(
+                ", ".join(c.split("\n"))
+            )
         )
         return {}, atty_info
 

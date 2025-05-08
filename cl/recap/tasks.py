@@ -305,8 +305,8 @@ async def process_recap_pdf(pk):
                 # the docket will be in place soon (it could be in a
                 # different upload task that hasn't yet been processed).
                 logger.warning(
-                    "Unable to find docket for processing queue '%s'. "
-                    "Retrying if max_retries is not exceeded." % pq
+                    f"Unable to find docket for processing queue '{pq}'. "
+                    "Retrying if max_retries is not exceeded."
                 )
                 error_message = "Unable to find docket for item."
                 if retries > 0:
@@ -507,9 +507,8 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
                     continue
                 await mark_pq_status(
                     pq,
-                    "Zip too large; possible zip bomb. File in zip named %s "
-                    "would be %s bytes expanded."
-                    % (zip_info.filename, zip_info.file_size),
+                    f"Zip too large; possible zip bomb. File in zip named {zip_info.filename} "
+                    f"would be {zip_info.file_size} bytes expanded.",
                     PROCESSING_STATUS.INVALID_CONTENT,
                 )
                 return {"new_pqs": [], "tasks": []}
@@ -2077,7 +2076,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
     if not pacer_doc_id:
         msg = (
             "Unable to get attachment page: Unknown pacer_doc_id for "
-            "RECAP Document object %s" % rd.pk
+            f"RECAP Document object {rd.pk}"
         )
         mark_fq_status(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
         self.request.chain = None

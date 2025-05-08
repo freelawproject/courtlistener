@@ -997,8 +997,10 @@ async def add_docket_entries(
                     continue
         except RECAPDocument.MultipleObjectsReturned:
             logger.info(
-                "Multiple recap documents found for document entry number'%s' "
-                "while processing '%s'" % (docket_entry["document_number"], d)
+                "Multiple recap documents found for document entry number'{}' "
+                "while processing '{}'".format(
+                    docket_entry["document_number"], d
+                )
             )
             if params["document_type"] == RECAPDocument.ATTACHMENT:
                 continue

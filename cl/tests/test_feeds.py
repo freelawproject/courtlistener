@@ -93,7 +93,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
         Can the RSS feeds be properly used in an RSS Reader?
         """
-        url = "%s%s" % (
+        url = "{}{}".format(
             self.live_server_url,
             reverse("jurisdiction_feed", kwargs={"court": "test"}),
         )
