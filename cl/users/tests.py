@@ -3555,7 +3555,6 @@ class WebhooksHTMXTests(APITestCase):
 @override_settings(DEVELOPMENT=False)
 @patch("cl.users.tasks.NeonClient")
 class NeonAccountCreationTest(TestCase):
-
     async def test_can_send_email_for_multiple_neon_accounts(
         self, mock_neon_client
     ) -> None:
@@ -3660,7 +3659,6 @@ class NeonAccountCreationTest(TestCase):
 @patch("cl.users.views.create_neon_account")
 @patch("cl.users.views.update_neon_account")
 class NeonAccountUpdateTest(TestCase):
-
     def setUp(self) -> None:
         self.client = AsyncClient()
         self.up = UserProfileWithParentsFactory.create(

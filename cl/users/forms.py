@@ -91,7 +91,6 @@ class ProfileForm(ModelForm):
 
 
 class CleanEmailMixin:
-
     def clean_email(self):
         email = self.cleaned_data.get("email")
         user_part, domain_part = email.rsplit("@", 1)

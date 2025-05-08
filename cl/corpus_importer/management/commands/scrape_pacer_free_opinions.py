@@ -117,7 +117,9 @@ def fetch_doc_report(
         end,
     )
     try:
-        status, rows_to_create = get_and_save_free_document_report(pacer_court_id, start, end, log.pk)  # type: ignore
+        status, rows_to_create = get_and_save_free_document_report(
+            pacer_court_id, start, end, log.pk
+        )  # type: ignore
     except (
         RequestException,
         ReadTimeoutError,
@@ -151,7 +153,7 @@ def fetch_doc_report(
 
     if not exception_raised:
         logger.info(
-            "Got %s document references for " "%s between %s and %s",
+            "Got %s document references for %s between %s and %s",
             rows_to_create,
             pacer_court_id,
             start,
@@ -232,7 +234,9 @@ def get_and_save_free_document_reports(
         # Iterate through the gap in dates either short or long
         for _start, _end in dates:
             exc = fetch_doc_report(
-                pacer_court_id, _start, _end  # type: ignore
+                pacer_court_id,
+                _start,
+                _end,  # type: ignore
             )
             if exc:
                 # Something happened with the queried date range, abort process for

@@ -195,9 +195,7 @@ def add_floating_opinion(
             op_type = opinions[-1].get("type")
 
     # Get rid of double spaces from floating content
-    opinion_content = re.sub(
-        " +", " ", "\n".join(floating_content)
-    ).strip()  # type: str
+    opinion_content = re.sub(" +", " ", "\n".join(floating_content)).strip()  # type: str
     if opinion_content:
         opinions.append(
             {

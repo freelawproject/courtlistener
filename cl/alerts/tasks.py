@@ -619,9 +619,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
 
         if hasattr(hit.meta, "highlight"):
             document_content_copy["meta"] = {}
-            document_content_copy["meta"][
-                "highlight"
-            ] = hit.meta.highlight.to_dict()
+            document_content_copy["meta"]["highlight"] = (
+                hit.meta.highlight.to_dict()
+            )
 
         # Override order_by to show the latest items when clicking the
         # "View Full Results" button.
