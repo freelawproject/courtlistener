@@ -80,7 +80,7 @@ def get_docket_ids_week_ago_no_case_name() -> set[int]:
     )
 
 
-def get_rd_ids_pray_and_pray() -> set[int]:
+def get_rd_ids_pray_and_pay() -> set[int]:
     """Retrieve a set of RECAP document IDs that should be checked for availability on PACER as part of the Pray and Pay project
     - This is focused on transcripts that have likely had their embargos lifted after the three-month period.
     - In the future, depending on outcomes, we can entertain implementing exponential backoff, but I don't think it's necessary right now.
