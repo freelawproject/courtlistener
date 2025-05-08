@@ -267,7 +267,6 @@ class Command(VerboseCommand):
             )
 
         for i, rd_id in enumerate(get_rd_ids_pray_and_pay()):
-
             if i % 10 == 0:
                 logger.info(
                     "Sent %s RECAP Documents to celery for crawling so far.", i
