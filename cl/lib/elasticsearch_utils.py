@@ -2845,13 +2845,13 @@ def build_full_join_es_queries(
                     should=string_query,
                     minimum_should_match=1,
                 )
-            case _, []:
+            case [_, []]:
                 parent_filters.extend([default_parent_filter])
                 parent_query = Q(
                     "bool",
                     filter=parent_filters,
                 )
-            case _, _:
+            case [_, _]:
                 parent_filters.extend([default_parent_filter])
                 parent_query = Q(
                     "bool",
