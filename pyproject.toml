@@ -106,7 +106,7 @@ django-model-utils = "^5.0.0"
 django-permissions-policy = "^4.25.0"
 tiktoken = "^0.9.0"
 hyperscan = "^0.7.8"
-openai = "^1.68.2"
+openai = "^1.72.0"
 seal-rookery = "^2.3.1"
 types-pytz = "^2025.1.0.20250318"
 psycopg = {version = "3.2.6", extras = ["binary", "pool"]}
