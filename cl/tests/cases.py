@@ -24,27 +24,6 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
 
 
-class OutputBlockerTestMixin:
-    """Block the output of tests so that they run a bit faster.
-
-    This is pulled from Speed Up Your Django Tests, Chapter, 4.9 "Prevent
-    Output". In Django 3.2, this should be easier via a new --buffer argument.
-    """
-
-    def _callTestMethod(self, method):
-        try:
-            out = StringIO()
-            err = StringIO()
-            with mock.patch.object(sys, "stdout", new=out), mock.patch.object(
-                sys, "stderr", new=err
-            ):
-                super()._callTestMethod(method)
-        except Exception:
-            print(out.getvalue(), end="")
-            print(err.getvalue(), end="", file=sys.stderr)
-            raise
-
-
 class OneDatabaseMixin:
     """Only use one DB during tests
 
@@ -93,7 +72,6 @@ class RestartSentEmailQuotaMixin:
 
 
 class SimpleTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     test.SimpleTestCase,
 ):
@@ -101,7 +79,6 @@ class SimpleTestCase(
 
 
 class TestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TestCase,
@@ -110,7 +87,6 @@ class TestCase(
 
 
 class TransactionTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TransactionTestCase,
@@ -119,7 +95,6 @@ class TransactionTestCase(
 
 
 class LiveServerTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     test.LiveServerTestCase,
@@ -128,7 +103,6 @@ class LiveServerTestCase(
 
 
 class StaticLiveServerTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     testing.StaticLiveServerTestCase,
@@ -137,7 +111,6 @@ class StaticLiveServerTestCase(
 
 
 class APITestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     APITestCase,
