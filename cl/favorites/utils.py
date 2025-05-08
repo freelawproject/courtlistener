@@ -393,10 +393,10 @@ def prayer_unavailable(instance: RECAPDocument, user_pk: int | None ) -> None:
     ).select_related("user")
 
     user_prayer = open_prayers.filter(user__pk=user_pk).first()
-    
+
     if not user_prayer:
         return
-    
+
     email_recipients = [
         {
             "email": user_prayer.user.email,
