@@ -387,7 +387,7 @@ async def get_lifetime_prayer_stats(
     return PrayerStats(**data)
 
 
-def prayer_unavailable(instance: RECAPDocument, user_pk: int | None ) -> None:
+def prayer_unavailable(instance: RECAPDocument, user_pk: int | None) -> None:
     open_prayers = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
     ).select_related("user")
