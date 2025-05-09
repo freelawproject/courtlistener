@@ -87,6 +87,7 @@ from cl.corpus_importer.utils import (
     merge_strings,
     winnow_case_name,
 )
+from cl.favorites.models import PrayerAvailability
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import (
@@ -104,16 +105,18 @@ from cl.people_db.lookup_utils import (
     find_just_name,
 )
 from cl.people_db.models import Attorney, AttorneyOrganization, Party, Position
-from cl.recap.management.commands.pacer_iquery_scraper import (
+from cl.recap.management.commands.nightly_pacer_updates import (
     get_docket_ids_docket_alerts,
     get_docket_ids_missing_info,
     get_docket_ids_week_ago_no_case_name,
+    get_recap_documents_pray_and_pay,
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.factories import (
     CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
     OpinionClusterFactoryMultipleOpinions,
@@ -121,6 +124,7 @@ from cl.search.factories import (
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -3109,8 +3113,8 @@ class ScrapeIqueryPagesTest(TestCase):
                 dispatch_uid=test_dispatch_uid,
             )
 
-    def test_pacer_iquery_scraper_queries(self, mock_cookies):
-        """Test pacer_iquery_scraper command queries."""
+    def test_nightly_pacer_updates_queries(self, mock_cookies):
+        """Test nightly_pacer_updates command queries."""
 
         d_1 = DocketFactory(
             source=Docket.RECAP,
@@ -3175,6 +3179,67 @@ class ScrapeIqueryPagesTest(TestCase):
             {d_1.pk, d_2.pk},
             msg="Wrong IDs returned by get_docket_ids_week_ago_no_case_name",
         )
+
+    def test_can_retrieve_old_prayers_to_check(self, mock_cookies):
+        """Verifies retrieval of old, unchecked RECAP documents for 'pray and pay'."""
+        # Create DocketEntry instances with different filing dates
+        ten_days_old_entry = DocketEntryFactory(
+            date_filed=now() - timedelta(days=10)
+        )
+        ninety_one_days_old_entry = DocketEntryFactory(
+            date_filed=now() - timedelta(days=91)
+        )
+        ninety_five_days_old_entry = DocketEntryFactory(
+            date_filed=now() - timedelta(days=95)
+        )
+
+        # Create RECAPDocument instances associated with the DocketEntry instances
+        rd_1 = RECAPDocumentFactory(docket_entry=ten_days_old_entry)
+        rd_2 = RECAPDocumentFactory(
+            docket_entry=ninety_one_days_old_entry,
+        )
+        rd_3 = RECAPDocumentFactory(
+            docket_entry=ninety_one_days_old_entry,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+        rd_4 = RECAPDocumentFactory(
+            docket_entry=ninety_five_days_old_entry,
+        )
+        rd_5 = RECAPDocumentFactory(
+            docket_entry=ninety_five_days_old_entry,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+
+        # Simulate PrayerAvailability records with different last_checked dates
+        PrayerAvailability.objects.create(
+            recap_document=rd_1, last_checked=now() - timedelta(days=3)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_2, last_checked=now() - timedelta(days=2)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_3, last_checked=now() - timedelta(days=1)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_4, last_checked=now() - timedelta(days=6)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_5, last_checked=now() - timedelta(days=2)
+        )
+
+        # Retrieve the RECAP documents that should be checked
+        recap_documents = get_recap_documents_pray_and_pay()
+
+        self.assertIn(rd_2, recap_documents)
+        self.assertIn(rd_4, recap_documents)
+        # Not old enough
+        self.assertNotIn(rd_1, recap_documents)
+        # Not expected: Last Checked on the same day it should have been unsealed
+        self.assertNotIn(rd_3, recap_documents)
+        # Not expected: Checked after it should have been unsealed
+        self.assertNotIn(rd_5, recap_documents)
 
     def test_get_latest_pacer_case_id_for_courts(self, mock_cookies):
         """Test get_latest_pacer_case_id_for_courts helper."""
