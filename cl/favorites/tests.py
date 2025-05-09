@@ -9,7 +9,7 @@ from django.contrib.auth.hashers import make_password
 from django.core import mail
 from django.core.cache import cache
 from django.template.defaultfilters import date as template_date
-from django.test import AsyncClient, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_naive, now
@@ -62,7 +62,6 @@ class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
 
     def setUp(self) -> None:
         # Set up some handy variables
-        self.async_client = AsyncClient()
         self.note_cluster_params = {
             "cluster_id": 1,
             "name": "foo",
@@ -74,34 +73,31 @@ class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
             "notes": "testing notes",
         }
 
-    async def test_create_note(self) -> None:
+    def test_create_note(self) -> None:
         """Can we create a note by sending a post?"""
         self.assertTrue(
-            await self.async_client.alogin(
-                username="pandora", password="password"
-            )
+            self.client.login(username="pandora", password="password")
         )
         for params in [self.note_cluster_params, self.note_audio_params]:
-            r = await self.async_client.post(
+            r = self.client.post(
                 reverse("save_or_update_note"),
                 params,
                 follow=True,
-                X_REQUESTED_WITH="XMLHttpRequest",
+                headers={"x-requested-with": "XMLHttpRequest"},
             )
             self.assertEqual(r.status_code, 200)
             self.assertIn("It worked", r.content.decode())
 
         # And can we delete them?
         for params in [self.note_cluster_params, self.note_audio_params]:
-            r = await self.async_client.post(
+            r = self.client.post(
                 reverse("delete_note"),
                 params,
                 follow=True,
-                X_REQUESTED_WITH="XMLHttpRequest",
+                headers={"x-requested-with": "XMLHttpRequest"},
             )
         self.assertEqual(r.status_code, 200)
         self.assertIn("It worked", r.content.decode())
-        await self.async_client.alogout()
 
 
 class UserNotesTest(BaseSeleniumTest):
