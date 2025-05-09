@@ -75,6 +75,10 @@ class NeonWebhookEventAdmin(admin.ModelAdmin):
         "account_id",
         "membership_id",
     )
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
 
     @admin.display(description="Trigger")
     def get_trigger(self, obj):

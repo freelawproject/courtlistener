@@ -1,6 +1,7 @@
 import logging
+from collections.abc import MutableMapping
 from datetime import datetime
-from typing import Any, MutableMapping
+from typing import Any
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -388,12 +389,8 @@ class BaseCourtUploadForm(forms.Form):
             "panel",
         ]:
             if field_name in self.fields:
-                self.fields[
-                    field_name
-                ].queryset = judges_qs  # type: ignore[attr-defined]
-                self.fields[
-                    field_name
-                ].label_from_instance = self.person_label  # type: ignore[attr-defined]
+                self.fields[field_name].queryset = judges_qs  # type: ignore[attr-defined]
+                self.fields[field_name].label_from_instance = self.person_label  # type: ignore[attr-defined]
 
     def validate_neutral_citation(self) -> None:
         """Validate if we already have the neutral citation in the system

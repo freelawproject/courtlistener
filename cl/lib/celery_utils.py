@@ -2,7 +2,7 @@ import functools
 import inspect
 import time
 from datetime import datetime, timedelta
-from typing import Any, Callable, Final, List
+from typing import Any, Callable, Final
 
 from celery import Task
 from dateutil import parser
@@ -15,7 +15,7 @@ from cl.lib.ratelimiter import parse_rate
 from cl.lib.redis_utils import get_redis_interface
 
 PRIORITY_SEP: str = "\x06\x16"
-DEFAULT_PRIORITY_STEPS: List[int] = [0, 3, 6, 9]
+DEFAULT_PRIORITY_STEPS: list[int] = [0, 3, 6, 9]
 
 
 def clear_queue(queue_name: str):
@@ -52,7 +52,7 @@ def make_queue_name_for_pri(queue: str, pri: int) -> str:
     """
     if pri not in DEFAULT_PRIORITY_STEPS:
         raise ValueError("Priority not in priority steps")
-    return "{0}{1}{2}".format(
+    return "{}{}{}".format(
         *((queue, PRIORITY_SEP, pri) if pri else (queue, "", ""))
     )
 

@@ -23,7 +23,6 @@ class TimeStampField(serializers.Field):
         super().__init__(**kwargs)
 
     def to_representation(self, value):
-
         if isinstance(value, datetime.datetime):
             if self.timezone:
                 return serializers.DateTimeField(

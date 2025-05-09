@@ -167,9 +167,7 @@ def build_chart_data(court_ids: list[str]):
                         "id": court_id,
                     }
                 ]
-                grouped_data.setdefault("Scrapers", []).append(
-                    scraper_data
-                )  # type: ignore
+                grouped_data.setdefault("Scrapers", []).append(scraper_data)  # type: ignore
     return [
         {"group": key, "data": value} for key, value in grouped_data.items()
     ]

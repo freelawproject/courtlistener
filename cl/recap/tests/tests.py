@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY, MagicMock
 
+import requests
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.tz import tzutc
@@ -23,7 +24,6 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
-from requests import ConnectionError
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.api.factories import (
@@ -100,7 +100,6 @@ from cl.recap.models import (
     PROCESSING_STATUS,
     REQUEST_TYPE,
     UPLOAD_TYPE,
-    EmailProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
     PacerHtmlFiles,
@@ -112,7 +111,6 @@ from cl.recap.tasks import (
     download_pacer_pdf_by_rd,
     fetch_appellate_docket,
     fetch_pacer_doc_by_rd,
-    get_and_copy_recap_attachment_docs,
     process_recap_acms_appellate_attachment,
     process_recap_acms_docket,
     process_recap_appellate_attachment,
@@ -156,7 +154,6 @@ from cl.users.factories import (
 
 
 class RecapUtilsTest(TestCase):
-
     def setUp(self) -> None:
         self.court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
         self.docket = DocketFactory(
@@ -2637,7 +2634,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         )
         self.assertFalse(
             serialized_fq.is_valid(),
-            msg=f"Serializer should be invalid due to missing 'docket' field.",
+            msg="Serializer should be invalid due to missing 'docket' field.",
         )
 
         self.assertEqual(
@@ -3205,7 +3202,6 @@ class RecapPdfFetchApiTest(TestCase):
     side_effect=lambda a: True,
 )
 class RecapAttPageFetchApiTest(TestCase):
-
     def setUp(self) -> None:
         self.district_court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
         self.district_docket = DocketFactory(
@@ -3804,16 +3800,12 @@ class RecapAddAttorneyTest(TestCase):
         self.atty_email = "jamiesonb@lanepowell.com"
         self.atty_name = "Brewster H. Jamieson"
         self.atty = {
-            "contact": "{org_name}\n"
+            "contact": f"{self.atty_org_name}\n"
             "301 W. Nothern Lights Blvd., Suite 301\n"
             "Anchorage, AK 99503-2648\n"
-            "{phone}\n"
+            f"{self.atty_phone}\n"
             "Fax: 907-276-2631\n"
-            "Email: {email}\n".format(
-                org_name=self.atty_org_name,
-                phone=self.atty_phone,
-                email=self.atty_email,
-            ),
+            f"Email: {self.atty_email}\n",
             "name": self.atty_name,
             "roles": [
                 {"role": Role.ATTORNEY_LEAD, "date_action": None},
@@ -4436,7 +4428,6 @@ class DescriptionCleanupTest(SimpleTestCase):
 
 
 class RecapDocketTaskTest(TestCase):
-
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="scotus", jurisdiction="F")
@@ -6158,9 +6149,7 @@ class WebhooksRetries(TestCase):
 
         with mock.patch(
             "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: exec(
-                "raise ConnectionError('Connection Error')"
-            ),
+            side_effect=requests.ConnectionError("Connection Error"),
         ):
             fake_now_0 = now()
             with time_machine.travel(fake_now_0, tick=False):
@@ -8105,15 +8094,15 @@ class RemoveDuplicatedMinuteEntries(TestCase):
 
         data_history = deepcopy(docket_data)
         # Add short descriptions to entries, simulating a docket history report.
-        data_history["docket_entries"][0][
-            "short_description"
-        ] = "Order on Motion for Extension of Time to Complete Discovery"
-        data_history["docket_entries"][1][
-            "short_description"
-        ] = "Set/Reset Deadlines"
-        data_history["docket_entries"][2][
-            "short_description"
-        ] = "Set/Reset Deadlines"
+        data_history["docket_entries"][0]["short_description"] = (
+            "Order on Motion for Extension of Time to Complete Discovery"
+        )
+        data_history["docket_entries"][1]["short_description"] = (
+            "Set/Reset Deadlines"
+        )
+        data_history["docket_entries"][2]["short_description"] = (
+            "Set/Reset Deadlines"
+        )
         # Merge docket history report entries.
         async_to_sync(add_docket_entries)(
             self.d, data_history["docket_entries"]
@@ -8184,12 +8173,12 @@ class RemoveDuplicatedMinuteEntries(TestCase):
         # without duplicates.
         data_history = deepcopy(docket_data)
         docket_entries_history = data_history["docket_entries"][0:3]
-        docket_entries_history[0][
-            "short_description"
-        ] = "Order on Motion for Extension of Time to Complete Discovery"
-        docket_entries_history[1][
-            "description"
-        ] = "Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)"
+        docket_entries_history[0]["short_description"] = (
+            "Order on Motion for Extension of Time to Complete Discovery"
+        )
+        docket_entries_history[1]["description"] = (
+            "Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)"
+        )
         docket_entries_history[2]["short_description"] = "Set/Reset Deadlines"
         # Merge docket history report entries.
         async_to_sync(add_docket_entries)(self.d, docket_entries_history)

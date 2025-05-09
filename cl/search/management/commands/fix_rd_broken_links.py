@@ -116,7 +116,7 @@ def compose_redis_key() -> str:
     """Compose a Redis key based on the search type for indexing log.
     :return: A Redis key as a string.
     """
-    return f"es_fix_rd_broken_links:log"
+    return "es_fix_rd_broken_links:log"
 
 
 class Command(VerboseCommand):

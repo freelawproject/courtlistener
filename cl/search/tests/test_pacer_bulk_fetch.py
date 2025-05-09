@@ -693,7 +693,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
         RECAPDocumentFactory(
             docket_entry=de_3,
             document_number=3,
-            pacer_doc_id=f"1234",
+            pacer_doc_id="1234",
             is_available=False,
             page_count=100,
         )

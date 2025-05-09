@@ -1,5 +1,3 @@
-from typing import Dict, Tuple
-
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -14,9 +12,9 @@ from cl.users.models import UserProfile
 
 
 def create_stub_account(
-    user_data: Dict[str, str],
-    profile_data: Dict[str, str],
-) -> Tuple[User, UserProfile]:
+    user_data: dict[str, str],
+    profile_data: dict[str, str],
+) -> tuple[User, UserProfile]:
     """Create a minimal user account in CL
 
     This can be helpful when receiving anonymous donations, payments from
@@ -109,7 +107,7 @@ def delete_user_assets(user: User) -> None:
     WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
 
 
-emails: Dict[str, EmailType] = {
+emails: dict[str, EmailType] = {
     "account_deleted": {
         "subject": "User deleted their account on CourtListener!",
         "body": "Sad day indeed. Somebody deleted their account completely, "
