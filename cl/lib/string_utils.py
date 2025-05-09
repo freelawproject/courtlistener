@@ -1,5 +1,4 @@
 import re
-from typing import Optional
 
 import tiktoken
 
@@ -13,7 +12,7 @@ def camel_to_snake(key: str) -> str:
     return re.sub(r"([a-z])([A-Z])", r"\1_\2", key).lower()
 
 
-def trunc(s: str, length: int, ellipsis: Optional[str] = None) -> str:
+def trunc(s: str, length: int, ellipsis: str | None = None) -> str:
     """Truncates a string at a good length.
 
     Finds the rightmost space in a string, and truncates there. Lacking such

@@ -1,7 +1,7 @@
 import itertools
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
 from unittest import mock
 from unittest.mock import Mock, patch
@@ -2800,7 +2800,7 @@ class CitationLookUpApiTest(
         throttle_logic_mock.return_value = "citation_throttle_test"
         # Throttle users for 1 minute if they query for the exact number of
         # citations allowed by the rate limit.
-        test_date = datetime(1970, 1, 1, 0, 0, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 0, 0, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False) as traveler:
             ten_citations = "56 F.2d 9, " * 10
             r = await self.async_client.post(
@@ -2844,7 +2844,7 @@ class CitationLookUpApiTest(
         self, get_rate_mock, throttle_logic_mock
     ) -> None:
         throttle_logic_mock.return_value = "citation_throttle_test"
-        test_date = datetime(1970, 1, 1, 0, 1, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 0, 1, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False) as traveler:
             fifteen_citations = "56 F.2d 9, " * 15
             r = await self.async_client.post(
@@ -2882,7 +2882,7 @@ class CitationLookUpApiTest(
             expected_time = test_date + timedelta(minutes=1)
             self.assertEqual(data["wait_until"], expected_time.isoformat())
 
-        test_date = datetime(1970, 1, 1, 0, 2, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 0, 2, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False) as traveler:
             fifteen_citations = "56 F.2d 9, " * 15
             r = await self.async_client.post(
@@ -2934,7 +2934,7 @@ class CitationLookUpApiTest(
         throttle_logic_mock.return_value = "citation_throttle_test"
         # throttle users that exceeds the max number of citations by a
         # significant margin.
-        test_date = datetime(1970, 1, 1, 4, 0, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 4, 0, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False):
             sixty_citations = "56 F.2d 9, " * 60
             r = await self.async_client.post(

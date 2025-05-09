@@ -5,7 +5,6 @@ import logging
 import re
 from calendar import SATURDAY, SUNDAY
 from datetime import datetime, timedelta
-from typing import Optional
 
 import requests
 from asgiref.sync import async_to_sync
@@ -77,7 +76,7 @@ def update_entry_types(court_pk: str, description: str) -> None:
         court.save()
 
 
-def get_last_build_date(b: bytes) -> Optional[datetime]:
+def get_last_build_date(b: bytes) -> datetime | None:
     """Get the last build date for an RSS feed
 
     In this case we considered using lxml & xpath, which was 1000× faster than

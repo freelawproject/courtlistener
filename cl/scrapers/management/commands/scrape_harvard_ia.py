@@ -4,7 +4,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 import internetarchive as ia
 import requests
@@ -20,7 +20,7 @@ from cl.lib.utils import human_sort
 
 class OptionsType(TypedDict):
     reporter: str
-    volumes: Optional[range]
+    volumes: range | None
 
 
 def fetch_ia_volumes(

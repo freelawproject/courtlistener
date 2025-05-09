@@ -1,7 +1,7 @@
 import itertools
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import requests
 from bs4 import BeautifulSoup
@@ -219,7 +219,7 @@ def combine_non_overlapping_data(
 def merge_cluster_dates(
     cluster: OpinionCluster,
     field_name: str,
-    overlapping_data: Optional[tuple],
+    overlapping_data: tuple | None,
 ) -> dict[str, Any]:
     """Compare two dates and choose the best to update the opinion cluster
     the value if one value is better than the other

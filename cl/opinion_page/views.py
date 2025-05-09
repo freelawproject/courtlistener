@@ -2,7 +2,7 @@ import datetime
 from collections import OrderedDict, defaultdict
 from datetime import timedelta
 from http import HTTPStatus
-from typing import Any, Union
+from typing import Any
 from urllib.parse import urlencode
 
 import eyecite
@@ -1279,7 +1279,7 @@ async def make_reporter_dict() -> dict:
         .distinct()
     ]
 
-    reporters: Union[defaultdict, OrderedDict] = defaultdict(list)
+    reporters: defaultdict | OrderedDict = defaultdict(list)
     for name, abbrev_list in NAMES_TO_EDITIONS.items():
         for abbrev in abbrev_list:
             if abbrev in reporters_in_db:

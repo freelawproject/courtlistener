@@ -1,6 +1,6 @@
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable
 
 from django.contrib.syndication.views import Feed
 from django.http import HttpResponse

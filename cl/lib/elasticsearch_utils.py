@@ -5,10 +5,11 @@ import re
 import time
 import traceback
 from collections import defaultdict
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -1901,7 +1902,7 @@ def fill_position_mapping(
                 if callable(field_value):
                     field_value = field_value()
                 elif isinstance(
-                    field_value, (datetime.datetime, datetime.date)
+                    field_value, (datetime.datetime | datetime.date)
                 ):
                     field_value = midnight_pt(field_value)
 

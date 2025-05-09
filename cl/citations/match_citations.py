@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from collections.abc import Iterable
-from typing import Optional, no_type_check
+from typing import no_type_check
 
 from asgiref.sync import async_to_sync
 from elasticsearch_dsl.response import Hit
@@ -40,8 +40,8 @@ MULTIPLE_MATCHES_RESOURCE = Resource(
 
 def filter_by_matching_antecedent(
     opinion_candidates: Iterable[Opinion],
-    antecedent_guess: Optional[str],
-) -> Optional[Opinion]:
+    antecedent_guess: str | None,
+) -> Opinion | None:
     if not antecedent_guess:
         return None
 
@@ -125,7 +125,7 @@ def resolve_fullcase_citation(
 def resolve_shortcase_citation(
     short_citation: ShortCaseCitation,
     resolved_full_cites: ResolvedFullCites,
-) -> Optional[Opinion]:
+) -> Opinion | None:
     candidates: list[Opinion] = []
     matched_opinions = [
         o for c, o in resolved_full_cites if type(o) is Opinion
@@ -155,7 +155,7 @@ def resolve_shortcase_citation(
 def resolve_supra_citation(
     supra_citation: SupraCitation,
     resolved_full_cites: ResolvedFullCites,
-) -> Optional[Opinion]:
+) -> Opinion | None:
     matched_opinions = [
         o for c, o in resolved_full_cites if type(o) is Opinion
     ]

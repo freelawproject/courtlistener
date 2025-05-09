@@ -2,7 +2,6 @@ import logging
 import re
 from datetime import date
 from http import HTTPStatus
-from typing import Optional
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
@@ -198,7 +197,7 @@ async def coverage_data(request, version, court):
 
 async def fetch_first_last_date_filed(
     court_id: str,
-) -> tuple[Optional[date], Optional[date]]:
+) -> tuple[date | None, date | None]:
     """Fetch first and last date for court
 
     :param court_id: Court object id

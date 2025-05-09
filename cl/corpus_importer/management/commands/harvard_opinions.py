@@ -6,7 +6,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, Optional, TypedDict
+from typing import Any, TypedDict
 
 import requests
 from bs4 import BeautifulSoup
@@ -38,7 +38,7 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 cnt = CaseNameTweaker()
 
 
-def validate_dt(date_str: str) -> tuple[Optional[date], bool]:
+def validate_dt(date_str: str) -> tuple[date | None, bool]:
     """
     Check if the date string is only year-month or year.
     If partial date string, make date string the first of the month
@@ -71,9 +71,9 @@ def validate_dt(date_str: str) -> tuple[Optional[date], bool]:
 
 
 def _make_glob_from_args(
-    reporter: Optional[str],
-    volumes: Optional[range],
-    page: Optional[str],
+    reporter: str | None,
+    volumes: range | None,
+    page: str | None,
 ) -> list[str]:
     """Make list of glob paths
 
@@ -117,8 +117,8 @@ def _make_glob_from_args(
 
 def filepath_list(
     reporter: str,
-    volumes: Optional[range],
-    page: Optional[str],
+    volumes: range | None,
+    page: str | None,
 ) -> list[str]:
     """Given a reporter and volume, return a sorted list of files to process
 
@@ -224,10 +224,10 @@ def parse_extra_fields(soup, fields, long_field=False) -> dict:
 
 class OptionsType(TypedDict):
     reporter: str
-    volumes: Optional[range]
+    volumes: range | None
     page: str
-    court_id: Optional[str]
-    location: Optional[str]
+    court_id: str | None
+    location: str | None
     bankruptcy: bool
 
 
@@ -258,7 +258,7 @@ def merge_fixes(data: dict[str, Any], identifier: str) -> dict[str, Any]:
     return data
 
 
-def read_json(file_path: str, ia_download_url: str) -> Optional[Any]:
+def read_json(file_path: str, ia_download_url: str) -> Any | None:
     """Read JSON file and throw a warning if exceptions occur
 
     :param file_path: Filepath to JSON
@@ -427,10 +427,10 @@ def add_new_case(
     case_name: str,
     case_name_full: str,
     case_name_short: str,
-    date_filed: Optional[date],
+    date_filed: date | None,
     is_approximate: bool,
     citation: FullCaseCitation,
-    court_id: Optional[str],
+    court_id: str | None,
     file_path: str,
 ) -> None:
     """Add new case to Courtlistener.com
@@ -604,12 +604,12 @@ def add_opinions(
 
 def find_previously_imported_cases(
     data: dict[str, Any],
-    court_id: Optional[str],
+    court_id: str | None,
     date_filed: date,
     harvard_characters: str,
     case_name_full: str,
     citation: FullCaseCitation,
-) -> Optional[OpinionCluster]:
+) -> OpinionCluster | None:
     """Check if opinion is in Courtlistener
 
     :param data: The harvard data

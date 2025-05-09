@@ -3,7 +3,8 @@ import datetime
 import inspect
 import math
 import time
-from typing import Callable, Optional, cast
+from collections.abc import Callable
+from typing import cast
 
 from celery.canvas import chain
 from django.db.models import F, Q, Window
@@ -36,7 +37,7 @@ from cl.search.models import Court, RECAPDocument
 
 def get_last_complete_date(
     court_id: str,
-) -> Optional[datetime.date]:
+) -> datetime.date | None:
     """Get the next start query date for a court.
 
     Check the DB for the last date for a court that was completed. Return the
@@ -128,11 +129,11 @@ def fetch_doc_report(
         PacerLoginException,
         ValueError,
     ) as exc:
-        if isinstance(exc, (RequestException, ReadTimeoutError)):
+        if isinstance(exc, (RequestException | ReadTimeoutError)):
             reason = "network error."
         elif isinstance(exc, IndexError):
             reason = "PACER 6.3 bug."
-        elif isinstance(exc, (TypeError, ValueError)):
+        elif isinstance(exc, (TypeError | ValueError)):
             reason = "failing PACER website."
         elif isinstance(exc, PacerLoginException):
             reason = "PACER login issue."
@@ -166,9 +167,9 @@ def fetch_doc_report(
 
 
 def get_and_save_free_document_reports(
-    courts: list[Optional[str]],
-    date_start: Optional[datetime.date],
-    date_end: Optional[datetime.date],
+    courts: list[str | None],
+    date_start: datetime.date | None,
+    date_end: datetime.date | None,
 ) -> None:
     """Query the Free Doc Reports on PACER and get a list of all the free
     documents. Do not download those items, as that step is done later. For now
@@ -253,7 +254,7 @@ def get_and_save_free_document_reports(
 
 
 def get_pdfs(
-    courts: list[Optional[str]],
+    courts: list[str | None],
     date_start: datetime.date,
     date_end: datetime.date,
     queue: str,

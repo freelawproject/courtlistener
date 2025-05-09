@@ -1,7 +1,6 @@
 import re
 import sys
 from datetime import date
-from typing import Optional
 
 from dateutil import parser
 from django.core.management import CommandError
@@ -24,7 +23,7 @@ from cl.search.models import Court
 
 def create_or_update_row(
     values: dict[str, str],
-) -> Optional[FjcIntegratedDatabase]:
+) -> FjcIntegratedDatabase | None:
     fjc_filters = [
         {
             "district": values["district"],

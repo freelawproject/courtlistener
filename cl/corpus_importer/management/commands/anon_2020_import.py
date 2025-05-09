@@ -2,7 +2,7 @@ import json
 import re
 from datetime import date, datetime
 from glob import iglob
-from typing import Any, Optional
+from typing import Any
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
@@ -48,13 +48,13 @@ def merge_or_add_opinions(
     cluster_id: int,
     html_str: str,
     data: dict[str, Any],
-    date_argued: Optional[date],
-    date_filed: Optional[date],
+    date_argued: date | None,
+    date_filed: date | None,
     case_names: dict[str, str],
     status: str,
     docket_number: str,
     found_citations: list[FoundCitation],
-) -> Optional[Docket]:
+) -> Docket | None:
     """Merge opinions if applicable.
 
     If opinion not in system, merge or add to cluster.
@@ -161,8 +161,8 @@ def merge_or_add_opinions(
 def add_new_records(
     html_str: str,
     data: dict[str, Any],
-    date_argued: Optional[date],
-    date_filed: Optional[date],
+    date_argued: date | None,
+    date_filed: date | None,
     case_names: dict[str, str],
     status: str,
     docket_number: str,
@@ -260,7 +260,7 @@ def clean_docket_number(docket_number: str) -> str:
 def attempt_cluster_lookup(
     citations: list[FoundCitation],
     new_docket_number: str,
-) -> Optional[int]:
+) -> int | None:
     """Check if the citation in our database.
 
     If citation in found citations in our database, return cluster ID.
@@ -337,7 +337,7 @@ def find_court_id(court_str: str) -> str:
 
 def process_dates(
     data: dict[str, Any],
-) -> tuple[Optional[date], Optional[date]]:
+) -> tuple[date | None, date | None]:
     """Process date argued and date filed
 
     Dates in this dataset fall into two categories, argued and filed/decided.
@@ -358,7 +358,7 @@ def process_dates(
 
 def import_anon_2020_db(
     import_dir: str,
-    skip_until: Optional[str],
+    skip_until: str | None,
 ) -> None:
     """Import data from anon 2020 DB into our system.
 

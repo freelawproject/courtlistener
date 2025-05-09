@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, Union
+from typing import Any
 
 from asgiref.sync import async_to_sync
 from celery.canvas import chain
@@ -31,7 +31,7 @@ cnt = CaseNameTweaker()
 
 @transaction.atomic
 def save_everything(
-    items: dict[str, Union[Docket, Audio]],
+    items: dict[str, Docket | Audio],
     backscrape: bool = False,
 ) -> None:
     docket, af = items["docket"], items["audio_file"]

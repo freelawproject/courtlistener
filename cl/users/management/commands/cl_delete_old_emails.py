@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from django.utils.timezone import make_aware
 
@@ -9,9 +9,7 @@ from cl.users.models import EmailSent
 def delete_old_emails(days: int) -> int:
     """Delete stored emails older than the specified number of days."""
 
-    older_than = make_aware(datetime.now(), timezone.utc) - timedelta(
-        days=days
-    )
+    older_than = make_aware(datetime.now(), UTC) - timedelta(days=days)
     emails = EmailSent.objects.filter(date_created__lt=older_than)
     print(f"Deleting emails created before: {older_than}")
 

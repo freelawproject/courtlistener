@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterator
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any, Optional
+from typing import Any
 
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
@@ -150,7 +150,7 @@ async def ais_appellate_court(court_id: str) -> bool:
     return await appellate_court_ids.filter(pk=court_id).aexists()
 
 
-def get_start_of_quarter(d: Optional[date] = None) -> date:
+def get_start_of_quarter(d: date | None = None) -> date:
     """Get the start date of the  calendar quarter requested
 
     :param d: The date to get the start date for. If None, then use current
@@ -372,7 +372,7 @@ def clean_docket_number(docket_number: str) -> str:
 
 def merge_docket_numbers(
     cluster: OpinionCluster, docket_number: str
-) -> Optional[str]:
+) -> str | None:
     """Merge docket number
 
     :param cluster: The cluster of the merging item
@@ -487,7 +487,7 @@ def merge_strings(
 
 def merge_long_fields(
     field_name: str,
-    overlapping_data: Optional[tuple[str, str]],
+    overlapping_data: tuple[str, str] | None,
     cluster_id: int,
 ) -> dict[str, Any]:
     """Merge two long text fields
@@ -517,7 +517,7 @@ def merge_long_fields(
 
 
 def merge_judges(
-    overlapping_data: Optional[tuple[str, str]],
+    overlapping_data: tuple[str, str] | None,
     cluster_id: int,
     is_columbia: bool = False,
     skip_judge_merger: bool = False,
@@ -728,7 +728,7 @@ def add_citations_to_cluster(
 def update_cluster_panel(
     cluster: OpinionCluster,
     panel_list: list[str],
-    panel_date: Optional[date] = None,
+    panel_date: date | None = None,
 ) -> None:
     """Update cluster's panel
 
@@ -1031,7 +1031,7 @@ def match_based_text(
     possible_cases: QuerySet,
     case_name_abbreviation: str,
     citation: FullCaseCitation,
-) -> Optional[OpinionCluster]:
+) -> OpinionCluster | None:
     """Compare CL text to file content to establish duplicates
 
     :param file_characters: stripped characters to compare from file/source

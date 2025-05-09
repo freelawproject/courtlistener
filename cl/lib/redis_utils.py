@@ -1,6 +1,5 @@
 import time
 import uuid
-from typing import Union
 
 from django.conf import settings
 from redis import Redis
@@ -21,7 +20,7 @@ def get_redis_interface(
     return settings.REDIS_CLIENTS[f"{db_name}-{decode_responses}"]
 
 
-def create_redis_semaphore(r: Union[str, Redis], key: str, ttl: int) -> bool:
+def create_redis_semaphore(r: str | Redis, key: str, ttl: int) -> bool:
     """Use a redis key to create a semaphore with a specified TTL
 
     Note that this function has a very small race condition between when it
@@ -62,7 +61,7 @@ def create_redis_semaphore(r: Union[str, Redis], key: str, ttl: int) -> bool:
     return True
 
 
-def delete_redis_semaphore(r: Union[str, Redis], key: str) -> None:
+def delete_redis_semaphore(r: str | Redis, key: str) -> None:
     """Delete a redis key
 
     :param r: The Redis DB to connect to as a connection interface or str that

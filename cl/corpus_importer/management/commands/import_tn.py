@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from glob import glob
-from typing import IO, Union
+from typing import IO
 
 from dateutil import parser
 from django.utils.encoding import force_bytes
@@ -66,7 +66,7 @@ def make_item(case):
 
 def import_tn_corpus(
     log: bool,
-    skip_until: Union[bool, str],
+    skip_until: bool | str,
     file: IO,
     ocr_available: bool,
 ) -> None:

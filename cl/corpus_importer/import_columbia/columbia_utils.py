@@ -1,7 +1,7 @@
 import itertools
 import re
 from datetime import date
-from typing import Any, Optional
+from typing import Any
 
 import dateutil.parser as dparser
 from bs4 import (
@@ -214,7 +214,7 @@ def add_floating_opinion(
 
 def extract_columbia_opinions(
     outer_opinion: BeautifulSoup,
-) -> list[Optional[dict]]:
+) -> list[dict | None]:
     """Get the opinions of the soup object
 
     We extract all possible opinions from BeautifulSoup, with and without
@@ -336,9 +336,7 @@ def merge_opinions(
     return opinions, current_order
 
 
-def is_per_curiam_opinion(
-    content: Optional[str], byline: Optional[str]
-) -> bool:
+def is_per_curiam_opinion(content: str | None, byline: str | None) -> bool:
     """Check if opinion author is per curiam
 
     :param content: opinion content
