@@ -265,7 +265,6 @@ class Command(VerboseCommand):
             )
 
         for i, rd in enumerate(get_recap_documents_pray_and_pay()):
-
             if i % 10 == 0:
                 logger.info(
                     "Sent %s RECAP Documents to celery for crawling so far.", i
@@ -276,7 +275,7 @@ class Command(VerboseCommand):
                 PrayerAvailability.objects.update_or_create(
                     recap_document=rd, defaults={"last_checked": now}
                 )
-                
+
                 continue
 
             else:
