@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytz
 import requests
 from django.conf import settings
-from django.db.models import F, Q
+from django.db.models import F, Q, QuerySet
 from django.utils import timezone
 from requests import RequestException
 from simplejson import JSONDecodeError
@@ -80,25 +80,23 @@ def get_docket_ids_week_ago_no_case_name() -> set[int]:
     )
 
 
-def get_rd_ids_pray_and_pay() -> set[int]:
-    """Retrieve a set of RECAP document IDs that should be checked for availability on PACER as part of the Pray and Pay project
+def get_recap_documents_pray_and_pay() -> QuerySet[RECAPDocument]:
+    """Retrieve a set of RECAP documents that should be checked for availability on PACER as part of the Pray and Pay project
     - This is focused on transcripts that have likely had their embargos lifted after the three-month period.
     - In the future, depending on outcomes, we can entertain implementing exponential backoff, but I don't think it's necessary right now.
 
-    :return: A set of document IDs matching the criteria.
+    :return: A set of documents matching the criteria.
     """
     cutoff_date = timezone.now() - timedelta(days=91)
 
     # Filter for documents where:
     # - the original filing was at least 91 days ago (i.e., embargo likely lifted)
     # - we have not checked them after the embargo passed
-    queryset = PrayerAvailability.objects.filter(
-        recap_document__docket_entry__date_filed__lte=cutoff_date,
-        last_checked__lt=F("recap_document__docket_entry__date_filed")
+    return RECAPDocument.objects.filter(
+        docket_entry__date_filed__lte=cutoff_date,
+        prayeravailability__last_checked__lt=F("docket_entry__date_filed")
         + timedelta(days=90),
-    )
-
-    return set(queryset.values_list("recap_document_id", flat=True))
+    ).only("pacer_doc_id")
 
 
 def get_docket_ids() -> set[int]:
@@ -266,27 +264,19 @@ class Command(VerboseCommand):
                 args=(d.pk, d.court_id), queue=queue
             )
 
-        for i, rd_id in enumerate(get_rd_ids_pray_and_pay()):
+        for i, rd in enumerate(get_recap_documents_pray_and_pay()):
 
             if i % 10 == 0:
                 logger.info(
                     "Sent %s RECAP Documents to celery for crawling so far.", i
                 )
 
-            rd = (
-                RECAPDocument.objects.select_related("docket_entry__docket")
-                .only(
-                    "pacer_doc_id",
-                    "docket_entry_id",
-                    "docket_entry__docket_id",
-                    "docket_entry__docket__court_id",
-                    "is_sealed",
-                )
-                .get(pk=rd_id)
-            )
-
             pacer_doc_id = rd.pacer_doc_id
             if pacer_doc_id == "":
+                PrayerAvailability.objects.update_or_create(
+                    recap_document=rd, defaults={"last_checked": now}
+                )
+                
                 continue
 
             else:
