@@ -101,9 +101,8 @@ def iterate_and_log_courts(courts):
             # Tried `try_count` times, and it was always down just for me. Oof.
             # Use % instead of logging params to bypass Sentry issue grouping
             logger.error(
-                "After %s seconds and %s tries, failed to access %s's PACER "
+                f"After {(now() - t1).seconds} seconds and {try_number} tries, failed to access {court.pk}'s PACER "
                 "website from our server, but got it via our proxy each time."
-                % ((now() - t1).seconds, try_number, court.pk)
             )
 
 

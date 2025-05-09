@@ -115,8 +115,9 @@ def import_tn_corpus(
         if len(ops) > 0:
             op = ops[0]
             logging.warning(
-                "Document already in database. See: %s at %s"
-                % (op.get_absolute_url(), op.cluster.case_name)
+                "Document already in database. See: %s at %s",
+                op.get_absolute_url(),
+                op.cluster.case_name,
             )
 
         docket, opinion, cluster, citations = make_objects(

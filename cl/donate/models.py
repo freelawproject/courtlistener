@@ -116,11 +116,7 @@ class Donation(AbstractDateTimeModel):
     referrer = models.TextField("GET or HTTP referrer", blank=True)
 
     def __str__(self) -> str:
-        return "%s: $%s, %s" % (
-            self.get_payment_provider_display(),
-            self.amount,
-            self.get_status_display(),
-        )
+        return f"{self.get_payment_provider_display()}: ${self.amount}, {self.get_status_display()}"
 
     class Meta:
         ordering = ["-date_created"]
@@ -161,11 +157,7 @@ class MonthlyDonation(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "%s: $%s by %s" % (
-            self.pk,
-            self.monthly_donation_amount,
-            self.get_payment_provider_display(),
-        )
+        return f"{self.pk}: ${self.monthly_donation_amount} by {self.get_payment_provider_display()}"
 
 
 class NeonWebhookEvent(AbstractDateTimeModel):

@@ -18,8 +18,9 @@ class Command(VerboseCommand):
     def valid_actions(self, s):
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
-                "Unable to parse action. Valid actions are: %s"
-                % (", ".join(self.VALID_ACTIONS.keys()))
+                "Unable to parse action. Valid actions are: {}".format(
+                    ", ".join(self.VALID_ACTIONS.keys())
+                )
             )
 
         return self.VALID_ACTIONS[s]
@@ -55,8 +56,9 @@ class Command(VerboseCommand):
             "--action",
             type=self.valid_actions,
             required=True,
-            help="The action you wish to take. Valid choices are: %s"
-            % (", ".join(self.VALID_ACTIONS.keys())),
+            help="The action you wish to take. Valid choices are: {}".format(
+                ", ".join(self.VALID_ACTIONS.keys())
+            ),
         )
         parser.add_argument(
             "--input_file",
@@ -66,8 +68,9 @@ class Command(VerboseCommand):
             "--jurisdictions",
             help="A list of jurisdiction abbreviations for use with the "
             "assign-authors command. If no value is provided it will "
-            "default to all jurisdictions. Valid options are:\n%s"
-            % ", ".join(f"{j[0]} ({j[1]})" for j in Court.JURISDICTIONS),
+            "default to all jurisdictions. Valid options are:\n{}".format(
+                ", ".join(f"{j[0]} ({j[1]})" for j in Court.JURISDICTIONS)
+            ),
             nargs="*",
         )
 
