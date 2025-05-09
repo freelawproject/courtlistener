@@ -3241,7 +3241,6 @@ class ScrapeIqueryPagesTest(TestCase):
         # Not expected: Checked after it should have been unsealed
         self.assertNotIn(rd_5, recap_documents)
 
-
     def test_get_latest_pacer_case_id_for_courts(self, mock_cookies):
         """Test get_latest_pacer_case_id_for_courts helper."""
         today = date.today()
