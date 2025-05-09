@@ -1,5 +1,3 @@
-import os
-
 import environ
 
 env = environ.FileAwareEnv()

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 import environ
 from django.contrib.messages import constants as message_constants
@@ -45,7 +44,7 @@ if env("DB_REPLICA_HOST", default=""):
     }
 
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
-API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
+API_READ_DATABASES: list[str] = env("API_READ_DATABASES", default="replica")
 
 ####################
 # Cache & Sessions #
@@ -240,6 +239,8 @@ MESSAGE_TAGS = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
+FORMS_URLFIELD_ASSUME_HTTPS = True
 
 SILENCED_SYSTEM_CHECKS = [
     # Allow index names >30 characters, because we aren’t using Oracle

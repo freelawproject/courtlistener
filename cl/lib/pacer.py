@@ -3,8 +3,9 @@ import pickle
 import re
 import socket
 from collections import OrderedDict
+from collections.abc import Mapping
 from datetime import date, datetime, timezone
-from typing import Mapping, Optional, TypedDict
+from typing import Optional, TypedDict
 
 import requests
 import usaddress
@@ -247,7 +248,7 @@ def process_docket_data(
         )
 
     if filepath:
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             text = f.read()
     else:
         # This is an S3 path, so get it remotely.

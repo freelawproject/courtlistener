@@ -3,7 +3,7 @@ import sys
 import time
 import traceback
 from datetime import date
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Union
 
 from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
@@ -53,11 +53,11 @@ cnt = CaseNameTweaker()
 
 @transaction.atomic
 def make_objects(
-    item: Dict[str, Union[str, Any]],
+    item: dict[str, Union[str, Any]],
     court: Court,
     sha1_hash: str,
     content: bytes,
-) -> Tuple[Docket, Opinion, OpinionCluster, List[Citation]]:
+) -> tuple[Docket, Opinion, OpinionCluster, list[Citation]]:
     """Takes the meta data from the scraper and associates it with objects.
 
     The keys returned by juriscraper scrapers are defined by `self._all_attrs`
@@ -147,7 +147,7 @@ def make_objects(
 
 @transaction.atomic
 def save_everything(
-    items: Dict[str, Any],
+    items: dict[str, Any],
     backscrape: bool = False,
 ) -> None:
     """Saves all the sub items and associates them as appropriate."""

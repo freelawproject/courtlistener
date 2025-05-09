@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-from typing import Dict, Iterable, List, Optional, no_type_check
+from collections.abc import Iterable
+from typing import Optional, no_type_check
 
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from elasticsearch_dsl.response import Hit
 from eyecite import resolve_citations
 from eyecite.models import (
@@ -45,7 +46,7 @@ def filter_by_matching_antecedent(
         return None
 
     antecedent_guess = strip_punct(antecedent_guess)
-    candidates: List[Opinion] = []
+    candidates: list[Opinion] = []
 
     for o in opinion_candidates:
         if antecedent_guess in best_case_name(o.cluster):
@@ -125,7 +126,7 @@ def resolve_shortcase_citation(
     short_citation: ShortCaseCitation,
     resolved_full_cites: ResolvedFullCites,
 ) -> Optional[Opinion]:
-    candidates: List[Opinion] = []
+    candidates: list[Opinion] = []
     matched_opinions = [
         o for c, o in resolved_full_cites if type(o) is Opinion
     ]
@@ -165,8 +166,8 @@ def resolve_supra_citation(
 
 @no_type_check
 def do_resolve_citations(
-    citations: List[CitationBase], citing_object: Opinion | RECAPDocument
-) -> Dict[MatchedResourceType, List[SupportedCitationType]]:
+    citations: list[CitationBase], citing_object: Opinion | RECAPDocument
+) -> dict[MatchedResourceType, list[SupportedCitationType]]:
     # Set the citing opinion on FullCaseCitation objects for later matching
     for c in citations:
         if type(c) is FullCaseCitation:

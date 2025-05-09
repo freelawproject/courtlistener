@@ -22,7 +22,7 @@ from django.template import loader
 from django.utils import timezone
 
 from cl.custom_filters.templatetags.pacer import price
-from cl.favorites.models import Prayer
+from cl.favorites.models import Prayer, PrayerAvailability
 from cl.search.models import RECAPDocument
 
 
@@ -271,9 +271,13 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
     ]
     open_prayers.update(status=Prayer.GRANTED)
 
+    # copying code from cl/favorites/tasks.py to account for circumstance where
+    # someone buys a document from PACER despite it being marked sealed on RECAP
+    PrayerAvailability.objects.filter(recap_document=instance).delete()
+
     # Send email notifications in bulk.
     if email_recipients:
-        subject = f"A document you requested is now on CourtListener"
+        subject = "A document you requested is now on CourtListener"
         txt_template = loader.get_template("prayer_email.txt")
         html_template = loader.get_template("prayer_email.html")
 
@@ -318,7 +322,6 @@ class PrayerStats:
 
 
 async def get_user_prayer_history(user: User) -> PrayerStats:
-
     cache_key = f"prayer-stats-{user}"
 
     data = await cache.aget(cache_key)
@@ -349,7 +352,6 @@ async def get_lifetime_prayer_stats(
 ) -> (
     PrayerStats
 ):  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
-
     cache_key = f"prayer-stats-{status}"
 
     data = await cache.aget(cache_key)
@@ -399,7 +401,7 @@ def prayer_unavailable(instance: RECAPDocument, user_pk: int) -> None:
 
     # Send email notification.
     if email_recipients:
-        subject = f"A document you requested is unavailable for purchase"
+        subject = "A document you requested is unavailable for purchase"
         txt_template = loader.get_template("prayer_email_unavailable.txt")
         html_template = loader.get_template("prayer_email_unavailable.html")
 
