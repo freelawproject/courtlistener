@@ -1,7 +1,6 @@
 import itertools
 import os
 import uuid
-from typing import Optional
 
 from django.conf import settings
 from django.core.files.storage import Storage
@@ -12,7 +11,7 @@ from storages.backends.s3boto3 import S3Boto3Storage
 def clobbering_get_name(
     instance: Storage,
     name: str,
-    max_length: Optional[int] = None,
+    max_length: int | None = None,
 ) -> str:
     """A no-op get name function that clobbers if the item already exists"""
     return name
@@ -21,7 +20,7 @@ def clobbering_get_name(
 def get_name_by_incrementing(
     instance: Storage,
     name: str,
-    max_length: Optional[int] = None,
+    max_length: int | None = None,
 ) -> str:
     """Generate usable file name for storage iterating if needed.
 
@@ -78,7 +77,7 @@ class IncrementingAWSMediaStorage(AWSMediaStorage):
     def get_available_name(
         self,
         name: str,
-        max_length: Optional[int] = None,
+        max_length: int | None = None,
     ) -> str:
         return get_name_by_incrementing(self, name, max_length)
 
@@ -112,7 +111,7 @@ class S3PrivateUUIDStorage(S3Storage):
     def get_available_name(
         self,
         name: str,
-        max_length: Optional[int] = None,
+        max_length: int | None = None,
     ) -> str:
         dir_name, file_name = os.path.split(name)
         _, file_ext = os.path.splitext(file_name)
@@ -134,7 +133,7 @@ class S3GlacierInstantRetrievalStorage(S3Storage):
     def get_available_name(
         self,
         name: str,
-        max_length: Optional[int] = None,
+        max_length: int | None = None,
     ) -> str:
         return get_name_by_incrementing(self, name, max_length)
 

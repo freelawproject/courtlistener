@@ -4,7 +4,7 @@ import os
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Optional
+from typing import Any
 
 import boto3
 from django.conf import settings
@@ -112,7 +112,7 @@ class Command(BaseCommand):
         self.cap_bucket_name = settings.CAP_R2_BUCKET_NAME
 
     def process_crosswalks(
-        self, specific_reporter: Optional[str], resume: bool
+        self, specific_reporter: str | None, resume: bool
     ) -> None:
         """Process crosswalk files for importing PDFs.
 
@@ -311,7 +311,7 @@ class Command(BaseCommand):
         case_name = parts[-1].replace(".json", "")
         return reporter_slug, volume_folder, case_name
 
-    def fetch_pdf_from_cap(self, pdf_path: str) -> Optional[bytes]:
+    def fetch_pdf_from_cap(self, pdf_path: str) -> bytes | None:
         """Fetch PDF content from CAP.
 
         :param pdf_path: Path to the PDF in CAP storage.

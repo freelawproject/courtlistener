@@ -1,7 +1,7 @@
 import json
 import os
 from copy import deepcopy
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
@@ -5672,7 +5672,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         failed extraction due to a missing file in storage?"""
 
         # RD is_available and has a valid PDF, needs extraction.
-        date_upload = datetime.now(timezone.utc)
+        date_upload = datetime.now(UTC)
         RECAPDocument.objects.create(
             docket_entry=self.de,
             document_number="1",
@@ -5717,7 +5717,7 @@ class CheckCourtConnectivityTest(TestCase):
         side_effect=lambda x: {
             "connection_ok": True,
             "status_code": 200,
-            "date_time": datetime.now(timezone.utc),
+            "date_time": datetime.now(UTC),
         },
     )
     def test_is_pacer_court_accessible_pass(
@@ -5731,7 +5731,7 @@ class CheckCourtConnectivityTest(TestCase):
         side_effect=lambda x: {
             "connection_ok": False,
             "status_code": 403,
-            "date_time": datetime.now(timezone.utc),
+            "date_time": datetime.now(UTC),
         },
     )
     def test_is_pacer_court_accessible_fails(
@@ -6853,7 +6853,7 @@ class WebhooksRetries(TestCase):
             enabled=True
         )
 
-        now_time = datetime.now(timezone.utc)
+        now_time = datetime.now(UTC)
         fake_now = now_time.replace(hour=11, minute=00)
 
         fake_minus_2_days = fake_now - timedelta(days=2)

@@ -1,6 +1,6 @@
 import datetime
-from distutils.spawn import find_executable
 
+from distutils.spawn import find_executable
 from django.utils.text import slugify
 
 from cl.audio.models import Audio
