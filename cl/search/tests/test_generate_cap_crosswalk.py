@@ -1,7 +1,6 @@
 import json
 import os
-from datetime import datetime, timezone
-from io import StringIO
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytz
@@ -77,7 +76,7 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
         )
 
         # Check the content of the file
-        with open(expected_file_path, "r") as f:
+        with open(expected_file_path) as f:
             crosswalk_data = json.load(f)
             self.assertEqual(len(crosswalk_data), 1)
             self.assertEqual(crosswalk_data[0]["cap_case_id"], 1)
@@ -166,7 +165,7 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
         expected_file_path = f"{output_dir}/U_S_.json"
         self.assertTrue(os.path.exists(expected_file_path))
 
-        with open(expected_file_path, "r") as f:
+        with open(expected_file_path) as f:
             crosswalk_data = json.load(f)
             # Verify only one case is present
             self.assertEqual(len(crosswalk_data), 1)
@@ -268,7 +267,7 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
         expected_file_path = f"{output_dir}/U_S_.json"
         self.assertTrue(os.path.exists(expected_file_path))
 
-        with open(expected_file_path, "r") as f:
+        with open(expected_file_path) as f:
             crosswalk_data = json.load(f)
             self.assertEqual(len(crosswalk_data), 1)
 

@@ -156,7 +156,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         tree = html.fromstring(html_content)
         article = tree.xpath("//article")[article]
         col_md_offset_half_elements = article.xpath(
-            f".//div[@class='bottom']//div[@class='col-md-offset-half']"
+            ".//div[@class='bottom']//div[@class='col-md-offset-half']"
         )
         col_md_offset_half_elem = col_md_offset_half_elements[child_index]
         inline_element = col_md_offset_half_elem.xpath(
@@ -2408,7 +2408,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         dockets_to_remove = []
         # Add dockets with no documents
         with self.captureOnCommitCallbacks(execute=True):
-
             # District document initial document available
             de_1 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
@@ -2972,9 +2971,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         mock_date = now().replace(
             day=29, hour=0, minute=0, second=0, microsecond=0
         )
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory(
                 court=self.court,
                 case_name="Lorem vs Natural Gas ",
@@ -3015,9 +3015,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         async_to_sync(self._test_article_count)(params, 0, "timestamp")
 
         # Test timestamp filter for RDs.
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             entry = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -3360,7 +3361,7 @@ class RECAPSearchDecayRelevancyTest(
                 r = async_to_sync(self._test_article_count)(
                     test["search_params"],
                     len(test["expected_order_frontend"]),
-                    f"Failed count {test["name"]}",
+                    f"Failed count {test['name']}",
                 )
                 self._assert_order_in_html(
                     r.content.decode(), test["expected_order_frontend"]
@@ -3390,7 +3391,6 @@ class RECAPSearchDecayRelevancyTest(
 
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
-
     version_api = "v3"
     skip_common_tests = True
 
@@ -4585,9 +4585,12 @@ class RECAPSearchAPIV4Test(
 
         original_datetime = now().replace(day=1, hour=5, minute=0)
         for search_params in all_tests:
-            with self.subTest(
-                search_params=search_params, msg="Test stable scores."
-            ), time_machine.travel(original_datetime, tick=False) as traveler:
+            with (
+                self.subTest(
+                    search_params=search_params, msg="Test stable scores."
+                ),
+                time_machine.travel(original_datetime, tick=False) as traveler,
+            ):
                 # Two first-page requests (no cursor) made on the same day will
                 # now have consistent scores because scores are now computed
                 # based on the same day's date.
@@ -5868,10 +5871,13 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         """Can we remove control characters in the plain_text for a proper XML
         rendering?
         """
-        with mock.patch(
-            "cl.search.documents.escape",
-            return_value="Lorem ipsum control chars \x07\x08\x0b.",
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            mock.patch(
+                "cl.search.documents.escape",
+                return_value="Lorem ipsum control chars \x07\x08\x0b.",
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             de_1 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -6328,9 +6334,10 @@ class IndexDocketRECAPDocumentsCommandTest(
         request = self.factory.post(url)
         queryset = RECAPDocument.objects.filter(pk__in=[rd_1.pk])
         mock_date = now().replace(day=15, hour=0)
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_documents"
-        ), time_machine.travel(mock_date, tick=False):
+        with (
+            mock.patch("cl.lib.es_signal_processor.update_es_documents"),
+            time_machine.travel(mock_date, tick=False),
+        ):
             recap_admin.seal_documents(request, queryset)
 
         recap_admin.message_user.assert_called_once_with(

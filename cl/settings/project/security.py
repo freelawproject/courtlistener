@@ -4,7 +4,6 @@ import environ
 
 from ..django import DATABASES, INSTALLED_APPS, MIDDLEWARE, TESTING
 from ..third_party.aws import AWS_S3_CUSTOM_DOMAIN
-from ..third_party.sentry import SENTRY_REPORT_URI
 
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)

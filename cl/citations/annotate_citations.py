@@ -1,6 +1,5 @@
 import html
 import re
-from typing import Dict, List
 
 from django.urls import reverse
 from eyecite import annotate_citations
@@ -16,10 +15,10 @@ from cl.lib.string_utils import trunc
 
 
 def generate_annotations(
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
     ],
-) -> List[List]:
+) -> list[list]:
     """Generate the string annotations to insert into the opinion text
 
     :param citation_resolutions: A map of lists of citations in the opinion
@@ -27,7 +26,7 @@ def generate_annotations(
     """
     from cl.opinion_page.views import make_citation_url_dict
 
-    annotations: List[List] = []
+    annotations: list[list] = []
     for opinion, citations in citation_resolutions.items():
         if opinion is NO_MATCH_RESOURCE:  # If unsuccessfully matched...
             annotation = [
@@ -87,8 +86,8 @@ def generate_annotations(
 
 
 def create_cited_html(
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
     ],
     get_citations_kwargs: dict[str, str],
 ) -> str:

@@ -1,7 +1,7 @@
 import copy
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any, Set
+from typing import Any
 from urllib.parse import parse_qs
 
 from django.apps import apps
@@ -507,22 +507,22 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
             )
 
             match parent_filters, string_query:
-                case [], []:
+                case [[], []]:
                     NotImplementedError(
                         "Indexing match-all queries is not supported."
                     )
-                case [], _:
+                case [[], _]:
                     plain_query = Q(
                         "bool",
                         should=string_query,
                         minimum_should_match=1,
                     )
-                case _, []:
+                case [_, []]:
                     plain_query = Q(
                         "bool",
                         filter=parent_filters,
                     )
-                case _, _:
+                case [_, _]:
                     plain_query = Q(
                         "bool",
                         filter=parent_filters,
@@ -596,7 +596,7 @@ def get_field_names(mapping_dict):
 def select_es_document_fields(
     es_document_class: ESModelClassType,
     main_document: ESDictDocument,
-    fields_to_ignore: Set[str],
+    fields_to_ignore: set[str],
 ) -> ESDictDocument:
     """Select specific required fields from an Elasticsearch document.
 
@@ -618,7 +618,9 @@ def select_es_document_fields(
     }
 
 
-def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
+def prepare_percolator_content(
+    app_label: str, document_id: str
+) -> tuple[
     str,
     str | None,
     tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None,

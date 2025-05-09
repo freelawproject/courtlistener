@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union
+from typing import Optional, Union
 
 import pghistory
 from django.db import models
@@ -44,7 +44,7 @@ class CODES:
     L = "L"
     M = "M"
     N = "N"
-    O = "O"
+    O = "O"  # noqa: E741
     P1 = "P1"
     P2 = "P2"
     P3 = "P3"
@@ -101,7 +101,7 @@ class CODES:
         (X, "Failed Extraction"),
     )
 
-    VALUES: Dict[str, Dict[str, Optional[int]]] = {
+    VALUES: dict[str, dict[str, Optional[int]]] = {
         A: {"min": 1, "max": 1_000},
         B: {"min": 1_001, "max": 2_500},
         C: {"min": 2_501, "max": 5_000},
@@ -255,7 +255,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
             args=(self.person.pk, self.pk, self.person.slug),
         )
 
-    def calculate_wealth(self, field_name: str) -> Dict[str, Union[str, int]]:
+    def calculate_wealth(self, field_name: str) -> dict[str, Union[str, int]]:
         """Calculate gross value of all investments in disclosure
 
         We can calculate the total investment for four fields

@@ -372,7 +372,6 @@ def process_csv(
 
             # Add any of the citations if possible
             for citation in valid_citations:
-
                 citation["cluster_id"] = matched_cluster.id
                 if Citation.objects.filter(**citation).exists():
                     # We already have the citation
