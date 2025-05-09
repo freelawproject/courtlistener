@@ -277,7 +277,7 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 
     # Send email notifications in bulk.
     if email_recipients:
-        subject = f"A document you requested is now on CourtListener"
+        subject = "A document you requested is now on CourtListener"
         txt_template = loader.get_template("prayer_email.txt")
         html_template = loader.get_template("prayer_email.html")
 

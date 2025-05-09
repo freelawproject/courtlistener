@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Union
 
 from asgiref.sync import async_to_sync
 from celery.canvas import chain
@@ -31,7 +31,7 @@ cnt = CaseNameTweaker()
 
 @transaction.atomic
 def save_everything(
-    items: Dict[str, Union[Docket, Audio]],
+    items: dict[str, Union[Docket, Audio]],
     backscrape: bool = False,
 ) -> None:
     docket, af = items["docket"], items["audio_file"]
@@ -57,11 +57,11 @@ def save_everything(
 
 @transaction.atomic
 def make_objects(
-    item: Dict[str, Any],
+    item: dict[str, Any],
     court: Court,
     sha1_hash: str,
     content: bytes,
-) -> Tuple[Docket, Audio]:
+) -> tuple[Docket, Audio]:
     blocked = item["blocked_statuses"]
     if blocked:
         date_blocked = date.today()

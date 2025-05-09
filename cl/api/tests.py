@@ -2,7 +2,7 @@ import json
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
-from typing import Any, Dict
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
@@ -936,7 +936,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
     @async_to_sync
     async def setUp(self):
         self.path = reverse("court-list", kwargs={"version": "v4"})
-        self.q: Dict[str, Any] = {}
+        self.q: dict[str, Any] = {}
 
     async def test_parent_court_filter(self):
         """Can we filter courts by parent_court id?"""
@@ -1065,7 +1065,7 @@ class DRFJudgeApiFilterTests(
                 username="pandora", password="password"
             )
         )
-        self.q: Dict[Any, Any] = {}
+        self.q: dict[Any, Any] = {}
 
     async def test_judge_filtering_by_first_name(self) -> None:
         """Can we filter by first name?"""
@@ -1300,7 +1300,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
                 username="recap-user", password="password"
             )
         )
-        self.q: Dict[Any, Any] = {}
+        self.q: dict[Any, Any] = {}
 
     async def test_docket_entry_to_docket_filters(self) -> None:
         """Do a variety of docket entry filters work?"""
@@ -1681,7 +1681,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
                 username="recap-user", password="password"
             )
         )
-        self.q: Dict[Any, Any] = {}
+        self.q: dict[Any, Any] = {}
 
     async def test_cluster_filters(self) -> None:
         """Do a variety of cluster filters work?"""

@@ -8,14 +8,13 @@ from collections import defaultdict
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
-from typing import Any, Callable, Dict, List, Literal
+from typing import Any, Callable, Literal
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.paginator import Page
-from django.db.models import Case
+from django.db.models import Case, QuerySet, TextField, When
 from django.db.models import Q as QObject
-from django.db.models import QuerySet, TextField, When
 from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
 from django.http.request import QueryDict
@@ -253,7 +252,7 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
     return bool_query
 
 
-def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
+def make_es_boost_list(fields: dict[str, float]) -> list[str]:
     """Constructs a list of Elasticsearch fields with their corresponding
     boost values.
 
@@ -506,7 +505,7 @@ def build_term_query(
     return [Q("term", **{field: value})]
 
 
-def build_text_filter(field: str, value: str) -> List:
+def build_text_filter(field: str, value: str) -> list:
     """Given a field and value, return Elasticsearch match_phrase query or [].
     "match_phrase" Returns documents that contain the exact phrase in a
     provided field, by default match_phrase has a slop of 0 that requires all
@@ -572,7 +571,7 @@ def build_sort_results(
     cd: CleanData,
     toggle_sorting: bool = False,
     api_version: Literal["v3", "v4"] | None = None,
-) -> Dict:
+) -> dict:
     """Given cleaned data, find order_by value and return dict to use with
     ElasticSearch sort
 
@@ -776,7 +775,7 @@ def extend_selected_courts_with_child_courts(
     return list(unique_courts)
 
 
-def build_es_plain_filters(cd: CleanData) -> List:
+def build_es_plain_filters(cd: CleanData) -> list:
     """Builds elasticsearch filters based on the CleanData object.
 
     :param cd: An object containing cleaned user data.
@@ -2366,7 +2365,7 @@ def build_has_child_filters(cd: CleanData) -> list[QueryString | Range]:
     return queries_list
 
 
-def build_join_es_filters(cd: CleanData) -> List:
+def build_join_es_filters(cd: CleanData) -> list:
     """Builds parent join elasticsearch filters based on the CleanData object.
 
     :param cd: An object containing cleaned user data.

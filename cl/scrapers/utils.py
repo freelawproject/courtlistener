@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import date, datetime
-from typing import Optional, Tuple
+from typing import Optional
 from urllib.parse import urljoin
 
 import httpx
@@ -170,7 +170,7 @@ def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
     backoff=2,
     logger=logger,
 )
-def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
+def test_for_meta_redirections(r: Response) -> tuple[bool, Optional[str]]:
     """Test for meta data redirections
 
     :param r: A response object

@@ -1,6 +1,6 @@
 import datetime
 import pickle
-from typing import Tuple, TypedDict, cast
+from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import patch
 
@@ -12,7 +12,6 @@ from requests.cookies import RequestsCookieJar
 
 from cl.lib.courts import (
     get_active_court_from_cache,
-    get_cache_key_for_court_list,
     get_minimal_list_of_courts,
     lookup_child_courts_cache,
 )
@@ -279,7 +278,7 @@ class TestStringUtils(SimpleTestCase):
             ellipsis: str
 
         s = "Henry wants apple."
-        tests: Tuple[TestType, ...] = (
+        tests: tuple[TestType, ...] = (
             # Simple case
             {"length": 13, "result": "Henry wants"},
             # Off by one cases
@@ -1198,9 +1197,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_for_proximity_tokens(
-                test["input_str"]  # type: ignore
-            )
+            output = check_for_proximity_tokens(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         # Check for Unbalanced parentheses.
@@ -1237,15 +1234,11 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = check_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
 
         # Check for Unbalanced quotes.
@@ -1296,9 +1289,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_quotes(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_quotes(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
 
     def test_can_get_parties_from_bankruptcy_case_name(self) -> None:

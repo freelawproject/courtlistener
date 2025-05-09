@@ -6,4 +6,4 @@ class UsersConfig(AppConfig):
 
     def ready(self):
         # Implicitly connect a signal handlers decorated with @receiver.
-        from cl.donate import signals
+        from cl.donate import signals  # noqa: F401

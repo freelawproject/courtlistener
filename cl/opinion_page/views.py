@@ -2,7 +2,7 @@ import datetime
 from collections import OrderedDict, defaultdict
 from datetime import timedelta
 from http import HTTPStatus
-from typing import Any, Dict, Union
+from typing import Any, Union
 from urllib.parse import urlencode
 
 import eyecite
@@ -15,7 +15,6 @@ from django.db.models import IntegerField, Prefetch, QuerySet
 from django.db.models.functions import Cast
 from django.http import (
     HttpRequest,
-    HttpResponsePermanentRedirect,
     HttpResponseRedirect,
 )
 from django.http.response import (
@@ -23,11 +22,9 @@ from django.http.response import (
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
-    HttpResponseServerError,
 )
 from django.shortcuts import (  # type: ignore[attr-defined]
     aget_object_or_404,
-    redirect,
     render,
 )
 from django.template.response import TemplateResponse
@@ -80,16 +77,13 @@ from cl.opinion_page.forms import (
     TennWorkCompAppUploadForm,
     TennWorkCompClUploadForm,
 )
-from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import (
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
-    es_get_citing_and_related_clusters_with_cache,
     es_get_related_clusters_with_cache,
     es_related_case_count,
     generate_docket_entries_csv_data,
-    get_case_title,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -100,7 +94,6 @@ from cl.search.models import (
     Court,
     Docket,
     DocketEntry,
-    Opinion,
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
@@ -479,7 +472,7 @@ async def view_parties(
             return paginator.page(paginator.num_pages)
 
     party_types_paginator = await paginate_parties(party_types, page)
-    parties: Dict[str, list] = {}
+    parties: dict[str, list] = {}
     async for party_type in party_types_paginator.object_list:
         if party_type.name not in parties:
             parties[party_type.name] = []
@@ -1129,7 +1122,7 @@ async def view_opinion_related_cases(
     )
 
 
-async def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
+async def throw_404(request: HttpRequest, context: dict) -> HttpResponse:
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",
@@ -1270,7 +1263,7 @@ async def reporter_or_volume_handler(
     )
 
 
-async def make_reporter_dict() -> Dict:
+async def make_reporter_dict() -> dict:
     """Make a dict of reporter names and abbreviations
 
     The format here is something like:

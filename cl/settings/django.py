@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 import environ
 from django.contrib.messages import constants as message_constants
@@ -45,7 +44,7 @@ if env("DB_REPLICA_HOST", default=""):
     }
 
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
-API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
+API_READ_DATABASES: list[str] = env("API_READ_DATABASES", default="replica")
 
 ####################
 # Cache & Sessions #

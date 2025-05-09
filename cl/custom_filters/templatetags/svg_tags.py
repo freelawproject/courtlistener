@@ -30,7 +30,7 @@ def svg(name, **kwargs):
         return ""
 
     try:
-        with open(absolute_path, "r", encoding="utf-8") as file:
+        with open(absolute_path, encoding="utf-8") as file:
             svg_content = file.read()
 
     except FileNotFoundError:
@@ -54,4 +54,4 @@ def svg(name, **kwargs):
         key = key.replace("_", "-")
         svg_content = svg_content.replace("<svg", f'<svg {key}="{value}"')
 
-    return format_html(svg_content.replace("<svg", f'<svg role="img"'))
+    return format_html(svg_content.replace("<svg", '<svg role="img"'))

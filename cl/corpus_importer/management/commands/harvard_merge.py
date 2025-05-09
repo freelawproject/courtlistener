@@ -1,7 +1,7 @@
 import itertools
 import json
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -58,7 +58,7 @@ def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
     )
 
 
-def read_json(cluster: OpinionCluster) -> Dict[str, Any] | None:
+def read_json(cluster: OpinionCluster) -> dict[str, Any] | None:
     """Helper method to read json into object
 
     :param cluster: the cluster to fetch the filepath for
@@ -95,7 +95,7 @@ def read_json(cluster: OpinionCluster) -> Dict[str, Any] | None:
     return None
 
 
-def get_data_source(harvard_data: Dict[str, Any]) -> str:
+def get_data_source(harvard_data: dict[str, Any]) -> str:
     """Get json data source: Fastcase or CAP
 
     The default is CAP/Harvard
@@ -111,7 +111,7 @@ def get_data_source(harvard_data: Dict[str, Any]) -> str:
     return data_source
 
 
-def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
+def fetch_non_harvard_data(harvard_data: dict[str, Any]) -> dict[str, Any]:
     """Get data from harvard casebody and preprocess
 
     :param harvard_data:
@@ -189,7 +189,7 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
 
 def combine_non_overlapping_data(
     cluster: OpinionCluster, harvard_data: dict
-) -> dict[str, Tuple]:
+) -> dict[str, tuple]:
     """Combine non overlapping data and return dictionary of data for merging
 
     :param cluster: Cluster to merge
@@ -197,7 +197,7 @@ def combine_non_overlapping_data(
     :return: Optional dictionary of data to continue to merge
     """
     all_data = fetch_non_harvard_data(harvard_data)
-    changed_values_dictionary: dict[str, Tuple] = {}
+    changed_values_dictionary: dict[str, tuple] = {}
     to_update: dict[str, Any] = {}
     for key, value in all_data.items():
         cl_value = getattr(cluster, key)
@@ -219,7 +219,7 @@ def combine_non_overlapping_data(
 def merge_cluster_dates(
     cluster: OpinionCluster,
     field_name: str,
-    overlapping_data: Optional[Tuple],
+    overlapping_data: Optional[tuple],
 ) -> dict[str, Any]:
     """Compare two dates and choose the best to update the opinion cluster
     the value if one value is better than the other
@@ -311,7 +311,7 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
         raise ClusterSourceException("Unexpected cluster source")
 
 
-def save_headmatter(harvard_data: Dict[str, Any]) -> dict[str, Any]:
+def save_headmatter(harvard_data: dict[str, Any]) -> dict[str, Any]:
     """Save and update headmatter
 
     Clean up the headmatter content - (pre opinion content) and save it
@@ -598,7 +598,7 @@ def update_matching_opinions(
 
 
 def map_and_merge_opinions(
-    cluster: OpinionCluster, harvard_data: Dict[str, Any]
+    cluster: OpinionCluster, harvard_data: dict[str, Any]
 ) -> None:
     """Map and merge opinion data
 

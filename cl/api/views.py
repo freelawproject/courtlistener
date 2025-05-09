@@ -13,7 +13,6 @@ from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
-from requests import Session
 
 from cl.lib.elasticsearch_utils import (
     do_es_alert_estimation_query,

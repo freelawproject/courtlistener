@@ -1,12 +1,11 @@
 import logging
 import re
 from datetime import datetime
-from typing import Dict, List, Tuple, TypeVar
+from typing import TypeVar
 
 import nh3
 import pghistory
 import pytz
-import tiktoken
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
@@ -3355,8 +3354,8 @@ class Opinion(AbstractDateTimeModel):
 
     def save(
         self,
-        *args: List,
-        **kwargs: Dict,
+        *args: list,
+        **kwargs: dict,
     ) -> None:
         self.clean()
         super().save(*args, **kwargs)
@@ -3601,7 +3600,7 @@ class Tag(AbstractDateTimeModel):
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
 
-    def tag_object(self, thing: TaggableType) -> Tuple["Tag", bool]:
+    def tag_object(self, thing: TaggableType) -> tuple["Tag", bool]:
         """Atomically add a tag to an item.
 
         Django has a system for adding to a m2m relationship like the ones

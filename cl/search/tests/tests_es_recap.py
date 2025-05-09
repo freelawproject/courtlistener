@@ -156,7 +156,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         tree = html.fromstring(html_content)
         article = tree.xpath("//article")[article]
         col_md_offset_half_elements = article.xpath(
-            f".//div[@class='bottom']//div[@class='col-md-offset-half']"
+            ".//div[@class='bottom']//div[@class='col-md-offset-half']"
         )
         col_md_offset_half_elem = col_md_offset_half_elements[child_index]
         inline_element = col_md_offset_half_elem.xpath(
