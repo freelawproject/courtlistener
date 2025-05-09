@@ -64,7 +64,7 @@ class CourtFactory(DjangoModelFactory):
                 obj.save()
                 return obj
             except IntegrityError as exp:
-                logger.info(f"Unexpected {exp=}, {type(exp)=}")
+                logger.info("Unexpected exp=%s, type(exp)=%s", exp, type(exp))
                 kwargs["position"] = Faker(
                     "pyfloat", positive=True, right_digits=4, left_digits=3
                 ).evaluate(None, None, {"locale": None})

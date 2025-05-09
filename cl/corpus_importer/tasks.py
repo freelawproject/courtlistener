@@ -286,7 +286,7 @@ def download_recap_item(
     filename: str,
     clobber: bool = False,
 ) -> None:
-    logger.info(f"  Getting item at: {url}")
+    logger.info("  Getting item at: %s", url)
     location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
     try:
         if os.path.isfile(location) and not clobber:
@@ -299,12 +299,12 @@ def download_recap_item(
         )
         r.raise_for_status()
     except requests.Timeout as e:
-        logger.warning(f"    Timed out attempting to get: {url}\n")
+        logger.warning("    Timed out attempting to get: %s\n", url)
         raise self.retry(exc=e, countdown=2)
     except requests.RequestException as e:
-        logger.warning(f"    Unable to get {url}\nException was:\n{e}")
+        logger.warning("    Unable to get %s\nException was:\n%s", url, e)
     except OSError as e:
-        logger.warning(f"    {e}")
+        logger.warning("    %s", e)
     else:
         with NamedTemporaryFile(prefix="recap_download_") as tmp:
             r.raw.decode_content = True
@@ -387,9 +387,9 @@ def get_and_save_free_document_report(
             msg = "An unknown error ocurred while getting an opinion report"
 
         if self.request.retries == self.max_retries:
-            logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)
+            logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)  # noqa: G004
             return PACERFreeDocumentLog.SCRAPE_FAILED
-        logger.info(f"{msg} Retrying.", court_id, start, end)
+        logger.info(f"{msg} Retrying.", court_id, start, end)  # noqa: G004
         raise self.retry(exc=exc, countdown=5)
 
     try:
@@ -430,8 +430,9 @@ def get_and_save_free_document_report(
         # There is a document without a case number in pacer, skip it (issue #4547)
         if not row["docket_number"]:
             logger.warning(
-                f"No case number for document, court: {row['court_id']}, "
-                f"date_filed: {row['date_filed']}"
+                "No case number for document, court: %s, date_filed: %s",
+                row["court_id"],
+                row["date_filed"],
             )
             continue
 
@@ -474,7 +475,7 @@ def process_free_opinion_result(
     try:
         result = PACERFreeDocumentRow.objects.get(pk=row_pk)
     except PACERFreeDocumentRow.DoesNotExist:
-        logger.warning(f"Unable to find PACERFreeDocumentRow: {row_pk}")
+        logger.warning("Unable to find PACERFreeDocumentRow: %s", row_pk)
         self.request.chain = None
         return None
 
@@ -666,7 +667,7 @@ def get_and_process_free_pdf(
                 logger.error(msg)
                 self.request.chain = None
                 return None
-            logger.info(f"{msg} Retrying.")
+            logger.info(f"{msg} Retrying.")  # noqa: G004
             raise self.retry(exc=exc)
         elif exc.response:
             msg = (
@@ -686,7 +687,7 @@ def get_and_process_free_pdf(
             return None
     except PacerLoginException as exc:
         msg = "PacerLoginException while getting free docs."
-        logger.info(f"{msg} Retrying.")
+        logger.info(f"{msg} Retrying.")  # noqa: G004
         # Refresh cookies before retrying
         get_or_cache_pacer_cookies(
             "pacer_scraper",
@@ -701,7 +702,7 @@ def get_and_process_free_pdf(
             logger.warning(msg)
             self.request.chain = None
             return None
-        logger.info(f"{msg} Retrying.")
+        logger.info(f"{msg} Retrying.")  # noqa: G004
         raise self.retry(exc=exc)
 
     pdf_bytes = None
@@ -897,8 +898,8 @@ def upload_to_ia(
         # retrying. Just abort.
         return None
     logger.info(
-        "Item uploaded to IA with responses %s"
-        % [r.status_code for r in responses]
+        "Item uploaded to IA with responses %s",
+        [r.status_code for r in responses],
     )
     return responses
 
@@ -1053,7 +1054,7 @@ def get_pacer_case_id_and_title(
             logger.warning(msg, court_id, docket_number)
             self.request.chain = None
             return None
-        logger.info(f"{msg} Retrying.", court_id, docket_number)
+        logger.info(f"{msg} Retrying.", court_id, docket_number)  # noqa: G004
         raise self.retry(exc=exc)
 
     try:
@@ -1107,7 +1108,7 @@ def do_case_query_by_pacer_case_id(
 
     pacer_case_id = data.get("pacer_case_id")
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-    logger.info(f"Querying docket report {court_id}.{pacer_case_id}")
+    logger.info("Querying docket report %s.%s", court_id, pacer_case_id)
     try:
         d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id)
     except Docket.DoesNotExist:
@@ -1118,7 +1119,7 @@ def do_case_query_by_pacer_case_id(
     report.query(pacer_case_id)
     docket_data = report.data
     logger.info(
-        f"Querying and parsing complete for {court_id}.{pacer_case_id}"
+        "Querying and parsing complete for %s.%s", court_id, pacer_case_id
     )
 
     if not docket_data:
@@ -1152,7 +1153,7 @@ def do_case_query_by_pacer_case_id(
         ContentFile(report.response.text.encode()),
     )
 
-    logger.info(f"Created/updated docket: {d}")
+    logger.info("Created/updated docket: %s", d)
     return {
         "pacer_case_id": pacer_case_id,
         "docket_pk": d.pk,
@@ -1723,10 +1724,10 @@ def get_docket_by_pacer_case_id(
     except (RequestException, ReadTimeoutError) as exc:
         msg = "Network error getting docket: %s"
         if self.request.retries == self.max_retries:
-            logger.error(f"{msg} Aborting chain.", logging_id)
+            logger.error(f"{msg} Aborting chain.", logging_id)  # noqa: G004
             self.request.chain = None
             return None
-        logger.info(f"{msg} Retrying.", logging_id)
+        logger.info(f"{msg} Retrying.", logging_id)  # noqa: G004
         raise self.retry(exc)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
@@ -2505,7 +2506,8 @@ def get_pacer_doc_by_rd_and_description(
     if not att_found:
         if fallback_to_main_doc:
             logger.info(
-                f"Falling back to main document for pacer_doc_id: {rd.pacer_doc_id}"
+                "Falling back to main document for pacer_doc_id: %s",
+                rd.pacer_doc_id,
             )
             att_found = att_report.data
             document_type = RECAPDocument.PACER_DOCUMENT
@@ -2613,7 +2615,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
         if last_try:
             logger.error(msg, rd)
             return
-        logger.info(f"{msg} Retrying.", rd)
+        logger.info(f"{msg} Retrying.", rd)  # noqa: G004
         raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
@@ -2623,10 +2625,10 @@ def get_pacer_doc_id_with_show_case_doc_url(
             status_code = exc.response.status_code
             msg = "Got HTTPError with status code %s."
             if last_try:
-                logger.error(f"{msg} Aborting.", status_code)
+                logger.error(f"{msg} Aborting.", status_code)  # noqa: G004
                 return
 
-            logger.info(f"{msg} Retrying", status_code)
+            logger.info(f"{msg} Retrying", status_code)  # noqa: G004
             raise self.retry(exc)
         elif exc.response:
             status_code = exc.response.status_code
@@ -2640,12 +2642,12 @@ def get_pacer_doc_id_with_show_case_doc_url(
     try:
         pacer_doc_id = report.data
     except ParsingException:
-        logger.error(f"Unable to get redirect for {rd}")
+        logger.error("Unable to get redirect for %s", rd)
         return
     else:
         rd.pacer_doc_id = pacer_doc_id
         rd.save()
-        logger.info(f"Successfully saved pacer_doc_id to rd {rd_pk}")
+        logger.info("Successfully saved pacer_doc_id to rd %s", rd_pk)
 
 
 def make_csv_file(
@@ -2717,7 +2719,7 @@ def query_and_save_list_of_creditors(
         report = ListOfCreditors(court_id, s)
     except AssertionError:
         # This is not a bankruptcy court.
-        logger.warning(f"Court {court_id} is not a bankruptcy court.")
+        logger.warning("Court %s is not a bankruptcy court.", court_id)
         delete_redis_semaphore(
             "CACHE", make_list_of_creditors_key(court_id, d_number_file_name)
         )
@@ -2736,8 +2738,9 @@ def query_and_save_list_of_creditors(
             )
         except ParsingException:
             logger.info(
-                f"No valid hidden API response for {docket_number} in court: "
-                f"{court_id}, possibly a sealed case."
+                "No valid hidden API response for %s in court: %s, possibly a sealed case.",
+                docket_number,
+                court_id,
             )
             delete_redis_semaphore(
                 "CACHE",
@@ -2747,8 +2750,10 @@ def query_and_save_list_of_creditors(
 
         if not result:
             logger.info(
-                f"Skipping row: {i} in court: {court_id}, docket: "
-                f"{docket_number}, no result from hidden API"
+                "Skipping row: %s in court: %s, docket: %s, no result from hidden API",
+                i,
+                court_id,
+                docket_number,
             )
             delete_redis_semaphore(
                 "CACHE",
@@ -2759,8 +2764,10 @@ def query_and_save_list_of_creditors(
         pacer_case_id = result.get("pacer_case_id")
         if not pacer_case_id:
             logger.info(
-                f"Skipping row: {i} in court: {court_id}, docket: "
-                f"{docket_number}, no pacer_case_id found."
+                "Skipping row: %s in court: %s, docket: %s, no pacer_case_id found.",
+                i,
+                court_id,
+                docket_number,
             )
             delete_redis_semaphore(
                 "CACHE",
@@ -2768,10 +2775,12 @@ def query_and_save_list_of_creditors(
             )
             return None
 
-        logger.info(f"File {html_file} doesn't exist.")
+        logger.info("File %s doesn't exist.", html_file)
         logger.info(
-            f"Querying report, court_id: {court_id}, pacer_case_id: "
-            f"{pacer_case_id} docket_number: {docket_number}"
+            "Querying report, court_id: %s, pacer_case_id: %s docket_number: %s",
+            court_id,
+            pacer_case_id,
+            docket_number,
         )
 
         # First get the POST param to ensure the same cost as in the browser.
@@ -2781,7 +2790,8 @@ def query_and_save_list_of_creditors(
             # Sometimes this query fails, retry if there are retries available.
             if self.request.retries == self.max_retries:
                 logger.info(
-                    f"Failed to obtain a valid POST param for {court_id}, aborting..."
+                    "Failed to obtain a valid POST param for %s, aborting...",
+                    court_id,
                 )
                 delete_redis_semaphore(
                     "CACHE",
@@ -2790,7 +2800,8 @@ def query_and_save_list_of_creditors(
                 return None
             else:
                 logger.info(
-                    f"Failed to obtain a valid POST param for {court_id}, retrying..."
+                    "Failed to obtain a valid POST param for %s, retrying...",
+                    court_id,
                 )
                 raise self.retry(exc=exc)
 
@@ -2799,7 +2810,7 @@ def query_and_save_list_of_creditors(
                 "CACHE",
                 make_list_of_creditors_key(court_id, d_number_file_name),
             )
-            logger.info(f"Invalid POST param for {court_id}, aborting...")
+            logger.info("Invalid POST param for %s, aborting...", court_id)
             return None
 
         report.query(
@@ -2812,7 +2823,7 @@ def query_and_save_list_of_creditors(
             file.write(report.response.text)
 
     else:
-        logger.info(f"File {html_file} already exists court: {court_id}.")
+        logger.info("File %s already exists court: %s.", html_file, court_id)
 
     with open(html_file, "rb") as file:
         text = file.read().decode("utf-8")
@@ -2885,7 +2896,7 @@ def recap_document_into_opinions(
     if not recap_document_id and task_data:
         recap_document_id = task_data["rd_pk"]
 
-    logger.info(f"Importing recap document {recap_document_id}")
+    logger.info("Importing recap document %s", recap_document_id)
     recap_document = (
         RECAPDocument.objects.select_related("docket_entry__docket")
         .only(
@@ -2918,7 +2929,7 @@ def recap_document_into_opinions(
 
     ops = Opinion.objects.filter(sha1=recap_document.sha1)
     if ops.count() > 0:
-        logger.info(f"Skipping previously imported opinion: {ops[0].id}")
+        logger.info("Skipping previously imported opinion: %s", ops[0].id)
         return task_data
 
     response = extract_recap_document_for_opinions(rd=recap_document)
@@ -2933,13 +2944,13 @@ def recap_document_into_opinions(
         # Ex. 42\u2009U.S.C.\u2009§\u200912131 \u2009 is a small space
         # fallback to regular citation match
         logger.warning(
-            f"Hyperscan failed for {recap_document}, trying w/o tokenizer"
+            "Hyperscan failed for %s, trying w/o tokenizer", recap_document
         )
         citations = eyecite.get_citations(r["content"])
 
     case_law_citations = filter_out_non_case_law_citations(citations)
     if len(case_law_citations) == 0:
-        logger.info(f"No citation found for rd: {recap_document.id}")
+        logger.info("No citation found for rd: %s", recap_document.id)
         return task_data
 
     with transaction.atomic():
@@ -2963,7 +2974,8 @@ def recap_document_into_opinions(
         )
 
         logger.info(
-            f"Successfully imported https://www.courtlistener.com/opinion/{cluster.id}/decision/"
+            "Successfully imported https://www.courtlistener.com/opinion/%s/decision/",
+            cluster.id,
         )
     # Return input task data to preserve the chain in scrape_pacer_free_opinion
     return task_data

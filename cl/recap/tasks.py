@@ -276,7 +276,7 @@ async def process_recap_pdf(pk):
         None if not pq.attachment_number else pq.attachment_number
     )
 
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq} ")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
     try:
         # Attempt to get RECAPDocument instance.
         # It is possible for this instance to not have a document yet,
@@ -306,7 +306,8 @@ async def process_recap_pdf(pk):
                 # different upload task that hasn't yet been processed).
                 logger.warning(
                     "Unable to find docket for processing queue '%s'. "
-                    "Retrying if max_retries is not exceeded." % pq
+                    "Retrying if max_retries is not exceeded.",
+                    pq,
                 )
                 error_message = "Unable to find docket for item."
                 if retries > 0:
@@ -337,7 +338,8 @@ async def process_recap_pdf(pk):
                 )
             except DocketEntry.DoesNotExist:
                 logger.warning(
-                    f"Unable to find docket entry for processing queue '{pq}'."
+                    "Unable to find docket entry for processing queue '%s'.",
+                    pq,
                 )
                 msg = "Unable to find docket entry for item."
                 if retries > 0:
@@ -595,7 +597,7 @@ async def process_recap_docket(pk):
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
@@ -623,7 +625,7 @@ async def process_recap_docket(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed of item {pq}")
+    logger.info("Parsing completed of item %s", pq)
 
     if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
@@ -845,7 +847,7 @@ async def process_recap_attachment(
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     pq, att_data, text = await get_att_data_from_pq(pq)
     if not att_data:
@@ -909,7 +911,7 @@ async def process_recap_claims_register(pk):
         return None
 
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
@@ -939,7 +941,7 @@ async def process_recap_claims_register(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed for item {pq}")
+    logger.info("Parsing completed for item %s", pq)
 
     if not data:
         # Bad HTML
@@ -1015,7 +1017,7 @@ async def process_recap_docket_history_report(pk):
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
@@ -1045,7 +1047,7 @@ async def process_recap_docket_history_report(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed for item {pq}")
+    logger.info("Parsing completed for item %s", pq)
 
     if data == {}:
         # Bad docket history page.
@@ -1133,7 +1135,7 @@ async def process_case_query_page(pk):
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
@@ -1163,7 +1165,7 @@ async def process_case_query_page(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed for item {pq}")
+    logger.info("Parsing completed for item %s", pq)
 
     if data == {}:
         # Bad docket iquery page.
@@ -1274,7 +1276,7 @@ async def process_recap_appellate_docket(pk):
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info(
-        f"Processing Appellate RECAP item (debug is: {pq.debug}): {pq}"
+        "Processing Appellate RECAP item (debug is: %s): %s", pq.debug, pq
     )
 
     try:
@@ -1303,7 +1305,7 @@ async def process_recap_appellate_docket(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed of item {pq}")
+    logger.info("Parsing completed of item %s", pq)
 
     if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
@@ -1387,7 +1389,7 @@ async def process_recap_acms_docket(pk):
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing ACMS RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing ACMS RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
@@ -1415,7 +1417,7 @@ async def process_recap_acms_docket(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed of item {pq}")
+    logger.info("Parsing completed of item %s", pq)
 
     if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
@@ -1484,7 +1486,7 @@ async def process_recap_acms_appellate_attachment(
     """
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
@@ -1517,7 +1519,7 @@ async def process_recap_acms_appellate_attachment(
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed of item {pq}")
+    logger.info("Parsing completed of item %s", pq)
 
     if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
@@ -1576,7 +1578,7 @@ async def process_recap_appellate_attachment(
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
@@ -1588,7 +1590,7 @@ async def process_recap_appellate_attachment(
         return pq_status, msg, []
 
     att_data = get_data_from_appellate_att_report(text, pq.court_id)
-    logger.info(f"Parsing completed for item {pq}")
+    logger.info("Parsing completed for item %s", pq)
 
     if att_data == {}:
         # Bad attachment page.
@@ -2109,7 +2111,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
                 self.request.chain = None
                 return []
             logger.info(
-                f"Ran into HTTPError: {exc.response.status_code}. Retrying."
+                "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
             raise self.retry(exc=exc)
         else:
@@ -2659,7 +2661,8 @@ def get_attachment_page_by_url(att_page_url: str, court_id: str) -> str | None:
     """
 
     logger.info(
-        f"Querying the email notice attachment page endpoint at URL: {att_page_url}"
+        "Querying the email notice attachment page endpoint at URL: %s",
+        att_page_url,
     )
     req_timeout = (60, 300)
     att_response = requests.get(att_page_url, timeout=req_timeout)
