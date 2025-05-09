@@ -68,14 +68,12 @@ class PeopleSearchAPICommonTests(CourtTestCase, PeopleTestCase):
 
     @skip_if_common_tests_skipped
     async def test_name_field(self) -> None:
-
         params = {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}
         # API
         await self._test_api_results_count(params, 2, "name")
 
     @skip_if_common_tests_skipped
     async def test_court_filter(self) -> None:
-
         params = {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}
         # API
         await self._test_api_results_count(params, 1, "court")
@@ -653,9 +651,10 @@ class PeopleV4APISearchTest(
         """Confirm  empty fields values in V4 People Search API results."""
 
         mock_date = now().replace(day=15, hour=0)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             person = PersonFactory(
                 name_first="John",
                 name_suffix="",

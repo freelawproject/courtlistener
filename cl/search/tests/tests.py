@@ -26,7 +26,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
 from cl.lib.elasticsearch_utils import simplify_estimated_count
@@ -1951,7 +1950,7 @@ class SaveSearchQueryTest(TestCase):
     def test_search_api_v4_query_saving(self) -> None:
         """Do we save queries on all V4 Search endpoints"""
         for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+            url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
             self.client.get(url)
             # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
@@ -1976,7 +1975,7 @@ class SaveSearchQueryTest(TestCase):
     def test_failed_es_search_v4_api_queries(self) -> None:
         """Do we flag failed v4 API queries properly?"""
         query = "type=r&q=contains/sproximity token"
-        url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+        url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 400)
         last_query = SearchQuery.objects.last()
@@ -1993,7 +1992,7 @@ class SaveSearchQueryTest(TestCase):
     def test_search_es_api_v3_query_saving(self) -> None:
         """Do we save queries on all V3 Search endpoints"""
         for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+            url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
             self.client.get(url)
             # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
@@ -2018,7 +2017,7 @@ class SaveSearchQueryTest(TestCase):
     def test_failed_es_search_v3_api_queries(self) -> None:
         """Do we flag failed ES v3 API queries properly?"""
         query = "type=r&q=contains/sproximity token"
-        url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+        url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 500)
         last_query = SearchQuery.objects.last()

@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 from zipfile import ZipFile
 
 import requests
@@ -106,7 +106,10 @@ from cl.recap.utils import (
     get_court_id_from_fetch_queue,
     get_main_rds,
 )
-from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
+from cl.scrapers.tasks import (
+    extract_recap_pdf,
+    extract_recap_pdf_base,  # noqa: F401
+)
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import index_docket_parties_in_es
 
@@ -403,7 +406,7 @@ async def process_recap_pdf(pk):
     try:
         with pq.filepath_local.open("rb") as f:
             new_sha1 = hashlib.file_digest(f, "sha1").hexdigest()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -439,9 +442,9 @@ async def process_recap_pdf(pk):
             )
             if response.is_success:
                 rd.page_count = int(response.text)
-                assert isinstance(
-                    rd.page_count, (int, type(None))
-                ), "page_count must be an int or None."
+                assert isinstance(rd.page_count, (int, type(None))), (
+                    "page_count must be an int or None."
+                )
             rd.file_size = rd.filepath_local.size
 
         rd.ocr_status = None
@@ -596,7 +599,7 @@ async def process_recap_docket(pk):
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -690,7 +693,7 @@ async def get_att_data_from_pq(
     try:
         with pq.filepath_local.open("rb") as file:
             text = file.read().decode("utf-8")
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return pq, {}, None
@@ -910,7 +913,7 @@ async def process_recap_claims_register(pk):
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -1016,7 +1019,7 @@ async def process_recap_docket_history_report(pk):
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -1134,7 +1137,7 @@ async def process_case_query_page(pk):
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -1276,7 +1279,7 @@ async def process_recap_appellate_docket(pk):
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -1388,7 +1391,7 @@ async def process_recap_acms_docket(pk):
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -1473,7 +1476,7 @@ async def process_recap_acms_docket(pk):
 
 async def process_recap_acms_appellate_attachment(
     pk: int,
-) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
+) -> Optional[tuple[int, str, list[RECAPDocument]]]:
     """Process an uploaded appellate attachment page.
     :param pk: The primary key of the processing queue item you want to work on
     :return: Tuple indicating the status of the processing, a related
@@ -1485,7 +1488,7 @@ async def process_recap_acms_appellate_attachment(
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         pq_status, msg = await mark_pq_status(
             pq, msg, PROCESSING_STATUS.FAILED
@@ -1562,7 +1565,7 @@ async def process_recap_acms_appellate_attachment(
 
 async def process_recap_appellate_attachment(
     pk: int,
-) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
+) -> Optional[tuple[int, str, list[RECAPDocument]]]:
     """Process an uploaded appellate attachment page.
 
     :param self: The Celery task
@@ -1577,7 +1580,7 @@ async def process_recap_appellate_attachment(
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         pq_status, msg = await mark_pq_status(
             pq, msg, PROCESSING_STATUS.FAILED
@@ -3232,9 +3235,9 @@ def process_recap_email(
             epq.court_id, pacer_doc_id, pq
         )
         if appellate_doc_num:
-            data["dockets"][0]["docket_entries"][0][
-                "document_number"
-            ] = appellate_doc_num
+            data["dockets"][0]["docket_entries"][0]["document_number"] = (
+                appellate_doc_num
+            )
 
     unique_case_ids = []
     got_content_updated = False

@@ -3,9 +3,10 @@ import math
 import random
 import re
 from collections import defaultdict
+from collections.abc import Iterator
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any, Iterator, Optional, Set
+from typing import Any, Optional
 
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
@@ -773,7 +774,7 @@ def get_opinion_text(cluster: OpinionCluster) -> str:
     return soup.getText(separator=" ", strip=True)
 
 
-def winnow_case_name(case_name: str) -> Set:
+def winnow_case_name(case_name: str) -> set:
     """Reduce each case title to a set of words worth comparing
 
     :param case_name: The name of a case or combination of case names

@@ -20,7 +20,6 @@ class IsOwner(permissions.BasePermission):
 
 
 class V3APIPermission(permissions.BasePermission):
-
     r = get_redis_interface("STATS")
     v3_blocked_message = (
         "As a new user, you don't have permission to access V3 of the API. "

@@ -725,8 +725,11 @@ class ScrapeCitationsTest(TestCase):
     def test_citation_scraper(self):
         """Test if citation scraper creates a citation or ignores duplicates"""
         cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
-        with mock.patch(f"{cmd}.sha1", side_effect=self.hashes), mock.patch(
-            f"{cmd}.get_binary_content", return_value="placeholder"
+        with (
+            mock.patch(f"{cmd}.sha1", side_effect=self.hashes),
+            mock.patch(
+                f"{cmd}.get_binary_content", return_value="placeholder"
+            ),
         ):
             cl_back_scrape_citations.Command().scrape_court(self.mock_site)
 

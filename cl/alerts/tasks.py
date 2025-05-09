@@ -2,7 +2,6 @@ import copy
 from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
-from typing import List
 from urllib.parse import urlencode
 
 from asgiref.sync import async_to_sync
@@ -369,7 +368,7 @@ def send_alert_and_webhook(
 
 
 @app.task(ignore_result=True)
-def send_alerts_and_webhooks(data: list[tuple[int, datetime]]) -> List[int]:
+def send_alerts_and_webhooks(data: list[tuple[int, datetime]]) -> list[int]:
     """Send many docket alerts at one time without making numerous calls
     to the send_alert_and_webhook function.
 
@@ -619,9 +618,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
 
         if hasattr(hit.meta, "highlight"):
             document_content_copy["meta"] = {}
-            document_content_copy["meta"][
-                "highlight"
-            ] = hit.meta.highlight.to_dict()
+            document_content_copy["meta"]["highlight"] = (
+                hit.meta.highlight.to_dict()
+            )
 
         # Override order_by to show the latest items when clicking the
         # "View Full Results" button.

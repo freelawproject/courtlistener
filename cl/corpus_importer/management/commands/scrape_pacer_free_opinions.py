@@ -3,7 +3,7 @@ import datetime
 import inspect
 import math
 import time
-from typing import Callable, Dict, List, Optional, cast
+from typing import Callable, Optional, cast
 
 from celery.canvas import chain
 from django.db.models import F, Q, Window
@@ -117,7 +117,9 @@ def fetch_doc_report(
         end,
     )
     try:
-        status, rows_to_create = get_and_save_free_document_report(pacer_court_id, start, end, log.pk)  # type: ignore
+        status, rows_to_create = get_and_save_free_document_report(
+            pacer_court_id, start, end, log.pk
+        )  # type: ignore
     except (
         RequestException,
         ReadTimeoutError,
@@ -151,7 +153,7 @@ def fetch_doc_report(
 
     if not exception_raised:
         logger.info(
-            "Got %s document references for " "%s between %s and %s",
+            "Got %s document references for %s between %s and %s",
             rows_to_create,
             pacer_court_id,
             start,
@@ -232,7 +234,9 @@ def get_and_save_free_document_reports(
         # Iterate through the gap in dates either short or long
         for _start, _end in dates:
             exc = fetch_doc_report(
-                pacer_court_id, _start, _end  # type: ignore
+                pacer_court_id,
+                _start,
+                _end,  # type: ignore
             )
             if exc:
                 # Something happened with the queried date range, abort process for
@@ -474,7 +478,7 @@ class Command(VerboseCommand):
             help="Date when the query should end.",
         )
 
-    def handle(self, *args: List[str], **options: OptionsType) -> None:
+    def handle(self, *args: list[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
 
         if not self.validate_date_args(options):
@@ -484,7 +488,7 @@ class Command(VerboseCommand):
         filtered_kwargs = self.filter_kwargs(action, options)
         action(**filtered_kwargs)
 
-    VALID_ACTIONS: Dict[str, Callable] = {
+    VALID_ACTIONS: dict[str, Callable] = {
         "do-everything": do_everything,
         "get-report-results": get_and_save_free_document_reports,
         "get-pdfs": get_pdfs,

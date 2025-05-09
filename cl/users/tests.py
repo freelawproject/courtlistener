@@ -1,5 +1,4 @@
 import json
-import logging
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
@@ -103,8 +102,8 @@ class UserTest(LiveServerTestCase):
             self.assertEqual(
                 r.status_code,
                 HTTPStatus.OK,
-                msg="Got wrong status code for page at: {path}. "
-                "Status Code: {code}".format(path=path, code=r.status_code),
+                msg=f"Got wrong status code for page at: {path}. "
+                f"Status Code: {r.status_code}",
             )
 
     @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
@@ -3555,7 +3554,6 @@ class WebhooksHTMXTests(APITestCase):
 @override_settings(DEVELOPMENT=False)
 @patch("cl.users.tasks.NeonClient")
 class NeonAccountCreationTest(TestCase):
-
     async def test_can_send_email_for_multiple_neon_accounts(
         self, mock_neon_client
     ) -> None:
@@ -3660,7 +3658,6 @@ class NeonAccountCreationTest(TestCase):
 @patch("cl.users.views.create_neon_account")
 @patch("cl.users.views.update_neon_account")
 class NeonAccountUpdateTest(TestCase):
-
     def setUp(self) -> None:
         self.client = AsyncClient()
         self.up = UserProfileWithParentsFactory.create(

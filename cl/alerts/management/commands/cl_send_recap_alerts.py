@@ -689,7 +689,7 @@ def query_and_schedule_alerts(
     for user in alert_users:
         alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
         logger.info(
-            f"Running '%s' alerts for user '%s': %s", rate, user, alerts
+            "Running '%s' alerts for user '%s': %s", rate, user, alerts
         )
         scheduled_hits_to_create = []
         for alert in alerts:

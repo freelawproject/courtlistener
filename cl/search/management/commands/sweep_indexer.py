@@ -1,6 +1,7 @@
 import time
+from collections.abc import Iterable, Mapping
 from datetime import datetime
-from typing import Iterable, Literal, Mapping, cast
+from typing import Literal, cast
 
 from django.apps import apps
 from django.conf import settings
@@ -415,16 +416,11 @@ class Command(VerboseCommand):
                     # it will wait for 0.1 seconds for every 10 documents processed,
                     # maintaining an index rate of 100 documents per second.
                     time.sleep(
-                        1 / settings.ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS  # type: ignore
+                        1
+                        / settings.ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS  # type: ignore
                     )
                 self.stdout.write(
-                    "\rProcessed {}/{}, ({:.0%}), last {} ID indexed: {},".format(
-                        processed_count,
-                        count,
-                        processed_count * 1.0 / count,
-                        app_label,
-                        item_id,
-                    )
+                    f"\rProcessed {processed_count}/{count}, ({processed_count * 1.0 / count:.0%}), last {app_label} ID indexed: {item_id},"
                 )
                 chunk = []
 

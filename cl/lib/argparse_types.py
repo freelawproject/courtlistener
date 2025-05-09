@@ -1,7 +1,6 @@
 import argparse
 import os
 from datetime import timezone
-from typing import List
 
 from dateutil import parser
 from django.utils.timezone import is_naive, make_aware
@@ -39,7 +38,7 @@ def readable_dir(prospective_dir):
         )
 
 
-def _argparse_volumes(volumes_arg: str) -> List:
+def _argparse_volumes(volumes_arg: str) -> list:
     """Custom argparse handling for volumes
 
     :param volumes_arg: The volume argparse for harvard imports
