@@ -72,10 +72,11 @@ def cached_sitemap(
 
     cache = caches["db_cache"]
     cache_key = make_cache_key(request, section, force_page)
-    urls = cache.get(cache_key, [])
+    urls = cache.get(cache_key)
 
     # return HttpResponse(f'{request.build_absolute_uri(escape_uri_path(request.path))} {cache_key} {urls}', content_type='text/plain')
-    if not urls:
+    if not urls and not isinstance(urls, list):
+        # No cache for this page, otherwise cache exists and it could be the empty list
         try:
             if callable(sitemap):
                 sitemap = sitemap()

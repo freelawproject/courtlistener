@@ -192,7 +192,10 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                         f"Empty urls query for section: {section}, page: {current_page} and cursor: {cursor_data.get('cursor')}."
                     )
                     cursor_data["has_next"] = 0
-                    continue
+                    if current_page == 1:
+                        db_cache.set(cache_key, [], short_cache_timeout)
+                    else:
+                        continue
 
                 if len(urls) == sitemapObject.limit:
                     # Full sitemap. Cache it a long time.
