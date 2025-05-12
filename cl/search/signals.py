@@ -574,7 +574,7 @@ def handle_recap_doc_change(
 
     if (
         instance.es_rd_field_tracker.has_changed("is_available")
-        and instance.is_available == True
+        and instance.is_available
     ):
         send_prayer_emails(instance)
 

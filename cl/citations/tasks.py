@@ -1,6 +1,5 @@
 import logging
 from http.client import ResponseNotReady
-from typing import Dict, List, Set, Tuple
 
 from django.conf import settings
 from django.db import transaction
@@ -52,8 +51,8 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 @app.task
 def identify_parallel_citations(
-    citations: List[SupportedCitationType],
-) -> Set[Tuple[SupportedCitationType, ...]]:
+    citations: list[SupportedCitationType],
+) -> set[tuple[SupportedCitationType, ...]]:
     """Work through a list of citations and identify ones that are physically
     near each other in the document.
 
@@ -90,7 +89,7 @@ def identify_parallel_citations(
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_and_parantheticals_for_recap_documents(
-    self, doc_ids: List[int]
+    self, doc_ids: list[int]
 ):
     """Find citations and authored parentheticals for search.RECAPDocument objects.
 
@@ -98,13 +97,13 @@ def find_citations_and_parantheticals_for_recap_documents(
 
     :return: None
     """
-    documents: QuerySet[
-        RECAPDocument, RECAPDocument
-    ] = RECAPDocument.objects.filter(pk__in=doc_ids).filter(
-        ocr_status__in=[
-            RECAPDocument.OCR_UNNECESSARY,
-            RECAPDocument.OCR_COMPLETE,
-        ]
+    documents: QuerySet[RECAPDocument, RECAPDocument] = (
+        RECAPDocument.objects.filter(pk__in=doc_ids).filter(
+            ocr_status__in=[
+                RECAPDocument.OCR_UNNECESSARY,
+                RECAPDocument.OCR_COMPLETE,
+            ]
+        )
     )
 
     for d in documents:
@@ -118,7 +117,7 @@ def find_citations_and_parantheticals_for_recap_documents(
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
-    opinion_pks: List[int],
+    opinion_pks: list[int],
     disconnect_pg_signals: bool = False,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
@@ -189,15 +188,15 @@ def store_opinion_citations_and_update_parentheticals(
     # If the source has marked up text, pass it so it can be used to find
     # ReferenceCitations. This is handled by `make_get_citations_kwargs`
     get_citations_kwargs = make_get_citations_kwargs(opinion)
-    citations: List[CitationBase] = get_citations(
+    citations: list[CitationBase] = get_citations(
         tokenizer=HYPERSCAN_TOKENIZER,
         **get_citations_kwargs,
     )
 
     # Resolve all those different citation objects to Opinion objects,
     # using a variety of heuristics.
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
     ] = do_resolve_citations(citations, opinion)
 
     # Generate the citing opinion's new HTML with inline citation links
@@ -231,7 +230,7 @@ def store_opinion_citations_and_update_parentheticals(
     }
 
     clusters_to_update_par_groups_for = set()
-    parentheticals: List[Parenthetical] = []
+    parentheticals: list[Parenthetical] = []
 
     for _opinion, _citations in citation_resolutions.items():
         # Currently, eyecite has a bug where parallel citations are
@@ -322,8 +321,8 @@ def store_opinion_citations_and_update_parentheticals(
 
 
 def update_unmatched_citations_status(
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
     ],
     citing_opinion: Opinion,
 ) -> None:
@@ -360,8 +359,8 @@ def update_unmatched_citations_status(
 
 
 def store_unmatched_citations(
-    unmatched_citations: List[CitationBase],
-    ambiguous_matches: List[CitationBase],
+    unmatched_citations: list[CitationBase],
+    ambiguous_matches: list[CitationBase],
     opinion: Opinion,
 ) -> None:
     """Bulk create UnmatchedCitation instances cited by an opinion

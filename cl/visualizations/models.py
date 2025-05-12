@@ -335,12 +335,7 @@ class SCOTUSMap(AbstractDateTimeModel):
             ]
             return next((_ for _ in case_name_preference if _), "Unknown")
 
-        return "{start} ({start_year}) to {end} ({end_year})".format(
-            start=get_best_case_name(self.cluster_start),
-            start_year=self.cluster_start.date_filed.year,
-            end=get_best_case_name(self.cluster_end),
-            end_year=self.cluster_end.date_filed.year,
-        )
+        return f"{get_best_case_name(self.cluster_start)} ({self.cluster_start.date_filed.year}) to {get_best_case_name(self.cluster_end)} ({self.cluster_end.date_filed.year})"
 
     def save(self, update_fields=None, *args, **kwargs):
         # Note that the title needs to be made first, so that the slug can be

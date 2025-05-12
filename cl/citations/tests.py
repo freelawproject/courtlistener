@@ -3,7 +3,6 @@ import json
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
-from typing import List, Tuple
 from unittest import mock
 from unittest.mock import Mock, patch
 
@@ -655,7 +654,7 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
 
 
 class CitationObjectTest(ESIndexTestCase, TestCase):
-    fixtures: List = []
+    fixtures: list = []
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1600,7 +1599,7 @@ class CitationFeedTest(
         case name?
         """
         new_case_name = (
-            "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & " "CO., \u2014"
+            "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & CO., \u2014"
         )
         await OpinionCluster.objects.filter(
             pk=self.opinion_cluster_1.pk
@@ -1619,7 +1618,7 @@ class CitationFeedTest(
 class CitationCommandTest(ESIndexTestCase, TestCase):
     """Test a variety of the ways that find_citations can be called."""
 
-    fixtures: List = []
+    fixtures: list = []
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1850,7 +1849,7 @@ class FilterParentheticalTest(SimpleTestCase):
                 )
 
 
-DescriptionUtilityTestCase = Tuple[Tuple[str, int], Tuple[str, int], int]
+DescriptionUtilityTestCase = tuple[tuple[str, int], tuple[str, int], int]
 
 
 class DescriptionScoreTest(SimpleTestCase):
@@ -1861,7 +1860,7 @@ class DescriptionScoreTest(SimpleTestCase):
         by a human)
         """
         minimum_accuracy = 0.9
-        test_cases: List[DescriptionUtilityTestCase] = [
+        test_cases: list[DescriptionUtilityTestCase] = [
             (
                 (
                     "holding that a State may not require a parade to include a group if the parade's organizer disagrees with the group's message",
@@ -2003,7 +2002,7 @@ class DescriptionScoreTest(SimpleTestCase):
         self.assertGreater(result, 0)
 
     def _print_failed_cases(
-        self, failed_cases: List[DescriptionUtilityTestCase]
+        self, failed_cases: list[DescriptionUtilityTestCase]
     ) -> str:
         output = ""
         for case in failed_cases:
@@ -2329,7 +2328,6 @@ class GroupParentheticalsTest(SimpleTestCase):
 class CitationLookUpApiTest(
     CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
-
     @classmethod
     def setUpTestData(cls) -> None:
         UserProfileWithParentsFactory.create(
@@ -2540,7 +2538,6 @@ class CitationLookUpApiTest(
     async def test_can_handle_ambiguous_reporter_variations(
         self, cache_key_mock
     ) -> None:
-
         handy_citation = await sync_to_async(
             CitationWithParentsFactory.create
         )(volume=1, reporter="Handy", page="150", type=1)

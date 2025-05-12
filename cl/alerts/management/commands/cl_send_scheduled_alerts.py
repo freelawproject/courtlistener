@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from typing import Any, DefaultDict
+from typing import Any
 
 import pytz
 from asgiref.sync import async_to_sync
@@ -132,8 +132,8 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
         ).select_related("user", "alert")
 
         # Group scheduled hits by Alert and the main_doc_id
-        grouped_hits: DefaultDict[
-            Alert, DefaultDict[int, list[dict[str, Any]]]
+        grouped_hits: defaultdict[
+            Alert, defaultdict[int, list[dict[str, Any]]]
         ] = defaultdict(lambda: defaultdict(list))
         alerts_to_update = set()
         for hit in scheduled_hits:
@@ -152,7 +152,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
         # Merge child documents with the same main_doc_id if the document dict
         # contains the child_docs key.
-        merged_hits: DefaultDict[Alert, list[dict[str, Any]]] = defaultdict(
+        merged_hits: defaultdict[Alert, list[dict[str, Any]]] = defaultdict(
             list
         )
         for alert, document_groups in grouped_hits.items():

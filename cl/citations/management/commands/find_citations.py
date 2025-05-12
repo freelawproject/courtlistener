@@ -1,6 +1,7 @@
 import sys
 import time
-from typing import Iterable, List, cast
+from collections.abc import Iterable
+from typing import cast
 
 from django.core.management import CommandError
 from django.core.management.base import CommandParser
@@ -108,7 +109,7 @@ class Command(VerboseCommand):
             help="Disconnect ElasticSearch signals for ParentheticalGroups",
         )
 
-    def handle(self, *args: List[str], **options: OptionsType) -> None:
+    def handle(self, *args: list[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None
@@ -183,7 +184,7 @@ class Command(VerboseCommand):
 
         self.count = query.count()
         self.average_per_s = 0.0
-        self.timings: List[float] = []
+        self.timings: list[float] = []
         opinion_pks = query.values_list("pk", flat=True).iterator()
         self.update_documents(
             opinion_pks,

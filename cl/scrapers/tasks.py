@@ -1,7 +1,7 @@
 import logging
 import random
 import traceback
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 
 import httpx
 import requests
@@ -34,7 +34,7 @@ from cl.search.models import Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
-ExtractProcessResult = Tuple[str, Optional[str]]
+ExtractProcessResult = tuple[str, Optional[str]]
 
 
 def update_document_from_text(
@@ -185,9 +185,9 @@ def extract_doc_content(
     if data["page_count"]:
         opinion.page_count = data["page_count"]
 
-    assert isinstance(
-        content, str
-    ), f"content must be of type str, not {type(content)}"
+    assert isinstance(content, str), (
+        f"content must be of type str, not {type(content)}"
+    )
 
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion, juriscraper_module)
@@ -230,10 +230,10 @@ def extract_doc_content(
 )
 def extract_recap_pdf(
     self,
-    pks: Union[int, List[int]],
+    pks: Union[int, list[int]],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> List[int]:
+) -> list[int]:
     """Celery task wrapper for extract_recap_pdf_base
     Extract the contents from a RECAP PDF if necessary.
 
@@ -265,10 +265,10 @@ def extract_recap_pdf(
 
 
 async def extract_recap_pdf_base(
-    pks: Union[int, List[int]],
+    pks: Union[int, list[int]],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> List[int]:
+) -> list[int]:
     """Extract the contents from a RECAP PDF if necessary.
 
     :param pks: The RECAPDocument pk or list of pks to work on.
@@ -282,7 +282,7 @@ async def extract_recap_pdf_base(
     if not is_iter(pks):
         pks = [pks]
 
-    processed: List[int] = []
+    processed: list[int] = []
     for pk in pks:
         rd = await RECAPDocument.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:

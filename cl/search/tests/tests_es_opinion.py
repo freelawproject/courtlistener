@@ -646,9 +646,10 @@ class OpinionV4APISearchTest(
         prioritizing the different text fields available in the content when
         highlighting is disabled."""
 
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             c_2_opinion_1 = OpinionFactory.create(
                 extracted_by_ocr=True,
                 author=self.person_2,
@@ -730,9 +731,10 @@ class OpinionV4APISearchTest(
                     )
                     self.assertEqual(expected_text, result_opinion["snippet"])
 
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             c_2_opinion_1.delete()
             c_2_opinion_2.delete()
             c_2_opinion_3.delete()
@@ -3012,7 +3014,7 @@ class RelatedSearchTest(
         expected_cited_by = [
             (
                 f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
-                f"Howard v. Honda (1895)",
+                "Howard v. Honda (1895)",
             ),
             (
                 f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
@@ -4316,10 +4318,13 @@ class OpinionFeedTest(
         """Can we clean up control characters in the text for a proper XML
         rendering?
         """
-        with mock.patch(
-            "cl.search.documents.escape",
-            return_value="Lorem ipsum control chars \x07\x08\x0b.",
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            mock.patch(
+                "cl.search.documents.escape",
+                return_value="Lorem ipsum control chars \x07\x08\x0b.",
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             court = CourtFactory(
                 id="ca1_test",
                 jurisdiction="FB",

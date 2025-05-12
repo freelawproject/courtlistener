@@ -1,12 +1,11 @@
 import logging
 import re
 from datetime import datetime
-from typing import Dict, List, Tuple, TypeVar
+from typing import TypeVar
 
 import nh3
 import pghistory
 import pytz
-import tiktoken
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
@@ -295,8 +294,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     )
     ordering_judge_str = models.TextField(
         help_text=(
-            "The judge that issued the final order in the case, as a "
-            "string."
+            "The judge that issued the final order in the case, as a string."
         ),
         blank=True,
     )
@@ -420,8 +418,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     idb_data = models.OneToOneField(
         "recap.FjcIntegratedDatabase",
         help_text=(
-            "Data from the FJC Integrated Database associated with this "
-            "case."
+            "Data from the FJC Integrated Database associated with this case."
         ),
         related_name="docket",
         on_delete=models.SET_NULL,
@@ -1798,14 +1795,13 @@ class Claim(AbstractDateTimeModel):
     )
     description = models.TextField(
         help_text=(
-            "The description of the claim that appears on the claim "
-            "register."
+            "The description of the claim that appears on the claim register."
         ),
         blank=True,
     )
     remarks = models.TextField(
         help_text=(
-            "The remarks of the claim that appear on the claim " "register."
+            "The remarks of the claim that appear on the claim register."
         ),
         blank=True,
     )
@@ -1920,7 +1916,8 @@ class FederalCourtsQuerySet(models.QuerySet):
 
     def appellate_pacer_courts(self) -> models.QuerySet:
         return self.filter(
-            Q(jurisdiction=Court.FEDERAL_APPELLATE) |
+            Q(jurisdiction=Court.FEDERAL_APPELLATE)
+            |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
             end_date__isnull=True,
@@ -2423,7 +2420,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     syllabus = models.TextField(
         help_text=(
-            "A summary of the issues presented in the case and the " "outcome."
+            "A summary of the issues presented in the case and the outcome."
         ),
         blank=True,
     )
@@ -2504,7 +2501,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     citation_count = models.IntegerField(
         help_text=(
-            "The number of times this document is cited by other " "opinion"
+            "The number of times this document is cited by other opinion"
         ),
         default=0,
         db_index=True,
@@ -3189,14 +3186,13 @@ class Opinion(AbstractDateTimeModel):
         "people_db.Person",
         related_name="opinions_joined",
         help_text=(
-            "Other judges that joined the primary author " "in this opinion"
+            "Other judges that joined the primary author in this opinion"
         ),
         blank=True,
     )
     joined_by_str = models.TextField(
         help_text=(
-            "Other judges that joined the primary author "
-            "in this opinion str"
+            "Other judges that joined the primary author in this opinion str"
         ),
         blank=True,
     )
@@ -3358,8 +3354,8 @@ class Opinion(AbstractDateTimeModel):
 
     def save(
         self,
-        *args: List,
-        **kwargs: Dict,
+        *args: list,
+        **kwargs: dict,
     ) -> None:
         self.clean()
         super().save(*args, **kwargs)
@@ -3604,7 +3600,7 @@ class Tag(AbstractDateTimeModel):
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
 
-    def tag_object(self, thing: TaggableType) -> Tuple["Tag", bool]:
+    def tag_object(self, thing: TaggableType) -> tuple["Tag", bool]:
         """Atomically add a tag to an item.
 
         Django has a system for adding to a m2m relationship like the ones

@@ -145,9 +145,9 @@ class MembershipWebhookTest(TestCase):
 
         self.data["eventTrigger"] = "updateMembership"
         self.data["data"]["membership"]["membershipId"] = "12344"
-        self.data["data"]["membership"][
-            "membershipName"
-        ] = "CL Membership - Tier 4"
+        self.data["data"]["membership"]["membershipName"] = (
+            "CL Membership - Tier 4"
+        )
         r = await self.async_client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
             data=self.data,
@@ -176,9 +176,9 @@ class MembershipWebhookTest(TestCase):
 
         # Update the membership level and the trigger type
         self.data["eventTrigger"] = "editMembership"
-        self.data["data"]["membership"][
-            "membershipName"
-        ] = "CL Membership - Tier 4"
+        self.data["data"]["membership"]["membershipName"] = (
+            "CL Membership - Tier 4"
+        )
 
         r = await self.async_client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
@@ -416,7 +416,6 @@ class MembershipWebhookTest(TestCase):
 
 
 class ProfileMembershipTest(TestCase):
-
     def setUp(self) -> None:
         self.user_profile = UserProfileWithParentsFactory()
 

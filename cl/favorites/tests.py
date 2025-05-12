@@ -1,4 +1,3 @@
-import math
 import time
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
@@ -10,13 +9,12 @@ from django.contrib.auth.hashers import make_password
 from django.core import mail
 from django.core.cache import cache
 from django.template.defaultfilters import date as template_date
-from django.test import AsyncClient, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.donate.models import NeonMembership
@@ -64,7 +62,6 @@ class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
 
     def setUp(self) -> None:
         # Set up some handy variables
-        self.async_client = AsyncClient()
         self.note_cluster_params = {
             "cluster_id": 1,
             "name": "foo",
@@ -76,34 +73,31 @@ class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
             "notes": "testing notes",
         }
 
-    async def test_create_note(self) -> None:
+    def test_create_note(self) -> None:
         """Can we create a note by sending a post?"""
         self.assertTrue(
-            await self.async_client.alogin(
-                username="pandora", password="password"
-            )
+            self.client.login(username="pandora", password="password")
         )
         for params in [self.note_cluster_params, self.note_audio_params]:
-            r = await self.async_client.post(
+            r = self.client.post(
                 reverse("save_or_update_note"),
                 params,
                 follow=True,
-                X_REQUESTED_WITH="XMLHttpRequest",
+                headers={"x-requested-with": "XMLHttpRequest"},
             )
             self.assertEqual(r.status_code, 200)
             self.assertIn("It worked", r.content.decode())
 
         # And can we delete them?
         for params in [self.note_cluster_params, self.note_audio_params]:
-            r = await self.async_client.post(
+            r = self.client.post(
                 reverse("delete_note"),
                 params,
                 follow=True,
-                X_REQUESTED_WITH="XMLHttpRequest",
+                headers={"x-requested-with": "XMLHttpRequest"},
             )
         self.assertEqual(r.status_code, 200)
         self.assertIn("It worked", r.content.decode())
-        await self.async_client.alogout()
 
 
 class UserNotesTest(BaseSeleniumTest):
@@ -664,7 +658,6 @@ class APITests(APITestCase):
 
 
 class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
-
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
         """Does the prayer_eligible method work properly?"""
@@ -1396,7 +1389,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 @patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
 @patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPaySignalTests(PrayAndPayTestCase):
-
     @patch("cl.favorites.signals.check_prayer_pacer")
     async def test_create_prayer_no_pacer_doc_id(
         self,
@@ -1524,7 +1516,6 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
 @patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
 @patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
-
     @patch(
         "cl.favorites.tasks.DownloadConfirmationPage", new=FakeConfirmationPage
     )
