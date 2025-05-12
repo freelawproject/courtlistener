@@ -126,19 +126,13 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
             # read the last existing page from the cache
             cached_urls: CacheableList | None = db_cache.get(cache_key)
 
-            if (
-                current_cursor is None
-                and cached_urls is None
-                and current_page > 1
-            ):
+            if current_cursor is None and cached_urls is None and current_page > 1:
                 # reset the section page number to 1 and regenerate the whole section
                 current_page = 1
                 continue
 
             # Cursor of the current page read from the cache
-            cached_cursor: str | None = getattr(
-                cached_urls, "current_cursor", None
-            )
+            cached_cursor: str | None = getattr(cached_urls, "current_cursor", None)
 
             logger.info(
                 f"Cursor of the current page read from the cache: {cached_cursor}, passed from the previous iteration: {current_cursor}, current_page: {current_page}"
@@ -204,9 +198,7 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                     cache_timeout = short_cache_timeout
 
                 # Save expiration time in the urls object to check it later
-                urls.expiration_time = make_expiration_time(
-                    db_cache, cache_timeout
-                )
+                urls.expiration_time = make_expiration_time(db_cache, cache_timeout)
 
                 # Save the sitemap page data to the cache
                 db_cache.set(cache_key, urls, cache_timeout)
