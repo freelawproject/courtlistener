@@ -1,6 +1,7 @@
 {% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
+{% load tailwind_tags %}{% load component_tags %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
   <meta charset="utf-8"/>
   <meta http-equiv="Content-Language" content="en"/>
@@ -43,6 +44,9 @@
   <meta property="og:image:height" content="{% block og_image_height %}630{% endblock %}"/>
   {% endblock %}
 
+  {% tailwind_css %}
+  {% tailwind_preload_css %}
+
   {% block icons %}
   {# Touch icons, etc from: https://evilmartians.com/chronicles/how-to-favicon-in-2021-six-files-that-fit-most-needs #}
   <link rel="icon" href="{% static "ico/favicon.ico" %}" sizes="32x32">
@@ -67,119 +71,65 @@
   <title>{% block title %}CourtListener.com{% endblock %}</title>
   {% block head %}{% endblock %}
   {% block canonical %}{% endblock %}
-  <link rel="stylesheet" href="{% static "css/override.css" %}" type="text/css"
-        media="screen, projection">
 </head>
 
 <body class="{% block body-classes %}{% endblock %}">
-<div class="container round-bottom">
   {% block header %}
-  <header class="row">
+  <header class="border border-greyscale-200">
   New design MVP
   </header>
   {% endblock %}
 
-  {% block messages %}
-    {% include "includes/messages.html" %}
-  {% endblock %}
-
-  <div class="row content">
-    {% block sidebar %}
-      <div class="col-sm-3" id="sidebar"></div>
-    {% endblock %}
-
-    {# for the settings pages #}
-    {% block nav %}{% endblock %}
-
-    {% block content %}
-      <p>Your content seems to be missing! This is never good.</p>
-    {% endblock %}
-  </div>
-
-  {% block newsletter %}
-    <div class="row base-newsletter hidden-print">
-      <div class="col-sm-6">
-        <p class="bold bottom">Newsletter</p>
-        <p>Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
-      </div>
-      <div class="col-sm-6 right">
-        <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?forwardedFromSecureDomain=1&subscription=9"
-          class="btn btn-default"
-          tabindex="10000">
-          <i class="fa fa-newspaper-o"></i>&nbsp;Subscribe
-        </a>
-      </div>
+  <main>
+    {% block content_wrapper %}
+    <div class="max-w-content mx-auto pt-4 md:pt-20 pb-35 max-lg:px-4">
+      {% block content %}
+        <p>Your content seems to be missing! This is never good.</p>
+      {% endblock %}
     </div>
-  {% endblock %}
+    {% endblock %}
+  </main>
 
   {% block footer %}
-  <footer class="row hidden-print">
+  <footer class="">
   </footer>
   {% endblock %}
-</div>
 
-{% block social %}
-<div class="text-center hidden-print" id="social-container">
-  <a href="https://free.law/"
-     class="fa-stack fa-lg"
-     tabindex="12000">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-link fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://x.com/freelawproject"
-     rel="noreferrer"
-     class="fa-stack fa-lg"
-     tabindex="12001">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-twitter fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9"
-     class="fa-stack fa-lg"
-     tabindex="12002">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-newspaper-o fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://github.com/freelawproject/courtlistener"
-     rel="noreferrer"
-     class="fa-stack fa-lg"
-     tabindex="12003">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
-  </a>
-</div>
-{% endblock %}
+  {% render_required_scripts %}
 
-{% if DEBUG %}
-<script type="text/javascript"
-        src="{% static "js/jquery/jquery-3.4.1.js" %}"></script>
-{% else %}
-<script type="text/javascript"
-        src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
-{% endif %}
-
-<script type="text/javascript" src="{% static "js/base.js" %}"></script>
-<script type="text/javascript" nonce="{{ request.csp_nonce }}">
-  {# Default values are to ensure JS parsing even if 500 error thrown #}
-  var isMember = {{ user.profile.is_member|yesno:"true,false" }},
-      userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},
-      priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }}),
-      maxFreeDocketAlerts = {{ MAX_FREE_DOCKET_ALERTS|default:0 }},
-      recapBonusAlerts = {{ DOCKET_ALERT_RECAP_BONUS|default:0 }};
-
-</script>
-
-{# Allows your own scripts in the footer. #}
-{% block footer-scripts %}{% endblock %}
-
-{# Record stats for non-superusers 1/10 times to save money #}
-{% if not user.is_superuser  %}
-  {% random_int 0 9 as rand %}
-  {% if rand == 0 %}
-    <script
-      defer
-      data-domain="courtlistener.com"
-      src="https://plausible.io/js/plausible.js"></script>
+  {% if DEBUG %}
+  <script type="text/javascript"
+          src="{% static "js/jquery/jquery-3.4.1.js" %}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  {% else %}
+  <script type="text/javascript"
+          src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% endif %}
-{% endif %}
+
+  <script type="text/javascript" src="{% static "js/base.js" %}"></script>
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+    {# Default values are to ensure JS parsing even if 500 error thrown #}
+    var isMember = {{ user.profile.is_member|yesno:"true,false" }},
+        userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},
+        priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }}),
+        maxFreeDocketAlerts = {{ MAX_FREE_DOCKET_ALERTS|default:0 }},
+        recapBonusAlerts = {{ DOCKET_ALERT_RECAP_BONUS|default:0 }};
+
+  </script>
+
+  {# Allows your own scripts in the footer. #}
+  {% block footer-scripts %}{% endblock %}
+
+  {# Record stats for non-superusers 1/10 times to save money #}
+  {% if not user.is_superuser  %}
+    {% random_int 0 9 as rand %}
+    {% if rand == 0 %}
+      <script
+        defer
+        data-domain="courtlistener.com"
+        src="https://plausible.io/js/plausible.js"></script>
+    {% endif %}
+  {% endif %}
 </body>
 </html>

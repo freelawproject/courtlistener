@@ -1,20 +1,29 @@
 import logging
 import re
 from datetime import datetime
-from typing import Dict, List, Tuple, TypeVar
+from typing import TypeVar
 
+import nh3
 import pghistory
 import pytz
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
-from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
-from django.db.models import Prefetch, Q, QuerySet
+from django.db.models import (
+    Case,
+    CharField,
+    F,
+    Prefetch,
+    Q,
+    QuerySet,
+    Value,
+    When,
+)
 from django.db.models.aggregates import Count, Sum
-from django.db.models.functions import MD5
+from django.db.models.functions import MD5, Coalesce, NullIf
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_str
@@ -38,7 +47,7 @@ from cl.lib.model_helpers import (
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
 from cl.lib.storage import IncrementingAWSMediaStorage
-from cl.lib.string_utils import trunc
+from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.docket_sources import DocketSources
 from cl.users.models import User
 
@@ -285,8 +294,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     )
     ordering_judge_str = models.TextField(
         help_text=(
-            "The judge that issued the final order in the case, as a "
-            "string."
+            "The judge that issued the final order in the case, as a string."
         ),
         blank=True,
     )
@@ -410,8 +418,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     idb_data = models.OneToOneField(
         "recap.FjcIntegratedDatabase",
         help_text=(
-            "Data from the FJC Integrated Database associated with this "
-            "case."
+            "Data from the FJC Integrated Database associated with this case."
         ),
         related_name="docket",
         on_delete=models.SET_NULL,
@@ -1788,14 +1795,13 @@ class Claim(AbstractDateTimeModel):
     )
     description = models.TextField(
         help_text=(
-            "The description of the claim that appears on the claim "
-            "register."
+            "The description of the claim that appears on the claim register."
         ),
         blank=True,
     )
     remarks = models.TextField(
         help_text=(
-            "The remarks of the claim that appear on the claim " "register."
+            "The remarks of the claim that appear on the claim register."
         ),
         blank=True,
     )
@@ -1910,7 +1916,8 @@ class FederalCourtsQuerySet(models.QuerySet):
 
     def appellate_pacer_courts(self) -> models.QuerySet:
         return self.filter(
-            Q(jurisdiction=Court.FEDERAL_APPELLATE) |
+            Q(jurisdiction=Court.FEDERAL_APPELLATE)
+            |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
             end_date__isnull=True,
@@ -2413,7 +2420,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     syllabus = models.TextField(
         help_text=(
-            "A summary of the issues presented in the case and the " "outcome."
+            "A summary of the issues presented in the case and the outcome."
         ),
         blank=True,
     )
@@ -2494,7 +2501,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     citation_count = models.IntegerField(
         help_text=(
-            "The number of times this document is cited by other " "opinion"
+            "The number of times this document is cited by other opinion"
         ),
         default=0,
         db_index=True,
@@ -3050,7 +3057,67 @@ def sort_cites(c):
         return 8
 
 
-@pghistory.track()
+OPINION_TEXT_SOURCE_FIELDS = [
+    "html_with_citations",
+    "xml_harvard",
+    "html_columbia",
+    "html_lawbox",
+    "html_anon_2020",
+    "html",
+]
+
+
+class OpinionQuerySet(models.QuerySet):
+    def with_best_text(self):
+        """Annotates an Opinion QuerySet with best_text and best_text_source.
+
+        To determine the best text, we get the first non-empty value from
+        various source fields, prioritizing HTML formats with citations
+        over plain text.
+
+        The best_text_source is a CharField that indicates
+        the name of the field from which the best_text was retrieved.
+
+        The supported source fields are:
+            - html_with_citations (preferred)
+            - xml_harvard
+            - html_columbia
+            - html_lawbox
+            - html_anon_2020
+            - html
+        """
+        source_fields = OPINION_TEXT_SOURCE_FIELDS
+        # To populate best_text we get the first non-empty value
+        # from the list of possible text sources:
+        coalesce_args = [
+            NullIf(F(field), Value("")) for field in source_fields
+        ]
+        # And we fall back to plain_text if all of the above are empty:
+        coalesce_args.append(F("plain_text"))
+
+        # We use When clauses to determine the name of the field that was used
+        # as the source for the best text:
+        when_clauses = [
+            When(
+                Q(**{f"{field}__isnull": False}) & ~Q(**{field: ""}),
+                then=Value(field),
+            )
+            for field in source_fields
+        ]
+
+        deferred_fields = source_fields + ["plain_text"]
+
+        return self.defer(*deferred_fields).annotate(
+            best_text=Coalesce(*coalesce_args, output_field=CharField()),
+            best_text_source=Case(
+                *when_clauses,
+                default=Value("plain_text"),
+                output_field=CharField(),
+            ),
+        )
+
+
+@pghistory.track(exclude=["html_with_citations"])
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
@@ -3119,14 +3186,13 @@ class Opinion(AbstractDateTimeModel):
         "people_db.Person",
         related_name="opinions_joined",
         help_text=(
-            "Other judges that joined the primary author " "in this opinion"
+            "Other judges that joined the primary author in this opinion"
         ),
         blank=True,
     )
     joined_by_str = models.TextField(
         help_text=(
-            "Other judges that joined the primary author "
-            "in this opinion str"
+            "Other judges that joined the primary author in this opinion str"
         ),
         blank=True,
     )
@@ -3226,6 +3292,8 @@ class Opinion(AbstractDateTimeModel):
     )
     ordering_key = models.IntegerField(null=True, blank=True)
 
+    objects = OpinionQuerySet.as_manager()
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -3238,6 +3306,34 @@ class Opinion(AbstractDateTimeModel):
     def siblings(self) -> QuerySet:
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
+
+    @property
+    def clean_text(self) -> str:
+        """
+        Returns the cleaned opinion text by using the annotated `best_text`
+        if it exists; otherwise, it falls back to computing the value in Python.
+
+        The retrieved text is then cleaned using the `nh3.clean`. This cleaning
+        process removes all HTML tags while preserving the content.
+
+        The annotated field `best_text` is added when calling the QuerySet
+        using with_best_text like so:
+        Opinion.objects.filter(something_here=foo).with_best_text()
+        """
+        if hasattr(self, "best_text"):
+            return nh3.clean(self.best_text, tags=set())
+
+        for field in OPINION_TEXT_SOURCE_FIELDS:
+            value = getattr(self, field, None)
+            if value and value.strip():
+                return nh3.clean(value, tags=set())
+
+        return nh3.clean(self.plain_text, tags=set())
+
+    @property
+    def token_count(self) -> int:
+        """Returns the number of tokens in this opinion text."""
+        return get_token_count_from_string(self.clean_text)
 
     def __str__(self) -> str:
         try:
@@ -3258,8 +3354,8 @@ class Opinion(AbstractDateTimeModel):
 
     def save(
         self,
-        *args: List,
-        **kwargs: Dict,
+        *args: list,
+        **kwargs: dict,
     ) -> None:
         self.clean()
         super().save(*args, **kwargs)
@@ -3504,7 +3600,7 @@ class Tag(AbstractDateTimeModel):
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
 
-    def tag_object(self, thing: TaggableType) -> Tuple["Tag", bool]:
+    def tag_object(self, thing: TaggableType) -> tuple["Tag", bool]:
         """Atomically add a tag to an item.
 
         Django has a system for adding to a m2m relationship like the ones

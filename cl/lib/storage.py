@@ -1,7 +1,7 @@
 import itertools
 import os
 import uuid
-from typing import Dict, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.core.files.storage import Storage
@@ -61,7 +61,7 @@ class AWSMediaStorage(S3Storage):
     location = ""
     file_overwrite = True
 
-    def get_object_parameters(self, name: str) -> Dict[str, str]:
+    def get_object_parameters(self, name: str) -> dict[str, str]:
         # Set extremely long caches b/c we hash our content anyway
         # Expires is the old header, replaced by Cache-Control, but we can
         # include them both for good measure.
@@ -126,7 +126,7 @@ class S3GlacierInstantRetrievalStorage(S3Storage):
     bucket_name = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
     file_overwrite = True
 
-    def get_object_parameters(self, name: str) -> Dict[str, str]:
+    def get_object_parameters(self, name: str) -> dict[str, str]:
         params = self.object_parameters.copy()
         params["StorageClass"] = "GLACIER_IR"
         return params
@@ -147,3 +147,15 @@ class HarvardPDFStorage(S3Boto3Storage):
     default_acl = settings.AWS_DEFAULT_ACL
     querystring_auth = settings.AWS_QUERYSTRING_AUTH
     max_memory_size = settings.AWS_S3_MAX_MEMORY_SIZE
+
+
+class S3IntelligentTieringStorage(S3Storage):
+    """Uses S3 Intelligent Tiering storage class"""
+
+    location = ""
+    file_overwrite = True
+
+    def get_object_parameters(self, name: str) -> dict[str, str]:
+        params = self.object_parameters.copy()
+        params["StorageClass"] = "INTELLIGENT_TIERING"
+        return params

@@ -20,10 +20,9 @@ from django.test import AsyncRequestFactory, RequestFactory, override_settings
 from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils.text import slugify
 from factory import RelatedFactory
-from waffle.testutils import override_flag
 
+from cl.citations.utils import slugify_reporter
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -115,7 +114,6 @@ class SimpleLoadTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
-@override_flag("ui_flag_for_o", False)
 class OpinionPageLoadTest(
     ESIndexTestCase,
     CourtTestCase,
@@ -309,7 +307,7 @@ class CitationRedirectorTest(TestCase):
         f2_cite.cluster_id = 3
         await f2_cite.asave()
 
-        self.citation["reporter"] = slugify(self.citation["reporter"])
+        self.citation["reporter"] = slugify_reporter(self.citation["reporter"])
         r = await self.async_client.get(
             reverse("citation_redirector", kwargs=self.citation)
         )
@@ -503,6 +501,24 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
+    async def test_slugifying_reporters_collision(self) -> None:
+        """Test reporter collision-aware slugification"""
+        test_pairs = [("Vt.", "VT"), ("La.", "LA"), ("MSPB", "M.S.P.B.")]
+        for r1, r2 in test_pairs:
+            response1 = await self.async_client.get(
+                reverse(
+                    "citation_redirector",
+                    kwargs={"reporter": r1},
+                )
+            )
+            response2 = await self.async_client.get(
+                reverse(
+                    "citation_redirector",
+                    kwargs={"reporter": r2},
+                )
+            )
+            self.assertNotEqual(response1.url, response2.url)
+
     async def test_reporter_variation_just_reporter(self) -> None:
         """Do we redirect properly when we get reporter variations?"""
         r = await self.async_client.get(
@@ -652,7 +668,6 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
 
-    @override_flag("ui_flag_for_o", False)
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
@@ -664,7 +679,7 @@ class CitationRedirectorTest(TestCase):
             follow=True,
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        self.assertTemplateUsed(r, "opinion.html")
+        self.assertTemplateUsed(r, "opinions.html")
         self.assertEqual(
             r.context["cluster"].get_absolute_url(),
             "/opinion/2/case-name-cluster/",

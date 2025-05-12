@@ -1,14 +1,13 @@
 import re
 from collections.abc import Iterable
+from collections.abc import Iterable as IterableType
 from itertools import chain, islice, tee
-from typing import Any
-from typing import Iterable as IterableType
-from typing import Match, Optional, Tuple
+from re import Match
+from typing import Any, Optional
 
-from django.core.cache import caches
+from django.core.cache import cache
 
-import cl.search.models as search_model
-from cl.lib.crypto import sha256
+from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData
 from cl.search.exception import DisallowedWildcardPattern, QueryType
@@ -83,18 +82,18 @@ def is_iter(item: Any) -> bool:
     return isinstance(item, Iterable)
 
 
-def remove_duplicate_dicts(l: list[dict]) -> list[dict]:
+def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
     """Given a list of dicts, remove any that are the same.
 
     See: https://stackoverflow.com/a/9427216/64911
     """
-    return [dict(t) for t in {tuple(d.items()) for d in l}]
+    return [dict(t) for t in {tuple(d.items()) for d in dicts}]
 
 
 def human_sort(
-    unordered_list: IterableType[str | Tuple[str, Any]],
+    unordered_list: IterableType[str | tuple[str, Any]],
     key: Optional[str] = None,
-) -> IterableType[str | Tuple[str, Any]]:
+) -> IterableType[str | tuple[str, Any]]:
     """Human sort Lists of strings or list of dictionaries
 
     :param unordered_list: The list we want to sort
@@ -144,38 +143,6 @@ def get_array_of_selected_fields(cd: CleanData, prefix: str) -> list[str]:
     ]
 
 
-def lookup_child_courts(parent_courts: list[str]) -> set[str]:
-    """Recursively fetches child courts for the given parent courts.
-
-    :param parent_courts: List of parent court_ids.
-    :return: Set of all child court IDs.
-    """
-
-    cache = caches["db_cache"]
-    all_child_courts = set()
-    sorted_courts_hash = sha256("-".join(sorted(parent_courts)))
-    cache_key = f"child_courts:{sorted_courts_hash}"
-    cached_result = cache.get(cache_key)
-
-    if cached_result is not None:
-        return set(cached_result)
-
-    child_courts = search_model.Court.objects.filter(
-        parent_court_id__in=parent_courts
-    ).values_list("id", flat=True)
-    all_child_courts.update(child_courts)
-    if not all_child_courts:
-        return set()
-
-    final_results = all_child_courts.union(
-        lookup_child_courts(list(all_child_courts))
-    )
-    sorted_final_results = sorted(final_results)
-    one_month = 60 * 60 * 24 * 30
-    cache.set(cache_key, sorted_final_results, one_month)
-    return set(sorted_final_results)
-
-
 def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
     """
     Retrieves and combines court IDs from both the given parents and their
@@ -185,7 +152,7 @@ def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
     :return: A string containing the unique combination of parent and child courts.
     """
     unique_courts = set(re.findall(r'"(.*?)"', selected_courts_string))
-    unique_courts.update(lookup_child_courts(list(unique_courts)))
+    unique_courts.update(lookup_child_courts_cache(list(unique_courts)))
     courts = [f'"{c}"' for c in sorted(list(unique_courts))]
     return " OR ".join(courts)
 
@@ -326,7 +293,10 @@ def cleanup_main_query(query_string: str) -> str:
 
     query_string = perform_special_character_replacements(query_string)
 
-    for item in re.split(r'([^a-zA-Z0-9_\-^~":]+)', query_string):
+    # Tweaks to the following regex for special characters exceptions
+    # like §, $, %, and ¶ should also be applied to type_table in
+    # custom_word_delimiter_filter.
+    for item in re.split(r'([^a-zA-Z0-9_\-^~":§$%¶]+)', query_string):
         if not item:
             continue
 
@@ -503,3 +473,20 @@ def map_to_docket_entry_sorting(sort_string: str) -> str:
         return "entry_date_filed desc"
     else:
         return sort_string
+
+
+def append_value_in_cache(key, value):
+    """Append a value to a cached list associated with the given key.
+    If the key does not exist, a new list is created and the value is added.
+
+    :param key: The cache key to retrieve or store the list.
+    :param value: The value to be appended to the cached list.
+    :return: None.
+    """
+
+    cached_docs = cache.get(key)
+    if cached_docs is None:
+        cached_docs = []
+    cached_docs.append(value)
+    one_month = 60 * 60 * 24 * 7 * 4
+    cache.set(key, cached_docs, timeout=one_month)

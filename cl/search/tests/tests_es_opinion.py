@@ -21,7 +21,6 @@ from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
-from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import do_es_api_query
@@ -506,7 +505,8 @@ class OpinionV3APISearchTest(
                 type=cd["type"],
             )
             for result in hits:
-                ids_in_results.add(result.id)
+                if result:
+                    ids_in_results.add(result.id)
         self.assertEqual(
             len(ids_in_results),
             total_opinions,
@@ -646,9 +646,10 @@ class OpinionV4APISearchTest(
         prioritizing the different text fields available in the content when
         highlighting is disabled."""
 
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             c_2_opinion_1 = OpinionFactory.create(
                 extracted_by_ocr=True,
                 author=self.person_2,
@@ -730,9 +731,10 @@ class OpinionV4APISearchTest(
                     )
                     self.assertEqual(expected_text, result_opinion["snippet"])
 
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             c_2_opinion_1.delete()
             c_2_opinion_2.delete()
             c_2_opinion_3.delete()
@@ -2569,7 +2571,6 @@ class OpinionSearchDecayRelevancyTest(
             self._test_results_ordering(test, "cluster_id", version="v3")
 
 
-@override_flag("ui_flag_for_o", False)
 @override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
@@ -2702,14 +2703,16 @@ class RelatedSearchTest(
             )
         )
 
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
 
-        recomendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        recommendations_actual = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
         recommendations_expected = [
             (
@@ -2728,7 +2731,7 @@ class RelatedSearchTest(
         # Test if related opinion exist in expected order
         self.assertEqual(
             recommendations_expected,
-            recomendations_actual,
+            recommendations_actual,
             msg="Unexpected opinion recommendations.",
         )
         await sync_to_async(self.async_client.logout)()
@@ -2745,17 +2748,19 @@ class RelatedSearchTest(
             )
         )
 
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
 
-        recomendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        current_related_cases = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
 
-        recommendations_expected = [
+        expected_related_cases = [
             (
                 f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
                 "Howard v. Honda",
@@ -2772,9 +2777,9 @@ class RelatedSearchTest(
 
         # Test if related opinion exist in expected order
         self.assertEqual(
-            recommendations_expected,
-            recomendations_actual,
-            msg="Unexpected opinion recommendations.",
+            expected_related_cases,
+            current_related_cases,
+            msg="Unexpected related cases.",
         )
         await sync_to_async(self.async_client.logout)()
 
@@ -2792,16 +2797,18 @@ class RelatedSearchTest(
             )
         )
 
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
 
-        recommendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        current_related_cases = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
-        recommendations_expected = [
+        expected_related_cases = [
             (
                 f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
                 "Debbas v. Franklin",
@@ -2817,17 +2824,18 @@ class RelatedSearchTest(
         ]
         # Test if related opinion exist in expected order
         self.assertEqual(
-            recommendations_expected,
-            recommendations_actual,
-            msg="Unexpected opinion recommendations.",
+            expected_related_cases,
+            current_related_cases,
+            msg="Unexpected related cases.",
         )
         await sync_to_async(self.async_client.logout)()
 
+    @override_settings(RELATED_USE_CACHE=False)
     async def test_es_get_citing_and_related_clusters_no_cache_timeout(
         self,
     ) -> None:
         """Confirm that 'Unable to retrieve clusters...' message is shown if
-        the MLT and citing query time out."""
+        the MLT and citing query time out and there is no cache available."""
         seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
@@ -2837,30 +2845,64 @@ class RelatedSearchTest(
             )
         )
 
+        # Timeout Request for related cases and there is no cache
         with mock.patch(
-            "elasticsearch_dsl.MultiSearch.execute"
+            "elasticsearch_dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionTimeout(
                 "Connection timeout"
             )
-            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/related-cases/" % seed_pk
+            )
 
         self.assertEqual(r.status_code, 200)
         tree = html.fromstring(r.content.decode())
-        recommendations_text = tree.xpath("//*[@id='recommendations']")[
-            0
-        ].text_content()
-        citing_text = tree.xpath("//*[@id='cited-by']")[0].text_content()
-        self.assertIn(
-            "Unable to retrieve related clusters.", recommendations_text
+
+        # Results are returned from cache.
+        current_related_cases = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
+        ]
+        expected_related_cases = []
+        self.assertEqual(
+            expected_related_cases,
+            current_related_cases,
+            msg="Unexpected related cases.",
         )
-        self.assertIn("Unable to retrieve citing clusters.", citing_text)
+
+        # Timeout Request for cited by cases and there is no cache
+        with mock.patch(
+            "elasticsearch_dsl.Search.execute"
+        ) as mock_m_search_execute:
+            mock_m_search_execute.side_effect = ConnectionTimeout(
+                "Connection timeout"
+            )
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/cited-by/" % seed_pk
+            )
+
+        self.assertEqual(r.status_code, 200)
+        tree = html.fromstring(r.content.decode())
+
+        current_cited_by = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='cited-by']/article/h3/a")
+        ]
+
+        expected_cited_by = []
+        self.assertEqual(
+            expected_cited_by,
+            current_cited_by,
+            msg="Unexpected opinion cited.",
+        )
         await sync_to_async(self.async_client.logout)()
 
+    @override_settings(RELATED_USE_CACHE=False)
     async def test_es_get_citing_and_related_clusters_no_cache_connection_error(
         self,
     ) -> None:
-        """Confirm that there are no related clusters, and display 'This case
+        """Confirm that there are no related clusters, no cached results, and display 'This case
         has not yet been cited in our system.' if the query raised a
         connection error."""
 
@@ -2874,16 +2916,16 @@ class RelatedSearchTest(
         )
 
         with mock.patch(
-            "elasticsearch_dsl.MultiSearch.execute"
+            "elasticsearch_dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionError()
-            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/cited-by/" % seed_pk
+            )
 
         self.assertEqual(r.status_code, 200)
         tree = html.fromstring(r.content.decode())
-        recommendations_text = tree.xpath("//*[@id='recommendations']")
         citing_text = tree.xpath("//*[@id='cited-by']")[0].text_content()
-        self.assertEqual([], recommendations_text)
         self.assertIn(
             "This case has not yet been cited in our system.", citing_text
         )
@@ -2904,31 +2946,33 @@ class RelatedSearchTest(
             )
         )
         # Initial successful request. Results are cached.
-        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get(
+            "/opinion/%i/asdf/related-cases/" % seed_pk
+        )
+        self.assertEqual(r.status_code, 200)
+        r = await self.async_client.get("/opinion/%i/asdf/cited-by/" % seed_pk)
         self.assertEqual(r.status_code, 200)
 
-        # Timeout Request.
+        # Timeout Request for related cases
         with mock.patch(
-            "elasticsearch_dsl.MultiSearch.execute"
+            "elasticsearch_dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionTimeout(
                 "Connection timeout"
             )
-            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/related-cases/" % seed_pk
+            )
 
         self.assertEqual(r.status_code, 200)
         tree = html.fromstring(r.content.decode())
 
         # Results are returned from cache.
-        recommendations_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        current_related_cases = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='related']//article//h3/a")
         ]
-        citing_actual = [
-            (a.get("href"), a.text_content().strip())
-            for a in tree.xpath("//*[@id='cited-by']/ul/li/a")
-        ]
-        recommendations_expected = [
+        expected_related_cases = [
             (
                 f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
                 "Debbas v. Franklin",
@@ -2943,15 +2987,34 @@ class RelatedSearchTest(
             ),
         ]
         self.assertEqual(
-            recommendations_expected,
-            recommendations_actual,
-            msg="Unexpected opinion recommendations.",
+            expected_related_cases,
+            current_related_cases,
+            msg="Unexpected related cases.",
         )
 
-        citing_expected = [
+        # Timeout Request for cited by cases
+        with mock.patch(
+            "elasticsearch_dsl.Search.execute"
+        ) as mock_m_search_execute:
+            mock_m_search_execute.side_effect = ConnectionTimeout(
+                "Connection timeout"
+            )
+            r = await self.async_client.get(
+                "/opinion/%i/asdf/cited-by/" % seed_pk
+            )
+
+        self.assertEqual(r.status_code, 200)
+        tree = html.fromstring(r.content.decode())
+
+        current_cited_by = [
+            (a.get("href"), a.xpath("normalize-space()"))
+            for a in tree.xpath("//*[@id='cited-by']/article/h3/a")
+        ]
+
+        expected_cited_by = [
             (
                 f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
-                f"Howard v. Honda (1895)",
+                "Howard v. Honda (1895)",
             ),
             (
                 f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
@@ -2959,8 +3022,8 @@ class RelatedSearchTest(
             ),
         ]
         self.assertEqual(
-            citing_expected,
-            citing_actual,
+            expected_cited_by,
+            current_cited_by,
             msg="Unexpected opinion cited.",
         )
         await sync_to_async(self.async_client.logout)()
@@ -4255,10 +4318,13 @@ class OpinionFeedTest(
         """Can we clean up control characters in the text for a proper XML
         rendering?
         """
-        with mock.patch(
-            "cl.search.documents.escape",
-            return_value="Lorem ipsum control chars \x07\x08\x0b.",
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            mock.patch(
+                "cl.search.documents.escape",
+                return_value="Lorem ipsum control chars \x07\x08\x0b.",
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             court = CourtFactory(
                 id="ca1_test",
                 jurisdiction="FB",

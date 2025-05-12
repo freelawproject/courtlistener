@@ -6,8 +6,9 @@ from datetime import date
 from http import HTTPStatus
 from io import BytesIO
 from pyexpat import ExpatError
+from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
+from typing import Any, Optional, Union
 
 import eyecite
 import internetarchive as ia
@@ -147,7 +148,7 @@ def increment_failure_count(obj: Union[Audio, Docket, RECAPDocument]) -> None:
 def generate_ia_json(
     d_pk: int,
     database: str = "default",
-) -> Tuple[Docket, str]:
+) -> tuple[Docket, str]:
     """Generate JSON for upload to Internet Archive
 
     :param d_pk: The PK of the docket to generate JSON for
@@ -289,7 +290,7 @@ def download_recap_item(
     location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
     try:
         if os.path.isfile(location) and not clobber:
-            raise IOError(f"    IOError: File already exists at {location}")
+            raise OSError(f"    IOError: File already exists at {location}")
         r = requests.get(
             url,
             stream=True,
@@ -302,7 +303,7 @@ def download_recap_item(
         raise self.retry(exc=e, countdown=2)
     except requests.RequestException as e:
         logger.warning(f"    Unable to get {url}\nException was:\n{e}")
-    except IOError as e:
+    except OSError as e:
         logger.warning(f"    {e}")
     else:
         with NamedTemporaryFile(prefix="recap_download_") as tmp:
@@ -327,7 +328,7 @@ def download_recap_item(
 )
 def get_and_save_free_document_report(
     self: Task, court_id: str, start: date, end: date, log_id: int = 0
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Download the Free document report and save it to the DB.
 
     :param self: The Celery task.
@@ -426,12 +427,11 @@ def get_and_save_free_document_report(
 
     document_rows_to_create = []
     for row in results:
-
         # There is a document without a case number in pacer, skip it (issue #4547)
         if not row["docket_number"]:
             logger.warning(
-                f"No case number for document, court: {row["court_id"]}, "
-                f"date_filed: {row["date_filed"]}"
+                f"No case number for document, court: {row['court_id']}, "
+                f"date_filed: {row['date_filed']}"
             )
             continue
 
@@ -788,14 +788,14 @@ ia_session = ia.get_session(
 def upload_to_ia(
     self: Task,
     identifier: str,
-    files: Union[str, List[str], List[BytesIO], Dict[str, BytesIO]],
+    files: Union[str, list[str], list[BytesIO], dict[str, BytesIO]],
     title: str,
-    collection: List[str],
+    collection: list[str],
     court_id: str,
     source_url: str,
     media_type: str,
     description: str,
-) -> Optional[List[Response]]:
+) -> Optional[list[Response]]:
     """Upload an item and its files to the Internet Archive
 
     On the Internet Archive there are Items and files. Items have a global
@@ -840,8 +840,7 @@ def upload_to_ia(
             return None
         raise self.retry(exc=exc)
     logger.info(
-        "Uploading file to Internet Archive with identifier: %s and "
-        "files %s",
+        "Uploading file to Internet Archive with identifier: %s and files %s",
         identifier,
         files,
     )
@@ -919,7 +918,7 @@ def mark_court_done_on_date(log_id: int, status: int) -> Optional[int]:
 
 
 @app.task(ignore_result=True)
-def delete_pacer_row(data: TaskData, pk: int) -> List[int]:
+def delete_pacer_row(data: TaskData, pk: int) -> list[int]:
     try:
         PACERFreeDocumentRow.objects.get(pk=pk).delete()
     except PACERFreeDocumentRow.DoesNotExist:
@@ -929,7 +928,7 @@ def delete_pacer_row(data: TaskData, pk: int) -> List[int]:
 
 def make_fjc_idb_lookup_params(
     item: FjcIntegratedDatabase,
-) -> Dict[str, Optional[str]]:
+) -> dict[str, Optional[str]]:
     """Given an IDB row, generate good params for looking up that item in the
     PossibleCaseNumberApi.
 
@@ -1083,7 +1082,7 @@ def do_case_query_by_pacer_case_id(
     data: TaskData,
     court_id: str,
     session_data: SessionData,
-    tag_names: List[str] | None = None,
+    tag_names: list[str] | None = None,
 ) -> TaskData | None:
     """Run a case query (iquery.pl) query on a case and save the data
 
@@ -1163,10 +1162,10 @@ def do_case_query_by_pacer_case_id(
 @app.task(bind=True, ignore_result=True)
 def filter_docket_by_tags(
     self: Task,
-    data: Optional[Dict[Any, Any]],
-    tags: Optional[List[str]],
+    data: Optional[dict[Any, Any]],
+    tags: Optional[list[str]],
     court_id: str,
-) -> Optional[Dict[Any, Any]]:
+) -> Optional[dict[Any, Any]]:
     """Stop the chain if the docket that'll be updated is already tagged.
 
     This is useful for if you're running a bulk download a second time and want
@@ -1427,32 +1426,69 @@ def query_iquery_page(
     bind=True,
     ignore_result=True,
 )
-def probe_iquery_pages(
+def probe_or_scrape_iquery_pages(
     self: Task,
     court_id: str,
+    latest_know_case_id_db: str | None,
     testing: bool = False,
 ) -> None:
     """
     Using the iquery endpoint, to perform forward probing and retrieve the
-    highest watermark we can scrape.
+    highest watermark we can scrape. Or perform a fixed sweep in case the
+    court hasn't caught up yet.
 
     :param self: The celery task
     :param court_id: A CL court ID where we'll look things up.
+    :param latest_know_case_id_db: The latest known pacer case ID from DB if available.
     :param testing: A boolean indicating whether this was called from tests.
     :return: None
     """
+    from cl.corpus_importer.signals import (
+        update_latest_case_id_and_schedule_iquery_sweep,
+    )
 
     r = get_redis_interface("CACHE")
     probe_iteration = 1
     latest_match = 0
+    probe_offset = 0
     highest_known_pacer_case_id = int(
         r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
     )
-    jitter = compute_binary_probe_jitter(testing)
+
+    # latest_known_case_id_db represents the latest known PACER case ID from a
+    # court. If it's greater than the current highest_known_pacer_case_id in
+    # Redis, we can conclude that the court hasn't caught up yet. In this
+    # scenario, instead of performing the regular exploration mode which can be
+    # slow we can switch to a fixed sweep mode. This mode will process
+    # IQUERY_FIXED_SWEEP case IDs per cycle and update the
+    # highest_known_pacer_case_id so the scraper can continue progressing at
+    # a fixed pace each cycle until
+    # highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP is equal to or
+    # greater than latest_known_case_id_db.
+    # Note that including settings.IQUERY_FIXED_SWEEP in the comparison is important
+    # so that the fixed sweep mode runs only up to latest_known_case_id_db.
+    # Otherwise, we might miss a few cases during the transition from fixed sweep
+    # back to regular exploration mode.
+    do_fixed_sweep = (
+        (
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP
+            < int(latest_know_case_id_db)
+        )
+        if latest_know_case_id_db
+        else False
+    )
+    # Avoid random jitter when performing a fixed sweep.
+    jitter = 0 if do_fixed_sweep else compute_binary_probe_jitter(testing)
     reports_data = []
     found_match = False
-    while probe_iteration <= settings.IQUERY_PROBE_ITERATIONS:
-        pacer_case_id_to_lookup = compute_next_binary_probe(
+    pacer_case_id_to_lookup = highest_known_pacer_case_id
+    # In fixed sweep mode, probing is not required, but we perform one iteration
+    # just to verify that the court is not down or that we haven't been blocked.
+    probe_iteration_limit = (
+        1 if do_fixed_sweep else settings.IQUERY_PROBE_MAX_OFFSET
+    )
+    while probe_offset + jitter < probe_iteration_limit:
+        pacer_case_id_to_lookup, probe_offset = compute_next_binary_probe(
             highest_known_pacer_case_id, probe_iteration, jitter
         )
         probe_iteration += 1
@@ -1531,16 +1567,49 @@ def probe_iquery_pages(
             "iquery:test_highest_known_pacer_case_id", court_id, latest_match
         )
 
+    if do_fixed_sweep:
+        # The court hasn't caught up; perform a fixed sweep.
+        logger.info(
+            "Scheduling a fixed sweep for court %s — case IDs from %s to %s.",
+            court_id,
+            highest_known_pacer_case_id,
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
+        )
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None,
+            court_id,
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
+        )
+        delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
+        return None
+
     if not reports_data:
+        logger.info(
+            "No cases were found during this probe for court %s - case IDs from %s to %s.",
+            court_id,
+            str(highest_known_pacer_case_id),
+            str(pacer_case_id_to_lookup),
+        )
         court_empty_probe_attempts = r.incr(
             f"iquery:court_empty_probe_attempts:{court_id}"
         )
-        if court_empty_probe_attempts >= settings.IQUERY_EMPTY_PROBES_LIMIT:
+        # Compute the duration of empty probes in hours based on the number of
+        # court_empty_probe_attempts and the current IQUERY_PROBE_WAIT interval
+        empty_probes_hours = (
+            court_empty_probe_attempts * settings.IQUERY_PROBE_WAIT
+        ) / 3600
+        court_empty_probe_limit_hours = (
+            settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS.get(
+                court_id, settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS["default"]
+            )
+        )
+        if empty_probes_hours >= court_empty_probe_limit_hours:
             logger.error(
-                "The court %s has accumulated %s empty probe attempts. "
-                "Probably the probe got stuck and manual intervention is required.",
+                "Court %s has accumulated many probe attempts over "
+                "approximately %s hours. It appears the probe may be stuck; "
+                "manual intervention may be required.",
                 court_id,
-                settings.IQUERY_EMPTY_PROBES_LIMIT,
+                court_empty_probe_limit_hours,
             )
             # Restart court_blocked_attempts to avoid continue logging the
             # error on next iterations.
@@ -1704,7 +1773,7 @@ def get_appellate_docket_by_docket_number(
     docket_number: str,
     court_id: str,
     session_data: SessionData,
-    tag_names: Optional[List[str]] = None,
+    tag_names: Optional[list[str]] = None,
     **kwargs,
 ) -> Optional[TaskData]:
     """Get a docket by docket number, CL court ID, and a collection of kwargs
@@ -1869,7 +1938,7 @@ def get_bankr_claims_registry(
     self: Task,
     data: TaskData,
     session_data: SessionData,
-    tag_names: List[str] | None = None,
+    tag_names: list[str] | None = None,
 ) -> TaskData | None:
     """Get the bankruptcy claims registry for a docket
 
@@ -1888,8 +1957,7 @@ def get_bankr_claims_registry(
     )
     if data is None or data.get("docket_pk") is None:
         logger.warning(
-            "Empty data argument or parameter. Terminating chains "
-            "and exiting."
+            "Empty data argument or parameter. Terminating chains and exiting."
         )
         self.request.chain = None
         return None
@@ -2242,7 +2310,7 @@ def update_rd_metadata(
     pacer_doc_id: str,
     document_number: str,
     attachment_number: int,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
 
     :param self: The celery task
@@ -2297,9 +2365,9 @@ def update_rd_metadata(
     if response.is_success:
         rd.page_count = int(response.text)
 
-    assert isinstance(
-        rd.page_count, (int, type(None))
-    ), "page_count must be an int or None."
+    assert isinstance(rd.page_count, (int, type(None))), (
+        "page_count must be an int or None."
+    )
 
     # Save and extract, skipping OCR.
     rd.save()
@@ -2405,7 +2473,7 @@ def get_pacer_doc_by_rd_and_description(
     description_re: Pattern,
     session_data: SessionData,
     fallback_to_main_doc: bool = False,
-    tag_name: Optional[List[str]] = None,
+    tag_name: Optional[list[str]] = None,
 ) -> None:
     """Using a RECAPDocument object ID and a description of a document, get the
     document from PACER.
@@ -2895,9 +2963,7 @@ def recap_document_into_opinions(
         )
 
         logger.info(
-            "Successfully imported https://www.courtlistener.com/opinion/{}/decision/".format(
-                cluster.id
-            )
+            f"Successfully imported https://www.courtlistener.com/opinion/{cluster.id}/decision/"
         )
     # Return input task data to preserve the chain in scrape_pacer_free_opinion
     return task_data

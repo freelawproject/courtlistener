@@ -2,7 +2,7 @@ import json
 import re
 from datetime import date, datetime
 from glob import iglob
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
@@ -23,7 +23,7 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 cnt = CaseNameTweaker()
 
 
-def find_cites(case_data: Dict[str, str]) -> List[FoundCitation]:
+def find_cites(case_data: dict[str, str]) -> list[FoundCitation]:
     """Extract citations from raw string.
 
     :param case_data: Case information from the anon 2020 db.
@@ -47,13 +47,13 @@ def find_cites(case_data: Dict[str, str]) -> List[FoundCitation]:
 def merge_or_add_opinions(
     cluster_id: int,
     html_str: str,
-    data: Dict[str, Any],
+    data: dict[str, Any],
     date_argued: Optional[date],
     date_filed: Optional[date],
-    case_names: Dict[str, str],
+    case_names: dict[str, str],
     status: str,
     docket_number: str,
-    found_citations: List[FoundCitation],
+    found_citations: list[FoundCitation],
 ) -> Optional[Docket]:
     """Merge opinions if applicable.
 
@@ -160,13 +160,13 @@ def merge_or_add_opinions(
 @transaction.atomic
 def add_new_records(
     html_str: str,
-    data: Dict[str, Any],
+    data: dict[str, Any],
     date_argued: Optional[date],
     date_filed: Optional[date],
-    case_names: Dict[str, str],
+    case_names: dict[str, str],
     status: str,
     docket_number: str,
-    found_citations: List[FoundCitation],
+    found_citations: list[FoundCitation],
     court_id: str,
 ) -> Docket:
     """Create new records in the DB based on parsed data
@@ -234,7 +234,7 @@ def add_new_records(
     return docket
 
 
-def check_publication_status(found_cites: List[Citation]) -> str:
+def check_publication_status(found_cites: list[Citation]) -> str:
     """Identify if the opinion is published in a specific reporter.
 
     Check if one of the found citations matches published reporters.
@@ -258,7 +258,7 @@ def clean_docket_number(docket_number: str) -> str:
 
 
 def attempt_cluster_lookup(
-    citations: List[FoundCitation],
+    citations: list[FoundCitation],
     new_docket_number: str,
 ) -> Optional[int]:
     """Check if the citation in our database.
@@ -290,7 +290,7 @@ def attempt_cluster_lookup(
     return None
 
 
-def do_case_name(soup, data: Dict[str, Any]) -> Dict[str, str]:
+def do_case_name(soup, data: dict[str, Any]) -> dict[str, str]:
     """Extract and normalize the case name
 
     :param soup: bs4 html object of opinion.
@@ -308,7 +308,7 @@ def do_case_name(soup, data: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
-def do_docket_number(data: Dict[str, Any]) -> str:
+def do_docket_number(data: dict[str, Any]) -> str:
     """Extract the docket number
 
     :param data: The full json data dict
@@ -336,8 +336,8 @@ def find_court_id(court_str: str) -> str:
 
 
 def process_dates(
-    data: Dict[str, Any],
-) -> Tuple[Optional[date], Optional[date]]:
+    data: dict[str, Any],
+) -> tuple[Optional[date], Optional[date]]:
     """Process date argued and date filed
 
     Dates in this dataset fall into two categories, argued and filed/decided.

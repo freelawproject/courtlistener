@@ -1,4 +1,4 @@
-from typing import Dict, List, Union
+from typing import Union
 
 from django.contrib import sitemaps
 from django.urls import reverse
@@ -8,7 +8,7 @@ def make_url_dict(
     view_name: str,
     changefreq: str = "yearly",
     priority: float = 0.5,
-) -> Dict[str, Union[float, str]]:
+) -> dict[str, Union[float, str]]:
     return {
         "view_name": view_name,
         "changefreq": changefreq,
@@ -17,7 +17,7 @@ def make_url_dict(
 
 
 class SimpleSitemap(sitemaps.Sitemap):
-    def items(self) -> List[Dict[str, Union[str, float]]]:
+    def items(self) -> list[dict[str, Union[str, float]]]:
         return [
             # API
             make_url_dict("api_index", priority=0.7),
@@ -78,15 +78,15 @@ class SimpleSitemap(sitemaps.Sitemap):
         ]
 
     def changefreq(
-        self, obj: Dict[str, Union[str, float]]
+        self, obj: dict[str, Union[str, float]]
     ) -> Union[str, float]:
         return obj["changefreq"]
 
-    def priority(self, obj: Dict[str, Union[str, float]]) -> Union[str, float]:
+    def priority(self, obj: dict[str, Union[str, float]]) -> Union[str, float]:
         return str(obj["priority"])
 
     def location(  # type: ignore[override]
         self,
-        obj: Dict[str, Union[str, float]],
+        obj: dict[str, Union[str, float]],
     ) -> str:
         return reverse(str(obj["view_name"]))

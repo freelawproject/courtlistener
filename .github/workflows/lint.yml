@@ -1,12 +1,10 @@
 name: Lint
 
 on:
+  pull_request:
   push:
     branches:
-      - '**'
-  pull_request:
-    branches:
-      - 'main'
+      - main
 
 jobs:
   lint:
@@ -19,10 +17,12 @@ jobs:
           # Once codebase is updated, this can easily be changed to any specific version.
           python-version: "3.13"
 
+      - uses: pre-commit/action@v3.0.0
+
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: 1.8.4
+          version: 2.1.1
           virtualenvs-create: true
           virtualenvs-in-project: true
 
@@ -95,31 +95,5 @@ jobs:
           cl/recap/utils.py \
           cl/search/management/commands/cl_index_parent_and_child_docs.py \
           cl/search/management/commands/sweep_indexer.py \
-          cl/search/management/commands/pacer_bulk_fetch.py
-
-
-
-      - name: Flynt f-string Formatter
-        run: >
-          flynt .
-          --line-length=79
-          --transform-concats
-          --fail-on-change
-
-      - name: Black Code Formatter
-        uses: psf/black@stable
-
-  lint-isort:
-    # This is an unfortunate necessity because the latest version of isort
-    # doesn't work with Python 3.10. To work around that, we simply run this
-    # in version 3.9, but someday we hope to simplify this again.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-
-      - name: isort Import Sorter
-        uses: isort/isort-action@v1
+          cl/search/management/commands/pacer_bulk_fetch.py \
+          cl/search/management/commands/generate_opinion_embeddings.py

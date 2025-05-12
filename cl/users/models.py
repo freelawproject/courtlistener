@@ -1,7 +1,6 @@
 import re
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict
 
 import pghistory
 from django.conf import settings
@@ -10,7 +9,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError, ObjectDoesNotExist
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import models
-from django.db.models import Q, Sum, UniqueConstraint
+from django.db.models import Q, UniqueConstraint
 from django.utils.timezone import now
 from localflavor.us.models import USStateField
 
@@ -139,6 +138,10 @@ class UserProfile(models.Model):
         help_text="Unique identifier assigned by Neon CRM to a customer record",
         blank=True,
     )
+    prayers_public = models.BooleanField(
+        help_text="If enabled, the user's pending document prayers will be viewable by the public",
+        default=False,
+    )
 
     @property
     def is_member(self) -> bool:
@@ -190,7 +193,7 @@ class UserProfile(models.Model):
         return False
 
     @property
-    def recent_api_usage(self) -> Dict[str, int]:
+    def recent_api_usage(self) -> dict[str, int]:
         """Get stats about API usage for the user for the past 14 days
 
         :return: A dict of date-count pairs indicating the amount of times the

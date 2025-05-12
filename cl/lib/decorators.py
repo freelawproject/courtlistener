@@ -2,7 +2,7 @@ import logging
 import time
 from functools import wraps
 from hashlib import md5
-from typing import Callable, Tuple, Type, Union
+from typing import Callable, Union
 from urllib.parse import urlparse
 
 from asgiref.sync import sync_to_async
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def retry(
-    ExceptionToCheck: Union[Type[Exception], Tuple[Type[Exception], ...]],
+    ExceptionToCheck: Union[type[Exception], tuple[type[Exception], ...]],
     tries: int = 4,
     delay: float = 3,
     backoff: float = 2,
@@ -63,7 +63,7 @@ def retry(
 
 def cache_page_ignore_params(timeout: int):
     """Cache the result of a view while ignoring URL query parameters.
-    Ensuring that the cache  is consistent for different requests with varying
+    Ensuring that the cache is consistent for different requests with varying
     query strings.
 
     WARNING:

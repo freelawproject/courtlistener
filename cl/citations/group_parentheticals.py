@@ -33,7 +33,6 @@ import re
 from copy import deepcopy
 from dataclasses import dataclass
 from math import ceil
-from typing import Dict, List, Set
 
 from datasketch import MinHash, MinHashLSH
 from Stemmer import Stemmer
@@ -41,7 +40,7 @@ from Stemmer import Stemmer
 from cl.lib.stop_words import STOP_WORDS
 from cl.search.models import Parenthetical
 
-Graph = Dict[str, List[str]]
+Graph = dict[str, list[str]]
 
 GERUND_WORD = re.compile(r"(?:\S+ing)", re.IGNORECASE)
 
@@ -65,15 +64,15 @@ stemmer = Stemmer("english")
 @dataclass
 class ComputedParentheticalGroup:
     # So named to avoid collision with the database model named ParentheticalGroup
-    parentheticals: List[Parenthetical]
+    parentheticals: list[Parenthetical]
     representative: Parenthetical
     size: int
     score: float
 
 
 def compute_parenthetical_groups(
-    parentheticals: List[Parenthetical],
-) -> List[ComputedParentheticalGroup]:
+    parentheticals: list[Parenthetical],
+) -> list[ComputedParentheticalGroup]:
     """
     Given a list of parentheticals for a case, cluster them based on textual
     similarity and returns a list of ComputedParentheticalGroup objects containing
@@ -93,8 +92,8 @@ def compute_parenthetical_groups(
         return []
 
     similarity_index = deepcopy(_EMPTY_SIMILARITY_INDEX)
-    parenthetical_objects: Dict[str, Parenthetical] = {}
-    parenthetical_minhashes: Dict[str, MinHash] = {}
+    parenthetical_objects: dict[str, Parenthetical] = {}
+    parenthetical_minhashes: dict[str, MinHash] = {}
 
     for par in parentheticals:
         mhash = deepcopy(_EMPTY_MHASH)
@@ -110,8 +109,8 @@ def compute_parenthetical_groups(
         parenthetical_minhashes, similarity_index
     )
 
-    parenthetical_groups: List[ComputedParentheticalGroup] = []
-    visited_nodes: Set[str] = set()
+    parenthetical_groups: list[ComputedParentheticalGroup] = []
+    visited_nodes: set[str] = set()
     for node, neighbors in similarity_graph.items():
         if component := get_graph_component(
             node, similarity_graph, visited_nodes
@@ -129,7 +128,7 @@ def compute_parenthetical_groups(
 
 
 def get_similarity_graph(
-    parenthetical_minhashes: Dict[str, MinHash], similarity_index: MinHashLSH
+    parenthetical_minhashes: dict[str, MinHash], similarity_index: MinHashLSH
 ) -> Graph:
     """
     From the MinHashLSH index, create a dictionary representation of a graph
@@ -152,8 +151,8 @@ def get_similarity_graph(
 
 
 def get_graph_component(
-    node: str, graph: Graph, visited: Set[str]
-) -> List[str]:
+    node: str, graph: Graph, visited: set[str]
+) -> list[str]:
     """
     From a given starting node, find the list of nodes connected to it either
     directly or indirectly. In graph theory terms, this is a "connected
@@ -178,8 +177,8 @@ def get_graph_component(
 
 
 def get_group_from_component(
-    component: List[str],
-    parenthetical_objects: Dict[str, Parenthetical],
+    component: list[str],
+    parenthetical_objects: dict[str, Parenthetical],
     similarity_graph: Graph,
 ) -> ComputedParentheticalGroup:
     """
@@ -221,7 +220,7 @@ BEST_PARENTHETICAL_SEARCH_THRESHOLD = 0.2
 
 
 def get_representative_parenthetical(
-    parentheticals: List[Parenthetical], similarity_graph: Graph
+    parentheticals: list[Parenthetical], similarity_graph: Graph
 ) -> Parenthetical:
     """
     Takes a list of parentheticals sorted by score and returns the parenthetical
@@ -243,7 +242,7 @@ def get_representative_parenthetical(
     )
 
 
-def get_parenthetical_tokens(text: str) -> List[str]:
+def get_parenthetical_tokens(text: str) -> list[str]:
     """
     For a given text string, tokenize it, and filter stop words.
 
