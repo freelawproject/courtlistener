@@ -22,8 +22,6 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         if options["force_regenerate"]:
             reset_sitemaps_cursor()
-            logger.info(
-                "Sitemaps cursor was reset, run `generate_sitemaps` again to start the generation"
-            )
+            logger.info("Sitemaps cursor was reset successfully.")
 
         generate_urls_chunk(options["force_regenerate"])
