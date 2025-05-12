@@ -153,7 +153,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         Returns:
             list[dict[str, Any]]: A list of dictionaries representing the URLs for the sitemap.
         """
-        if self._cursor == False:
+        if self._cursor is False:
             raise Exception(
                 "The cursor should be set (by calling `set_cursor`) before calling `get_urls_by_cursor` method."
             )
