@@ -82,14 +82,11 @@ class DocketSitemap(InfinitePaginatorSitemap):
             date_filed__gt=datetime.today() - timedelta(days=30)
         )
         # Ordering should NOT be set here, define the ordering in the separate `ordering` property
-        return (
-            Docket.objects.filter(
-                new_or_popular,
-                source__in=Docket.RECAP_SOURCES(),
-                blocked=False,
-            )
-            .only("view_count", "date_modified", "pk", "slug")
-        )
+        return Docket.objects.filter(
+            new_or_popular,
+            source__in=Docket.RECAP_SOURCES(),
+            blocked=False,
+        ).only("view_count", "date_modified", "pk", "slug")
 
     def lastmod(self, obj: Docket) -> datetime:
         return obj.date_modified

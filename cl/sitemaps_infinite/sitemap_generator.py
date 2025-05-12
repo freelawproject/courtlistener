@@ -12,12 +12,12 @@ from django.utils.timezone import now as tz_now
 from redis import Redis
 
 from cl.lib.redis_utils import get_redis_interface
-from cl.sitemaps_infinite.urls import pregenerated_sitemaps
 from cl.sitemaps_infinite.base_sitemap import (
     CacheableList,
     InfinitePaginatorSitemap,
 )
 from cl.sitemaps_infinite.types import TaskCursorData
+from cl.sitemaps_infinite.urls import pregenerated_sitemaps
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,6 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
     # Iterate over the sitemap sections, find the place where we left off, and continue from there
     for section, sitemapClass in pregenerated_sitemaps.items():
-
         # Get from the cache the cursor value for the sitemap section, processed last time
         cursor_section: str | None = cursor_data.get("section")
 
@@ -111,7 +110,6 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
         # Pre-generate sitemap pages in the current section
         while True:
-
             if num_files >= settings.SITEMAPS_FILES_PER_CALL:
                 logger.info(
                     f"Reached the limit of {settings.SITEMAPS_FILES_PER_CALL} files per call for section: {section} and page: {cursor_data.get('last_page')}."
@@ -126,13 +124,19 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
             # read the last existing page from the cache
             cached_urls: CacheableList | None = db_cache.get(cache_key)
 
-            if current_cursor is None and cached_urls is None and current_page > 1:
+            if (
+                current_cursor is None
+                and cached_urls is None
+                and current_page > 1
+            ):
                 # reset the section page number to 1 and regenerate the whole section
                 current_page = 1
                 continue
 
             # Cursor of the current page read from the cache
-            cached_cursor: str | None = getattr(cached_urls, "current_cursor", None)
+            cached_cursor: str | None = getattr(
+                cached_urls, "current_cursor", None
+            )
 
             logger.info(
                 f"Cursor of the current page read from the cache: {cached_cursor}, passed from the previous iteration: {current_cursor}, current_page: {current_page}"
@@ -198,7 +202,9 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                     cache_timeout = short_cache_timeout
 
                 # Save expiration time in the urls object to check it later
-                urls.expiration_time = make_expiration_time(db_cache, cache_timeout)
+                urls.expiration_time = make_expiration_time(
+                    db_cache, cache_timeout
+                )
 
                 # Save the sitemap page data to the cache
                 db_cache.set(cache_key, urls, cache_timeout)
@@ -268,7 +274,7 @@ def make_cache_key(
     scheme = sitemapObject.get_protocol()
     host = sitemapObject.get_domain()
 
-    uri = f"{scheme}://{host}{reverse('sitemaps-pregenerated', kwargs={"section": section})}?p={page}"
+    uri = f"{scheme}://{host}{reverse('sitemaps-pregenerated', kwargs={'section': section})}?p={page}"
     url = hashlib.md5(force_bytes(iri_to_uri(uri)))
 
     return f"sitemap.{section}.{url.hexdigest()}"

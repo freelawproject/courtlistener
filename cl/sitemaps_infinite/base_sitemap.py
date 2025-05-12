@@ -83,7 +83,9 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
     # set url scheme to be compatible with the regular sitemap
     def get_protocol(self, protocol=None):
         env_based_protocol = (
-            "http" if any([settings.TESTING, settings.DEVELOPMENT]) else "https"
+            "http"
+            if any([settings.TESTING, settings.DEVELOPMENT])
+            else "https"
         )
         return self.protocol or protocol or env_based_protocol
 
@@ -98,7 +100,9 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         """
         The section of the response that this cursor data applies to, as a string or bytes.
         """
-        raise Exception("The section property should by provided by the subclass.")
+        raise Exception(
+            "The section property should by provided by the subclass."
+        )
 
     def set_cursor(self, cursor: str | None = None):
         self._cursor = cursor
@@ -121,7 +125,9 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
 
     @property
     def paginator(self):
-        return CustomCursorPaginator(self._items(), self.ordering, self.section)
+        return CustomCursorPaginator(
+            self._items(), self.ordering, self.section
+        )
 
     def get_urls(
         self,
@@ -161,14 +167,15 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         protocol = self.get_protocol(protocol)
         domain = self.get_domain(site)
 
-        urls, self._cursor, self._has_next = self._urls(self._cursor, protocol, domain)
+        urls, self._cursor, self._has_next = self._urls(
+            self._cursor, protocol, domain
+        )
 
         return urls
 
     def _urls(
         self, cursor: str, protocol: str, domain: str
     ) -> tuple[CacheableList[dict[str, Any]], str, bool]:
-
         urls = CacheableList()
         # keep the `current_cursor` with the list as cached metadata, can be used later to re-fetch the list
         urls.current_cursor = cursor
@@ -226,7 +233,9 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
             self.latest_lastmod = latest_lastmod
 
         next_cursor = (
-            self.paginator.cursor(paginator_page[-1]) if len(paginator_page) else None
+            self.paginator.cursor(paginator_page[-1])
+            if len(paginator_page)
+            else None
         )
 
         # Save `next_cursor` in the list as cached metadata

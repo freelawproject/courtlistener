@@ -20,7 +20,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-
         if options["force_regenerate"]:
             reset_sitemaps_cursor()
             logger.info(
