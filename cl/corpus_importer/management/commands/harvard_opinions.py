@@ -356,7 +356,9 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             )
             if len(found_court) != 1:
                 logging.warning(
-                    f"Court not found for {data['court']['name']} at {file_path}"
+                    "Court not found for %s at %s",
+                    data["court"]["name"],
+                    file_path,
                 )
                 continue
             court_id = found_court[0]
