@@ -784,10 +784,11 @@ class SNSWebhookTest(TestCase):
             signals.bounce_received,
         )
         # Check if warning is logged
-        warning_part_one = "Unexpected ContentRejected soft bounce for "
-        warning_part_two = "bounce@simulator.amazonses.com, message_id: "
         mock_logging.warning.assert_called_with(
-            f"{warning_part_one}{warning_part_two}"
+            "Unexpected %s soft bounce for %s, message_id: %s",
+            "ContentRejected",
+            "bounce@simulator.amazonses.com",
+            "",
         )
 
     def test_handle_soft_bounce_create_back_off(self) -> None:
@@ -1054,10 +1055,10 @@ class SNSWebhookTest(TestCase):
             signals.bounce_received,
         )
         # Check if a warning is logged
-        warning_part_one = "Unexpected Suppressed hard bounce for "
-        warning_part_two = "bounce@simulator.amazonses.com"
         mock_logging.warning.assert_called_with(
-            f"{warning_part_one}{warning_part_two}"
+            "Unexpected %s hard bounce for %s",
+            "Suppressed",
+            "bounce@simulator.amazonses.com",
         )
         email_ban_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
@@ -2434,8 +2435,8 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Check if warning is logged
         mock_logging.warning.assert_called_with(
-            "The message: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0 can't be "
-            "enqueued because it doesn't exist anymore."
+            "The message: %s can't be enqueued because it doesn't exist anymore.",
+            "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0",
         )
 
     def test_compose_message_from_db_retrieve_user_email(self) -> None:

@@ -148,7 +148,8 @@ def extract_doc_content(
     )
     if not response.is_success:
         logger.error(
-            f"Error from document-extract microservice: {response.status_code}",
+            "Error from document-extract microservice: %s",
+            response.status_code,
             extra=dict(
                 opinion_id=opinion.id,
                 url=opinion.download_url,
@@ -194,7 +195,10 @@ def extract_doc_content(
 
     if data["err"]:
         logger.error(
-            f"****Error: {data['err']}, extracting text from {extension}: {opinion}****"
+            "****Error: %s, extracting text from %s: %s****",
+            data["err"],
+            extension,
+            opinion,
         )
         return
 

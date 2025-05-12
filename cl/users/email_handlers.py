@@ -52,7 +52,7 @@ def handle_hard_bounce(
         if notification_subtype in unexpected_events:
             # Handle unexpected notification_subtype events, log a warning
             logging.warning(
-                f"Unexpected {notification_subtype} hard bounce for {email}"
+                "Unexpected %s hard bounce for %s", notification_subtype, email
             )
         # After log the event ban the email address
         # Only ban email address if it hasn't been previously banned
@@ -192,8 +192,10 @@ def handle_soft_bounce(
             # Handle other unexpected notification_subtype events, like:
             # ContentRejected, log a warning
             logging.warning(
-                f"Unexpected {notification_subtype} soft bounce for {email}, "
-                f"message_id: {message_id}"
+                "Unexpected %s soft bounce for %s, message_id: %s",
+                notification_subtype,
+                email,
+                message_id,
             )
 
 
@@ -434,8 +436,9 @@ def enqueue_email(recipients: list[str], message_id: str) -> None:
 
     if not stored:
         logging.warning(
-            f"The message: {message_id} can't be enqueued because it "
-            "doesn't exist anymore."
+            "The message: %s can't be enqueued because it "
+            "doesn't exist anymore.",
+            message_id,
         )
         return
     for recipient in recipients:
