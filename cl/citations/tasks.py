@@ -138,39 +138,39 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         "routing_key", settings.CELERY_ETL_TASK_QUEUE
     )
 
-    for index, opinion in enumerate(opinions):
-        if disconnect_pg_signals:
-            disconnect_parenthetical_group_signals()
-
-        try:
-            store_opinion_citations_and_update_parentheticals(
-                opinion,
-                children_queue,
-            )
-        except ResponseNotReady as e:
-            # Threading problem in httplib.
-            raise self.retry(exc=e, countdown=2)
-        except OperationalError:
-            # delay deadlocked tasks, and continue regular process
-            find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-                ([opinion.id], disconnect_pg_signals), countdown=60
-            )
-        except Exception as e:
-            # do not retry the whole loop on an unknown exception
-            end_index = min(len(opinions) - 1, index + 1)
-            ids = [o.id for o in opinions[end_index:]]
-            if ids:
-                raise self.retry(
-                    exc=e,
-                    countdown=60,
-                    kwargs={
-                        "opinion_pks": ids,
-                        "disconnect_pg_signals": disconnect_pg_signals,
-                    },
+    if disconnect_pg_signals:
+        disconnect_parenthetical_group_signals()
+    try:
+        for index, opinion in enumerate(opinions):
+            try:
+                store_opinion_citations_and_update_parentheticals(
+                    opinion,
+                    children_queue,
                 )
-        finally:
-            if disconnect_pg_signals:
-                reconnect_parenthetical_group_signals()
+            except ResponseNotReady as e:
+                # Threading problem in httplib.
+                raise self.retry(exc=e, countdown=2)
+            except OperationalError:
+                # delay deadlocked tasks, and continue regular process
+                find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
+                    ([opinion.id], disconnect_pg_signals), countdown=60
+                )
+            except Exception as e:
+                # do not retry the whole loop on an unknown exception
+                end_index = min(len(opinions) - 1, index + 1)
+                ids = [o.id for o in opinions[end_index:]]
+                if ids:
+                    raise self.retry(
+                        exc=e,
+                        countdown=60,
+                        kwargs={
+                            "opinion_pks": ids,
+                            "disconnect_pg_signals": disconnect_pg_signals,
+                        },
+                    )
+    finally:
+        if disconnect_pg_signals:
+            reconnect_parenthetical_group_signals()
 
 
 def store_opinion_citations_and_update_parentheticals(
