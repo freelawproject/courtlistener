@@ -1015,6 +1015,7 @@ class DocketSitemapTest(SitemapTest):
             blocked=True,
         )
 
+    def setUp(self) -> None:
         # set the domain name in the Sites framework to match the test domain name, set http url schema
         domain = "testserver"
         SiteModel = apps.get_model("sites", "Site")
@@ -1023,7 +1024,6 @@ class DocketSitemapTest(SitemapTest):
             pk=settings.SITE_ID, defaults={"domain": domain, "name": domain}
         )
 
-    def setUp(self) -> None:
         self.sitemap_url = reverse(
             "sitemaps-pregenerated", kwargs={"section": SEARCH_TYPES.RECAP}
         )
@@ -1031,12 +1031,12 @@ class DocketSitemapTest(SitemapTest):
 
     def test_is_the_sitemap_generated_and_have_content(self) -> None:
         """Is content generated and read properly from the cache into the sitemap?"""
-        response = self.client.get(self.sitemap_url)
-        self.assertEqual(
-            404,
-            response.status_code,
-            msg="Did not get a '400 Page not found' status code before generating the sitemap.",
-        )
+
+        with self.assertRaises(
+            NotImplementedError,
+            msg="Did not get a NotImplementedError exception before generating the sitemap.",
+        ):
+            _ = self.client.get(self.sitemap_url)
 
         generate_urls_chunk()
 
@@ -1046,6 +1046,10 @@ class DocketSitemapTest(SitemapTest):
             response.status_code,
             msg="Did not get a 200 OK status code after generating the sitemap.",
         )
+
+    def test_does_the_sitemap_have_content(self) -> None:
+        generate_urls_chunk()
+        super().assert_sitemap_has_content()
 
 
 class BlockedSitemapTest(SitemapTest):
