@@ -9,7 +9,6 @@ from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 from asgiref.sync import async_to_sync, sync_to_async
-from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group, User
