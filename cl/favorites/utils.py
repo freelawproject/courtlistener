@@ -385,12 +385,15 @@ async def get_lifetime_prayer_stats(
     return PrayerStats(**data)
 
 
-def prayer_unavailable(instance: RECAPDocument, user_pk: int) -> None:
+def prayer_unavailable(instance: RECAPDocument, user_pk: int | None) -> None:
     open_prayers = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
     ).select_related("user")
 
     user_prayer = open_prayers.filter(user__pk=user_pk).first()
+
+    if not user_prayer:
+        return
 
     email_recipients = [
         {
@@ -400,38 +403,37 @@ def prayer_unavailable(instance: RECAPDocument, user_pk: int) -> None:
     ]
 
     # Send email notification.
-    if email_recipients:
-        subject = "A document you requested is unavailable for purchase"
-        txt_template = loader.get_template("prayer_email_unavailable.txt")
-        html_template = loader.get_template("prayer_email_unavailable.html")
+    subject = "A document you requested is unavailable for purchase"
+    txt_template = loader.get_template("prayer_email_unavailable.txt")
+    html_template = loader.get_template("prayer_email_unavailable.html")
 
-        docket = instance.docket_entry.docket
-        docket_entry = instance.docket_entry
-        document_url = instance.get_absolute_url()
-        num_waiting = open_prayers.count()
-        doc_price = price(instance)
+    docket = instance.docket_entry.docket
+    docket_entry = instance.docket_entry
+    document_url = instance.get_absolute_url()
+    num_waiting = open_prayers.count()
+    doc_price = price(instance)
 
-        messages = []
-        for email_recipient in email_recipients:
-            context = {
-                "docket": docket,
-                "docket_entry": docket_entry,
-                "rd": instance,
-                "document_url": document_url,
-                "num_waiting": num_waiting,
-                "price": doc_price,
-                "date_created": email_recipient["date_created"],
-            }
-            txt = txt_template.render(context)
-            html = html_template.render(context)
-            msg = EmailMultiAlternatives(
-                subject=subject,
-                body=txt,
-                from_email=settings.DEFAULT_ALERTS_EMAIL,
-                to=[email_recipient["email"]],
-                headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
-            )
-            msg.attach_alternative(html, "text/html")
-            messages.append(msg)
-        connection = get_connection()
-        connection.send_messages(messages)
+    messages = []
+    for email_recipient in email_recipients:
+        context = {
+            "docket": docket,
+            "docket_entry": docket_entry,
+            "rd": instance,
+            "document_url": document_url,
+            "num_waiting": num_waiting,
+            "price": doc_price,
+            "date_created": email_recipient["date_created"],
+        }
+        txt = txt_template.render(context)
+        html = html_template.render(context)
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=txt,
+            from_email=settings.DEFAULT_ALERTS_EMAIL,
+            to=[email_recipient["email"]],
+            headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
+        )
+        msg.attach_alternative(html, "text/html")
+        messages.append(msg)
+    connection = get_connection()
+    connection.send_messages(messages)

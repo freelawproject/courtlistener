@@ -115,7 +115,9 @@ def lookup_and_save(new, debug=False):
     if not debug:
         d.save()
         logger.info(
-            f"Saved as Docket {d.pk}: https://www.courtlistener.com{d.get_absolute_url()}"
+            "Saved as Docket %s: https://www.courtlistener.com%s",
+            d.pk,
+            d.get_absolute_url(),
         )
     return d
 
@@ -516,8 +518,8 @@ def normalize_attorney_contact(c, fallback_name=""):
         # See https://github.com/datamade/probableparsing/issues/2 for why we
         # catch the UnicodeEncodeError. Oy.
         logger.warning(
-            "Unable to parse address (RepeatedLabelError): %s"
-            % ", ".join(c.split("\n"))
+            "Unable to parse address (RepeatedLabelError): %s",
+            ", ".join(c.split("\n")),
         )
         return {}, atty_info
 
@@ -526,8 +528,8 @@ def normalize_attorney_contact(c, fallback_name=""):
 
     if any([address_type == "Ambiguous", "CountryName" in address_info]):
         logger.warning(
-            "Unable to parse address (Ambiguous address type): %s"
-            % ", ".join(c.split("\n"))
+            "Unable to parse address (Ambiguous address type): %s",
+            ", ".join(c.split("\n")),
         )
         return {}, atty_info
 

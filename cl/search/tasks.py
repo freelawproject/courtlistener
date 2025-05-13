@@ -630,8 +630,10 @@ def get_doc_from_es(
             )
         except (ConflictError, RequestError) as exc:
             logger.error(
-                f"Error indexing the {es_document.Django.model.__name__.capitalize()} with ID: {instance_id}. "
-                f"Exception was: {type(exc).__name__}"
+                "Error indexing the %s with ID: %s. Exception was: %s",
+                es_document.Django.model.__name__.capitalize(),
+                instance_id,
+                type(exc).__name__,
             )
 
         return None
@@ -1086,8 +1088,10 @@ def index_parent_and_child_docs(
                 )
             except (ConflictError, RequestError) as exc:
                 logger.error(
-                    f"Error indexing the {model_label} with ID: {instance_id}. "
-                    f"Exception was: {type(exc).__name__}"
+                    "Error indexing the %s with ID: %s. Exception was: %s",
+                    model_label,
+                    instance_id,
+                    type(exc).__name__,
                 )
                 continue
 
@@ -1108,8 +1112,10 @@ def index_parent_and_child_docs(
 
         if failed_child_docs:
             logger.error(
-                f"Error indexing child documents from the {model_label}"
-                f" with ID: {instance_id}. Child IDs are: {failed_child_docs}"
+                "Error indexing child documents from the %s with ID: %s. Child IDs are: %s",
+                model_label,
+                instance_id,
+                failed_child_docs,
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -1192,8 +1198,9 @@ def index_parent_or_child_docs_in_es(
         if failed_docs:
             model_label = child_es_document.Django.model.__name__.capitalize()
             logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
+                "Error indexing documents from %s, Failed Doc IDs are: %s",
+                model_label,
+                failed_docs,
             )
 
     if document_type == "parent":
@@ -1207,8 +1214,9 @@ def index_parent_or_child_docs_in_es(
         if failed_docs:
             model_label = parent_es_document.Django.model.__name__.capitalize()
             logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
+                "Error indexing documents from %s, Failed Doc IDs are: %s",
+                model_label,
+                failed_docs,
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -1323,7 +1331,7 @@ def index_dockets_in_bulk(
                 failed_docs.append(info["index"]["_id"])
 
     if failed_docs:
-        logger.error(f"Error indexing Dockets in bulk IDs are: {failed_docs}")
+        logger.error("Error indexing Dockets in bulk IDs are: %s", failed_docs)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
