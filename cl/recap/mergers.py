@@ -3,7 +3,7 @@ import logging
 import re
 from copy import deepcopy
 from datetime import date, timedelta
-from typing import Any, Optional, Union
+from typing import Any
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.exceptions import ValidationError
@@ -773,7 +773,7 @@ def add_create_docket_entry_transaction(d, docket_entry):
 
 async def get_or_make_docket_entry(
     d: Docket, docket_entry: dict[str, any]
-) -> Optional[tuple[DocketEntry, bool]]:
+) -> tuple[DocketEntry, bool] | None:
     """Lookup or create a docket entry to match the one that was scraped.
 
     :param d: The docket we expect to find it in.
@@ -1604,7 +1604,7 @@ def merge_pacer_docket_into_cl_docket(
 
 async def clean_duplicate_attachment_entries(
     de: DocketEntry,
-    attachment_dicts: list[dict[str, Union[int, str]]],
+    attachment_dicts: list[dict[str, int | str]],
 ):
     """Remove attachment page entries with duplicate pacer_doc_id's that
     have incorrect attachment numbers. This is needed because older attachment
@@ -1658,7 +1658,7 @@ async def merge_attachment_page_data(
     pacer_doc_id: int,
     document_number: int | None,
     text: str | None,
-    attachment_dicts: list[dict[str, Union[int, str]]],
+    attachment_dicts: list[dict[str, int | str]],
     debug: bool = False,
     is_acms_attachment: bool = False,
 ) -> tuple[list[RECAPDocument], DocketEntry]:
@@ -1955,9 +1955,9 @@ def save_iquery_to_docket(
     iquery_data: dict[str, str],
     iquery_text: str,
     d: Docket,
-    tag_names: Optional[list[str]],
+    tag_names: list[str] | None,
     skip_iquery_sweep: bool = False,
-) -> Optional[int]:
+) -> int | None:
     """Merge iquery results into a docket
 
     :param self: The celery task calling this function

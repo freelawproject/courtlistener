@@ -2,8 +2,9 @@
 Unit tests for Visualizations
 """
 
+from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any, Callable
+from typing import Any
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password

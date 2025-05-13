@@ -74,7 +74,7 @@ def generate_annotations(
                     ">",
                     "</a></span>",
                 ]
-                if isinstance(citation, (IdCitation, SupraCitation)):
+                if isinstance(citation, (IdCitation | SupraCitation)):
                     # for ID and Supra citations use full span to
                     # to avoid unbalanced html
                     annotation_span = citation.full_span()

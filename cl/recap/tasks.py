@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any, Optional
+from typing import Any
 from zipfile import ZipFile
 
 import requests
@@ -445,7 +445,7 @@ async def process_recap_pdf(pk):
             )
             if response.is_success:
                 rd.page_count = int(response.text)
-                assert isinstance(rd.page_count, (int, type(None))), (
+                assert isinstance(rd.page_count, (int | type(None))), (
                     "page_count must be an int or None."
                 )
             rd.file_size = rd.filepath_local.size
@@ -1479,7 +1479,7 @@ async def process_recap_acms_docket(pk):
 
 async def process_recap_acms_appellate_attachment(
     pk: int,
-) -> Optional[tuple[int, str, list[RECAPDocument]]]:
+) -> tuple[int, str, list[RECAPDocument]] | None:
     """Process an uploaded appellate attachment page.
     :param pk: The primary key of the processing queue item you want to work on
     :return: Tuple indicating the status of the processing, a related
@@ -1568,7 +1568,7 @@ async def process_recap_acms_appellate_attachment(
 
 async def process_recap_appellate_attachment(
     pk: int,
-) -> Optional[tuple[int, str, list[RECAPDocument]]]:
+) -> tuple[int, str, list[RECAPDocument]] | None:
     """Process an uploaded appellate attachment page.
 
     :param self: The Celery task
@@ -1858,8 +1858,8 @@ def update_docket_from_hidden_api(data):
 
 
 def fetch_pacer_doc_by_rd_base(
-    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
-) -> Optional[int]:
+    self, rd_pk: int, fq_pk: int, magic_number: str | None = None
+) -> int | None:
     """Fetch a PACER PDF by rd_pk
 
     This is very similar to get_pacer_doc_by_rd, except that it manages
@@ -1995,8 +1995,8 @@ def fetch_pacer_doc_by_rd_base(
 )
 @transaction.atomic
 def fetch_pacer_doc_by_rd(
-    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
-) -> Optional[int]:
+    self, rd_pk: int, fq_pk: int, magic_number: str | None = None
+) -> int | None:
     """Celery task wrapper for fetch_pacer_doc_by_rd_base
 
     :param self: The celery task.
@@ -2721,7 +2721,7 @@ def save_pacer_doc_from_pq(
     fq: PacerFetchQueue,
     pq: ProcessingQueue,
     magic_number: str | None,
-) -> Optional[int]:
+) -> int | None:
     """Save the PDF binary previously downloaded and stored in a PQ object to
     the corresponding RECAPDocument.
 
@@ -3171,7 +3171,7 @@ def replicate_recap_email_to_subdockets(
 )
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
-) -> Optional[list[int]]:
+) -> list[int] | None:
     """Processes a recap.email when it comes in, fetches the free document and
     triggers docket alerts and webhooks.
 

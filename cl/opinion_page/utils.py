@@ -3,7 +3,6 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import Union
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -62,7 +61,7 @@ def make_docket_title(docket: Docket) -> str:
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> tuple[Docket, dict[str, Union[bool, str, Docket, NoteForm]]]:
+) -> tuple[Docket, dict[str, bool | str | Docket | NoteForm]]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     title = make_docket_title(docket)
@@ -98,9 +97,7 @@ async def core_docket_data(
     )
 
 
-async def user_has_alert(
-    user: Union[AnonymousUser, User], docket: Docket
-) -> bool:
+async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
     has_alert = False
     if user.is_authenticated:
         has_alert = await DocketAlert.objects.filter(
