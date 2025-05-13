@@ -35,7 +35,6 @@ The main settings are:
 
 `.env`:
   - `SITEMAPS_FILES_PER_CALL` - The number of sitemap 'files' (pages) to cache per single sitemap generation call (10 by default)
-  - `SITEMAPS_TASK_REPEAT_SEC` - call sitemap file generation every `SITEMAPS_TASK_REPEAT_SEC` seconds via celery, set 0 to disable task (default)
 
 The domain of the sitemap urls is retrieved from the `django.contrib.sites` current site.
 
