@@ -29,6 +29,7 @@ REST_FRAMEWORK = {
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
         # Sock puppets
+        "bobjase27": "1/hour",
         "Kejik5": "1/hour",
         "PRpl.Kane": "1/hour",
         "PeterZH": "1/hour",
@@ -57,7 +58,6 @@ REST_FRAMEWORK = {
         "yancy_closer": "1/hour",
         "phx_major": "1/hour",
         "giraffe_counsel_2025": "1/hour",
-        "yoway_3897": "1/hour",
         "deantaylor2025": "1/hour",
         "yoway_3897": "1/hour",
         "api_1": "1/hour",

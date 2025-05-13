@@ -1,6 +1,5 @@
 import re
 from datetime import timedelta
-from typing import Tuple
 
 from django.utils.timezone import now
 
@@ -113,7 +112,7 @@ def set_blocked_status(opinion: Opinion, content: str, extension: str) -> None:
         return None
 
 
-def anonymize(s: str) -> Tuple[str, bool]:
+def anonymize(s: str) -> tuple[str, bool]:
     """Anonymizes private information.
 
     Converts SSNs, EINs, and A-Numbers to X's. Reports whether a modification

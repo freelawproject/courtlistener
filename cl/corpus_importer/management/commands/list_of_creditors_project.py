@@ -1,5 +1,4 @@
 # !/usr/bin/python
-# -*- coding: utf-8 -*-
 import csv
 import itertools
 import os
@@ -59,7 +58,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
     base_path = options["base_path"]
     csv_files = []
     for file in options["files"]:
-        f = open(f"{base_path}/{file}", "r", encoding="utf-8")
+        f = open(f"{base_path}/{file}", encoding="utf-8")
         reader = csv.DictReader(f)
         match = regex.search(file)
         if match:

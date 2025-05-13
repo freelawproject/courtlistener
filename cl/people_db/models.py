@@ -473,8 +473,7 @@ class Position(AbstractDateTimeModel):
                 (SPECIAL_MASTER, "Special Master"),
                 (
                     SPECIAL_SUPERIOR_COURT_JUDGE_FOR_COMPLEX_BUSINESS_CASES,
-                    "Special Superior Court Judge for Complex Business "
-                    "Cases",
+                    "Special Superior Court Judge for Complex Business Cases",
                 ),
                 (SPECIAL_TRIAL_JUDGE, "Special Trial Judge"),
                 # Other
@@ -903,15 +902,14 @@ class Position(AbstractDateTimeModel):
         if self.votes_yes or self.votes_yes_percent:
             s += ", "
         if self.votes_yes:
-            s += '%s in favor <span class="alt">and</span> %s ' "opposed" % (
+            s += '%s in favor <span class="alt">and</span> %s opposed' % (
                 self.votes_yes,
                 self.votes_no,
             )
         elif self.votes_yes_percent:
-            s += (
-                '%g%% in favor <span class="alt">and</span> '
-                "%g%% opposed"
-                % (self.votes_yes_percent, self.votes_no_percent)
+            s += '%g%% in favor <span class="alt">and</span> %g%% opposed' % (
+                self.votes_yes_percent,
+                self.votes_no_percent,
             )
         return s
 

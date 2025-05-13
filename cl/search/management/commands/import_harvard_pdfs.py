@@ -4,7 +4,7 @@ import os
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 import boto3
 from django.conf import settings
@@ -84,13 +84,13 @@ class Command(BaseCommand):
 
         if not os.path.exists(self.crosswalk_dir):
             logger.warning(
-                f"Crosswalk directory does not exist: {self.crosswalk_dir}"
+                "Crosswalk directory does not exist: %s", self.crosswalk_dir
             )
             return
 
         if self.resume and self.start_from_reporter:
             logger.warning(
-                f"You can't combine --resume and --start-from-reporter arguments."
+                "You can't combine --resume and --start-from-reporter arguments."
             )
             return
 
@@ -121,7 +121,10 @@ class Command(BaseCommand):
         :return: None
         """
         logger.info(
-            f"Processing crosswalks. Specific reporter: {specific_reporter}, Resume: {self.resume}, Workers: {self.max_workers}"
+            "Processing crosswalks. Specific reporter: %s, Resume: %s, Workers: %s",
+            specific_reporter,
+            self.resume,
+            self.max_workers,
         )
         # Find all json files
         reporters_files = sorted(os.listdir(self.crosswalk_dir))
@@ -140,7 +143,7 @@ class Command(BaseCommand):
         # Load the last completed reporter if resuming
         if resume:
             try:
-                with open(last_reporter_file, "r") as f:
+                with open(last_reporter_file) as f:
                     last_completed_reporter = f.read().strip()
                 resume = True
             except FileNotFoundError:
@@ -155,7 +158,9 @@ class Command(BaseCommand):
         if self.start_from_reporter:
             if self.start_from_reporter not in reporters:
                 logger.error(
-                    f"Invalid reporter to start from: {self.start_from_reporter}. Valid options: {reporters}"
+                    "Invalid reporter to start from: %s. Valid options: %s",
+                    self.start_from_reporter,
+                    reporters,
                 )
                 return
             else:
@@ -178,30 +183,32 @@ class Command(BaseCommand):
                 if resume and last_completed_reporter:
                     if last_completed_reporter not in reporters:
                         logger.error(
-                            f"Invalid last completed reporter: {last_completed_reporter}. Valid options: {reporters}"
+                            "Invalid last completed reporter: %s. Valid options: %s",
+                            last_completed_reporter,
+                            reporters,
                         )
                         return
 
                     if reporter <= last_completed_reporter:
                         logger.info(
-                            f"Skipping already processed reporter: {reporter}"
+                            "Skipping already processed reporter: %s", reporter
                         )
                         continue
 
                 if specific_reporter and reporter != specific_reporter:
                     continue
 
-                logger.info(f"Starting to process reporter: {reporter}")
+                logger.info("Starting to process reporter: %s", reporter)
                 self.process_crosswalk_file(
                     os.path.join(self.crosswalk_dir, filename)
                 )
 
                 # Log the completed reporter
-                logger.info(f"Completed processing reporter: {reporter}")
+                logger.info("Completed processing reporter: %s", reporter)
                 with open(last_reporter_file, "w") as f:
                     f.write(reporter)
 
-    def process_entry(self, entry: Dict[str, Any]) -> int:
+    def process_entry(self, entry: dict[str, Any]) -> int:
         """Processes a single entry by attempting to download and store its associated
         PDF file
         :param entry: A dictionary containing details about the case entry.
@@ -210,7 +217,7 @@ class Command(BaseCommand):
                  - 0 if the PDF was not downloaded (e.g., already processed, dry run
                  mode, or an error occurred).
         """
-        logger.debug(f"Processing entry: {entry}")
+        logger.debug("Processing entry: %s", entry)
         try:
             cap_case_id = entry["cap_case_id"]
             cl_cluster_id = entry["cl_cluster_id"]
@@ -222,11 +229,11 @@ class Command(BaseCommand):
             )
 
             if pdf_path in self.processed_pdfs:
-                logger.info(f"Skipping already processed PDF: {pdf_path}")
+                logger.info("Skipping already processed PDF: %s", pdf_path)
                 # Early abort
                 return 0
 
-            logger.info(f"Processing PDF: {pdf_path}")
+            logger.info("Processing PDF: %s", pdf_path)
 
             if not self.dry_run:
                 cluster = OpinionCluster.objects.get(id=cl_cluster_id)
@@ -240,23 +247,29 @@ class Command(BaseCommand):
                         return 1
                 else:
                     logger.info(
-                        f"Cluster: {cl_cluster_id} already has a PDF file assigned: {pdf_path}"
+                        "Cluster: %s already has a PDF file assigned: %s",
+                        cl_cluster_id,
+                        pdf_path,
                     )
             else:
-                logger.info(f"Dry run: Would fetch PDF from {pdf_path}")
+                logger.info("Dry run: Would fetch PDF from %s", pdf_path)
 
         except OpinionCluster.DoesNotExist:
             logger.error(
-                f"Cluster id: {entry.get('cl_cluster_id', 'Unknown')} doesn't exist."
+                "Cluster id: %s doesn't exist.",
+                entry.get("cl_cluster_id", "Unknown"),
             )
         except KeyError as e:
             logger.error(
-                f"Missing key in entry: {e}. Entry: {json.dumps(entry, indent=2)}"
+                "Missing key in entry: %s. Entry: %s",
+                e,
+                json.dumps(entry, indent=2),
             )
         except Exception as e:
-            logger.error(
-                f"Error processing CAP ID {entry.get('cap_case_id', 'Unknown')}: {str(e)}",
-                exc_info=True,
+            logger.exception(
+                "Error processing CAP ID %s: %s",
+                entry.get("cap_case_id", "Unknown"),
+                str(e),
             )
 
         # No files downloaded
@@ -268,13 +281,13 @@ class Command(BaseCommand):
         :param crosswalk_file: Path to the crosswalk file.
         :return: None
         """
-        logger.info(f"Processing crosswalk file: {crosswalk_file}")
+        logger.info("Processing crosswalk file: %s", crosswalk_file)
 
         start_time = time.time()
 
-        with open(crosswalk_file, "r") as f:
+        with open(crosswalk_file) as f:
             crosswalk_data = json.load(f)
-            logger.info(f"Documents to download: {len(crosswalk_data)}")
+            logger.info("Documents to download: %s", len(crosswalk_data))
 
         total_downloaded = 0
 
@@ -291,14 +304,19 @@ class Command(BaseCommand):
                     if result is not None:
                         total_downloaded += result
                 except Exception as e:
-                    logger.error(f"Error processing entry {entry}: {str(e)}")
+                    logger.error(
+                        "Error processing entry %s: %s", entry, str(e)
+                    )
 
         total_time = time.time() - start_time
         logger.info(
-            f"Finished processing all entries in the crosswalk file: {crosswalk_file} - Total time: {total_time:.2f} seconds. Total files downloaded: {total_downloaded}."
+            "Finished processing all entries in the crosswalk file: %s - Total time: %.2f seconds. Total files downloaded: %s",
+            crosswalk_file,
+            total_time,
+            total_downloaded,
         )
 
-    def parse_cap_path(self, cap_path: str) -> Tuple[str, str, str]:
+    def parse_cap_path(self, cap_path: str) -> tuple[str, str, str]:
         """Extract data from CAP path.
 
         :param cap_path: CAP path string.
@@ -317,32 +335,33 @@ class Command(BaseCommand):
         :param pdf_path: Path to the PDF in CAP storage.
         :return: PDF content as bytes, or None if fetching fails.
         """
-        logger.info(f"Fetching PDF from CAP: {pdf_path}")
-        logger.debug(f"Bucket name: {self.cap_bucket_name}")
+        logger.info("Fetching PDF from CAP: %s", pdf_path)
+        logger.debug("Bucket name: %s", self.cap_bucket_name)
 
         pdf_path = pdf_path.lstrip("/")
 
         if self.dry_run:
-            logger.info(f"Dry run: Would fetch PDF from {pdf_path}")
+            logger.info("Dry run: Would fetch PDF from %s", pdf_path)
             return b"Mock PDF content"
 
         temp_file = None
         try:
             with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-                logger.debug(f"Attempting to download file: {pdf_path}")
+                logger.debug("Attempting to download file: %s", pdf_path)
                 self.cap_client.download_file(
                     self.cap_bucket_name, pdf_path, temp_file.name
                 )
                 with open(temp_file.name, "rb") as f:
                     pdf_content = f.read()
                 logger.debug(
-                    f"Downloaded PDF to temporary file: {temp_file.name}"
+                    "Downloaded PDF to temporary file: %s", temp_file.name
                 )
-                logger.debug(f"Read PDF content, length: {len(pdf_content)}")
+                logger.debug("Read PDF content, length: %s", len(pdf_content))
                 return pdf_content
         except Exception as e:
-            logger.error(
-                f"Error fetching PDF from CAP: {str(e)}", exc_info=True
+            logger.exception(
+                "Error fetching PDF from CAP: %s",
+                str(e),
             )
             return None
         finally:
@@ -358,26 +377,28 @@ class Command(BaseCommand):
         :param pdf_content: PDF content as bytes.
         :return: None
         """
-        logger.info(f"Storing PDF for cluster: {cluster.id}")
+        logger.info("Storing PDF for cluster: %s", cluster.id)
         storage = HarvardPDFStorage()
         file_path = f"harvard_pdf/{cluster.pk}.pdf"
-        logger.debug(f"Saving file to: {file_path}")
+        logger.debug("Saving file to: %s", file_path)
 
         try:
             content_file = ContentFile(pdf_content)
 
             saved_path = storage.save(file_path, content_file)
-            logger.info(f"File saved successfully at: {saved_path}")
+            logger.info("File saved successfully at: %s", saved_path)
 
             cluster.filepath_pdf_harvard = saved_path
             cluster.save()
             logger.info(
-                f"Cluster updated. filepath_pdf_harvard: {cluster.filepath_pdf_harvard}"
+                "Cluster updated. filepath_pdf_harvard: %s",
+                cluster.filepath_pdf_harvard,
             )
         except Exception as e:
-            logger.error(
-                f"Error saving PDF for cluster {cluster.id}: {str(e)}",
-                exc_info=True,
+            logger.exception(
+                "Error saving PDF for cluster %s: %s",
+                cluster.id,
+                str(e),
             )
 
 

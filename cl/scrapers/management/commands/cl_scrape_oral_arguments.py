@@ -1,7 +1,8 @@
 from datetime import date
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Union
 
 from asgiref.sync import async_to_sync
+from celery.canvas import chain
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils.encoding import force_bytes
@@ -9,6 +10,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
+from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.import_lib import get_scotus_judges
@@ -29,7 +31,7 @@ cnt = CaseNameTweaker()
 
 @transaction.atomic
 def save_everything(
-    items: Dict[str, Union[Docket, Audio]],
+    items: dict[str, Union[Docket, Audio]],
     backscrape: bool = False,
 ) -> None:
     docket, af = items["docket"], items["audio_file"]
@@ -55,11 +57,11 @@ def save_everything(
 
 @transaction.atomic
 def make_objects(
-    item: Dict[str, Any],
+    item: dict[str, Any],
     court: Court,
     sha1_hash: str,
     content: bytes,
-) -> Tuple[Docket, Audio]:
+) -> tuple[Docket, Audio]:
     blocked = item["blocked_statuses"]
     if blocked:
         date_blocked = date.today()
@@ -144,7 +146,10 @@ class Command(cl_scrape_opinions.Command):
             items={"docket": docket, "audio_file": audio_file},
             backscrape=backscrape,
         )
-        process_audio_file.delay(audio_file.pk)
+        chain(
+            process_audio_file.si(audio_file.pk),
+            transcribe_from_open_ai_api.si(audio_file.pk),
+        ).apply_async()
 
         logger.info(
             "Successfully added audio file %s: %s",

@@ -14,13 +14,14 @@
         {'href': '#eyebrow', 'text': 'Eyebrow'},
       ]},
       {'href': '#layout-components', 'text': 'Layout components', 'children': [
+        {'href': '#expansion', 'text': 'Expansion panel'},
         {'href': '#navigation-menu', 'text': 'Navigation menu'},
         {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
       ]},
   ]"
 >
   <section class="max-w-full w-full" x-intersect.margin.-100px="show" id="main-title">
-    <c-eyebrow>'s</c-eyebrow>
+    <c-eyebrow>CourtListener's</c-eyebrow>
     <h1 class="">Component Library</h1>
     <p class="mt-4">Below you will find a display of the components available in our codebase with usage notes to make development easier.</p>
     <p class="my-3">These components are available to all templates that extend from <code>new_base.html</code>. Using them doesn't require any imports or settings, they should just work!</p>
@@ -105,7 +106,7 @@ Sample code here.
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="eyebrow">
     <h2 class="mt-6 mb-3">Eyebrow</h2>
     <h4 class="mt-3">Demo</h4>
-    <c-eyebrow class="my-4"></c-eyebrow>
+    <c-eyebrow class="my-4">CourtListener</c-eyebrow>
 
     <h4 class="mt-3">Props</h4>
     <p>No props</p>
@@ -113,13 +114,47 @@ Sample code here.
     <div class="bg-greyscale-100 rounded-xl p-4 my-3">
       <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
         <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Text to be appended.</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Eyebrow's content.</span>
       </div>
     </div>
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-eyebrow&gt;&lt;/c-eyebrow>
+&lt;c-eyebrow&gt;CourtListener&lt;/c-eyebrow>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="expansion">
+    <h2 class="mt-6 mb-3">Expansion panel</h2>
+    <h4 class="mt-3">Demo</h4>
+    <c-expansion-panel title="This is a demo" class="my-4 text-primary-600 font-bold">
+      Hello!
+    </c-expansion-panel>
+
+    <h4 class="mt-3">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>title</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Title displayed.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Collapsible content.</span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-expansion-panel title="This is a demo" class="my-4 text-primary-600 font-bold"&gt;
+  Hello!
+&lt;/c-expansion-panel>
       </c-code>
     </c-expansion-panel>
   </section>
@@ -158,6 +193,7 @@ Sample code here.
       {'href': '#eyebrow', 'text': 'Eyebrow'},
     ]},
     {'href': '#', 'text': 'Layout components', 'children': [
+      {'href': '#expansion', 'text': 'Expansion panel'},
       {'href': '#navigation-menu', 'text': 'Navigation menu'},
       {'href': '#layout-with-navigation', 'text': 'Layout with navigation'},
     ]},

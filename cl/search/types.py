@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import Any, Literal, Type, Union
+from typing import Any, Literal, Union
 
 from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrList
@@ -47,19 +47,19 @@ ESModelType = Union[
 ]
 
 ESModelClassType = Union[
-    Type[Citation],
-    Type[Docket],
-    Type[DocketEntry],
-    Type[Opinion],
-    Type[OpinionCluster],
-    Type[Parenthetical],
-    Type[ParentheticalGroup],
-    Type[Audio],
-    Type[Person],
-    Type[Position],
-    Type[Education],
-    Type[RECAPDocument],
-    Type[ESRECAPBaseDocument],
+    type[Citation],
+    type[Docket],
+    type[DocketEntry],
+    type[Opinion],
+    type[OpinionCluster],
+    type[Parenthetical],
+    type[ParentheticalGroup],
+    type[Audio],
+    type[Person],
+    type[Position],
+    type[Education],
+    type[RECAPDocument],
+    type[ESRECAPBaseDocument],
 ]
 
 ESDocumentInstanceType = Union[
@@ -74,15 +74,15 @@ ESDocumentInstanceType = Union[
 ]
 
 ESDocumentClassType = Union[
-    Type[AudioDocument],
-    Type[ParentheticalGroupDocument],
-    Type[AudioPercolator],
-    Type[PersonDocument],
-    Type[PositionDocument],
-    Type[DocketDocument],
-    Type[OpinionDocument],
-    Type[OpinionClusterDocument],
-    Type[ESRECAPDocument],
+    type[AudioDocument],
+    type[ParentheticalGroupDocument],
+    type[AudioPercolator],
+    type[PersonDocument],
+    type[PositionDocument],
+    type[DocketDocument],
+    type[OpinionDocument],
+    type[OpinionClusterDocument],
+    type[ESRECAPDocument],
 ]
 
 ESDocumentNameType = Literal[
@@ -99,9 +99,6 @@ ESDocumentNameType = Literal[
 
 ESDictDocument = dict[str, Any]
 
-# TODO: Remove after scheduled OA alerts have been processed.
-PercolatorResponseType = tuple[list[Hit], ESDictDocument]
-
 
 @dataclass
 class SendAlertsResponse:
@@ -117,10 +114,6 @@ class PercolatorResponses:
     main_response: Response
     rd_response: Response | None
     d_response: Response | None
-
-
-# TODO: Remove after scheduled OA alerts have been processed.
-SaveDocumentResponseType = tuple[str, ESDictDocument]
 
 
 @dataclass

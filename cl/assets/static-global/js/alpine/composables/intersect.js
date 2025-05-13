@@ -1,3 +1,16 @@
+/*
+API for the intersect plugin in Alpine's CSP-friendly build,
+which doesn't support inline JavaScript.
+
+Usage:
+
+```
+{% load component_tags %}
+{% require_script "js/alpine/composables/intersect.js" %}
+{% require_script "js/alpine/plugins/intersect@3.14.8" defer=True %}
+```
+*/
+
 document.addEventListener('alpine:init', () => {
   Alpine.data('intersect', () => ({
     visibleSection: '', // id of the last intersected element

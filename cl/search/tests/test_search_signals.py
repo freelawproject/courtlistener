@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List
 from unittest.mock import Mock, patch
 
 from django.db.models.signals import post_save
@@ -33,14 +32,14 @@ class RECAPDocumentSignalTests(SimpleTestCase):
 
 @dataclass
 class ReceiverTestCase:
-    update_fields: List[str] | None
+    update_fields: list[str] | None
     ocr_status: RECAPDocument.OCR_STATUSES
     expect_enqueue: bool
 
 
 class RECAPDocumentReceiverTests(SimpleTestCase):
     def test_receiver_enqueues_task(self):
-        test_cases: List[ReceiverTestCase] = [
+        test_cases: list[ReceiverTestCase] = [
             ReceiverTestCase(
                 update_fields=["plain_text", "ocr_status"],
                 ocr_status=RECAPDocument.OCR_UNNECESSARY,

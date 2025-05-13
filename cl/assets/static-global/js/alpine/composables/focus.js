@@ -1,3 +1,16 @@
+/*
+API for the intersect plugin in Alpine's CSP-friendly build,
+which doesn't support inline JavaScript.
+
+Usage:
+
+```
+{% load component_tags %}
+{% require_script "js/alpine/composables/focus.js" %}
+{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+```
+*/
+
 document.addEventListener('alpine:init', () => {
   Alpine.data('focus', () => ({
     focusPrevious() {

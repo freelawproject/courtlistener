@@ -4,11 +4,12 @@ import io
 import json
 import logging
 import uuid
+from collections.abc import Generator
 from datetime import date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Generator
+from typing import Any
 
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -82,7 +83,6 @@ from cl.search.models import (
     SEARCH_TYPES,
     Docket,
     DocketEntry,
-    DocketEvent,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -163,7 +163,7 @@ def get_instance_from_db(
         return model.objects.get(pk=instance_id)
     except ObjectDoesNotExist:
         logger.warning(
-            f"The %s with ID %s doesn't exists and it cannot be updated in ES.",
+            "The %s with ID %s doesn't exists and it cannot be updated in ES.",
             model.__name__,
             instance_id,
         )
@@ -375,7 +375,7 @@ def document_fields_to_update(
 
     if fields_to_update:
         # If fields to update, append the timestamp to be updated too.
-        prepare_timestamp = getattr(es_document(), f"prepare_timestamp", None)
+        prepare_timestamp = getattr(es_document(), "prepare_timestamp", None)
         if prepare_timestamp:
             field_value = prepare_timestamp(main_instance)
             fields_to_update["timestamp"] = field_value
@@ -466,7 +466,7 @@ def email_search_results(self: Task, user_id: int, query: str):
 
     # Generate a filename for the CSV attachment with timestamp
     now = datetime.now()
-    filename = f'search_results_{now.strftime("%Y%m%d_%H%M%S")}.csv'
+    filename = f"search_results_{now.strftime('%Y%m%d_%H%M%S')}.csv"
 
     # Send email with attachments
     message.attach(filename, csv_content, "text/csv")
@@ -630,8 +630,10 @@ def get_doc_from_es(
             )
         except (ConflictError, RequestError) as exc:
             logger.error(
-                f"Error indexing the {es_document.Django.model.__name__.capitalize()} with ID: {instance_id}. "
-                f"Exception was: {type(exc).__name__}"
+                "Error indexing the %s with ID: %s. Exception was: %s",
+                es_document.Django.model.__name__.capitalize(),
+                instance_id,
+                type(exc).__name__,
             )
 
         return None
@@ -1086,8 +1088,10 @@ def index_parent_and_child_docs(
                 )
             except (ConflictError, RequestError) as exc:
                 logger.error(
-                    f"Error indexing the {model_label} with ID: {instance_id}. "
-                    f"Exception was: {type(exc).__name__}"
+                    "Error indexing the %s with ID: %s. Exception was: %s",
+                    model_label,
+                    instance_id,
+                    type(exc).__name__,
                 )
                 continue
 
@@ -1108,8 +1112,10 @@ def index_parent_and_child_docs(
 
         if failed_child_docs:
             logger.error(
-                f"Error indexing child documents from the {model_label}"
-                f" with ID: {instance_id}. Child IDs are: {failed_child_docs}"
+                "Error indexing child documents from the %s with ID: %s. Child IDs are: %s",
+                model_label,
+                instance_id,
+                failed_child_docs,
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -1192,8 +1198,9 @@ def index_parent_or_child_docs_in_es(
         if failed_docs:
             model_label = child_es_document.Django.model.__name__.capitalize()
             logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
+                "Error indexing documents from %s, Failed Doc IDs are: %s",
+                model_label,
+                failed_docs,
             )
 
     if document_type == "parent":
@@ -1207,8 +1214,9 @@ def index_parent_or_child_docs_in_es(
         if failed_docs:
             model_label = parent_es_document.Django.model.__name__.capitalize()
             logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
+                "Error indexing documents from %s, Failed Doc IDs are: %s",
+                model_label,
+                failed_docs,
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -1257,8 +1265,8 @@ def remove_document_from_es_index(
             es_document._index.refresh()
     except NotFoundError:
         logger.info(
-            f"The document with ID: %s can't be deleted from the %s index,"
-            f" it doesn't exist.",
+            "The document with ID: %s can't be deleted from the %s index,"
+            " it doesn't exist.",
             instance_id,
             es_document._index._name,
         )
@@ -1323,7 +1331,7 @@ def index_dockets_in_bulk(
                 failed_docs.append(info["index"]["_id"])
 
     if failed_docs:
-        logger.error(f"Error indexing Dockets in bulk IDs are: {failed_docs}")
+        logger.error("Error indexing Dockets in bulk IDs are: %s", failed_docs)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.

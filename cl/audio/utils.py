@@ -31,8 +31,7 @@ def get_audio_binary() -> str:
         path_to_binary = find_executable("ffmpeg")
         if path_to_binary is None:
             raise Exception(
-                "Unable to find avconv or ffmpeg for doing "
-                "audio conversions."
+                "Unable to find avconv or ffmpeg for doing audio conversions."
             )
     return path_to_binary
 

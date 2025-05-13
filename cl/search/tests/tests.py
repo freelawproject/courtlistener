@@ -26,7 +26,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
 from cl.lib.elasticsearch_utils import simplify_estimated_count
@@ -427,7 +426,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                html_columbia="<p>Code, &#167; 1-815 </p>",
+                html_columbia="<p>Code, &#167; 1-815 Lorem §247 $247 %247 ¶247</p>",
                 plain_text="",
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
@@ -453,7 +452,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                plain_text="Strickland Motion",
+                plain_text="Strickland Motion 247",
             ),
         )
         OpinionClusterFactoryWithChildrenAndParents(
@@ -883,6 +882,61 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
+    async def test_avoid_splitting_terms_on_special_chars(
+        self, court_cache_key_mock
+    ) -> None:
+        """Can we avoid splitting words in queries such as §247 and phrases
+        like "§247"?
+        """
+
+        special_chars_exceptions = ["§", "$", "%", "¶"]
+        # A search for phrase "§247" shouldn't match "247"
+        for special_char in special_chars_exceptions:
+            with self.subTest(
+                special_char=special_char, msg="Phrase query and special char."
+            ):
+                r = await self.async_client.get(
+                    reverse("show_results"), {"q": f'"{special_char}247"'}
+                )
+                actual = self.get_article_count(r)
+                self.assertEqual(
+                    actual, 1, msg="Didn't get the right number of results"
+                )
+                self.assertIn("1:21-cv-1234", r.content.decode())
+
+        # A search for phrase "247" shouldn't match "§247"
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": '"247"'}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(
+            actual, 1, msg="Didn't get the right number of results"
+        )
+        self.assertIn("34-2535", r.content.decode())
+
+        # A search for §247 shouldn't match 247
+        for special_char in special_chars_exceptions:
+            with self.subTest(
+                special_char=special_char,
+                msg="Non-phrase query and special char.",
+            ):
+                r = await self.async_client.get(
+                    reverse("show_results"), {"q": f"{special_char}247"}
+                )
+                actual = self.get_article_count(r)
+                self.assertEqual(
+                    actual, 1, msg="Didn't get the right number of results"
+                )
+                self.assertIn("1:21-cv-1234", r.content.decode())
+
+        # A search for 247 shouldn't match §247
+        r = await self.async_client.get(reverse("show_results"), {"q": "247"})
+        actual = self.get_article_count(r)
+        self.assertEqual(
+            actual, 1, msg="Didn't get the right number of results"
+        )
+        self.assertIn("34-2535", r.content.decode())
+
     def test_query_cleanup_function(self, court_cache_key_mock) -> None:
         # Send string of search_query to the function and expect it
         # to be encoded properly
@@ -1002,6 +1056,10 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 'docketNumber:"docket number 2"',
                 'docketNumber:"docket number 2"',
             ),
+            ("§242", "§242"),
+            ("$242", "$242"),
+            ("%242", "%242"),
+            ("¶242", "¶242"),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
@@ -1892,7 +1950,7 @@ class SaveSearchQueryTest(TestCase):
     def test_search_api_v4_query_saving(self) -> None:
         """Do we save queries on all V4 Search endpoints"""
         for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+            url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
             self.client.get(url)
             # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
@@ -1917,7 +1975,7 @@ class SaveSearchQueryTest(TestCase):
     def test_failed_es_search_v4_api_queries(self) -> None:
         """Do we flag failed v4 API queries properly?"""
         query = "type=r&q=contains/sproximity token"
-        url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+        url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 400)
         last_query = SearchQuery.objects.last()
@@ -1934,7 +1992,7 @@ class SaveSearchQueryTest(TestCase):
     def test_search_es_api_v3_query_saving(self) -> None:
         """Do we save queries on all V3 Search endpoints"""
         for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+            url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
             self.client.get(url)
             # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
@@ -1959,7 +2017,7 @@ class SaveSearchQueryTest(TestCase):
     def test_failed_es_search_v3_api_queries(self) -> None:
         """Do we flag failed ES v3 API queries properly?"""
         query = "type=r&q=contains/sproximity token"
-        url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+        url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 500)
         last_query = SearchQuery.objects.last()

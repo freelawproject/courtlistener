@@ -49,20 +49,14 @@ document.addEventListener('alpine:init', () => {
       return this.options[index].children.some((child) => `#${this.visibleSection}` === child.href);
     },
     get markerClass() {
-      return this.isVisible || this.hasVisibleChild ? 'marker:text-primary-600' : 'marker:text-greyscale-200';
+      return this.isVisible || this.hasVisibleChild ? '#B5362D' : '#E8E4DE';
     },
     get childClass() {
       return this.isVisible ? this.activeItemClasses : this.inactiveItemClasses;
     },
     get hasChildren() {
       const index = this.options.findIndex((el) => el.href === this.target);
-      return index > -1 ? this.options[index].children : false;
-    },
-    focusPrevious() {
-      this.$focus.wrap().previous();
-    },
-    focusNext() {
-      this.$focus.wrap().next();
+      return index > -1 && this.options[index].children?.length > 0;
     },
     init() {
       this.options = JSON.parse(document.getElementById('nav-items').textContent);

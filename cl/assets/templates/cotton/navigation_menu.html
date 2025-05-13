@@ -1,6 +1,10 @@
 {% load svg_tags static component_tags %}
 {% require_script "js/alpine/components/navigation_menu.js" %}
-{% require_script "js/alpine/components/intersect.js" %}
+{% require_script "js/alpine/composables/intersect.js" %}
+{% require_script "js/alpine/composables/focus.js" %}
+{% require_script "js/alpine/plugins/intersect@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/collapse@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 
 <c-vars nav_items ></c-vars>
 {{ nav_items|json_script:"nav-items" }}
@@ -8,21 +12,25 @@
 {# DESKTOP #}
 
 <div x-data="navMenu" class="max-md:hidden overflow-y-auto h-[100vh] sticky top-5 min-w-[var(--nav-menu-width)]">
-<nav class="sticky top-0 flex flex-col flex-wrap items-start w-full">
-<ul class="list-inside pl-0 w-full" role="menu" aria-label="Navigation">
+<nav class="sticky top-0 flex flex-col flex-wrap items-start w-full pr-3">
+<ul
+  class="list-none w-full"
+  role="menu"
+  aria-label="Navigation"
+>
   {% for item in nav_items %}
     <li
       data-intersect-target="{{ item.href }}"
-      class="pl-3.5 w-full marker:text-greyscale-200"
-      x-bind:class="markerClass"
+      class="w-full"
       role="none"
     >
-      <div class="-mt-7 ml-4 text-sm font-sans flex justify-start items-center gap-2 flex-wrap">
+      <div class="ml-1 text-sm font-sans flex justify-start items-center flex-wrap">
+        {% svg "ellipse" x_bind__fill="markerClass" data_intersect_target=item.href aria_hidden="true" %}
         <a
           x-bind:class="itemClass"
           title="{{ item.text }}"
           href="#{{ item.href|slugify }}"
-          class="py-1.5 font-semibold truncate"
+          class="pl-3.5 pr-2 py-1.5 font-semibold truncate"
           data-intersect-target="{{ item.href }}"
           aria-label="Go to {{ item.text }}"
         >
@@ -52,7 +60,7 @@
         x-show="isExpanded"
         x-collapse
         data-intersect-target="{{ item.href }}"
-        class="flex flex-col pl-[3px]"
+        class="flex flex-col pl-1.5"
         role="menu"
       >
         {% for sub_item in item.children %}
@@ -60,7 +68,7 @@
             x-bind:class="childClass"
             title="{{ sub_item.text }}"
             href="#{{ sub_item.href|slugify }}"
-            class="w-full pl-7.5 py-1.5 font-normal text-sm truncate"
+            class="w-full pl-8 py-1.5 font-normal text-sm truncate"
             data-intersect-target="{{ sub_item.href }}"
             role="menuitem"
             aria-label="Go to {{ sub_item.text }}"
@@ -97,11 +105,12 @@
   <ul
     id="mobile-menu-list"
     x-show="menuOpen"
+    x-data="focus"
     x-on:click.outside="closeMenu"
     x-on:keyup.esc="closeMenu"
     x-on:keyup.right="focusNext"
     x-on:keyup.left="focusPrevious"
-    class="absolute z-10 mt-2 max-h-[320px] w-full overflow-auto rounded-lg bg-white py-1 shadow-lg border border-greyscale-200 focus:outline-hidden list-none pl-0"
+    class="absolute z-10 mt-2 max-h-[320px] w-full overflow-auto rounded-lg bg-white py-1 shadow-lg border border-greyscale-200 focus:outline-hidden"
     tabindex="-1"
     role="menu"
     aria-label="Navigation"
@@ -128,7 +137,7 @@
           x-if="hasChildren"
           x-bind:data-intersect-target="option.href"
         >
-          <ul class="flex flex-col w-full list-none pl-0" role="menu">
+          <ul class="flex flex-col w-full" role="menu">
             <template x-for="subItem in option.children">
               <li class="w-full pl-7.5 py-1.5 font-normal text-sm text-greyscale-600" role="none">
                 <a
