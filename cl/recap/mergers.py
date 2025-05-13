@@ -280,7 +280,7 @@ def add_attorney(atty, p, d):
     elif count >= 2:
         # Too many found, choose the most recent attorney.
         logger.info(
-            f"Got too many results for atty: '{atty}'. Picking earliest."
+            "Got too many results for atty: '%s'. Picking earliest.", atty
         )
         a = attys.earliest("date_created")
 
@@ -998,7 +998,9 @@ async def add_docket_entries(
         except RECAPDocument.MultipleObjectsReturned:
             logger.info(
                 "Multiple recap documents found for document entry number'%s' "
-                "while processing '%s'" % (docket_entry["document_number"], d)
+                "while processing '%s'",
+                docket_entry["document_number"],
+                d,
             )
             if params["document_type"] == RECAPDocument.ATTACHMENT:
                 continue
@@ -1596,7 +1598,7 @@ def merge_pacer_docket_into_cl_docket(
     async_to_sync(process_orphan_documents)(
         rds_created, d.court_id, d.date_filed
     )
-    logger.info(f"Created/updated docket: {d}")
+    logger.info("Created/updated docket: %s", d)
     return rds_created, content_updated
 
 
@@ -1877,9 +1879,9 @@ async def merge_attachment_page_data(
                         except RECAPDocument.MultipleObjectsReturned:
                             rd.description = ""
                             logger.info(
-                                f"Failed to migrate description for "
-                                f"{attachment['pacer_doc_id']}, "
-                                f"multiple source documents found."
+                                "Failed to migrate description for "
+                                "%s, multiple source documents found.",
+                                attachment["pacer_doc_id"],
                             )
                         rd.attachment_number = None
                         rd.document_type = RECAPDocument.PACER_DOCUMENT
@@ -1900,9 +1902,8 @@ async def merge_attachment_page_data(
                         except RECAPDocument.MultipleObjectsReturned:
                             rd.description = ""
                             logger.info(
-                                f"Failed to migrate description for "
-                                f"{attachment['pacer_doc_id']}, "
-                                f"multiple source documents found."
+                                "Failed to migrate description for %s, multiple source documents found.",
+                                attachment["pacer_doc_id"],
                             )
                     rds_created.append(rd)
 
@@ -1983,7 +1984,7 @@ def save_iquery_to_docket(
         raise self.retry(exc=exc)
 
     async_to_sync(add_tags_to_objs)(tag_names, [d])
-    logger.info(f"Created/updated docket: {d}")
+    logger.info("Created/updated docket: %s", d)
 
     # Add the CASE_QUERY_PAGE to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles.objects.create(
@@ -2073,7 +2074,10 @@ def process_case_query_report(
     d.save()
     add_bankruptcy_data_to_docket(d, report_data)
     logger.info(
-        f"Created/updated docket: {d} from court: {court_id} and pacer_case_id {pacer_case_id}"
+        "Created/updated docket: %s from court: %s and pacer_case_id %s",
+        d,
+        court_id,
+        pacer_case_id,
     )
 
     # Add the CASE_QUERY_PAGE to the docket in case we need it someday.

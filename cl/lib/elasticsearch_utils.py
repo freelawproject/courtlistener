@@ -2987,9 +2987,9 @@ def do_count_query(
         total_results = search_query.count()
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            f"Error on count query request: {search_query.to_dict()}"
+            "Error on count query request: %s", search_query.to_dict()
         )
-        logger.warning(f"Error was: {e}")
+        logger.warning("Error was: %s", e)
         # Required for the paginator class to work, as it expects an integer.
         total_results = 0
     return total_results
@@ -3222,9 +3222,9 @@ def do_collapse_count_query(
         )
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            f"Error on count query request: {search_query.to_dict()}"
+            "Error on count query request: %s", search_query.to_dict()
         )
-        logger.warning(f"Error was: {e}")
+        logger.warning("Error was: %s", e)
         total_results = 0
     return total_results
 

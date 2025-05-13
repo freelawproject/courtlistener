@@ -147,6 +147,8 @@ lint.select = [
   "E",
   # Pyflakes errors
   "F",
+  # flake8-logging-format
+  "G",
   # isort
   "I",
   # pyupgrade
