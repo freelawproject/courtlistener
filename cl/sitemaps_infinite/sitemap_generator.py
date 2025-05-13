@@ -1,6 +1,6 @@
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from django.conf import settings
 from django.core.cache import caches
@@ -315,7 +315,7 @@ def make_expiration_time(cache: BaseCache, timeout: int) -> datetime:
     if timeout is None:
         exp = datetime.max
     else:
-        tz = timezone.utc if settings.USE_TZ else None
+        tz = UTC if settings.USE_TZ else None
         exp = datetime.fromtimestamp(timeout, tz=tz)
     exp = exp.replace(microsecond=0)
 

@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from functools import cached_property
-from typing import Any, Union
+from typing import Any
 
 from cursor_pagination import CursorPaginator
 from django.conf import settings
@@ -89,7 +89,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         )
         return self.protocol or protocol or env_based_protocol
 
-    _cursor: Union[str, None, False] = False
+    _cursor: str | None | False = False
     _has_next: bool = False
 
     # make cache key with p=1 by default (to simplify the handling, @see `make_cache_key` in `sitemap.py`)
