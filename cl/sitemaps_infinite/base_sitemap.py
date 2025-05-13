@@ -89,7 +89,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         )
         return self.protocol or protocol or env_based_protocol
 
-    _cursor: str | None | False = False
+    _cursor: str | None | bool = False
     _has_next: bool = False
 
     # make cache key with p=1 by default (to simplify the handling, @see `make_cache_key` in `sitemap.py`)
