@@ -85,7 +85,6 @@ dependencies = [
   "datasketch>=1.6.5",
   "PyStemmer>=2.2.0.3",
   "factory-boy>=3.3.3",
-  "django-elasticsearch-dsl>=8.0",
   "django-override-storage>=0.3.2",
   "django-environ>=0.12.0",
   "judge-pics>=2.0.5",
@@ -113,6 +112,8 @@ dependencies = [
   "django-ses[events]>=0.44.0",
   "juriscraper>=2.6.26",
   "django-cotton>=2.0.1",
+  "django-cursor-pagination>=0.3.0",
+  "django-elasticsearch-dsl>=8.0",
 ]
 
 [dependency-groups]
