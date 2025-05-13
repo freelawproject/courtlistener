@@ -106,7 +106,9 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
 
     def set_cursor(self, cursor: str | None = None):
         self._cursor = cursor
-        logger.debug("Cursor set to '%s' for section '%s'", cursor, self.section)
+        logger.debug(
+            "Cursor set to '%s' for section '%s'", cursor, self.section
+        )
 
     @property
     def cursor(self):
