@@ -70,6 +70,9 @@
 
 @layer utilities {
   .btn-xl {
-    @apply py-3 px-4.5;
+    @apply py-3 px-4.5 text-md;
+  }
+  .lead {
+    @apply text-xl text-greyscale-700 font-normal;
   }
 }
