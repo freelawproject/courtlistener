@@ -30,13 +30,19 @@
 
 @layer components {
   .btn {
-    @apply py-2.5 px-3.5 rounded-lg w-fit text-sm font-normal;
+    @apply py-2.5 px-3.5 rounded-lg w-fit text-sm font-normal gap-1;
   }
   .btn-primary {
-    @apply btn text-white bg-primary-600 hover:bg-primary-700 outline-none focus:ring-4 focus:ring-primary-200 disabled:bg-primary-100 disabled:text-primary-400;
+    @apply btn text-white bg-primary-600 hover:bg-primary-700 outline-none focus:ring-4 focus:ring-primary-300 disabled:bg-primary-100 disabled:text-primary-400;
   }
   .btn-outline {
     @apply btn text-greyscale-700 hover:bg-greyscale-100 outline outline-1 outline-greyscale-300 focus:ring-4 focus:ring-greyscale-200 disabled:outline-greyscale-200 disabled:text-greyscale-400;
+  }
+  .btn-dark {
+    @apply btn text-white bg-greyscale-900 hover:bg-greyscale-800 outline-none focus:ring-4 focus:ring-greyscale-400 disabled:bg-greyscale-400 disabled:text-greyscale-200;
+  }
+  .banner {
+    @apply flex flex-col gap-4 rounded-2xl bg-greyscale-100 border-2 border-greyscale-200 justify-between;
   }
 }
 
