@@ -423,7 +423,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.0.2" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", specifier = ">=2.6.26" },
+    { name = "juriscraper", specifier = ">=2.6.68" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=5.3.1" },
     { name = "markdown2", specifier = ">=2.5.0" },
@@ -1605,7 +1605,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.67"
+version = "2.6.68"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argparse" },
@@ -1624,7 +1624,7 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/66/f3/8c0127d681c9c812c86c86fbd0f2a1e7614dfde66b3e69d192aabb804c2d/juriscraper-2.6.67.tar.gz", hash = "sha256:5e6dd991927eb54d247d0a033c3da969e8ed0364f1d2d88fd5c58b7378433347", size = 300269, upload-time = "2025-05-08T21:51:44.624Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4d/63/b05bfe35f708fa3604e71859c25ad37042e823c7b85ceb4c0f078b750ac3/juriscraper-2.6.68.tar.gz", hash = "sha256:d7e22efb9fa96d209fda8be27a6c39a313e141a8b7632c5f7a28eac57742e379", size = 300324, upload-time = "2025-05-12T17:44:11.169Z" }
 
 [[package]]
 name = "kdtree"
@@ -2746,7 +2746,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/80/f8/0802dd14c58b5d3d7
 
 [[package]]
 name = "tldextract"
-version = "5.1.3"
+version = "5.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
@@ -2754,9 +2754,9 @@ dependencies = [
     { name = "requests" },
     { name = "requests-file" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4a/4f/eee4bebcbad25a798bf55601d3a4aee52003bebcf9e55fce08b91ca541a9/tldextract-5.1.3.tar.gz", hash = "sha256:d43c7284c23f5dc8a42fd0fee2abede2ff74cc622674e4cb07f514ab3330c338", size = 125033, upload-time = "2024-11-05T00:03:00.009Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/97/78/182641ea38e3cfd56e9c7b3c0d48a53d432eea755003aa544af96403d4ac/tldextract-5.3.0.tar.gz", hash = "sha256:b3d2b70a1594a0ecfa6967d57251527d58e00bb5a91a74387baa0d87a0678609", size = 128502, upload-time = "2025-04-22T06:19:37.491Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/86/aebe15fa40a992c446be5cf14e70e58a251277494c14d26bdbcff0e658fd/tldextract-5.1.3-py3-none-any.whl", hash = "sha256:78de310cc2ca018692de5ddf320f9d6bd7c5cf857d0fd4f2175f0cdf4440ea75", size = 104923, upload-time = "2024-11-05T00:02:58.009Z" },
+    { url = "https://files.pythonhosted.org/packages/67/7c/ea488ef48f2f544566947ced88541bc45fae9e0e422b2edbf165ee07da99/tldextract-5.3.0-py3-none-any.whl", hash = "sha256:f70f31d10b55c83993f55e91ecb7c5d84532a8972f22ec578ecfbe5ea2292db2", size = 107384, upload-time = "2025-04-22T06:19:36.304Z" },
 ]
 
 [[package]]

@@ -110,10 +110,10 @@ dependencies = [
   "django-tailwind>=3.8.0",
   "drf-dynamic-fields>=0.4.0",
   "django-ses[events]>=0.44.0",
-  "juriscraper>=2.6.26",
   "django-cotton>=2.0.1",
   "django-cursor-pagination>=0.3.0",
   "django-elasticsearch-dsl>=8.0",
+  "juriscraper>=2.6.68",
 ]
 
 [dependency-groups]
