@@ -34,6 +34,7 @@ def check_prayer_pacer(self, rd_pk: int, user_pk: int):
         .defer("plain_text")
         .get(pk=rd_pk)
     )
+
     court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
     pacer_doc_id = rd.pacer_doc_id
     recap_user = User.objects.get(username="recap")
