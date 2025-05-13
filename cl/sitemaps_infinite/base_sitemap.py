@@ -66,7 +66,7 @@ class CustomCursorPaginator(CursorPaginator):
         """
         redis_db: Redis = get_redis_interface(REDIS_DB)
         redis_db.hset(HASH_NAME, self.section, num)
-        logger.debug(f"Saved {num} pages for {self.section} in the cache")
+        logger.debug("Saved %d pages for %s in the cache", num, self.section)
 
 
 class InfinitePaginatorSitemap(sitemaps.Sitemap):
@@ -106,7 +106,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
 
     def set_cursor(self, cursor: str | None = None):
         self._cursor = cursor
-        logger.debug(f"Cursor set to '{cursor}' for section '{self.section}'")
+        logger.debug("Cursor set to '%s' for section '%s'", cursor, self.section)
 
     @property
     def cursor(self):

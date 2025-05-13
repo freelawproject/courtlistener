@@ -98,11 +98,16 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
         try:
             sitemapObject: InfinitePaginatorSitemap = sitemapClass()
             logger.info(
-                f"Loaded the sitemap class '{sitemapClass.__name__}' for section {section}."
+                "Loaded the sitemap class '%s' for section %s.",
+                sitemapClass.__name__,
+                section,
             )
         except Exception as e:
             logger.error(
-                f"Error while loading the sitemap class '{sitemapClass.__name__}' for section {section}: {e}"
+                "Error while loading the sitemap class '%s' for section %s: %s",
+                sitemapClass.__name__,
+                section,
+                e,
             )
             continue
 
@@ -112,7 +117,10 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
         while True:
             if num_files >= settings.SITEMAPS_FILES_PER_CALL:
                 logger.info(
-                    f"Reached the limit of {settings.SITEMAPS_FILES_PER_CALL} files per call for section: {section} and page: {cursor_data.get('last_page')}."
+                    "Reached the limit of %d files per call for section: %s and page: %d.",
+                    settings.SITEMAPS_FILES_PER_CALL,
+                    section,
+                    cursor_data.get("last_page"),
                 )
 
                 forced_exit = True
@@ -139,7 +147,10 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
             )
 
             logger.info(
-                f"Cursor of the current page read from the cache: {cached_cursor}, passed from the previous iteration: {current_cursor}, current_page: {current_page}"
+                "Cursor of the current page read from the cache: %s, passed from the previous iteration: %s, current_page: %d",
+                cached_cursor,
+                current_cursor,
+                current_page,
             )
 
             # Need to regenerate the cache, because cached and currently processed cursors do not match
@@ -159,7 +170,9 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                 > short_cache_timeout
             ):
                 logger.info(
-                    f"No need to regenerate the cache '{cache_key}' for the page {current_page}, because it's a full page, move the cursor to the next page"
+                    "No need to regenerate the cache '%s' for the page %d, because it's a full page, move the cursor to the next page",
+                    cache_key,
+                    current_page,
                 )
 
                 # No need to regenerate the cache, because it's a full page, move the cursor to the next page
@@ -178,7 +191,9 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                 current_cursor = current_cursor or cached_cursor
 
                 logger.info(
-                    f"(Re)generating the cache '{cache_key}' for the page {current_page}, because the previous and current cursors do not match"
+                    "(Re)generating the cache '%s' for the page %d, because the previous and current cursors do not match",
+                    cache_key,
+                    current_page,
                 )
 
                 # either re-read the current page or start from the beginning, if `cursor` is None
@@ -189,7 +204,10 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
                 if not urls or len(urls) == 0:
                     logger.info(
-                        f"Empty urls query for section: {section}, page: {current_page} and cursor: {cursor_data.get('cursor')}."
+                        "Empty urls query for section: %s, page: %d and cursor: %s.",
+                        section,
+                        current_page,
+                        cursor_data.get("cursor"),
                     )
                     cursor_data["has_next"] = 0
                     if current_page == 1:
@@ -213,7 +231,10 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                 db_cache.set(cache_key, urls, cache_timeout)
 
                 logger.info(
-                    f"Generated sitemap cache for section: {section}, page: {current_page} and cursor: {current_cursor}."
+                    "Generated sitemap cache for section: %s, page: %d and cursor: %s.",
+                    section,
+                    current_page,
+                    current_cursor,
                 )
 
                 cursor_data.update(
@@ -226,7 +247,10 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
                 if not sitemapObject.has_next:
                     logger.info(
-                        f"No more URLs to generate for section: {section}, page: {current_page} and cursor: {current_cursor}."
+                        "No more URLs to generate for section: %s, page: %d and cursor: %s.",
+                        section,
+                        current_page,
+                        current_cursor,
                     )
 
                     # the infinite paginator saves the last page in the current section to its cache
