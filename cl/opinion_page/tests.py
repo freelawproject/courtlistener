@@ -1016,13 +1016,7 @@ class DocketSitemapTest(SitemapTest):
         )
 
     def setUp(self) -> None:
-        # set the domain name in the Sites framework to match the test domain name, set http url schema
-        domain = "testserver"
-        SiteModel = apps.get_model("sites", "Site")
-
-        SiteModel.objects.update_or_create(
-            pk=settings.SITE_ID, defaults={"domain": domain, "name": domain}
-        )
+        self.setUpSiteDomain()
 
         self.sitemap_url = reverse(
             "sitemaps-pregenerated", kwargs={"section": SEARCH_TYPES.RECAP}
