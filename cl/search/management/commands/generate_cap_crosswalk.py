@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import boto3
 import pytz
@@ -111,7 +111,7 @@ class Command(CommandUtils, BaseCommand):
 
         self.print_statistics()
 
-    def setup_s3_client(self, mock_client: Optional[Any] = None) -> None:
+    def setup_s3_client(self, mock_client: Any | None = None) -> None:
         """Set up S3 client for accessing CAP data in R2.
 
         :param mock_client: Optional mock client for testing.
@@ -288,7 +288,7 @@ class Command(CommandUtils, BaseCommand):
 
     def find_matching_case(
         self, case_meta: dict[str, Any], reporter_slug: str, volume: str
-    ) -> Optional[OpinionCluster]:
+    ) -> OpinionCluster | None:
         """Find a matching case in CourtListener database using the filepath_json_harvard field.
 
         :param case_meta: Case metadata dictionary from CAP.

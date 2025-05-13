@@ -1,7 +1,6 @@
 import hashlib
 from calendar import timegm
 from datetime import datetime
-from typing import Optional
 
 from django.contrib.sitemaps import Sitemap
 from django.contrib.sitemaps.views import x_robots_tag
@@ -50,7 +49,7 @@ def make_cache_key(
 def cached_sitemap(
     request: HttpRequest,
     sitemaps: dict[str, Sitemap],
-    section: Optional[str] = None,
+    section: str | None = None,
     template_name: str = "sitemap.xml",
     content_type: str = "application/xml",
 ) -> HttpResponse:

@@ -902,7 +902,7 @@ def bulk_indexing_generator(
     base_doc: dict[str, str],
     child_id_property: str | None = None,
     parent_id: int | None = None,
-) -> Generator[ESDictDocument, None, None]:
+) -> Generator[ESDictDocument]:
     """Generate ES documents for bulk indexing.
 
     :param docs_query_set: The queryset of model instances to be indexed.

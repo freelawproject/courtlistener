@@ -8,7 +8,7 @@ from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import Any, Optional, Union
+from typing import Any
 
 import eyecite
 import internetarchive as ia
@@ -137,7 +137,7 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 logger = logging.getLogger(__name__)
 
 
-def increment_failure_count(obj: Union[Audio, Docket, RECAPDocument]) -> None:
+def increment_failure_count(obj: Audio | Docket | RECAPDocument) -> None:
     if obj.ia_upload_failure_count is None:
         obj.ia_upload_failure_count = 1
     else:
@@ -362,12 +362,12 @@ def get_and_save_free_document_report(
         SoftTimeLimitExceeded,
         ValueError,
     ) as exc:
-        if isinstance(exc, (TypeError, ValueError)):
+        if isinstance(exc, (TypeError | ValueError)):
             msg = (
                 "TypeError getting free document report results, likely due "
                 "to failure to get Nonce."
             )
-        elif isinstance(exc, (RequestException, ReadTimeoutError)):
+        elif isinstance(exc, (RequestException | ReadTimeoutError)):
             msg = "Unable to get free document report results"
         elif isinstance(exc, PacerLoginException):
             msg = "PacerLoginException while getting free docs"
@@ -463,7 +463,7 @@ def process_free_opinion_result(
     row_pk: int,
     court_id: str,
     cnt: CaseNameTweaker,
-) -> Optional[TaskData]:
+) -> TaskData | None:
     """Add data from a free opinion report to our DB
 
     :param self: The celery task
@@ -614,7 +614,7 @@ def get_and_process_free_pdf(
     data: TaskData,
     row_pk: int,
     court_id: str,
-) -> Optional[TaskData]:
+) -> TaskData | None:
     """Get a PDF from a PACERFreeDocumentRow object
 
     :param self: The celery task
@@ -789,14 +789,14 @@ ia_session = ia.get_session(
 def upload_to_ia(
     self: Task,
     identifier: str,
-    files: Union[str, list[str], list[BytesIO], dict[str, BytesIO]],
+    files: str | list[str] | list[BytesIO] | dict[str, BytesIO],
     title: str,
     collection: list[str],
     court_id: str,
     source_url: str,
     media_type: str,
     description: str,
-) -> Optional[list[Response]]:
+) -> list[Response] | None:
     """Upload an item and its files to the Internet Archive
 
     On the Internet Archive there are Items and files. Items have a global
@@ -905,7 +905,7 @@ def upload_to_ia(
 
 
 @app.task
-def mark_court_done_on_date(log_id: int, status: int) -> Optional[int]:
+def mark_court_done_on_date(log_id: int, status: int) -> int | None:
     try:
         doc_log = PACERFreeDocumentLog.objects.get(pk=log_id)
     except PACERFreeDocumentLog.DoesNotExist:
@@ -929,7 +929,7 @@ def delete_pacer_row(data: TaskData, pk: int) -> list[int]:
 
 def make_fjc_idb_lookup_params(
     item: FjcIntegratedDatabase,
-) -> dict[str, Optional[str]]:
+) -> dict[str, str | None]:
     """Given an IDB row, generate good params for looking up that item in the
     PossibleCaseNumberApi.
 
@@ -1039,7 +1039,7 @@ def get_pacer_case_id_and_title(
     try:
         report.query(docket_number)
     except (RequestException, ReadTimeoutError, PacerLoginException) as exc:
-        if isinstance(exc, (RequestException, ReadTimeoutError)):
+        if isinstance(exc, (RequestException | ReadTimeoutError)):
             msg = (
                 "Network error while running possible case number query on: "
                 "%s.%s"
@@ -1163,10 +1163,10 @@ def do_case_query_by_pacer_case_id(
 @app.task(bind=True, ignore_result=True)
 def filter_docket_by_tags(
     self: Task,
-    data: Optional[dict[Any, Any]],
-    tags: Optional[list[str]],
+    data: dict[Any, Any] | None,
+    tags: list[str] | None,
     court_id: str,
-) -> Optional[dict[Any, Any]]:
+) -> dict[Any, Any] | None:
     """Stop the chain if the docket that'll be updated is already tagged.
 
     This is useful for if you're running a bulk download a second time and want
@@ -1665,8 +1665,8 @@ def get_docket_by_pacer_case_id(
     data: TaskData,
     court_id: str,
     session_data: SessionData,
-    docket_pk: Optional[int] = None,
-    tag_names: Optional[str] = None,
+    docket_pk: int | None = None,
+    tag_names: str | None = None,
     **kwargs,
 ) -> TaskData | None:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
@@ -1774,9 +1774,9 @@ def get_appellate_docket_by_docket_number(
     docket_number: str,
     court_id: str,
     session_data: SessionData,
-    tag_names: Optional[list[str]] = None,
+    tag_names: list[str] | None = None,
     **kwargs,
-) -> Optional[TaskData]:
+) -> TaskData | None:
     """Get a docket by docket number, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -1850,7 +1850,7 @@ def get_appellate_docket_by_docket_number(
 def get_att_report_by_rd(
     rd: RECAPDocument,
     session_data: SessionData,
-) -> Optional[AttachmentPage]:
+) -> AttachmentPage | None:
     """Method to get the attachment report for the item in PACER.
 
     :param rd: The RECAPDocument object to use as a source.
@@ -1885,7 +1885,7 @@ def get_attachment_page_by_rd(
     self: Task,
     rd_pk: int,
     session_data: SessionData,
-) -> Optional[AttachmentPage]:
+) -> AttachmentPage | None:
     """Get the attachment page for the item in PACER.
 
     :param self: The celery task
@@ -2304,7 +2304,7 @@ def is_docket_entry_sealed(
 def update_rd_metadata(
     self: Task,
     rd_pk: int,
-    pdf_bytes: Optional[bytes],
+    pdf_bytes: bytes | None,
     r_msg: str,
     court_id: str,
     pacer_case_id: str,
@@ -2366,7 +2366,7 @@ def update_rd_metadata(
     if response.is_success:
         rd.page_count = int(response.text)
 
-    assert isinstance(rd.page_count, (int, type(None))), (
+    assert isinstance(rd.page_count, (int | type(None))), (
         "page_count must be an int or None."
     )
 
@@ -2380,7 +2380,7 @@ def update_rd_metadata(
     return True, "Saved item successfully"
 
 
-def add_tags(rd: RECAPDocument, tag_name: Optional[str]) -> None:
+def add_tags(rd: RECAPDocument, tag_name: str | None) -> None:
     """Add tags to a tree of objects starting with the RECAPDocument
 
     Adds the tag to the RECAPDocument, Docket Entry, and Docket.
@@ -2409,8 +2409,8 @@ def get_pacer_doc_by_rd(
     self: Task,
     rd_pk: int,
     session_data: SessionData,
-    tag: Optional[str] = None,
-) -> Optional[int]:
+    tag: str | None = None,
+) -> int | None:
     """A simple method for getting the PDF associated with a RECAPDocument.
 
     :param self: The bound celery task
@@ -2474,7 +2474,7 @@ def get_pacer_doc_by_rd_and_description(
     description_re: Pattern,
     session_data: SessionData,
     fallback_to_main_doc: bool = False,
-    tag_name: Optional[list[str]] = None,
+    tag_name: list[str] | None = None,
 ) -> None:
     """Using a RECAPDocument object ID and a description of a document, get the
     document from PACER.
@@ -2880,9 +2880,9 @@ def extract_recap_document_for_opinions(rd: RECAPDocument) -> Response:
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def recap_document_into_opinions(
     self,
-    task_data: Optional[TaskData] = None,
-    recap_document_id: Optional[int] = None,
-) -> Optional[TaskData]:
+    task_data: TaskData | None = None,
+    recap_document_id: int | None = None,
+) -> TaskData | None:
     """Ingest recap document into Opinions
 
     :param task_data: dictionary that will contain the recap_document_id,

@@ -4,8 +4,8 @@ import re
 import socket
 from collections import OrderedDict
 from collections.abc import Mapping
-from datetime import date, datetime, timezone
-from typing import Optional, TypedDict
+from datetime import UTC, date, datetime
+from typing import TypedDict
 
 import requests
 import usaddress
@@ -213,7 +213,7 @@ def process_docket_data(
     d: Docket,
     report_type: int,
     filepath: str | None = None,
-) -> Optional[int]:
+) -> int | None:
     """Process docket data file.
 
     :param d: A docket object to work on.
@@ -571,7 +571,7 @@ def check_pacer_court_connectivity(court_id: str) -> ConnectionType:
     blocked_dict: ConnectionType = {
         "connection_ok": connection_ok,
         "status_code": status_code,
-        "date_time": datetime.now(timezone.utc),
+        "date_time": datetime.now(UTC),
     }
     return blocked_dict
 
