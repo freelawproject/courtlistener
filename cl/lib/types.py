@@ -1,7 +1,8 @@
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, NotRequired, TypedDict, Union
+from typing import Any, NotRequired, TypedDict
 
 from django.http import HttpRequest
 from django_elasticsearch_dsl.search import Search
@@ -70,7 +71,7 @@ SearchParam = TypedDict(
         "boost": str,
         "qf": str,
         "pf": str,
-        "ps": Union[float, str],
+        "ps": float | str,
 
         # More Like This
         "mlt": str,
@@ -88,7 +89,7 @@ SearchParam = TypedDict(
 # fmt: on
 
 
-OptionsType = dict[str, Union[str, Callable]]
+OptionsType = dict[str, str | Callable]
 
 
 """

@@ -1,6 +1,6 @@
 import json
 from collections import OrderedDict, defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
 from typing import Any
 from unittest import mock
@@ -884,7 +884,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             start_date=date(2000, 1, 1),
             end_date=None,
             jurisdiction=Court.FEDERAL_APPELLATE,
-            date_modified=datetime(2021, 1, 1, tzinfo=timezone.utc),
+            date_modified=datetime(2021, 1, 1, tzinfo=UTC),
         )
 
         cls.child_court1 = CourtFactory(
@@ -900,7 +900,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             start_date=date(2010, 6, 15),
             end_date=date(2020, 12, 31),
             jurisdiction=Court.STATE_SUPREME,
-            date_modified=datetime(2022, 6, 15, tzinfo=timezone.utc),
+            date_modified=datetime(2022, 6, 15, tzinfo=UTC),
         )
         cls.child_court2 = CourtFactory(
             id="child2",
@@ -915,7 +915,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             start_date=date(2015, 5, 20),
             end_date=None,
             jurisdiction=Court.STATE_TRIAL,
-            date_modified=datetime(2023, 3, 10, tzinfo=timezone.utc),
+            date_modified=datetime(2023, 3, 10, tzinfo=UTC),
         )
 
         cls.orphan_court = CourtFactory(
@@ -930,7 +930,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             start_date=date(2012, 8, 25),
             end_date=None,
             jurisdiction=Court.FEDERAL_DISTRICT,
-            date_modified=datetime(2023, 5, 5, tzinfo=timezone.utc),
+            date_modified=datetime(2023, 5, 5, tzinfo=UTC),
         )
 
     @async_to_sync

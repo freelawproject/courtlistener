@@ -3,7 +3,13 @@ from datetime import datetime, timedelta
 from django.contrib import sitemaps
 from django.db.models import Q, QuerySet
 
-from cl.search.models import PRECEDENTIAL_STATUS, Docket, OpinionCluster
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    SEARCH_TYPES,
+    Docket,
+    OpinionCluster,
+)
+from cl.sitemaps_infinite.base_sitemap import InfinitePaginatorSitemap
 
 
 class OpinionSitemap(sitemaps.Sitemap):
@@ -58,24 +64,29 @@ class BlockedOpinionSitemap(sitemaps.Sitemap):
         return obj.date_modified
 
 
-class DocketSitemap(sitemaps.Sitemap):
+class DocketSitemap(InfinitePaginatorSitemap):
     changefreq = "weekly"
     limit = 50_000
+
+    @property
+    def section(self) -> str:
+        return SEARCH_TYPES.RECAP
+
+    @property
+    def ordering(self) -> tuple[str]:
+        return ("pk",)
 
     def items(self) -> QuerySet:
         # Give items ten days to get some views.
         new_or_popular = Q(view_count__gt=10) | Q(
             date_filed__gt=datetime.today() - timedelta(days=30)
         )
-        return (
-            Docket.objects.filter(
-                new_or_popular,
-                source__in=Docket.RECAP_SOURCES(),
-                blocked=False,
-            )
-            .order_by("pk")
-            .only("view_count", "date_modified", "pk", "slug")
-        )
+        # Ordering should NOT be set here, define the ordering in the separate `ordering` property
+        return Docket.objects.filter(
+            new_or_popular,
+            source__in=Docket.RECAP_SOURCES(),
+            blocked=False,
+        ).only("view_count", "date_modified", "pk", "slug")
 
     def lastmod(self, obj: Docket) -> datetime:
         return obj.date_modified

@@ -1,8 +1,9 @@
 import functools
 import inspect
 import time
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any, Callable, Final
+from typing import Any, Final
 
 from celery import Task
 from dateutil import parser
