@@ -45,6 +45,7 @@
         <ul>
           <li><a href="#creating-alerts">Creating Alerts</a></li>
           <li><a href="#enabling-real-time-alerts">Enabling Real Time Alerts</a></li>
+          <li><a href="#recap-search-alerts-limitations">Limitations of Real-Time RECAP Search Alerts</a></li>
           <li><a href="#editing-search-alerts">Editing an Alert</a></li>
           <li><a href="#editing-search-alerts">Deleting an Alert</a></li>
           <li><a href="#disabling-search-alerts">Disabling an Alert</a></li>
@@ -223,7 +224,7 @@
   <p>Search alerts are triggered by our search engine and are a powerful way to get fine-tuned alerts on cases or topics that you are following.
   </p>
   <h3>Creating Alerts</h3>
-  <p>To create a Search Alert, begin with a search in CourtListener's Case Law or Oral Argument database. In the results page, click the bell icon in the search bar (<i class="fa fa-bell-o gray"></i>) or click the <a class="btn btn-success btn-xs"><i class="fa fa-bell-o"></i> Get Alerts</a> button in the sidebar on the left.
+  <p>To create a Search Alert, begin with a search in CourtListener's Case Law, RECAP or Oral Argument database. In the results page, click the bell icon in the search bar (<i class="fa fa-bell-o gray"></i>) or click the <a class="btn btn-success btn-xs"><i class="fa fa-bell-o"></i> Get Alerts</a> button in the sidebar on the left.
   </p>
   <p>
     <img src="{% static "png/search-bar.png" %}"
@@ -242,8 +243,9 @@
          width="1090">
   </p>
 
-  <p>The available rates are "Real Time," "Daily," "Weekly," "Monthly," or "Off." Real Time alerts are usually delivered within about an hour of when something is published by the court. Daily, weekly, and monthly alerts come at the end of the day, week, and month.
+  <p>The available rates are "Real Time," "Daily," "Weekly," "Monthly," or "Off." Real Time alerts for Case Law are usually delivered within about an hour of when something is published by the court. Real time alerts for oral arguments and the majority of RECAP alerts are batched and delivered every {{ rt_alerts_sending_rate }} minutes. Daily, weekly, and monthly alerts come at the end of the day, week, and month.
   </p>
+  <p>Search alert webhooks for Case Law are delivered at the same time as the alert email. For Oral Argument alerts and the majority of RECAP alerts, webhooks are delivered immediately as we ingest the data, regardless of the alert rate.</p>
   <p>Alerts that are Off will not be run. This can be useful for temporarily disabling an alert.
   </p>
 
@@ -262,6 +264,18 @@
        class="btn btn-danger"><i class="fa fa-heart-o"></i> Join Free.law</a>
   </p>
 
+  <h3 id="recap-search-alerts-limitations">Limitations of Real-Time RECAP Search Alerts</h3>
+  <p> RECAP Search Alerts can be triggered by case-level fields, filing-level fields, or a combination of both. This flexibility introduces complexity, which leads to certain limitations when triggering real-time alerts. For example, suppose you have a real-time alert based on a query like:</p>
+  <p><code>caseName:"Lorem vs Dolor" AND description:"Notice of Removal"</code></p>
+  <p>Now imagine a case previously named <strong>"Ipsum vs Dolor"</strong> contains a filing with the description <strong>"Notice of Removal"</strong>. If the case name is later updated to <strong>"Lorem vs Dolor"</strong>, this case would now match the alert query. </p>
+  <p>However, because the field that causes the match <code>caseName</code> is at the case level and not tied directly to the individual filing, CourtListener cannot detect that a relevant filing now qualifies for the alert. As a result, the alert will not be triggered in real time.
+    Instead, edge-case alerts like this are processed at the end of the day using a different matching strategy. In such cases, the associated webhooks are also triggered at the end of the day, rather than in real time.</p>
+  <p>Apart from the edge case described above, real-time search alert emails are triggered within {{ rt_alerts_sending_rate }} minutes of ingesting a case or filing that matches the alert criteria.</p>
+  <h4 id="recap-search-alerts-party-limitations">Limitations with Text-Based Queries and Party Fields</h4>
+  <p>Another known limitation of RECAP Search Alerts is that alerts do not support combined text-based queries involving both <code>party</code> or <code>attorney</code> fields and filing-level fields such as <code>description</code>. For example, the following query will not work as expected:</p>
+  <p><code>party:"Michael Jordan" AND attorney:"LeBron James" AND description:goat</code></p>
+  <p>This is because <code>party</code> and <code>attorney</code> values are only associated with dockets, not with individual filings, unlike other docket fields.</p>
+  <p>As a workaround to build alerts that involve party and attorney conditions along with a filing description, use the sidebar filters instead of the main query box.</p>
   <h3 id="editing-search-alerts">Editing or Deleting a Search Alert</h3>
   <p>Existing alerts can be edited or deleted from <a href="{% url "profile_alerts" %}">your user profile</a>. By clicking the <a class="btn btn-xs btn-primary"><i class="fa fa-pencil"></i>Edit</a> button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
   </p>
@@ -302,11 +316,6 @@
   <p>For more on citation alerts, <a href="https://free.law/2016/01/30/citation-searching/">see our blog post announcing this feature</a>.
   </p>
   <hr>
-
-  <h2>Coming Soon</h2>
-  <p>We do not currently support search alerts or citation alerts for PACER filings, but we plan to do so soon.
-  </p>
-  <p>Please stay tuned!</p>
 
   {% include "includes/donate_footer_plea.html" %}
 </div>
