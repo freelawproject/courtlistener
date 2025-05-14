@@ -43,12 +43,26 @@
     <p>Note this component uses <code>&lt;pre&gt;</code> tags so all whitespace will be preserved.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <c-code disable_copy="true">
+    <c-code disable_copy>
 Sample code here.
     </c-code>
 
-    <h4 class="mt-3">Props</h4>
-    <p>No props</p>
+    <h4 class="mt-8">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>disable_copy</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Adding this attribute hides the copy-to-clipboard button in the top-right corner of the code block.
+          <br>Defaults to false.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>class</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          CSS classes applied to the <code>&lt;pre&gt;</code> element.
+        </span>
+      </div>
+    </div>
 
     <h4 class="mt-3">Slot</h4>
     <div class="bg-greyscale-100 rounded-xl p-4 my-3">
@@ -60,7 +74,7 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-code disable_copy="true"&gt;
+&lt;c-code disable_copy&gt;
     Sample code here.
 &lt;/c-code&gt;
       </c-code>
