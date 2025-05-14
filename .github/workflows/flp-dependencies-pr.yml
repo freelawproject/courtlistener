@@ -23,7 +23,11 @@ jobs:
 
       - name: Update FLP dependencies
         run: |
-          uv add courts-db eyecite juriscraper reporters-db
+          uv sync \
+          --upgrade-package courts-db \
+          --upgrade-package eyecite \
+          --upgrade-package juriscraper \
+          --upgrade-package reporters-db
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
