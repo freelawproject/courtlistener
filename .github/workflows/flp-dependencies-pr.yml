@@ -1,0 +1,34 @@
+name: Auto-update FLP Dependencies
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-flp-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '>= 3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          version: "0.7.x"
+
+      - name: Update FLP dependencies
+        run: |
+          uv add courts-db eyecite juriscraper reporters-db
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: Update freelawproject dependencies
+          title: Update freelawproject dependencies
+          body: This PR updates FLP dependencies to their latest version
+          branch: update-freelawproject-dependencies
