@@ -217,7 +217,7 @@ def extract_doc_content(
 
     # Identify and link citations within the document content
     find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-        ([opinion.pk],), countdown=random.randint(0, 3600)
+        (opinion.pk,), countdown=random.randint(0, 3600)
     )
 
 
