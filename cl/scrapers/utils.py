@@ -1,7 +1,6 @@
 import json
 import os
 from datetime import date, datetime
-from typing import Optional
 from urllib.parse import urljoin
 
 import httpx
@@ -38,7 +37,7 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 def make_citation(
     cite_str: str, cluster: OpinionCluster, court_id: str
-) -> Optional[Citation]:
+) -> Citation | None:
     """Create and return a citation object for the input values."""
     citation_objs = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
     if not citation_objs:
@@ -105,7 +104,7 @@ def citation_is_duplicated(citation_candidate: Citation, cite: str) -> bool:
     return False
 
 
-def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
+def get_child_court(child_court_name: str, court_id: str) -> Court | None:
     """Get Court object from "child_courts" scraped string
 
     Ensure that the Court object found has the same parent court id has the
@@ -170,7 +169,7 @@ def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
     backoff=2,
     logger=logger,
 )
-def test_for_meta_redirections(r: Response) -> tuple[bool, Optional[str]]:
+def test_for_meta_redirections(r: Response) -> tuple[bool, str | None]:
     """Test for meta data redirections
 
     :param r: A response object

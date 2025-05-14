@@ -22,14 +22,19 @@ module.exports = {
   theme: {
     extend: {
       screens: {
-        xs: '380px',
+        xs: '392px',
       },
       spacing: {
-        4.5: '18px',
-        7.5: '30px',
-        13: '52px',
-        15: '60px',
-        35: '140px',
+        4.5: '1.125rem', // 18px
+        7.5: '1.875rem', // 30px
+        13: '3.25rem', // 52px
+        15: '3.75rem', // 60px
+        18: '4.5rem', // 72px
+        35: '8.75rem', // 140px
+        41: '10.25rem', // 164px
+        42: '10.5rem', // 168px
+        53: '13.25rem', // 212px
+        70: '17.5rem', // 280px
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
