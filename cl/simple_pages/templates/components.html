@@ -12,11 +12,13 @@
         {'href': '#code-block', 'text': 'Code blocks'},
         {'href': '#two-column-list', 'text': 'Two column list'},
         {'href': '#eyebrow', 'text': 'Eyebrow'},
+        {'href': '#copy', 'text': 'Copy to clipboard'},
       ]},
       {'href': '#layout-components', 'text': 'Layout components', 'children': [
         {'href': '#expansion', 'text': 'Expansion panel'},
         {'href': '#navigation-menu', 'text': 'Navigation menu'},
         {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
+        {'href': '#data-table', 'text': 'Data table'},
       ]},
   ]"
 >
@@ -35,12 +37,13 @@
     </ul>
   </section>
 
+  {# CODE BLOCKS #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect="show" id="code-block">
     <h2 class="mt-6 mb-3">Code blocks</h2>
     <p>Note this component uses <code>&lt;pre&gt;</code> tags so all whitespace will be preserved.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <c-code>
+    <c-code disable_copy="true">
 Sample code here.
     </c-code>
 
@@ -57,13 +60,14 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-code&gt;
+&lt;c-code disable_copy="true"&gt;
     Sample code here.
 &lt;/c-code&gt;
       </c-code>
     </c-expansion-panel>
   </section>
 
+  {# TWO COLUMN LIST #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect="show" id="two-column-list">
     <h2 class="mt-6 mb-3">Two column list</h2>
     <h4 class="mt-3">Demo</h4>
@@ -103,6 +107,7 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+  {# EYEBROW #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="eyebrow">
     <h2 class="mt-6 mb-3">Eyebrow</h2>
     <h4 class="mt-3">Demo</h4>
@@ -125,6 +130,47 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+  {# COPY TO CLIPBOARD #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="copy">
+    <h2 class="mt-6 mb-3">Copy to clipboard</h2>
+    <p>Unstyled button that copies text to clipboard.</p>
+    <p>Works with click events, but also keyup events for the <kbd>Enter</kbd> and <kbd>Space</kbd> keys.</p>
+
+    <h4 class="my-3">Demo</h4>
+    <c-copy-to-clipboard
+      text_to_copy="You did it! This was copied with a single click!"
+      class="btn-outline"
+    >
+      Click to copy
+    </c-copy-to-clipboard>
+
+    <h4 class="mt-8">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>text_to_copy</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Text to be copied to clipboard when clicking the button, or when pressing either the <kbd>Enter</kbd> or <kbd>Space</kbd> keys on focus.
+          <br>To pass a string that includes quotation marks, use the <code>escape_quotations</code> filter.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <p class="mb-3">Button content.</p>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-copy-to-clipboard
+  text_to_copy="You did it! This was copied with a single click!"
+  class="btn-outline"
+&gt;
+  Click to copy
+&lt;/c-copy-to-clipboard&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# EXPANSION PANEL #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="expansion">
     <h2 class="mt-6 mb-3">Expansion panel</h2>
     <h4 class="mt-3">Demo</h4>
@@ -159,6 +205,7 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+  {# NAVIGATION MENU #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="navigation-menu">
     <h2 class="mt-6 mb-3">Navigation menu</h2>
     <p>The desktop version of this component highlights the currently visible section on scroll.
@@ -203,6 +250,7 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+  {# TABBED CARDS #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="tabbed-cards">
     <h2 class="mt-6 mb-3">Tabbed cards</h2>
     <p>The tabbed component is composed of two elements: the <code>c-tabs</code> element and the <code>c-tabs.tab</code> element.
@@ -271,6 +319,167 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+  {# DATA TABLE #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="data-table">
+    <h2 class="mt-6 mb-3">Data table</h2>
+    <p>Renders a data table
+    </p>
+
+    <h4 class="my-3">Demo</h4>
+    <c-data-table
+      safe
+      caption="Usage example of data table component"
+      :columns="[
+        {'label': 'First header', 'field': 'first'},
+        {'label': 'Second header', 'field': 'second'},
+        {'label': 'Third header', 'field': 'third'},
+        {'label': 'Fourth header', 'field': 'fourth'},
+        {'label': 'Fifth header', 'field': 'fifth'},
+        {'label': 'Sixth header', 'field': 'sixth'},
+      ]"
+      :rows="[
+        {
+          'first': 'Row 1<br>This one has a line break (safe only)',
+          'second': 'Row 1, second',
+          'third': 'Row 1, third',
+          'fourth': 'Row 1, fourth',
+          'fifth': 'Row 1, fifth',
+          'sixth': 'Row 1, sixth',
+        },
+        {
+          'first': 'Row 2, first',
+          'second': 'Row 2, second',
+          'third': 'Row 2, third',
+          'fourth': 'Row 2, fourth, and this one has a longer text than the rest, to showcase how the table layout is arranged with differently sized cells.',
+          'fifth': 'Row 2, fifth',
+          'sixth': 'Row 2, sixth',
+        },
+        {
+          'first': 'Row 3, first',
+          'second': 'Row 3, second',
+          'third': 'Row 3, third',
+          'fourth': 'Row 3, fourth',
+          'fifth': 'Row 3, fifth',
+          'sixth': 'Row 3, sixth',
+        },
+        {
+          'first': 'Row 4, first',
+          'second': 'Row 4, second',
+          'third': 'Row 4, third',
+          'fourth': 'Row 4, fourth',
+          'fifth': 'Row 4, fifth',
+          'sixth': 'Row 4, sixth',
+        },
+      ]"
+      :footer="[
+        {
+          'first': 'First foot',
+          'second': 'Second foot',
+          'third': 'Third foot',
+          'fifth': 'Fifth foot',
+        },
+      ]"
+    ></c-data-table>
+
+    <h4 class="mt-8">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>columns</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the col value for each row).
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>rows</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          List of rows in the <code>&lt;tbody&gt;</code>.
+          <br>Each element in the list is a dictionary where the keys correspond to the column fields.
+          <br>If a given field isn't present, the cell will be empty.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>footer</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          List of rows in the <code>&lt;tfoot&gt;</code>.<br>Same structure as <code>rows</code>.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>caption</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Table caption for accessibility.<br>Not displayed visually, but it's important to provide context for screen readers.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>safe</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Marks the contents as safe, so it can render HTML inside the table.
+          <br>Defaults to false.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <p class="mb-3">No slot</p>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-data-table
+  safe
+  caption="Usage example of data table component"
+  :columns="[
+    {'label': 'First header', 'field': 'first'},
+    {'label': 'Second header', 'field': 'second'},
+    {'label': 'Third header', 'field': 'third'},
+    {'label': 'Fourth header', 'field': 'fourth'},
+    {'label': 'Fifth header', 'field': 'fifth'},
+    {'label': 'Sixth header', 'field': 'sixth'},
+  ]"
+  :rows="[
+    {
+      'first': 'Row 1&lt;br&gt;This one has a line break (safe only)',
+      'second': 'Row 1, second',
+      'third': 'Row 1, third',
+      'fourth': 'Row 1, fourth',
+      'fifth': 'Row 1, fifth',
+      'sixth': 'Row 1, sixth',
+    },
+    {
+      'first': 'Row 2, first',
+      'second': 'Row 2, second',
+      'third': 'Row 2, third',
+      'fourth': 'Row 2, fourth, and this one has a longer text than the rest, to showcase how the table layout is arranged with differently sized cells.',
+      'fifth': 'Row 2, fifth',
+      'sixth': 'Row 2, sixth',
+    },
+    {
+      'first': 'Row 3, first',
+      'second': 'Row 3, second',
+      'third': 'Row 3, third',
+      'fourth': 'Row 3, fourth',
+      'fifth': 'Row 3, fifth',
+      'sixth': 'Row 3, sixth',
+    },
+    {
+      'first': 'Row 4, first',
+      'second': 'Row 4, second',
+      'third': 'Row 4, third',
+      'fourth': 'Row 4, fourth',
+      'fifth': 'Row 4, fifth',
+      'sixth': 'Row 4, sixth',
+    },
+  ]"
+  :footer="[
+    {
+      'first': 'First foot',
+      'second': 'Second foot',
+      'third': 'Third foot',
+      'fifth': 'Fifth foot',
+    },
+  ]"
+&gt;&lt;/c-data-table&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
 </c-layout-with-navigation>
 </div>
 {% endblock %}
