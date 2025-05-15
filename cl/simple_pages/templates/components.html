@@ -18,6 +18,9 @@
         {'href': '#navigation-menu', 'text': 'Navigation menu'},
         {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
       ]},
+      {'href': '#misc', 'text': 'Other components', 'children': [
+        {'href': '#support-banner', 'text': 'Support plea banner'},
+      ]},
   ]"
 >
   <section class="max-w-full w-full" x-intersect.margin.-100px="show" id="main-title">
@@ -270,6 +273,25 @@ Sample code here.
       </c-code>
     </c-expansion-panel>
   </section>
+
+  <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="support-banner">
+    <h2 class="mt-6 mb-3">Support plea banner</h2>
+    <p>Very simple component to avoid code duplication.</p>
+    <h4 class="mt-3">Demo</h4>
+    <c-support-plea-banner></c-support-plea-banner>
+
+    <h4 class="mt-3">Props</h4>
+    <p>No props</p>
+
+    <h4 class="mt-3">Slot</h4>
+    <p>No slots</p>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-support-plea-banner&gt;&lt;/c-support-plea-banner&gt;
+      </c-code>
+    </c-expansion-panel>
+  </c-layout-with-navigation.section>
 
 </c-layout-with-navigation>
 </div>
