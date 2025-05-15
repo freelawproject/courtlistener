@@ -37,6 +37,7 @@ from juriscraper.pacer import (
     S3NotificationEmail,
 )
 from juriscraper.pacer.email import DocketType
+from lxml.etree import ParserError
 from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -2042,7 +2043,7 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
 
 @app.task(
     bind=True,
-    autoretry_for=(RedisConnectionError, PacerLoginException),
+    autoretry_for=(RedisConnectionError, PacerLoginException, ParserError),
     max_retries=5,
     interval_start=5,
     interval_step=5,
@@ -2100,6 +2101,13 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
 
     try:
         r = get_att_report_by_rd(rd, session_data)
+    except ParserError as exc:
+        if self.request.retries == self.max_retries:
+            msg = "ParserError while getting attachment page"
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return []
+        raise self.retry(exc=exc)
     except HTTPError as exc:
         msg = "Failed to get attachment page from network."
         if exc.response.status_code in [
