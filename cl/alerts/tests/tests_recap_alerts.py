@@ -2215,6 +2215,335 @@ class RECAPAlertsSweepIndexTest(
 
         docket.delete()
 
+    def test_case_only_alerts(self, mock_prefix) -> None:
+        """Confirm that case-only alerts are properly sent and that they are
+        triggered only once per case. This means that if a Docket or a
+        RECAPDocument belonging to the case triggers the alert, subsequent
+        changes to the Docket or the ingestion of another matching
+        RECAPDocument for the same case will not trigger the alert again.
+        """
+
+        # Test: Case-only alert Docket Only query
+        docket_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Case Only Alert Docket Only query",
+            query='q="405 Civil"&type=r',
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        one_day_future = self.mock_date + datetime.timedelta(days=1)
+        with (
+            time_machine.travel(one_day_future, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                docket_number="1:23-bk-1239",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+                cause="405 Civil",
+                jurisdiction_type="U.S. Government Defendant",
+                jury_demand="1,000,000",
+            )
+
+        two_day_future = self.mock_date + datetime.timedelta(days=2)
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(two_day_future, tick=False),
+        ):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # The docket-only alert query should be triggered.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match...."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(docket_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The docket-only alert doesn't contain any nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_only_alert.name,
+            1,
+            docket.case_name,
+            0,
+        )
+
+        # Update the docket on a different day. The case-only alert should not
+        # be triggered again.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.docket_number = "1:23-bk-1240"
+            docket.save()
+
+        # No new alerts should be triggered for the case only alert.
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox),
+            1,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        # Confirm that a different Docket can still trigger the case-only alert.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket_2 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE 2",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                docket_number="1:23-bk-1250",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+                cause="405 Civil",
+                jurisdiction_type="U.S. Government Defendant",
+                jury_demand="1,000",
+            )
+
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self.assertIn(docket_only_alert.name, html_content)
+        self.assertIn(docket_2.case_name, html_content)
+
+        # Ingest RECAPDocuments for additional test cases.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            alert_de = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File",
+                document_number="1",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652436",
+                plain_text="plain text for 018036652436",
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File 2",
+                document_number="2",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652437",
+                plain_text="plain text for 018036652437",
+            )
+
+        # Test: Case-only alert RECAP only query.
+        recap_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Case Only Alert RECAP Only",
+            query='q="plain text for 018036652436"&type=r',
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+        ):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # The recap_only alert should be triggered by rd.
+        self.assertEqual(
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[2])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            recap_only_alert.name,
+            alert_de.docket.case_name,
+            [rd.description],
+        )
+
+        # Ingest a new document that potentially could trigger the recap_only
+        # alert again.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Hearing",
+                document_number="3",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652438",
+                plain_text="plain text for 018036652436",
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+        ):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # No new alert should be triggered again, since rd_3 belongs to the
+        # same case for which the alert has already been triggered.
+        self.assertEqual(
+            len(mail.outbox),
+            3,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        # Test: Case-only alert Cross-object query.
+        cross_object_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Case Only Alert Cross-object query",
+            query=f'q="Motion to File"&docket_number={docket.docket_number}&type=r',
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+        ):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # A new alert should be triggered containing two RDs, rd and rd_2
+        self.assertEqual(
+            len(mail.outbox), 4, msg="Outgoing emails don't match."
+        )
+
+        html_content = self.get_html_content_from_email(mail.outbox[3])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            cross_object_alert.name,
+            alert_de.docket.case_name,
+            [rd.description, rd_2.description],
+        )
+
+        webhook_events = WebhookEvent.objects.all().values_list(
+            "content", flat=True
+        )
+        # Assert webhook event child hits.
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
+            cross_object_alert.name,
+            1,
+            alert_de.docket.case_name,
+            2,
+        )
+        # Assert email text version:
+        txt_email = mail.outbox[3].body
+        self.assertIn(cross_object_alert.name, txt_email)
+        self.assertIn(rd.description, txt_email)
+
+        # Ingest a new document that can trigger the case only alert.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File 3",
+                document_number="4",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652439",
+                plain_text="plain text for 018036652439",
+            )
+
+        # No new alerts should be triggered for the case only alert.
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox),
+            4,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        # Test: Case-only alert Docket OR RECAPDocument query.
+        docket_or_rd_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Case Only Alert Docket OR RECAPDocument query",
+            query=f"q=short_description:Hearing OR docketNumber:{docket.docket_number}&type=r",
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+        ):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # A new alert should be triggered containing rd_3
+        self.assertEqual(
+            len(mail.outbox), 5, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[4])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            docket_or_rd_alert.name,
+            alert_de.docket.case_name,
+            [rd_3.description],
+        )
+
+        # Change a document that potentially could trigger the docket_or_rd_alert
+        # alert again.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd_2.description = "Hearing"
+            rd_2.save()
+
+        # No new alerts should be triggered, since rd_2 belongs to the same
+        # case from which the alert has already been triggered.
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox),
+            5,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+        docket.delete()
+
 
 @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
 @mock.patch(

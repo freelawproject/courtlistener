@@ -491,6 +491,7 @@ def process_alert_hits(
     child_results: Response | None,
     alert_id: int,
     query_date: datetime.date,
+    case_only_alert: bool,
 ) -> list[Hit]:
     """Process alert hits by filtering and prepare the results to send based
     on alert conditions.
@@ -511,6 +512,11 @@ def process_alert_hits(
     results_to_send = []
     if len(results) > 0:
         for hit in results:
+            if case_only_alert and has_document_alert_hit_been_triggered(
+                r, alert_id, "co", hit.docket_id
+            ):
+                continue
+
             if hit.docket_id in docket_ids:
                 # Possible Docket-only alert
                 rds_to_send = filter_rd_alert_hits(
@@ -527,6 +533,9 @@ def process_alert_hits(
                     # e.g: q=docket_id:34238745 OR pacer_doc_id:1014052133
                     hit["child_docs"] = rds_to_send
                     results_to_send.append(hit)
+                    add_document_hit_to_alert_set(
+                        r, alert_id, "co", hit.docket_id
+                    )
                     if should_docket_hit_be_included(
                         r, alert_id, hit.docket_id, query_date
                     ):
@@ -543,6 +552,9 @@ def process_alert_hits(
                     hit["child_docs"] = []
                     results_to_send.append(hit)
                     add_document_hit_to_alert_set(
+                        r, alert_id, "co", hit.docket_id
+                    )
+                    add_document_hit_to_alert_set(
                         r, alert_id, "d", hit.docket_id
                     )
             else:
@@ -557,6 +569,9 @@ def process_alert_hits(
                 if rds_to_send:
                     hit["child_docs"] = rds_to_send
                     results_to_send.append(hit)
+                    add_document_hit_to_alert_set(
+                        r, alert_id, "co", hit.docket_id
+                    )
     return results_to_send
 
 
@@ -596,14 +611,18 @@ def query_and_send_alerts(
     :return: None.
     """
     alert_users: UserProfile.user = User.objects.filter(
-        alerts__rate=rate, alerts__alert_type=SEARCH_TYPES.RECAP
+        alerts__rate=rate,
+        alerts__alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
     ).distinct()
     total_alerts_sent_count = 0
     sent_time = datetime.datetime.now() if not custom_date else query_date
     for user in alert_users:
         if rate == Alert.REAL_TIME and not user.profile.is_member:
             continue
-        alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
+        alerts = user.alerts.filter(
+            rate=rate,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
         logger.info(
             "Running '%s' alerts for user '%s': %s", rate, user, alerts
         )
@@ -612,6 +631,12 @@ def query_and_send_alerts(
         alerts_sent = []
         for alert in alerts:
             search_params = QueryDict(alert.query.encode(), mutable=True)
+            case_only_alert = (
+                True if alert.alert_type == SEARCH_TYPES.DOCKETS else False
+            )
+            # Override the alert type to RECAP, since DOCKETS alerts should
+            # behave exactly like RECAP alerts.
+            search_params["type"] = SEARCH_TYPES.RECAP
             results, parent_results, child_results = query_alerts(
                 search_params
             )
@@ -625,6 +650,7 @@ def query_and_send_alerts(
                 child_results,
                 alert.pk,
                 query_date.date(),
+                case_only_alert,
             )
             if not results_to_send:
                 continue
