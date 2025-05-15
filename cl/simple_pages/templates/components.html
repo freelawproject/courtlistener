@@ -16,6 +16,7 @@
       {'href': '#layout-components', 'text': 'Layout components', 'children': [
         {'href': '#expansion', 'text': 'Expansion panel'},
         {'href': '#navigation-menu', 'text': 'Navigation menu'},
+        {'href': '#nav-layout', 'text': 'Layout with navigation'},
         {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
       ]},
       {'href': '#misc', 'text': 'Other components', 'children': [
@@ -206,6 +207,94 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+  {# LAYOUT WITH NAVIGATION #}
+  <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="nav-layout">
+    <h2 class="mt-6 mb-3">Layout with navigation</h2>
+    <p>The layout with navigation component is composed of two elements: <code>c-layout-with-navigation</code> and <code>c-layout-with-navigation.section</code>.</p>
+    <p>Only one layout per page is supported.</p>
+    <h4 class="mt-3">Demo</h4>
+    <p>See this page's layout: responsive navigation menu with a main content divided by sections.</p>
+
+    <h4 class="mt-3">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation</code>: <code>nav_items</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Same as the navigation menu: a list of navigation items, where each item is a dictionary with <code>href</code> and <code>text</code>.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation.section</code>: <code>id</code></span>
+        <div class="p-2.5 flex flex-col gap-2 max-md:max-w-full [overflow-wrap:anywhere]">
+          <div>
+            Used to identify the active section for navigation menu highlighting.
+          </div>
+          <div>Make sure the id is for the entire section that needs to be highlighted, not just a heading or a child element, otherwise the highlighting could misbehave.</div>
+        </div>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation</code> default</span>
+        <div class="p-2.5 flex flex-col gap-2 max-md:max-w-full [overflow-wrap:anywhere]">
+          <div>
+            To preserve proper spacing and ensure correct highlighting, nest all content in sections using the <code>c-layout-with-navigation.section</code> sub-component.
+          </div>
+          <div>
+            However, if you need to tweak or remove the section's intersect behavior, you can swap the sub-component for a native <code>&lt;section&gt;</code> element and it will preserve proper spacing and layout.
+          </div>
+          <div>
+            For further reference, check Alpine's docs on <a class="underline" href="https://alpinejs.dev/plugins/intersect#modifiers" target="_blank" rel="noopener noreferrer">intersect modifiers</a>.</div>
+        </div>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation.section</code> default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          A section's content which should probably have a heading.
+          <br>For further reference check the <a class="underline" href="https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/section" target="_blank" rel="noopener noreferrer">mdn web docs</a> on the <code>&lt;section&gt;</code> element.
+        </span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-layout-with-navigation
+  :nav_items="[
+    {'href': '#main-title', 'text': 'Component Library'},
+    {'href': '#text-components', 'text': 'Text components', 'children': [
+      {'href': '#code-block', 'text': 'Code blocks'},
+      {'href': '#two-column-list', 'text': 'Two column list'},
+      {'href': '#eyebrow', 'text': 'Eyebrow'},
+    ]},
+    {'href': '#layout-components', 'text': 'Layout components', 'children': [
+      {'href': '#expansion', 'text': 'Expansion panel'},
+      {'href': '#navigation-menu', 'text': 'Navigation menu'},
+      {'href': '#navigation-menu', 'text': 'Layout with navigation'},
+      {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
+    ]},
+    {'href': '#misc', 'text': 'Other components', 'children': [
+      {'href': '#support-banner', 'text': 'Support plea banner'},
+    ]},
+  ]"
+&gt;
+  &lt;c-layout-with-navigation.section id="main-title"&gt;
+    &lt;c-eyebrow&gt;CourtListener's&lt;/c-eyebrow&gt;
+    ...
+  &lt;/c-layout-with-navigation.section&gt;
+
+  &lt;c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="code-block"&gt;
+    &lt;h2 class="mt-6 mb-3"&gt;Code blocks&lt;/h2&gt;
+    ...
+  &lt;/c-layout-with-navigation.section&gt;
+
+  ...
+&lt;/c-layout-with-navigation>
+      </c-code>
+    </c-expansion-panel>
+  </c-layout-with-navigation.section>
+
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="tabbed-cards">
     <h2 class="mt-6 mb-3">Tabbed cards</h2>
     <p>The tabbed component is composed of two elements: the <code>c-tabs</code> element and the <code>c-tabs.tab</code> element.
@@ -274,6 +363,7 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+  {# SUPPORT PLEA BANNER #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="support-banner">
     <h2 class="mt-6 mb-3">Support plea banner</h2>
     <p>Very simple component to avoid code duplication.</p>
