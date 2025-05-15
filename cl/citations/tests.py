@@ -352,14 +352,14 @@ class CitationTextTest(SimpleTestCase):
 
             # Pincited reference
             ('See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>403 U. S. 388 (1971). '
-             ' The legal issue there was whether a <em>Bivens </em> at 122 action can be employed...',
+             ' The legal issue there was whether a <em>Bivens </em> at 122, action can be employed...',
 
              'See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>'
              '<span class="citation" data-id="MATCH_ID">'
              f'<a href="MATCH_URL" {aria_description}>403 U. S. 388</a></span> (1971).  '
              'The legal issue there was whether a <span class="citation" data-id="MATCH_ID">'
              f'<a href="MATCH_URL#122" {aria_description}>'
-             '<em>Bivens </em> at 122</a></span> action can be employed...'
+             '<em>Bivens </em> at 122</a></span>, action can be employed...'
             ),
             # pin cite before citation with S.Ct.
             (
