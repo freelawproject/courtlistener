@@ -502,6 +502,8 @@ def process_alert_hits(
     :param child_results: The ES Response for the RECAPDocument-only query.
     :param alert_id: The ID of the alert being processed.
     :param query_date: The daily re_index query date.
+    :param case_only_alert: A boolean indicating whether the alert is a
+    case-only one
     :return: A list of Hit objects that are filtered and prepared to be sent.
     """
     docket_hits = parent_results.hits if parent_results else []
@@ -515,6 +517,8 @@ def process_alert_hits(
             if case_only_alert and has_document_alert_hit_been_triggered(
                 r, alert_id, "co", hit.docket_id
             ):
+                # The RECAP case-only alert has already been triggered by this case.
+                # Ignore it.
                 continue
 
             if hit.docket_id in docket_ids:
