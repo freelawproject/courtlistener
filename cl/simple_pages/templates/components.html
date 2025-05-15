@@ -164,13 +164,20 @@ Sample code here.
         <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>text_to_copy</code></span>
         <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
           Text to be copied to clipboard when clicking the button, or when pressing either the <kbd>Enter</kbd> or <kbd>Space</kbd> keys on focus.
-          <br>To pass a string that includes quotation marks, use the <code>escape_quotations</code> filter.
+          <br><strong>Important:</strong> Some characters, like double quotation marks, could break syntax. To pass a string that includes any of these characters, escape them with
+          <a class="underline" href="https://www.w3schools.com/html/html_entities.asp" target="_blank" rel="noopener noreferrer">HTML entities</a>, or use
+          <a class="underline" href="https://docs.djangoproject.com/en/5.1/ref/templates/builtins/#escapejs" target="_blank" rel="noopener noreferrer">Django's built-in <code>escapejs</code> filter</a> to do it for you.
         </span>
       </div>
     </div>
 
     <h4 class="mt-3">Slot</h4>
-    <p class="mb-3">Button content.</p>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Button content.</span>
+      </div>
+    </div>
 
     <c-expansion-panel title="Code">
       <c-code>
