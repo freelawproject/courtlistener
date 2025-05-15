@@ -4,6 +4,8 @@ from collections.abc import Sized
 from functools import wraps
 from typing import cast
 
+from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.testcases import SerializeMixin
@@ -1349,6 +1351,15 @@ class SimpleUserDataMixin:
 class SitemapTest(TestCase):
     sitemap_url: str
     expected_item_count: int
+
+    def setUpSiteDomain(self) -> None:
+        # set the domain name in the Sites framework to match the test domain name, set http url schema
+        domain = "testserver"
+        SiteModel = apps.get_model("sites", "Site")
+
+        SiteModel.objects.update_or_create(
+            pk=settings.SITE_ID, defaults={"domain": domain, "name": domain}
+        )
 
     def assert_sitemap_has_content(self) -> None:
         """Does content get into the sitemap?"""

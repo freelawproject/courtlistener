@@ -1,7 +1,6 @@
 import pickle
 import random
 from dataclasses import dataclass
-from typing import Union
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -135,7 +134,7 @@ def log_into_pacer(
 
 
 def get_or_cache_pacer_cookies(
-    user_pk: Union[str, int],
+    user_pk: str | int,
     username: str,
     password: str,
     client_code: str | None = None,
@@ -179,7 +178,7 @@ def get_or_cache_pacer_cookies(
 
 
 def get_pacer_cookie_from_cache(
-    user_pk: Union[str, int],
+    user_pk: str | int,
     r: Redis | None = None,
 ):
     """Get the cookie for a user from the cache.
@@ -197,7 +196,7 @@ def get_pacer_cookie_from_cache(
 
 
 def delete_pacer_cookie_from_cache(
-    user_pk: Union[str, int],
+    user_pk: str | int,
     r: Redis | None = None,
 ):
     """Deletes the cookie for a user from the cache.

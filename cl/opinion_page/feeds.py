@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from django.contrib.syndication.views import Feed
 from django.db.models import Prefetch, QuerySet
@@ -104,7 +103,7 @@ class DocketFeed(Feed):
     def item_pubdate(self, item: DocketEntry) -> datetime:
         return midnight_pt(item.date_filed)
 
-    def item_enclosure_url(self, item: DocketEntry) -> Optional[str]:
+    def item_enclosure_url(self, item: DocketEntry) -> str | None:
         if not item.entry_number:
             return None
 

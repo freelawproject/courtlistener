@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from collections.abc import Iterable as IterableType
 from itertools import chain, islice, tee
 from re import Match
-from typing import Any, Optional
+from typing import Any
 
 from django.core.cache import cache
 
@@ -92,7 +92,7 @@ def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
 
 def human_sort(
     unordered_list: IterableType[str | tuple[str, Any]],
-    key: Optional[str] = None,
+    key: str | None = None,
 ) -> IterableType[str | tuple[str, Any]]:
     """Human sort Lists of strings or list of dictionaries
 

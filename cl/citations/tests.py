@@ -1,7 +1,7 @@
 import itertools
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
 from unittest import mock
 from unittest.mock import Mock, patch
@@ -12,8 +12,10 @@ from bs4 import BeautifulSoup
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
 from django.core.management import call_command
+from django.db.models.signals import post_delete, post_save
 from django.test import override_settings
 from django.urls import reverse
+from elasticsearch import NotFoundError
 from eyecite import get_citations
 from eyecite.test_factories import (
     case_citation,
@@ -56,6 +58,7 @@ from cl.citations.tasks import (
 )
 from cl.citations.utils import make_get_citations_kwargs
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
+from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -656,6 +659,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.rebuild_index("search.OpinionCluster")
+        cls.rebuild_index("search.ParentheticalGroup")
         super().setUpTestData()
         # Courts
         cls.court_scotus = CourtFactory(id="scotus")
@@ -1510,6 +1514,49 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             expected_ids,
             "Should fall back to ID sorting when no ordering_keys exist",
         )
+
+    def test_signal_disconnection(self) -> None:
+        """Can ParentheticalGroup signals be disconnected and reconnected?"""
+
+        # from `test_opinionscited_creation` we know that opinion5 should
+        # have Parentheticals for
+        opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
+        find_citations_and_parentheticals_for_opinion_by_pks(
+            opinion_pks=[opinion5.pk], disconnect_pg_signals=True
+        )
+        self.assertEqual(
+            post_save.receivers[-1][0][0],
+            "update_related_parentheticalgroup_documents_in_es_index_parentheticalgroup",
+        )
+        self.assertEqual(
+            post_delete.receivers[-1][0][0],
+            "remove_parentheticalgroup_from_es_index_parentheticalgroup",
+        )
+        par = Parenthetical.objects.first()
+        pg = ParentheticalGroup(
+            opinion=par.described_opinion,
+            representative=par,
+            score=0.5,
+            size=1,
+        )
+        pg.save()
+        pg_id = pg.id
+        self.rebuild_index("search.ParentheticalGroup")
+        try:
+            ParentheticalGroupDocument.get(id=pg_id)
+        except NotFoundError:
+            self.fail(
+                "Signal should create a ParentheticalGroupDocument on ParentheticalGroup save"
+            )
+
+        pg.delete()
+        try:
+            ParentheticalGroupDocument.get(id=pg_id)
+            self.fail(
+                "Signal should delete the ParentheticalGroupDocument on ParentheticalGroup delete"
+            )
+        except NotFoundError:
+            pass
 
 
 class CitationFeedTest(
@@ -2800,7 +2847,7 @@ class CitationLookUpApiTest(
         throttle_logic_mock.return_value = "citation_throttle_test"
         # Throttle users for 1 minute if they query for the exact number of
         # citations allowed by the rate limit.
-        test_date = datetime(1970, 1, 1, 0, 0, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 0, 0, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False) as traveler:
             ten_citations = "56 F.2d 9, " * 10
             r = await self.async_client.post(
@@ -2844,7 +2891,7 @@ class CitationLookUpApiTest(
         self, get_rate_mock, throttle_logic_mock
     ) -> None:
         throttle_logic_mock.return_value = "citation_throttle_test"
-        test_date = datetime(1970, 1, 1, 0, 1, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 0, 1, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False) as traveler:
             fifteen_citations = "56 F.2d 9, " * 15
             r = await self.async_client.post(
@@ -2882,7 +2929,7 @@ class CitationLookUpApiTest(
             expected_time = test_date + timedelta(minutes=1)
             self.assertEqual(data["wait_until"], expected_time.isoformat())
 
-        test_date = datetime(1970, 1, 1, 0, 2, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 0, 2, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False) as traveler:
             fifteen_citations = "56 F.2d 9, " * 15
             r = await self.async_client.post(
@@ -2934,7 +2981,7 @@ class CitationLookUpApiTest(
         throttle_logic_mock.return_value = "citation_throttle_test"
         # throttle users that exceeds the max number of citations by a
         # significant margin.
-        test_date = datetime(1970, 1, 1, 4, 0, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 4, 0, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False):
             sixty_citations = "56 F.2d 9, " * 60
             r = await self.async_client.post(

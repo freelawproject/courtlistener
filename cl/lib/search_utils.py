@@ -2,7 +2,7 @@ import logging
 import pickle
 import re
 from collections.abc import Callable
-from typing import Any, Optional, TypedDict
+from typing import Any, TypedDict
 from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -80,7 +80,7 @@ def check_pagination_depth(page_number):
 
 def make_get_string(
     request: HttpRequest,
-    nuke_fields: Optional[list[str]] = None,
+    nuke_fields: list[str] | None = None,
 ) -> str:
     """Makes a get string from the request object. If necessary, it removes
     the pagination parameters.

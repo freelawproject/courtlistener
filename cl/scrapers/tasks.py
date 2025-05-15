@@ -1,7 +1,6 @@
 import logging
 import random
 import traceback
-from typing import Optional, Union
 
 import httpx
 import requests
@@ -34,7 +33,7 @@ from cl.search.models import Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
-ExtractProcessResult = tuple[str, Optional[str]]
+ExtractProcessResult = tuple[str, str | None]
 
 
 def update_document_from_text(
@@ -218,7 +217,7 @@ def extract_doc_content(
 
     # Identify and link citations within the document content
     find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-        ([opinion.pk],), countdown=random.randint(0, 3600)
+        (opinion.pk,), countdown=random.randint(0, 3600)
     )
 
 
@@ -234,7 +233,7 @@ def extract_doc_content(
 )
 def extract_recap_pdf(
     self,
-    pks: Union[int, list[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
 ) -> list[int]:
@@ -269,7 +268,7 @@ def extract_recap_pdf(
 
 
 async def extract_recap_pdf_base(
-    pks: Union[int, list[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
 ) -> list[int]:
