@@ -41,14 +41,6 @@
                 {% endfor %}
               </p>
             {% endif %}
-            {{ alert_form.alert_type}}
-            {% if alert_form.alert_type.errors %}
-              <p class="help-block">
-                {% for error in alert_form.alert_type.errors %}
-                  {{ error|escape }}
-                {% endfor %}
-              </p>
-            {% endif %}
             <div class="form-group">
               <label for="id_name">Give the alert a name</label>
               {{ alert_form.name }}
@@ -72,6 +64,28 @@
                 </p>
               {% endif %}
             </div>
+
+            {# Hide it for search types other than RECAP #}
+            {% if alert_form.alert_type.is_hidden %}
+              {{ alert_form.alert_type }}
+            {# Show the radio button for case-only alerts #}
+            {% else %}
+              <div class="form-group">
+                <label>{{ alert_form.alert_type.label }}</label>
+                {% for radio in alert_form.alert_type %}
+                  <div class="radio">
+                    <label>{{ radio.tag }} {{ radio.choice_label }}</label>
+                  </div>
+                {% endfor %}
+                {% if alert_form.alert_type.errors %}
+                  <p class="help-block">
+                    {% for err in alert_form.alert_type.errors %}
+                      {{ err|escape }}
+                    {% endfor %}
+                  </p>
+                {% endif %}
+              </div>
+            {% endif %}
 
             {# Hidden unless shown by JS #}
             <div class="alert alert-warning hidden"
