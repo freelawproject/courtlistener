@@ -3133,10 +3133,3 @@ class UnmatchedCitationTest(TransactionTestCase):
         self.assertEqual(
             count, 0, "Self-cite has been stored as UnmatchedCitation"
         )
-
-
-#
-# # See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" aria-description="Citation for case: Example vs. Example">403 U. S. 388</a></span> (1971).  The legal issue there was whether a <em>Bivens </em> at 122 action can be employed...
-# # See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em><span class="citation" data-id="MATCH_ID"><a href="MATCH_URL" aria-description="Citation for case: Example vs. Example">403 U. S. 388</a></span> (1971).  The legal issue there was whether a <span class="citation" data-id="MATCH_ID"><a href="MATCH_URL#122" aria-description="Citation for case: Example vs. Example"><em>Bivens </em> at 122</a></span> action can be employed...
-#
-# 'See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>403 U. S. 388 (1971). The legal issue there was whether a <em>Bivens </em> at 122 action can be employed...'
