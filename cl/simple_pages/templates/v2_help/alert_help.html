@@ -234,18 +234,20 @@
   </c-layout-with-navigation.section>
 
   {# Limitations of RECAP Search Alerts #}
-  <h3 x-intersect.margin.-100px="show" class="flex flex-col gap-4" id="recap-search-alerts-limitations">Limitations of RECAP Search Alerts</h3>
-  <p> RECAP Search Alerts can be triggered by case-level fields, filing-level fields, or a combination of both. This flexibility introduces complexity, which leads to certain limitations when triggering real-time alerts. For example, suppose you have a real-time alert based on a query like:</p>
-  <p><code>caseName:"Lorem vs Dolor" AND description:"Notice of Removal"</code></p>
-  <p>Now imagine a case previously named <strong>"Ipsum vs Dolor"</strong> contains a filing with the description <strong>"Notice of Removal"</strong>. If the case name is later updated to <strong>"Lorem vs Dolor"</strong>, this case would now match the alert query. </p>
-  <p>However, because the field that causes the match <code>caseName</code> is at the case level and not tied directly to the individual filing, CourtListener cannot detect that a relevant filing now qualifies for the alert. As a result, the alert will not be triggered in real time.
-    Instead, edge-case alerts like this are processed at the end of the day using a different matching strategy. In such cases, the associated webhooks are also triggered at the end of the day, rather than in real time.</p>
-  <p>Apart from the edge case described above, real-time search alert emails are triggered within {{ rt_alerts_sending_rate }} minutes of ingesting a case or filing that matches the alert criteria.</p>
-  <h4 id="recap-search-alerts-party-limitations">Limitations with Text-Based Queries and Party Fields</h4>
-  <p>Another known limitation of RECAP Search Alerts is that alerts do not support combined text-based queries involving both <code>party</code> or <code>attorney</code> fields and filing-level fields such as <code>description</code>. For example, the following query will not work as expected:</p>
-  <p><code>party:"Michael Jordan" AND attorney:"LeBron James" AND description:goat</code></p>
-  <p>This is because <code>party</code> and <code>attorney</code> values are only associated with dockets, not with individual filings, unlike other docket fields.</p>
-  <p>As a workaround to build alerts that involve party and attorney conditions along with a filing description, use the sidebar filters instead of the main query box.</p>
+  <c-layout-with-navigation.section id="recap-search-alerts-limitations">
+    <h3>Limitations of RECAP Search Alerts</h3>
+    <p> RECAP Search Alerts can be triggered by case-level fields, filing-level fields, or a combination of both. This flexibility introduces complexity, which leads to certain limitations when triggering real-time alerts. For example, suppose you have a real-time alert based on a query like:</p>
+    <p><code>caseName:"Lorem vs Dolor" AND description:"Notice of Removal"</code></p>
+    <p>Now imagine a case previously named <strong>"Ipsum vs Dolor"</strong> contains a filing with the description <strong>"Notice of Removal"</strong>. If the case name is later updated to <strong>"Lorem vs Dolor"</strong>, this case would now match the alert query. </p>
+    <p>However, because the field that causes the match <code>caseName</code> is at the case level and not tied directly to the individual filing, CourtListener cannot detect that a relevant filing now qualifies for the alert. As a result, the alert will not be triggered in real time.
+      Instead, edge-case alerts like this are processed at the end of the day using a different matching strategy. In such cases, the associated webhooks are also triggered at the end of the day, rather than in real time.</p>
+    <p>Apart from the edge case described above, real-time search alert emails are triggered within {{ rt_alerts_sending_rate }} minutes of ingesting a case or filing that matches the alert criteria.</p>
+    <h4 id="recap-search-alerts-party-limitations">Limitations with Text-Based Queries and Party Fields</h4>
+    <p>Another known limitation of RECAP Search Alerts is that alerts do not support combined text-based queries involving both <code>party</code> or <code>attorney</code> fields and filing-level fields such as <code>description</code>. For example, the following query will not work as expected:</p>
+    <p><code>party:"Michael Jordan" AND attorney:"LeBron James" AND description:goat</code></p>
+    <p>This is because <code>party</code> and <code>attorney</code> values are only associated with dockets, not with individual filings, unlike other docket fields.</p>
+    <p>As a workaround to build alerts that involve party and attorney conditions along with a filing description, use the sidebar filters instead of the main query box.</p>
+  </c-layout-with-navigation.section>
 
   {# Editing or Deleting a Search Alert #}
   <c-layout-with-navigation.section id="editing-search-alerts">
