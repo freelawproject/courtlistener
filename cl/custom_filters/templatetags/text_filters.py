@@ -226,17 +226,3 @@ def read_more(s, show_words, autoescape=True):
 def html_decode(value):
     """Decode unicode HTML entities."""
     return html.unescape(value)
-
-
-@register.filter()
-def escape_quotations(value: str) -> str:
-    """
-    Replace single (') and double (") quotation marks with HTML entities.
-
-    Useful to safely pass text as an HTML attribute without breaking the quoting syntax.
-
-    :param value: The text in which to escape quotation marks.
-
-    :return: A new string where `"` becomes `&quot;` and `'` becomes `&apos;`
-    """
-    return value.replace('"', "&quot;").replace("'", "&apos;")

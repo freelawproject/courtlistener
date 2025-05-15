@@ -24,8 +24,9 @@ Example:
 document.addEventListener('alpine:init', () => {
   Alpine.data('copy', () => ({
     copyToClipboard() {
+      const raw = JSON.parse(`"${this.$el.dataset?.textToCopy}"`);
       const textToCopy = document.createElement('textarea');
-      textToCopy.innerHTML = this.$el.dataset?.textToCopy;
+      textToCopy.innerHTML = raw;
       navigator.clipboard.writeText(textToCopy.value.trim());
     },
   }));

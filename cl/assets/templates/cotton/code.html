@@ -1,8 +1,6 @@
-{% load text_filters %}
-
 <c-vars disable_copy class=""></c-vars>
 
 <pre class="relative w-full max-w-full {{ class }}" {{ attrs }}><div class="w-full px-6 bg-greyscale-50 rounded-[10px] border border-greyscale-300 overflow-auto">{% if not disable_copy %}<c-copy-to-clipboard
-  text_to_copy="{{ slot|escape_quotations }}"
+  text_to_copy="{{ slot|escapejs }}"
   class="shadow-sm absolute right-2 top-1 bg-greyscale-50 active:bg-greyscale-200 hover:bg-greyscale-100 border-2 rounded-lg text-[9px] text-greyscale-600 px-1 py-0.5"
 >Copy</c-copy-to-clipboard>{% endif %}<code class="w-full border-none bg-greyscale-50 text-greyscale-800 font-mono">{{ slot }}</code></div></pre>
