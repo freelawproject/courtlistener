@@ -601,6 +601,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                     r, alert_triggered_id, "r", document_content_copy["id"]
                 )
                 object_id = document_content_copy["docket_id"]
+                # Mark case-only alert as triggered.
                 add_document_hit_to_alert_set(
                     r, alert_triggered_id, "co", object_id
                 )
@@ -622,6 +623,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                     document_content_copy["docket_id"],
                 )
                 object_id = document_content_copy["docket_id"]
+                # Mark case-only alert as triggered.
                 add_document_hit_to_alert_set(
                     r, alert_triggered_id, "co", object_id
                 )

@@ -2427,7 +2427,7 @@ class RECAPAlertsSweepIndexTest(
         # Test: Case-only alert RECAP only query.
         recap_only_alert = AlertFactory(
             user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
+            rate=Alert.WEEKLY,
             name="Test Case Only Alert RECAP Only",
             query='q="plain text for 018036652436"&type=r',
             alert_type=SEARCH_TYPES.DOCKETS,
@@ -2443,6 +2443,12 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date, tick=False),
         ):
             call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # Trigger the scheduled weekly alert.
+        week_ago = self.mock_date + datetime.timedelta(days=7)
+        with time_machine.travel(week_ago, tick=False):
+            # Send scheduled Weekly alerts.
+            call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
 
         # The recap_only alert should be triggered by rd.
         self.assertEqual(
@@ -2483,6 +2489,10 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date, tick=False),
         ):
             call_command("cl_send_recap_alerts", testing_mode=True)
+
+        with time_machine.travel(week_ago, tick=False):
+            # Send scheduled Weekly alerts.
+            call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
 
         # No new alert should be triggered again, since rd_3 belongs to the
         # same case for which the alert has already been triggered.
@@ -4145,7 +4155,7 @@ class RECAPAlertsPercolatorTest(
         with self.captureOnCommitCallbacks(execute=True):
             docket_only_alert = AlertFactory(
                 user=self.user_profile.user,
-                rate=Alert.REAL_TIME,
+                rate=Alert.WEEKLY,
                 name="Test Case Only Alert Docket Only query",
                 query='q="405 Civil"&type=r',
                 alert_type=SEARCH_TYPES.DOCKETS,
@@ -4173,7 +4183,8 @@ class RECAPAlertsPercolatorTest(
                 jury_demand="1,000,000",
             )
 
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        # Send scheduled Weekly alerts.
+        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
 
         # The docket-only alert query should be triggered.
         self.assertEqual(
@@ -4206,7 +4217,7 @@ class RECAPAlertsPercolatorTest(
             docket.save()
 
         # No new alerts should be triggered for the case only alert.
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
         self.assertEqual(
             len(mail.outbox),
             1,
@@ -4235,7 +4246,7 @@ class RECAPAlertsPercolatorTest(
                 jury_demand="1,000",
             )
 
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )

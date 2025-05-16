@@ -2,6 +2,7 @@ import copy
 import datetime
 import time
 import traceback
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import pytz
@@ -50,6 +51,26 @@ from cl.search.exception import (
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
+
+
+@dataclass
+class AlertHitsToProcess:
+    """Dataclass for storing alert hits to process and related metadata.
+
+    :param results: List of hits from the main query.
+    :param parent_results: The elasticsearch response targeting parent documents if any.
+    :param child_results: The elasticsearch response targeting child documents if any.
+    :param alert_id: The ID of the alert being processed.
+    :param query_date: The date when the query was executed.
+    :param case_only_alert: Boolean flag indicating if this is a case-only alert.
+    """
+
+    results: list[Hit]
+    parent_results: Response | None
+    child_results: Response | None
+    alert_id: int
+    query_date: datetime.date
+    case_only_alert: bool
 
 
 def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
@@ -485,27 +506,23 @@ def query_alerts(
 
 
 def process_alert_hits(
-    r: Redis,
-    results: list[Hit],
-    parent_results: Response | None,
-    child_results: Response | None,
-    alert_id: int,
-    query_date: datetime.date,
-    case_only_alert: bool,
+    r: Redis, hits_to_process: AlertHitsToProcess
 ) -> list[Hit]:
     """Process alert hits by filtering and prepare the results to send based
     on alert conditions.
 
     :param r: The Redis instance.
-    :param results: A list of Hit objects containing search results.
-    :param parent_results: The ES Response for the docket-only query.
-    :param child_results: The ES Response for the RECAPDocument-only query.
-    :param alert_id: The ID of the alert being processed.
-    :param query_date: The daily re_index query date.
-    :param case_only_alert: A boolean indicating whether the alert is a
-    case-only one
+    :param hits_to_process: A `AlertHitsToProcess` instance.
     :return: A list of Hit objects that are filtered and prepared to be sent.
     """
+
+    results = hits_to_process.results
+    parent_results = hits_to_process.parent_results
+    child_results = hits_to_process.child_results
+    alert_id = hits_to_process.alert_id
+    query_date = hits_to_process.query_date
+    case_only_alert = hits_to_process.case_only_alert
+
     docket_hits = parent_results.hits if parent_results else []
     docket_ids = [int(d.docket_id) for d in docket_hits]
 
@@ -537,6 +554,7 @@ def process_alert_hits(
                     # e.g: q=docket_id:34238745 OR pacer_doc_id:1014052133
                     hit["child_docs"] = rds_to_send
                     results_to_send.append(hit)
+                    # Mark case-only alert as triggered.
                     add_document_hit_to_alert_set(
                         r, alert_id, "co", hit.docket_id
                     )
@@ -555,6 +573,7 @@ def process_alert_hits(
                     # e.g: docket_number=23-43434
                     hit["child_docs"] = []
                     results_to_send.append(hit)
+                    # Mark case-only alert as triggered.
                     add_document_hit_to_alert_set(
                         r, alert_id, "co", hit.docket_id
                     )
@@ -573,6 +592,7 @@ def process_alert_hits(
                 if rds_to_send:
                     hit["child_docs"] = rds_to_send
                     results_to_send.append(hit)
+                    # Mark case-only alert as triggered.
                     add_document_hit_to_alert_set(
                         r, alert_id, "co", hit.docket_id
                     )
@@ -647,15 +667,16 @@ def query_and_send_alerts(
             if not results:
                 continue
             search_type = search_params.get("type", SEARCH_TYPES.RECAP)
-            results_to_send = process_alert_hits(
-                r,
-                results,
-                parent_results,
-                child_results,
-                alert.pk,
-                query_date.date(),
-                case_only_alert,
+
+            hits_to_process = AlertHitsToProcess(
+                results=results,
+                parent_results=parent_results,
+                child_results=child_results,
+                alert_id=alert.pk,
+                query_date=query_date.date(),
+                case_only_alert=case_only_alert,
             )
+            results_to_send = process_alert_hits(r, hits_to_process)
             if not results_to_send:
                 continue
             alerts_sent.append(alert.pk)
@@ -711,13 +732,16 @@ def query_and_schedule_alerts(
     """
 
     alert_users = User.objects.filter(
-        alerts__rate=rate, alerts__alert_type=SEARCH_TYPES.RECAP
+        alerts__alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
     ).distinct()
     docket_content_type = ContentType.objects.get(
         app_label="search", model="docket"
     )
     for user in alert_users:
-        alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
+        alerts = user.alerts.filter(
+            rate=rate,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
         logger.info(
             "Running '%s' alerts for user '%s': %s", rate, user, alerts
         )
@@ -727,12 +751,24 @@ def query_and_schedule_alerts(
             results, parent_results, child_results = query_alerts(
                 search_params
             )
+            case_only_alert = (
+                True if alert.alert_type == SEARCH_TYPES.DOCKETS else False
+            )
+            # Override the alert type to RECAP, since DOCKETS alerts should
+            # behave exactly like RECAP alerts.
+            search_params["type"] = SEARCH_TYPES.RECAP
             if not results:
                 continue
 
-            results_to_send = process_alert_hits(
-                r, results, parent_results, child_results, alert.pk, query_date
+            hits_to_process = AlertHitsToProcess(
+                results=results,
+                parent_results=parent_results,
+                child_results=child_results,
+                alert_id=alert.pk,
+                query_date=query_date,
+                case_only_alert=case_only_alert,
             )
+            results_to_send = process_alert_hits(r, hits_to_process)
             if not results_to_send:
                 continue
             for hit in results_to_send:
