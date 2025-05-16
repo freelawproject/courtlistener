@@ -3182,15 +3182,16 @@ class ScrapeIqueryPagesTest(TestCase):
 
     def test_can_retrieve_old_prayers_to_check(self, mock_cookies):
         """Verifies retrieval of old, unchecked RECAP documents for 'pray and pay'."""
+        mock_date = now().replace(day=1, hour=5)
         # Create DocketEntry instances with different filing dates
         ten_days_old_entry = DocketEntryFactory(
-            date_filed=now() - timedelta(days=10)
+            date_filed=mock_date - timedelta(days=10)
         )
         ninety_one_days_old_entry = DocketEntryFactory(
-            date_filed=now() - timedelta(days=91)
+            date_filed=mock_date - timedelta(days=91)
         )
         ninety_five_days_old_entry = DocketEntryFactory(
-            date_filed=now() - timedelta(days=95)
+            date_filed=mock_date - timedelta(days=95)
         )
 
         # Create RECAPDocument instances associated with the DocketEntry instances
@@ -3214,23 +3215,24 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Simulate PrayerAvailability records with different last_checked dates
         PrayerAvailability.objects.create(
-            recap_document=rd_1, last_checked=now() - timedelta(days=3)
+            recap_document=rd_1, last_checked=mock_date - timedelta(days=3)
         )
         PrayerAvailability.objects.create(
-            recap_document=rd_2, last_checked=now() - timedelta(days=2)
+            recap_document=rd_2, last_checked=mock_date - timedelta(days=3)
         )
         PrayerAvailability.objects.create(
-            recap_document=rd_3, last_checked=now() - timedelta(days=1)
+            recap_document=rd_3, last_checked=mock_date - timedelta(days=1)
         )
         PrayerAvailability.objects.create(
-            recap_document=rd_4, last_checked=now() - timedelta(days=6)
+            recap_document=rd_4, last_checked=mock_date - timedelta(days=7)
         )
         PrayerAvailability.objects.create(
-            recap_document=rd_5, last_checked=now() - timedelta(days=2)
+            recap_document=rd_5, last_checked=mock_date - timedelta(days=2)
         )
 
         # Retrieve the RECAP documents that should be checked
-        recap_documents = get_recap_documents_pray_and_pay()
+        with time_machine.travel(mock_date, tick=False):
+            recap_documents = get_recap_documents_pray_and_pay()
 
         self.assertIn(rd_2, recap_documents)
         self.assertIn(rd_4, recap_documents)
