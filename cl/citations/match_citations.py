@@ -82,22 +82,23 @@ def resolve_fullcase_citation(
                     get_clusters_from_citation_str
                 )(volume=volume, reporter=reporter, page=page)
 
-                # exclude self links
-                if getattr(full_citation, "citing_opinion", False):
-                    clusters = [
-                        cluster
-                        for cluster in clusters
-                        if cluster.id
-                        != full_citation.citing_opinion.cluster.pk
-                    ]
-                    _count = len(clusters)
+                if _count > 0:
+                    # exclude self links
+                    if getattr(full_citation, "citing_opinion", False):
+                        clusters = [
+                            cluster
+                            for cluster in clusters
+                            if cluster.id
+                            != full_citation.citing_opinion.cluster.pk
+                        ]
+                        _count = len(clusters)
 
-                if _count == 1:
-                    # return the first item by ordering key
-                    return clusters[0].ordered_opinions.first()
-                elif _count >= 2:
-                    # if two or more remain return multiple matches
-                    return MULTIPLE_MATCHES_RESOURCE
+                    if _count == 1:
+                        # return the first item by ordering key
+                        return clusters[0].ordered_opinions.first()
+                    elif _count >= 2:
+                        # if two or more remain return multiple matches
+                        return MULTIPLE_MATCHES_RESOURCE
 
         if len(db_search_results) > 1:
             return MULTIPLE_MATCHES_RESOURCE
