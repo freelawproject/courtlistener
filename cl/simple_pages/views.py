@@ -301,11 +301,20 @@ async def coverage_oa(request: HttpRequest) -> HttpResponse:
     oral_argument_courts = Court.objects.filter(
         in_use=True, has_oral_argument_scraper=True
     )
+    courts = await sync_to_async(list)(oral_argument_courts)
     return TemplateResponse(
         request,
         "help/coverage_oa.html",
         {
-            "courts_with_oral_argument_scrapers": oral_argument_courts,
+            "courts_with_oral_argument_scrapers": oral_argument_courts,  # -> can be safely removed once new design is launched
+            "courts_list": [
+                {
+                    "href": f"/?q=&court_{court.pk}=on&order_by=dateArgued+desc&type=oa",
+                    "label": court,
+                    "ref": "nofollow",
+                }
+                for court in courts
+            ],
             "private": False,
         },
     )
