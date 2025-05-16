@@ -126,7 +126,7 @@
       {% for group in full_feed_courts %}
         {% if group.grouper == "FD" or group.grouper == "FB" %}
           <c-tabs.tab name="{% if group.grouper == "FD" %}District Courts{% elif group.grouper == "FB" %}Bankruptcy Courts{% endif %}">
-            <c-two-column-list class="-ml-1" :list="group.list"></c-two-column-list>
+            <c-two-column-list key="short_name" class="-ml-1" :list="group.list"></c-two-column-list>
           </c-tabs.tab>
         {% endif %}
       {% endfor %}
@@ -166,7 +166,7 @@
       <c-tabs title="No RSS Feeds Jurisdictions">
         {% for group in no_feed_courts %}
           <c-tabs.tab name="{% if group.grouper == "FD" %}District Courts{% elif group.grouper == "FB" %}Bankruptcy Courts{% elif group.grouper == "F" %}Appellate Courts{% endif %}">
-            <c-two-column-list class="-ml-1" :list="group.list"></c-two-column-list>
+            <c-two-column-list key="short_name" class="-ml-1" :list="group.list"></c-two-column-list>
           </c-tabs.tab>
         {% endfor %}
       </c-tabs>

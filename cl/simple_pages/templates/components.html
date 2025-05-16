@@ -70,14 +70,17 @@ Sample code here.
 
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect="show" id="two-column-list">
     <h2 class="mt-6 mb-3">Two column list</h2>
+    <p>Each item in the list can either be plain text, text retrieved in a specified key from a given dict, or links when both <code>href</code> and <code>label</code> keys are present.</p>
     <h4 class="mt-3">Demo</h4>
     <c-two-column-list
+      key="some_field"
+      link_class="underline"
       class="my-4 p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
       :list="[
-          {'short_name': 'First item'},
-          {'short_name': 'Second item'},
-          {'short_name': 'Third item'},
-          {'short_name': 'Fourth item'},
+        {'some_field': 'First item is retrieved from custom key.'},
+        {'href': 'https://free.law', 'label': 'Second item is a link.'},
+        'Third item is plain text.',
+        {'some_field': 'Fourth item is also retrieved from custom key.'},
       ]"
     ></c-two-column-list>
 
@@ -85,7 +88,34 @@ Sample code here.
     <div class="bg-greyscale-100 rounded-xl p-4 my-3">
       <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
         <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>list</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">List of strings that will be displayed in two even columns.</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          List of items that can either be strings or dicts. In case of dicts, including both <code>href</code> and <code>label</code> will render a link.
+          Otherwise, if a key is specified, the value of that key is rendered.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>link_class</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          CSS classes to add to links. For accessibility, <a class="underline" href="https://accessibleweb.com/question-answer/do-links-need-to-be-underlined/" target="_blank" rel="noopener noreferrer">it's recommended all links are always underlined</a>.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>key</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Custom key to pick the value from a dict.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>responsive</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Collapses both columns into one stacked on top of the other in small screens.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>class</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          CSS classes for the list container, appended after the built-in <code>w-full flex flex-row justify-between</code>.
+        </span>
       </div>
     </div>
 
@@ -95,12 +125,14 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-two-column-list
-  class="p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
+  key="some_field"
+  link_class="underline"
+  class="my-4 p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
   :list="[
-      {'short_name': 'First item'},
-      {'short_name': 'Second item'},
-      {'short_name': 'Third item'},
-      {'short_name': 'Fourth item'},
+    {'some_field': 'First item is retrieved from custom key.'},
+    {'href': 'https://free.law', 'label': 'Second item is a link.'},
+    'Third item is plain text.',
+    {'some_field': 'Fourth item is also retrieved from custom key.'},
   ]"
 &gt;&lt;/c-two-column-list>
       </c-code>
