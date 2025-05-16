@@ -68,6 +68,13 @@
             {# Hide it for search types other than RECAP #}
             {% if alert_form.alert_type.is_hidden %}
               {{ alert_form.alert_type }}
+              {% if alert_form.alert_type.errors %}
+                <p class="help-block">
+                  {% for error in alert_form.alert_type.errors %}
+                    {{ error|escape }}
+                  {% endfor %}
+                </p>
+              {% endif %}
             {# Show the radio button for case-only alerts #}
             {% else %}
               <div class="form-group">
