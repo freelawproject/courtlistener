@@ -1,0 +1,88 @@
+{% extends "new_base.html" %}
+{% load svg_tags %}
+
+{% block title %}Contribute to Free Law Project – CourtListener.com{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#overview', 'text': 'How to Help'},
+    {'href': '#as-a-person', 'text': 'As a Regular Person'},
+    {'href': '#as-a-user', 'text': 'As a User'},
+    {'href': '#as-a-developer', 'text': 'As a Developer'},
+    {'href': '#as-a-journalist', 'text': 'As a Journalist'},
+    {'href': '#as-a-librarian', 'text': 'As a Librarian'},
+    {'href': '#as-an-attorney', 'text': 'As an Attorney'},
+  ]"
+>
+  <c-layout-with-navigation.section id="overview">
+    <h1>Contributing to CourtListener and Free&nbsp;Law&nbsp;Project</h1>
+    <p class="lead">CourtListener is an initiative of Free Law Project, a 501(c)(3) non-profit that uses advocacy and software to make the legal sector more competitive and equitable. We always need help to accomplish our goals.
+    </p>
+    <p>If you are looking to support our work, the first thing you can do to help is donate to Free Law Project or join us as a member. This allows us to hire more full time staff. It can be uncomfortable to say so directly, but nothing makes as big a difference as financial support. Please consider donating or becoming a member if you can.
+    </p>
+    <div class="flex md:flex-row flex-col gap-2">
+      <a target="_blank" rel="noopener noreferrer" href="https://donate.free.law/forms/supportflp" class="btn-primary max-md:btn-xl">
+        {% svg "heart" class="" %}Donate Now
+      </a>
+      <a target="_blank" rel="noopener noreferrer" href="https://donate.free.law/forms/membership" class="btn-primary max-md:btn-xl">Join Free.law</a>
+    </div>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="as-a-person">
+    <h2>Other Ways to Contribute</h2>
+    <h3>As a Regular Person</h3>
+    <p>Everybody can help us in these ways:</p>
+    <ul>
+      <li>Simply spread the word. Tell your colleagues to use RECAP and CourtListener. Use our links when referring to court materials. Follow and share our social media accounts.</li>
+      <li>Write a review of RECAP on the <a class="underline" target="_blank" rel="noopener noreferrer" href="https://chrome.google.com/webstore/detail/recap/oiillickanjlaeghobeeknbddaonmjnc">Chrome</a>, <a href="https://apps.apple.com/us/app/recap/id1600281788">Apple</a>, or <a class="underline" target="_blank" rel="noopener noreferrer" href="https://addons.mozilla.org/en-US/firefox/addon/recap-195534/">Firefox</a> store.</li>
+      <li>You can encourage your organization to <a class="underline" target="_blank" rel="noopener noreferrer" href="https://free.law/become-a-sponsor/">become a corporate sponsor</a>.</li>
+      <li>You can check out <a class="text-primary-600" href="{% url "donation_help" %}#other-ways">our other ways to contribute financially</a>.</li>
+    </ul>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="as-a-user">
+    <h3 id="as-a-user">As a User</h3>
+    <p>If you use CourtListener, then your feedback is invaluable. Please let us know what bugs you and what you love. Feel free to repeat yourself if you feel like you're not being heard. Get in touch!
+    </p>
+    <a href="{% url "contact" %}" class="btn-outline max-md:btn-xl">Give Us Feedback</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="as-a-developer">
+    <h3>As a Software Developer</h3>
+    <p>All of our code is open source and we have more work than we can ever complete.</p>
+    <p>If you want to contribute to our work, get in touch with an email noting your skills and time availability. If you have a recent résumé, include it. When we get your email, we'll try to think of a project that'd be right for you.
+    </p>
+    <p>We also maintain a project board for volunteer developers, where you can sometimes just grab something to work on.</p>
+    <div class="flex flex-col md:flex-row gap-2">
+      <a target="_blank" rel="noopener noreferrer" href="https://github.com/orgs/freelawproject/projects/31/views/1" class="btn-outline max-md:btn-xl">Review the Project Board</a>
+      <a href="{% url "contact" %}" class="btn-outline max-md:btn-xl">Get in Touch</a>
+    </div>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="as-a-journalist">
+    <h3 id="as-a-journalist">As a Journalist</h3>
+    <p>You probably know what to do: Use our links and tell people about our initiatives.</p>
+    <p>Beyond this, we hope you'll use and evangelize <a target="_blank" rel="noopener noreferrer" class="underline" href="https://free.law/recap/">RECAP</a> and <a class="text-primary-600" href="{% url "alert_help" %}">our alerts system</a>. Some news organizations pay for alert subscriptions. Maybe you know the decision-maker at your organization?
+    </p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="as-a-librarian">
+    <h3>As a Librarian</h3>
+    <p>We need help getting the next generation of users. Library Guides help! If you can write guides about our materials and put them on your library's website, that really helps get the word out. Let us know if you have questions while developing any kind of material.
+    </p>
+    <p>If you have time to volunteer, we regularly need research or data gathering help and have a #librarians channel in our Slack workspace where we hope you'll hang out. Get in touch to get started.
+    </p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="as-an-attorney">
+    <h3>As an Attorney</h3>
+    <p>If you are an attorney that works in federal court, we encourage you to use <a class="text-primary-600" href="{% url "recap_email_help" %}">@recap.email</a> so all of your cases are automatically available to the public. If you like, it can be done <a class="text-primary-600" href="{% url "recap_email_help" %}#whats-the-best-way-to-simply-contribute-to-the%C2%A0cause">somewhat anonymously</a>.
+    </p>
+    <p>Beyond this, if you're using our system, we hope you'll give us your feedback. The legal space is endlessly complicated, but we can often make changes to address newly identified corner cases or issues.
+    </p>
+    <a href="{% url "recap_email_help" %}" class="btn-outline max-md:btn-xl">Check out @recap.email</a>
+  </c-layout-with-navigation.section>
+</c-layout-with-navigation>
+{% endblock %}
