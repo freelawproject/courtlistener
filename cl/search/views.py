@@ -127,7 +127,15 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     if request.method == "POST":
         # The user is trying to save an alert.
-        alert_form = CreateAlertForm(request.POST, user=request.user)
+        alert_form = CreateAlertForm(
+            request.POST,
+            user=request.user,
+            initial={
+                "original_alert_type": request.GET.get(
+                    "type", SEARCH_TYPES.OPINION
+                ),
+            },
+        )
         if alert_form.is_valid():
             cd = alert_form.cleaned_data
 
@@ -257,6 +265,9 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 "query": get_string,
                 "rate": "dly",
                 "alert_type": request.GET.get("type", SEARCH_TYPES.OPINION),
+                "original_alert_type": request.GET.get(
+                    "type", SEARCH_TYPES.OPINION
+                ),
             },
             user=request.user,
         )

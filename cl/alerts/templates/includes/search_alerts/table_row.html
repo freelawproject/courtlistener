@@ -10,8 +10,10 @@
         Case Law
       {% elif alert.alert_type == SEARCH_TYPES.ORAL_ARGUMENT %}
         Oral Argument
-      {% elif alert.alert_type == SEARCH_TYPES.RECAP or alert.type == SEARCH_TYPES.DOCKETS %}
+      {% elif alert.alert_type == SEARCH_TYPES.RECAP %}
         RECAP
+      {% elif alert.alert_type == SEARCH_TYPES.DOCKETS %}
+        RECAP Cases Only
       {% endif %}
     </p>
   </td>

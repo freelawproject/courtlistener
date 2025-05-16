@@ -3698,6 +3698,7 @@ class SEARCH_TYPES:
     SUPPORTED_ALERT_TYPES = (
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
+        (DOCKETS, "RECAP Dockets"),
         (ORAL_ARGUMENT, "Oral Arguments"),
     )
 
