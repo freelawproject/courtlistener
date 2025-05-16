@@ -126,9 +126,9 @@
         <div class="col-md-6" id="citation-redirect">
             {% if closest_match != None %}
               <div class="alert alert-info">
-                <div class="row" style="display: table; width: 100%; height: 100%;">
-                  <div class="col-xs-9" style="display: table-cell; vertical-align: middle;">
-                    <p style="margin: 0;">
+                <div class="row">
+                  <div class="col-xs-9">
+                    <p>
                       <i class="fa fa-info-circle fa-lg"></i>
                       It looks like you're trying to search for
                       <a class="alert-link" href="{{ closest_match.absolute_url }}">
@@ -136,7 +136,7 @@
                         at {{ closest_match.citation_string }}.
                     </p>
                   </div>
-                  <div class="col-xs-3 text-right" style="display: table-cell; vertical-align: middle;">
+                  <div class="col-xs-3 text-right">
                     <a class="btn btn-primary btn-sm"
                        href="{{ closest_match.get_absolute_url }}">
                       Go<span class="hidden-xs"> to This Case</span>
