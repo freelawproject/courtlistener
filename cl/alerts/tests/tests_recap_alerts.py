@@ -2033,6 +2033,7 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
         docket_2.delete()
         alert_de.docket.delete()
+        alert_de_2.docket.delete()
 
     @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
     def test_percolator_plus_sweep_alerts_integration(
@@ -2626,7 +2627,10 @@ class RECAPAlertsSweepIndexTest(
             5,
             msg="No new alert should be triggered for this case-only alert.",
         )
+
         docket.delete()
+        docket_only_alert.delete()
+        docket_2.delete()
 
 
 @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
@@ -4316,7 +4320,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_3 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Hearing",
                 document_number="3",
@@ -4492,4 +4496,7 @@ class RECAPAlertsPercolatorTest(
             5,
             msg="No new alert should be triggered for this case-only alert.",
         )
+
+        docket_only_alert.delete()
         docket.delete()
+        docket_2.delete()

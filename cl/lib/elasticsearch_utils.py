@@ -3315,9 +3315,6 @@ def do_es_alert_estimation_query(
             # Case only count
             child_doc_count_response_case_only = responses[2]
             child_total_case_only = child_doc_count_response_case_only.aggregations.unique_documents.value
-
-            print("parent_total", parent_total)
-            print("child_total_case_only", child_total_case_only)
             total_recap_case_only_estimation = max(
                 parent_total, child_total_case_only
             )
