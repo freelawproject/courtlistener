@@ -68,42 +68,39 @@
             {# Hide it for search types other than RECAP #}
             {% if alert_form.alert_type.is_hidden %}
               {{ alert_form.alert_type }}
-              {% if alert_form.alert_type.errors %}
-                <p class="help-block">
-                  {% for error in alert_form.alert_type.errors %}
-                    {{ error|escape }}
-                  {% endfor %}
-                </p>
-              {% endif %}
             {# Show the radio button for case-only alerts #}
             {% else %}
               <div class="form-group">
                 <label>{{ alert_form.alert_type.label }}</label>
                 {% for radio in alert_form.alert_type %}
                   <div class="radio">
-                    <label for="{{ radio.id_for_label }}">
-                      {{ radio.tag }} {{ radio.choice_label }}
-                        {% if forloop.first %}
-                          <small class="text-muted hidden-xs" id="alert-estimate-case-only">
-                            <i class="fa fa-spinner fa-pulse gray"></i><span> Loading alert frequency&hellip;</span>
-                          </small>
-                        {% else %}
-                          <small class="text-muted hidden-xs" id="alert-estimate">
-                            <i class="fa fa-spinner fa-pulse gray"></i><span> Loading alert frequency&hellip;</span>
-                          </small>
-                        {% endif %}
-                    </label>
+                    <div class="row">
+                      <div class="col-xs-8">
+                        <label for="{{ radio.id_for_label }}">
+                          {{ radio.tag }} {{ radio.choice_label }}
+                        </label>
+                      </div>
+                      <div class="col-xs-4 text-right hidden-xs">
+                        <div
+                          class="text-muted hidden-xs"
+                          id="{% if forloop.first %}alert-estimate-case-only{% else %}alert-estimate{% endif %}">
+                          <i class="fa fa-spinner fa-pulse gray"></i>
+                          <span>Loading alert frequency&hellip;</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 {% endfor %}
-                {% if alert_form.alert_type.errors %}
-                  <p class="help-block">
-                    {% for err in alert_form.alert_type.errors %}
-                      {{ err|escape }}
-                    {% endfor %}
-                  </p>
-                {% endif %}
               </div>
             {% endif %}
+            {% if alert_form.alert_type.errors %}
+              <p class="help-block">
+                {% for error in alert_form.alert_type.errors %}
+                  {{ error|escape }}
+                {% endfor %}
+              </p>
+            {% endif %}
+
 
             {# Hidden unless shown by JS #}
             <div class="alert alert-warning hidden"

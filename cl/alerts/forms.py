@@ -26,9 +26,9 @@ class CreateAlertForm(ModelForm):
         super().__init__(*args, **kwargs)
 
         current_type = None
-        # First look at initial for new alerts.
-        if "alert_type" in initial:
-            current_type = initial["alert_type"]
+        # First look at the original alert_type for new alerts / errors.
+        if "original_alert_type" in initial:
+            current_type = initial["original_alert_type"]
 
         # Otherwise look at the existing instance alert_type for Edit Alert.
         elif getattr(self, "instance", None) and getattr(
@@ -39,6 +39,11 @@ class CreateAlertForm(ModelForm):
         # Hide the alert_type field for search types other than RECAP.
         if current_type not in (SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS):
             self.fields["alert_type"].widget = HiddenInput()
+            # Restore the original valid alert_type field choices, since
+            # they were overridden for RECAP
+            original_field = self._meta.model._meta.get_field("alert_type")
+            field = self.fields["alert_type"]
+            field.choices = original_field.choices
 
     def clean_rate(self):
         rate = self.cleaned_data["rate"]
