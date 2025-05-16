@@ -432,3 +432,17 @@ def humanize_number(value):
         formatted = str(num)
 
     return f"{formatted}{abbreviation}"
+
+
+@register.filter
+def has_attr(obj, attr_name):
+    """Return True if obj has attribute attr_name."""
+    return hasattr(obj, attr_name)
+
+
+@register.filter
+def get_attr(obj, attr_name):
+    """Return the value of the attribute attr_name."""
+    if not hasattr(obj, attr_name):
+        return ""
+    return getattr(obj, attr_name)

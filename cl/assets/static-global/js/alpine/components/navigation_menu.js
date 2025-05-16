@@ -4,6 +4,9 @@
  * and navigation items become dynamic or user-influenced, proper URL encoding MUST be
  * implemented.
  */
+
+const TOP_ELEMENT_BASE = 'font-semibold pl-3.5';
+
 document.addEventListener('alpine:init', () => {
   Alpine.data('navMenu', () => ({
     menuOpen: false,
@@ -11,6 +14,7 @@ document.addEventListener('alpine:init', () => {
     expandedSections: [],
     ids: ['listbox-option'],
     options: [],
+    hasNestedItems: false,
     toggleMenu() {
       this.menuOpen = !this.menuOpen;
       this.buttonPressed = true;
@@ -41,7 +45,11 @@ document.addEventListener('alpine:init', () => {
       return this.isExpanded ? 'transform rotate-180' : '';
     },
     get itemClass() {
-      return this.isVisible ? 'text-primary-600' : '';
+      if (this.hasNestedItems) {
+        const visibilityClasses = this.isVisible ? 'text-primary-600' : '';
+        return TOP_ELEMENT_BASE + ' ' + visibilityClasses;
+      }
+      return this.childClass + ' pl-4';
     },
     get hasVisibleChild() {
       const index = this.options.findIndex((el) => el.href === this.target);
@@ -65,6 +73,7 @@ document.addEventListener('alpine:init', () => {
           this.expandedSections.push(option.href);
         }
       });
+      this.hasNestedItems = this.expandedSections.length > 0;
     },
   }));
 });
