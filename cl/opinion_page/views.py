@@ -1303,11 +1303,17 @@ async def citation_handler(
 
     # Show the correct page....
     if cluster_count == 0:
-        # No results for an otherwise valid citation.
+        if isinstance(clusters, OpinionCluster):
+            # Tell user of closest citation match.
+            closest_match = clusters
+        else:
+            # No results for an otherwise valid citation.
+            closest_match = None
         return TemplateResponse(
             request,
             "citation_redirect_info_page.html",
             {
+                "closest_match": closest_match,
                 "none_found": True,
                 "citation_str": citation_str,
                 "private": False,
@@ -1468,7 +1474,9 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
             # Redirect to the page as a GET instead of a POST
             cd = form.cleaned_data
             citations = eyecite.get_citations(
-                cd["reporter"], tokenizer=HYPERSCAN_TOKENIZER
+                cd["reporter"],
+                tokenizer=HYPERSCAN_TOKENIZER,
+                clean_steps=["all_whitespace"],
             )
             case_law_citations = filter_out_non_case_law_citations(citations)
             if not case_law_citations:
