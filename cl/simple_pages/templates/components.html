@@ -29,9 +29,9 @@
   <section class="max-w-full w-full" x-intersect.margin.-100px="show" id="main-title">
     <c-eyebrow>CourtListener's</c-eyebrow>
     <h1 class="">Component Library</h1>
-    <p class="mt-4">Below you will find a display of the components available in our codebase with usage notes to make development easier.</p>
-    <p class="my-3">These components are available to all templates that extend from <code>new_base.html</code>. Using them doesn't require any imports or settings, they should just work!</p>
-    <p class="my-3">If these aren't enough for your needs and you make a new component or tweak one of the existing ones, make sure to:</p>
+    <p class="mt-1">Below you will find a display of the components available in our codebase with usage notes to make development easier.</p>
+    <p>These components are available to all templates that extend from <code>new_base.html</code>. Using them doesn't require any imports or settings, they should just work!</p>
+    <p>If these aren't enough for your needs and you make a new component or tweak one of the existing ones, make sure to:</p>
     <ul class="list-disc pl-4">
       <li>Save the html in one of the <code>/templates/cotton/</code> directories for Django to pick it up automatically.</li>
       <li>Read the docs! We use <a class="underline" href="https://django-cotton.com/docs/usage-patterns" target="_blank">Django Cotton</a> for components,
@@ -54,14 +54,14 @@ Sample code here.
     <h4 class="mt-8">Props</h4>
     <div class="bg-greyscale-100 rounded-xl p-4 my-3">
       <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>disable_copy</code></span>
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>disable_copy</code><br><span class="font-normal text-xs">(optional)</span></span>
         <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
           Adding this attribute hides the copy-to-clipboard button in the top-right corner of the code block.
           <br>Defaults to false.
         </span>
       </div>
       <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>class</code></span>
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>class</code><br><span class="font-normal text-xs">(optional)</span></span>
         <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
           CSS classes applied to the <code>&lt;pre&gt;</code> element.
         </span>
@@ -543,7 +543,7 @@ Sample code here.
         </span>
       </div>
       <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>footer</code></span>
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>footer</code><br><span class="font-normal text-xs">(optional)</span></span>
         <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
           List of rows in the <code>&lt;tfoot&gt;</code>.<br>Same structure as <code>rows</code>.
         </span>
@@ -555,7 +555,7 @@ Sample code here.
         </span>
       </div>
       <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>safe</code></span>
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>safe</code><br><span class="font-normal text-xs">(optional)</span></span>
         <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
           Marks the contents as safe, so it can render HTML inside the table.
           <br>Defaults to false.
