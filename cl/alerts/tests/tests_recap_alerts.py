@@ -1946,6 +1946,12 @@ class RECAPAlertsSweepIndexTest(
                 document_number="1",
                 pacer_doc_id="018036652450",
             )
+            RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Frequency Test RECAP 2",
+                document_number="2",
+                pacer_doc_id="0180366524502",
+            )
 
         r = self.client.get(
             reverse(
@@ -1953,11 +1959,79 @@ class RECAPAlertsSweepIndexTest(
             ),
             search_params,
         )
-        # 2 expected hits in the last 100 days. One docket filed today + one
-        # RECAPDocument filed today.
-        self.assertEqual(r.json()["count"], 2)
+        # 3 expected hits in the last 100 days for regular alerts.
+        # 1 expected hits in the last 100 days for case only alerts.
+        self.assertEqual(r.json()["count"], 3)
+        self.assertEqual(r.json()["count_case_only"], 1)
+
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # RECAPDocument filed today that belongs to a docket filed outside
+            # the estimation range.
+            date_outside_range = now() - datetime.timedelta(days=102)
+            alert_de_2 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Frequency Test RECAP 2",
+                    docket_number="1:21-bk-12452",
+                    source=Docket.RECAP,
+                    date_filed=date_outside_range.date(),
+                ),
+                entry_number=1,
+                date_filed=now().date(),
+            )
+            RECAPDocumentFactory(
+                docket_entry=alert_de_2,
+                description="Frequency Test RECAP 2",
+                document_number="1",
+                pacer_doc_id="018036652453",
+            )
+            RECAPDocumentFactory(
+                docket_entry=alert_de_2,
+                description="Frequency Test RECAP 2",
+                document_number="2",
+                pacer_doc_id="01803665245023",
+            )
+
+        r = self.client.get(
+            reverse(
+                "alert_frequency", kwargs={"version": "4", "day_count": "100"}
+            ),
+            search_params,
+        )
+        # 5 expected hits in the last 100 days regular alerts.
+        # 2 expected hits in the last 100 days for case only alerts.
+        self.assertEqual(r.json()["count"], 5)
+        self.assertEqual(r.json()["count_case_only"], 2)
+
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # Docket filed today.
+            docket_2 = DocketFactory(
+                court=self.court,
+                case_name="Frequency Test RECAP 3",
+                docket_number="1:21-bk-12497",
+                source=Docket.RECAP,
+                date_filed=now().date(),
+            )
+
+        r = self.client.get(
+            reverse(
+                "alert_frequency", kwargs={"version": "4", "day_count": "100"}
+            ),
+            search_params,
+        )
+        # 6 expected hits in the last 100 days regular alerts.
+        # 2 expected hits in the last 100 days for case only alerts.
+        self.assertEqual(r.json()["count"], 6)
+        self.assertEqual(r.json()["count_case_only"], 2, "error")
 
         docket.delete()
+        docket_2.delete()
         alert_de.docket.delete()
 
     @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)

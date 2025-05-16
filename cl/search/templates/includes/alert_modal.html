@@ -74,7 +74,18 @@
                 <label>{{ alert_form.alert_type.label }}</label>
                 {% for radio in alert_form.alert_type %}
                   <div class="radio">
-                    <label>{{ radio.tag }} {{ radio.choice_label }}</label>
+                    <label for="{{ radio.id_for_label }}">
+                      {{ radio.tag }} {{ radio.choice_label }}
+                        {% if forloop.first %}
+                          <small class="text-muted hidden-xs" id="alert-estimate-case-only">
+                            <i class="fa fa-spinner fa-pulse gray"></i><span> Loading alert frequency&hellip;</span>
+                          </small>
+                        {% else %}
+                          <small class="text-muted hidden-xs" id="alert-estimate">
+                            <i class="fa fa-spinner fa-pulse gray"></i><span> Loading alert frequency&hellip;</span>
+                          </small>
+                        {% endif %}
+                    </label>
                   </div>
                 {% endfor %}
                 {% if alert_form.alert_type.errors %}
@@ -118,9 +129,11 @@
               </p>
             {% endif %}
             <div class="row v-offset-above-2">
-              <div class="hidden-xs col-sm-4" id="alert-estimate">
-                <p class="v-offset-above-1"><i class="fa fa-spinner fa-pulse gray"></i><span> Loading alert frequency&hellip;</span></p>
-              </div>
+              {% if search_form.type.value != SEARCH_TYPES.RECAP %}
+                <div class="hidden-xs col-sm-4" id="alert-estimate">
+                  <p class="v-offset-above-1"><i class="fa fa-spinner fa-pulse gray"></i><span> Loading alert frequency&hellip;</span></p>
+                </div>
+              {% endif %}
               <div class="col-xs-12 col-sm-8">
                 <p class="text-right">
                   {% if request.GET.edit_alert %}
