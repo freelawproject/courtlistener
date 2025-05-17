@@ -31,15 +31,68 @@
           src="{% static "js/jquery.jplayer.min.js" %}"></script>
   <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     $(document).ready(function () {
-      $("#jquery_jplayer_1").jPlayer({
+      var player = $("#jquery_jplayer_1");
+      var speedBar = $('.jp-speed-bar');
+      var speedBarValue = $('.jp-speed-bar-value');
+
+      // Define min/max speed for the bar
+      var minSpeed = 0.5;
+      var maxSpeed = 3.0;
+
+      player.jPlayer({
         ready: function (event) {
           $(this).jPlayer("setMedia", {
             title: "{{ af|best_case_name }}",
             mp3: "{{ af.local_path_mp3.url }}"
           });
+          // Set initial speed bar position
+          updateSpeedBar(event.jPlayer.options.playbackRate);
         },
-        swfPath: "{% static "swf/Jplayer.swf" %}"
+        swfPath: '{% static "swf/Jplayer.swf" %}',
+        supplied: "mp3",
+        cssSelectorAncestor: "#jp_container_1",
+        useStateClassSkin: true,
+        autoBlur: false,
+        smoothPlayBar: true,
+        keyEnabled: true,
+        remainingDuration: true,
+        toggleDuration: true,
+        playbackRate: 1.0,
+        defaultPlaybackRate: 1.0
       });
+
+      // Function to update speed bar position and display text
+      function updateSpeedBar(currentSpeed) {
+          var percentage = (currentSpeed - minSpeed) / (maxSpeed - minSpeed);
+          // Clamp percentage between 0 and 1
+          percentage = Math.max(0, Math.min(1, percentage));
+          speedBarValue.css('width', (percentage * 100) + '%');
+
+          // Update the speed display text
+          // Format to one decimal place and add 'x'
+          $('#jp-speed-display').text(currentSpeed.toFixed(1) + 'x');
+      }
+
+      // Speed bar click/drag handler
+      speedBar.on('click', function(e) {
+        var $this = $(this);
+        var offset = $this.offset();
+        var x = e.pageX - offset.left;
+        var barWidth = $this.width();
+        var percentage = x / barWidth;
+        var newSpeed = minSpeed + percentage * (maxSpeed - minSpeed);
+        // Clamp speed
+        newSpeed = Math.max(minSpeed, Math.min(maxSpeed, newSpeed));
+
+        player.jPlayer("playbackRate", newSpeed);
+        // updateSpeedBar is called via the ratechange event below
+      });
+
+      // Update speed bar if playback rate changes
+      player.bind($.jPlayer.event.ratechange, function(event) {
+         updateSpeedBar(event.jPlayer.options.playbackRate);
+      });
+
     });
   </script>
 {% endblock %}
@@ -188,6 +241,11 @@
                         <div class="jp-volume-bar">
                             <div class="jp-volume-bar-value"></div>
                         </div>
+                        <i class="fa fa-dashboard jp-speed-icon" title="Playback Speed"></i> {# Speed icon (using older name) #}
+                        <div class="jp-speed-bar">
+                            <div class="jp-speed-bar-value"></div>
+                        </div>
+                        <span id="jp-speed-display" class="jp-speed-text">1.0x</span> {# Speed display #}
                         <div class="jp-time-holder">
                             <div class="jp-current-time"></div>
                             <div class="jp-duration"></div>
