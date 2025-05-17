@@ -1047,8 +1047,9 @@ class Command(BaseCommand):
             "--type",
             type=str,
             choices=VALID_TYPES,
-            help="Object type to clone. Current choices are %s"
-            % ", ".join(VALID_TYPES),
+            help="Object type to clone. Current choices are {}".format(
+                ", ".join(VALID_TYPES)
+            ),
             required=True,
         )
 

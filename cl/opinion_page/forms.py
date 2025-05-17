@@ -411,11 +411,7 @@ class BaseCourtUploadForm(forms.Form):
                     "cite_page",
                     ValidationError(
                         format_html(
-                            'Citation already in database. See: <a href="%s">%s</a>'
-                            % (
-                                cite.get_absolute_url(),
-                                cite.cluster.case_name,
-                            ),
+                            f'Citation already in database. See: <a href="{cite.get_absolute_url()}">{cite.cluster.case_name}</a>',
                         )
                     ),
                 )
@@ -435,8 +431,7 @@ class BaseCourtUploadForm(forms.Form):
                 "pdf_upload",
                 ValidationError(
                     format_html(
-                        'Document already in database. See: <a href="%s">%s</a>'
-                        % (op.get_absolute_url(), op.cluster.case_name),
+                        f'Document already in database. See: <a href="{op.get_absolute_url()}">{op.cluster.case_name}</a>',
                     )
                 ),
             )

@@ -146,9 +146,9 @@ class DocketBlockedFromSearchEnginesTest(Base412Test):
         self.assertEqual(
             actual_btn_count,
             expected_btn_count,
-            msg="Found %s button(s), but expected %s. Does the user have "
+            msg=f"Found {actual_btn_count} button(s), but expected {expected_btn_count}. Does the user have "
             "access to the blocked button they shouldn't or maybe the "
-            "page crashed?" % (actual_btn_count, expected_btn_count),
+            "page crashed?",
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)

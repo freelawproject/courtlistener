@@ -507,8 +507,9 @@ def add_new_case(
         except OperationalError as e:
             if "exceeds maximum" in str(e):
                 docket.docket_number = (
-                    "%s, See Corrections for full Docket Number"
-                    % trunc(docket_string, length=5000, ellipsis="...")
+                    "{}, See Corrections for full Docket Number".format(
+                        trunc(docket_string, length=5000, ellipsis="...")
+                    )
                 )
                 docket.save()
                 long_data["correction"] = (

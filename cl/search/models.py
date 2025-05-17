@@ -1353,12 +1353,7 @@ class RECAPDocument(
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
     def __str__(self) -> str:
-        return "%s: Docket_%s , document_number_%s , attachment_number_%s" % (
-            self.pk,
-            self.docket_entry.docket.docket_number,
-            self.document_number,
-            self.attachment_number,
-        )
+        return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
     def get_absolute_url(self) -> str:
         if not self.document_number:
@@ -1522,7 +1517,7 @@ class RECAPDocument(
                     raise ValidationError(
                         "Multiple duplicate values violate save constraint "
                         "and we are unable to fix it automatically for "
-                        "rd: %s" % self.pk
+                        f"rd: {self.pk}"
                     )
                 else:
                     # Only one duplicate. Attempt auto-resolution.
@@ -1539,8 +1534,7 @@ class RECAPDocument(
                     raise ValidationError(
                         "Duplicate values violate save constraint and we are "
                         "unable to fix it because the items have different "
-                        "pacer_doc_id values. The rds are %s and %s "
-                        % (self.pk, other.pk)
+                        f"pacer_doc_id values. The rds are {self.pk} and {other.pk} "
                     )
 
         if update_fields is not None:
@@ -1807,11 +1801,7 @@ class Claim(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "Claim #%s on docket %s with pk %s" % (
-            self.claim_number,
-            self.docket_id,
-            self.pk,
-        )
+        return f"Claim #{self.claim_number} on docket {self.docket_id} with pk {self.pk}"
 
 
 @pghistory.track(
@@ -1844,9 +1834,8 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     claim_document_type = models.IntegerField(
         help_text=(
             "The type of document that is used in the history row for "
-            "the claim. One of: %s"
-        )
-        % ", ".join([f"{t[0]} ({t[1]})" for t in CLAIM_TYPES]),
+            "the claim. One of: {}"
+        ).format(", ".join([f"{t[0]} ({t[1]})" for t in CLAIM_TYPES])),
         choices=CLAIM_TYPES,
     )
     description = models.TextField(
@@ -2154,8 +2143,9 @@ class Court(models.Model):
         null=True,
     )
     jurisdiction = models.CharField(
-        help_text="the jurisdiction of the court, one of: %s"
-        % ", ".join(f"{t[0]} ({t[1]})" for t in JURISDICTIONS),
+        help_text="the jurisdiction of the court, one of: {}".format(
+            ", ".join(f"{t[0]} ({t[1]})" for t in JURISDICTIONS)
+        ),
         max_length=3,
         choices=JURISDICTIONS,
     )
@@ -2394,8 +2384,9 @@ class OpinionCluster(AbstractDateTimeModel):
         null=True,
     )
     source = models.CharField(
-        help_text="the source of the cluster, one of: %s"
-        % ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES),
+        help_text="the source of the cluster, one of: {}".format(
+            ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES)
+        ),
         max_length=10,
         choices=SOURCES.NAMES,
         blank=True,
@@ -2507,8 +2498,9 @@ class OpinionCluster(AbstractDateTimeModel):
         db_index=True,
     )
     precedential_status = models.CharField(
-        help_text="The precedential status of document, one of: "
-        "%s" % ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES]),
+        help_text="The precedential status of document, one of: {}".format(
+            ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES])
+        ),
         max_length=50,
         blank=True,
         choices=PRECEDENTIAL_STATUS.NAMES,
@@ -3621,19 +3613,19 @@ class Tag(AbstractDateTimeModel):
         wish to tag.
         :return: A tuple with the tag and whether a new item was created
         """
-        if type(thing) == Docket:
+        if isinstance(thing, Docket):
             return self.dockets.through.objects.get_or_create(
                 docket_id=thing.pk, tag_id=self.pk
             )
-        elif type(thing) == DocketEntry:
+        elif isinstance(thing, DocketEntry):
             return self.docket_entries.through.objects.get_or_create(
                 docketentry_id=thing.pk, tag_id=self.pk
             )
-        elif type(thing) == RECAPDocument:
+        elif isinstance(thing, RECAPDocument):
             return self.recap_documents.through.objects.get_or_create(
                 recapdocument_id=thing.pk, tag_id=self.pk
             )
-        elif type(thing) == Claim:
+        elif isinstance(thing, Claim):
             return self.claims.through.objects.get_or_create(
                 claim_id=thing.pk, tag_id=self.pk
             )
