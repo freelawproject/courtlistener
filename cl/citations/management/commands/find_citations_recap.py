@@ -1,6 +1,7 @@
 import sys
 import time
-from typing import Iterable, List, cast
+from collections.abc import Iterable
+from typing import cast
 
 from django.core.management import CommandError
 from django.core.management.base import CommandParser
@@ -114,7 +115,7 @@ class Command(VerboseCommand):
 
             self.log_progress(processed_count, doc.pk)
 
-    def handle(self, *args: List[str], **options: OptionsType):
+    def handle(self, *args: list[str], **options: OptionsType):
         super().handle(*args, **options)
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None
@@ -160,7 +161,7 @@ class Command(VerboseCommand):
 
         self.count = query.count()
         self.average_per_s = 0.0
-        self.timings: List[float] = []
+        self.timings: list[float] = []
 
         docs = query.only("pk").iterator()
         queue = cast(str, options["queue"])

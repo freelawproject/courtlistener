@@ -1,7 +1,9 @@
 name: Automate build and deploy
+
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
 
 env:
   AWS_REGION: us-west-2
@@ -70,7 +72,7 @@ jobs:
       - name: Collect Static Assets
         id: collectStatic
         run: |
-          kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- python manage.py collectstatic --noinput
+          kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- ./manage.py collectstatic --noinput
       - name: Handle Collectstatic Error
         if: failure()
         run: | # Error-handling logic for collectstatic
@@ -80,7 +82,7 @@ jobs:
       - name: Check Migrations
         id: checkMigration
         run: |
-          kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- python manage.py migrate --check
+          kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- ./manage.py migrate --check
       - name: Handle Check Migrations Error
         if: failure()
         run: |

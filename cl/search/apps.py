@@ -14,7 +14,7 @@ class SearchConfig(AppConfig):
 
     def ready(self):
         # Implicitly connect a signal handlers decorated with @receiver.
-        from cl.search import signals
+        from cl.search import signals  # noqa: F401
 
         if settings.DEVELOPMENT and not settings.TESTING:
             # Only for DEVELOPMENT and not in TESTING:

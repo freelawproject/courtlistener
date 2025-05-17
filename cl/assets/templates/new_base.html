@@ -1,5 +1,5 @@
 {% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
-{% load static tailwind_tags %}
+{% load tailwind_tags %}{% load component_tags %}
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
@@ -91,18 +91,19 @@
   </main>
 
   {% block footer %}
-  <footer class="">
-  </footer>
+    <c-footer></c-footer>
   {% endblock %}
+
+  {% render_required_scripts %}
 
   {% if DEBUG %}
   <script type="text/javascript"
           src="{% static "js/jquery/jquery-3.4.1.js" %}"></script>
-  <script src="{% static 'js/alpinejscsp@3.14.8.js' %}" defer init nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% else %}
   <script type="text/javascript"
-        src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
-  <script src="{% static 'js/alpinejscsp@3.14.8.min.js' %}" defer init nonce="{{ request.csp_nonce }}"></script>
+          src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% endif %}
 
   <script type="text/javascript" src="{% static "js/base.js" %}"></script>

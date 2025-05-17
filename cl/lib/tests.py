@@ -1,6 +1,6 @@
 import datetime
 import pickle
-from typing import Tuple, TypedDict, cast
+from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import patch
 
@@ -12,7 +12,6 @@ from requests.cookies import RequestsCookieJar
 
 from cl.lib.courts import (
     get_active_court_from_cache,
-    get_cache_key_for_court_list,
     get_minimal_list_of_courts,
     lookup_child_courts_cache,
 )
@@ -84,8 +83,7 @@ class TestPacerUtils(TestCase):
         )
         self.assertFalse(
             blocked,
-            msg="Bankruptcy dockets with many entries "
-            "should not be blocked",
+            msg="Bankruptcy dockets with many entries should not be blocked",
         )
         # This should stay blocked even though it's a big bankruptcy docket.
         d.blocked = True
@@ -94,8 +92,7 @@ class TestPacerUtils(TestCase):
         )
         self.assertTrue(
             blocked,
-            msg="Bankruptcy dockets that start blocked "
-            "should stay blocked.",
+            msg="Bankruptcy dockets that start blocked should stay blocked.",
         )
 
 
@@ -104,7 +101,6 @@ class TestPacerUtils(TestCase):
     return_value="lib_test:minimal-court-list",
 )
 class TestCachedCourtUtils(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.parent_court = CourtFactory(id="parent_court")
@@ -196,7 +192,6 @@ class TestCachedCourtUtils(TestCase):
     EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
 )
 class TestPacerSessionUtils(TestCase):
-
     def setUp(self) -> None:
         r = get_redis_interface("CACHE", decode_responses=False)
         # Clear cached session keys to prevent data inconsistencies.
@@ -283,7 +278,7 @@ class TestStringUtils(SimpleTestCase):
             ellipsis: str
 
         s = "Henry wants apple."
-        tests: Tuple[TestType, ...] = (
+        tests: tuple[TestType, ...] = (
             # Simple case
             {"length": 13, "result": "Henry wants"},
             # Off by one cases
@@ -1202,9 +1197,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_for_proximity_tokens(
-                test["input_str"]  # type: ignore
-            )
+            output = check_for_proximity_tokens(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         # Check for Unbalanced parentheses.
@@ -1241,15 +1234,11 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = check_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
 
         # Check for Unbalanced quotes.
@@ -1300,9 +1289,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_quotes(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_quotes(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
 
     def test_can_get_parties_from_bankruptcy_case_name(self) -> None:

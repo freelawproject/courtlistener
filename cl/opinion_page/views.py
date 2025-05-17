@@ -2,7 +2,7 @@ import datetime
 from collections import OrderedDict, defaultdict
 from datetime import timedelta
 from http import HTTPStatus
-from typing import Any, Dict, Union
+from typing import Any
 from urllib.parse import urlencode
 
 import eyecite
@@ -15,7 +15,6 @@ from django.db.models import IntegerField, Prefetch, QuerySet
 from django.db.models.functions import Cast
 from django.http import (
     HttpRequest,
-    HttpResponsePermanentRedirect,
     HttpResponseRedirect,
 )
 from django.http.response import (
@@ -23,14 +22,11 @@ from django.http.response import (
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
-    HttpResponseServerError,
 )
 from django.shortcuts import (  # type: ignore[attr-defined]
     aget_object_or_404,
-    redirect,
     render,
 )
-from django.template.defaultfilters import slugify
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
@@ -50,6 +46,7 @@ from cl.citations.utils import (
     SLUGIFIED_EDITIONS,
     filter_out_non_case_law_citations,
     get_canonicals_from_reporter,
+    slugify_reporter,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
@@ -80,16 +77,13 @@ from cl.opinion_page.forms import (
     TennWorkCompAppUploadForm,
     TennWorkCompClUploadForm,
 )
-from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import (
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
-    es_get_citing_and_related_clusters_with_cache,
     es_get_related_clusters_with_cache,
     es_related_case_count,
     generate_docket_entries_csv_data,
-    get_case_title,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -100,7 +94,6 @@ from cl.search.models import (
     Court,
     Docket,
     DocketEntry,
-    Opinion,
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
@@ -479,7 +472,7 @@ async def view_parties(
             return paginator.page(paginator.num_pages)
 
     party_types_paginator = await paginate_parties(party_types, page)
-    parties: Dict[str, list] = {}
+    parties: dict[str, list] = {}
     async for party_type in party_types_paginator.object_list:
         if party_type.name not in parties:
             parties[party_type.name] = []
@@ -696,7 +689,8 @@ async def view_recap_document(
     rd = await make_thumb_if_needed(request, rd)
     try:
         note = await Note.objects.aget(
-            recap_doc_id=rd.pk, user=await request.auser()  # type: ignore[attr-defined]
+            recap_doc_id=rd.pk,
+            user=await request.auser(),  # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
         # Not saved in notes or anonymous user
@@ -768,7 +762,8 @@ async def view_recap_authorities(
 
     try:
         note = await Note.objects.aget(
-            recap_doc_id=rd.pk, user=await request.auser()  # type: ignore[attr-defined]
+            recap_doc_id=rd.pk,
+            user=await request.auser(),  # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
         # Not saved in notes or anonymous user
@@ -1127,7 +1122,7 @@ async def view_opinion_related_cases(
     )
 
 
-async def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
+async def throw_404(request: HttpRequest, context: dict) -> HttpResponse:
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",
@@ -1268,7 +1263,7 @@ async def reporter_or_volume_handler(
     )
 
 
-async def make_reporter_dict() -> Dict:
+async def make_reporter_dict() -> dict:
     """Make a dict of reporter names and abbreviations
 
     The format here is something like:
@@ -1284,7 +1279,7 @@ async def make_reporter_dict() -> Dict:
         .distinct()
     ]
 
-    reporters: Union[defaultdict, OrderedDict] = defaultdict(list)
+    reporters: defaultdict | OrderedDict = defaultdict(list)
     for name, abbrev_list in NAMES_TO_EDITIONS.items():
         for abbrev in abbrev_list:
             if abbrev in reporters_in_db:
@@ -1428,7 +1423,7 @@ async def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
-    reporter_slug = slugify(reporter)
+    reporter_slug = slugify_reporter(reporter)
 
     if reporter != reporter_slug:
         # Reporter provided in non-slugified form. Redirect to slugified
@@ -1540,7 +1535,9 @@ async def block_item(request: HttpRequest) -> HttpResponse:
         docket_pk = (
             pk
             if obj_type == "docket"
-            else cluster.docket_id if cluster is not None else None
+            else cluster.docket_id
+            if cluster is not None
+            else None
         )
         if not docket_pk:
             return HttpResponse("It worked")

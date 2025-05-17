@@ -47,7 +47,9 @@ urlpatterns = [
     ),
     path("help/coverage/oral-arguments/", coverage_oa, name="coverage_oa"),  # type: ignore[arg-type]
     path(
-        "help/coverage/opinions/", coverage_opinions, name="coverage_opinions"  # type: ignore[arg-type]
+        "help/coverage/opinions/",
+        coverage_opinions,
+        name="coverage_opinions",  # type: ignore[arg-type]
     ),
     path(
         "help/coverage/recap/",

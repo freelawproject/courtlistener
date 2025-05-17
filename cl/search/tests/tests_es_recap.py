@@ -19,6 +19,7 @@ from elasticsearch_dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
 
+from cl.alerts.utils import add_cutoff_timestamp_filter
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     compute_lowest_possible_estimate,
@@ -155,7 +156,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         tree = html.fromstring(html_content)
         article = tree.xpath("//article")[article]
         col_md_offset_half_elements = article.xpath(
-            f".//div[@class='bottom']//div[@class='col-md-offset-half']"
+            ".//div[@class='bottom']//div[@class='col-md-offset-half']"
         )
         col_md_offset_half_elem = col_md_offset_half_elements[child_index]
         inline_element = col_md_offset_half_elem.xpath(
@@ -2407,7 +2408,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         dockets_to_remove = []
         # Add dockets with no documents
         with self.captureOnCommitCallbacks(execute=True):
-
             # District document initial document available
             de_1 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
@@ -2964,6 +2964,104 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         de.docket.delete()
         docket_2.delete()
 
+    def test_timestamp_filtering(self) -> None:
+        """Confirm the timestamp fielded filter works properly"""
+
+        # Add docket with no document
+        mock_date = now().replace(
+            day=29, hour=0, minute=0, second=0, microsecond=0
+        )
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Lorem vs Natural Gas ",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="5:90-cv-04007",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(params["q"], mock_date)
+        # Docket with mock_date as timestamp should be found.
+        async_to_sync(self._test_article_count)(params, 1, "timestamp")
+
+        # Filter by date:
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date.date()
+        )
+        # Docket with mock_date as timestamp should be found.
+        async_to_sync(self._test_article_count)(params, 1, "timestamp")
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date + datetime.timedelta(seconds=1)
+        )
+        # Querying for a timestamp one second greater than mock_date shouldn't return any results.
+        async_to_sync(self._test_article_count)(params, 0, "timestamp")
+
+        # Test timestamp filter for RDs.
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            entry = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="1",
+                is_available=False,
+                page_count=5,
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="2",
+                is_available=True,
+                page_count=5,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "New File",
+            "available_only": True,
+        }
+        params["q"] = add_cutoff_timestamp_filter(params["q"], mock_date)
+        # RECAPDocument with mock_date as timestamp should be found.
+        r = async_to_sync(self._test_article_count)(params, 1, "timestamp")
+        self._count_child_documents(0, r.content.decode(), 1, "timestamp")
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "New File",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date + datetime.timedelta(seconds=1)
+        )
+        # Querying for a timestamp one second greater than mock_date shouldn't return any results.
+        async_to_sync(self._test_article_count)(params, 0, "timestamp")
+
+        docket.delete()
+
 
 class RECAPSearchDecayRelevancyTest(
     ESIndexTestCase, V4SearchAPIAssertions, TestCase
@@ -3263,7 +3361,7 @@ class RECAPSearchDecayRelevancyTest(
                 r = async_to_sync(self._test_article_count)(
                     test["search_params"],
                     len(test["expected_order_frontend"]),
-                    f"Failed count {test["name"]}",
+                    f"Failed count {test['name']}",
                 )
                 self._assert_order_in_html(
                     r.content.decode(), test["expected_order_frontend"]
@@ -3293,7 +3391,6 @@ class RECAPSearchDecayRelevancyTest(
 
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
-
     version_api = "v3"
     skip_common_tests = True
 
@@ -4488,9 +4585,12 @@ class RECAPSearchAPIV4Test(
 
         original_datetime = now().replace(day=1, hour=5, minute=0)
         for search_params in all_tests:
-            with self.subTest(
-                search_params=search_params, msg="Test stable scores."
-            ), time_machine.travel(original_datetime, tick=False) as traveler:
+            with (
+                self.subTest(
+                    search_params=search_params, msg="Test stable scores."
+                ),
+                time_machine.travel(original_datetime, tick=False) as traveler,
+            ):
                 # Two first-page requests (no cursor) made on the same day will
                 # now have consistent scores because scores are now computed
                 # based on the same day's date.
@@ -5771,10 +5871,13 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         """Can we remove control characters in the plain_text for a proper XML
         rendering?
         """
-        with mock.patch(
-            "cl.search.documents.escape",
-            return_value="Lorem ipsum control chars \x07\x08\x0b.",
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            mock.patch(
+                "cl.search.documents.escape",
+                return_value="Lorem ipsum control chars \x07\x08\x0b.",
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             de_1 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -6231,9 +6334,10 @@ class IndexDocketRECAPDocumentsCommandTest(
         request = self.factory.post(url)
         queryset = RECAPDocument.objects.filter(pk__in=[rd_1.pk])
         mock_date = now().replace(day=15, hour=0)
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_documents"
-        ), time_machine.travel(mock_date, tick=False):
+        with (
+            mock.patch("cl.lib.es_signal_processor.update_es_documents"),
+            time_machine.travel(mock_date, tick=False),
+        ):
             recap_admin.seal_documents(request, queryset)
 
         recap_admin.message_user.assert_called_once_with(

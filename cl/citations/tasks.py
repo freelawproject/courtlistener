@@ -1,11 +1,11 @@
-import html
 import logging
 from http.client import ResponseNotReady
-from typing import Dict, List, Set, Tuple
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
+from django.db.utils import OperationalError
 from eyecite import get_citations
 from eyecite.models import CitationBase, FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
@@ -22,7 +22,11 @@ from cl.citations.match_citations import (
     do_resolve_citations,
 )
 from cl.citations.models import UnmatchedCitation
-from cl.citations.parenthetical_utils import create_parenthetical_groups
+from cl.citations.parenthetical_utils import (
+    create_parenthetical_groups,
+    disconnect_parenthetical_group_signals,
+    reconnect_parenthetical_group_signals,
+)
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.types import MatchedResourceType, SupportedCitationType
@@ -36,7 +40,7 @@ from cl.search.models import (
 )
 from cl.search.tasks import index_related_cites_fields
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
@@ -47,8 +51,8 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 @app.task
 def identify_parallel_citations(
-    citations: List[SupportedCitationType],
-) -> Set[Tuple[SupportedCitationType, ...]]:
+    citations: list[SupportedCitationType],
+) -> set[tuple[SupportedCitationType, ...]]:
     """Work through a list of citations and identify ones that are physically
     near each other in the document.
 
@@ -85,7 +89,7 @@ def identify_parallel_citations(
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_and_parantheticals_for_recap_documents(
-    self, doc_ids: List[int]
+    self, doc_ids: list[int]
 ):
     """Find citations and authored parentheticals for search.RECAPDocument objects.
 
@@ -93,13 +97,13 @@ def find_citations_and_parantheticals_for_recap_documents(
 
     :return: None
     """
-    documents: QuerySet[
-        RECAPDocument, RECAPDocument
-    ] = RECAPDocument.objects.filter(pk__in=doc_ids).filter(
-        ocr_status__in=[
-            RECAPDocument.OCR_UNNECESSARY,
-            RECAPDocument.OCR_COMPLETE,
-        ]
+    documents: QuerySet[RECAPDocument, RECAPDocument] = (
+        RECAPDocument.objects.filter(pk__in=doc_ids).filter(
+            ocr_status__in=[
+                RECAPDocument.OCR_UNNECESSARY,
+                RECAPDocument.OCR_COMPLETE,
+            ]
+        )
     )
 
     for d in documents:
@@ -113,47 +117,86 @@ def find_citations_and_parantheticals_for_recap_documents(
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
-    opinion_pks: List[int],
+    opinion_pks: list[int],
+    disconnect_pg_signals: bool = False,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
+    :param disconnect_pg_signals: True if ParentheticalGroup post_save and
+        post_delete signals should be disconnected; useful in batch jobs
+        from the `find_citations` command
+
     :return: None
     """
     opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
         pk__in=opinion_pks
     )
-    for opinion in opinions:
-        try:
-            store_opinion_citations_and_update_parentheticals(opinion)
-        except ResponseNotReady as e:
-            # Threading problem in httplib.
-            raise self.retry(exc=e, countdown=2)
+    # delivery_info does not exist in test environment
+    children_queue = (self.request.delivery_info or {}).get(
+        "routing_key", settings.CELERY_ETL_TASK_QUEUE
+    )
+
+    if disconnect_pg_signals:
+        disconnect_parenthetical_group_signals()
+    try:
+        for index, opinion in enumerate(opinions):
+            try:
+                store_opinion_citations_and_update_parentheticals(
+                    opinion,
+                    children_queue,
+                )
+            except ResponseNotReady as e:
+                # Threading problem in httplib.
+                raise self.retry(exc=e, countdown=2)
+            except OperationalError:
+                # delay deadlocked tasks, and continue regular process
+                find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
+                    ([opinion.id], disconnect_pg_signals), countdown=60
+                )
+            except Exception as e:
+                # do not retry the whole loop on an unknown exception
+                end_index = min(len(opinions) - 1, index + 1)
+                ids = [o.id for o in opinions[end_index:]]
+                if ids:
+                    raise self.retry(
+                        exc=e,
+                        countdown=60,
+                        kwargs={
+                            "opinion_pks": ids,
+                            "disconnect_pg_signals": disconnect_pg_signals,
+                        },
+                    )
+    finally:
+        if disconnect_pg_signals:
+            reconnect_parenthetical_group_signals()
 
 
 def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion,
+    queue_for_children: str = settings.CELERY_ETL_TASK_QUEUE,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion,
     parenthetical info for the cited opinions, and stores unmatched citations
 
-    :param opinion: A search.Opinion object.
+    :param opinion: A search.Opinion object
+    :param queue: celery queue to send the child tasks to
     :return: None
     """
     # Extract the citations from the opinion's text
     # If the source has marked up text, pass it so it can be used to find
     # ReferenceCitations. This is handled by `make_get_citations_kwargs`
     get_citations_kwargs = make_get_citations_kwargs(opinion)
-    citations: List[CitationBase] = get_citations(
+    citations: list[CitationBase] = get_citations(
         tokenizer=HYPERSCAN_TOKENIZER,
         **get_citations_kwargs,
     )
 
     # Resolve all those different citation objects to Opinion objects,
     # using a variety of heuristics.
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
     ] = do_resolve_citations(citations, opinion)
 
     # Generate the citing opinion's new HTML with inline citation links
@@ -187,7 +230,7 @@ def store_opinion_citations_and_update_parentheticals(
     }
 
     clusters_to_update_par_groups_for = set()
-    parentheticals: List[Parenthetical] = []
+    parentheticals: list[Parenthetical] = []
 
     for _opinion, _citations in citation_resolutions.items():
         # Currently, eyecite has a bug where parallel citations are
@@ -267,14 +310,19 @@ def store_opinion_citations_and_update_parentheticals(
     cluster_ids_to_update = list(
         opinion_clusters_to_update.values_list("id", flat=True)
     )
-    index_related_cites_fields.delay(
-        OpinionsCited.__name__, opinion.pk, cluster_ids_to_update
+    index_related_cites_fields.apply_async(
+        args=(
+            OpinionsCited.__name__,
+            opinion.pk,
+            cluster_ids_to_update,
+        ),
+        queue=queue_for_children,
     )
 
 
 def update_unmatched_citations_status(
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
     ],
     citing_opinion: Opinion,
 ) -> None:
@@ -311,8 +359,8 @@ def update_unmatched_citations_status(
 
 
 def store_unmatched_citations(
-    unmatched_citations: List[CitationBase],
-    ambiguous_matches: List[CitationBase],
+    unmatched_citations: list[CitationBase],
+    ambiguous_matches: list[CitationBase],
     opinion: Opinion,
 ) -> None:
     """Bulk create UnmatchedCitation instances cited by an opinion

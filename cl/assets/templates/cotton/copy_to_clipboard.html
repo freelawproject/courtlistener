@@ -1,0 +1,9 @@
+<c-vars text_to_copy class=""></c-vars>{% load component_tags %}{% require_script "js/alpine/composables/clipboard.js" %}<button
+  x-data="copy"
+  role="button"
+  class="{{ class }}"
+  data-text-to-copy="{{ text_to_copy }}"
+  x-on:click="copyToClipboard"
+  x-on:keyup.enter="copyToClipboard"
+  x-on:keyup.space="copyToClipboard"
+>{{ slot }}</button>

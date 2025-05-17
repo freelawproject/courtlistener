@@ -2,8 +2,9 @@
 Unit tests for Visualizations
 """
 
+from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any, Callable, Dict
+from typing import Any
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
@@ -281,7 +282,7 @@ class TestVizAjaxCrud(TestCase):
         self,
         url: str,
         username: str = None,
-        data: Dict[str, Any] = None,
+        data: dict[str, Any] = None,
     ) -> ASGIRequest:
         """Helper method to build authenticated AJAX POST
         Args:

@@ -5,15 +5,51 @@ from django.apps import (  # Must use apps.get_model() to avoid circular import 
 )
 from django.db.models import Sum
 from django.template.defaultfilters import slugify
+from django.utils.functional import keep_lazy_text
 from django.utils.safestring import SafeString
 from eyecite.models import CitationBase, FullCaseCitation, ShortCaseCitation
 from eyecite.utils import strip_punct
-from reporters_db import EDITIONS, VARIATIONS_ONLY
+from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 
 QUERY_LENGTH = 10
-SLUGIFIED_EDITIONS: dict[str, str] = {
-    str(slugify(item)): item for item in EDITIONS.keys()
-}
+NAIVE_SLUGIFIED_EDITIONS = {str(slugify(item)): item for item in EDITIONS}
+
+
+@keep_lazy_text
+def slugify_reporter(reporter: str) -> str:
+    """Slugify reporters preventing slug collision
+
+    Some different reporter abbreviations may have their naive slug collide
+    Examples where  one is the state reporter, the other a neutral reporter
+    - 'Vt.' and 'VT': naive slug 'vt'
+    - 'La.' and 'LA': naive slug 'la'
+
+    Others: 'CIT' 'C.I.T.'; 'Day.' 'Day'; 'MSPB' 'M.S.P.B.'; 'Me.' 'ME';
+    'ND' 'N.D.'; 'NM' 'N.M.'; 'Pa.' 'PA'; 'SD' 'S.D.'
+
+    :param reporter: the reporter abbreviation, or a slug, or an user input
+    :return: the collision-aware slug
+    """
+    slug = str(slugify(reporter))
+    if slug == reporter:
+        # return the already slugified reporter; this may happen on redirected
+        # cl.opinion_page.views.citation_redirector
+        return slug
+
+    if NAIVE_SLUGIFIED_EDITIONS.get(slug, "") == reporter:
+        # the slug and reporter match the naive mapper
+        return slug
+
+    # if the input string is actually a reporter, return a collision-aware slug
+    if reporter in REPORTERS:
+        return str(
+            slugify(f"{reporter} {REPORTERS[reporter][0]['cite_type']}")
+        )
+
+    return slug
+
+
+SLUGIFIED_EDITIONS = {slugify_reporter(item): item for item in EDITIONS}
 
 
 def map_reporter_db_cite_type(citation_type: str) -> int:
@@ -89,7 +125,7 @@ def make_name_param(
     return " ".join(query_words), len(query_words)
 
 
-def get_canonicals_from_reporter(reporter_slug: str) -> list[SafeString]:
+def get_canonicals_from_reporter(reporter_or_slug: str) -> list[SafeString]:
     """
     Disambiguates a reporter slug using a list of variations.
 
@@ -97,16 +133,17 @@ def get_canonicals_from_reporter(reporter_slug: str) -> list[SafeString]:
     to a list of reporters that it could be possibly referring to.
 
     Args:
-        reporter_slug (str): The reporter's name in slug format
+        reporter_or_slug: The reporter's name, which may be in slug format
 
     Returns:
         list[str]: A list of potential canonical names for the reporter
     """
+    reporter_slug = slugify_reporter(reporter_or_slug)
     slugified_variations = {}
     for variant, canonicals in VARIATIONS_ONLY.items():
         slugged_canonicals = []
         for canonical in canonicals:
-            slugged_canonicals.append(slugify(canonical))
+            slugged_canonicals.append(slugify_reporter(canonical))
         slugified_variations[str(slugify(variant))] = slugged_canonicals
 
     return slugified_variations.get(reporter_slug, [])
@@ -127,7 +164,7 @@ def filter_out_non_case_law_citations(
     return [
         c
         for c in citations
-        if isinstance(c, (FullCaseCitation, ShortCaseCitation))
+        if isinstance(c, (FullCaseCitation | ShortCaseCitation))
     ]
 
 
@@ -147,7 +184,7 @@ def filter_out_non_case_law_and_non_valid_citations(
     return [
         c
         for c in citations
-        if isinstance(c, (FullCaseCitation, ShortCaseCitation))
+        if isinstance(c, (FullCaseCitation | ShortCaseCitation))
         and c.groups.get("volume", None)
         and c.groups.get("page", None)
     ]

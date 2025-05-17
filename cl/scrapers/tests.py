@@ -73,13 +73,14 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             url="https://example.com/",
             enabled=True,
         )
-        cls.search_alert_oa = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA",
-            query="type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
+        with cls.captureOnCommitCallbacks(execute=True):
+            cls.search_alert_oa = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA",
+                query="type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
 
     def test_extension(self):
         r = async_to_sync(microservice)(
@@ -724,8 +725,11 @@ class ScrapeCitationsTest(TestCase):
     def test_citation_scraper(self):
         """Test if citation scraper creates a citation or ignores duplicates"""
         cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
-        with mock.patch(f"{cmd}.sha1", side_effect=self.hashes), mock.patch(
-            f"{cmd}.get_binary_content", return_value="placeholder"
+        with (
+            mock.patch(f"{cmd}.sha1", side_effect=self.hashes),
+            mock.patch(
+                f"{cmd}.get_binary_content", return_value="placeholder"
+            ),
         ):
             cl_back_scrape_citations.Command().scrape_court(self.mock_site)
 

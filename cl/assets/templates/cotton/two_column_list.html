@@ -1,0 +1,12 @@
+{% load partition_util %}
+<c-vars list class=""></c-vars>
+
+<div class="w-full flex flex-row justify-between {{ class }}">
+  {% for row in list|rows:2 %}
+    <ul class="w-1/2 list-disc pl-5">
+      {% for item in row %}
+        <li>{{ item.short_name }}</li>
+      {% endfor %}
+    </ul>
+  {% endfor %}
+</div>
