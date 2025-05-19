@@ -155,6 +155,7 @@ REST_FRAMEWORK = {
         "quevon24": "500000/hour",  # Perform tests, clone cases in local env
     },
     "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES": {
+        "jafrank": "180/minute",
         "LexText": "180/minute",
     },
     # Auth
