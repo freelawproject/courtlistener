@@ -151,7 +151,7 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
             continue
 
         # Ensure we have valid citations to process
-        if isinstance(citation, (FullCaseCitation, FullJournalCitation)):
+        if isinstance(citation, (FullCaseCitation | FullJournalCitation)):
             volume = citation.groups.get("volume")
 
             # Validate the volume

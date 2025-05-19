@@ -136,6 +136,9 @@ async def alert_help(request: HttpRequest) -> HttpResponse:
         "partial_feeds": partial_feeds,
         "full_feeds": full_feeds,
         "private": False,
+        "rt_alerts_sending_rate": int(
+            settings.REAL_TIME_ALERTS_SENDING_RATE / 60
+        ),
     }
     context.update(data)
     return TemplateResponse(request, "help/alert_help.html", context)

@@ -1,5 +1,13 @@
-[tool.poetry]
-authors = ["Mike Lissner <mike@free.law>"]
+[project]
+name = "cl"
+version = "1"
+description = "A free and powerful system for awareness and research of the American judicial system."
+requires-python = ">=3.13,<3.14"
+readme = "README.md"
+authors = [
+  { name = "Mike Lissner", email = "mike@free.law" },
+]
+keywords = ["legal", "courts", "databases", "judiciary", "laws"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Natural Language :: English",
@@ -10,130 +18,125 @@ classifiers = [
   "Intended Audience :: Developers",
   "Intended Audience :: Legal Industry",
 ]
-description = "A free and powerful system for awareness and research of the American judicial system."
-documentation = "https://github.com/freelawproject/courtlistener/wiki"
-homepage = "https://www.courtlistener.com/"
-include = ["manage.py"]
-keywords = ["legal", "courts", "databases", "judiciary", "laws"] # Max: 5
-license = "AGPL-3.0" # Should be spdx ID: https://spdx.org/licenses/
-maintainers = ["Mike Lissner <mike@free.law>"]
-name = "cl"
-readme = "README.md"
-repository = "https://github.com/freelawproject/courtlistener"
-version = "0.14.24"
+urls.Home = "https://www.courtlistener.com/"
+urls.Repository = "https://github.com/freelawproject/courtlistener"
+urls.Documentation = "https://github.com/freelawproject/courtlistener/wiki"
+license = " AGPL-3.0-only"
+license-files = [ "LICENSE.txt" ]
 
-[tool.poetry.scripts]
-cl-manage = "manage:main"
+dependencies = [
+  "ada-url>=1.21.0",
+  "beautifulsoup4>=4.13.0",
+  "celery>=5.4.0",
+  "certifi>=2025.1.31",
+  "courts-db",
+  "disposable-email-domains",
+  "Django>=5.1, <5.2",
+  "django-cache-memoize",
+  "django-cors-headers>=4.7.0",
+  "django-csp>=3.8",
+  "django-extensions>=3.2.3",
+  "django-filter>=25.1",
+  "django-localflavor>=4.0",
+  "django-markdown-deux>=1.0.6",
+  "django-mathfilters",
+  "django-pghistory>=3.5.4",
+  "django-ratelimit>=4.1.0",
+  "django-storages>=1.14.5",
+  "djangorestframework @ git+https://github.com/encode/django-rest-framework.git@cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2",
+  "djangorestframework-xml>=2.0.0",
+  "feedparser>=6.0.10",
+  "httplib2>=0.22.0",
+  "internetarchive>=5.3.1",
+  "ipaddress>=1.0.16",
+  "itypes>=1.1.0",
+  "kombu>=5.5.1",
+  "lxml>=5.3.1",
+  "markdown2>=2.5.0",
+  "natsort>=8.4.0",
+  "ndg-httpsclient>=0.5.1",
+  "networkx>=3.4.2",
+  "nose",
+  "pandas>=2.2.3",
+  "pillow",
+  "pycparser>=2.22",
+  "pyopenssl",
+  "pyparsing>=3.2.3",
+  "python-dateutil>=2.9.0",
+  "python-magic>=0.4.27",
+  "pytz",
+  "pyyaml>=6.0.2",
+  "redis>=5.2.1",
+  "requests>=2.32.3",
+  "simplejson>=3.20.1",
+  "timeout-decorator",
+  "unidecode",
+  "usaddress>=0.5.13",
+  "djangorestframework-filters==1.0.0.dev2",
+  "gunicorn>=23.0.0",
+  "django-hCaptcha>=0.2.0",
+  "reporters-db",
+  "django-waffle>=4.2.0",
+  "nameparser>=1.1.3",
+  "eyecite",
+  "scipy>=1.15.2",
+  "scikit-learn>=1.6.1",
+  "numpy>=2.2.4",
+  "datasketch>=1.6.5",
+  "PyStemmer>=2.2.0.3",
+  "factory-boy>=3.3.3",
+  "django-override-storage>=0.3.2",
+  "django-environ>=0.12.0",
+  "judge-pics>=2.0.5",
+  "django-admin-cursor-paginator>=0.1.6",
+  "sentry-sdk[celery,django]>=2.24.1",
+  "selenium>=4.30.0",
+  "ipython>=9.0.2",
+  "time-machine>=2.16.0",
+  "dateparser==1.2.1",
+  "types-dateparser>=1.2.0.20250208",
+  "uvicorn[standard]>=0.34.0",
+  "daphne>=4.1.2",
+  "httpx[http2]>=0.28.1",
+  "django-model-utils>=5.0.0",
+  "django-permissions-policy>=4.25.0",
+  "tiktoken>=0.9.0",
+  "hyperscan>=0.7.8",
+  "openai>=1.68.2",
+  "seal-rookery>=2.3.1",
+  "types-pytz>=2025.1.0.20250318",
+  "psycopg[binary,pool]>=3.2.6",
+  "boto3>=1.37.20",
+  "django-tailwind>=3.8.0",
+  "drf-dynamic-fields>=0.4.0",
+  "django-ses[events]>=0.44.0",
+  "django-cotton>=2.0.1",
+  "django-cursor-pagination>=0.3.0",
+  "django-elasticsearch-dsl>=8.0",
+  "juriscraper>=2.6.68",
+]
 
-[tool.poetry.dependencies]
-ada-url = "^1.21.0"
-argparse = "*"
-beautifulsoup4 = "==4.13.*"
-celery = "^5.4.0"
-certifi = "^2025.1.31"
-courts-db = "*"
-disposable-email-domains = "*"
-Django = "^5.1.8"
-django-cache-memoize = "==0.*"
-django-cors-headers = "^4.7.0"
-django-csp = "^3.8"
-django-extensions = "^3.2.3"
-django-filter = "^25.1"
-django-localflavor = "^4.0"
-django-markdown-deux = "^1.0.6"
-django-mathfilters = "*"
-django-pghistory = "^3.5.4"
-django-ratelimit = "^4.1.0"
-django-storages = "^1.14.5"
-djangorestframework = {git = "https://github.com/encode/django-rest-framework.git", rev = "cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2"}
-djangorestframework-xml = "^2.0.0"
-feedparser = "^6.0.10"
-httplib2 = "^0.22.0"
-internetarchive = "^5.3.1"
-ipaddress = "^1.0.16"
-itypes = "^1.1.0"
-kombu = "^5.5.1"
-lxml = "^5.3.1"
-markdown2 = "==2.5.*"
-natsort = "^8.4.0"
-ndg-httpsclient = "^0.5.1"
-networkx = "^3.4.2"
-nose = "*"
-pandas = "^2.2.3"
-pillow = "*"
-pycparser = "^2.22"
-pyopenssl = "*"
-pyparsing = "^3.2.3"
-python = ">=3.13, <3.14"
-python-dateutil = "^2.9.0"
-python-magic = "^0.4.27"
-pytz = "*"
-pyyaml = "^6.0.2"
-redis = "^5.2.1"
-requests = "^2.32.3"
-simplejson = "^3.20.1"
-timeout-decorator = "*"
-unidecode = "*"
-usaddress = "^0.5.13"
-djangorestframework-filters = "1.0.0.dev2"
-gunicorn = "^23.0.0"
-django-hCaptcha = "^0.2.0"
-reporters-db = "*"
-django-waffle = "^4.2.0"
-nameparser = "^1.1.3"
-eyecite = "*"
-scipy = "^1.15.2"
-scikit-learn = "^1.6.1"
-numpy = "^2.2.4"
-datasketch = "^1.6.5"
-PyStemmer = "^2.2.0.3"
-factory-boy = "^3.3.3"
-django-elasticsearch-dsl = "^8.0"
-django-override-storage = "^0.3.2"
-django-environ = "^0.12.0"
-judge-pics = "^2.0.5"
-django-admin-cursor-paginator = "^0.1.6"
-sentry-sdk = {extras = ["celery", "django"], version = "^2.25.0"}
-selenium = "^4.30.0"
-ipython = "^9.0.2"
-time-machine = "^2.16.0"
-dateparser = "1.2.1"
-types-dateparser = "^1.2.0.20250208"
-uvicorn = {extras = ["standard"], version = "^0.34.0"}
-daphne = "^4.1.2"
-httpx = {extras = ["http2"], version = "^0.28.1"}
-django-model-utils = "^5.0.0"
-django-permissions-policy = "^4.25.0"
-tiktoken = "^0.9.0"
-hyperscan = "^0.7.8"
-openai = "^1.70.0"
-seal-rookery = "^2.3.1"
-types-pytz = "^2025.2.0.20250326"
-psycopg = {version = "3.2.6", extras = ["binary", "pool"]}
-boto3 = "^1.37.20"
-django-tailwind = "^3.8.0"
-drf-dynamic-fields = "^0.4.0"
-django-ses = {extras = ["events"], version = "^4.4.0"}
-juriscraper = "^2.6.26"
-django-cotton = "^2.0.1"
+[dependency-groups]
+dev = [
+  "pre-commit>=4.2.0",
+  "types-redis>=4.6.0.20241004",
+  "pytest>=8.3.5",
+  "pytest-django>=4.10.0",
+  "exrex>=0.12.0",
+  "tblib>=3.0.0",
+  "mypy>=1.15.0",
+  "types-python-dateutil>=2.9.0.20241206",
+  "types-requests>=2.32.0.20250306",
+  "django-stubs>=5.1.3",
+  "djangorestframework-stubs>=3.15.3",
+  "types-simplejson>=3.20.0.20250318",
+  "lxml-stubs>=0.5.1",
+  "django-debug-toolbar>=5.1.0",
+  "django-tailwind[reload]>=3.8.0",
+]
 
-
-[tool.poetry.group.dev.dependencies]
-pre-commit = "^4.2.0"
-types-redis = "^4.6.0.20241004"
-pytest = "^8.3.5"
-pytest-django = "^4.10.0"
-exrex = "^0.12.0"
-tblib = "^3.0.0"
-mypy = "^1.15.0"
-types-python-dateutil = "^2.9.0.20241206"
-types-requests = "^2.32.0.20250306"
-django-stubs = "^5.1.3"
-djangorestframework-stubs = "^3.15.3"
-types-simplejson = "^3.20.0.20250318"
-lxml-stubs = "^0.5.1"
-django-debug-toolbar = "^5.1.0"
-django-tailwind = {extras = ["reload"], version = "^3.8.0"}
+[tool.uv.sources]
+djangorestframework = { git = "https://github.com/encode/django-rest-framework.git", rev = "cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2" }
 
 [tool.ruff]
 line-length = 79
@@ -177,7 +180,3 @@ lint.ignore = [
   "F841",
   "UP008",
 ]
-
-[build-system]
-build-backend = "poetry.masonry.api"
-requires = ["poetry>=0.12"]

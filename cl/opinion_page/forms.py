@@ -527,7 +527,9 @@ class BaseCourtUploadForm(forms.Form):
         )
 
         logging.info(
-            f"Successfully added object cluster: {cluster.id} for {self.cleaned_data.get('court_str')}"
+            "Successfully added object cluster: %s for %s",
+            cluster.id,
+            self.cleaned_data.get("court_str"),
         )
 
         return cluster
