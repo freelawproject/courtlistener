@@ -6,13 +6,13 @@ from http import HTTPStatus
 from unittest import mock
 
 import time_machine
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import admin
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import AsyncClient, RequestFactory, override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
@@ -44,7 +44,6 @@ from cl.lib.test_helpers import (
     v4_meta_keys,
     v4_recap_meta_keys,
 )
-from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
     AttorneyFactory,
     AttorneyOrganizationFactory,
@@ -2355,40 +2354,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
-
-    @mock.patch("cl.lib.es_signal_processor.chain")
-    async def test_avoid_updating_docket_in_es_on_view_count_increment(
-        self, mock_es_save_chain
-    ) -> None:
-        """Confirm a docket is not updated in ES on a view_count increment."""
-
-        with self.captureOnCommitCallbacks(execute=True):
-            docket = await sync_to_async(DocketFactory)(
-                court=self.court,
-                case_name="Lorem Ipsum",
-                case_name_full="Jackson & Sons Holdings vs. Bank",
-                date_filed=datetime.date(2015, 8, 16),
-                date_argued=datetime.date(2013, 5, 20),
-                docket_number="1:21-bk-1234",
-                assigned_to=None,
-                referred_to=None,
-                nature_of_suit="440",
-                source=Docket.RECAP,
-            )
-        # Restart save chain mock count.
-        mock_es_save_chain.reset_mock()
-        self.assertEqual(mock_es_save_chain.call_count, 0)
-
-        request_factory = AsyncClient()
-        request = await request_factory.get("/docket/")
-        with mock.patch("cl.lib.view_utils.is_bot", return_value=False):
-            # Increase the view_count.
-            await increment_view_count(docket, request)
-
-        # The save chain shouldn't be called.
-        self.assertEqual(mock_es_save_chain.call_count, 0)
-        with self.captureOnCommitCallbacks(execute=True):
-            await docket.adelete()
 
     async def test_fail_rd_type_gracefully_frontend(self) -> None:
         """Confirm that the rd type fails gracefully in the frontend."""

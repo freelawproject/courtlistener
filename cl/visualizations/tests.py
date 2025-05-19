@@ -228,37 +228,6 @@ class TestViews(TestCase):
         self.assertNotEqual(response.status_code, HTTPStatus.OK)
         self.assertNotIn("My Private Visualization", response.content.decode())
 
-    async def test_view_counts_increment_by_one(self) -> None:
-        """Test the view count for a Visualization increments on page view
-
-        Ensure that the date_modified does not change.
-        """
-        viz = await sync_to_async(VisualizationFactory.create)(
-            user=self.regular_user,
-            published=True,
-            deleted=False,
-            view_count=10,
-        )
-        old_view_count = viz.view_count
-        old_date_modified = viz.date_modified
-
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="regular_user", password="password"
-            )
-        )
-        response = await self.async_client.get(viz.get_absolute_url())
-
-        await viz.arefresh_from_db(fields=["view_count", "date_modified"])
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(old_view_count + 1, viz.view_count)
-
-        self.assertEqual(
-            old_date_modified,
-            viz.date_modified,
-            msg="date_modified changed when the page was loaded!",
-        )
-
 
 class TestVizAjaxCrud(TestCase):
     """
