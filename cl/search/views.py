@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import quote
 
 from asgiref.sync import async_to_sync
@@ -46,9 +46,7 @@ def get_homepage_stats():
     dict
     """
     r = get_redis_interface("STATS")
-    ten_days_ago = make_aware(
-        datetime.today() - timedelta(days=10), timezone.utc
-    )
+    ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
     last_ten_days = [
         f"api:v3.d:{(date.today() - timedelta(days=x)).isoformat()}.count"
         for x in range(0, 10)

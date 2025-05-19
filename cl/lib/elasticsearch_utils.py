@@ -5,10 +5,11 @@ import re
 import time
 import traceback
 from collections import defaultdict
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -1901,7 +1902,7 @@ def fill_position_mapping(
                 if callable(field_value):
                     field_value = field_value()
                 elif isinstance(
-                    field_value, (datetime.datetime, datetime.date)
+                    field_value, (datetime.datetime | datetime.date)
                 ):
                     field_value = midnight_pt(field_value)
 
@@ -2987,9 +2988,9 @@ def do_count_query(
         total_results = search_query.count()
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            f"Error on count query request: {search_query.to_dict()}"
+            "Error on count query request: %s", search_query.to_dict()
         )
-        logger.warning(f"Error was: {e}")
+        logger.warning("Error was: %s", e)
         # Required for the paginator class to work, as it expects an integer.
         total_results = 0
     return total_results
@@ -3222,9 +3223,9 @@ def do_collapse_count_query(
         )
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            f"Error on count query request: {search_query.to_dict()}"
+            "Error on count query request: %s", search_query.to_dict()
         )
-        logger.warning(f"Error was: {e}")
+        logger.warning("Error was: %s", e)
         total_results = 0
     return total_results
 

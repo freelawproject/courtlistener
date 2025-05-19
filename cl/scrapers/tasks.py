@@ -1,7 +1,6 @@
 import logging
 import random
 import traceback
-from typing import Optional, Union
 
 import httpx
 import requests
@@ -34,7 +33,7 @@ from cl.search.models import Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
-ExtractProcessResult = tuple[str, Optional[str]]
+ExtractProcessResult = tuple[str, str | None]
 
 
 def update_document_from_text(
@@ -148,7 +147,8 @@ def extract_doc_content(
     )
     if not response.is_success:
         logger.error(
-            f"Error from document-extract microservice: {response.status_code}",
+            "Error from document-extract microservice: %s",
+            response.status_code,
             extra=dict(
                 opinion_id=opinion.id,
                 url=opinion.download_url,
@@ -194,7 +194,10 @@ def extract_doc_content(
 
     if data["err"]:
         logger.error(
-            f"****Error: {data['err']}, extracting text from {extension}: {opinion}****"
+            "****Error: %s, extracting text from %s: %s****",
+            data["err"],
+            extension,
+            opinion,
         )
         return
 
@@ -230,7 +233,7 @@ def extract_doc_content(
 )
 def extract_recap_pdf(
     self,
-    pks: Union[int, list[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
 ) -> list[int]:
@@ -265,7 +268,7 @@ def extract_recap_pdf(
 
 
 async def extract_recap_pdf_base(
-    pks: Union[int, list[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
 ) -> list[int]:

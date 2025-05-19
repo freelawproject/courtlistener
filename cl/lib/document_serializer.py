@@ -30,7 +30,7 @@ class TimeStampField(serializers.Field):
                 ).to_representation(value)
             else:
                 if timezone.is_naive(value):
-                    value = timezone.make_aware(value, datetime.timezone.utc)
+                    value = timezone.make_aware(value, datetime.UTC)
                 return serializers.DateTimeField().to_representation(
                     timezone.localtime(value)
                 )
@@ -142,7 +142,7 @@ class DocumentSerializer(serializers.Serializer):
                 "Meta class."
             )
 
-        if not issubclass(self.Meta.document, (Document,)):
+        if not issubclass(self.Meta.document, Document):
             raise ImproperlyConfigured(
                 "You must subclass the serializer 'document' from the Document"
                 "class."

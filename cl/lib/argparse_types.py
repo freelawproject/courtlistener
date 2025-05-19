@@ -1,6 +1,6 @@
 import argparse
 import os
-from datetime import timezone
+from datetime import UTC
 
 from dateutil import parser
 from django.utils.timezone import is_naive, make_aware
@@ -19,7 +19,7 @@ def valid_date_time(s):
     try:
         d = parser.parse(s)
         if is_naive(d):
-            d = make_aware(d, timezone.utc)
+            d = make_aware(d, UTC)
         return d
     except ValueError:
         raise argparse.ArgumentTypeError(f"Unable to parse date/time, {s}")

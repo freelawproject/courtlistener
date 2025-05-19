@@ -3,7 +3,6 @@ import operator
 import re
 from datetime import date, timedelta
 from functools import reduce
-from typing import Optional, Union
 
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q, QuerySet
@@ -426,11 +425,11 @@ def extract_judge_last_name(
 
 
 async def lookup_judge_by_full_name(
-    name: Union[HumanName, str],
+    name: HumanName | str,
     court_id: str,
-    event_date: Optional[date] = None,
+    event_date: date | None = None,
     require_living_judge: bool = True,
-) -> Optional[Person]:
+) -> Person | None:
     """Uniquely identifies a judge by both name and metadata.
 
     :param name: The judge's name, either as a str of the full name or as
@@ -556,7 +555,7 @@ async def lookup_judge_by_full_name(
 async def lookup_judge_by_full_name_and_set_attr(
     item: object,
     target_field: str,
-    full_name: Union[HumanName, str],
+    full_name: HumanName | str,
     court_id: str,
     event_date: date,
 ) -> None:
@@ -578,9 +577,9 @@ async def lookup_judge_by_full_name_and_set_attr(
 async def lookup_judge_by_last_name(
     last_name: str,
     court_id: str,
-    event_date: Optional[date] = None,
+    event_date: date | None = None,
     require_living_judge: bool = True,
-) -> Optional[Person]:
+) -> Person | None:
     """Look up the judge using their last name, a date and court"""
     hn = HumanName()
     hn.last = last_name
@@ -592,7 +591,7 @@ async def lookup_judge_by_last_name(
 async def lookup_judges_by_last_name_list(
     last_names: list[str],
     court_id: str,
-    event_date: Optional[date] = None,
+    event_date: date | None = None,
     require_living_judge: bool = True,
 ) -> list[Person]:
     """Look up a group of judges by list of last names, a date, and a court"""
@@ -611,7 +610,7 @@ async def lookup_judges_by_last_name_list(
 async def lookup_judges_by_messy_str(
     s: str,
     court_id: str,
-    event_date: Optional[date] = None,
+    event_date: date | None = None,
 ) -> list[Person]:
     """Look up a group of judges by a messy string that might contain their
     names. (This is the least accurate way to look up judges.)

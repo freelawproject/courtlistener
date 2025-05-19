@@ -3,7 +3,7 @@ import sys
 import time
 import traceback
 from datetime import date
-from typing import Any, Union
+from typing import Any
 
 from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
@@ -53,7 +53,7 @@ cnt = CaseNameTweaker()
 
 @transaction.atomic
 def make_objects(
-    item: dict[str, Union[str, Any]],
+    item: dict[str, str | Any],
     court: Court,
     sha1_hash: str,
     content: bytes,
