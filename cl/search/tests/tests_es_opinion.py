@@ -159,11 +159,11 @@ class OpinionSearchAPICommonTests(
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -288,8 +288,8 @@ class OpinionSearchAPICommonTests(
         self.assertTrue(
             r.content.decode().index(most_cited_name)
             < r.content.decode().index(less_cited_name),
-            msg="'%s' should come BEFORE '%s' when ordered by descending "
-            "citeCount." % (most_cited_name, less_cited_name),
+            msg=f"'{most_cited_name}' should come BEFORE '{less_cited_name}' when ordered by descending "
+            "citeCount.",
         )
 
         search_params = {"q": "*", "order_by": "citeCount asc"}
@@ -300,8 +300,8 @@ class OpinionSearchAPICommonTests(
         self.assertTrue(
             r.content.decode().index(most_cited_name)
             > r.content.decode().index(less_cited_name),
-            msg="'%s' should come AFTER '%s' when ordered by ascending "
-            "citeCount." % (most_cited_name, less_cited_name),
+            msg=f"'{most_cited_name}' should come AFTER '{less_cited_name}' when ordered by ascending "
+            "citeCount.",
         )
 
     @skip_if_common_tests_skipped
@@ -604,11 +604,11 @@ class OpinionV4APISearchTest(
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -1291,11 +1291,11 @@ class OpinionsESSearchTest(
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in Frontend with %s "
+            msg=f"Did not get the right number of search results in Frontend with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -1692,8 +1692,8 @@ class OpinionsESSearchTest(
         self.assertTrue(
             r.content.decode().index(most_cited_name)
             < r.content.decode().index(less_cited_name),
-            msg="'%s' should come BEFORE '%s' when ordered by descending "
-            "citeCount." % (most_cited_name, less_cited_name),
+            msg=f"'{most_cited_name}' should come BEFORE '{less_cited_name}' when ordered by descending "
+            "citeCount.",
         )
 
         search_params = {"q": "*", "order_by": "citeCount asc"}
@@ -1702,8 +1702,8 @@ class OpinionsESSearchTest(
         self.assertTrue(
             r.content.decode().index(most_cited_name)
             > r.content.decode().index(less_cited_name),
-            msg="'%s' should come AFTER '%s' when ordered by ascending "
-            "citeCount." % (most_cited_name, less_cited_name),
+            msg=f"'{most_cited_name}' should come AFTER '{less_cited_name}' when ordered by ascending "
+            "citeCount.",
         )
 
     async def test_random_ordering(self) -> None:
@@ -2055,8 +2055,8 @@ class OpinionsESSearchTest(
             got,
             expected_count,
             msg="Did not get the right number of child documents \n"
-            "Expected: %s\n"
-            "     Got: %s\n\n" % (expected_count, got),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n",
         )
         cluster.delete()
 
@@ -2671,8 +2671,8 @@ class RelatedSearchTest(
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(expected_article_count, self.get_article_count(r))
         self.assertTrue(
-            r.content.decode().index("/opinion/%i/" % expected_first_pk)
-            < r.content.decode().index("/opinion/%i/" % expected_second_pk),
+            r.content.decode().index(f"/opinion/{expected_first_pk}/")
+            < r.content.decode().index(f"/opinion/{expected_second_pk}/"),
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
         # Confirm that results contain a snippet
@@ -2704,7 +2704,7 @@ class RelatedSearchTest(
         )
 
         r = await self.async_client.get(
-            "/opinion/%i/asdf/related-cases/" % seed_pk
+            f"/opinion/{seed_pk}/asdf/related-cases/"
         )
         self.assertEqual(r.status_code, 200)
 
@@ -2749,7 +2749,7 @@ class RelatedSearchTest(
         )
 
         r = await self.async_client.get(
-            "/opinion/%i/asdf/related-cases/" % seed_pk
+            f"/opinion/{seed_pk}/asdf/related-cases/"
         )
         self.assertEqual(r.status_code, 200)
 
@@ -2798,7 +2798,7 @@ class RelatedSearchTest(
         )
 
         r = await self.async_client.get(
-            "/opinion/%i/asdf/related-cases/" % seed_pk
+            f"/opinion/{seed_pk}/asdf/related-cases/"
         )
         self.assertEqual(r.status_code, 200)
 
@@ -2853,7 +2853,7 @@ class RelatedSearchTest(
                 "Connection timeout"
             )
             r = await self.async_client.get(
-                "/opinion/%i/asdf/related-cases/" % seed_pk
+                f"/opinion/{seed_pk}/asdf/related-cases/"
             )
 
         self.assertEqual(r.status_code, 200)
@@ -2879,7 +2879,7 @@ class RelatedSearchTest(
                 "Connection timeout"
             )
             r = await self.async_client.get(
-                "/opinion/%i/asdf/cited-by/" % seed_pk
+                f"/opinion/{seed_pk}/asdf/cited-by/"
             )
 
         self.assertEqual(r.status_code, 200)
@@ -2920,7 +2920,7 @@ class RelatedSearchTest(
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionError()
             r = await self.async_client.get(
-                "/opinion/%i/asdf/cited-by/" % seed_pk
+                f"/opinion/{seed_pk}/asdf/cited-by/"
             )
 
         self.assertEqual(r.status_code, 200)
@@ -2947,10 +2947,10 @@ class RelatedSearchTest(
         )
         # Initial successful request. Results are cached.
         r = await self.async_client.get(
-            "/opinion/%i/asdf/related-cases/" % seed_pk
+            f"/opinion/{seed_pk}/asdf/related-cases/"
         )
         self.assertEqual(r.status_code, 200)
-        r = await self.async_client.get("/opinion/%i/asdf/cited-by/" % seed_pk)
+        r = await self.async_client.get(f"/opinion/{seed_pk}/asdf/cited-by/")
         self.assertEqual(r.status_code, 200)
 
         # Timeout Request for related cases
@@ -2961,7 +2961,7 @@ class RelatedSearchTest(
                 "Connection timeout"
             )
             r = await self.async_client.get(
-                "/opinion/%i/asdf/related-cases/" % seed_pk
+                f"/opinion/{seed_pk}/asdf/related-cases/"
             )
 
         self.assertEqual(r.status_code, 200)
@@ -3000,7 +3000,7 @@ class RelatedSearchTest(
                 "Connection timeout"
             )
             r = await self.async_client.get(
-                "/opinion/%i/asdf/cited-by/" % seed_pk
+                f"/opinion/{seed_pk}/asdf/cited-by/"
             )
 
         self.assertEqual(r.status_code, 200)

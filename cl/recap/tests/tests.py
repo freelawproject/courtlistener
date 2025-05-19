@@ -3765,9 +3765,8 @@ class RecapZipTaskTest(TestCase):
         self.assertEqual(
             expected_new_pq_count,
             actual_new_pq_count,
-            msg="Should have %s pq items in the DB, two from inside the zip, "
-            "and one for the zip itself. Instead got %s."
-            % (expected_new_pq_count, actual_new_pq_count),
+            msg=f"Should have {expected_new_pq_count} pq items in the DB, two from inside the zip, "
+            f"and one for the zip itself. Instead got {actual_new_pq_count}.",
         )
 
         # Wait for all the tasks to finish

@@ -470,17 +470,19 @@ class APIVisualizationTestCase(APITestCase):
         # cluster_start and cluster_end are reversed
         self.assertEqual(
             res["cluster_start"],
-            "http://testserver%s"
-            % reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            "http://testserver{}".format(
+                reverse(
+                    "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+                )
             ),
         )
         self.assertEqual(
             res["cluster_end"],
-            "http://testserver%s"
-            % reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
-            ),
+            f"http://testserver{
+                reverse(
+                    'opinioncluster-detail', kwargs={'version': 'v3', 'pk': 1}
+                )
+            }",
         )
 
     async def test_visualization_permissions(self) -> None:

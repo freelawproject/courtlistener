@@ -164,17 +164,15 @@ class UserTest(LiveServerTestCase):
                     self.assertNotIn(
                         next_param,
                         response.content.decode(),
-                        msg="'%s' found in HTML of response. This suggests it was "
-                        "not cleaned by the sanitize_redirection function."
-                        % next_param,
+                        msg=f"'{next_param}' found in HTML of response. This suggests it was "
+                        "not cleaned by the sanitize_redirection function.",
                     )
                 else:
                     self.assertIn(
                         next_param,
                         response.content.decode(),
-                        msg="'%s' not found in HTML of response. This suggests it "
-                        "was sanitized when it should not have been."
-                        % next_param,
+                        msg=f"'{next_param}' not found in HTML of response. This suggests it "
+                        "was sanitized when it should not have been.",
                     )
 
     async def test_prevent_text_injection_in_success_registration(self):
@@ -202,18 +200,17 @@ class UserTest(LiveServerTestCase):
                     self.assertNotIn(
                         email,
                         response.content.decode(),
-                        msg="'%s' found in HTML of response. This indicates a "
+                        msg=f"'{email}' found in HTML of response. This indicates a "
                         "potential security vulnerability. The view likely "
-                        "failed to properly validate it." % email,
+                        "failed to properly validate it.",
                     )
                 else:
                     self.assertIn(
                         email,
                         response.content.decode(),
-                        msg="'%s' not found in HTML of response. This suggests a "
+                        msg=f"'{email}' not found in HTML of response. This suggests a "
                         "a potential issue with the validation logic. The email "
-                        "address may have been incorrectly identified as invalid"
-                        % email,
+                        "address may have been incorrectly identified as invalid",
                     )
 
     async def test_login_redirects(self) -> None:
@@ -252,17 +249,15 @@ class UserTest(LiveServerTestCase):
                     self.assertNotIn(
                         f'value="{next_param}"',
                         response.content.decode(),
-                        msg="'%s' found in HTML of response. This suggests it was "
-                        "not cleaned by the sanitize_redirection function."
-                        % next_param,
+                        msg=f"'{next_param}' found in HTML of response. This suggests it was "
+                        "not cleaned by the sanitize_redirection function.",
                     )
                 else:
                     self.assertIn(
                         f'value="{next_param}"',
                         response.content.decode(),
-                        msg="'%s' not found in HTML of response. This suggests it "
-                        "was sanitized when it should not have been."
-                        % next_param,
+                        msg=f"'{next_param}' not found in HTML of response. This suggests it "
+                        "was sanitized when it should not have been.",
                     )
 
 
@@ -339,7 +334,7 @@ class UserDataTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
         self.assertIn(
             "has been confirmed",
@@ -370,7 +365,7 @@ class UserDataTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
         ups = UserProfile.objects.filter(pk__in=[up.pk for up in ups])
         async for up in ups:
@@ -3579,7 +3574,7 @@ class NeonAccountCreationTest(TestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
 
         self.assertIn("[Action Needed]:", mail.outbox[-1].subject)
@@ -3619,7 +3614,7 @@ class NeonAccountCreationTest(TestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
 
         await up.arefresh_from_db()
@@ -3648,7 +3643,7 @@ class NeonAccountCreationTest(TestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
 
         await up.arefresh_from_db()

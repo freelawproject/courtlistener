@@ -19,9 +19,7 @@ def application(environ, start_response):
         f"sys.getfilesystemencoding() = {repr(sys.getfilesystemencoding())}\n"
     )
     output += f"sys.getdefaultencoding() = {repr(sys.getdefaultencoding())}\n"
-    output += "locale.getpreferredencoding(False): %s\n" % repr(
-        locale.getpreferredencoding(False)
-    )
+    output += f"locale.getpreferredencoding(False): {repr(locale.getpreferredencoding(False))}\n"
 
     output += "\n\n"
     output += (
