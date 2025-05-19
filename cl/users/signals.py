@@ -46,12 +46,13 @@ def get_message_id(mail_obj: dict) -> str:
 
 
 def store_bounce_or_complaint_obj(
-    bounce_obj: dict[str, Any], obj_type: SESEventType
+    bounce_obj: dict[str, Any], email_recipient:str, obj_type: SESEventType
 ) -> None:
     """
     Store the SES bounce/complaint payload to S3 as JSON.
 
     :param bounce_obj: The bounce payload to store.
+    :param email_recipient: The email address the event belongs to.
     :param obj_type: The type of the bounce/complaint.
     """
 
@@ -65,7 +66,7 @@ def store_bounce_or_complaint_obj(
         case _:
             return None
 
-    if random.random() >= storing_rate:
+    if random.random() >= storing_rate and email_recipient:
         # Ignore events over the random rate.
         return None
 
@@ -73,7 +74,7 @@ def store_bounce_or_complaint_obj(
         storage = S3PrivateUUIDStorage()
         feedback_id = bounce_obj.get("feedbackId", "unknown_id")
         file_contents = json.dumps(bounce_obj, indent=2)
-        s3_path = PurePosixPath(dir_name, f"{feedback_id}.json")
+        s3_path = PurePosixPath(dir_name, email_recipient, f"{feedback_id}.json")
         # Save to S3
         storage.save(str(s3_path), ContentFile(file_contents))
     except Exception:
@@ -87,6 +88,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
     """
 
     message_id = get_message_id(mail_obj)
+    email_recipient = ""
     if bounce_obj:
         bounce_type = bounce_obj["bounceType"]
         bounce_sub_type = bounce_obj["bounceSubType"]
@@ -99,6 +101,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
                 email["emailAddress"] for email in bounced_recipients
             ]
             handle_hard_bounce(bounce_sub_type, hard_recipient_emails)
+            email_recipient = hard_recipient_emails[0] if hard_recipient_emails else ""
         elif bounce_type == "Transient" or "Undetermined":
             # Only consider a soft bounce those that contains a "failed" action
             # in its bounce recipient, avoiding other bounces that might not
@@ -112,8 +115,9 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
                 handle_soft_bounce(
                     message_id, bounce_sub_type, soft_recipient_emails
                 )
+                email_recipient = soft_recipient_emails[0]
 
-        store_bounce_or_complaint_obj(bounce_obj, SESEventType.BOUNCE)
+        store_bounce_or_complaint_obj(bounce_obj, email_recipient, SESEventType.BOUNCE)
 
 
 @receiver(complaint_received, dispatch_uid="complaint_handler")
@@ -130,7 +134,8 @@ def complaint_handler(
             email["emailAddress"] for email in complained_recipients
         ]
         handle_complaint(recipient_emails)
-        store_bounce_or_complaint_obj(complaint_obj, SESEventType.COMPLAINT)
+        email_recipient = recipient_emails[0] if recipient_emails else ""
+        store_bounce_or_complaint_obj(complaint_obj, email_recipient, SESEventType.COMPLAINT)
 
 
 @receiver(
