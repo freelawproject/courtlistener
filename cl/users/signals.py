@@ -1,6 +1,12 @@
+import json
+import random
 from datetime import timedelta
+from enum import Enum
+from pathlib import PurePosixPath
+from typing import Any
 
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
@@ -9,6 +15,7 @@ from rest_framework.authtoken.models import Token
 
 from cl.api.models import Webhook
 from cl.lib.crypto import sha1_activation_key
+from cl.lib.storage import S3PrivateUUIDStorage
 from cl.users.email_handlers import (
     handle_complaint,
     handle_hard_bounce,
@@ -16,6 +23,11 @@ from cl.users.email_handlers import (
 )
 from cl.users.models import UserProfile, generate_recap_email
 from cl.users.tasks import notify_new_or_updated_webhook
+
+
+class SESEventType(str, Enum):
+    BOUNCE = "bounce"
+    COMPLAINT = "complaint"
 
 
 def get_message_id(mail_obj: dict) -> str:
@@ -31,6 +43,41 @@ def get_message_id(mail_obj: dict) -> str:
             message_id = header["value"]
             return message_id
     return ""
+
+
+def store_bounce_or_complaint_obj(
+    bounce_obj: dict[str, Any], obj_type: SESEventType
+) -> None:
+    """
+    Store the SES bounce/complaint payload to S3 as JSON.
+
+    :param bounce_obj: The bounce payload to store.
+    :param obj_type: The type of the bounce/complaint.
+    """
+
+    match obj_type:
+        case SESEventType.COMPLAINT:
+            dir_name = "complaints"
+            storing_rate = settings.COMPLAINTS_STORE_RATE
+        case SESEventType.BOUNCE:
+            dir_name = "bounces"
+            storing_rate = settings.BOUNCES_STORE_RATE
+        case _:
+            return None
+
+    if random.random() >= storing_rate:
+        # Ignore events over the random rate.
+        return None
+
+    try:
+        storage = S3PrivateUUIDStorage()
+        feedback_id = bounce_obj.get("feedbackId", "unknown_id")
+        file_contents = json.dumps(bounce_obj, indent=2)
+        s3_path = PurePosixPath(dir_name, f"{feedback_id}.json")
+        # Save to S3
+        storage.save(str(s3_path), ContentFile(file_contents))
+    except Exception:
+        return None
 
 
 @receiver(bounce_received, dispatch_uid="bounce_handler")
@@ -66,6 +113,8 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
                     message_id, bounce_sub_type, soft_recipient_emails
                 )
 
+        store_bounce_or_complaint_obj(bounce_obj, SESEventType.BOUNCE)
+
 
 @receiver(complaint_received, dispatch_uid="complaint_handler")
 def complaint_handler(
@@ -81,6 +130,7 @@ def complaint_handler(
             email["emailAddress"] for email in complained_recipients
         ]
         handle_complaint(recipient_emails)
+        store_bounce_or_complaint_obj(complaint_obj, SESEventType.COMPLAINT)
 
 
 @receiver(
