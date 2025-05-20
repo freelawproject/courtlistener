@@ -1,6 +1,12 @@
+import json
+import random
 from datetime import timedelta
+from enum import Enum
+from pathlib import PurePosixPath
+from typing import Any
 
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
@@ -9,13 +15,20 @@ from rest_framework.authtoken.models import Token
 
 from cl.api.models import Webhook
 from cl.lib.crypto import sha1_activation_key
+from cl.lib.storage import S3PrivateUUIDStorage
 from cl.users.email_handlers import (
     handle_complaint,
     handle_hard_bounce,
     handle_soft_bounce,
+    normalize_addresses,
 )
 from cl.users.models import UserProfile, generate_recap_email
 from cl.users.tasks import notify_new_or_updated_webhook
+
+
+class SESEventType(str, Enum):
+    BOUNCE = "bounce"
+    COMPLAINT = "complaint"
 
 
 def get_message_id(mail_obj: dict) -> str:
@@ -33,6 +46,44 @@ def get_message_id(mail_obj: dict) -> str:
     return ""
 
 
+def store_bounce_or_complaint_obj(
+    bounce_obj: dict[str, Any], email_recipient: str, obj_type: SESEventType
+) -> None:
+    """
+    Store the SES bounce/complaint payload to S3 as JSON.
+
+    :param bounce_obj: The bounce payload to store.
+    :param email_recipient: The email address the event belongs to.
+    :param obj_type: The type of the bounce/complaint.
+    """
+
+    match obj_type:
+        case SESEventType.COMPLAINT:
+            dir_name = "complaints"
+            storing_rate = settings.COMPLAINTS_STORE_RATE
+        case SESEventType.BOUNCE:
+            dir_name = "bounces"
+            storing_rate = settings.BOUNCES_STORE_RATE
+        case _:
+            return None
+
+    if random.random() >= storing_rate and email_recipient:
+        # Ignore events over the random rate.
+        return None
+
+    try:
+        storage = S3PrivateUUIDStorage()
+        feedback_id = bounce_obj.get("feedbackId", "unknown_id")
+        file_contents = json.dumps(bounce_obj, indent=2)
+        s3_path = PurePosixPath(
+            dir_name, email_recipient, f"{feedback_id}.json"
+        )
+        # Save to S3
+        storage.save(str(s3_path), ContentFile(file_contents))
+    except Exception:
+        return None
+
+
 @receiver(bounce_received, dispatch_uid="bounce_handler")
 def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
     """Receiver function to handle bounce notifications sent by Amazon SES via
@@ -40,6 +91,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
     """
 
     message_id = get_message_id(mail_obj)
+    normalized_recipients = []
     if bounce_obj:
         bounce_type = bounce_obj["bounceType"]
         bounce_sub_type = bounce_obj["bounceSubType"]
@@ -52,6 +104,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
                 email["emailAddress"] for email in bounced_recipients
             ]
             handle_hard_bounce(bounce_sub_type, hard_recipient_emails)
+            normalized_recipients = normalize_addresses(hard_recipient_emails)
         elif bounce_type == "Transient" or "Undetermined":
             # Only consider a soft bounce those that contains a "failed" action
             # in its bounce recipient, avoiding other bounces that might not
@@ -65,6 +118,16 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
                 handle_soft_bounce(
                     message_id, bounce_sub_type, soft_recipient_emails
                 )
+                normalized_recipients = normalize_addresses(
+                    soft_recipient_emails
+                )
+
+        email_recipient = (
+            normalized_recipients[0] if normalized_recipients else ""
+        )
+        store_bounce_or_complaint_obj(
+            bounce_obj, email_recipient, SESEventType.BOUNCE
+        )
 
 
 @receiver(complaint_received, dispatch_uid="complaint_handler")
@@ -81,6 +144,13 @@ def complaint_handler(
             email["emailAddress"] for email in complained_recipients
         ]
         handle_complaint(recipient_emails)
+        normalized_recipients = normalize_addresses(recipient_emails)
+        email_recipient = (
+            normalized_recipients[0] if normalized_recipients else ""
+        )
+        store_bounce_or_complaint_obj(
+            complaint_obj, email_recipient, SESEventType.COMPLAINT
+        )
 
 
 @receiver(
