@@ -20,6 +20,7 @@ from cl.users.email_handlers import (
     handle_complaint,
     handle_hard_bounce,
     handle_soft_bounce,
+    normalize_addresses,
 )
 from cl.users.models import UserProfile, generate_recap_email
 from cl.users.tasks import notify_new_or_updated_webhook
@@ -90,7 +91,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
     """
 
     message_id = get_message_id(mail_obj)
-    email_recipient = ""
+    normalized_recipients = []
     if bounce_obj:
         bounce_type = bounce_obj["bounceType"]
         bounce_sub_type = bounce_obj["bounceSubType"]
@@ -103,9 +104,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
                 email["emailAddress"] for email in bounced_recipients
             ]
             handle_hard_bounce(bounce_sub_type, hard_recipient_emails)
-            email_recipient = (
-                hard_recipient_emails[0] if hard_recipient_emails else ""
-            )
+            normalized_recipients = normalize_addresses(hard_recipient_emails)
         elif bounce_type == "Transient" or "Undetermined":
             # Only consider a soft bounce those that contains a "failed" action
             # in its bounce recipient, avoiding other bounces that might not
@@ -119,8 +118,13 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
                 handle_soft_bounce(
                     message_id, bounce_sub_type, soft_recipient_emails
                 )
-                email_recipient = soft_recipient_emails[0]
+                normalized_recipients = normalize_addresses(
+                    soft_recipient_emails
+                )
 
+        email_recipient = (
+            normalized_recipients[0] if normalized_recipients else ""
+        )
         store_bounce_or_complaint_obj(
             bounce_obj, email_recipient, SESEventType.BOUNCE
         )
@@ -140,7 +144,10 @@ def complaint_handler(
             email["emailAddress"] for email in complained_recipients
         ]
         handle_complaint(recipient_emails)
-        email_recipient = recipient_emails[0] if recipient_emails else ""
+        normalized_recipients = normalize_addresses(recipient_emails)
+        email_recipient = (
+            normalized_recipients[0] if normalized_recipients else ""
+        )
         store_bounce_or_complaint_obj(
             complaint_obj, email_recipient, SESEventType.COMPLAINT
         )
