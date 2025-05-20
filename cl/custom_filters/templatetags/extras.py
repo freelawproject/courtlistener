@@ -443,6 +443,4 @@ def has_attr(obj, attr_name):
 @register.filter
 def get_attr(obj, attr_name):
     """Return the value of the attribute attr_name."""
-    if not hasattr(obj, attr_name):
-        return ""
-    return getattr(obj, attr_name)
+    return getattr(obj, attr_name, "")
