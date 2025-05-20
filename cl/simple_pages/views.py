@@ -301,7 +301,6 @@ async def coverage_oa(request: HttpRequest) -> HttpResponse:
     oral_argument_courts = Court.objects.filter(
         in_use=True, has_oral_argument_scraper=True
     )
-    courts = await sync_to_async(list)(oral_argument_courts)
     return TemplateResponse(
         request,
         "help/coverage_oa.html",
@@ -313,7 +312,7 @@ async def coverage_oa(request: HttpRequest) -> HttpResponse:
                     "label": court,
                     "ref": "nofollow",
                 }
-                for court in courts
+                async for court in oral_argument_courts
             ],
             "private": False,
         },
