@@ -30,7 +30,6 @@ from cl.favorites.utils import (
     prayer_eligible,
 )
 from cl.lib.http import is_ajax
-from cl.lib.view_utils import increment_view_count
 from cl.search.models import RECAPDocument
 from cl.users.models import UserProfile
 
@@ -140,7 +139,6 @@ async def view_tag(request, username, tag_name):
     tag = await aget_object_or_404(
         UserTag, name=tag_name, user__username=username
     )
-    await increment_view_count(tag, request)
 
     if tag.published is False:
         if await User.objects.aget(pk=tag.user_id) != await request.auser():
