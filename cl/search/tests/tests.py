@@ -1,7 +1,7 @@
 import datetime
 import io
 import re
-from datetime import date
+from datetime import date, datetime
 from http import HTTPStatus
 from unittest import mock
 from urllib.parse import parse_qs
@@ -28,7 +28,10 @@ from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.audio.factories import AudioFactory
-from cl.lib.elasticsearch_utils import simplify_estimated_count
+from cl.lib.elasticsearch_utils import (
+    build_daterange_query,
+    simplify_estimated_count,
+)
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -1390,6 +1393,107 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     "The query contains a disallowed wildcard pattern.",
                     msg="Failed for V3",
                 )
+
+    def test_absolute_dates_filter(self, court_cache_key_mock):
+        """Confirm that passing absolute dates returns the expected absolute
+        filter in ISO format.
+        """
+        filed_before = date(2025, 5, 1)
+        filed_after = date(2025, 5, 18)
+        qs = build_daterange_query(
+            "dateFiled", before=filed_before, after=filed_after
+        )
+        # Assert the filters.
+        body = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(body["gte"], "2025-05-18T00:00:00Z")
+        self.assertEqual(body["lte"], "2025-05-01T23:59:59Z")
+        self.assertNotIn("time_zone", body)
+
+    def test_all_relative_syntaxes(self, court_cache_key_mock):
+        """Confirms that build_daterange_query is able to parse and convert
+        the different allowed relative date syntaxes into an ES-compatible date
+         math expression.
+        """
+        cases = {
+            # days
+            "1d ago": "now-1d",
+            "7d ago": "now-7d",
+            "5 days ago": "now-5d",
+            "-10d": "now-10d",
+            "-10d ago": "now-10d",
+            "10d": False,  # Invalid syntax
+            "10 days": False,  # Invalid syntax
+            "past 3 days": "now-3d",
+            # months (30d each)
+            "1m ago": "now-30d",
+            "2M ago": "now-60d",
+            "2m": False,  # Invalid syntax
+            "3 months ago": "now-90d",
+            "-4m": "now-120d",
+            "4 months": False,  # Invalid syntax
+            "-5 months ago": "now-150d",
+            "past 6 months": "now-180d",
+            # years (365d each)
+            "1y ago": "now-365d",
+            "2Y ago": "now-730d",
+            "2y": False,  # Invalid syntax
+            "3 years ago": "now-1095d",
+            "4 years": False,  # Invalid syntax
+            "-1y": "now-365d",
+            "-2 years": "now-730d",
+            "past 1 year": "now-365d",
+            "invalid 3 syntax": False,  # Invalid syntax
+        }
+        now_regex = re.compile(r"^now[+-]\d+d$")
+
+        for user_input, expected_math in cases.items():
+            with self.subTest(user_input=user_input):
+                qs = build_daterange_query(
+                    "dateFiled", before=None, after=user_input
+                )
+                if not expected_math:
+                    # Assert invalid syntaxes.
+                    self.assertFalse(qs)
+                else:
+                    # Assert the validity of the relative range filter.
+                    self.assertEqual(len(qs), 1)
+                    query_dict = qs[0].to_dict()["range"]["dateFiled"]
+                    self.assertEqual(query_dict.get("gte"), expected_math)
+                    self.assertNotIn("lte", query_dict)
+                    self.assertEqual(
+                        query_dict.get("time_zone"), "America/Los_Angeles"
+                    )
+                    self.assertTrue(now_regex.match(query_dict["gte"]))
+
+    def test_before_and_after_relative(self, court_cache_key_mock):
+        """Confirm that both values, before and after are compatible with the
+        relative date syntaxes.
+        """
+        qs = build_daterange_query(
+            "dateFiled",
+            before="7 days ago",
+            after="1d ago",
+        )
+        self.assertEqual(len(qs), 1)
+        query_dict = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(query_dict["gte"], "now-1d")
+        self.assertEqual(query_dict["lte"], "now-7d")
+        self.assertEqual(query_dict.get("time_zone"), "America/Los_Angeles")
+
+    def test_mixed_absolute_and_relative(self, court_cache_key_mock):
+        """Confirm that the range filter is compatible with mixed requests,
+        where one value may be absolute and the other relative,
+        as might occur in API calls.
+        """
+        qs = build_daterange_query(
+            "dateFiled", before=date(2025, 5, 10), after="2 days ago"
+        )
+        self.assertEqual(len(qs), 1)
+
+        body = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(body["gte"], "now-2d")
+        self.assertEqual(body["lte"], "2025-05-10T23:59:59Z")
+        self.assertEqual(body.get("time_zone"), "America/Los_Angeles")
 
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):

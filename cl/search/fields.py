@@ -9,6 +9,8 @@ from django.forms import ChoiceField, DateField
 from django.utils import formats
 from django.utils.encoding import force_str
 
+from cl.lib.utils import parse_string_date
+
 INPUT_FORMATS = [
     "%Y%m%d",  # '20061025'
     "%Y-%m-%d",  # '2006-10-25'
@@ -41,6 +43,13 @@ class FloorDateField(DateField):
         """
         if value in validators.EMPTY_VALUES or value == "MM/DD/YYYY":
             return None
+
+        if isinstance(value, str):
+            # Allow valid relative date strings.
+            date_string = value.strip()
+            if parse_string_date(date_string):
+                return date_string
+
         if isinstance(value, datetime.datetime):
             return value.date()
         if isinstance(value, datetime.date):
@@ -103,6 +112,13 @@ class CeilingDateField(DateField):
         """
         if value in validators.EMPTY_VALUES or value == "MM/DD/YYYY":
             return None
+
+        if isinstance(value, str):
+            # Allow valid relative date strings.
+            date_string = value.strip()
+            if parse_string_date(date_string):
+                return date_string
+
         if isinstance(value, datetime.datetime):
             return value.date()
         if isinstance(value, datetime.date):

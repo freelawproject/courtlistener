@@ -1,3 +1,4 @@
+import datetime
 import re
 from collections import OrderedDict
 
@@ -279,6 +280,7 @@ class SearchForm(forms.Form):
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.PARENTHETICAL,
     ]
+    filed_after_relative = forms.CharField(required=False)
     filed_before = CeilingDateField(
         required=False,
         label="Filed Before",
@@ -585,6 +587,8 @@ class SearchForm(forms.Form):
         Handles validation fixes that need to be performed across fields.
         """
         cleaned_data = self.cleaned_data
+
+        print("<<<<< cleaned_data", cleaned_data)
         default_status = "stat_Published"
 
         # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
@@ -639,6 +643,10 @@ class SearchForm(forms.Form):
         for k, v in cleaned_data.items():
             if isinstance(v, str):
                 cleaned_data[k] = v.strip()
+
+        filed_after = cleaned_data.get("filed_after") or cleaned_data.get(
+            "filed_after_relative")
+        cleaned_data["filed_after"] = filed_after
 
         return cleaned_data
 
@@ -698,14 +706,18 @@ def clean_up_date_formats(
 
     for time in ("before", "after"):
         field = f"{date_field}_{time}"
+        value = cd.get(field)
         if get_params.get(field) and cd.get(field) is not None:
-            # Don't use strftime. It'll fail before 1900
-            before = cd[field]
-            get_params[field] = "%02d/%02d/%s" % (
-                before.month,
-                before.day,
-                before.year,
-            )
+            if isinstance(value, datetime.date | datetime.datetime):
+                # Don't use strftime. It'll fail before 1900
+                get_params[field] = "%02d/%02d/%s" % (
+                    value.month,
+                    value.day,
+                    value.year,
+                )
+            elif isinstance(value, str):
+                # Leave relative date strings as-is
+                get_params[field] = value
 
 
 def _clean_form(get_params, cd, courts):

@@ -3062,6 +3062,74 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         docket.delete()
 
+    def test_relative_dates_filtering(self):
+        """Confirm that the relative date filter works properly by returning
+        the expected documents within the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            d_1 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23456",
+                docket_number="55-1234",
+            )
+            # 40 days ago
+            d_2 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23457",
+                docket_number="56-1234",
+            )
+            # 400 days ago
+            d_3 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23458",
+                docket_number="57-1234",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No case within the range.
+            ("9d ago", [d_1]),  # Only the 9-day old
+            ("past 10 days", [d_1]),  # Only the 9-day old
+            ("30d ago", [d_1]),  # only the 9-day old
+            ("60d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1m ago", [d_1]),  # only the 9-day old
+            ("2m ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("365d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1y ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("2y ago", [d_1, d_2, d_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                cd = {**params, "filed_after": relative_date}
+                r = async_to_sync(self._test_article_count)(
+                    cd,
+                    len(expected_cases),
+                    f"filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for docket in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(docket.docket_number, r.content.decode())
+
 
 class RECAPSearchDecayRelevancyTest(
     ESIndexTestCase, V4SearchAPIAssertions, TestCase
@@ -5663,6 +5731,94 @@ class RECAPSearchAPIV4Test(
 
         with self.captureOnCommitCallbacks(execute=True):
             d.delete()
+
+    def test_relative_dates_filtering(self):
+        """Confirm that the relative date filter in the API works properly by returning
+        the expected documents within the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            d_1 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23456",
+                docket_number="55-1234",
+            )
+            # 40 days ago
+            d_2 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23457",
+                docket_number="56-1234",
+            )
+            # 400 days ago
+            d_3 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23458",
+                docket_number="57-1234",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No case within the range.
+            ("9d ago", [d_1]),  # Only the 9-day old
+            ("past 10 days", [d_1]),  # Only the 9-day old
+            ("30d ago", [d_1]),  # only the 9-day old
+            ("60d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1m ago", [d_1]),  # only the 9-day old
+            ("2m ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("365d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1y ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("2y ago", [d_1, d_2, d_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                search_params = {**params, "filed_after": relative_date}
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertEqual(
+                    len(r.data["results"]),
+                    len(expected_cases),
+                    f"filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for docket in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(docket.docket_number, r.content.decode())
+
+        # Test a relative date range that is supported in the API.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+            "filed_after": "1y ago",
+            "filed_before": "30d ago",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            cd,
+        )
+
+        # only the d_2 docket falls between 365d and 30d ago
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertIn(d_2.docket_number, r.content.decode())
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

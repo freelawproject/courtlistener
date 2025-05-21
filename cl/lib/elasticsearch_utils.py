@@ -50,6 +50,7 @@ from cl.lib.utils import (
     cleanup_main_query,
     get_array_of_selected_fields,
     map_to_docket_entry_sorting,
+    parse_string_date,
     perform_special_character_replacements,
 )
 from cl.people_db.models import Position
@@ -168,32 +169,48 @@ def build_numeric_range_query(
 
 def build_daterange_query(
     field: str,
-    before: datetime.date | str,
-    after: datetime.date | str,
+    before: datetime.date | str | None = None,
+    after: datetime.date | str | None = None,
     relation: Literal["INTERSECTS", "CONTAINS", "WITHIN", None] = None,
 ) -> list[Range]:
-    """Given field name and date range limits returns ElasticSearch range query or None
+    """Given field name and date range limits returns ElasticSearch absolute
+    range query or None
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html#ranges-on-dates
 
-    :param field: elasticsearch index fieldname
+    If a relative date string in the allowed syntax is provided, it is
+    converted to an ES-compatible date math syntax to query a relative date.
+
+    :param field: The date field name
     :param before: datetime upper limit
     :param after: datetime lower limit
     :param relation: Indicates how the range query matches values for range fields
     :return: Empty list or list with DSL Range query
     """
 
+    if not any([before, after]):
+        return []
+
     params = {}
-    if any([before, after]):
-        if isinstance(after, datetime.date):
-            params["gte"] = f"{after.isoformat()}T00:00:00Z"
-        if isinstance(before, datetime.date):
-            params["lte"] = f"{before.isoformat()}T23:59:59Z"
-        if relation is not None:
-            allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-            assert relation in allowed_relations, (
-                f"'{relation}' is not an allowed relation."
-            )
-            params["relation"] = relation
+    # Build an absolute date range if the provided values are date objects.
+    if isinstance(after, datetime.date):
+        params["gte"] = f"{after.isoformat()}T00:00:00Z"
+    if isinstance(before, datetime.date):
+        params["lte"] = f"{before.isoformat()}T23:59:59Z"
+    if relation is not None:
+        allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
+        assert relation in allowed_relations, (
+            f"'{relation}' is not an allowed relation."
+        )
+        params["relation"] = relation
+
+    # Try parsing the date when it’s a relative date, and override the
+    # gte and lte parameters.
+    gte = parse_string_date(after)
+    lte = parse_string_date(before)
+    if gte is not None:
+        params["gte"] = gte
+    if lte is not None:
+        params["lte"] = lte
 
     if params:
         return [Q("range", **{field: params})]

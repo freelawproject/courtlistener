@@ -1862,3 +1862,49 @@ rect.series-segment {
 #doc-no-available-warning a.btn {
   height: 28px;
 }
+
+
+/* Date relative filter */
+.relative-select {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.relative-select input.form-control {
+  flex: 1;
+}
+
+.btn-dropdown-toggle {
+  margin-left: -1px;
+  padding: 0 0.75em;
+  border-left: none;
+  border-radius: 0 .25em .25em 0;
+}
+
+.relative-options-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: none;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relative-options-list.show {
+  display: block;
+}
+
+.relative-options-list li {
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.relative-options-list li:hover {
+  background-color: #f5f5f5;
+}
