@@ -645,7 +645,8 @@ class SearchForm(forms.Form):
                 cleaned_data[k] = v.strip()
 
         filed_after = cleaned_data.get("filed_after") or cleaned_data.get(
-            "filed_after_relative")
+            "filed_after_relative"
+        )
         cleaned_data["filed_after"] = filed_after
 
         return cleaned_data
