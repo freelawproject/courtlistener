@@ -558,7 +558,7 @@ def convert_to_es_date_match(date_string: str) -> str:
     return f"now-{number}d/d"
 
 
-def parse_string_date(date_value: datetime.date | str | None) -> str | None:
+def parse_string_date(date_value: datetime.date | str) -> str | None:
     """Parse a provided relative string date or ignore incompatible relative
     date syntax.
     :param date_value: The relative date to parse.

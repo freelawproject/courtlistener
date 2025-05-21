@@ -1447,7 +1447,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         for user_input, expected_math in cases.items():
             with self.subTest(user_input=user_input):
                 qs = build_daterange_query(
-                    "dateFiled", before=None, after=user_input
+                    "dateFiled", before="", after=user_input
                 )
                 if not expected_math:
                     # Assert invalid syntaxes.

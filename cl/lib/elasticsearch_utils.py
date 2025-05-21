@@ -169,8 +169,8 @@ def build_numeric_range_query(
 
 def build_daterange_query(
     field: str,
-    before: datetime.date | str | None = None,
-    after: datetime.date | str | None = None,
+    before: datetime.date | str,
+    after: datetime.date | str,
     relation: Literal["INTERSECTS", "CONTAINS", "WITHIN", None] = None,
 ) -> list[Range]:
     """Given field name and date range limits returns ElasticSearch absolute
