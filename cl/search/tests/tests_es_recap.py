@@ -3130,6 +3130,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                     # Confirm the right cases are displayed.
                     self.assertIn(docket.docket_number, r.content.decode())
 
+        d_1.delete()
+        d_2.delete()
+        d_3.delete()
+
 
 class RECAPSearchDecayRelevancyTest(
     ESIndexTestCase, V4SearchAPIAssertions, TestCase
@@ -5819,6 +5823,10 @@ class RECAPSearchAPIV4Test(
         # only the d_2 docket falls between 365d and 30d ago
         self.assertEqual(len(r.data["results"]), 1)
         self.assertIn(d_2.docket_number, r.content.decode())
+
+        d_1.delete()
+        d_2.delete()
+        d_3.delete()
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

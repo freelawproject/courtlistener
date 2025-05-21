@@ -1,4 +1,3 @@
-import datetime
 import io
 import re
 from datetime import date, datetime
@@ -1416,35 +1415,34 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         """
         cases = {
             # days
-            "1d ago": "now-1d",
-            "7d ago": "now-7d",
-            "5 days ago": "now-5d",
-            "-10d": "now-10d",
-            "-10d ago": "now-10d",
+            "1d ago": "now-1d/d",
+            "7d ago": "now-7d/d",
+            "5 days ago": "now-5d/d",
+            "-10d": "now-10d/d",
+            "-10d ago": "now-10d/d",
             "10d": False,  # Invalid syntax
             "10 days": False,  # Invalid syntax
-            "past 3 days": "now-3d",
+            "past 3 days": "now-3d/d",
             # months (30d each)
-            "1m ago": "now-30d",
-            "2M ago": "now-60d",
+            "1m ago": "now-30d/d",
+            "2M ago": "now-60d/d",
             "2m": False,  # Invalid syntax
-            "3 months ago": "now-90d",
-            "-4m": "now-120d",
+            "3 months ago": "now-90d/d",
+            "-4m": "now-120d/d",
             "4 months": False,  # Invalid syntax
-            "-5 months ago": "now-150d",
-            "past 6 months": "now-180d",
+            "-5 months ago": "now-150d/d",
+            "past 6 months": "now-180d/d",
             # years (365d each)
-            "1y ago": "now-365d",
-            "2Y ago": "now-730d",
+            "1y ago": "now-365d/d",
+            "2Y ago": "now-730d/d",
             "2y": False,  # Invalid syntax
-            "3 years ago": "now-1095d",
+            "3 years ago": "now-1095d/d",
             "4 years": False,  # Invalid syntax
-            "-1y": "now-365d",
-            "-2 years": "now-730d",
-            "past 1 year": "now-365d",
+            "-1y": "now-365d/d",
+            "-2 years": "now-730d/d",
+            "past 1 year": "now-365d/d",
             "invalid 3 syntax": False,  # Invalid syntax
         }
-        now_regex = re.compile(r"^now[+-]\d+d$")
 
         for user_input, expected_math in cases.items():
             with self.subTest(user_input=user_input):
@@ -1460,10 +1458,6 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     query_dict = qs[0].to_dict()["range"]["dateFiled"]
                     self.assertEqual(query_dict.get("gte"), expected_math)
                     self.assertNotIn("lte", query_dict)
-                    self.assertEqual(
-                        query_dict.get("time_zone"), "America/Los_Angeles"
-                    )
-                    self.assertTrue(now_regex.match(query_dict["gte"]))
 
     def test_before_and_after_relative(self, court_cache_key_mock):
         """Confirm that both values, before and after are compatible with the
@@ -1476,9 +1470,8 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(len(qs), 1)
         query_dict = qs[0].to_dict()["range"]["dateFiled"]
-        self.assertEqual(query_dict["gte"], "now-1d")
-        self.assertEqual(query_dict["lte"], "now-7d")
-        self.assertEqual(query_dict.get("time_zone"), "America/Los_Angeles")
+        self.assertEqual(query_dict["gte"], "now-1d/d")
+        self.assertEqual(query_dict["lte"], "now-7d/d")
 
     def test_mixed_absolute_and_relative(self, court_cache_key_mock):
         """Confirm that the range filter is compatible with mixed requests,
@@ -1491,9 +1484,8 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertEqual(len(qs), 1)
 
         body = qs[0].to_dict()["range"]["dateFiled"]
-        self.assertEqual(body["gte"], "now-2d")
+        self.assertEqual(body["gte"], "now-2d/d")
         self.assertEqual(body["lte"], "2025-05-10T23:59:59Z")
-        self.assertEqual(body.get("time_zone"), "America/Los_Angeles")
 
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):

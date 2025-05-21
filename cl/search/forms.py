@@ -587,8 +587,6 @@ class SearchForm(forms.Form):
         Handles validation fixes that need to be performed across fields.
         """
         cleaned_data = self.cleaned_data
-
-        print("<<<<< cleaned_data", cleaned_data)
         default_status = "stat_Published"
 
         # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
