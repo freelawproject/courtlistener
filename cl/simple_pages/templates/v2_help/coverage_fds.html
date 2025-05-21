@@ -41,6 +41,7 @@
   <c-layout-with-navigation.section id="totals">
     <h2>Yearly Totals</h2>
     <c-data-table
+      safe
       :columns="[
         {'label': 'Source', 'field': 'source'},
         {'label': 'Year', 'field': 'year'},
@@ -49,7 +50,7 @@
         {'label': 'Notes', 'field': 'notes'},
       ]"
       :rows="[
-        {'source': 'Senate Records', 'year': '1987-2013', 'count': '874', 'size': '394.7 MB', 'notes': 'Extracted from Senate Records'},
+        {'source': 'Senate Records', 'year': '1987-2013', 'count': '874', 'size': '394.7 MB', 'notes': '<a class=underline href=https://free.law/2021/12/22/nomination-disclosures target=_blank>Extracted from Senate Records</a>'},
         {'source': 'Judicial Watch', 'year': '2003-2010', 'count': '9,157', 'size': '7.6', 'notes': 'Gathered from their website'},
         {'source': 'U.S. Courts', 'year': '2011', 'count': '3,515', 'size': '46.8', 'notes': 'Complete'},
         {'source': 'U.S. Courts', 'year': '2012', 'count': '2,763', 'size': '49.8', 'notes': 'Complete'},
