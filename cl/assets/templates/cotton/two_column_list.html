@@ -1,11 +1,25 @@
-{% load partition_util %}
-<c-vars list class=""></c-vars>
+{% load partition_util extras %}
+<c-vars list link_class key responsive class=""></c-vars>
 
-<div class="w-full flex flex-row justify-between {{ class }}">
+<div class="w-full flex {% if responsive %}flex-col md:{% endif %}flex-row justify-between {{ class }}">
   {% for row in list|rows:2 %}
-    <ul class="w-1/2 list-disc pl-5">
+    <ul class="{% if responsive %}md:{% endif %}w-1/2 list-disc pl-5">
       {% for item in row %}
-        <li>{{ item.short_name }}</li>
+        <li>
+          {% if item.href and item.label %}
+            <a
+              href="{{ item.href }}"
+              {% if link_class %}class="{{ link_class }}"{% endif %}
+              {% if item.rel %}rel="{{ item.rel }}"{% endif %}
+            >{{ item.label }}</a>
+          {% elif key and item|has_attr:key %}
+            {{ item|get_attr:key }}
+          {% elif key and item|has_attr:"get" %}
+            {{ item|get:key }}
+          {% else %}
+            {{ item }}
+          {% endif %}
+        </li>
       {% endfor %}
     </ul>
   {% endfor %}

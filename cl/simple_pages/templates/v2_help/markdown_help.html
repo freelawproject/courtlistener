@@ -1,0 +1,406 @@
+{% extends "new_base.html" %}
+{% load static %}
+
+{% block title %}Markdown Guide – CourtListener.com{% endblock %}
+
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="markdown"
+  :nav_items="[
+    {'href': '#markdown', 'text': 'Overview'},
+    {'href': '#basic-formatting', 'text': 'Basic Formatting', 'children': [
+      {'href': '#paragraphs', 'text': 'Paragraphs'},
+      {'href': '#emphasis', 'text': '*Emphasis*'},
+      {'href': '#headers', 'text': '# Headers'},
+      {'href': '#lists', 'text': '- Lists'},
+      {'href': '#links', 'text': '[Links](https://...)'},
+      {'href': '#quotes', 'text': '> Quotes'},
+    ]},
+    {'href': '#special-topics', 'text': 'Special Topics', 'children': [
+      {'href': '#images', 'text': 'Images'},
+      {'href': '#footnotes', 'text': 'Footnotes'},
+      {'href': '#tables', 'text': 'Tables'},
+      {'href': '#other-items', 'text': 'Linking to other items'},
+    ]},
+  ]"
+>
+    <c-layout-with-navigation.section id="markdown">
+      <h2>Understanding Markdown</h2>
+      <p>Markdown is a lightweight and simple system that can be used to write complex and beautiful documents on the Web. At CourtListener, you can use Markdown in a number of locations to add links, headers, and other formatting.
+      </p>
+      <p>Markdown is based loosely on email formatting and is very easy to learn. For example, to make a word bold, all you have to do is add asterisks around it, **like this**, and then when CourtListener displays the words, they'll be bold. Many of the rules of Markdown are similar, so most people are able to learn the basics in a few minutes.
+      </p>
+    </c-layout-with-navigation.section>
+
+    <c-layout-with-navigation.section id="paragraphs">
+      <h2>Basic Formatting</h2>
+      <h3>Paragraphs</h3>
+      <p>The easiest thing to do in Markdown is to create paragraphs. To create paragraphs, simply press <kbd>enter</kbd> twice, like you normally do. For example, these are paragraphs from the recent Supreme Court opinion,
+        <em><a class="text-primary-600" href="/opinion/2812209/obergefell-v-hodges/">Obergefell v. Hodges</a></em>:
+      </p>
+      <c-code>
+It would misunderstand these men and women to say they disrespect the idea of
+marriage. Their plea is that they do respect it, respect it so deeply that they
+seek to find its fulfillment for themselves.
+
+Who ever thought that intimacy and spirituality (whatever that means) were
+freedoms? And if intimacy is, one would think Freedom of Intimacy is abridged
+rather than expanded by marriage. Ask the nearest hippie.
+      </c-code>
+      <p>When rendered, these paragraphs do what you might expect, becoming:</p>
+      <div class="textbox">
+          <p class="mb-2">
+            It would misunderstand these men and women to say they disrespect
+            the idea of marriage. Their plea is that they do respect it,
+            respect it so deeply that they seek to find its fulfillment for
+            themselves.
+          </p>
+          <p>
+            Who ever thought that intimacy and spirituality (whatever that
+            means) were freedoms? And if intimacy is, one would think
+            Freedom of Intimacy is abridged rather than expanded by
+            marriage. Ask the nearest hippie.
+          </p>
+      </div>
+      <p id="manual-link-break">If you want a manual line break, without a space between two paragraphs, add two or more spaces to the end of a line:
+      </p>
+      <c-code>
+I know it when I see it␣␣
+the motion picture involved in this case is not that.
+      </c-code>
+      <p>Which then renders as:</p>
+      <div class="textbox">
+          <p>I know it when I see it<br>the motion picture involved in this case is not that.</p>
+      </div>
+    </c-layout-with-navigation.section>
+
+    <c-layout-with-navigation.section id="emphasis">
+      <h3>Emphasis</h3>
+      <p>Like you sometimes see in email, it's easy to make bold, italics and the combination of the two:</p>
+      <c-code>
+*italics*
+**bold**
+***bold italics***
+      </c-code>
+      <p>Becomes:</p>
+      <div class="textbox">
+          <em>italics</em><br>
+          <strong>bold</strong><br>
+          <em><strong>bold italics</strong></em>
+      </div>
+    </c-layout-with-navigation.section>
+
+    <c-layout-with-navigation.section id="headers">
+      <h3>Headers</h3>
+      <p>The easiest way to make headers is to put a pound sign in front of some words. For example:
+      </p>
+      <c-code>
+# Biggest Header
+## Smaller Header
+### Smaller Still
+#### Smallest Header
+      </c-code>
+      <p>Becomes:</p>
+      <div class="textbox">
+          <h1>Biggest Header</h1>
+          <h2>Smaller Header</h2>
+          <h3>Smaller Still</h3>
+          <h4>Smallest Header</h4>
+      </div>
+  </c-layout-with-navigation.section>
+
+    <c-layout-with-navigation.section id="lists">
+        <h3>Lists</h3>
+        <p>You can make basic lists as well using dashes or asterisks at the beginning of the line:
+        </p>
+        <c-code>
+Here's a list of fruit:
+
+- apples
+- bananas
+- berries
+  - strawberries
+        </c-code>
+        <p>Becomes:</p>
+        <div class="textbox flex flex-col gap-2">
+            <p>Here's a list of fruit:</p>
+            <ul>
+                <li>apples</li>
+                <li>bananas</li>
+                <li>
+                  <p>berries</p>
+                  <ul>
+                      <li>strawberries</li>
+                  </ul>
+                </li>
+            </ul>
+        </div>
+        <p>You can also make ordered lists using numbers at the beginning of the line. For example:
+        </p>
+        <c-code>
+1. This list is
+2. Numbered
+        </c-code>
+        <p>Becomes:</p>
+        <div class="textbox">
+            <ol>
+                <li>This list is</li>
+                <li>Numbered</li>
+            </ol>
+         </div>
+        <p>You don't have to use sequential numbers, and lots of people just use the number one over and over so that they can change the order of the list easily. For example, this is the same as above:
+        </p>
+        <c-code>
+1. This list is
+1. Numbered
+        </c-code>
+        <p>You can also mix and match numbered and ordered lists, even nesting, one inside the other, like so:</p>
+        <c-code>
+- Something
+- Something else
+- These are other things:
+    1. Thingamajig
+    1. Wingding
+        </c-code>
+        <p>Which becomes:</p>
+        <div class="textbox">
+            <ul>
+                <li>Something</li>
+                <li>Something else</li>
+                <li>These are other things:
+                    <ol>
+                        <li>Thingamajig</li>
+                        <li>Wingding</li>
+                    </ol>
+                </li>
+            </ul>
+        </div>
+        <p>If you put an extra return between two bullets or two numbered lines, you can create numbered paragraphs, with slightly more space between. And if you want one item in your list to have multiple paragraphs, you can do that too using an additional four spaces before the second paragraph. Here's an example showing both these features:
+        </p>
+        <c-code>
+1. This is an example of space between list items.
+
+1. Look at all that space.
+
+    And here's an extra paragraph as part of bullet 2!
+
+1. And then a third item.
+        </c-code>
+        <p>Becomes:</p>
+        <div class="textbox">
+            <ol>
+                <li class="mb-2">
+                    <p>This is an example of space between list items.</p>
+                </li>
+                <li class="mb-2">
+                    <p>Look at all that space.</p>
+                    <p>And here's an extra paragraph as part of bullet 2!</p>
+                </li>
+                <li><p>And then a third item.</p></li>
+            </ol>
+        </div>
+    </c-layout-with-navigation.section>
+
+    <c-layout-with-navigation.section id="links">
+        <h3>Links</h3>
+        <p>There are three ways to make links. The first is very easy. Just put a link in <code>&lt;</code> and <code>&gt;</code>, and it will become clickable:</p>
+        <c-code>
+&lt;https://free.law&gt;
+        </c-code>
+        <p>The second way to make a link allows certain text to be in the link. So:</p>
+        <c-code>
+The [Free Law Project](https://free.law) is a 501(c)(3) non-profit.
+        </c-code>
+        <p>Becomes:</p>
+        <div class="textbox">
+            <p>The <a class="underline" href="https://free.law">Free Law Project</a> is a 501(c)(3) non-profit.
+            </p>
+        </div>
+        <p>The third way is again borrowed from email and uses footnotes:</p>
+        <c-code>
+We rely on your [donations][1] to survive.
+
+Some of our projects are [CourtListener][cl] and [RECAP][r].
+
+[1]: https://donate.free.law/forms/supportflp
+[cl]: https://www.courtlistener.com/
+[r]: https://free.law/recap/
+        </c-code>
+        <p>Becomes:</p>
+        <div class="textbox">
+            <p>We rely on your
+               <a class="underline" href="https://donate.free.law/forms/supportflp">donations</a>
+               to survive.
+            </p>
+
+            <p>Some of our projects are
+               <a class="underline" href="https://www.courtlistener.com/">CourtListener</a>
+               and
+               <a class="underline" href="https://free.law/recap/">RECAP</a>.
+            </p>
+        </div>
+        <p>Note that you're free to use numbers or any other specific text when creating these footnote-style links. It's often easier to give them meaningful names instead of numbers so that you can remember them later if you want to use the same footnote a second or third time. (Above, I used
+            <code>1</code>, <code>cl</code>, and <code>r</code> but I could have used anything.)
+        </p>
+    </c-layout-with-navigation.section>
+
+    <c-layout-with-navigation.section id="quotes">
+        <h3>Quotes</h3>
+        <p>If you wish to quote somebody, you can do that too, again borrowing a style common in email:
+        </p>
+        <c-code>
+> This is a quote!
+        </c-code>
+        <p>Becomes:</p>
+        <div class="textbox">
+            <blockquote>
+                This is a quote!
+            </blockquote>
+        </div>
+        <p>If you want to nest quotes, just repeat the format:</p>
+        <c-code>
+The [Oyez Project][oyez] reported big news today on their blog:
+
+> Thomas asked a question during oral argument! He said:
+
+> > I'm sorry, could you repeat that?
+
+[oyez]: https://www.oyez.org
+        </c-code>
+
+        <div class="textbox">
+            <p>The <a class="underline" href="https://www.oyez.org">Oyez Project</a> reported big news today on their blog:</p>
+
+            <blockquote>
+                <p>Thomas asked a question during oral argument! He said:</p>
+
+                <blockquote>
+                    <p>I'm sorry, could you repeat that?</p>
+                </blockquote>
+            </blockquote>
+        </div>
+        <p>This example also shows an extra paragraph and a footnote-style link, to build up a more complex example.</p>
+    </c-layout-with-navigation.section>
+
+    <c-layout-with-navigation.section id="images">
+        <h2 id="special">Special Topics</h2>
+        <h3>Images</h3>
+        <p>Links to images are allowed, and can be used in two ways similar to the link formats. For example, you can either do:
+        </p>
+        <c-code>
+![CourtListener Logo](https://www.courtlistener.com{%  static "png/logo.png" %})
+        </c-code>
+
+        <p>Or you can do footnote-style images:</p>
+        <c-code>
+![CourtListener Logo][logo]
+
+[logo]: https://www.courtlistener.com{%  static "png/logo.png" %}
+        </c-code>
+
+        <p>Both of these would render as:</p>
+        <img src="{% static "png/logo.png" %}"
+             alt="CourtListener Logo"
+             width="250"
+             height="113">
+        <p>These formats mirror those of links, but with an exclamation point at the front.
+        </p>
+        <p>Naturally, you can also make an image into a link, by wrapping it like we did when making links:</p>
+        <c-code>
+[![CourtListener Logo][logo]][cl]
+
+[logo]: https://www.courtlistener.com{%  static "png/logo.png" %}
+[cl]: https://www.courtlistener.com/
+        </c-code>
+
+        <p>Which looks the same as above, but takes you to the CourtListener homepage:</p>
+        <a href="/">
+            <img src="{% static "png/logo.png" %}"
+                 alt="CourtListener Logo"
+                 width="250"
+                 height="113"/>
+        </a>
+    </c-layout-with-navigation.section>
+
+    <c-layout-with-navigation.section id="footnotes">
+        <h3>Footnotes</h3>
+        <p>You can create footnotes as follows:</p>
+        <c-code>
+This is a paragraph with a footnote. [^note-id]
+
+[^note-id]: This is the text of the note.
+        </c-code>
+
+        <p>Which creates:</p>
+       <div class="textbox">
+            <p>This is a paragraph with a footnote.
+               <sup class="footnote-ref" id="fnref-note-id">
+                 <a href="#fn-note-id">1</a>
+               </sup>
+            </p>
+            <hr/>
+            <ol>
+                <li id="fn-note-id">
+                    <p>This is the text of the note.&nbsp;
+                        <a href="#fnref-note-id"
+                           title="Jump back to footnote 1 in the text."
+                        >&#8617;</a>
+                    </p>
+                </li>
+            </ol>
+        </div>
+    </c-layout-with-navigation.section>
+
+    <c-layout-with-navigation.section id="tables">
+        <h3>Tables</h3>
+        <p>You can make tables using pipes (<code>|</code>) and dashes
+            (<code>-</code>). For example:
+        </p>
+        <c-code>
+Fruits|Vegetables
+------|----------
+apple|spinach
+orange|celery
+        </c-code>
+        <p>Which becomes:</p>
+        <div class="textbox">
+            <table class="w-full">
+                <tr>
+                    <th scope="col">Fruits</th>
+                    <th scope="col">Vegetables</th>
+                </tr>
+                <tr>
+                    <td>apple</td>
+                    <td>spinach</td>
+                </tr>
+                <tr>
+                    <td>orange</td>
+                    <td>celery</td>
+                </tr>
+            </table>
+        </div>
+    </c-layout-with-navigation.section>
+
+    <c-layout-with-navigation.section id="linking">
+        <h3>Linking to Other
+            Items</h3>
+
+        <p>One final thing you can do is link to other networks or opinions on
+            CourtListener. This can be done as follows:
+        </p>
+        <c-code>
+As demonstrated in network #2, the doctrine has a long history starting at opinion #108713.
+        </c-code>
+        <p>Which creates a link to network #2.</p>
+        <div class="textbox">
+            <p>As demonstrated in
+               <a class="text-primary-600" href="{% url "view_visualization" pk=2 slug="md" %}">network #2</a>, the doctrine has a long history starting at
+               <a class="text-primary-600" href="{% url "view_case" 108713 "md" %}">opinion #108713</a>.
+            </p>
+        </div>
+        <p>Whenever the word <em>network</em> or the word <em>opinion</em> is followed by a pound sign and a number, it will automatically be made into a link. Upper case or lower case letters will work.
+        </p>
+    </c-layout-with-navigation.section>
+</c-layout-with-navigation>
+{% endblock %}
