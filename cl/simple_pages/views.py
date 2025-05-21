@@ -305,7 +305,15 @@ async def coverage_oa(request: HttpRequest) -> HttpResponse:
         request,
         "help/coverage_oa.html",
         {
-            "courts_with_oral_argument_scrapers": oral_argument_courts,
+            "courts_with_oral_argument_scrapers": oral_argument_courts,  # -> can be safely removed once new design is launched
+            "courts_list": [
+                {
+                    "href": f"/?q=&court_{court.pk}=on&order_by=dateArgued+desc&type=oa",
+                    "label": court,
+                    "ref": "nofollow",
+                }
+                async for court in oral_argument_courts
+            ],
             "private": False,
         },
     )
