@@ -67,8 +67,9 @@ def store_bounce_or_complaint_obj(
         case _:
             return None
 
-    if random.random() >= storing_rate and email_recipient:
-        # Ignore events over the random rate.
+    if random.random() >= storing_rate or not email_recipient:
+        # Ignore events that exceed the random sampling rate or have no
+        # email recipient.
         return None
 
     try:
