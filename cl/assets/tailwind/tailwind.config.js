@@ -17,6 +17,9 @@ module.exports = {
 
       /*  Alpine components that could contain Tailwind CSS classes. */
       '../static-global/js/alpine/components/*.js',
+
+      /*  SVG files that could contain Tailwind CSS classes. */
+      '../static-global/svg/*.svg',
     ],
   },
   theme: {
