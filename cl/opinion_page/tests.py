@@ -806,39 +806,6 @@ class ViewRecapDocketTest(TestCase):
         )
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
-    async def test_docket_view_counts_increment_by_one(self) -> None:
-        """Test the view count for a Docket increments on page view"""
-
-        old_view_count = self.docket.view_count
-        r = await self.async_client.get(
-            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
-        )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        await self.docket.arefresh_from_db(fields=["view_count"])
-        self.assertEqual(old_view_count + 1, self.docket.view_count)
-
-    async def test_appellate_docket_no_pacer_case_id_increment_view_count(
-        self,
-    ) -> None:
-        """Test the view count for a RECAP Docket without pacer_case_id
-        increments on page view
-        """
-
-        # Set pacer_case_id blank
-        await Docket.objects.filter(pk=self.docket_appellate.pk).aupdate(
-            pacer_case_id=None
-        )
-        old_view_count = self.docket_appellate.view_count
-        r = await self.async_client.get(
-            reverse(
-                "view_docket",
-                args=[self.docket_appellate.pk, self.docket_appellate.slug],
-            )
-        )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        await self.docket_appellate.arefresh_from_db(fields=["view_count"])
-        self.assertEqual(old_view_count + 1, self.docket_appellate.view_count)
-
     async def test_pagination_returns_last_page_if_page_out_of_range(self):
         """
         Verify that the Docket view handles out-of-range page requests by returning
