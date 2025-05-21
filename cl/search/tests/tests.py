@@ -1,6 +1,6 @@
+import datetime
 import io
 import re
-from datetime import date, datetime
 from http import HTTPStatus
 from unittest import mock
 from urllib.parse import parse_qs
@@ -102,7 +102,9 @@ class ModelTest(TestCase):
             case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         self.oc = OpinionCluster.objects.create(
-            case_name="Blah", docket=self.docket, date_filed=date(2010, 1, 1)
+            case_name="Blah",
+            docket=self.docket,
+            date_filed=datetime.date(2010, 1, 1),
         )
         self.o = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
         self.c = Citation.objects.create(
@@ -129,12 +131,12 @@ class ModelTest(TestCase):
             case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         docket.save()
-        self.oc.date_filed = date(1899, 1, 1)
+        self.oc.date_filed = datetime.date(1899, 1, 1)
         self.oc.save()
 
         try:
             cf = ContentFile(io.BytesIO(b"blah").read())
-            self.o.file_with_date = date(1899, 1, 1)
+            self.o.file_with_date = datetime.date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
             self.o.save()
         except ValueError:
@@ -199,7 +201,7 @@ class ModelTest(TestCase):
             docket=DocketFactory(
                 court=court,
             ),
-            date_filed=date(1978, 3, 10),
+            date_filed=datetime.date(1978, 3, 10),
             source="U",
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
@@ -1397,8 +1399,8 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         """Confirm that passing absolute dates returns the expected absolute
         filter in ISO format.
         """
-        filed_before = date(2025, 5, 1)
-        filed_after = date(2025, 5, 18)
+        filed_before = datetime.date(2025, 5, 1)
+        filed_after = datetime.date(2025, 5, 18)
         qs = build_daterange_query(
             "dateFiled", before=filed_before, after=filed_after
         )
@@ -1479,7 +1481,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         as might occur in API calls.
         """
         qs = build_daterange_query(
-            "dateFiled", before=date(2025, 5, 10), after="2 days ago"
+            "dateFiled", before=datetime.date(2025, 5, 10), after="2 days ago"
         )
         self.assertEqual(len(qs), 1)
 
@@ -2137,7 +2139,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -2157,7 +2159,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -2174,7 +2176,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
