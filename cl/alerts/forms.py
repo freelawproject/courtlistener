@@ -41,9 +41,9 @@ class CreateAlertForm(ModelForm):
             self.fields["alert_type"].widget = HiddenInput()
             # Restore the original valid alert_type field choices, since
             # they were overridden for RECAP
-            original_field = self._meta.model._meta.get_field("alert_type")
-            field = self.fields["alert_type"]
-            field.choices = original_field.choices
+            self.fields[
+                "alert_type"
+            ].choices = SEARCH_TYPES.SUPPORTED_ALERT_TYPES
 
     def clean_rate(self):
         rate = self.cleaned_data["rate"]
