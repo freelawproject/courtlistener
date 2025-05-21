@@ -269,7 +269,7 @@ class SearchForm(forms.Form):
         label="Filed After",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "MM/DD/YYYY",
+                "placeholder": "Filed After",
                 "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
@@ -280,13 +280,12 @@ class SearchForm(forms.Form):
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.PARENTHETICAL,
     ]
-    filed_after_relative = forms.CharField(required=False)
     filed_before = CeilingDateField(
         required=False,
         label="Filed Before",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "MM/DD/YYYY",
+                "placeholder": "Filed Before",
                 "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
@@ -642,11 +641,6 @@ class SearchForm(forms.Form):
             if isinstance(v, str):
                 cleaned_data[k] = v.strip()
 
-        filed_after = cleaned_data.get("filed_after") or cleaned_data.get(
-            "filed_after_relative"
-        )
-        cleaned_data["filed_after"] = filed_after
-
         return cleaned_data
 
     def as_display_dict(self, court_count_human):
@@ -715,7 +709,7 @@ def clean_up_date_formats(
                     value.year,
                 )
             elif isinstance(value, str):
-                # Leave relative date strings as-is
+                # Leave relative date strings as it's.
                 get_params[field] = value
 
 

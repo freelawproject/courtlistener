@@ -1870,9 +1870,19 @@ rect.series-segment {
   display: flex;
   align-items: stretch;
 }
+.date-filter-mode .radio-inline {
+  margin-left: 15px;
+}
+
+.date-filter-mode input[name="date-mode"] {
+  margin-top: 1px;
+}
+
 
 .relative-select input.form-control {
   flex: 1;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .btn-dropdown-toggle {
@@ -1880,6 +1890,12 @@ rect.series-segment {
   padding: 0 0.75em;
   border-left: none;
   border-radius: 0 .25em .25em 0;
+  -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+}
+.btn-dropdown-toggle:hover {
+  background-color:white;
+  border-color: #cccccc;
 }
 
 .relative-options-list {

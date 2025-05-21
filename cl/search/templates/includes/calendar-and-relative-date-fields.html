@@ -1,0 +1,65 @@
+<div class="form-group date-filter-mode">
+  <label>Date Filed:</label>
+  <label class="radio-inline">
+    <input type="radio" name="date-mode" value="calendar"
+      {% if not request.GET.filed_after or "/" in request.GET.filed_after %}
+        checked
+      {% endif %}
+    > Calendar
+  </label>
+  <label class="radio-inline">
+    <input type="radio" name="date-mode" value="relative"
+      {% if request.GET.filed_after and not "/" in request.GET.filed_after %}
+        checked
+      {% endif %}
+    > Relative
+  </label>
+</div>
+
+<div class="date-calendar-fields
+  {% if request.GET.filed_after and not "/" in request.GET.filed_after %}
+    htmx-hidden-indicator
+  {% endif %}">
+  <div class="row">
+    <div class="col-md-6">
+      <div class="form-group{% if search_form.filed_after.errors %} has-error{% endif %}">
+        {{ search_form.filed_after }}
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="form-group{% if search_form.filed_before.errors %} has-error{% endif %}">
+        {{ search_form.filed_before }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="date-relative-fields
+  {% if not request.GET.filed_after or "/" in request.GET.filed_after %}
+   htmx-hidden-indicator
+  {% endif %}">
+  <div class="form-group{% if search_form.filed_after.errors %} has-error{% endif %}">
+    <div class="relative-select">
+      <input
+        type="text"
+        id="id_filed_after_relative"
+        name="filed_after"
+        class="external-input form-control"
+        placeholder="------------"
+        value="{{ request.GET.filed_after }}"
+        autocomplete="off">
+      <button
+        type="button"
+        class="btn btn-default btn-dropdown-toggle"
+        aria-label="Toggle options">
+       <i class="fa fa-caret-down" aria-hidden="true"></i>
+      </button>
+      <ul class="relative-options-list dropdown-menu">
+        <li data-value="1d ago">Past Day</li>
+        <li data-value="7d ago">Past Week</li>
+        <li data-value="30d ago">Past Month</li>
+        <li data-value="365d ago">Past Year</li>
+      </ul>
+    </div>
+  </div>
+</div>
