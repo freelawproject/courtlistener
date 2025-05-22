@@ -11,8 +11,11 @@ from cl.search.models import SEARCH_TYPES
 
 class CreateAlertForm(ModelForm):
     ALERT_INCLUSION_CHOICES = [
-        (SEARCH_TYPES.DOCKETS, "Notifications on Cases only"),
-        (SEARCH_TYPES.RECAP, "Notifications on both Cases and Filings"),
+        (SEARCH_TYPES.DOCKETS, "Notifications on new cases only"),
+        (
+            SEARCH_TYPES.RECAP,
+            "Notifications on both new cases and new filings",
+        ),
     ]
     alert_type = forms.ChoiceField(
         label="What should we include in your alerts?",
