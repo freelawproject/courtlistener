@@ -266,28 +266,38 @@ async def get_result_count(request, version, day_count):
         )
     cd = search_form.cleaned_data
     search_type = cd["type"]
+    total_case_only_query_results = 0
     match search_type:
         case SEARCH_TYPES.ORAL_ARGUMENT:
             # Elasticsearch version for OA
             search_query = AudioDocument.search()
-            total_query_results = await sync_to_async(
+            total_query_results, _ = await sync_to_async(
                 do_es_alert_estimation_query
             )(search_query, cd, day_count)
         case SEARCH_TYPES.OPINION:
             # Elasticsearch version for O
             search_query = OpinionClusterDocument.search()
-            total_query_results = await sync_to_async(
+            total_query_results, _ = await sync_to_async(
                 do_es_alert_estimation_query
             )(search_query, cd, day_count)
         case SEARCH_TYPES.RECAP:
             # Elasticsearch version for RECAP
             search_query = DocketDocument.search()
-            total_query_results = await sync_to_async(
-                do_es_alert_estimation_query
-            )(search_query, cd, day_count)
+            (
+                total_query_results,
+                total_case_only_query_results,
+            ) = await sync_to_async(do_es_alert_estimation_query)(
+                search_query, cd, day_count
+            )
         case _:
             total_query_results = 0
-    return JsonResponse({"count": total_query_results}, safe=True)
+    return JsonResponse(
+        {
+            "count": total_query_results,
+            "count_case_only": total_case_only_query_results,
+        },
+        safe=True,
+    )
 
 
 async def deprecated_api(request, v):

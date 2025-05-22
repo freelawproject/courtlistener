@@ -3251,7 +3251,7 @@ def do_collapse_count_query(
 
 def do_es_alert_estimation_query(
     search_query: Search, cd: CleanData, day_count: int
-) -> int:
+) -> tuple[int, int]:
     """Builds an ES alert estimation query based on the provided search query,
      clean data, and day count.
 
@@ -3262,6 +3262,7 @@ def do_es_alert_estimation_query(
     :return: An integer representing the alert estimation.
     """
 
+    total_recap_case_only_estimation = 0
     match cd["type"]:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP:
             after_field = "filed_after"
@@ -3303,21 +3304,43 @@ def do_es_alert_estimation_query(
         child_docs_count_query = build_child_docs_query(child_docs_query, cd)
         child_total = 0
         if child_docs_count_query:
-            child_docs_count_query = search_query.query(child_docs_count_query)
-            child_total_query = child_docs_count_query.extra(
+            child_docs_count_query_all = search_query.query(
+                child_docs_count_query
+            )
+            child_total_query = child_docs_count_query_all.extra(
                 size=0, track_total_hits=True
             )
             multi_search = multi_search.add(child_total_query)
+
+            # Count RECAPDocuments aggregating by docket_id for case only alerts
+            rd_case_only_query = search_query.query(child_docs_count_query)
+            rd_case_only_query.aggs.bucket(
+                "unique_documents",
+                "cardinality",
+                field="docket_id",
+                precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
+            )
+            rd_case_only_query = rd_case_only_query.extra(
+                size=0, track_total_hits=False
+            )
+            multi_search = multi_search.add(rd_case_only_query)
 
         responses = multi_search.execute()
         parent_total = responses[0].hits.total.value
         if child_docs_count_query:
             child_doc_count_response = responses[1]
             child_total = child_doc_count_response.hits.total.value
-        total_recap_estimation = parent_total + child_total
-        return total_recap_estimation
 
-    return estimation_query.count()
+            # Case only count
+            child_doc_count_response_case_only = responses[2]
+            child_total_case_only = child_doc_count_response_case_only.aggregations.unique_documents.value
+            total_recap_case_only_estimation = max(
+                parent_total, child_total_case_only
+            )
+        total_recap_estimation = parent_total + child_total
+        return total_recap_estimation, total_recap_case_only_estimation
+
+    return estimation_query.count(), total_recap_case_only_estimation
 
 
 def do_es_sweep_alert_query(
