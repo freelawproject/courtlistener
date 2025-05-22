@@ -3,6 +3,7 @@
 {% load text_filters %}
 {% load extras %}
 {% load static %}
+{% load waffle_tags %}
 
 {% block message %}{% endblock %}
 
@@ -51,7 +52,9 @@
 
 {% block footer-scripts %}
   <script src="{% static "js/progress-bar.js" %}"></script>
-  <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
+  {% flag "recap_relative_date_filter" %}
+    <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
+  {% endflag %}
   {% include "includes/date_picker.html" %}
   {% if alert_form.errors or request.GET.show_alert_modal %}
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">

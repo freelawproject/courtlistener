@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', function(){
     } else {
       calendarAfter.name = '';
       relativeInput.name = 'filed_after';
+      // In relative mode, also clear the filed_before value to prevent unintended absolute and relative range combinations
+      calendarBefore.value = '';
     }
     calendarAfter.disabled = !isCalendar;
     calendarBefore.disabled = !isCalendar;

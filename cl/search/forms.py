@@ -269,7 +269,7 @@ class SearchForm(forms.Form):
         label="Filed After",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "Filed After",
+                "placeholder": "MM/DD/YYYY",
                 "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
@@ -285,7 +285,7 @@ class SearchForm(forms.Form):
         label="Filed Before",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "Filed Before",
+                "placeholder": "MM/DD/YYYY",
                 "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
@@ -592,7 +592,19 @@ class SearchForm(forms.Form):
         for field_name in self.get_date_field_names():
             before = cleaned_data.get(f"{field_name}_before")
             after = cleaned_data.get(f"{field_name}_after")
-            if before and after and (before < after):
+            if (
+                all(
+                    (
+                        before,
+                        after,
+                        not isinstance(
+                            before, str
+                        ),  # Ignore combinations of absolute and relative dates.
+                        not isinstance(after, str),
+                    )
+                )
+                and before < after
+            ):
                 # The user is requesting dates like this: <--b  a-->. Switch
                 # the dates so their query is like this: a-->   <--b
                 cleaned_data[f"{field_name}_before"] = after

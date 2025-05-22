@@ -23,12 +23,26 @@
   <div class="row">
     <div class="col-md-6">
       <div class="form-group{% if search_form.filed_after.errors %} has-error{% endif %}">
-        {{ search_form.filed_after }}
+        <input
+            type="text"
+            name="filed_after"
+            value="{% if '/' in request.GET.filed_after %}{{ request.GET.filed_after }}{% else %}{% endif %}"
+            placeholder="Filed After"
+            class="external-input form-control datepicker"
+            autocomplete="off"
+            id="id_filed_after">
       </div>
     </div>
     <div class="col-md-6">
       <div class="form-group{% if search_form.filed_before.errors %} has-error{% endif %}">
-        {{ search_form.filed_before }}
+        <input
+            type="text"
+            name="filed_before"
+            value="{% if '/' in request.GET.filed_before %}{{ request.GET.filed_before }}{% else %}{% endif %}"
+            placeholder="Filed Before"
+            class="external-input form-control datepicker"
+            autocomplete="off"
+            id="id_filed_before">
       </div>
     </div>
   </div>
@@ -43,10 +57,10 @@
       <input
         type="text"
         id="id_filed_after_relative"
-        name="filed_after"
+        name=""
         class="external-input form-control"
         placeholder="------------"
-        value="{{ request.GET.filed_after }}"
+        value="{% if not '/' in request.GET.filed_after %}{{ request.GET.filed_after }}{% else %}{% endif %}"
         autocomplete="off">
       <button
         type="button"
@@ -58,10 +72,10 @@
         <li data-value="1d ago">Past Day</li>
         <li data-value="7d ago">Past Week</li>
         <li data-value="14d ago">Past 2 Weeks</li>
-        <li data-value="30d ago">Past Month</li>
-        <li data-value="90d ago">Past 3 Months</li>
-        <li data-value="180d ago">Past 6 Months</li>
-        <li data-value="365d ago">Past Year</li>
+        <li data-value="-1m ago">Past Month</li>
+        <li data-value="-3m ago">Past 3 Months</li>
+        <li data-value="-6m ago">Past 6 Months</li>
+        <li data-value="-1y ago">Past Year</li>
       </ul>
     </div>
   </div>

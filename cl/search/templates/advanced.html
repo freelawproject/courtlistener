@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load extras humanize static %}
+{% load extras humanize static waffle_tags %}
 
 
 {% block head %}
@@ -38,7 +38,9 @@
 
 {% block footer-scripts %}
   <script src="{% static "js/progress-bar.js" %}"></script>
-  <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
+  {% flag "recap_relative_date_filter" %}
+    <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
+  {% endflag %}
   {% include "includes/date_picker.html" %}
   <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     $(document).ready(function () {
@@ -341,10 +343,24 @@
                     </div>
                 </div>
                 <div class="row">
+                  {% flag "recap_relative_date_filter" %}
                     <div class="col-sm-6">
                       {% include "includes/calendar-and-relative-date-fields.html" %}
                     </div>
-
+                  {% else %}
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.filed_after.label_tag }}
+                            {{ search_form.filed_after }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.filed_before.label_tag }}
+                            {{ search_form.filed_before }}
+                        </div>
+                    </div>
+                  {% endflag %}
                     <div class="col-sm-3">
                         <div class="form-group">
                             {{ search_form.document_number.label_tag }}
