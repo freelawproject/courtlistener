@@ -3099,6 +3099,26 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         d_2.delete()
         d_3.delete()
 
+    def test_invalid_relative_date_syntax(self):
+        """Confirm that a custom error is displayed to users when they enter an
+        invalid relative date syntax.
+        """
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+        test_cases = ["1d", "5 day", "invalid date", "12/05-23"]
+        for invalid_date in test_cases:
+            with self.subTest(expr=invalid_date):
+                cd = {**params, "filed_after": invalid_date}
+                r = async_to_sync(self._test_article_count)(
+                    cd, 0, "Invalid date syntax."
+                )
+                self.assertIn(
+                    "The date entered has an invalid format.",
+                    r.content.decode(),
+                )
+
 
 class RECAPSearchDecayRelevancyTest(
     ESIndexTestCase, V4SearchAPIAssertions, TestCase
@@ -5792,6 +5812,27 @@ class RECAPSearchAPIV4Test(
         d_1.delete()
         d_2.delete()
         d_3.delete()
+
+    def test_invalid_relative_date_syntax(self):
+        """Confirm that a custom error is displayed to users when they enter an
+        invalid relative date syntax.
+        """
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+        test_cases = ["1d", "5 day", "invalid date", "12/05-23"]
+        for invalid_date in test_cases:
+            with self.subTest(expr=invalid_date):
+                search_params = {**params, "filed_after": invalid_date}
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertIn(
+                    "The date entered has an invalid format.",
+                    r.content.decode(),
+                )
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

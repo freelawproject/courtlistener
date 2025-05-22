@@ -54,6 +54,7 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.exception import InvalidRelativeDateSyntax
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
@@ -1448,13 +1449,16 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
 
         for user_input, expected_math in cases.items():
             with self.subTest(user_input=user_input):
-                qs = build_daterange_query(
-                    "dateFiled", before="", after=user_input
-                )
                 if not expected_math:
                     # Assert invalid syntaxes.
-                    self.assertFalse(qs)
+                    with self.assertRaises(InvalidRelativeDateSyntax):
+                        build_daterange_query(
+                            "dateFiled", before="", after=user_input
+                        )
                 else:
+                    qs = build_daterange_query(
+                        "dateFiled", before="", after=user_input
+                    )
                     # Assert the validity of the relative range filter.
                     self.assertEqual(len(qs), 1)
                     query_dict = qs[0].to_dict()["range"]["dateFiled"]

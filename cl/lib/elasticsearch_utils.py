@@ -82,6 +82,7 @@ from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
     ElasticBadRequestError,
+    InvalidRelativeDateSyntax,
     QueryType,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
@@ -3105,6 +3106,7 @@ def do_es_api_query(
         UnbalancedQuotesQuery,
         BadProximityQuery,
         DisallowedWildcardPattern,
+        InvalidRelativeDateSyntax,
     ) as e:
         raise ElasticBadRequestError(detail=e.message)
 

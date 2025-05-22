@@ -11,7 +11,11 @@ from django.core.cache import cache
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData
-from cl.search.exception import DisallowedWildcardPattern, QueryType
+from cl.search.exception import (
+    DisallowedWildcardPattern,
+    InvalidRelativeDateSyntax,
+    QueryType,
+)
 
 RELATIVE_DATES_SYNTAX = re.compile(
     r"""
@@ -577,5 +581,4 @@ def parse_string_date(date_value: datetime.date | str) -> str | None:
     try:
         return convert_to_es_date_match(date_value)
     except ValueError:
-        # Invalid relative date syntax. Ignore it.
-        return None
+        raise InvalidRelativeDateSyntax(QueryType.FILTER)
