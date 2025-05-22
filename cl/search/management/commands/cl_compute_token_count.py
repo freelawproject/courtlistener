@@ -28,10 +28,8 @@ def get_recap_random_dataset(
         A Django QuerySet containing a random sample of RECAPDocument objects.
     """
     return RECAPDocument.objects.raw(
-        (
-            f"SELECT * FROM search_recapdocument TABLESAMPLE SYSTEM ({percentage}) "
-            "where is_available= True and plain_text <> '' and page_count > 0"
-        )
+        f"SELECT * FROM search_recapdocument TABLESAMPLE SYSTEM ({percentage}) "
+        "where is_available= True and plain_text <> '' and page_count > 0"
     )
 
 
@@ -166,7 +164,7 @@ class Command(VerboseCommand):
             f"Total number of recap documents: {total_recap_documents}"
         )
         self.stdout.write(
-            f"The sample represents {sample_size/total_recap_documents:.3%} of the Archive"
+            f"The sample represents {sample_size / total_recap_documents:.3%} of the Archive"
         )
         self.stdout.write(
             f"Total number of tokens in the recap archive: {intword(total_token_in_recap)}"
@@ -203,7 +201,7 @@ class Command(VerboseCommand):
         self.stdout.write("-" * 20)
         self.stdout.write(f"Total number of opinions: {total_opinions}")
         self.stdout.write(
-            f"The sample represents {sample_size/total_opinions:.3%} of the Caselaw"
+            f"The sample represents {sample_size / total_opinions:.3%} of the Caselaw"
         )
         self.stdout.write(
             f"Total number of tokens in caselaw: {intword(total_token_in_caselaw)}"

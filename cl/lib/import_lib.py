@@ -36,10 +36,8 @@ def get_path_list():
     to import a previous item.
     """
     return set(
-        (
-            Opinion.objects.exclude(local_path="").values_list(
-                "local_path", flat=True
-            )
+        Opinion.objects.exclude(local_path="").values_list(
+            "local_path", flat=True
         )
     )
 

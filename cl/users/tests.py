@@ -1,5 +1,4 @@
 import json
-import logging
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
@@ -103,8 +102,8 @@ class UserTest(LiveServerTestCase):
             self.assertEqual(
                 r.status_code,
                 HTTPStatus.OK,
-                msg="Got wrong status code for page at: {path}. "
-                "Status Code: {code}".format(path=path, code=r.status_code),
+                msg=f"Got wrong status code for page at: {path}. "
+                f"Status Code: {r.status_code}",
             )
 
     @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
@@ -790,10 +789,11 @@ class SNSWebhookTest(TestCase):
             signals.bounce_received,
         )
         # Check if warning is logged
-        warning_part_one = "Unexpected ContentRejected soft bounce for "
-        warning_part_two = "bounce@simulator.amazonses.com, message_id: "
         mock_logging.warning.assert_called_with(
-            f"{warning_part_one}{warning_part_two}"
+            "Unexpected %s soft bounce for %s, message_id: %s",
+            "ContentRejected",
+            "bounce@simulator.amazonses.com",
+            "",
         )
 
     def test_handle_soft_bounce_create_back_off(self) -> None:
@@ -1060,10 +1060,10 @@ class SNSWebhookTest(TestCase):
             signals.bounce_received,
         )
         # Check if a warning is logged
-        warning_part_one = "Unexpected Suppressed hard bounce for "
-        warning_part_two = "bounce@simulator.amazonses.com"
         mock_logging.warning.assert_called_with(
-            f"{warning_part_one}{warning_part_two}"
+            "Unexpected %s hard bounce for %s",
+            "Suppressed",
+            "bounce@simulator.amazonses.com",
         )
         email_ban_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
@@ -2440,8 +2440,8 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Check if warning is logged
         mock_logging.warning.assert_called_with(
-            "The message: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0 can't be "
-            "enqueued because it doesn't exist anymore."
+            "The message: %s can't be enqueued because it doesn't exist anymore.",
+            "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0",
         )
 
     def test_compose_message_from_db_retrieve_user_email(self) -> None:
@@ -3555,7 +3555,6 @@ class WebhooksHTMXTests(APITestCase):
 @override_settings(DEVELOPMENT=False)
 @patch("cl.users.tasks.NeonClient")
 class NeonAccountCreationTest(TestCase):
-
     async def test_can_send_email_for_multiple_neon_accounts(
         self, mock_neon_client
     ) -> None:
@@ -3660,7 +3659,6 @@ class NeonAccountCreationTest(TestCase):
 @patch("cl.users.views.create_neon_account")
 @patch("cl.users.views.update_neon_account")
 class NeonAccountUpdateTest(TestCase):
-
     def setUp(self) -> None:
         self.client = AsyncClient()
         self.up = UserProfileWithParentsFactory.create(

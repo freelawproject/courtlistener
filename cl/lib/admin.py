@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import Any
 from urllib.parse import urlencode
 
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -21,7 +21,7 @@ class NotesInline(GenericTabularInline):
 
 
 def build_admin_url(
-    model_class: Type[Model],
+    model_class: type[Model],
     query_params: dict[str, Any] | None = None,
 ) -> str:
     """

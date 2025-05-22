@@ -38,10 +38,13 @@ class PodcastTest(ESIndexTestCase, TestCase):
             jurisdiction="F",
             citation_string="Appeals. CA8.",
         )
-        with mock.patch(
-            "cl.lib.es_signal_processor.allow_es_audio_indexing",
-            side_effect=lambda x, y: True,
-        ), cls.captureOnCommitCallbacks(execute=True):
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ),
+            cls.captureOnCommitCallbacks(execute=True),
+        ):
             cls.audio = AudioWithParentsFactory.create(
                 docket=DocketFactory(
                     court=cls.court_1, date_argued=datetime.date(2014, 8, 16)
@@ -159,10 +162,8 @@ class PodcastTest(ESIndexTestCase, TestCase):
         self.assertEqual(
             node_count,
             expected_item_count,
-            msg="Did not get {expected} node(s) during search podcast "
-            "generation. Instead found: {actual}".format(
-                expected=expected_item_count, actual=node_count
-            ),
+            msg=f"Did not get {expected_item_count} node(s) during search podcast "
+            f"generation. Instead found: {node_count}",
         )
         # pubDate key must be present in Audios with date_argued.
         pubdate_present = xml_tree.xpath(

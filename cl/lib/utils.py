@@ -1,9 +1,9 @@
 import re
 from collections.abc import Iterable
+from collections.abc import Iterable as IterableType
 from itertools import chain, islice, tee
+from re import Match
 from typing import Any
-from typing import Iterable as IterableType
-from typing import Match, Optional, Tuple
 
 from django.core.cache import cache
 
@@ -82,18 +82,18 @@ def is_iter(item: Any) -> bool:
     return isinstance(item, Iterable)
 
 
-def remove_duplicate_dicts(l: list[dict]) -> list[dict]:
+def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
     """Given a list of dicts, remove any that are the same.
 
     See: https://stackoverflow.com/a/9427216/64911
     """
-    return [dict(t) for t in {tuple(d.items()) for d in l}]
+    return [dict(t) for t in {tuple(d.items()) for d in dicts}]
 
 
 def human_sort(
-    unordered_list: IterableType[str | Tuple[str, Any]],
-    key: Optional[str] = None,
-) -> IterableType[str | Tuple[str, Any]]:
+    unordered_list: IterableType[str | tuple[str, Any]],
+    key: str | None = None,
+) -> IterableType[str | tuple[str, Any]]:
     """Human sort Lists of strings or list of dictionaries
 
     :param unordered_list: The list we want to sort
@@ -293,7 +293,10 @@ def cleanup_main_query(query_string: str) -> str:
 
     query_string = perform_special_character_replacements(query_string)
 
-    for item in re.split(r'([^a-zA-Z0-9_\-^~":]+)', query_string):
+    # Tweaks to the following regex for special characters exceptions
+    # like §, $, %, and ¶ should also be applied to type_table in
+    # custom_word_delimiter_filter.
+    for item in re.split(r'([^a-zA-Z0-9_\-^~":§$%¶]+)', query_string):
         if not item:
             continue
 

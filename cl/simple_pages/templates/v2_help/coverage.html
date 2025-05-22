@@ -1,0 +1,63 @@
+{% extends 'new_base.html' %}
+{% load humanize %}
+
+{% block title %}Coverage – CourtListener.com{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="recap-archive"
+  :nav_items="[
+      {'href': '#recap-archive', 'text': 'PACER Data Coverage'},
+      {'href': '#opinions', 'text': 'Case Law Coverage'},
+      {'href': '#financial-disclosures', 'text': 'Financial Disclosure Coverage'},
+      {'href': '#judges', 'text': 'Judge Coverage'},
+      {'href': '#oral-arguments', 'text': 'Oral Argument Coverage'},
+  ]"
+>
+  <section id="overview">
+    <h2>Data Coverage &mdash; What's in CourtListener?</h2>
+    <p class="lead">CourtListener is a vast searchable collection of legal information.</p>
+    <p>We have millions of case law records including <a class="underline" href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, tens of millions of PACER docket entries in the <a class="text-primary-600" href="{% url "advanced_r" %}">RECAP Archive</a>, and <a class="text-primary-600" href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|floatformat:"0"|intcomma }} minutes of recordings (and counting).
+    </p>
+    <p>The best way to think about our data is to consider where we get it from. The answer to that question depends on which kind of information you are interested in &mdash; PACER data (the RECAP Archive), case law, oral argument recordings, or financial disclosures.
+    </p>
+  </section>
+
+  <c-layout-with-navigation.section id="recap-archive">
+    <h2>PACER Data (The RECAP Archive)</h2>
+    <p>The RECAP Archive is the biggest open collection of federal court data on the Internet. It contains hundreds of millions of docket entries, nearly every federal case, and millions of documents. It grows by thousands of documents each day. See our page on this topic for more details.
+    </p>
+    <a href="{% url "coverage_recap" %}" class="btn-outline max-md:btn-xl">RECAP Archive Coverage</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="opinions">
+    <h2>Case Law</h2>
+    <p>Courtlistener has one of the most comprehensive collections of American Legal Jurisprudence on the internet. We have over nine million decisions from over 2000 courts. See our page on this topic for more details.</p>
+    <a href="{% url "coverage_opinions" %}" class="btn-outline max-md:btn-xl">Case Law Coverage</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="financial-disclosures">
+    <h2>Financial Disclosures</h2>
+    <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have. We have collected
+      {{ count_fds|intcomma|default:"tens of thousands" }} of these records containing {{ count_investments|intcomma|default:"more than a million" }} investments. See our page on this topic for more details.
+    </p>
+    <a href="{% url "coverage_fds" %}" class="btn-outline max-md:btn-xl">Disclosure Coverage</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="judges">
+    <h2>Judges</h2>
+    <p>We host a structured database of {{ count_people|intcomma|default:"thousands of" }} state and federal judges including their biographical, professional, judicial, and political information.
+    </p>
+    <a href="https://free.law/projects/judge-db" class="btn-outline max-md:btn-xl">Learn More on Free.law</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="oral-arguments">
+    <h2>Oral Argument Recordings</h2>
+    <p>We have the largest collection of oral argument audio recordings on the Internet. Currently our collection contains {{ oa_duration|floatformat:"0"|intcomma }} minutes of recordings.
+    </p>
+    <a href="{% url "coverage_oa" %}" class="btn-outline max-md:btn-xl">Oral Argument Coverage</a>
+  </c-layout-with-navigation.section>
+
+  <c-support-plea-banner></c-support-plea-banner>
+</c-layout-with-navigation>
+{% endblock %}

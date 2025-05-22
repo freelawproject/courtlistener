@@ -1,8 +1,8 @@
 import logging
 from collections import OrderedDict, defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from itertools import batched, chain
-from typing import Any, Dict, List, Set, TypedDict, Union
+from typing import Any, TypedDict
 
 import eyecite
 from dateutil import parser
@@ -272,9 +272,7 @@ class SimpleMetadataWithFilters(SimpleMetadata):
             else:
                 # Exact match or RelatedFilter
                 if isinstance(filter_type, RelatedFilter):
-                    model_name = (
-                        filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
-                    )
+                    model_name = filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
                     attrs["lookup_types"] = (
                         f"See available filters for '{model_name}'"
                     )
@@ -626,7 +624,7 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
             )
             if remaining_citation < max_num_citations or not idx:
                 datetime_obj = datetime.fromtimestamp(
-                    self.history[idx][-1], timezone.utc
+                    self.history[idx][-1], UTC
                 )
                 soonest_time = datetime_obj.isoformat()
                 break
@@ -682,9 +680,9 @@ class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
 
 
 def make_date_str_list(
-    start: Union[str, datetime],
-    end: Union[str, datetime],
-) -> List[str]:
+    start: str | datetime,
+    end: str | datetime,
+) -> list[str]:
     """Make a list of date strings for a date span
 
     :param start: The beginning date, as a string or datetime object
@@ -701,10 +699,10 @@ def make_date_str_list(
 
 
 def invert_user_logs(
-    start: Union[str, datetime],
-    end: Union[str, datetime],
+    start: str | datetime,
+    end: str | datetime,
     add_usernames: bool = True,
-) -> Dict[str, Dict[str, int]]:
+) -> dict[str, dict[str, int]]:
     """Aggregate API usage statistics per user over a date range.
 
     - Anonymous users are aggregated under the key 'AnonymousUser'.
@@ -785,9 +783,9 @@ def invert_user_logs(
 
 
 def get_user_ids_for_date_range(
-    start: Union[str, datetime],
-    end: Union[str, datetime],
-) -> Set[int]:
+    start: str | datetime,
+    end: str | datetime,
+) -> set[int]:
     """Get a list of user IDs that used the API during a span of time
 
     :param start: The beginning of when you want to find users. A str to be
@@ -1032,9 +1030,7 @@ def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
 
     deprecation_date = (
         datetime.strptime(webhook_deprecation_date, "%Y-%m-%d")
-        .replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
-        )
+        .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
         .isoformat()
     )
     return deprecation_date

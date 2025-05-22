@@ -2,7 +2,6 @@ import logging
 import re
 from datetime import date
 from http import HTTPStatus
-from typing import Optional
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
@@ -13,7 +12,6 @@ from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
-from requests import Session
 
 from cl.lib.elasticsearch_utils import (
     do_es_alert_estimation_query,
@@ -53,7 +51,9 @@ async def get_cached_court_counts(courts_queryset: QuerySet) -> dict[str, int]:
     )
     if court_counts:
         cache.set(
-            cache_key, court_counts, timeout=settings.QUERY_RESULTS_CACHE  # type: ignore
+            cache_key,
+            court_counts,
+            timeout=settings.QUERY_RESULTS_CACHE,  # type: ignore
         )
     return court_counts or {}
 
@@ -140,7 +140,6 @@ def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
 async def citation_lookup_api(
     request: HttpRequest, version=None
 ) -> HttpResponse:
-
     cite_count = await Citation.objects.acount()
     rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore
     default_throttle_rate = parse_throttle_rate_for_template(rate)
@@ -198,7 +197,7 @@ async def coverage_data(request, version, court):
 
 async def fetch_first_last_date_filed(
     court_id: str,
-) -> tuple[Optional[date], Optional[date]]:
+) -> tuple[date | None, date | None]:
     """Fetch first and last date for court
 
     :param court_id: Court object id

@@ -5,17 +5,17 @@ import re
 import time
 import traceback
 from collections import defaultdict
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
-from typing import Any, Callable, Dict, List, Literal
+from typing import Any, Literal
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.paginator import Page
-from django.db.models import Case
+from django.db.models import Case, QuerySet, TextField, When
 from django.db.models import Q as QObject
-from django.db.models import QuerySet, TextField, When
 from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
 from django.http.request import QueryDict
@@ -106,7 +106,6 @@ def elasticsearch_enabled(func: Callable) -> Callable:
 
 
 class CSVSerializableDocumentMixin:
-
     @classmethod
     def get_csv_headers(cls) -> list[str]:
         """
@@ -159,9 +158,9 @@ def build_numeric_range_query(
     params: ESRangeQueryParams = {"gte": lower_bound, "lte": upper_bound}
     if relation is not None:
         allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-        assert (
-            relation in allowed_relations
-        ), f"'{relation}' is not an allowed relation."
+        assert relation in allowed_relations, (
+            f"'{relation}' is not an allowed relation."
+        )
         params["relation"] = relation
 
     return [Q("range", **{field: params})]
@@ -191,9 +190,9 @@ def build_daterange_query(
             params["lte"] = f"{before.isoformat()}T23:59:59Z"
         if relation is not None:
             allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-            assert (
-                relation in allowed_relations
-            ), f"'{relation}' is not an allowed relation."
+            assert relation in allowed_relations, (
+                f"'{relation}' is not an allowed relation."
+            )
             params["relation"] = relation
 
     if params:
@@ -223,7 +222,7 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
 
     document_list = [
         {
-            "_id": f'o_{pair["pk"]}',
+            "_id": f"o_{pair['pk']}",
             "routing": pair["cluster_id"],
             # Important to match documents in the production cluster
         }
@@ -254,7 +253,7 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
     return bool_query
 
 
-def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
+def make_es_boost_list(fields: dict[str, float]) -> list[str]:
     """Constructs a list of Elasticsearch fields with their corresponding
     boost values.
 
@@ -507,7 +506,7 @@ def build_term_query(
     return [Q("term", **{field: value})]
 
 
-def build_text_filter(field: str, value: str) -> List:
+def build_text_filter(field: str, value: str) -> list:
     """Given a field and value, return Elasticsearch match_phrase query or [].
     "match_phrase" Returns documents that contain the exact phrase in a
     provided field, by default match_phrase has a slop of 0 that requires all
@@ -573,7 +572,7 @@ def build_sort_results(
     cd: CleanData,
     toggle_sorting: bool = False,
     api_version: Literal["v3", "v4"] | None = None,
-) -> Dict:
+) -> dict:
     """Given cleaned data, find order_by value and return dict to use with
     ElasticSearch sort
 
@@ -777,7 +776,7 @@ def extend_selected_courts_with_child_courts(
     return list(unique_courts)
 
 
-def build_es_plain_filters(cd: CleanData) -> List:
+def build_es_plain_filters(cd: CleanData) -> list:
     """Builds elasticsearch filters based on the CleanData object.
 
     :param cd: An object containing cleaned user data.
@@ -1903,7 +1902,7 @@ def fill_position_mapping(
                 if callable(field_value):
                     field_value = field_value()
                 elif isinstance(
-                    field_value, (datetime.datetime, datetime.date)
+                    field_value, (datetime.datetime | datetime.date)
                 ):
                     field_value = midnight_pt(field_value)
 
@@ -2367,7 +2366,7 @@ def build_has_child_filters(cd: CleanData) -> list[QueryString | Range]:
     return queries_list
 
 
-def build_join_es_filters(cd: CleanData) -> List:
+def build_join_es_filters(cd: CleanData) -> list:
     """Builds parent join elasticsearch filters based on the CleanData object.
 
     :param cd: An object containing cleaned user data.
@@ -2754,20 +2753,20 @@ def build_full_join_es_queries(
 
         # Build the child query based on child_filters and child child_text_query
         match child_filters, child_text_query:
-            case [], []:
+            case [[], []]:
                 pass
-            case [], _:
+            case [[], _]:
                 child_docs_query = Q(
                     "bool",
                     should=child_text_query,
                     minimum_should_match=1,
                 )
-            case _, []:
+            case [_, []]:
                 child_docs_query = Q(
                     "bool",
                     filter=child_filters,
                 )
-            case _, _:
+            case [_, _]:
                 child_docs_query = Q(
                     "bool",
                     filter=child_filters,
@@ -2837,22 +2836,22 @@ def build_full_join_es_queries(
         }
         default_parent_filter = parent_filter_dict[child_type]
         match parent_filters, string_query:
-            case [], []:
+            case [[], []]:
                 pass
-            case [], _:
+            case [[], _]:
                 parent_query = Q(
                     "bool",
                     filter=default_parent_filter,
                     should=string_query,
                     minimum_should_match=1,
                 )
-            case _, []:
+            case [_, []]:
                 parent_filters.extend([default_parent_filter])
                 parent_query = Q(
                     "bool",
                     filter=parent_filters,
                 )
-            case _, _:
+            case [_, _]:
                 parent_filters.extend([default_parent_filter])
                 parent_query = Q(
                     "bool",
@@ -2989,9 +2988,9 @@ def do_count_query(
         total_results = search_query.count()
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            f"Error on count query request: {search_query.to_dict()}"
+            "Error on count query request: %s", search_query.to_dict()
         )
-        logger.warning(f"Error was: {e}")
+        logger.warning("Error was: %s", e)
         # Required for the paginator class to work, as it expects an integer.
         total_results = 0
     return total_results
@@ -3055,46 +3054,6 @@ def make_es_stats_variable(
         field.count = count
         facet_fields.append(field)
     return facet_fields
-
-
-# TODO: Remove after scheduled OA alerts have been processed.
-def fetch_all_search_results(
-    fetch_method: Callable, initial_response: Response, *args
-) -> list[Hit]:
-    """Fetches all search results based on a given search method and an
-    initial response. It retrieves all the search results that exceed the
-    initial batch size by iteratively calling the provided fetch method with
-    the necessary pagination parameters.
-
-    :param fetch_method: A callable that executes the search query.
-    :param initial_response: The initial ES Response object.
-    :param args: Additional arguments to pass to the fetch method.
-
-    :return: A list of `Hit` objects representing all search results.
-    """
-
-    all_search_hits = []
-    all_search_hits.extend(initial_response.hits)
-    total_hits = initial_response.hits.total.value
-    results_returned = len(initial_response.hits.hits)
-    if total_hits > settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE:
-        documents_retrieved = results_returned
-        search_after = initial_response.hits[-1].meta.sort
-        while True:
-            response = fetch_method(*args, search_after=search_after)
-            if not response:
-                break
-
-            all_search_hits.extend(response.hits)
-            results_returned = len(response.hits.hits)
-            documents_retrieved += results_returned
-            # Check if all results have been retrieved. If so break the loop
-            # Otherwise, increase search_after.
-            if documents_retrieved >= total_hits or results_returned == 0:
-                break
-            else:
-                search_after = response.hits[-1].meta.sort
-    return all_search_hits
 
 
 def do_es_api_query(
@@ -3264,9 +3223,9 @@ def do_collapse_count_query(
         )
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            f"Error on count query request: {search_query.to_dict()}"
+            "Error on count query request: %s", search_query.to_dict()
         )
-        logger.warning(f"Error was: {e}")
+        logger.warning("Error was: %s", e)
         total_results = 0
     return total_results
 

@@ -1,7 +1,6 @@
-import contextlib
 import os
 import re
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -61,7 +60,7 @@ def clean_docket_number(docket_number: str | None) -> str:
     return ""
 
 
-def make_docket_number_core(docket_number: Optional[str]) -> str:
+def make_docket_number_core(docket_number: str | None) -> str:
     """Make a core docket number from an existing docket number.
 
     Converts docket numbers like:
@@ -401,7 +400,7 @@ def make_choices_group_lookup(c):
     """
     d = {}
     for choice, value in c:
-        if isinstance(value, (list, tuple)):
+        if isinstance(value, (list | tuple)):
             for t in value:
                 d[t[0]] = choice
         else:
@@ -427,7 +426,7 @@ def flatten_choices(self):
     """
     flat = []
     for choice, value in self.choices:
-        if isinstance(value, (list, tuple)):
+        if isinstance(value, (list | tuple)):
             flat.extend(value)
         else:
             flat.append((choice, value))
@@ -461,34 +460,6 @@ def disable_auto_now_fields(*models):
                 field.auto_now = False
             if hasattr(field, "auto_now_add"):
                 field.auto_now_add = False
-
-
-@contextlib.contextmanager
-def suppress_autotime(model, fields):
-    """Disable auto_now and auto_now_add fields
-
-    :param model: The model you wish to modify or an instance of it. All objects
-    of this type will be modified until the end of the managed context.
-    :param fields: The fields you wish to disable for the model.
-    """
-    _original_values = {}
-    for field in model._meta.local_fields:
-        if field.name in fields:
-            _original_values[field.name] = {
-                "auto_now": field.auto_now,
-                "auto_now_add": field.auto_now_add,
-            }
-            field.auto_now = False
-            field.auto_now_add = False
-    try:
-        yield
-    finally:
-        for field in model._meta.local_fields:
-            if field.name in fields:
-                field.auto_now = _original_values[field.name]["auto_now"]
-                field.auto_now_add = _original_values[field.name][
-                    "auto_now_add"
-                ]
 
 
 def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
@@ -565,7 +536,6 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
 
 
 class CSVExportMixin:
-
     def get_csv_columns(self, get_column_name: bool = False) -> list[str]:
         """Get list of column names required in a csv file.
         If get column name is True. It will add class name to attribute

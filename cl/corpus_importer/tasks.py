@@ -6,8 +6,9 @@ from datetime import date
 from http import HTTPStatus
 from io import BytesIO
 from pyexpat import ExpatError
+from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
+from typing import Any
 
 import eyecite
 import internetarchive as ia
@@ -136,7 +137,7 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 logger = logging.getLogger(__name__)
 
 
-def increment_failure_count(obj: Union[Audio, Docket, RECAPDocument]) -> None:
+def increment_failure_count(obj: Audio | Docket | RECAPDocument) -> None:
     if obj.ia_upload_failure_count is None:
         obj.ia_upload_failure_count = 1
     else:
@@ -147,7 +148,7 @@ def increment_failure_count(obj: Union[Audio, Docket, RECAPDocument]) -> None:
 def generate_ia_json(
     d_pk: int,
     database: str = "default",
-) -> Tuple[Docket, str]:
+) -> tuple[Docket, str]:
     """Generate JSON for upload to Internet Archive
 
     :param d_pk: The PK of the docket to generate JSON for
@@ -285,11 +286,11 @@ def download_recap_item(
     filename: str,
     clobber: bool = False,
 ) -> None:
-    logger.info(f"  Getting item at: {url}")
+    logger.info("  Getting item at: %s", url)
     location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
     try:
         if os.path.isfile(location) and not clobber:
-            raise IOError(f"    IOError: File already exists at {location}")
+            raise OSError(f"    IOError: File already exists at {location}")
         r = requests.get(
             url,
             stream=True,
@@ -298,12 +299,12 @@ def download_recap_item(
         )
         r.raise_for_status()
     except requests.Timeout as e:
-        logger.warning(f"    Timed out attempting to get: {url}\n")
+        logger.warning("    Timed out attempting to get: %s\n", url)
         raise self.retry(exc=e, countdown=2)
     except requests.RequestException as e:
-        logger.warning(f"    Unable to get {url}\nException was:\n{e}")
-    except IOError as e:
-        logger.warning(f"    {e}")
+        logger.warning("    Unable to get %s\nException was:\n%s", url, e)
+    except OSError as e:
+        logger.warning("    %s", e)
     else:
         with NamedTemporaryFile(prefix="recap_download_") as tmp:
             r.raw.decode_content = True
@@ -327,7 +328,7 @@ def download_recap_item(
 )
 def get_and_save_free_document_report(
     self: Task, court_id: str, start: date, end: date, log_id: int = 0
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Download the Free document report and save it to the DB.
 
     :param self: The Celery task.
@@ -361,12 +362,12 @@ def get_and_save_free_document_report(
         SoftTimeLimitExceeded,
         ValueError,
     ) as exc:
-        if isinstance(exc, (TypeError, ValueError)):
+        if isinstance(exc, (TypeError | ValueError)):
             msg = (
                 "TypeError getting free document report results, likely due "
                 "to failure to get Nonce."
             )
-        elif isinstance(exc, (RequestException, ReadTimeoutError)):
+        elif isinstance(exc, (RequestException | ReadTimeoutError)):
             msg = "Unable to get free document report results"
         elif isinstance(exc, PacerLoginException):
             msg = "PacerLoginException while getting free docs"
@@ -386,9 +387,9 @@ def get_and_save_free_document_report(
             msg = "An unknown error ocurred while getting an opinion report"
 
         if self.request.retries == self.max_retries:
-            logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)
+            logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)  # noqa: G004
             return PACERFreeDocumentLog.SCRAPE_FAILED
-        logger.info(f"{msg} Retrying.", court_id, start, end)
+        logger.info(f"{msg} Retrying.", court_id, start, end)  # noqa: G004
         raise self.retry(exc=exc, countdown=5)
 
     try:
@@ -426,12 +427,12 @@ def get_and_save_free_document_report(
 
     document_rows_to_create = []
     for row in results:
-
         # There is a document without a case number in pacer, skip it (issue #4547)
         if not row["docket_number"]:
             logger.warning(
-                f"No case number for document, court: {row["court_id"]}, "
-                f"date_filed: {row["date_filed"]}"
+                "No case number for document, court: %s, date_filed: %s",
+                row["court_id"],
+                row["date_filed"],
             )
             continue
 
@@ -462,7 +463,7 @@ def process_free_opinion_result(
     row_pk: int,
     court_id: str,
     cnt: CaseNameTweaker,
-) -> Optional[TaskData]:
+) -> TaskData | None:
     """Add data from a free opinion report to our DB
 
     :param self: The celery task
@@ -474,7 +475,7 @@ def process_free_opinion_result(
     try:
         result = PACERFreeDocumentRow.objects.get(pk=row_pk)
     except PACERFreeDocumentRow.DoesNotExist:
-        logger.warning(f"Unable to find PACERFreeDocumentRow: {row_pk}")
+        logger.warning("Unable to find PACERFreeDocumentRow: %s", row_pk)
         self.request.chain = None
         return None
 
@@ -613,7 +614,7 @@ def get_and_process_free_pdf(
     data: TaskData,
     row_pk: int,
     court_id: str,
-) -> Optional[TaskData]:
+) -> TaskData | None:
     """Get a PDF from a PACERFreeDocumentRow object
 
     :param self: The celery task
@@ -666,7 +667,7 @@ def get_and_process_free_pdf(
                 logger.error(msg)
                 self.request.chain = None
                 return None
-            logger.info(f"{msg} Retrying.")
+            logger.info(f"{msg} Retrying.")  # noqa: G004
             raise self.retry(exc=exc)
         elif exc.response:
             msg = (
@@ -686,7 +687,7 @@ def get_and_process_free_pdf(
             return None
     except PacerLoginException as exc:
         msg = "PacerLoginException while getting free docs."
-        logger.info(f"{msg} Retrying.")
+        logger.info(f"{msg} Retrying.")  # noqa: G004
         # Refresh cookies before retrying
         get_or_cache_pacer_cookies(
             "pacer_scraper",
@@ -701,7 +702,7 @@ def get_and_process_free_pdf(
             logger.warning(msg)
             self.request.chain = None
             return None
-        logger.info(f"{msg} Retrying.")
+        logger.info(f"{msg} Retrying.")  # noqa: G004
         raise self.retry(exc=exc)
 
     pdf_bytes = None
@@ -788,14 +789,14 @@ ia_session = ia.get_session(
 def upload_to_ia(
     self: Task,
     identifier: str,
-    files: Union[str, List[str], List[BytesIO], Dict[str, BytesIO]],
+    files: str | list[str] | list[BytesIO] | dict[str, BytesIO],
     title: str,
-    collection: List[str],
+    collection: list[str],
     court_id: str,
     source_url: str,
     media_type: str,
     description: str,
-) -> Optional[List[Response]]:
+) -> list[Response] | None:
     """Upload an item and its files to the Internet Archive
 
     On the Internet Archive there are Items and files. Items have a global
@@ -840,8 +841,7 @@ def upload_to_ia(
             return None
         raise self.retry(exc=exc)
     logger.info(
-        "Uploading file to Internet Archive with identifier: %s and "
-        "files %s",
+        "Uploading file to Internet Archive with identifier: %s and files %s",
         identifier,
         files,
     )
@@ -898,14 +898,14 @@ def upload_to_ia(
         # retrying. Just abort.
         return None
     logger.info(
-        "Item uploaded to IA with responses %s"
-        % [r.status_code for r in responses]
+        "Item uploaded to IA with responses %s",
+        [r.status_code for r in responses],
     )
     return responses
 
 
 @app.task
-def mark_court_done_on_date(log_id: int, status: int) -> Optional[int]:
+def mark_court_done_on_date(log_id: int, status: int) -> int | None:
     try:
         doc_log = PACERFreeDocumentLog.objects.get(pk=log_id)
     except PACERFreeDocumentLog.DoesNotExist:
@@ -919,7 +919,7 @@ def mark_court_done_on_date(log_id: int, status: int) -> Optional[int]:
 
 
 @app.task(ignore_result=True)
-def delete_pacer_row(data: TaskData, pk: int) -> List[int]:
+def delete_pacer_row(data: TaskData, pk: int) -> list[int]:
     try:
         PACERFreeDocumentRow.objects.get(pk=pk).delete()
     except PACERFreeDocumentRow.DoesNotExist:
@@ -929,7 +929,7 @@ def delete_pacer_row(data: TaskData, pk: int) -> List[int]:
 
 def make_fjc_idb_lookup_params(
     item: FjcIntegratedDatabase,
-) -> Dict[str, Optional[str]]:
+) -> dict[str, str | None]:
     """Given an IDB row, generate good params for looking up that item in the
     PossibleCaseNumberApi.
 
@@ -1039,7 +1039,7 @@ def get_pacer_case_id_and_title(
     try:
         report.query(docket_number)
     except (RequestException, ReadTimeoutError, PacerLoginException) as exc:
-        if isinstance(exc, (RequestException, ReadTimeoutError)):
+        if isinstance(exc, (RequestException | ReadTimeoutError)):
             msg = (
                 "Network error while running possible case number query on: "
                 "%s.%s"
@@ -1054,7 +1054,7 @@ def get_pacer_case_id_and_title(
             logger.warning(msg, court_id, docket_number)
             self.request.chain = None
             return None
-        logger.info(f"{msg} Retrying.", court_id, docket_number)
+        logger.info(f"{msg} Retrying.", court_id, docket_number)  # noqa: G004
         raise self.retry(exc=exc)
 
     try:
@@ -1083,7 +1083,7 @@ def do_case_query_by_pacer_case_id(
     data: TaskData,
     court_id: str,
     session_data: SessionData,
-    tag_names: List[str] | None = None,
+    tag_names: list[str] | None = None,
 ) -> TaskData | None:
     """Run a case query (iquery.pl) query on a case and save the data
 
@@ -1108,7 +1108,7 @@ def do_case_query_by_pacer_case_id(
 
     pacer_case_id = data.get("pacer_case_id")
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-    logger.info(f"Querying docket report {court_id}.{pacer_case_id}")
+    logger.info("Querying docket report %s.%s", court_id, pacer_case_id)
     try:
         d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id)
     except Docket.DoesNotExist:
@@ -1119,7 +1119,7 @@ def do_case_query_by_pacer_case_id(
     report.query(pacer_case_id)
     docket_data = report.data
     logger.info(
-        f"Querying and parsing complete for {court_id}.{pacer_case_id}"
+        "Querying and parsing complete for %s.%s", court_id, pacer_case_id
     )
 
     if not docket_data:
@@ -1153,7 +1153,7 @@ def do_case_query_by_pacer_case_id(
         ContentFile(report.response.text.encode()),
     )
 
-    logger.info(f"Created/updated docket: {d}")
+    logger.info("Created/updated docket: %s", d)
     return {
         "pacer_case_id": pacer_case_id,
         "docket_pk": d.pk,
@@ -1163,10 +1163,10 @@ def do_case_query_by_pacer_case_id(
 @app.task(bind=True, ignore_result=True)
 def filter_docket_by_tags(
     self: Task,
-    data: Optional[Dict[Any, Any]],
-    tags: Optional[List[str]],
+    data: dict[Any, Any] | None,
+    tags: list[str] | None,
     court_id: str,
-) -> Optional[Dict[Any, Any]]:
+) -> dict[Any, Any] | None:
     """Stop the chain if the docket that'll be updated is already tagged.
 
     This is useful for if you're running a bulk download a second time and want
@@ -1427,20 +1427,26 @@ def query_iquery_page(
     bind=True,
     ignore_result=True,
 )
-def probe_iquery_pages(
+def probe_or_scrape_iquery_pages(
     self: Task,
     court_id: str,
+    latest_know_case_id_db: str | None,
     testing: bool = False,
 ) -> None:
     """
     Using the iquery endpoint, to perform forward probing and retrieve the
-    highest watermark we can scrape.
+    highest watermark we can scrape. Or perform a fixed sweep in case the
+    court hasn't caught up yet.
 
     :param self: The celery task
     :param court_id: A CL court ID where we'll look things up.
+    :param latest_know_case_id_db: The latest known pacer case ID from DB if available.
     :param testing: A boolean indicating whether this was called from tests.
     :return: None
     """
+    from cl.corpus_importer.signals import (
+        update_latest_case_id_and_schedule_iquery_sweep,
+    )
 
     r = get_redis_interface("CACHE")
     probe_iteration = 1
@@ -1449,11 +1455,40 @@ def probe_iquery_pages(
     highest_known_pacer_case_id = int(
         r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
     )
-    jitter = compute_binary_probe_jitter(testing)
+
+    # latest_known_case_id_db represents the latest known PACER case ID from a
+    # court. If it's greater than the current highest_known_pacer_case_id in
+    # Redis, we can conclude that the court hasn't caught up yet. In this
+    # scenario, instead of performing the regular exploration mode which can be
+    # slow we can switch to a fixed sweep mode. This mode will process
+    # IQUERY_FIXED_SWEEP case IDs per cycle and update the
+    # highest_known_pacer_case_id so the scraper can continue progressing at
+    # a fixed pace each cycle until
+    # highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP is equal to or
+    # greater than latest_known_case_id_db.
+    # Note that including settings.IQUERY_FIXED_SWEEP in the comparison is important
+    # so that the fixed sweep mode runs only up to latest_known_case_id_db.
+    # Otherwise, we might miss a few cases during the transition from fixed sweep
+    # back to regular exploration mode.
+    do_fixed_sweep = (
+        (
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP
+            < int(latest_know_case_id_db)
+        )
+        if latest_know_case_id_db
+        else False
+    )
+    # Avoid random jitter when performing a fixed sweep.
+    jitter = 0 if do_fixed_sweep else compute_binary_probe_jitter(testing)
     reports_data = []
     found_match = False
     pacer_case_id_to_lookup = highest_known_pacer_case_id
-    while probe_offset + jitter < settings.IQUERY_PROBE_MAX_OFFSET:
+    # In fixed sweep mode, probing is not required, but we perform one iteration
+    # just to verify that the court is not down or that we haven't been blocked.
+    probe_iteration_limit = (
+        1 if do_fixed_sweep else settings.IQUERY_PROBE_MAX_OFFSET
+    )
+    while probe_offset + jitter < probe_iteration_limit:
         pacer_case_id_to_lookup, probe_offset = compute_next_binary_probe(
             highest_known_pacer_case_id, probe_iteration, jitter
         )
@@ -1532,6 +1567,22 @@ def probe_iquery_pages(
         r.hset(
             "iquery:test_highest_known_pacer_case_id", court_id, latest_match
         )
+
+    if do_fixed_sweep:
+        # The court hasn't caught up; perform a fixed sweep.
+        logger.info(
+            "Scheduling a fixed sweep for court %s — case IDs from %s to %s.",
+            court_id,
+            highest_known_pacer_case_id,
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
+        )
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None,
+            court_id,
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
+        )
+        delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
+        return None
 
     if not reports_data:
         logger.info(
@@ -1614,8 +1665,8 @@ def get_docket_by_pacer_case_id(
     data: TaskData,
     court_id: str,
     session_data: SessionData,
-    docket_pk: Optional[int] = None,
-    tag_names: Optional[str] = None,
+    docket_pk: int | None = None,
+    tag_names: str | None = None,
     **kwargs,
 ) -> TaskData | None:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
@@ -1673,10 +1724,10 @@ def get_docket_by_pacer_case_id(
     except (RequestException, ReadTimeoutError) as exc:
         msg = "Network error getting docket: %s"
         if self.request.retries == self.max_retries:
-            logger.error(f"{msg} Aborting chain.", logging_id)
+            logger.error(f"{msg} Aborting chain.", logging_id)  # noqa: G004
             self.request.chain = None
             return None
-        logger.info(f"{msg} Retrying.", logging_id)
+        logger.info(f"{msg} Retrying.", logging_id)  # noqa: G004
         raise self.retry(exc)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
@@ -1723,9 +1774,9 @@ def get_appellate_docket_by_docket_number(
     docket_number: str,
     court_id: str,
     session_data: SessionData,
-    tag_names: Optional[List[str]] = None,
+    tag_names: list[str] | None = None,
     **kwargs,
-) -> Optional[TaskData]:
+) -> TaskData | None:
     """Get a docket by docket number, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -1799,7 +1850,7 @@ def get_appellate_docket_by_docket_number(
 def get_att_report_by_rd(
     rd: RECAPDocument,
     session_data: SessionData,
-) -> Optional[AttachmentPage]:
+) -> AttachmentPage | None:
     """Method to get the attachment report for the item in PACER.
 
     :param rd: The RECAPDocument object to use as a source.
@@ -1834,7 +1885,7 @@ def get_attachment_page_by_rd(
     self: Task,
     rd_pk: int,
     session_data: SessionData,
-) -> Optional[AttachmentPage]:
+) -> AttachmentPage | None:
     """Get the attachment page for the item in PACER.
 
     :param self: The celery task
@@ -1888,7 +1939,7 @@ def get_bankr_claims_registry(
     self: Task,
     data: TaskData,
     session_data: SessionData,
-    tag_names: List[str] | None = None,
+    tag_names: list[str] | None = None,
 ) -> TaskData | None:
     """Get the bankruptcy claims registry for a docket
 
@@ -1907,8 +1958,7 @@ def get_bankr_claims_registry(
     )
     if data is None or data.get("docket_pk") is None:
         logger.warning(
-            "Empty data argument or parameter. Terminating chains "
-            "and exiting."
+            "Empty data argument or parameter. Terminating chains and exiting."
         )
         self.request.chain = None
         return None
@@ -2254,14 +2304,14 @@ def is_docket_entry_sealed(
 def update_rd_metadata(
     self: Task,
     rd_pk: int,
-    pdf_bytes: Optional[bytes],
+    pdf_bytes: bytes | None,
     r_msg: str,
     court_id: str,
     pacer_case_id: str,
     pacer_doc_id: str,
     document_number: str,
     attachment_number: int,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
 
     :param self: The celery task
@@ -2316,9 +2366,9 @@ def update_rd_metadata(
     if response.is_success:
         rd.page_count = int(response.text)
 
-    assert isinstance(
-        rd.page_count, (int, type(None))
-    ), "page_count must be an int or None."
+    assert isinstance(rd.page_count, (int | type(None))), (
+        "page_count must be an int or None."
+    )
 
     # Save and extract, skipping OCR.
     rd.save()
@@ -2330,7 +2380,7 @@ def update_rd_metadata(
     return True, "Saved item successfully"
 
 
-def add_tags(rd: RECAPDocument, tag_name: Optional[str]) -> None:
+def add_tags(rd: RECAPDocument, tag_name: str | None) -> None:
     """Add tags to a tree of objects starting with the RECAPDocument
 
     Adds the tag to the RECAPDocument, Docket Entry, and Docket.
@@ -2359,8 +2409,8 @@ def get_pacer_doc_by_rd(
     self: Task,
     rd_pk: int,
     session_data: SessionData,
-    tag: Optional[str] = None,
-) -> Optional[int]:
+    tag: str | None = None,
+) -> int | None:
     """A simple method for getting the PDF associated with a RECAPDocument.
 
     :param self: The bound celery task
@@ -2424,7 +2474,7 @@ def get_pacer_doc_by_rd_and_description(
     description_re: Pattern,
     session_data: SessionData,
     fallback_to_main_doc: bool = False,
-    tag_name: Optional[List[str]] = None,
+    tag_name: list[str] | None = None,
 ) -> None:
     """Using a RECAPDocument object ID and a description of a document, get the
     document from PACER.
@@ -2456,7 +2506,8 @@ def get_pacer_doc_by_rd_and_description(
     if not att_found:
         if fallback_to_main_doc:
             logger.info(
-                f"Falling back to main document for pacer_doc_id: {rd.pacer_doc_id}"
+                "Falling back to main document for pacer_doc_id: %s",
+                rd.pacer_doc_id,
             )
             att_found = att_report.data
             document_type = RECAPDocument.PACER_DOCUMENT
@@ -2564,7 +2615,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
         if last_try:
             logger.error(msg, rd)
             return
-        logger.info(f"{msg} Retrying.", rd)
+        logger.info(f"{msg} Retrying.", rd)  # noqa: G004
         raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
@@ -2574,10 +2625,10 @@ def get_pacer_doc_id_with_show_case_doc_url(
             status_code = exc.response.status_code
             msg = "Got HTTPError with status code %s."
             if last_try:
-                logger.error(f"{msg} Aborting.", status_code)
+                logger.error(f"{msg} Aborting.", status_code)  # noqa: G004
                 return
 
-            logger.info(f"{msg} Retrying", status_code)
+            logger.info(f"{msg} Retrying", status_code)  # noqa: G004
             raise self.retry(exc)
         elif exc.response:
             status_code = exc.response.status_code
@@ -2591,12 +2642,12 @@ def get_pacer_doc_id_with_show_case_doc_url(
     try:
         pacer_doc_id = report.data
     except ParsingException:
-        logger.error(f"Unable to get redirect for {rd}")
+        logger.error("Unable to get redirect for %s", rd)
         return
     else:
         rd.pacer_doc_id = pacer_doc_id
         rd.save()
-        logger.info(f"Successfully saved pacer_doc_id to rd {rd_pk}")
+        logger.info("Successfully saved pacer_doc_id to rd %s", rd_pk)
 
 
 def make_csv_file(
@@ -2668,7 +2719,7 @@ def query_and_save_list_of_creditors(
         report = ListOfCreditors(court_id, s)
     except AssertionError:
         # This is not a bankruptcy court.
-        logger.warning(f"Court {court_id} is not a bankruptcy court.")
+        logger.warning("Court %s is not a bankruptcy court.", court_id)
         delete_redis_semaphore(
             "CACHE", make_list_of_creditors_key(court_id, d_number_file_name)
         )
@@ -2687,8 +2738,9 @@ def query_and_save_list_of_creditors(
             )
         except ParsingException:
             logger.info(
-                f"No valid hidden API response for {docket_number} in court: "
-                f"{court_id}, possibly a sealed case."
+                "No valid hidden API response for %s in court: %s, possibly a sealed case.",
+                docket_number,
+                court_id,
             )
             delete_redis_semaphore(
                 "CACHE",
@@ -2698,8 +2750,10 @@ def query_and_save_list_of_creditors(
 
         if not result:
             logger.info(
-                f"Skipping row: {i} in court: {court_id}, docket: "
-                f"{docket_number}, no result from hidden API"
+                "Skipping row: %s in court: %s, docket: %s, no result from hidden API",
+                i,
+                court_id,
+                docket_number,
             )
             delete_redis_semaphore(
                 "CACHE",
@@ -2710,8 +2764,10 @@ def query_and_save_list_of_creditors(
         pacer_case_id = result.get("pacer_case_id")
         if not pacer_case_id:
             logger.info(
-                f"Skipping row: {i} in court: {court_id}, docket: "
-                f"{docket_number}, no pacer_case_id found."
+                "Skipping row: %s in court: %s, docket: %s, no pacer_case_id found.",
+                i,
+                court_id,
+                docket_number,
             )
             delete_redis_semaphore(
                 "CACHE",
@@ -2719,10 +2775,12 @@ def query_and_save_list_of_creditors(
             )
             return None
 
-        logger.info(f"File {html_file} doesn't exist.")
+        logger.info("File %s doesn't exist.", html_file)
         logger.info(
-            f"Querying report, court_id: {court_id}, pacer_case_id: "
-            f"{pacer_case_id} docket_number: {docket_number}"
+            "Querying report, court_id: %s, pacer_case_id: %s docket_number: %s",
+            court_id,
+            pacer_case_id,
+            docket_number,
         )
 
         # First get the POST param to ensure the same cost as in the browser.
@@ -2732,7 +2790,8 @@ def query_and_save_list_of_creditors(
             # Sometimes this query fails, retry if there are retries available.
             if self.request.retries == self.max_retries:
                 logger.info(
-                    f"Failed to obtain a valid POST param for {court_id}, aborting..."
+                    "Failed to obtain a valid POST param for %s, aborting...",
+                    court_id,
                 )
                 delete_redis_semaphore(
                     "CACHE",
@@ -2741,7 +2800,8 @@ def query_and_save_list_of_creditors(
                 return None
             else:
                 logger.info(
-                    f"Failed to obtain a valid POST param for {court_id}, retrying..."
+                    "Failed to obtain a valid POST param for %s, retrying...",
+                    court_id,
                 )
                 raise self.retry(exc=exc)
 
@@ -2750,7 +2810,7 @@ def query_and_save_list_of_creditors(
                 "CACHE",
                 make_list_of_creditors_key(court_id, d_number_file_name),
             )
-            logger.info(f"Invalid POST param for {court_id}, aborting...")
+            logger.info("Invalid POST param for %s, aborting...", court_id)
             return None
 
         report.query(
@@ -2763,7 +2823,7 @@ def query_and_save_list_of_creditors(
             file.write(report.response.text)
 
     else:
-        logger.info(f"File {html_file} already exists court: {court_id}.")
+        logger.info("File %s already exists court: %s.", html_file, court_id)
 
     with open(html_file, "rb") as file:
         text = file.read().decode("utf-8")
@@ -2820,9 +2880,9 @@ def extract_recap_document_for_opinions(rd: RECAPDocument) -> Response:
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def recap_document_into_opinions(
     self,
-    task_data: Optional[TaskData] = None,
-    recap_document_id: Optional[int] = None,
-) -> Optional[TaskData]:
+    task_data: TaskData | None = None,
+    recap_document_id: int | None = None,
+) -> TaskData | None:
     """Ingest recap document into Opinions
 
     :param task_data: dictionary that will contain the recap_document_id,
@@ -2836,7 +2896,7 @@ def recap_document_into_opinions(
     if not recap_document_id and task_data:
         recap_document_id = task_data["rd_pk"]
 
-    logger.info(f"Importing recap document {recap_document_id}")
+    logger.info("Importing recap document %s", recap_document_id)
     recap_document = (
         RECAPDocument.objects.select_related("docket_entry__docket")
         .only(
@@ -2869,7 +2929,7 @@ def recap_document_into_opinions(
 
     ops = Opinion.objects.filter(sha1=recap_document.sha1)
     if ops.count() > 0:
-        logger.info(f"Skipping previously imported opinion: {ops[0].id}")
+        logger.info("Skipping previously imported opinion: %s", ops[0].id)
         return task_data
 
     response = extract_recap_document_for_opinions(rd=recap_document)
@@ -2884,13 +2944,13 @@ def recap_document_into_opinions(
         # Ex. 42\u2009U.S.C.\u2009§\u200912131 \u2009 is a small space
         # fallback to regular citation match
         logger.warning(
-            f"Hyperscan failed for {recap_document}, trying w/o tokenizer"
+            "Hyperscan failed for %s, trying w/o tokenizer", recap_document
         )
         citations = eyecite.get_citations(r["content"])
 
     case_law_citations = filter_out_non_case_law_citations(citations)
     if len(case_law_citations) == 0:
-        logger.info(f"No citation found for rd: {recap_document.id}")
+        logger.info("No citation found for rd: %s", recap_document.id)
         return task_data
 
     with transaction.atomic():
@@ -2914,9 +2974,8 @@ def recap_document_into_opinions(
         )
 
         logger.info(
-            "Successfully imported https://www.courtlistener.com/opinion/{}/decision/".format(
-                cluster.id
-            )
+            "Successfully imported https://www.courtlistener.com/opinion/%s/decision/",
+            cluster.id,
         )
     # Return input task data to preserve the chain in scrape_pacer_free_opinion
     return task_data
