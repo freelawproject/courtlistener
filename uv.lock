@@ -1171,7 +1171,7 @@ wheels = [
 
 [[package]]
 name = "eyecite"
-version = "2.7.4"
+version = "2.7.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "courts-db" },
@@ -1181,9 +1181,9 @@ dependencies = [
     { name = "regex" },
     { name = "reporters-db" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6f/61/4faabfe688568890c68cc4e7604fce9051f7f10c2b6701f33450defce406/eyecite-2.7.4.tar.gz", hash = "sha256:3e535507cf372f2f408fe4cab1b4ac0448cfb3f0a122c662c8fe2b92cf8eb156", size = 56424, upload-time = "2025-05-15T16:06:44.068Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/0e/b81758485648883d865edaefbd0be57550c920e6f613c5f7c06485860a2e/eyecite-2.7.5.tar.gz", hash = "sha256:3208f4bbea4d060d87b5d3750ae8662fc5bd05dfec04b40510839ced05b93e15", size = 56826, upload-time = "2025-05-22T20:28:50.737Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/43/59b3129ef538087ddc55383b188f073b3ac1c8fd1580f0c044f148c59931/eyecite-2.7.4-py3-none-any.whl", hash = "sha256:b86dcd3c1805146bcb3cd01aa4ede993700eaf8895bfe8be0e68562d67d5d0a8", size = 55210, upload-time = "2025-05-15T16:06:42.517Z" },
+    { url = "https://files.pythonhosted.org/packages/09/94/50318599d2951a60ad76a756e16bc5986d66b51b1613d87127cab330b5c2/eyecite-2.7.5-py3-none-any.whl", hash = "sha256:117d407c988e347c4fadee411254152afd0a2318f61a24d92f7da41c2b4b3c5e", size = 55670, upload-time = "2025-05-22T20:28:49.559Z" },
 ]
 
 [[package]]
