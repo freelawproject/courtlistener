@@ -124,6 +124,27 @@
     {% else %}
         <div class="col-md-3"></div>
         <div class="col-md-6" id="citation-redirect">
+            {% if closest_match != None %}
+              <div class="alert alert-info">
+                <div class="row">
+                  <div class="col-xs-9">
+                    <p>
+                      <i class="fa fa-info-circle fa-lg"></i>
+                      It looks like you're trying to search for
+                      <a class="alert-link" href="{{ closest_match.absolute_url }}">
+                        {{ closest_match.case_name|safe }}</a>,
+                        at {{ closest_match.citation_string }}.
+                    </p>
+                  </div>
+                  <div class="col-xs-3 text-right">
+                    <a class="btn btn-primary btn-sm"
+                       href="{{ closest_match.get_absolute_url }}">
+                      Go<span class="hidden-xs"> to This Case</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            {% endif %}
             {% if none_found %}
                 <h1>Unable to Find Citation "{{ citation_str }}"</h1>
                 <p>This usually happens because although we might have an opinion in

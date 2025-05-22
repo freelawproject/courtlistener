@@ -87,5 +87,6 @@ async def get_clusters_from_citation_str(
                 | Q(sub_opinions__xml_harvard__contains=f"*{page}"),
             ).select_related("docket__court")
             cluster_count = 1 if await clusters.aexists() else 0
-
+            if cluster_count == 0:
+                clusters = possible_match
     return clusters, cluster_count
