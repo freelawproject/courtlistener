@@ -63,7 +63,7 @@
   <p>Search Alerts update you when there is new information in our search engine.</p>
   <p>This system scales to support thousands or even millions of alerts, allowing organizations to stay updated about numerous topics. This is a powerful system when used with <a href="{% url "webhooks_docs" %}">webhooks</a>.
   </p>
-  <p>Search alerts have three required fields:</p>
+  <p>Search alerts have four required fields:</p>
   <ul>
     <li><strong><code>name</code></strong> &mdash; A human-friendly name for the alert.</li>
     <li><strong><code>query</code></strong> &mdash; Search parameters you get from the front end, as a string.
@@ -76,6 +76,7 @@
       <li><code>wly</code> — Weekly</li>
       <li><code>mly</code> — Monthly</li>
     </ul>
+    <li><strong><code>alert_typ</code></strong> &mdash; Whether you want alerts for cases only, or for both cases and filings. For notifications on Cases only: the alert is created with <code>alert_type = SEARCH_TYPES.DOCKETS </code> ("d"). For notifications on both Cases and Filings: the alert is created with the regular <code>alert_type = SEARCH_TYPES.RECAP</code> ("r").</li>
   </ul>
   <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
   <pre class="pre-scrollable">curl -X OPTIONS \
