@@ -1,10 +1,12 @@
 from http import HTTPStatus
 
-import waffle
+from django.db.models import Prefetch
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
+from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
 from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
 from cl.lib.elasticsearch_utils import do_es_api_query
@@ -25,7 +27,6 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
-    SearchResultSerializer,
     TagSerializer,
     V3OAESResultSerializer,
     V3OpinionESResultSerializer,
@@ -64,6 +65,10 @@ from cl.search.models import (
 
 class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
     serializer_class = OriginalCourtInformationSerializer
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields
@@ -78,6 +83,10 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = (
         "id",
         "date_created",
@@ -109,10 +118,17 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = DocketEntrySerializer
     filterset_class = DocketEntryFilter
-    ordering_fields = ("id", "date_created", "date_modified", "date_filed")
+    ordering_fields = (
+        "id",
+        "date_created",
+        "date_modified",
+        "date_filed",
+        "recap_sequence_number",
+        "entry_number",
+    )
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields
@@ -137,7 +153,7 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
 class RECAPDocumentViewSet(
     LoggingMixin, CacheListMixin, viewsets.ModelViewSet
 ):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = RECAPDocumentSerializer
     filterset_class = RECAPDocumentFilter
     ordering_fields = ("id", "date_created", "date_modified", "date_upload")
@@ -161,6 +177,10 @@ class RECAPDocumentViewSet(
 class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = CourtSerializer
     filterset_class = CourtFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = (
         "id",
         "date_modified",
@@ -180,6 +200,10 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionClusterSerializer
     filterset_class = OpinionClusterFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = (
         "id",
         "date_created",
@@ -197,13 +221,22 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_modified",
     ]
     queryset = OpinionCluster.objects.prefetch_related(
-        "sub_opinions", "panel", "non_participating_judges", "citations"
+        Prefetch(
+            "sub_opinions", queryset=Opinion.objects.order_by("ordering_key")
+        ),
+        "panel",
+        "non_participating_judges",
+        "citations",
     ).order_by("-id")
 
 
 class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = (
         "id",
         "date_created",
@@ -219,7 +252,10 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
     queryset = (
         Opinion.objects.select_related("cluster", "author")
-        .prefetch_related("opinions_cited", "joined_by")
+        .prefetch_related(
+            "joined_by",
+            Prefetch("opinions_cited", queryset=Opinion.objects.only("id")),
+        )
         .order_by("-id")
     )
 
@@ -227,6 +263,10 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
 class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionsCitedSerializer
     filterset_class = OpinionsCitedFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields
@@ -235,7 +275,7 @@ class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = TagSerializer
     # Default cursor ordering key
     ordering = "-id"
@@ -251,51 +291,37 @@ class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
 class SearchViewSet(LoggingMixin, viewsets.ViewSet):
     # Default permissions use Django permissions, so here we AllowAny,
     # but folks will need to log in to get past the thresholds.
-    permission_classes = (permissions.AllowAny,)
+    permission_classes = (permissions.AllowAny, V3APIPermission)
 
     def list(self, request, *args, **kwargs):
-
-        is_opinion_active = waffle.flag_is_active(
-            request, "o-es-search-api-active"
-        )
-        search_form = SearchForm(request.GET, is_es_form=is_opinion_active)
+        search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-
             search_type = cd["type"]
             paginator = pagination.PageNumberPagination()
-            sl = api_utils.get_object_list(request, cd=cd, paginator=paginator)
+            sl = api_utils.get_object_list(
+                request,
+                cd=cd,
+                paginator=paginator,
+            )
             result_page = paginator.paginate_queryset(sl, request)
-
             match search_type:
-                case SEARCH_TYPES.ORAL_ARGUMENT if waffle.flag_is_active(
-                    request, "oa-es-active"
-                ):
+                case SEARCH_TYPES.ORAL_ARGUMENT:
                     serializer = V3OAESResultSerializer(result_page, many=True)
-                case SEARCH_TYPES.PEOPLE if waffle.flag_is_active(
-                    request, "p-es-active"
-                ):
+                case SEARCH_TYPES.PEOPLE:
                     serializer = ExtendedPersonESSerializer(
                         result_page, many=True
                     )
-                case SEARCH_TYPES.OPINION if is_opinion_active:
-                    serializer = V3OpinionESResultSerializer(
-                        result_page, many=True
-                    )
-                case (
-                    SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
-                ) if waffle.flag_is_active(request, "r-es-search-api-active"):
+                case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
                     serializer = V3RECAPDocumentESResultSerializer(
                         result_page, many=True
                     )
                 case _:
-                    if cd["q"] == "":
-                        cd["q"] = "*"  # Get everything
-                    serializer = SearchResultSerializer(
-                        result_page,
-                        many=True,
-                        context={"schema": sl.conn.schema},
+                    # Default to Opinion type.
+                    serializer = V3OpinionESResultSerializer(
+                        result_page, many=True
                     )
+
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(
@@ -336,7 +362,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
     }
 
     def list(self, request, *args, **kwargs):
-        search_form = SearchForm(request.GET, is_es_form=True)
+        search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]
@@ -363,11 +389,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                 request.version,
             )
             es_list_instance = api_utils.CursorESList(
-                main_query,
-                child_docs_query,
-                None,
-                None,
-                cd,
+                main_query, child_docs_query, None, None, cd, request
             )
             results_page = paginator.paginate_queryset(
                 es_list_instance, request

@@ -55,7 +55,6 @@ info_tips = (
     % reverse("alert_help"),
     'There is an <a href="%s">RSS feed</a> for every query so you can easily stay up to date.'
     % reverse("feeds_info"),
-    'Search relevancy on CourtListener is <a href="https://free.law/2013/11/12/citegeist/">highly tuned and is powered by the citation network between cases</a>.',
     'You can make sophisticated queries using a number of <a href="%s">advanced search features</a>.'
     % reverse("advanced_search"),
     'You can get an alert whenever an opinion is cited by <a href="https://free.law/2020/02/20/citation-alerts/">using a Citation Search</a>.',
@@ -66,7 +65,7 @@ info_tips = (
     % reverse("advanced_oa"),
     'CourtListener has an <a href="%s">API</a> so anybody can easily use our data.'
     % reverse("api_index"),
-    'Oral argument podcasts <a href="%s">are available in variety of apps</a> like iTunes, Stitcher Radio, and Google Music.'
+    'Oral argument podcasts <a href="%s">are available wherever you get your podcasts</a>.'
     % reverse("podcasts"),
     "We have more than a million minutes of oral argument audio. More than anywhere else on the Internet.",
     # RECAP & PACER
@@ -81,7 +80,7 @@ info_tips = (
     'CourtListener has <a href="https://free.law/2017/08/15/we-have-all-free-pacer/">every free opinion and order available in PACER</a> and gets the latest ones every night.',
     'Want to learn more about PACER? <a href="https://free.law/pacer-facts/">We have an extensive fact sheet</a>.',
     'You can <a href="https://free.law/recap/hacking-recap-links/">use the link to any RECAP PDF to pull up the docket</a>.',
-    "We have more than 80 million pages of PACER documents searchable in the RECAP Archive.",
+    "We have more than 200 million pages of PACER documents searchable in the RECAP Archive.",
     'You can <a href="%s">create an alert for any docket in the RECAP Archive</a>. Just press the "Get Alerts" button.'
     % reverse("alert_help"),
 )

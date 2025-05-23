@@ -1,0 +1,45 @@
+<div class="btn-group hidden-print">
+    <button type="button"
+            class="btn btn-default dropdown-toggle"
+            data-toggle="dropdown" aria-haspopup="true"
+            aria-expanded="false">
+        <i class="fa fa-file-o"></i>
+    <span class="hidden-xs">
+        Download {% if "pdf" in pdf_path %}PDF{% elif "html" in pdf_path %}HTML{% elif "docx" in pdf_path %}DOCX{% elif "rtf" in pdf_path %}RTF{% else %} {% endif %} <span class="caret"></span>
+    </span></button>
+    <ul class="dropdown-menu">
+        {% if cluster.filepath_pdf_harvard %}
+        <li>
+            <a href="{{ cluster.filepath_pdf_harvard.url }}"
+               rel="nofollow">
+                Download Case Law Scan
+            </a>
+          </li>
+        {% endif %}
+        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+            {% if sub_opinion.local_path %}
+                <li>
+                    <a href="{{ sub_opinion.local_path.url }}"
+                       rel="nofollow">
+                        {{ sub_opinion.get_type_display }} from
+                        our Backup
+                    </a>
+                </li>
+            {% endif %}
+        {% endfor %}
+        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+            {% if sub_opinion.download_url %}
+                {% if forloop.counter == 1 %}
+                    <li role="separator" class="divider"></li>
+                {% endif %}
+                <li>
+                    <a href="{{ sub_opinion.download_url }}"
+                       rel="nofollow">
+                        {{ sub_opinion.get_type_display }} from
+                        the Court
+                    </a>
+                </li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+</div>

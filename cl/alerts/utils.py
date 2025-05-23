@@ -1,7 +1,8 @@
 import copy
 from dataclasses import dataclass
-from datetime import date
-from typing import Any, Set
+from datetime import date, datetime
+from typing import Any
+from urllib.parse import parse_qs
 
 from django.apps import apps
 from django.conf import settings
@@ -9,7 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from elasticsearch_dsl import MultiSearch, Q, Search
 from elasticsearch_dsl.query import Query
-from elasticsearch_dsl.response import Hit, Response
+from elasticsearch_dsl.response import Hit
 from redis import Redis
 
 from cl.alerts.models import (
@@ -28,6 +29,7 @@ from cl.lib.elasticsearch_utils import (
     build_join_es_filters,
     merge_highlights_into_result,
 )
+from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
 from cl.recap.constants import bankruptcy_data_fields
 from cl.search.constants import (
@@ -35,6 +37,7 @@ from cl.search.constants import (
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
+    recap_boosts_es,
 )
 from cl.search.documents import (
     AudioDocument,
@@ -45,13 +48,28 @@ from cl.search.documents import (
     RECAPPercolator,
 )
 from cl.search.models import SEARCH_TYPES, Docket
-from cl.search.types import ESDictDocument, ESModelClassType
+from cl.search.types import (
+    ESDictDocument,
+    ESModelClassType,
+    PercolatorResponses,
+    SearchAlertHitType,
+)
+
+COMMON_QUERY_PARAMS = {"type", "order_by"}
 
 
 @dataclass
 class DocketAlertReportObject:
     da_alert: DocketAlert
     docket: Docket
+
+
+@dataclass
+class TaskCompletionStatus:
+    completed: bool = False
+    created: int = 0
+    total: int = 0
+    start_time_millis: int | None = None
 
 
 class OldAlertReport:
@@ -105,45 +123,6 @@ def create_percolator_search_query(
     return s
 
 
-# TODO: Remove after scheduled OA alerts have been processed.
-def percolate_document(
-    document_id: str,
-    document_index: str,
-    search_after: int = 0,
-) -> Response:
-    """Percolate a document against a defined Elasticsearch Percolator query.
-
-    :param document_id: The document ID in ES index to be percolated.
-    :param document_index: The ES document index where the document lives.
-    :param search_after: The ES search_after param for deep pagination.
-    :return: The response from the Elasticsearch query.
-    """
-
-    s = Search(index=AudioPercolator._index._name)
-    percolate_query = Q(
-        "percolate",
-        field="percolator_query",
-        index=document_index,
-        id=document_id,
-    )
-    exclude_rate_off = Q("term", rate=Alert.OFF)
-    final_query = Q(
-        "bool",
-        must=[percolate_query],
-        must_not=[exclude_rate_off],
-    )
-    s = s.query(final_query)
-    s = add_es_highlighting(
-        s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
-    )
-    s = s.source(excludes=["percolator_query"])
-    s = s.sort("date_created")
-    s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
-    if search_after:
-        s = s.extra(search_after=search_after)
-    return s.execute()
-
-
 def percolate_es_document(
     document_id: str,
     percolator_index: str,
@@ -155,7 +134,7 @@ def percolate_es_document(
     main_search_after: int | None = None,
     rd_search_after: int | None = None,
     d_search_after: int | None = None,
-) -> tuple[Response, Response | None, Response | None]:
+) -> PercolatorResponses:
     """Percolate a document against a defined Elasticsearch Percolator query.
 
     :param document_id: The document ID in ES index to be percolated.
@@ -172,9 +151,9 @@ def percolate_es_document(
     search_after param  for deep pagination.
     :param d_search_after: Optional the ES Docket document percolator query
     search_after param  for deep pagination.
-    :return: A three-tuple containing the main percolator response, the
-    RECAPDocument percolator response (if applicable), and the Docket
-    percolator response (if applicable).
+    :return: A PercolatorResponses dataclass containing the main percolator
+    response, the RECAPDocument percolator response (if applicable), and the
+    Docket percolator response (if applicable).
     """
 
     if document_index:
@@ -271,17 +250,22 @@ def percolate_es_document(
         rd_response = responses[1]
     if s_d:
         d_response = responses[2]
-    return main_response, rd_response, d_response
+    return PercolatorResponses(
+        main_response=main_response,
+        rd_response=rd_response,
+        d_response=d_response,
+    )
 
 
 def fetch_all_search_alerts_results(
-    initial_responses: tuple[Response, Response | None, Response | None], *args
+    initial_responses: PercolatorResponses, *args
 ) -> tuple[list[Hit], list[Hit], list[Hit]]:
     """Fetches all search alerts results based on a given percolator query and
     the initial responses. It retrieves all the search results that exceed the
     initial batch size by iteratively calling percolate_es_document method with
     the necessary pagination parameters.
-    :param initial_responses: The initial ES Responses tuple.
+    :param initial_responses: A PercolatorResponses dataclass containing the
+    initial ES Percolator Responses.
     :param args: Additional arguments to pass to the percolate_es_document method.
     :return: A three-tuple containing the main percolator results, the
     RECAPDocument percolator results (if applicable), and the Docket
@@ -292,63 +276,82 @@ def fetch_all_search_alerts_results(
     all_rd_alert_hits = []
     all_d_alert_hits = []
 
-    main_response = initial_responses[0]
+    main_response = initial_responses.main_response
     all_main_alert_hits.extend(main_response.hits)
     main_total_hits = main_response.hits.total.value
     main_alerts_returned = len(main_response.hits.hits)
     rd_response = d_response = None
-    if initial_responses[1]:
-        rd_response = initial_responses[1]
+    if initial_responses.rd_response:
+        rd_response = initial_responses.rd_response
         all_rd_alert_hits.extend(rd_response.hits)
-    if initial_responses[2]:
-        d_response = initial_responses[2]
+    if initial_responses.d_response:
+        d_response = initial_responses.d_response
         all_d_alert_hits.extend(d_response.hits)
 
-    if main_total_hits > settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE:
-        alerts_retrieved = main_alerts_returned
-        main_search_after = main_response.hits[-1].meta.sort
-        rd_search_after = (
-            rd_response.hits[-1].meta.sort if rd_response else None
-        )
-        d_search_after = d_response.hits[-1].meta.sort if d_response else None
-        while True:
-            search_after_params = {
-                "main_search_after": main_search_after,
-                "rd_search_after": rd_search_after,
-                "d_search_after": d_search_after,
-            }
-            responses = percolate_es_document(*args, **search_after_params)
-            if not responses[0]:
-                break
+    if main_total_hits <= settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE:
+        return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
-            all_main_alert_hits.extend(responses[0].hits)
-            main_alerts_returned = len(responses[0].hits.hits)
-            alerts_retrieved += main_alerts_returned
+    alerts_retrieved = main_alerts_returned
+    main_search_after = main_response.hits[-1].meta.sort
+    rd_search_after = rd_response.hits[-1].meta.sort if rd_response else None
+    d_search_after = d_response.hits[-1].meta.sort if d_response else None
+    while True:
+        search_after_params = {
+            "main_search_after": main_search_after,
+            "rd_search_after": rd_search_after,
+            "d_search_after": d_search_after,
+        }
+        responses = percolate_es_document(*args, **search_after_params)
+        if not responses.main_response:
+            break
 
-            if responses[1]:
-                all_rd_alert_hits.extend(responses[1].hits)
-            if responses[2]:
-                all_d_alert_hits.extend(responses[2].hits)
-            # Check if all results have been retrieved. If so break the loop
-            # Otherwise, increase search_after.
-            if (
-                alerts_retrieved >= main_total_hits
-                or main_alerts_returned == 0
-            ):
-                break
-            else:
-                main_search_after = responses[0].hits[-1].meta.sort
-                rd_search_after = (
-                    responses[1].hits[-1].meta.sort
-                    if responses[1] and len(responses[1].hits.hits)
-                    else None
-                )
-                d_search_after = (
-                    responses[2].hits[-1].meta.sort
-                    if responses[2] and len(responses[2].hits.hits)
-                    else None
-                )
+        all_main_alert_hits.extend(responses.main_response.hits)
+        main_alerts_returned = len(responses.main_response.hits.hits)
+        alerts_retrieved += main_alerts_returned
+
+        if responses.rd_response:
+            all_rd_alert_hits.extend(responses.rd_response.hits)
+        if responses.d_response:
+            all_d_alert_hits.extend(responses.d_response.hits)
+        # Check if all results have been retrieved. If so break the loop
+        # Otherwise, increase search_after.
+        if alerts_retrieved >= main_total_hits or main_alerts_returned == 0:
+            break
+        else:
+            main_search_after = responses.main_response.hits[-1].meta.sort
+            rd_search_after = (
+                responses.rd_response.hits[-1].meta.sort
+                if responses.rd_response and len(responses[1].hits.hits)
+                else None
+            )
+            d_search_after = (
+                responses.d_response.hits[-1].meta.sort
+                if responses.d_response and len(responses[2].hits.hits)
+                else None
+            )
+
     return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
+
+
+def add_cutoff_timestamp_filter(
+    query: str, cut_off_date: date | datetime | None
+) -> str:
+    """Append a timestamp range filter to an existing Elasticsearch query.
+
+    :param query: The original query string.
+    :param cut_off_date: The lower bound datetime for the timestamp filter.
+    :return: The query string with the appended timestamp range filter.
+    """
+    if not cut_off_date:
+        return query
+
+    iso_datetime = (
+        cut_off_date.strftime("%Y-%m-%dT%H:%M:%S")
+        if isinstance(cut_off_date, datetime)
+        else cut_off_date.strftime("%Y-%m-%d")
+    )
+    base_filter = f"timestamp:[{iso_datetime} TO *]"
+    return f"({query}) AND {base_filter}" if query else base_filter
 
 
 def override_alert_query(
@@ -363,40 +366,8 @@ def override_alert_query(
     """
 
     qd = QueryDict(alert.query.encode(), mutable=True)
-    if alert.alert_type == SEARCH_TYPES.ORAL_ARGUMENT:
-        qd["order_by"] = "dateArgued desc"
-        if cut_off_date:
-            qd["argued_after"] = cut_off_date.strftime("%m/%d/%Y")
-    else:
-        qd["order_by"] = "dateFiled desc"
-        if cut_off_date:
-            qd["filed_after"] = cut_off_date.strftime("%m/%d/%Y")
-
+    qd["q"] = add_cutoff_timestamp_filter(qd.get("q", ""), cut_off_date)
     return qd
-
-
-# TODO: Remove after scheduled OA alerts have been processed.
-def alert_hits_limit_reached(alert_pk: int, user_pk: int) -> bool:
-    """Check if the alert hits limit has been reached for a specific alert-user
-     combination.
-
-    :param alert_pk: The alert_id.
-    :param user_pk: The user_id.
-    :return: True if the limit has been reached, otherwise False.
-    """
-
-    stored_hits = ScheduledAlertHit.objects.filter(
-        alert_id=alert_pk,
-        user_id=user_pk,
-        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-    )
-    hits_count = stored_hits.count()
-    if hits_count >= settings.SCHEDULED_ALERT_HITS_LIMIT:
-        logger.info(
-            f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} hits stored for this alert."
-        )
-        return True
-    return False
 
 
 def scheduled_alert_hits_limit_reached(
@@ -438,8 +409,8 @@ def scheduled_alert_hits_limit_reached(
                 hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
                 content_type=content_type,
             )
-            .values("object_id")
-            .distinct()
+            .only("object_id")
+            .distinct("object_id")
         ).count()
         hits_limit = settings.SCHEDULED_ALERT_HITS_LIMIT
 
@@ -454,28 +425,6 @@ def scheduled_alert_hits_limit_reached(
                 f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} "
                 f"hits stored for this alert."
             )
-        return True
-    return False
-
-
-def recap_document_hl_matched(rd_hit: Hit) -> bool:
-    """Determine whether HL matched a RECAPDocument text field.
-
-    :param rd_hit: The ES hit.
-    :return: True if the hit matched a RECAPDocument field. Otherwise, False.
-    """
-
-    matched_rd_hl: set[str] = set()
-    rd_hl_fields = set(SEARCH_RECAP_CHILD_HL_FIELDS.keys())
-    if hasattr(rd_hit, "highlight"):
-        highlights = rd_hit.highlight.to_dict()
-        matched_rd_hl.update(
-            hl_key
-            for hl_key, hl_value in highlights.items()
-            for hl in hl_value
-            if f"<{ALERTS_HL_TAG}>" in hl
-        )
-    if matched_rd_hl and matched_rd_hl.issubset(rd_hl_fields):
         return True
     return False
 
@@ -547,12 +496,7 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
             text_fields.extend(
                 add_fields_boosting(
                     cd,
-                    [
-                        "description",
-                        # Docket Fields
-                        "docketNumber",
-                        "caseName",
-                    ],
+                    list(recap_boosts_es.keys()),
                 )
             )
             child_filters = build_has_child_filters(cd)
@@ -564,20 +508,22 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
             )
 
             match parent_filters, string_query:
-                case [], []:
-                    pass
-                case [], _:
+                case [[], []]:
+                    NotImplementedError(
+                        "Indexing match-all queries is not supported."
+                    )
+                case [[], _]:
                     plain_query = Q(
                         "bool",
                         should=string_query,
                         minimum_should_match=1,
                     )
-                case _, []:
+                case [_, []]:
                     plain_query = Q(
                         "bool",
                         filter=parent_filters,
                     )
-                case _, _:
+                case [_, _]:
                     plain_query = Q(
                         "bool",
                         filter=parent_filters,
@@ -632,15 +578,9 @@ def include_recap_document_hit(
 
     alert_in_rd_hits = alert_id in recap_document_hits
     alert_in_docket_hits = alert_id in docket_hits
-    if not alert_in_docket_hits and not alert_in_rd_hits:
-        return True
-    elif not alert_in_docket_hits and alert_in_rd_hits:
-        return True
-    elif alert_in_docket_hits and not alert_in_rd_hits:
+    if alert_in_docket_hits and not alert_in_rd_hits:
         return False
-    elif alert_in_docket_hits and alert_in_rd_hits:
-        return True
-    return False
+    return True
 
 
 def get_field_names(mapping_dict):
@@ -657,7 +597,7 @@ def get_field_names(mapping_dict):
 def select_es_document_fields(
     es_document_class: ESModelClassType,
     main_document: ESDictDocument,
-    fields_to_ignore: Set[str],
+    fields_to_ignore: set[str],
 ) -> ESDictDocument:
     """Select specific required fields from an Elasticsearch document.
 
@@ -679,7 +619,9 @@ def select_es_document_fields(
     }
 
 
-def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
+def prepare_percolator_content(
+    app_label: str, document_id: str
+) -> tuple[
     str,
     str | None,
     tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None,
@@ -727,7 +669,6 @@ def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
                 "docket_slug",
                 "docket_absolute_url",
                 "court_exact",
-                "docket_child",
                 "timestamp",
             }
             parent_document_content = select_es_document_fields(
@@ -771,3 +712,41 @@ def set_skip_percolation_if_parties_data(
     """
     if parties_data:
         d.skip_percolator_request = True
+
+
+def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:
+    """Build the email subject line for search alert emails.
+
+    "X Alert(s) have hits: alert_name_1, alert_name_2 ..."
+
+    :param hits: A list of search alert hits, where each hit contains the
+    alert details.
+    :return: A string representing the email subject line.
+    """
+
+    alert_count = len(hits)
+    alert_names_str = ", ".join(alert_hit[0].name for alert_hit in hits)
+    if alert_count > 1:
+        alert_subject = f"{alert_count} Alerts have hits: {alert_names_str}"
+    else:
+        alert_subject = f"{alert_count} Alert has hits: {alert_names_str}"
+    # Truncate the subject to a maximum length of 935 characters, which is
+    # Gmail's allowed subject size for display and also below RFC2822  line limit specs
+    return trunc(alert_subject, 935, ellipsis="...")
+
+
+def is_match_all_query(qs: str) -> bool:
+    """Determine whether a given query string is a match-all query.
+
+    :param qs: The raw query string to evaluate.
+    :return: True if the query string has no parameters other than those in
+    COMMON_QUERY_PARAMS or if all remaining values are empty; False otherwise.
+    """
+
+    parsed = parse_qs(qs, keep_blank_values=True)
+    # Drop common query params
+    for key in COMMON_QUERY_PARAMS:
+        parsed.pop(key, None)
+
+    # If any remaining value is not empty, it is not a match-all query.
+    return not any(val.strip() for vals in parsed.values() for val in vals)

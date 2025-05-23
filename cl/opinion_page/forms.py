@@ -1,6 +1,7 @@
 import logging
+from collections.abc import MutableMapping
 from datetime import datetime
-from typing import Any, MutableMapping
+from typing import Any
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -388,12 +389,8 @@ class BaseCourtUploadForm(forms.Form):
             "panel",
         ]:
             if field_name in self.fields:
-                self.fields[
-                    field_name
-                ].queryset = judges_qs  # type: ignore[attr-defined]
-                self.fields[
-                    field_name
-                ].label_from_instance = self.person_label  # type: ignore[attr-defined]
+                self.fields[field_name].queryset = judges_qs  # type: ignore[attr-defined]
+                self.fields[field_name].label_from_instance = self.person_label  # type: ignore[attr-defined]
 
     def validate_neutral_citation(self) -> None:
         """Validate if we already have the neutral citation in the system
@@ -513,8 +510,7 @@ class BaseCourtUploadForm(forms.Form):
                 "opinion": opinion,
                 "cluster": cluster,
                 "citations": citations,
-            },
-            index=False,
+            }
         )
 
         if self.cleaned_data.get("lower_court_docket_number"):
@@ -531,7 +527,9 @@ class BaseCourtUploadForm(forms.Form):
         )
 
         logging.info(
-            f"Successfully added object cluster: {cluster.id} for {self.cleaned_data.get('court_str')}"
+            "Successfully added object cluster: %s for %s",
+            cluster.id,
+            self.cleaned_data.get("court_str"),
         )
 
         return cluster
@@ -651,13 +649,13 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
     """Form for Tennessee Workers' Compensation Appeals Board (tennworkcompapp)
     Upload Portal"""
 
-    second_judge = forms.ModelChoiceField(
+    second_judge: forms.ModelChoiceField = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=False,
         label="Second Panelist",
         widget=forms.Select(attrs={"class": "form-control"}),
     )
-    third_judge = forms.ModelChoiceField(
+    third_judge: forms.ModelChoiceField = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=False,
         label="Third Panelist",

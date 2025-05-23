@@ -8,13 +8,16 @@ from .project.microservices import *
 from .project.money import *
 from .project.search import *
 from .project.security import *
+from .project.sitemaps import *
 from .project.testing import *
+from .project.users import *
 from .third_party.aws import *
 from .third_party.celery import *
 from .third_party.elasticsearch import *
 from .third_party.hcaptcha import *
 from .third_party.markdown import *
 from .third_party.neon import *
+from .third_party.pghistory import *
 from .third_party.redis import *
 from .third_party.rest_framework import *
 from .third_party.sentry import *

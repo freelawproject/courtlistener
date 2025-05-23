@@ -12,7 +12,6 @@ from cl.lib.converters import BlankSlugConverter
 from cl.opinion_page.sitemap import (
     BlockedDocketSitemap,
     BlockedOpinionSitemap,
-    DocketSitemap,
     OpinionSitemap,
 )
 from cl.people_db.sitemap import PersonSitemap
@@ -26,7 +25,6 @@ register_converter(BlankSlugConverter, "blank-slug")
 sitemaps = {
     SEARCH_TYPES.ORAL_ARGUMENT: AudioSitemap,
     SEARCH_TYPES.OPINION: OpinionSitemap,
-    SEARCH_TYPES.RECAP: DocketSitemap,
     SEARCH_TYPES.PEOPLE: PersonSitemap,
     "disclosures": DisclosureSitemap,
     "visualizations": VizSitemap,
@@ -71,6 +69,8 @@ urlpatterns = [
         {"sitemaps": sitemaps},
         name="sitemaps",
     ),
+    # Pregenerated sitemaps
+    path("", include("cl.sitemaps_infinite.urls")),
     # Redirects
     path(
         "donate/",
@@ -89,11 +89,23 @@ urlpatterns = [
         "removal/",
         RedirectView.as_view(url="/terms/#removal", permanent=True),
     ),
+    path(
+        "opinion/<int:pk>/<blank-slug:slug>/visualizations/",
+        RedirectView.as_view(
+            url="/help/api/rest/visualizations/#deprecation-notice",
+            permanent=True,
+        ),
+        name="cluster_visualizations",
+    ),
 ]
 
 if settings.DEVELOPMENT:
     urlpatterns.append(
-        path("__debug__/", include("debug_toolbar.urls")),
+        path("__reload__/", include("django_browser_reload.urls")),
     )
+    if not settings.TESTING:
+        urlpatterns.append(
+            path("__debug__/", include("debug_toolbar.urls")),
+        )
 
 urlpatterns += static("/", document_root=settings.MEDIA_ROOT)  # type: ignore

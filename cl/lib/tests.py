@@ -1,9 +1,20 @@
 import datetime
-from typing import Tuple, TypedDict, cast
+import pickle
+from typing import TypedDict, cast
+from unittest import mock
+from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
+from django.core.cache import cache
 from django.core.files.base import ContentFile
+from django.test import override_settings
+from requests.cookies import RequestsCookieJar
 
+from cl.lib.courts import (
+    get_active_court_from_cache,
+    get_minimal_list_of_courts,
+    lookup_child_courts_cache,
+)
 from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
@@ -11,6 +22,7 @@ from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
     is_docket_number,
+    linkify_orig_docket_number,
     make_docket_number_core,
     make_upload_path,
 )
@@ -21,6 +33,12 @@ from cl.lib.pacer import (
     normalize_attorney_role,
     normalize_us_state,
 )
+from cl.lib.pacer_session import (
+    ProxyPacerSession,
+    SessionData,
+    get_or_cache_pacer_cookies,
+    session_key,
+)
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.redis_utils import (
@@ -28,7 +46,7 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
-from cl.lib.search_utils import make_fq
+from cl.lib.search_index_utils import get_parties_from_case_name_bankr
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
     check_for_proximity_tokens,
@@ -65,8 +83,7 @@ class TestPacerUtils(TestCase):
         )
         self.assertFalse(
             blocked,
-            msg="Bankruptcy dockets with many entries "
-            "should not be blocked",
+            msg="Bankruptcy dockets with many entries should not be blocked",
         )
         # This should stay blocked even though it's a big bankruptcy docket.
         d.blocked = True
@@ -75,9 +92,180 @@ class TestPacerUtils(TestCase):
         )
         self.assertTrue(
             blocked,
-            msg="Bankruptcy dockets that start blocked "
-            "should stay blocked.",
+            msg="Bankruptcy dockets that start blocked should stay blocked.",
         )
+
+
+@mock.patch(
+    "cl.lib.courts.get_cache_key_for_court_list",
+    return_value="lib_test:minimal-court-list",
+)
+class TestCachedCourtUtils(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent_court = CourtFactory(id="parent_court")
+        cls.child_court_1 = CourtFactory(
+            id="child_1", jurisdiction="FB", parent_court=cls.parent_court
+        )
+        cls.child_court_2 = CourtFactory(
+            id="child_2",
+            jurisdiction="FB",
+            parent_court=cls.parent_court,
+        )
+        cls.court_not_in_use = CourtFactory(in_use=False)
+
+        cls.self_referencing_court = CourtFactory(
+            id="self_ref", parent_court_id="self_ref"
+        )
+        cls.self_referencing_child_1 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+        cls.self_referencing_child_1_1 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+        cls.self_referencing_child_2 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+
+    def setUp(self):
+        # Pre-populate the cache with the court list
+        with patch(
+            "cl.lib.courts.get_cache_key_for_court_list",
+            return_value="lib_test:minimal-court-list",
+        ):
+            get_minimal_list_of_courts()
+
+    def test_can_get_active_courts_from_cache(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            in_use_courts = get_active_court_from_cache()
+
+        court_count = Court.objects.filter(in_use=True).count()
+        self.assertEqual(len(in_use_courts), court_count)
+
+    def test_can_handle_empty_inputs(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([])
+
+        self.assertEqual(child_ids, set())
+
+    def test_can_return_empty_set_for_court_w_no_child(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([self.court_not_in_use.pk])
+
+        self.assertEqual(child_ids, set())
+
+    def test_can_return_set_with_child_court_ids(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([self.parent_court.pk])
+
+        self.assertSetEqual(
+            {
+                self.parent_court.pk,
+                self.child_court_1.pk,
+                self.child_court_2.pk,
+            },
+            child_ids,
+        )
+
+    def test_can_handle_self_referencing_courts(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache(
+                [self.self_referencing_court.pk]
+            )
+
+        self.assertSetEqual(
+            {
+                self.self_referencing_court.pk,
+                self.self_referencing_child_1.pk,
+                self.self_referencing_child_1_1.pk,
+                self.self_referencing_child_2.pk,
+            },
+            child_ids,
+        )
+
+    def tearDown(self):
+        cache.delete("lib_test:minimal-court-list")
+        return super().tearDown()
+
+
+@override_settings(
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+)
+class TestPacerSessionUtils(TestCase):
+    def setUp(self) -> None:
+        r = get_redis_interface("CACHE", decode_responses=False)
+        # Clear cached session keys to prevent data inconsistencies.
+        key = r.keys(session_key % "test_user_new_cookie")
+        if key:
+            r.delete(*key)
+        self.test_cookies = RequestsCookieJar()
+        self.test_cookies.set("PacerSession", "this-is-a-test")
+        r.set(
+            session_key % "test_user_new_format",
+            pickle.dumps(
+                SessionData(self.test_cookies, "http://proxy_1:9090")
+            ),
+            ex=60 * 60,
+        )
+        r.set(
+            session_key % "test_new_format_almost_expired",
+            pickle.dumps(
+                SessionData(self.test_cookies, "http://proxy_1:9090")
+            ),
+            ex=60,
+        )
+
+    def test_pick_random_proxy_when_list_is_available(self):
+        """Does ProxyPacerSession choose a random proxy from the available list?"""
+        session = ProxyPacerSession(username="test", password="password")
+        self.assertIn(
+            session.proxy_address,
+            ["http://proxy_1:9090", "http://proxy_2:9090"],
+        )
+
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_compute_new_cookies_with_new_format(self, mock_log_into_pacer):
+        """Are we using the dataclass for new cookies?"""
+        mock_log_into_pacer.return_value = SessionData(
+            self.test_cookies,
+            "http://proxy_1:9090",
+        )
+        session_data = get_or_cache_pacer_cookies(
+            "test_user_new_cookie", username="test", password="password"
+        )
+        self.assertEqual(mock_log_into_pacer.call_count, 1)
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
+
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_parse_cookie_proxy_pair_properly(self, mock_log_into_pacer):
+        """Can we parse the dataclass from cache properly?"""
+        session_data = get_or_cache_pacer_cookies(
+            "test_user_new_format", username="test", password="password"
+        )
+        self.assertEqual(mock_log_into_pacer.call_count, 0)
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
+
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_compute_cookies_for_almost_expired_data(
+        self, mock_log_into_pacer
+    ):
+        """Are we using the dataclass when re-computing session?"""
+        mock_log_into_pacer.return_value = SessionData(
+            self.test_cookies, "http://proxy_2:9090"
+        )
+
+        # Attempts to get almost expired cookies with the new format from cache
+        # Expects refresh.
+        session_data = get_or_cache_pacer_cookies(
+            "test_new_format_almost_expired",
+            username="test",
+            password="password",
+        )
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(mock_log_into_pacer.call_count, 1)
+        self.assertEqual(session_data.proxy_address, "http://proxy_2:9090")
 
 
 class TestStringUtils(SimpleTestCase):
@@ -90,7 +278,7 @@ class TestStringUtils(SimpleTestCase):
             ellipsis: str
 
         s = "Henry wants apple."
-        tests: Tuple[TestType, ...] = (
+        tests: tuple[TestType, ...] = (
             # Simple case
             {"length": 13, "result": "Henry wants"},
             # Off by one cases
@@ -167,26 +355,6 @@ class TestStringUtils(SimpleTestCase):
         for test, answer in tests.items():
             computed = normalize_dashes(test)
             self.assertEqual(computed, answer)
-
-
-class TestMakeFQ(SimpleTestCase):
-    def test_make_fq(self) -> None:
-        test_pairs = (
-            ("1 2", "1 AND 2"),
-            ("1 and 2", "1 AND 2"),
-            ('"1 AND 2"', '"1 AND 2"'),
-            ('"1 2"', '"1 2"'),
-            ("1 OR 2", "1 OR 2"),
-            ("1 NOT 2", "1 NOT 2"),
-            ("cause:sympathy", "cause AND sympathy"),
-        )
-        for test in test_pairs:
-            field = "f"
-            key = "key"
-            self.assertEqual(
-                make_fq(cd={key: test[0]}, field=field, key=key),
-                f"{field}:({test[1]})",
-            )
 
 
 class TestModelHelpers(TestCase):
@@ -1029,9 +1197,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_for_proximity_tokens(
-                test["input_str"]  # type: ignore
-            )
+            output = check_for_proximity_tokens(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         # Check for Unbalanced parentheses.
@@ -1068,15 +1234,11 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = check_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
 
         # Check for Unbalanced quotes.
@@ -1087,12 +1249,27 @@ class TestElasticsearchUtils(SimpleTestCase):
                 "sanitized": "This is unbalanced",
             },
             {
+                "input_str": "This is “unbalanced",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
                 "input_str": 'This is "unbalanced""',
                 "output": True,
                 "sanitized": 'This is "unbalanced"',
             },
             {
+                "input_str": "This is “unbalanced””",
+                "output": True,
+                "sanitized": 'This is "unbalanced"',
+            },
+            {
                 "input_str": 'This "is" unbalanced"',
+                "output": True,
+                "sanitized": 'This "is" unbalanced',
+            },
+            {
+                "input_str": 'This "is” unbalanced"',
                 "output": True,
                 "sanitized": 'This "is" unbalanced',
             },
@@ -1112,10 +1289,139 @@ class TestElasticsearchUtils(SimpleTestCase):
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_quotes(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_quotes(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
+
+    def test_can_get_parties_from_bankruptcy_case_name(self) -> None:
+        class PartiesNameTestType(TypedDict):
+            case_name: str
+            output: list[str]
+
+        tests: list[PartiesNameTestType] = [
+            {
+                "case_name": "Mendelsohn. Singh",
+                "output": ["Mendelsohn. Singh"],
+            },
+            {
+                "case_name": "Cadle Co. v Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. v Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. v. Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. vs Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. vs. Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Paul Thomas Presbury, Jr. and Lisa Rae Presbury",
+                "output": ["Paul Thomas Presbury, Jr.", "Lisa Rae Presbury"],
+            },
+            {
+                "case_name": "Ma Margarita Bernal Sosa -ABOVE MED",
+                "output": ["Ma Margarita Bernal Sosa"],
+            },
+            {
+                "case_name": "Jennifer Renee' Abbott and Quentin Andrew Abbott -ABOVE MED",
+                "output": ["Jennifer Renee' Abbott", "Quentin Andrew Abbott"],
+            },
+            {
+                "case_name": "Aiesha Renee -BELOW MED",
+                "output": ["Aiesha Renee"],
+            },
+            {
+                "case_name": "Justin Kaiser and Belinda Kaiser -BELOW MED",
+                "output": ["Justin Kaiser", "Belinda Kaiser"],
+            },
+            {
+                "case_name": "Cosmorex Ltd. (in Liquidation)",
+                "output": ["Cosmorex Ltd."],
+            },
+            {
+                "case_name": "Cowen & Co. v. Zagar (In re Zagar)",
+                "output": ["Cowen & Co.", "Zagar"],
+            },
+            {
+                "case_name": 'Advantage LLC <b><font color="red">Jointly Administered under 23-90886.</font></b>',
+                "output": ["Advantage LLC"],
+            },
+            {
+                "case_name": 'Sather v. Carlson<b><font color="red">DO NOT DOCKET. CASE TRANSFERRED OUT.</font></b>',
+                "output": ["Sather", "Carlson"],
+            },
+            {
+                "case_name": 'Saucedo and Green Dream International, LLC <b> <font color="red"> Case Consolidated under 23-03142 </font> </b>',
+                "output": ["Saucedo", "Green Dream International, LLC"],
+            },
+            {
+                "case_name": "In re: Matter of Nicholas M. Wajda",
+                "output": [],
+            },
+            {
+                "case_name": "In re Matter of Proof of Claim Replacement Filings",
+                "output": [],
+            },
+            {
+                "case_name": "In re T.H.",
+                "output": [],
+            },
+            {
+                "case_name": "In Re: Dempsey Clay Ward",
+                "output": [],
+            },
+            {
+                "case_name": "In re: Receivership of Horses and Equipment v. Gabriel",
+                "output": [],
+            },
+            {
+                "case_name": "In Re: Appearances of Attorney James G. ORourke in Pending Bankruptcy Cases",
+                "output": [],
+            },
+            {
+                "case_name": "In the matter of Attorney Rodney D. Shepherd",
+                "output": [],
+            },
+            {
+                "case_name": "Rochester Drug Cooperative, Inc. - Adversary Proceeding",
+                "output": ["Rochester Drug Cooperative, Inc."],
+            },
+            {
+                "case_name": "Ronald W. Howland, Jr and Marilee R Howland - Adversary Proceeding",
+                "output": ["Ronald W. Howland, Jr", "Marilee R Howland"],
+            },
+            {
+                "case_name": "Derrick D. Thomas v Kacy L. Thomas - Adversary Proceeding",
+                "output": ["Derrick D. Thomas", "Kacy L. Thomas"],
+            },
+            {
+                "case_name": "Unknown Case Title",
+                "output": [],
+            },
+            {
+                "case_name": "Unknown Case Title - Adversary Proceeding",
+                "output": [],
+            },
+        ]
+        for test in tests:
+            with self.subTest(
+                input=test["case_name"], msg="get parties names from case name"
+            ):
+                parties: list[str] = get_parties_from_case_name_bankr(
+                    test["case_name"]
+                )
+                self.assertEqual(
+                    parties,
+                    test["output"],
+                )
 
 
 class TestRedisUtils(SimpleTestCase):
@@ -1131,3 +1437,99 @@ class TestRedisUtils(SimpleTestCase):
 
         result = release_redis_lock(r, lock_key, identifier)
         self.assertEqual(result, 1)
+
+
+class TestLinkifyOrigDocketNumber(SimpleTestCase):
+    def test_linkify_orig_docket_number(self):
+        test_pairs = [
+            (
+                "National Labor Relations Board",
+                "19-CA-289275",
+                "https://www.nlrb.gov/case/19-CA-289275",
+            ),
+            (
+                "National Labor Relations Board",
+                "NLRB-09CA110508",
+                "https://www.nlrb.gov/case/09-CA-110508",
+            ),
+            (
+                "EPA",
+                "85 FR 20688",
+                "https://www.federalregister.gov/citation/85-FR-20688",
+            ),
+            (
+                "Other Agency",
+                "85 Fed. Reg. 12345",
+                "https://www.federalregister.gov/citation/85-FR-12345",
+            ),
+            (
+                "National Labor Relations Board",
+                "85 Fed. Reg. 12345",
+                "https://www.federalregister.gov/citation/85-FR-12345",
+            ),
+            (
+                "Bureau of Land Management",
+                "88FR20688",
+                "https://www.federalregister.gov/citation/88-FR-20688",
+            ),
+            (
+                "Bureau of Land Management",
+                "88 Fed Reg 34523",
+                "https://www.federalregister.gov/citation/88-FR-34523",
+            ),
+            (
+                "Department of Transportation",
+                "89 Fed. Reg. 34,620",
+                "https://www.federalregister.gov/citation/89-FR-34,620",
+            ),
+            (
+                "Animal and Plant Health Inspection Service",
+                "89 FR 106981",
+                "https://www.federalregister.gov/citation/89-FR-106981",
+            ),
+            (
+                "Animal and Plant Health Inspection Service",
+                "89 Fed. Reg. 106,981",
+                "https://www.federalregister.gov/citation/89-FR-106,981",
+            ),
+            (
+                "Environmental Protection Agency",
+                "EPA-HQ-OW-2020-0005",
+                "https://www.regulations.gov/docket/EPA-HQ-OW-2020-0005",
+            ),
+            (
+                "United States Tax Court",
+                "USTC-2451-13",
+                "https://dawson.ustaxcourt.gov/case-detail/02451-13",
+            ),
+            (
+                "United States Tax Court",
+                "6837-20",
+                "https://dawson.ustaxcourt.gov/case-detail/06837-20",
+            ),
+            (
+                "United States Tax Court",
+                "USTC-5903-19W",
+                "https://dawson.ustaxcourt.gov/case-detail/05903-19W",
+            ),
+            ("Federal Communications Commission", "19-CA-289275", ""),
+            (
+                "National Labor Relations Board",
+                "This is not an NLRB case",
+                "",
+            ),
+            ("Other Agency", "This is not a Federal Register citation", ""),
+        ]
+
+        for i, (agency, docket_number, expected_output) in enumerate(
+            test_pairs
+        ):
+            with self.subTest(
+                f"Testing description text cleaning for {agency, docket_number}...",
+                i=i,
+            ):
+                self.assertEqual(
+                    linkify_orig_docket_number(agency, docket_number),
+                    expected_output,
+                    f"Got incorrect result from clean_parenthetical_text for text: {agency, docket_number}",
+                )

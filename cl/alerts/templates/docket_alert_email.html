@@ -73,7 +73,11 @@
       {% for de in new_des %}
         {% for rd in de.recap_documents.all %}
           <tr>
-            <td style="text-align: center">{{ de.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}</td>
+            <td style="text-align: center">
+              <a href="https://www.courtlistener.com{% if rd.get_absolute_url %}{{ rd.get_absolute_url }}{% else %}{{ docket.get_absolute_url }}#minute-entry-{{ de.pk}}{% endif %}">
+                {{ de.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
+              </a>
+            </td>
             <td>
               {% if de.datetime_filed %}
                 <span title="{{ de.datetime_filed|timezone:timezone}}">{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}</span>
@@ -94,7 +98,7 @@
                   <a href="{{ rd.filepath_local.url }}">For free from RECAP
                   </a>
                  {% elif rd.is_sealed %}
-                  <span>Sealed on PACER</span>
+                  <span>Unavailable on PACER</span>
                 {% else %}
                   <a href="https://www.courtlistener.com{{ rd.get_absolute_url }}?redirect_to_download=True">From RECAP with PACER fallback
                   </a>

@@ -1,0 +1,697 @@
+
+
+/*Wrap all our changes around an opinion-body class we load up
+ in the opinion template*/
+
+.opinion-body {
+
+  .harvard > * {
+    font-size: 15px;
+    letter-spacing: 0.2px;
+    text-align: justify;
+    padding:0px;
+    margin: 0px;
+    background-color: white;
+    border: none;
+    line-height: 2.3em;
+  }
+
+  #headmatter > parties {
+    text-align: center;
+    font-style: initial;
+    font-size: 2em;
+    display: block;
+  }
+  #headmatter > div.footnotes > .footnote > p {
+      line-height: 1em;
+  }
+
+  #headmatter > * {
+    text-indent: 2em;
+  }
+
+  #headmatter docketnumber,
+  #headmatter court,
+  #headmatter parties,
+  #headmatter attorneys,
+  #headmatter syllabus,
+  #headmatter decisiondate {
+      display: block;
+  }
+
+  #headmatter > div.footnotes {
+      border-top: None;
+      padding-top: 1em;
+  }
+
+  .jump-links > a{
+    position: relative;
+    margin: -8px 20px 0 0;
+    width: 140px;
+    line-height: 18px;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    opacity: 1;
+  }
+
+  .hr-opinion {
+    border-top: 2px solid black;
+  }
+
+  /*Clean up the Case Caption section to look large and clean*/
+  .case-caption {
+    font-size: 3em;
+    font-weight: 500;
+    text-align: left;
+    line-height: 1.1em;
+    margin-top: 50px;
+  }
+
+
+  .case-court {
+    font-size: 25px;
+    text-align: left;
+  }
+
+/*Update sidebar jump links to look nice*/
+.jump-links {
+  font-size: 12px;
+  padding-top: 5px;
+}
+
+  li.jump-links.active {
+      color: #B53C2C;
+      font-weight: bold;
+  }
+
+  li.jump-links {
+    list-style-type: none;
+    padding-left: 0;
+  }
+
+  li.jump-links::before {
+    content: "";
+    border-left: 3px solid lightgrey;
+    height: 1em;
+    padding-right: 8px;
+    display: inline-block;
+    margin-right: 5px;
+  }
+
+  li.jump-links.active::before {
+    content: "";
+    border-left: 2px solid #B53C2C;
+    padding-right: 8px;
+    display: inline-block;
+    margin-right: 5px;
+  }
+
+
+  .jump-links {
+  font-size: 12px;
+  padding-top: 5px;
+}
+
+li.jump-links {
+  height:2.5em;
+  list-style-type: none;
+  padding-left: 0;
+  position: relative;
+}
+
+li.jump-links::before {
+  content: "";
+  border-left: 2px solid lightgrey;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding-right: 8px;
+  display: inline-block;
+}
+
+/* Active link styles */
+li.jump-links > a.active {
+  font-weight: 500;
+  color: black;
+}
+
+li.jump-links > a {
+  padding-left:10px;
+  color: black;
+}
+
+
+div.footnote:first-of-type {
+    border-top: 1px solid black;
+    width: 100%;
+    display: block;
+  }
+
+  /*Columbia specific Fix*/
+  /*Columbia/HTML Law box special footnotes data almost awlays starts with fn1*/
+  footnote_body sup#fn1 {
+    padding-top: 10px;
+    border-top: 1px solid black;
+    width: 100%;
+    display: block;
+  }
+
+  /*HTML law box page numbers*/
+  strong[data-ref] {
+    font-size: 0.8em;
+    fon: italic;
+  }
+
+  strong[data-ref]::before {
+    content: attr(data-ref);
+    display: inline;
+    position: relative;
+    float: right;
+    left: -.5em;
+    font-size: 0.8em;
+    color: dimgray;
+    width: 0;
+  }
+
+
+  div.footnote {
+    padding-top: 10px;
+    display: block;
+    line-height: 1em;
+  }
+
+  div.footnote > p {
+    display: inline;
+  }
+
+  div.footnote::before {
+    content: attr(label) " ";
+    font-weight: bold;
+    color: #000;
+    margin-right: 5px;
+    padding-top: 2em;
+  }
+
+  div.footnote {
+    padding-top: 10px;
+    font-size: 12px;
+  }
+
+  div.footnote > * {
+    padding-top: 10px;
+    font-size: 12px;
+  }
+
+
+  /*To help separate footnotes from opinion document*/
+  footnote:first-of-type {
+    border-top: 1px solid black;
+    width: 100%;
+    display: block;
+  }
+
+  footnote {
+    padding-top: 10px;
+    display: block;
+    line-height: 1.5em;
+    /*margin-left: 1em;*/
+    padding-left: 40px;
+  }
+
+  footnote > p {
+    display: inline;
+  }
+
+  footnote::before {
+    content: attr(label);
+    font-weight: bold;
+    color: #000;
+    margin-right: 26px;
+    padding-top: 2em;
+    margin-left: -35px;
+  }
+
+  /*Handle CSS in Columbia opinions*/
+  footnotemark {
+    font-weight: bold;
+    font-size: 0.8em;
+    vertical-align: super;
+    line-height: 0;
+  }
+
+
+  #cited-by {
+    z-index: 1;
+  }
+
+  footnotemark {
+    cursor: pointer;
+    color: blue;
+    text-decoration: underline;
+  }
+
+  footnote {
+    padding-top: 10px;
+    font-size: 12px;
+  }
+
+
+  .jumpback {
+    color: blue;
+    cursor: pointer;
+    font-weight: bold;
+    margin-left: 5px;
+  }
+
+  /*Jump backs are empty in resource.org documents for now*/
+  #resource-org-text .jumpback {
+    display: none;
+  }
+
+
+  footnote > * {
+    font-size: 12px;
+  }
+
+  author > page-number {
+    display: block;
+    font-size: 15px;
+  }
+
+  author {
+    display: inline;
+    margin: 0; /* Remove any default margin */
+    text-indent: 2em; /* Indents the first line by 2em */
+  }
+
+  /*Important for indenting harvard opinions correctly*/
+  opinion > p[id^="b"] {
+    text-indent: 2em;
+  }
+
+
+  opinion > [id^="p-"] {
+    padding-left: 2em;
+    text-indent: 2em;
+  }
+}
+
+[id^="A"] {
+  text-indent: 2em;
+  display: inline;
+
+}
+
+.opinion-body {
+  /*I think i did this but i dont know why so im leaving it for now*/
+  /*.tab-pane {*/
+  /*  display: none; */
+  /*}*/
+
+  .tab-pane.active {
+    display: block;
+  }
+
+  @media (min-width: 767px) {
+
+    #sidebar {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      justify-content: space-between; /* Push content apart */
+      padding: 20px;
+      padding-top: 3px;
+      overflow-y: auto;
+      position: -webkit-sticky; /* For Safari */
+      position: sticky;
+      top: 0; /* Stick to the top of the viewport */
+
+    }
+  }
+
+  @media (min-width: 100px) {
+    #sidebar {
+      height: auto;
+    }
+  }
+
+  .sidebar-bottom {
+    margin-top: auto;
+  }
+
+  .support-flp, .sponsored-by {
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  #opinion > article > * > p {
+    text-indent: 2em;
+  }
+
+  .active > a {
+    border-bottom-color: #B53C2C;
+  }
+
+  #opinion p {
+    text-indent: 2em;
+  }
+
+
+  .nav-pills > li > a {
+    padding: 1px 15px;
+  }
+
+  blockquote > * {
+    text-indent: 0em;
+  }
+
+  sup {
+    font-size: .9em;
+  }
+
+  .main-document {
+    padding-bottom: 5em;
+  }
+
+  /*Case Caption CSS*/
+  #caption-square {
+    background-color: whitesmoke;
+    margin-left: -15px;
+    margin-right: -15px;
+    margin-top: -20px;
+  }
+
+  #caption-square > ul > li {
+    background-color: #e7e7e7;
+    border-top-right-radius: 5px 5px; /* Rounds the corners */
+    border-top-left-radius: 5px 5px; /* Rounds the corners */
+  }
+
+  #caption-square > ul > li.active {
+    background-color: #ffffff;
+    border-bottom: 1px solid white;
+  }
+
+  #caption-square > ul > li.active > a {
+    border: 1px solid white;
+  }
+
+  /*Opinion Date File*/
+ .case-date-new {
+    border: 1px solid #B53C2C;
+    padding: 0px 10px;
+    border-radius: 20px; /* Rounds the corners */
+    color: #B53C2C;
+  }
+
+
+
+  /*Buttons on Top of Page*/
+  .add-a-note {
+    margin-left: 5px;
+    border: 1px solid black;
+    border-radius: 10px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .add-citation-alert {
+    border: 1px solid black;
+    border-radius: 10px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  cross_reference {
+    font-style: italic;
+  }
+
+  #opinion-caption {
+    margin-top: 20px;
+    font-size: 15px;
+    letter-spacing: 0.2px;
+    line-height: 2.3em;
+    margin-bottom: 20px;
+    padding-left: 20px;
+    padding-top: 10px;
+    padding-right: 10px;
+  }
+
+  .case-details {
+    font-size: 16px;
+  }
+
+  .case-details li {
+    line-height: 1.5em;
+  }
+
+  span.citation.no-link {
+    font-style: italic;
+  }
+
+  .top-row {
+    height: 32px;
+    line-height:28px
+  }
+
+  .action-buttons{
+    display: flex;
+    column-gap: 5px;
+  }
+
+  p > span.star-pagination::after {
+    display: inline;
+    position: relative;
+    content: attr(label);;
+    float: left;
+    left: -4.5em;
+    font-size: 1em;
+    color: dimgray;
+    width: 0;
+  }
+
+  div > span.star-pagination::after {
+    display: inline;
+    position: relative;
+    content: attr(label);;
+    float: left;
+    left: -2.5em;
+    font-size: 1em;
+    color: dimgray;
+    width: 0;
+  }
+
+  div.subopinion-content > .harvard {
+    font-size: 15px;
+    letter-spacing: 0.2px;
+    line-height: 2.3em;
+    text-align: justify;
+  }
+
+  #columbia-text {
+    font-size: 15px;
+    letter-spacing: 0.2px;
+    line-height: 2.3em;
+    text-align: justify;
+  }
+
+  #columbia-text > div.subopinion-content > div > p > span.star-pagination {
+    color: #555555;
+  }
+
+  #columbia-text > div.subopinion-content > div > p > span.star-pagination::after {
+    display: inline;
+    position: relative;
+    content: attr(label);;
+    float: left;
+    left: -4.5em;
+    font-size: 1em;
+    color: dimgray;
+    width: 0;
+  }
+
+
+  page-number::after {
+    display: inline;
+    position: relative;
+    content: attr(label);
+    float: right;
+    font-size: 1em;
+    color: dimgray;
+    width: 0;
+  }
+
+  page-number {
+    font-style: italic;
+    font-size: 0.8em;
+    margin-right: 4px;
+    margin-left: 2px;
+  }
+
+  page-label {
+    font-style: italic;
+    font-size: 0.8em;
+    margin-right: 4px;
+    margin-left: 2px;
+  }
+
+  page-label {
+      cursor: pointer;
+  }
+
+  page-label:hover {
+      color: darkblue;
+      text-decoration: underline;  /* Example hover styling */
+  }
+
+  page-label::after {
+    display: inline;
+    position: relative;
+    content: attr(data-label);
+    float: right;
+    font-size: 1em;
+    color: dimgray;
+    width: 0;
+  }
+
+  a.page-label {
+    font-style: italic;
+    font-size: 0.8em;
+    margin-right: 4px;
+    margin-left: 2px;
+    color: #555555;
+  }
+
+
+  a.page-label::after {
+    display: inline;
+    position: relative;
+    content: attr(data-label);
+    float: right;
+    font-size: 1em;
+    color: dimgray;
+    width: 0;
+  }
+
+  footnote > blockquote > a.page-label::after {
+    right: -1.0em;
+  }
+
+  blockquote[id^="A"] > a.page-label::after {
+    right: -1.0em;
+  }
+
+  blockquote[id^="b"] > a.page-label::after {
+    right: -1.0em;
+  }
+
+  opinion > a.page-label::after {
+    right: -1.0em;
+    text-indent: 0;
+  }
+
+  .harvard a.page-label::after {
+    right: -1.0em;
+    text-indent: 0;
+    position: absolute;
+  }
+
+   /* Adjust to move the entire blockquote to the right */
+  blockquote {
+    margin-left: 3em;
+    display: block;
+  }
+
+  div.counsel > a.page-label::after {
+    right: -1.0em;
+  }
+
+  footnote > p > a.page-label::after {
+    display: none;
+  }
+
+  footnote > blockquote > a.page-label::after {
+    display: none;
+  }
+
+  /*Remove the header on the opinion page so its flush*/
+  header {
+    margin-bottom: 0px;
+  }
+
+  .harvard > opinion > author {
+      line-height: inherit;
+      font-size: inherit;
+      display: inline-block;
+  }
+
+  .container > .content {
+      margin-bottom: 0em;
+  }
+
+  .meta-data-header {
+      font-size:14px;
+  }
+
+  .meta-data-value {
+      font-size:14px;
+  }
+
+  .case-details {
+    letter-spacing: 0.2px;
+    line-height:2.3em;
+  }
+
+  .opinion-section-title {
+    margin-top: 50px;
+  }
+
+  /*Add style to align roman numerals */
+  .center-header {
+    text-align: center;
+    font-size: 2em;
+  }
+
+  /*If XS screen - remove the side page labels*/
+  @media (max-width: 768px) {
+    a.page-label::after {
+      display: none;
+    }
+    a.page-number::after {
+      display: none;
+    }
+  }
+
+/* Stack tabs starting at 991px resolution */
+@media (max-width: 991px) {
+    .nav-tabs.nav-justified {
+      width: 100%;
+      border-bottom: 0;
+    }
+    .nav-tabs.nav-justified > li {
+      float: none;
+      display: block;
+      width: 100%;
+    }
+    .nav-tabs.nav-justified > li > a {
+      text-align: center;
+      margin-bottom: 5px;
+    }
+}
+
+  .scraped-html p {
+    display: block;
+    text-indent: 1em;
+  }
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+#all-summaries {
+    margin-top: 20px;
+}

@@ -1,4 +1,3 @@
-import json
 import logging
 from collections import OrderedDict
 from datetime import timedelta
@@ -12,8 +11,10 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView
+from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.validators import validate_email
 from django.db.models import Count, F
 from django.http import (
     HttpRequest,
@@ -28,7 +29,6 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import (
     sensitive_post_parameters,
     sensitive_variables,
@@ -547,6 +547,12 @@ def register_success(request: HttpRequest) -> HttpResponse:
     they left off."""
     redirect_to = get_redirect_or_abort(request, "next")
     email = request.GET.get("email", "")
+    if email:
+        try:
+            validate_email(email)
+        except ValidationError:
+            raise SuspiciousOperation("Invalid Email address")
+
     default_from = parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
     return TemplateResponse(
         request,

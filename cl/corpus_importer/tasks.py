@@ -5,8 +5,10 @@ import shutil
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
+from pyexpat import ExpatError
+from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
+from typing import Any
 
 import eyecite
 import internetarchive as ia
@@ -25,12 +27,14 @@ from eyecite.tokenizers import HyperscanTokenizer
 from httpx import (
     HTTPStatusError,
     NetworkError,
+    ReadError,
     RemoteProtocolError,
     TimeoutException,
 )
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
+    AppellateAttachmentPage,
     AppellateDocketReport,
     AttachmentPage,
     CaseQuery,
@@ -43,10 +47,8 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
-from pyexpat import ExpatError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
-from requests.cookies import RequestsCookieJar
 from requests.exceptions import (
     ConnectionError,
     HTTPError,
@@ -65,6 +67,8 @@ from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    is_appellate_court,
+    is_long_appellate_document_number,
     make_iquery_probing_key,
     mark_ia_upload_needed,
 )
@@ -83,6 +87,7 @@ from cl.lib.pacer import (
 )
 from cl.lib.pacer_session import (
     ProxyPacerSession,
+    SessionData,
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
 )
@@ -126,14 +131,13 @@ from cl.search.models import (
     RECAPDocument,
     Tag,
 )
-from cl.search.tasks import add_items_to_solr
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 logger = logging.getLogger(__name__)
 
 
-def increment_failure_count(obj: Union[Audio, Docket, RECAPDocument]) -> None:
+def increment_failure_count(obj: Audio | Docket | RECAPDocument) -> None:
     if obj.ia_upload_failure_count is None:
         obj.ia_upload_failure_count = 1
     else:
@@ -144,7 +148,7 @@ def increment_failure_count(obj: Union[Audio, Docket, RECAPDocument]) -> None:
 def generate_ia_json(
     d_pk: int,
     database: str = "default",
-) -> Tuple[Docket, str]:
+) -> tuple[Docket, str]:
     """Generate JSON for upload to Internet Archive
 
     :param d_pk: The PK of the docket to generate JSON for
@@ -282,11 +286,11 @@ def download_recap_item(
     filename: str,
     clobber: bool = False,
 ) -> None:
-    logger.info(f"  Getting item at: {url}")
+    logger.info("  Getting item at: %s", url)
     location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
     try:
         if os.path.isfile(location) and not clobber:
-            raise IOError(f"    IOError: File already exists at {location}")
+            raise OSError(f"    IOError: File already exists at {location}")
         r = requests.get(
             url,
             stream=True,
@@ -295,12 +299,12 @@ def download_recap_item(
         )
         r.raise_for_status()
     except requests.Timeout as e:
-        logger.warning(f"    Timed out attempting to get: {url}\n")
+        logger.warning("    Timed out attempting to get: %s\n", url)
         raise self.retry(exc=e, countdown=2)
     except requests.RequestException as e:
-        logger.warning(f"    Unable to get {url}\nException was:\n{e}")
-    except IOError as e:
-        logger.warning(f"    {e}")
+        logger.warning("    Unable to get %s\nException was:\n%s", url, e)
+    except OSError as e:
+        logger.warning("    %s", e)
     else:
         with NamedTemporaryFile(prefix="recap_download_") as tmp:
             r.raw.decode_content = True
@@ -323,28 +327,27 @@ def download_recap_item(
     soft_time_limit=240,
 )
 def get_and_save_free_document_report(
-    self: Task,
-    court_id: str,
-    start: date,
-    end: date,
-) -> int:
+    self: Task, court_id: str, start: date, end: date, log_id: int = 0
+) -> tuple[int, int]:
     """Download the Free document report and save it to the DB.
 
     :param self: The Celery task.
     :param court_id: A pacer court id.
     :param start: a date object representing the first day to get results.
     :param end: a date object representing the last day to get results.
+    :param log_id: a PACERFreeDocumentLog object id
     :return: The status code of the scrape
     """
-    cookies = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     s = ProxyPacerSession(
-        cookies=cookies,
+        cookies=session_data.cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
+        proxy=session_data.proxy_address,
     )
     report = FreeOpinionReport(court_id, s)
     msg = ""
@@ -359,12 +362,12 @@ def get_and_save_free_document_report(
         SoftTimeLimitExceeded,
         ValueError,
     ) as exc:
-        if isinstance(exc, (TypeError, ValueError)):
+        if isinstance(exc, (TypeError | ValueError)):
             msg = (
                 "TypeError getting free document report results, likely due "
                 "to failure to get Nonce."
             )
-        elif isinstance(exc, (RequestException, ReadTimeoutError)):
+        elif isinstance(exc, (RequestException | ReadTimeoutError)):
             msg = "Unable to get free document report results"
         elif isinstance(exc, PacerLoginException):
             msg = "PacerLoginException while getting free docs"
@@ -384,9 +387,9 @@ def get_and_save_free_document_report(
             msg = "An unknown error ocurred while getting an opinion report"
 
         if self.request.retries == self.max_retries:
-            logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)
+            logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)  # noqa: G004
             return PACERFreeDocumentLog.SCRAPE_FAILED
-        logger.info(f"{msg} Retrying.", court_id, start, end)
+        logger.info(f"{msg} Retrying.", court_id, start, end)  # noqa: G004
         raise self.retry(exc=exc, countdown=5)
 
     try:
@@ -398,8 +401,41 @@ def get_and_save_free_document_report(
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
 
+    if log_id and not settings.DEVELOPMENT:
+        # We only save the html when the script is run automatically every day and
+        # not in development environment
+        log = PACERFreeDocumentLog.objects.get(pk=log_id)
+        if hasattr(report, "responses_with_params"):
+            for result in report.responses_with_params:
+                # FreeOpinionReport now also returns a list of dicts with additional
+                # data instead of a list of requests responses. We do this to verify
+                # if we have the new version of juriscraper with the new attribute.
+                if isinstance(result, dict):
+                    response = result.get("response")
+                    query_start = result.get("start")
+                    query_end = result.get("end")
+
+                    if response and query_start and query_end:
+                        pacer_file = PacerHtmlFiles(
+                            content_object=log,
+                            upload_type=UPLOAD_TYPE.FREE_OPINIONS_REPORT,
+                        )
+                        pacer_file.filepath.save(
+                            f"free_opinions_report_{court_id}_from_{query_start.replace('/', '-')}_to_{query_end.replace('/', '-')}.html",
+                            ContentFile(response.text.encode()),
+                        )
+
     document_rows_to_create = []
     for row in results:
+        # There is a document without a case number in pacer, skip it (issue #4547)
+        if not row["docket_number"]:
+            logger.warning(
+                "No case number for document, court: %s, date_filed: %s",
+                row["court_id"],
+                row["date_filed"],
+            )
+            continue
+
         document_row = PACERFreeDocumentRow(
             court_id=row["court_id"],
             pacer_case_id=row["pacer_case_id"],
@@ -418,17 +454,16 @@ def get_and_save_free_document_report(
     # Create PACERFreeDocumentRow in bulk
     PACERFreeDocumentRow.objects.bulk_create(document_rows_to_create)
 
-    return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+    return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL, len(document_rows_to_create)
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-@throttle_task("1/4s", key="court_id")
 def process_free_opinion_result(
     self,
     row_pk: int,
     court_id: str,
     cnt: CaseNameTweaker,
-) -> Optional[TaskData]:
+) -> TaskData | None:
     """Add data from a free opinion report to our DB
 
     :param self: The celery task
@@ -440,7 +475,7 @@ def process_free_opinion_result(
     try:
         result = PACERFreeDocumentRow.objects.get(pk=row_pk)
     except PACERFreeDocumentRow.DoesNotExist:
-        logger.warning(f"Unable to find PACERFreeDocumentRow: {row_pk}")
+        logger.warning("Unable to find PACERFreeDocumentRow: %s", row_pk)
         self.request.chain = None
         return None
 
@@ -567,19 +602,19 @@ def process_free_opinion_result(
         ConnectionError,
         ReadTimeout,
         RedisConnectionError,
+        ReadError,
     ),
     max_retries=15,
     interval_start=5,
     interval_step=5,
     ignore_result=True,
 )
-@throttle_task("1/6s", key="court_id")
 def get_and_process_free_pdf(
     self: Task,
     data: TaskData,
     row_pk: int,
     court_id: str,
-) -> Optional[TaskData]:
+) -> TaskData | None:
     """Get a PDF from a PACERFreeDocumentRow object
 
     :param self: The celery task
@@ -606,14 +641,18 @@ def get_and_process_free_pdf(
             return None
         raise self.retry()
 
-    cookies = get_or_cache_pacer_cookies(
+    cookies_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     try:
         r, r_msg = download_pacer_pdf_by_rd(
-            rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
+            rd.pk,
+            result.pacer_case_id,
+            result.pacer_doc_id,
+            cookies_data,
+            de_seq_num=rd.docket_entry.pacer_sequence_number,
         )
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
@@ -628,7 +667,7 @@ def get_and_process_free_pdf(
                 logger.error(msg)
                 self.request.chain = None
                 return None
-            logger.info(f"{msg} Retrying.")
+            logger.info(f"{msg} Retrying.")  # noqa: G004
             raise self.retry(exc=exc)
         elif exc.response:
             msg = (
@@ -648,7 +687,7 @@ def get_and_process_free_pdf(
             return None
     except PacerLoginException as exc:
         msg = "PacerLoginException while getting free docs."
-        logger.info(f"{msg} Retrying.")
+        logger.info(f"{msg} Retrying.")  # noqa: G004
         # Refresh cookies before retrying
         get_or_cache_pacer_cookies(
             "pacer_scraper",
@@ -663,7 +702,7 @@ def get_and_process_free_pdf(
             logger.warning(msg)
             self.request.chain = None
             return None
-        logger.info(f"{msg} Retrying.")
+        logger.info(f"{msg} Retrying.")  # noqa: G004
         raise self.retry(exc=exc)
 
     pdf_bytes = None
@@ -750,14 +789,14 @@ ia_session = ia.get_session(
 def upload_to_ia(
     self: Task,
     identifier: str,
-    files: Union[str, List[str], List[BytesIO], Dict[str, BytesIO]],
+    files: str | list[str] | list[BytesIO] | dict[str, BytesIO],
     title: str,
-    collection: List[str],
+    collection: list[str],
     court_id: str,
     source_url: str,
     media_type: str,
     description: str,
-) -> Optional[List[Response]]:
+) -> list[Response] | None:
     """Upload an item and its files to the Internet Archive
 
     On the Internet Archive there are Items and files. Items have a global
@@ -802,8 +841,7 @@ def upload_to_ia(
             return None
         raise self.retry(exc=exc)
     logger.info(
-        "Uploading file to Internet Archive with identifier: %s and "
-        "files %s",
+        "Uploading file to Internet Archive with identifier: %s and files %s",
         identifier,
         files,
     )
@@ -860,25 +898,19 @@ def upload_to_ia(
         # retrying. Just abort.
         return None
     logger.info(
-        "Item uploaded to IA with responses %s"
-        % [r.status_code for r in responses]
+        "Item uploaded to IA with responses %s",
+        [r.status_code for r in responses],
     )
     return responses
 
 
 @app.task
-def mark_court_done_on_date(
-    status: int, court_id: str, d: date
-) -> Optional[int]:
-    court_id = map_pacer_to_cl_id(court_id)
+def mark_court_done_on_date(log_id: int, status: int) -> int | None:
     try:
-        doc_log = PACERFreeDocumentLog.objects.filter(
-            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS, court_id=court_id
-        ).latest("date_queried")
+        doc_log = PACERFreeDocumentLog.objects.get(pk=log_id)
     except PACERFreeDocumentLog.DoesNotExist:
         return None
     else:
-        doc_log.date_queried = d
         doc_log.status = status
         doc_log.date_completed = now()
         doc_log.save()
@@ -887,7 +919,7 @@ def mark_court_done_on_date(
 
 
 @app.task(ignore_result=True)
-def delete_pacer_row(data: TaskData, pk: int) -> List[int]:
+def delete_pacer_row(data: TaskData, pk: int) -> list[int]:
     try:
         PACERFreeDocumentRow.objects.get(pk=pk).delete()
     except PACERFreeDocumentRow.DoesNotExist:
@@ -897,7 +929,7 @@ def delete_pacer_row(data: TaskData, pk: int) -> List[int]:
 
 def make_fjc_idb_lookup_params(
     item: FjcIntegratedDatabase,
-) -> Dict[str, Optional[str]]:
+) -> dict[str, str | None]:
     """Given an IDB row, generate good params for looking up that item in the
     PossibleCaseNumberApi.
 
@@ -939,12 +971,12 @@ def get_pacer_case_id_and_title(
     pass_through: Any,
     docket_number: str,
     court_id: str,
-    cookies: Optional[RequestsCookieJar] = None,
-    user_pk: Optional[int] = None,
-    case_name: Optional[str] = None,
-    office_number: Optional[str] = None,
-    docket_number_letters: Optional[str] = None,
-) -> Optional[TaskData]:
+    session_data: SessionData | None = None,
+    user_pk: int | None = None,
+    case_name: str | None = None,
+    office_number: str | None = None,
+    docket_number_letters: str | None = None,
+) -> TaskData | None:
     """Get the pacer_case_id and title values for a district court docket. Use
     heuristics to disambiguate the results.
 
@@ -960,8 +992,8 @@ def get_pacer_case_id_and_title(
     :param docket_number: The docket number to look up. This is a flexible
     field that accepts a variety of docket number styles.
     :param court_id: The CourtListener court ID for the docket number
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param user_pk: The PK of a user making the request. This can be provided
     instead of the cookies parameter. If so, this will get the user's cookies
     from redis instead of passing them in as an argument.
@@ -989,16 +1021,25 @@ def get_pacer_case_id_and_title(
         docket_number,
         court_id,
     )
-    if not cookies:
-        # Get cookies from Redis if not provided
-        cookies = get_pacer_cookie_from_cache(user_pk)  # type: ignore
-    s = ProxyPacerSession(cookies=cookies)
+
+    if not session_data and user_pk:
+        session_data = get_pacer_cookie_from_cache(user_pk)
+        if not session_data:
+            raise Exception("Cookies not available in cache")
+    else:
+        raise Exception(
+            "user_pk is unavailable, cookies cannot be retrieved from cache"
+        )
+
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
     msg = ""
     try:
         report.query(docket_number)
     except (RequestException, ReadTimeoutError, PacerLoginException) as exc:
-        if isinstance(exc, (RequestException, ReadTimeoutError)):
+        if isinstance(exc, (RequestException | ReadTimeoutError)):
             msg = (
                 "Network error while running possible case number query on: "
                 "%s.%s"
@@ -1013,7 +1054,7 @@ def get_pacer_case_id_and_title(
             logger.warning(msg, court_id, docket_number)
             self.request.chain = None
             return None
-        logger.info(f"{msg} Retrying.", court_id, docket_number)
+        logger.info(f"{msg} Retrying.", court_id, docket_number)  # noqa: G004
         raise self.retry(exc=exc)
 
     try:
@@ -1041,9 +1082,9 @@ def do_case_query_by_pacer_case_id(
     self: Task,
     data: TaskData,
     court_id: str,
-    cookies: RequestsCookieJar,
-    tag_names: List[str] | None = None,
-) -> Optional[TaskData]:
+    session_data: SessionData,
+    tag_names: list[str] | None = None,
+) -> TaskData | None:
     """Run a case query (iquery.pl) query on a case and save the data
 
     :param self: The celery task
@@ -1051,13 +1092,15 @@ def do_case_query_by_pacer_case_id(
         'pacer_case_id': The internal pacer case ID for the item.
     }
     :param court_id: A courtlistener court ID
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param tag_names: A list of tag names to associate with the docket when
     saving it in the DB.
     :return: A dict with the pacer_case_id and docket_pk values.
     """
-    s = ProxyPacerSession(cookies=cookies)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
         self.request.chain = None
@@ -1065,7 +1108,7 @@ def do_case_query_by_pacer_case_id(
 
     pacer_case_id = data.get("pacer_case_id")
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-    logger.info(f"Querying docket report {court_id}.{pacer_case_id}")
+    logger.info("Querying docket report %s.%s", court_id, pacer_case_id)
     try:
         d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id)
     except Docket.DoesNotExist:
@@ -1076,7 +1119,7 @@ def do_case_query_by_pacer_case_id(
     report.query(pacer_case_id)
     docket_data = report.data
     logger.info(
-        f"Querying and parsing complete for {court_id}.{pacer_case_id}"
+        "Querying and parsing complete for %s.%s", court_id, pacer_case_id
     )
 
     if not docket_data:
@@ -1087,14 +1130,19 @@ def do_case_query_by_pacer_case_id(
     # Merge the contents into CL.
     if d is None:
         d = async_to_sync(find_docket_object)(
-            court_id, pacer_case_id, docket_data["docket_number"]
+            court_id,
+            pacer_case_id,
+            docket_data["docket_number"],
+            docket_data.get("federal_defendant_number"),
+            docket_data.get("federal_dn_judge_initials_assigned"),
+            docket_data.get("federal_dn_judge_initials_referred"),
         )
 
     d.add_recap_source()
     async_to_sync(update_docket_metadata)(d, docket_data)
     d.save()
 
-    add_tags_to_objs(tag_names, [d])
+    async_to_sync(add_tags_to_objs)(tag_names, [d])
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(
@@ -1105,7 +1153,7 @@ def do_case_query_by_pacer_case_id(
         ContentFile(report.response.text.encode()),
     )
 
-    logger.info(f"Created/updated docket: {d}")
+    logger.info("Created/updated docket: %s", d)
     return {
         "pacer_case_id": pacer_case_id,
         "docket_pk": d.pk,
@@ -1115,10 +1163,10 @@ def do_case_query_by_pacer_case_id(
 @app.task(bind=True, ignore_result=True)
 def filter_docket_by_tags(
     self: Task,
-    data: Optional[Dict[Any, Any]],
-    tags: Optional[List[str]],
+    data: dict[Any, Any] | None,
+    tags: list[str] | None,
     court_id: str,
-) -> Optional[Dict[Any, Any]]:
+) -> dict[Any, Any] | None:
     """Stop the chain if the docket that'll be updated is already tagged.
 
     This is useful for if you're running a bulk download a second time and want
@@ -1158,27 +1206,28 @@ def filter_docket_by_tags(
 
 def query_case_query_report(
     court_id: str, pacer_case_id: int
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], str]:
     """Query the iquery page for a given PACER case ID.
 
     :param court_id: A CL court ID where we'll look things up.
     :param pacer_case_id: The Pacer Case ID to lookup.
-    :return: The report.data.
+    :return: A two tuple, the report data and the report HTML text.
     """
 
-    cookies = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     s = ProxyPacerSession(
-        cookies=cookies,
+        cookies=session_data.cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
+        proxy=session_data.proxy_address,
     )
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
     report.query(pacer_case_id)
-    return report.data
+    return report.data, report.response.text
 
 
 def make_docket_by_iquery_base(
@@ -1188,7 +1237,7 @@ def make_docket_by_iquery_base(
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = False,
 ) -> int | None:
     """
     Using the iquery endpoint, create or update a docket
@@ -1200,14 +1249,16 @@ def make_docket_by_iquery_base(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep: Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None if failed, else the ID of the created/updated docket
     """
 
     try:
-        report_data = query_case_query_report(court_id, pacer_case_id)
+        report_data, report_text = query_case_query_report(
+            court_id, pacer_case_id
+        )
     except (requests.Timeout, requests.RequestException) as exc:
         logger.warning(
             "Timeout or unknown RequestException on iquery crawl. "
@@ -1237,6 +1288,9 @@ def make_docket_by_iquery_base(
         court_id,
         str(pacer_case_id),
         report_data["docket_number"],
+        report_data.get("federal_defendant_number"),
+        report_data.get("federal_dn_judge_initials_assigned"),
+        report_data.get("federal_dn_judge_initials_referred"),
         using=using,
     )
 
@@ -1245,10 +1299,10 @@ def make_docket_by_iquery_base(
     return save_iquery_to_docket(
         self,
         report_data,
+        report_text,
         d,
         tag_names,
-        add_to_solr=True,
-        avoid_trigger_signal=avoid_trigger_signal,
+        skip_iquery_sweep=skip_iquery_sweep,
     )
 
 
@@ -1268,7 +1322,7 @@ def make_docket_by_iquery(
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = True,
 ) -> int | None:
     """
     make_docket_by_iquery_base wrapper without throttling for its use in bulk
@@ -1282,7 +1336,7 @@ def make_docket_by_iquery(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal:  Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep:  Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None if failed, else the ID of the created/updated docket
@@ -1295,7 +1349,7 @@ def make_docket_by_iquery(
         using,
         tag_names,
         log_results_redis,
-        avoid_trigger_signal,
+        skip_iquery_sweep,
     )
 
 
@@ -1315,7 +1369,7 @@ def make_docket_by_iquery_sweep(
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
-    avoid_trigger_signal: bool = False,
+    skip_iquery_sweep: bool = False,
 ) -> int | None:
     """
      make_docket_by_iquery_base wrapper with court throttling for its use in
@@ -1328,7 +1382,7 @@ def make_docket_by_iquery_sweep(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    :param skip_iquery_sweep: Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
     :return: None if failed, else the ID of the created/updated docket
@@ -1341,68 +1395,108 @@ def make_docket_by_iquery_sweep(
         using,
         tag_names,
         log_results_redis,
-        avoid_trigger_signal,
+        skip_iquery_sweep,
     )
 
 
 @retry((requests.Timeout, PacerLoginException), tries=3, delay=0.25, backoff=1)
 def query_iquery_page(
     court_id: str, pacer_case_id: int
-) -> bool | dict[str, Any]:
+) -> tuple[bool, None] | tuple[dict[str, Any], str]:
     """A small wrapper to query the iquery page for a given PACER case ID to
     support retries via the @retry decorator in case of a failure.
 
     :param court_id: A CL court ID where we'll look things up.
     :param pacer_case_id: The Pacer Case ID to lookup.
-    :return: False if not valid report, otherwise the report.data.
+    :return: A two tuple, False and None if not a valid report or the report data
+    and the report HTML text.
     """
 
-    report_data = query_case_query_report(court_id, pacer_case_id)
+    report_data, report_text = query_case_query_report(court_id, pacer_case_id)
     if not report_data:
         logger.info(
             "No valid data found in iquery page for %s.%s",
             court_id,
             pacer_case_id,
         )
-        return False
-    return report_data
+        return False, None
+    return report_data, report_text
 
 
 @app.task(
     bind=True,
     ignore_result=True,
 )
-def probe_iquery_pages(
+def probe_or_scrape_iquery_pages(
     self: Task,
     court_id: str,
+    latest_know_case_id_db: str | None,
     testing: bool = False,
 ) -> None:
     """
     Using the iquery endpoint, to perform forward probing and retrieve the
-    highest watermark we can scrape.
+    highest watermark we can scrape. Or perform a fixed sweep in case the
+    court hasn't caught up yet.
 
     :param self: The celery task
     :param court_id: A CL court ID where we'll look things up.
+    :param latest_know_case_id_db: The latest known pacer case ID from DB if available.
     :param testing: A boolean indicating whether this was called from tests.
     :return: None
     """
+    from cl.corpus_importer.signals import (
+        update_latest_case_id_and_schedule_iquery_sweep,
+    )
 
     r = get_redis_interface("CACHE")
     probe_iteration = 1
     latest_match = 0
+    probe_offset = 0
     highest_known_pacer_case_id = int(
         r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
     )
-    jitter = compute_binary_probe_jitter(testing)
+
+    # latest_known_case_id_db represents the latest known PACER case ID from a
+    # court. If it's greater than the current highest_known_pacer_case_id in
+    # Redis, we can conclude that the court hasn't caught up yet. In this
+    # scenario, instead of performing the regular exploration mode which can be
+    # slow we can switch to a fixed sweep mode. This mode will process
+    # IQUERY_FIXED_SWEEP case IDs per cycle and update the
+    # highest_known_pacer_case_id so the scraper can continue progressing at
+    # a fixed pace each cycle until
+    # highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP is equal to or
+    # greater than latest_known_case_id_db.
+    # Note that including settings.IQUERY_FIXED_SWEEP in the comparison is important
+    # so that the fixed sweep mode runs only up to latest_known_case_id_db.
+    # Otherwise, we might miss a few cases during the transition from fixed sweep
+    # back to regular exploration mode.
+    do_fixed_sweep = (
+        (
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP
+            < int(latest_know_case_id_db)
+        )
+        if latest_know_case_id_db
+        else False
+    )
+    # Avoid random jitter when performing a fixed sweep.
+    jitter = 0 if do_fixed_sweep else compute_binary_probe_jitter(testing)
     reports_data = []
     found_match = False
-    while probe_iteration <= settings.IQUERY_PROBE_ITERATIONS:
-        pacer_case_id_to_lookup = compute_next_binary_probe(
+    pacer_case_id_to_lookup = highest_known_pacer_case_id
+    # In fixed sweep mode, probing is not required, but we perform one iteration
+    # just to verify that the court is not down or that we haven't been blocked.
+    probe_iteration_limit = (
+        1 if do_fixed_sweep else settings.IQUERY_PROBE_MAX_OFFSET
+    )
+    while probe_offset + jitter < probe_iteration_limit:
+        pacer_case_id_to_lookup, probe_offset = compute_next_binary_probe(
             highest_known_pacer_case_id, probe_iteration, jitter
         )
         probe_iteration += 1
         try:
-            report_data = query_iquery_page(court_id, pacer_case_id_to_lookup)
+            report_data, report_text = query_iquery_page(
+                court_id, pacer_case_id_to_lookup
+            )
         except HTTPError:
             # Set expiration accordingly and value to 2 to difference from
             # other waiting times.
@@ -1456,7 +1550,9 @@ def probe_iquery_pages(
 
         if report_data:
             # Find and update/store the Docket.
-            reports_data.append((pacer_case_id_to_lookup, report_data))
+            reports_data.append(
+                (pacer_case_id_to_lookup, report_data, report_text)
+            )
             latest_match = pacer_case_id_to_lookup
             found_match = True
             # Restart court_blocked_attempts and court_empty_probe_attempts.
@@ -1472,16 +1568,49 @@ def probe_iquery_pages(
             "iquery:test_highest_known_pacer_case_id", court_id, latest_match
         )
 
+    if do_fixed_sweep:
+        # The court hasn't caught up; perform a fixed sweep.
+        logger.info(
+            "Scheduling a fixed sweep for court %s — case IDs from %s to %s.",
+            court_id,
+            highest_known_pacer_case_id,
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
+        )
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None,
+            court_id,
+            highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
+        )
+        delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
+        return None
+
     if not reports_data:
+        logger.info(
+            "No cases were found during this probe for court %s - case IDs from %s to %s.",
+            court_id,
+            str(highest_known_pacer_case_id),
+            str(pacer_case_id_to_lookup),
+        )
         court_empty_probe_attempts = r.incr(
             f"iquery:court_empty_probe_attempts:{court_id}"
         )
-        if court_empty_probe_attempts >= settings.IQUERY_EMPTY_PROBES_LIMIT:
+        # Compute the duration of empty probes in hours based on the number of
+        # court_empty_probe_attempts and the current IQUERY_PROBE_WAIT interval
+        empty_probes_hours = (
+            court_empty_probe_attempts * settings.IQUERY_PROBE_WAIT
+        ) / 3600
+        court_empty_probe_limit_hours = (
+            settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS.get(
+                court_id, settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS["default"]
+            )
+        )
+        if empty_probes_hours >= court_empty_probe_limit_hours:
             logger.error(
-                "The court %s has accumulated %s empty probe attempts. "
-                "Probably the probe got stuck and manual intervention is required.",
+                "Court %s has accumulated many probe attempts over "
+                "approximately %s hours. It appears the probe may be stuck; "
+                "manual intervention may be required.",
                 court_id,
-                settings.IQUERY_EMPTY_PROBES_LIMIT,
+                court_empty_probe_limit_hours,
             )
             # Restart court_blocked_attempts to avoid continue logging the
             # error on next iterations.
@@ -1495,17 +1624,19 @@ def probe_iquery_pages(
 
     # Process all the reports retrieved during the probing.
     # Avoid triggering the iQuery sweep signal except for the latest hit.
-    avoid_trigger_signal = True
-    for index, report_data in enumerate(reports_data):
+    skip_iquery_sweep = True
+    for index, report_content in enumerate(reports_data):
+        pacer_case_id, report_data, report_text = report_content
         if index == len(reports_data) - 1:
             # Only trigger the sweep signal on the last hit.
-            avoid_trigger_signal = False
+            skip_iquery_sweep = False
         try:
             process_case_query_report(
                 court_id,
-                pacer_case_id=report_data[0],
-                report_data=report_data[1],
-                avoid_trigger_signal=avoid_trigger_signal,
+                pacer_case_id=pacer_case_id,
+                report_data=report_data,
+                report_text=report_text,
+                skip_iquery_sweep=skip_iquery_sweep,
             )
         except IntegrityError:
             # Individual IntegrityError retries failed for the report. Log the
@@ -1533,11 +1664,11 @@ def get_docket_by_pacer_case_id(
     self: Task,
     data: TaskData,
     court_id: str,
-    cookies: Optional[RequestsCookieJar] = None,
-    docket_pk: Optional[int] = None,
-    tag_names: Optional[str] = None,
+    session_data: SessionData,
+    docket_pk: int | None = None,
+    tag_names: str | None = None,
     **kwargs,
-) -> Optional[TaskData]:
+) -> TaskData | None:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -1549,14 +1680,14 @@ def get_docket_by_pacer_case_id(
         Optional: 'docket_pk': The ID of the docket to work on to avoid lookups
                   if it's known in advance.
     :param court_id: A courtlistener court ID.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param docket_pk: The PK of the docket to update. Can also be provided in
     the data param, above.
     :param tag_names: A list of tag names that should be stored with the item
     in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
-    :return: A dict indicating if we need to update Solr.
+    :return: A dict indicating if we need to update the search engine.
     """
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
@@ -1584,17 +1715,19 @@ def get_docket_by_pacer_case_id(
 
     logging_id = f"{court_id}.{pacer_case_id}"
     logger.info("Querying docket report %s", logging_id)
-    s = ProxyPacerSession(cookies=cookies)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
     try:
         report.query(pacer_case_id, **kwargs)
     except (RequestException, ReadTimeoutError) as exc:
         msg = "Network error getting docket: %s"
         if self.request.retries == self.max_retries:
-            logger.error(f"{msg} Aborting chain.", logging_id)
+            logger.error(f"{msg} Aborting chain.", logging_id)  # noqa: G004
             self.request.chain = None
             return None
-        logger.info(f"{msg} Retrying.", logging_id)
+        logger.info(f"{msg} Retrying.", logging_id)  # noqa: G004
         raise self.retry(exc)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
@@ -1606,7 +1739,12 @@ def get_docket_by_pacer_case_id(
 
     if d is None:
         d = async_to_sync(find_docket_object)(
-            court_id, pacer_case_id, docket_data["docket_number"]
+            court_id,
+            pacer_case_id,
+            docket_data["docket_number"],
+            docket_data.get("federal_defendant_number"),
+            docket_data.get("federal_dn_judge_initials_assigned"),
+            docket_data.get("federal_dn_judge_initials_referred"),
         )
 
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(
@@ -1635,10 +1773,10 @@ def get_appellate_docket_by_docket_number(
     self: Task,
     docket_number: str,
     court_id: str,
-    cookies: RequestsCookieJar,
-    tag_names: Optional[List[str]] = None,
+    session_data: SessionData,
+    tag_names: list[str] | None = None,
     **kwargs,
-) -> Optional[TaskData]:
+) -> TaskData | None:
     """Get a docket by docket number, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -1647,13 +1785,16 @@ def get_appellate_docket_by_docket_number(
     :param self: The celery task
     :param docket_number: The docket number of the case.
     :param court_id: A courtlistener/PACER appellate court ID.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param tag_names: The tag name that should be stored with the item in the
     DB, if desired.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     """
-    s = ProxyPacerSession(cookies=cookies)
+
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = AppellateDocketReport(court_id, s)
     logging_id = f"{court_id} - {docket_number}"
     logger.info("Querying docket report %s", logging_id)
@@ -1684,7 +1825,12 @@ def get_appellate_docket_by_docket_number(
 
     if d is None:
         d = async_to_sync(find_docket_object)(
-            court_id, docket_number, docket_number
+            court_id,
+            docket_number,
+            docket_number,
+            docket_data.get("federal_defendant_number"),
+            docket_data.get("federal_dn_judge_initials_assigned"),
+            docket_data.get("federal_dn_judge_initials_referred"),
         )
 
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(
@@ -1703,22 +1849,26 @@ def get_appellate_docket_by_docket_number(
 
 def get_att_report_by_rd(
     rd: RECAPDocument,
-    cookies: RequestsCookieJar,
-) -> Optional[AttachmentPage]:
+    session_data: SessionData,
+) -> AttachmentPage | None:
     """Method to get the attachment report for the item in PACER.
 
     :param rd: The RECAPDocument object to use as a source.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-on PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :return: The attachment report populated with the results
     """
-
     if not rd.pacer_doc_id:
         return None
 
-    s = ProxyPacerSession(cookies=cookies)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    att_report = AttachmentPage(pacer_court_id, s)
+    if is_appellate_court(pacer_court_id):
+        att_report = AppellateAttachmentPage(pacer_court_id, s)
+    else:
+        att_report = AttachmentPage(pacer_court_id, s)
     att_report.query(rd.pacer_doc_id)
     return att_report
 
@@ -1734,14 +1884,14 @@ def get_att_report_by_rd(
 def get_attachment_page_by_rd(
     self: Task,
     rd_pk: int,
-    cookies: RequestsCookieJar,
-) -> Optional[AttachmentPage]:
+    session_data: SessionData,
+) -> AttachmentPage | None:
     """Get the attachment page for the item in PACER.
 
     :param self: The celery task
     :param rd_pk: The PK of a RECAPDocument object to use as a source.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-on PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :return: The attachment report populated with the results
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
@@ -1750,7 +1900,7 @@ def get_attachment_page_by_rd(
         self.request.chain = None
         return None
     try:
-        att_report = get_att_report_by_rd(rd, cookies)
+        att_report = get_att_report_by_rd(rd, session_data)
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
             HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -1788,25 +1938,27 @@ def get_attachment_page_by_rd(
 def get_bankr_claims_registry(
     self: Task,
     data: TaskData,
-    cookies: RequestsCookieJar,
-    tag_names: Optional[List[str]] = None,
-) -> Optional[TaskData]:
+    session_data: SessionData,
+    tag_names: list[str] | None = None,
+) -> TaskData | None:
     """Get the bankruptcy claims registry for a docket
 
     :param self: The celery task
     :param data: A dict of data containing, primarily, a key to 'docket_pk' for
     the docket for which we want to get the registry. Other keys will be
     ignored.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param tag_names: A list of tag names that should be stored with the claims
     registry information in the DB.
     """
-    s = ProxyPacerSession(cookies=cookies)
+
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     if data is None or data.get("docket_pk") is None:
         logger.warning(
-            "Empty data argument or parameter. Terminating chains "
-            "and exiting."
+            "Empty data argument or parameter. Terminating chains and exiting."
         )
         self.request.chain = None
         return None
@@ -1855,13 +2007,38 @@ def get_bankr_claims_registry(
     return data
 
 
+def create_attachment_pq(
+    rd_pk: int,
+    user_pk: int,
+) -> ProcessingQueue:
+    """Create a ProcessingQueue instance for an attachment.
+
+    Note that the PQ returned hasn't been persisted in the database.
+    It must be saved in a subsequent step.
+
+    :param rd_pk: The pk of the RECAPDocument.
+    :param user_pk: The pk of the User uploading the attachment.
+    :return: A ProcessingQueue instance for the attachment upload.
+    """
+
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    user = User.objects.get(pk=user_pk)
+    pq = ProcessingQueue(
+        court_id=rd.docket_entry.docket.court_id,
+        pacer_doc_id=rd.pacer_doc_id,
+        uploader=user,
+        upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+        pacer_case_id=rd.docket_entry.docket.pacer_case_id,
+    )
+    return pq
+
+
 @app.task(bind=True, ignore_result=True)
-def make_attachment_pq_object(
+def save_attachment_pq_object(
     self: Task,
     attachment_report: AttachmentPage,
     rd_pk: int,
     user_pk: int,
-    att_report_text: str | None = None,
 ) -> int:
     """Create an item in the processing queue for an attachment page.
 
@@ -1875,33 +2052,53 @@ def make_attachment_pq_object(
     with
     :param user_pk: The user to associate with the ProcessingQueue object when
     it's created.
-    :param att_report_text: The attachment page report text if we got it from a
-    notification free look link.
     :return: The pk of the ProcessingQueue object that's created.
     """
-    rd = RECAPDocument.objects.get(pk=rd_pk)
-    user = User.objects.get(pk=user_pk)
-    pq = ProcessingQueue(
-        court_id=rd.docket_entry.docket.court_id,
-        uploader=user,
-        upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
-        pacer_case_id=rd.docket_entry.docket.pacer_case_id,
+
+    pq = create_attachment_pq(
+        rd_pk,
+        user_pk,
     )
-    if att_report_text is None:
-        att_report_text = attachment_report.response.text
+    att_report_text = attachment_report.response.text
     pq.filepath_local.save(
         "attachment_page.html", ContentFile(att_report_text.encode())
     )
+    return pq.pk
 
+
+def save_attachment_pq_from_text(
+    rd_pk: int,
+    user_pk: int,
+    att_report_text: str,
+) -> int:
+    """Create an item in the processing queue for an attachment page from the
+    att report text.
+
+    :param rd_pk: The RECAP document that the attachment page is associated
+    with
+    :param user_pk: The user to associate with the ProcessingQueue object when
+    it's created.
+    :param att_report_text: The attachment page report text.
+    :return: The pk of the ProcessingQueue object that's created.
+    """
+
+    pq = create_attachment_pq(
+        rd_pk,
+        user_pk,
+    )
+    pq.filepath_local.save(
+        "attachment_page.html", ContentFile(att_report_text.encode())
+    )
     return pq.pk
 
 
 def download_pacer_pdf_by_rd(
     rd_pk: int,
     pacer_case_id: str,
-    pacer_doc_id: int,
-    cookies: RequestsCookieJar,
-    magic_number: Optional[str] = None,
+    pacer_doc_id: str,
+    session_data: SessionData,
+    magic_number: str | None = None,
+    de_seq_num: str | None = None,
 ) -> tuple[Response | None, str]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
@@ -1909,22 +2106,34 @@ def download_pacer_pdf_by_rd(
     :param rd_pk: The PK of the RECAPDocument to download
     :param pacer_case_id: The internal PACER case ID number
     :param pacer_doc_id: The internal PACER document ID to download
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param magic_number: The magic number to fetch PACER documents for free
     this is an optional field, only used by RECAP Email documents
     :return: A two-tuple of requests.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
     """
-
     rd = RECAPDocument.objects.get(pk=rd_pk)
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    s = ProxyPacerSession(cookies=cookies)
-    report = FreeOpinionReport(pacer_court_id, s)
-
-    r, r_msg = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
-
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
+    if is_appellate_court(pacer_court_id):
+        report = AppellateDocketReport(pacer_court_id, s)
+        pacer_doc_id = (
+            pacer_doc_id
+            if not rd.attachment_number
+            else f"{pacer_doc_id[:3]}1{pacer_doc_id[4:]}"
+        )
+        r, r_msg = report.download_pdf(
+            pacer_doc_id=pacer_doc_id, pacer_case_id=pacer_case_id
+        )
+    else:
+        report = FreeOpinionReport(pacer_court_id, s)
+        r, r_msg = report.download_pdf(
+            pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
+        )
     return r, r_msg
 
 
@@ -1932,27 +2141,32 @@ def download_pdf_by_magic_number(
     court_id: str,
     pacer_doc_id: str,
     pacer_case_id: str,
-    cookies: RequestsCookieJar,
+    session_data: SessionData,
     magic_number: str,
     appellate: bool = False,
+    de_seq_num: str | None = None,
 ) -> tuple[Response | None, str]:
     """Small wrapper to fetch a PACER PDF document by magic number.
 
     :param court_id: A CourtListener court ID to query the free document.
     :param pacer_doc_id: The pacer_doc_id to query the free document.
     :param pacer_case_id: The pacer_case_id to query the free document.
-    :param cookies: The cookies of a logged in PACER session
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param magic_number: The magic number to fetch PACER documents for free.
     :param appellate: Whether the download belongs to an appellate court.
+    :param de_seq_num: The sequential number assigned by the PACER system to
+     identify the docket entry within a case.
     :return: A two-tuple of requests.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
     """
-
-    s = ProxyPacerSession(cookies=cookies)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = FreeOpinionReport(court_id, s)
     r, r_msg = report.download_pdf(
-        pacer_case_id, pacer_doc_id, magic_number, appellate
+        pacer_case_id, pacer_doc_id, magic_number, appellate, de_seq_num
     )
     return r, r_msg
 
@@ -1968,10 +2182,12 @@ def get_document_number_from_confirmation_page(
     """
 
     recap_email_user = User.objects.get(username="recap-email")
-    cookies = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
-    s = ProxyPacerSession(cookies=cookies)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     doc_num_report = DownloadConfirmationPage(court_id, s)
     doc_num_report.query(pacer_doc_id)
     data = doc_num_report.data
@@ -2022,7 +2238,7 @@ def get_document_number_for_appellate(
     if not len(document_number_split) == 1:
         document_number = document_number_split[0]
 
-    if len(document_number) > 9:
+    if is_long_appellate_document_number(document_number):
         # If the number is really big, it's probably a court that uses
         # pacer_doc_id instead of regular docket entry numbering.
         # Force the fourth-digit to 0:
@@ -2042,11 +2258,12 @@ def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
     """
 
     recap_email_user = User.objects.get(username="recap-email")
-    cookies = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
-
-    s = ProxyPacerSession(cookies=cookies)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     receipt_report = DownloadConfirmationPage(court_id, s)
     receipt_report.query(pacer_doc_id)
     data = receipt_report.data
@@ -2073,11 +2290,13 @@ def is_docket_entry_sealed(
         return False
 
     recap_email_user = User.objects.get(username="recap-email")
-    cookies = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
-    s = ProxyPacerSession(cookies=cookies)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = BaseReport(court_id, s)
     return report.is_entry_sealed(case_id, doc_id)
 
@@ -2085,14 +2304,14 @@ def is_docket_entry_sealed(
 def update_rd_metadata(
     self: Task,
     rd_pk: int,
-    pdf_bytes: Optional[bytes],
+    pdf_bytes: bytes | None,
     r_msg: str,
     court_id: str,
     pacer_case_id: str,
     pacer_doc_id: str,
     document_number: str,
     attachment_number: int,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
 
     :param self: The celery task
@@ -2112,8 +2331,13 @@ def update_rd_metadata(
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if pdf_bytes is None:
-        if r_msg:
-            # Send a specific message all the way from Juriscraper
+        if r_msg and "An attachment page was returned instead" in r_msg:
+            msg = (
+                "This PACER document is part of an attachment page. "
+                "Our system currently lacks the metadata for this attachment. "
+                "Please purchase the attachment page and try again."
+            )
+        elif r_msg:
             msg = f"{r_msg}: {court_id=}, {rd_pk=}"
         else:
             msg = (
@@ -2140,7 +2364,11 @@ def update_rd_metadata(
         item=rd,
     )
     if response.is_success:
-        rd.page_count = response.text
+        rd.page_count = int(response.text)
+
+    assert isinstance(rd.page_count, (int | type(None))), (
+        "page_count must be an int or None."
+    )
 
     # Save and extract, skipping OCR.
     rd.save()
@@ -2152,7 +2380,7 @@ def update_rd_metadata(
     return True, "Saved item successfully"
 
 
-def add_tags(rd: RECAPDocument, tag_name: Optional[str]) -> None:
+def add_tags(rd: RECAPDocument, tag_name: str | None) -> None:
     """Add tags to a tree of objects starting with the RECAPDocument
 
     Adds the tag to the RECAPDocument, Docket Entry, and Docket.
@@ -2180,14 +2408,15 @@ def add_tags(rd: RECAPDocument, tag_name: Optional[str]) -> None:
 def get_pacer_doc_by_rd(
     self: Task,
     rd_pk: int,
-    cookies: RequestsCookieJar,
-    tag: Optional[str] = None,
-) -> Optional[int]:
+    session_data: SessionData,
+    tag: str | None = None,
+) -> int | None:
     """A simple method for getting the PDF associated with a RECAPDocument.
 
     :param self: The bound celery task
     :param rd_pk: The PK for the RECAPDocument object
-    :param cookies: The cookies of a logged in PACER session
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param tag: The name of a tag to apply to any modified items
     :return: The RECAPDocument PK
     """
@@ -2199,8 +2428,13 @@ def get_pacer_doc_by_rd(
         return None
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    de_seq_num = rd.docket_entry.pacer_sequence_number
     r, r_msg = download_pacer_pdf_by_rd(
-        rd.pk, pacer_case_id, rd.pacer_doc_id, cookies
+        rd.pk,
+        pacer_case_id,
+        rd.pacer_doc_id,
+        session_data,
+        de_seq_num=de_seq_num,
     )
     court_id = rd.docket_entry.docket.court_id
 
@@ -2238,9 +2472,9 @@ def get_pacer_doc_by_rd_and_description(
     self: Task,
     rd_pk: int,
     description_re: Pattern,
-    cookies: RequestsCookieJar,
+    session_data: SessionData,
     fallback_to_main_doc: bool = False,
-    tag_name: Optional[List[str]] = None,
+    tag_name: list[str] | None = None,
 ) -> None:
     """Using a RECAPDocument object ID and a description of a document, get the
     document from PACER.
@@ -2252,15 +2486,15 @@ def get_pacer_doc_by_rd_and_description(
     :param rd_pk: The PK of a RECAPDocument object to use as a source.
     :param description_re: A compiled regular expression to search against the
     description provided by the attachment page.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param fallback_to_main_doc: Should we grab the main doc if none of the
     attachments match the regex?
     :param tag_name: A tag name to apply to any downloaded content.
     :return: None
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
-    att_report = get_attachment_page_by_rd(self, rd_pk, cookies)
+    att_report = get_attachment_page_by_rd(self, rd_pk, session_data)
 
     att_found = None
     for attachment in att_report.data.get("attachments", []):
@@ -2272,7 +2506,8 @@ def get_pacer_doc_by_rd_and_description(
     if not att_found:
         if fallback_to_main_doc:
             logger.info(
-                f"Falling back to main document for pacer_doc_id: {rd.pacer_doc_id}"
+                "Falling back to main document for pacer_doc_id: %s",
+                rd.pacer_doc_id,
             )
             att_found = att_report.data
             document_type = RECAPDocument.PACER_DOCUMENT
@@ -2308,8 +2543,13 @@ def get_pacer_doc_by_rd_and_description(
         return
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    de_seq_num = rd.docket_entry.pacer_sequence_number
     r, r_msg = download_pacer_pdf_by_rd(
-        rd.pk, pacer_case_id, att_found["pacer_doc_id"], cookies
+        rd.pk,
+        pacer_case_id,
+        att_found["pacer_doc_id"],
+        session_data,
+        de_seq_num=de_seq_num,
     )
     court_id = rd.docket_entry.docket.court_id
 
@@ -2333,7 +2573,6 @@ def get_pacer_doc_by_rd_and_description(
 
     # Skip OCR for now. It'll happen in a second step.
     async_to_sync(extract_recap_pdf_base)(rd.pk, ocr_available=False)
-    add_items_to_solr([rd.pk], "search.RECAPDocument")
 
 
 @app.task(
@@ -2347,18 +2586,20 @@ def get_pacer_doc_by_rd_and_description(
 def get_pacer_doc_id_with_show_case_doc_url(
     self: Task,
     rd_pk: int,
-    cookies: RequestsCookieJar,
+    session_data: SessionData,
 ) -> None:
     """use the show_case_doc URL to get pacer_doc_id values.
 
     :param self: The celery task
     :param rd_pk: The pk of the RECAPDocument you want to get.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
-    s = ProxyPacerSession(cookies=cookies)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     pacer_court_id = map_cl_to_pacer_id(d.court_id)
     report = ShowCaseDocApi(pacer_court_id, s)
     last_try = self.request.retries == self.max_retries
@@ -2374,7 +2615,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
         if last_try:
             logger.error(msg, rd)
             return
-        logger.info(f"{msg} Retrying.", rd)
+        logger.info(f"{msg} Retrying.", rd)  # noqa: G004
         raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
@@ -2384,10 +2625,10 @@ def get_pacer_doc_id_with_show_case_doc_url(
             status_code = exc.response.status_code
             msg = "Got HTTPError with status code %s."
             if last_try:
-                logger.error(f"{msg} Aborting.", status_code)
+                logger.error(f"{msg} Aborting.", status_code)  # noqa: G004
                 return
 
-            logger.info(f"{msg} Retrying", status_code)
+            logger.info(f"{msg} Retrying", status_code)  # noqa: G004
             raise self.retry(exc)
         elif exc.response:
             status_code = exc.response.status_code
@@ -2401,12 +2642,12 @@ def get_pacer_doc_id_with_show_case_doc_url(
     try:
         pacer_doc_id = report.data
     except ParsingException:
-        logger.error(f"Unable to get redirect for {rd}")
+        logger.error("Unable to get redirect for %s", rd)
         return
     else:
         rd.pacer_doc_id = pacer_doc_id
         rd.save()
-        logger.info(f"Successfully saved pacer_doc_id to rd {rd_pk}")
+        logger.info("Successfully saved pacer_doc_id to rd %s", rd_pk)
 
 
 def make_csv_file(
@@ -2448,7 +2689,7 @@ def make_list_of_creditors_key(court_id: str, d_number_file_name: str) -> str:
 @throttle_task("1/s", key="court_id")
 def query_and_save_list_of_creditors(
     self: Task,
-    cookies: RequestsCookieJar,
+    session_data: SessionData,
     court_id: str,
     d_number_file_name: str,
     docket_number: str,
@@ -2460,7 +2701,8 @@ def query_and_save_list_of_creditors(
     HTML and pipe-limited text files and convert them to CSVs.
 
     :param self: The celery task
-    :param cookies: The cookies for the current PACER session.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param court_id: The court_id for the bankruptcy court.
     :param d_number_file_name: The docket number to use as file name.
     :param docket_number: The docket number of the case.
@@ -2470,13 +2712,14 @@ def query_and_save_list_of_creditors(
 
     :return: None
     """
-
-    s = ProxyPacerSession(cookies=cookies)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     try:
         report = ListOfCreditors(court_id, s)
     except AssertionError:
         # This is not a bankruptcy court.
-        logger.warning(f"Court {court_id} is not a bankruptcy court.")
+        logger.warning("Court %s is not a bankruptcy court.", court_id)
         delete_redis_semaphore(
             "CACHE", make_list_of_creditors_key(court_id, d_number_file_name)
         )
@@ -2495,8 +2738,9 @@ def query_and_save_list_of_creditors(
             )
         except ParsingException:
             logger.info(
-                f"No valid hidden API response for {docket_number} in court: "
-                f"{court_id}, possibly a sealed case."
+                "No valid hidden API response for %s in court: %s, possibly a sealed case.",
+                docket_number,
+                court_id,
             )
             delete_redis_semaphore(
                 "CACHE",
@@ -2506,8 +2750,10 @@ def query_and_save_list_of_creditors(
 
         if not result:
             logger.info(
-                f"Skipping row: {i} in court: {court_id}, docket: "
-                f"{docket_number}, no result from hidden API"
+                "Skipping row: %s in court: %s, docket: %s, no result from hidden API",
+                i,
+                court_id,
+                docket_number,
             )
             delete_redis_semaphore(
                 "CACHE",
@@ -2518,8 +2764,10 @@ def query_and_save_list_of_creditors(
         pacer_case_id = result.get("pacer_case_id")
         if not pacer_case_id:
             logger.info(
-                f"Skipping row: {i} in court: {court_id}, docket: "
-                f"{docket_number}, no pacer_case_id found."
+                "Skipping row: %s in court: %s, docket: %s, no pacer_case_id found.",
+                i,
+                court_id,
+                docket_number,
             )
             delete_redis_semaphore(
                 "CACHE",
@@ -2527,10 +2775,12 @@ def query_and_save_list_of_creditors(
             )
             return None
 
-        logger.info(f"File {html_file} doesn't exist.")
+        logger.info("File %s doesn't exist.", html_file)
         logger.info(
-            f"Querying report, court_id: {court_id}, pacer_case_id: "
-            f"{pacer_case_id} docket_number: {docket_number}"
+            "Querying report, court_id: %s, pacer_case_id: %s docket_number: %s",
+            court_id,
+            pacer_case_id,
+            docket_number,
         )
 
         # First get the POST param to ensure the same cost as in the browser.
@@ -2540,7 +2790,8 @@ def query_and_save_list_of_creditors(
             # Sometimes this query fails, retry if there are retries available.
             if self.request.retries == self.max_retries:
                 logger.info(
-                    f"Failed to obtain a valid POST param for {court_id}, aborting..."
+                    "Failed to obtain a valid POST param for %s, aborting...",
+                    court_id,
                 )
                 delete_redis_semaphore(
                     "CACHE",
@@ -2549,7 +2800,8 @@ def query_and_save_list_of_creditors(
                 return None
             else:
                 logger.info(
-                    f"Failed to obtain a valid POST param for {court_id}, retrying..."
+                    "Failed to obtain a valid POST param for %s, retrying...",
+                    court_id,
                 )
                 raise self.retry(exc=exc)
 
@@ -2558,7 +2810,7 @@ def query_and_save_list_of_creditors(
                 "CACHE",
                 make_list_of_creditors_key(court_id, d_number_file_name),
             )
-            logger.info(f"Invalid POST param for {court_id}, aborting...")
+            logger.info("Invalid POST param for %s, aborting...", court_id)
             return None
 
         report.query(
@@ -2571,7 +2823,7 @@ def query_and_save_list_of_creditors(
             file.write(report.response.text)
 
     else:
-        logger.info(f"File {html_file} already exists court: {court_id}.")
+        logger.info("File %s already exists court: %s.", html_file, court_id)
 
     with open(html_file, "rb") as file:
         text = file.read().decode("utf-8")
@@ -2610,7 +2862,7 @@ def query_and_save_list_of_creditors(
     backoff=2,
     logger=logger,
 )
-def extract_recap_document(rd: RECAPDocument) -> Response:
+def extract_recap_document_for_opinions(rd: RECAPDocument) -> Response:
     """Call recap-extract from doctor with retries
 
     :param rd: the recap document to extract
@@ -2626,18 +2878,25 @@ def extract_recap_document(rd: RECAPDocument) -> Response:
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-def ingest_recap_document(
+def recap_document_into_opinions(
     self,
-    recap_document_id: int,
-    add_to_solr: bool,
-) -> None:
+    task_data: TaskData | None = None,
+    recap_document_id: int | None = None,
+) -> TaskData | None:
     """Ingest recap document into Opinions
 
+    :param task_data: dictionary that will contain the recap_document_id,
+        if called inside a chain() on the scraper_pacer_free_opinions
+        command. This task should be chained after the PDF has
+        been downloaded from PACER
     :param recap_document_id: The document id to inspect and import
-    :param add_to_solr: Whether to add to solr
-    :return:None
+
+    :return: The same `task_data` that came as input
     """
-    logger.info(f"Importing recap document {recap_document_id}")
+    if not recap_document_id and task_data:
+        recap_document_id = task_data["rd_pk"]
+
+    logger.info("Importing recap document %s", recap_document_id)
     recap_document = (
         RECAPDocument.objects.select_related("docket_entry__docket")
         .only(
@@ -2653,17 +2912,27 @@ def ingest_recap_document(
         .get(id=recap_document_id)
     )
     docket = recap_document.docket_entry.docket
-    if recap_document.docket_entry.docket.court.jurisdiction == "FD":
+
+    jurisdiction = recap_document.docket_entry.docket.court.jurisdiction
+    court_id = recap_document.docket_entry.docket.court.id
+    # `dcd` has a regular juriscraper scraper. Avoid duplicates
+    if court_id in ["dcd", "orld"] or jurisdiction not in [
+        Court.FEDERAL_DISTRICT,
+        Court.FEDERAL_BANKRUPTCY,
+    ]:
+        return task_data
+
+    if jurisdiction == Court.FEDERAL_DISTRICT:
         if "cv" not in docket.docket_number.lower():
             logger.info("Skipping non-civil opinion in district court")
-            return
+            return task_data
 
     ops = Opinion.objects.filter(sha1=recap_document.sha1)
     if ops.count() > 0:
-        logger.info(f"Skipping previously imported opinion: {ops[0].id}")
-        return
+        logger.info("Skipping previously imported opinion: %s", ops[0].id)
+        return task_data
 
-    response = extract_recap_document(rd=recap_document)
+    response = extract_recap_document_for_opinions(rd=recap_document)
     r = response.json()
 
     try:
@@ -2675,14 +2944,14 @@ def ingest_recap_document(
         # Ex. 42\u2009U.S.C.\u2009§\u200912131 \u2009 is a small space
         # fallback to regular citation match
         logger.warning(
-            f"Hyperscan failed for {recap_document}, trying w/o tokenizer"
+            "Hyperscan failed for %s, trying w/o tokenizer", recap_document
         )
         citations = eyecite.get_citations(r["content"])
 
     case_law_citations = filter_out_non_case_law_citations(citations)
     if len(case_law_citations) == 0:
-        logger.info(f"No citation found for rd: {recap_document.id}")
-        return
+        logger.info("No citation found for rd: %s", recap_document.id)
+        return task_data
 
     with transaction.atomic():
         cluster = OpinionCluster.objects.create(
@@ -2704,12 +2973,9 @@ def ingest_recap_document(
             extracted_by_ocr=r["extracted_by_ocr"],
         )
 
-        if add_to_solr:
-            # Add opinions to solr
-            add_items_to_solr.delay([opinion.id], "search.Opinion")
-
         logger.info(
-            "Successfully imported https://www.courtlistener.com/opinion/{}/decision/".format(
-                cluster.id
-            )
+            "Successfully imported https://www.courtlistener.com/opinion/%s/decision/",
+            cluster.id,
         )
+    # Return input task data to preserve the chain in scrape_pacer_free_opinion
+    return task_data

@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from glob import glob
-from typing import IO, Union
+from typing import IO
 
 from dateutil import parser
 from django.utils.encoding import force_bytes
@@ -66,7 +66,7 @@ def make_item(case):
 
 def import_tn_corpus(
     log: bool,
-    skip_until: Union[bool, str],
+    skip_until: bool | str,
     file: IO,
     ocr_available: bool,
 ) -> None:
@@ -115,8 +115,9 @@ def import_tn_corpus(
         if len(ops) > 0:
             op = ops[0]
             logging.warning(
-                "Document already in database. See: %s at %s"
-                % (op.get_absolute_url(), op.cluster.case_name)
+                "Document already in database. See: %s at %s",
+                op.get_absolute_url(),
+                op.cluster.case_name,
             )
 
         docket, opinion, cluster, citations = make_objects(
@@ -132,8 +133,7 @@ def import_tn_corpus(
                 "opinion": opinion,
                 "cluster": cluster,
                 "citations": citations,
-            },
-            index=False,
+            }
         )
 
         extract_doc_content.delay(

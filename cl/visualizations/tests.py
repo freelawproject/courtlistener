@@ -2,8 +2,9 @@
 Unit tests for Visualizations
 """
 
+from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any, Callable, Dict
+from typing import Any
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
@@ -227,37 +228,6 @@ class TestViews(TestCase):
         self.assertNotEqual(response.status_code, HTTPStatus.OK)
         self.assertNotIn("My Private Visualization", response.content.decode())
 
-    async def test_view_counts_increment_by_one(self) -> None:
-        """Test the view count for a Visualization increments on page view
-
-        Ensure that the date_modified does not change.
-        """
-        viz = await sync_to_async(VisualizationFactory.create)(
-            user=self.regular_user,
-            published=True,
-            deleted=False,
-            view_count=10,
-        )
-        old_view_count = viz.view_count
-        old_date_modified = viz.date_modified
-
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="regular_user", password="password"
-            )
-        )
-        response = await self.async_client.get(viz.get_absolute_url())
-
-        await viz.arefresh_from_db(fields=["view_count", "date_modified"])
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(old_view_count + 1, viz.view_count)
-
-        self.assertEqual(
-            old_date_modified,
-            viz.date_modified,
-            msg="date_modified changed when the page was loaded!",
-        )
-
 
 class TestVizAjaxCrud(TestCase):
     """
@@ -281,7 +251,7 @@ class TestVizAjaxCrud(TestCase):
         self,
         url: str,
         username: str = None,
-        data: Dict[str, Any] = None,
+        data: dict[str, Any] = None,
     ) -> ASGIRequest:
         """Helper method to build authenticated AJAX POST
         Args:
@@ -295,7 +265,8 @@ class TestVizAjaxCrud(TestCase):
             data = {}
         post = self.factory.post(url, data=data)
         if username:
-            post.user = await User.objects.aget(username=username)
+            user = await User.objects.aget(username=username)
+            post.auser = sync_to_async(lambda: user)
         post.META["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest"
         return post
 

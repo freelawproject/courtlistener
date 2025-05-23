@@ -1,12 +1,10 @@
 import logging
 import random
 import traceback
-from typing import List, Optional, Tuple, Union
 
 import httpx
 import requests
 from asgiref.sync import async_to_sync
-from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from httpx import Response
@@ -30,16 +28,17 @@ from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
+from cl.scrapers.utils import citation_is_duplicated, make_citation
 from cl.search.models import Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
-ExtractProcessResult = Tuple[str, Optional[str]]
+ExtractProcessResult = tuple[str, str | None]
 
 
 def update_document_from_text(
     opinion: Opinion, juriscraper_module: str = ""
-) -> None:
+) -> dict:
     """Extract additional metadata from document text
 
     We use this code with BIA decisions. Previously Tax.
@@ -49,34 +48,44 @@ def update_document_from_text(
     text. Formerly implemented in only Tax Court, but functional in all
     scrapers via AbstractSite object.
 
-    Note that this updates the values but does not save them. Saving is left to
-    the calling function.
+    Note that this updates the values but does not save them for
+    Docket, OpinionCluster and Opinion. Saving is left to
+    the calling function. It does save Citations
 
     :param opinion: Opinion object
     :param juriscraper_module: full module to get Site object
-    :return: None
+    :return: the extracted data dictionary
     """
-    court = opinion.cluster.docket.court.pk
-    site = get_scraper_object_by_name(court, juriscraper_module)
+    court_id = opinion.cluster.docket.court.pk
+    site = get_scraper_object_by_name(court_id, juriscraper_module)
     if site is None:
-        return
+        logger.debug("No site found %s", juriscraper_module)
+        return {}
 
+    citation_created = False
     metadata_dict = site.extract_from_text(opinion.plain_text or opinion.html)
     for model_name, data in metadata_dict.items():
-        ModelClass = apps.get_model(f"search.{model_name}")
         if model_name == "Docket":
             opinion.cluster.docket.__dict__.update(data)
         elif model_name == "OpinionCluster":
             opinion.cluster.__dict__.update(data)
         elif model_name == "Citation":
-            data["cluster_id"] = opinion.cluster_id
-            ModelClass.objects.get_or_create(**data)
+            citation = make_citation(data, opinion.cluster, court_id)
+            if not citation or citation_is_duplicated(citation, data):
+                continue
+            citation.save()
+            citation_created = True
         elif model_name == "Opinion":
             opinion.__dict__.update(data)
         else:
             raise NotImplementedError(
                 f"Object type of {model_name} not yet supported."
             )
+
+    # if the candidate citation was saved successfully, it will have an id
+    metadata_dict["citation_created"] = citation_created
+
+    return metadata_dict
 
 
 @app.task(
@@ -138,7 +147,8 @@ def extract_doc_content(
     )
     if not response.is_success:
         logger.error(
-            f"Error from document-extract microservice: {response.status_code}",
+            "Error from document-extract microservice: %s",
+            response.status_code,
             extra=dict(
                 opinion_id=opinion.id,
                 url=opinion.download_url,
@@ -175,32 +185,28 @@ def extract_doc_content(
     if data["page_count"]:
         opinion.page_count = data["page_count"]
 
-    assert isinstance(
-        content, str
-    ), f"content must be of type str, not {type(content)}"
+    assert isinstance(content, str), (
+        f"content must be of type str, not {type(content)}"
+    )
 
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion, juriscraper_module)
 
     if data["err"]:
         logger.error(
-            f"****Error: {data['err']}, extracting text from {extension}: {opinion}****"
+            "****Error: %s, extracting text from %s: %s****",
+            data["err"],
+            extension,
+            opinion,
         )
         return
 
-    # Save item, and index Solr if needed.
+    # Save item
     # noinspection PyBroadException
     try:
         opinion.cluster.docket.save()
-        opinion.cluster.save(index=False)
-        if not citation_jitter:
-            # No waiting around. Save to the database now, but don't bother
-            # with the index yet because citations are being done imminently.
-            opinion.save(index=False)
-        else:
-            # Save to the index now, citations come later, commit comes
-            # according to schedule
-            opinion.save(index=True)
+        opinion.cluster.save()
+        opinion.save()
     except Exception:
         logger.error(
             "****Error saving text to the db for: %s****\n%s",
@@ -227,10 +233,10 @@ def extract_doc_content(
 )
 def extract_recap_pdf(
     self,
-    pks: Union[int, List[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> List[int]:
+) -> list[int]:
     """Celery task wrapper for extract_recap_pdf_base
     Extract the contents from a RECAP PDF if necessary.
 
@@ -262,10 +268,10 @@ def extract_recap_pdf(
 
 
 async def extract_recap_pdf_base(
-    pks: Union[int, List[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> List[int]:
+) -> list[int]:
     """Extract the contents from a RECAP PDF if necessary.
 
     :param pks: The RECAPDocument pk or list of pks to work on.
@@ -279,7 +285,7 @@ async def extract_recap_pdf_base(
     if not is_iter(pks):
         pks = [pks]
 
-    processed: List[int] = []
+    processed: list[int] = []
     for pk in pks:
         rd = await RECAPDocument.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
@@ -321,9 +327,7 @@ async def extract_recap_pdf_base(
                 rd.ocr_status = RECAPDocument.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
-        # Do not do indexing here. Creates race condition in celery.
         await rd.asave(
-            index=False,
             do_extraction=False,
             update_fields=["ocr_status", "plain_text"],
         )
@@ -410,15 +414,16 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     :param court_id: The court of the docket. Needed for throttling by court.
     :return: None
     """
-    cookies = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     s = ProxyPacerSession(
-        cookies=cookies,
+        cookies=session_data.cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
+        proxy=session_data.proxy_address,
     )
     d = Docket.objects.get(pk=d_pk, court_id=court_id)
     report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
@@ -438,7 +443,8 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     save_iquery_to_docket(
         self,
         report.data,
+        report.response.text,
         d,
         tag_names=None,
-        add_to_solr=True,
+        skip_iquery_sweep=True,
     )

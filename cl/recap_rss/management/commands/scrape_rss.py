@@ -16,7 +16,6 @@ from cl.recap_rss.tasks import (
     trim_rss_data,
 )
 from cl.search.models import Court
-from cl.search.tasks import add_items_to_solr
 
 
 class Command(VerboseCommand):
@@ -66,7 +65,7 @@ class Command(VerboseCommand):
             with open(f"/tmp/rss-scraper-{court_str}.pid", "w") as fp:
                 try:
                     fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except IOError:
+                except OSError:
                     print(
                         "Another instance of this program is running with "
                         "this combination of courts. Only one instance "
@@ -155,7 +154,6 @@ class Command(VerboseCommand):
                     # docket information from the RSS feeds. RSS feeds also
                     # have information about hundreds or thousands of
                     # dockets. Updating them all would be very bad.
-                    add_items_to_solr.s("search.RECAPDocument"),
                     mark_status_successful.si(new_status.pk),
                 ).apply_async()
 

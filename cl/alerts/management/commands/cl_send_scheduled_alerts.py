@@ -1,10 +1,11 @@
-import datetime
 from collections import defaultdict
-from typing import Any, DefaultDict
+from datetime import date, datetime, timedelta
+from typing import Any
 
-import waffle
+import pytz
 from asgiref.sync import async_to_sync
 from django.conf import settings
+from django.utils.timezone import get_default_timezone, make_aware
 
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
@@ -25,32 +26,59 @@ def json_date_parser(dct):
     for key, value in dct.items():
         if isinstance(value, str):
             try:
-                dct[key] = datetime.datetime.fromisoformat(value)
+                dct[key] = datetime.fromisoformat(value)
             except ValueError:
                 pass
     return dct
 
 
-def get_cut_off_date(rate: str, d: datetime.date) -> datetime.date | None:
+def get_cut_off_date(
+    rate: str,
+    d: datetime,
+    sweep_index: bool = False,
+    custom_date: bool = False,
+) -> date | datetime | None:
     """Given a rate of dly, wly or mly and a date, returns the date after for
     building a daterange filter.
     :param rate: The alert rate to send Alerts.
-    :param d: The date alerts are run.
+    :param d: The datetime alerts are run.
+    :param sweep_index: True if this is being used to trigger alerts using the
+    sweep index.
+    :param custom_date: If true, send alerts on a custom date.
     :return: The cut-off date or None.
     """
-    cut_off_date = None
-    if rate == Alert.DAILY:
-        cut_off_date = d
+
+    if rate == Alert.REAL_TIME and not sweep_index:
+        # Set cut_off_date to the datetime when RT alerts are sent minus
+        # (REAL_TIME_ALERTS_SENDING_RATE + 1) seconds, considering that RT alerts
+        # are sent every REAL_TIME_ALERTS_SENDING_RATE seconds.
+        cut_off_date = d - timedelta(
+            seconds=settings.REAL_TIME_ALERTS_SENDING_RATE + 1
+        )
+        # Convert cut_off_date to UTC. This is important since hit timestamps
+        # are in UTC.
+        local_tz = get_default_timezone()
+        aware_local_dt = make_aware(cut_off_date, timezone=local_tz)
+        return aware_local_dt.astimezone(pytz.UTC)
+    elif rate == Alert.DAILY or (rate == Alert.REAL_TIME and sweep_index):
+        # Since scheduled daily alerts run early the next day, set cut_off_date
+        # to the previous day unless a custom date is used.
+        # When sending alerts using the sweep index, real-time alert hits are
+        # ingested throughout the day, so the timestamp filter should behave
+        # the same as for daily alerts.
+        return d.date() - timedelta(days=1) if not custom_date else d.date()
     elif rate == Alert.WEEKLY:
-        cut_off_date = d - datetime.timedelta(days=7)
+        # For weekly alerts, set cut_off_date to 7 days earlier.
+        return d.date() - timedelta(days=7)
     elif rate == Alert.MONTHLY:
         # Get the first of the month of the previous month regardless of the
         # current date
-        early_last_month = d - datetime.timedelta(days=28)
-        cut_off_date = datetime.datetime(
+        early_last_month = d.date() - timedelta(days=28)
+        return datetime(
             early_last_month.year, early_last_month.month, 1
         ).date()
-    return cut_off_date
+
+    return None
 
 
 def merge_alert_child_documents(
@@ -85,7 +113,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     """
 
     alerts_sent_count = 0
-    now_time = datetime.datetime.now()
+    now_time = datetime.now()
     # Get unique alert users with scheduled alert hits
     user_ids = (
         ScheduledAlertHit.objects.filter(
@@ -104,15 +132,15 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
         ).select_related("user", "alert")
 
         # Group scheduled hits by Alert and the main_doc_id
-        grouped_hits: DefaultDict[
-            Alert, DefaultDict[int, list[dict[str, Any]]]
+        grouped_hits: defaultdict[
+            Alert, defaultdict[int, list[dict[str, Any]]]
         ] = defaultdict(lambda: defaultdict(list))
         alerts_to_update = set()
         for hit in scheduled_hits:
             alert = hit.alert
             doc_content = json_date_parser(hit.document_content)
             match hit.alert.alert_type:
-                case SEARCH_TYPES.RECAP:
+                case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
                     main_doc_id = doc_content.get("docket_id")
                 case SEARCH_TYPES.ORAL_ARGUMENT:
                     main_doc_id = doc_content.get("id")
@@ -124,7 +152,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
         # Merge child documents with the same main_doc_id if the document dict
         # contains the child_docs key.
-        merged_hits: DefaultDict[Alert, list[dict[str, Any]]] = defaultdict(
+        merged_hits: defaultdict[Alert, list[dict[str, Any]]] = defaultdict(
             list
         )
         for alert, document_groups in grouped_hits.items():
@@ -135,11 +163,15 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
         hits = []
         for alert, documents in merged_hits.items():
-            search_type = alert.alert_type
-
-            # Override order_by to show the latest items when clicking the
-            # "View Full Results" button.
-            cut_off_date = get_cut_off_date(rate, now_time.date())
+            # Override the search type to RECAP for case-only alerts (DOCKETS)
+            search_type = (
+                SEARCH_TYPES.RECAP
+                if alert.alert_type == SEARCH_TYPES.DOCKETS
+                else alert.alert_type
+            )
+            # Override query n in the 'View Full Results' URL to
+            # include a filter by timestamp.
+            cut_off_date = get_cut_off_date(rate, now_time)
             qd = override_alert_query(alert, cut_off_date)
             alert.query_run = qd.urlencode()  # type: ignore
             hits.append((alert, search_type, documents, len(documents)))
@@ -171,7 +203,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
 def send_scheduled_alerts(rate: str) -> None:
     if rate == Alert.MONTHLY:
-        if datetime.date.today().day > 28:
+        if date.today().day > 28:
             raise InvalidDateError(
                 "Monthly alerts cannot be run on the 29th, 30th or 31st."
             )
@@ -185,18 +217,14 @@ def delete_old_scheduled_alerts() -> int:
     """
 
     # Delete SENT ScheduledAlertHits after DAYS_TO_DELETE
-    sent_older_than = datetime.datetime.now() - datetime.timedelta(
-        days=DAYS_TO_DELETE
-    )
+    sent_older_than = datetime.now() - timedelta(days=DAYS_TO_DELETE)
     scheduled_sent_hits_to_delete = ScheduledAlertHit.objects.filter(
         date_created__lt=sent_older_than,
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT,
     ).delete()
 
     # Delete SCHEDULED ScheduledAlertHits after 2 * DAYS_TO_DELETE
-    unsent_older_than = datetime.datetime.now() - datetime.timedelta(
-        days=2 * DAYS_TO_DELETE
-    )
+    unsent_older_than = datetime.now() - timedelta(days=2 * DAYS_TO_DELETE)
     scheduled_unsent_hits_to_delete = ScheduledAlertHit.objects.filter(
         date_created__lt=unsent_older_than,
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
@@ -220,7 +248,4 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        if not waffle.switch_is_active("oa-es-alerts-active"):
-            logger.info("ES OA Alerts are disabled.")
-            return None
         send_scheduled_alerts(options["rate"])

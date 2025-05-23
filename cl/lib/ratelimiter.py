@@ -1,7 +1,6 @@
 import functools
 import socket
 import sys
-from typing import Tuple
 
 from django.conf import settings
 from django.core.cache import caches
@@ -66,7 +65,9 @@ ratelimiter_all_250_per_h = ratelimit(
 if "test" in sys.argv:
     ratelimiter_all_2_per_m = lambda func: func
     ratelimiter_unsafe_3_per_m = lambda func: func
+    ratelimiter_unsafe_5_per_d = lambda func: func
     ratelimiter_unsafe_10_per_m = lambda func: func
+    ratelimiter_all_10_per_h = lambda func: func
     ratelimiter_unsafe_2000_per_h = lambda func: func
 else:
     ratelimiter_all_2_per_m = ratelimit(
@@ -78,10 +79,19 @@ else:
         rate="3/m",
         method=UNSAFE,
     )
+    ratelimiter_unsafe_5_per_d = ratelimit(
+        key=get_ip_for_ratelimiter,
+        rate="5/d",
+        method=UNSAFE,
+    )
     ratelimiter_unsafe_10_per_m = ratelimit(
         key=get_ip_for_ratelimiter,
         rate="10/m",
         method=UNSAFE,
+    )
+    ratelimiter_all_10_per_h = ratelimit(
+        key=get_path_to_make_key,
+        rate="10/h",
     )
     ratelimiter_unsafe_2000_per_h = ratelimit(
         key=get_path_to_make_key,
@@ -186,7 +196,7 @@ def is_allowlisted(request: HttpRequest) -> bool:
     return approved_crawler
 
 
-def parse_rate(rate: str) -> Tuple[int, int]:
+def parse_rate(rate: str) -> tuple[int, int]:
     """
 
     Given the request rate string, return a two tuple of:

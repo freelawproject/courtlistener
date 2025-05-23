@@ -71,7 +71,12 @@ class NeonClient:
         """
         search_payload = {
             "searchFields": [
-                {"field": "Email", "operator": "EQUAL", "value": email}
+                {"field": "Email", "operator": "EQUAL", "value": email},
+                {
+                    "field": "Account Type",
+                    "operator": "EQUAL",
+                    "value": "Individual",
+                },
             ],
             "outputFields": ["Account ID"],
             "pagination": {"pageSize": 10},

@@ -1,6 +1,5 @@
 import pghistory
 from django.db import models
-from django.template import loader
 from django.urls import reverse
 from django.utils.text import slugify
 from localflavor.us.models import (
@@ -11,7 +10,6 @@ from localflavor.us.models import (
 from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.extras import granular_date
-from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
     validate_all_or_none,
@@ -25,12 +23,6 @@ from cl.lib.model_helpers import (
     validate_supervisor,
 )
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
-from cl.lib.search_index_utils import (
-    normalize_search_dicts,
-    null_map,
-    solr_list,
-)
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -61,7 +53,7 @@ DATE_GRANULARITIES = (
 )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Person(AbstractDateTimeModel):
     RELIGIONS = (
         ("ca", "Catholic"),
@@ -73,6 +65,11 @@ class Person(AbstractDateTimeModel):
         ("mo", "Mormon"),
         ("bu", "Buddhist"),
         ("hi", "Hindu"),
+        ("ep", "Episcopalian"),
+        ("ro", "Roman Catholic"),
+        ("me", "Methodist"),
+        ("pe", "Presbyterian"),
+        ("un", "Unitarian"),
     )
     race = models.ManyToManyField(
         "Race",
@@ -280,136 +277,8 @@ class Person(AbstractDateTimeModel):
             position.is_judicial_position for position in self.positions.all()
         )
 
-    def as_search_dict(self):
-        """Create a dict that can be ingested by Solr"""
-        out = {
-            "id": self.pk,
-            "fjc_id": self.fjc_id,
-            "cl_id": "none",  # Deprecated, but required by Solr
-            "alias_ids": [alias.pk for alias in self.aliases.all()],
-            "races": [r.get_race_display() for r in self.race.all()],
-            "gender": self.get_gender_display(),
-            "religion": self.religion,
-            "name": self.name_full,
-            "name_reverse": self.name_full_reverse,
-            "date_granularity_dob": self.date_granularity_dob,
-            "date_granularity_dod": self.date_granularity_dod,
-            "dob_city": self.dob_city,
-            "dob_state": self.get_dob_state_display(),
-            "dob_state_id": self.dob_state,
-            "absolute_url": self.get_absolute_url(),
-            "school": [e.school.name for e in self.educations.all()],
-            "political_affiliation": [
-                pa.get_political_party_display()
-                for pa in self.political_affiliations.all()
-                if pa
-            ],
-            "political_affiliation_id": [
-                pa.political_party
-                for pa in self.political_affiliations.all()
-                if pa
-            ],
-            "aba_rating": [
-                r.get_rating_display() for r in self.aba_ratings.all() if r
-            ],
-        }
 
-        # Dates
-        if self.date_dob is not None:
-            out["dob"] = midnight_pt(self.date_dob)
-        if self.date_dod is not None:
-            out["dod"] = midnight_pt(self.date_dod)
-
-        # Joined Values. Brace yourself.
-        positions = self.positions.all()
-        if positions.count() > 0:
-            p_out = {
-                "court": [p.court.short_name for p in positions if p.court],
-                "court_exact": [p.court.pk for p in positions if p.court],
-                "position_type": [
-                    p.get_position_type_display() for p in positions
-                ],
-                "appointer": [
-                    p.appointer.person.name_full_reverse
-                    for p in positions
-                    if p.appointer
-                ],
-                "supervisor": [
-                    p.supervisor.name_full_reverse
-                    for p in positions
-                    if p.supervisor
-                ],
-                "predecessor": [
-                    p.predecessor.name_full_reverse
-                    for p in positions
-                    if p.predecessor
-                ],
-                "date_nominated": solr_list(positions, "date_nominated"),
-                "date_elected": solr_list(positions, "date_elected"),
-                "date_recess_appointment": solr_list(
-                    positions,
-                    "date_recess_appointment",
-                ),
-                "date_referred_to_judicial_committee": solr_list(
-                    positions,
-                    "date_referred_to_judicial_committee",
-                ),
-                "date_judicial_committee_action": solr_list(
-                    positions,
-                    "date_judicial_committee_action",
-                ),
-                "date_hearing": solr_list(positions, "date_hearing"),
-                "date_confirmation": solr_list(positions, "date_confirmation"),
-                "date_start": solr_list(positions, "date_start"),
-                "date_granularity_start": solr_list(
-                    positions,
-                    "date_granularity_start",
-                ),
-                "date_retirement": solr_list(
-                    positions,
-                    "date_retirement",
-                ),
-                "date_termination": solr_list(
-                    positions,
-                    "date_termination",
-                ),
-                "date_granularity_termination": solr_list(
-                    positions,
-                    "date_granularity_termination",
-                ),
-                "judicial_committee_action": [
-                    p.get_judicial_committee_action_display()
-                    for p in positions
-                    if p.judicial_committee_action
-                ],
-                "nomination_process": [
-                    p.get_nomination_process_display()
-                    for p in positions
-                    if p.nomination_process
-                ],
-                "selection_method": [
-                    p.get_how_selected_display()
-                    for p in positions
-                    if p.how_selected
-                ],
-                "selection_method_id": [
-                    p.how_selected for p in positions if p.how_selected
-                ],
-                "termination_reason": [
-                    p.get_termination_reason_display()
-                    for p in positions
-                    if p.termination_reason
-                ],
-            }
-            out.update(p_out)
-
-        text_template = loader.get_template("indexes/person_text.txt")
-        out["text"] = text_template.render({"item": self}).translate(null_map)
-
-        return normalize_search_dicts(out)
-
-
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class School(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
         "self",
@@ -451,7 +320,7 @@ class School(AbstractDateTimeModel):
         super().clean_fields(*args, **kwargs)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Position(AbstractDateTimeModel):
     """A role held by a person, and the details about it."""
 
@@ -475,6 +344,7 @@ class Position(AbstractDateTimeModel):
     CHIEF_JUSTICE = "c-jus"
     CHIEF_SPECIAL_MASTER = "c-spec-m"
     CHIEF_ADMINISTRATIVE_JUSTICE = "c-admin-jus"
+    CHIEF_SPECIAL_TRIAL_JUDGE = "c-spec-tr-jud"
     PRESIDING_JUDGE = "pres-jud"
     PRESIDING_JUSTICE = "pres-jus"
     SUPERVISING_JUDGE = "sup-jud"
@@ -506,6 +376,7 @@ class Position(AbstractDateTimeModel):
     SPECIAL_JUDGE = "spec-jud"
     SPECIAL_MASTER = "spec-m"
     SPECIAL_SUPERIOR_COURT_JUDGE_FOR_COMPLEX_BUSINESS_CASES = "spec-scjcbc"
+    SPECIAL_TRIAL_JUDGE = "spec-tr-jud"
     # Other
     CHAIRMAN = "chair"
     CHANCELLOR = "chan"
@@ -565,6 +436,7 @@ class Position(AbstractDateTimeModel):
                 (CHIEF_JUSTICE, "Chief Justice"),
                 (CHIEF_SPECIAL_MASTER, "Chief Special Master"),
                 (CHIEF_ADMINISTRATIVE_JUSTICE, "Chief Administrative Justice"),
+                (CHIEF_SPECIAL_TRIAL_JUDGE, "Chief Special Trial Judge"),
                 (PRESIDING_JUDGE, "Presiding Judge"),
                 (PRESIDING_JUSTICE, "Presiding Justice"),
                 (SUPERVISING_JUDGE, "Supervising Judge"),
@@ -601,9 +473,9 @@ class Position(AbstractDateTimeModel):
                 (SPECIAL_MASTER, "Special Master"),
                 (
                     SPECIAL_SUPERIOR_COURT_JUDGE_FOR_COMPLEX_BUSINESS_CASES,
-                    "Special Superior Court Judge for Complex Business "
-                    "Cases",
+                    "Special Superior Court Judge for Complex Business Cases",
                 ),
+                (SPECIAL_TRIAL_JUDGE, "Special Trial Judge"),
                 # Other
                 (CHAIRMAN, "Chairman"),
                 (CHANCELLOR, "Chancellor"),
@@ -1030,15 +902,14 @@ class Position(AbstractDateTimeModel):
         if self.votes_yes or self.votes_yes_percent:
             s += ", "
         if self.votes_yes:
-            s += '%s in favor <span class="alt">and</span> %s ' "opposed" % (
+            s += '%s in favor <span class="alt">and</span> %s opposed' % (
                 self.votes_yes,
                 self.votes_no,
             )
         elif self.votes_yes_percent:
-            s += (
-                '%g%% in favor <span class="alt">and</span> '
-                "%g%% opposed"
-                % (self.votes_yes_percent, self.votes_no_percent)
+            s += '%g%% in favor <span class="alt">and</span> %g%% opposed' % (
+                self.votes_yes_percent,
+                self.votes_no_percent,
             )
         return s
 
@@ -1109,7 +980,7 @@ class Position(AbstractDateTimeModel):
         super().clean_fields(*args, **kwargs)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class RetentionEvent(AbstractDateTimeModel):
     RETENTION_TYPES = (
         ("reapp_gov", "Governor Reappointment"),
@@ -1181,7 +1052,7 @@ class RetentionEvent(AbstractDateTimeModel):
         super().clean_fields(*args, **kwargs)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Education(AbstractDateTimeModel):
     DEGREE_LEVELS = (
         ("ba", "Bachelor's (e.g. B.A.)"),
@@ -1249,7 +1120,7 @@ class Education(AbstractDateTimeModel):
         super().clean_fields(*args, **kwargs)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Race(models.Model):
     RACES = (
         ("w", "White"),
@@ -1272,7 +1143,9 @@ class Race(models.Model):
         return f"{self.race}"
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class PersonRace(Person.race.through):
     """A model class to track person race m2m relation"""
 
@@ -1280,7 +1153,7 @@ class PersonRace(Person.race.through):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class PoliticalAffiliation(AbstractDateTimeModel):
     POLITICAL_AFFILIATION_SOURCE = (
         ("b", "Ballot"),
@@ -1351,7 +1224,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         super().clean_fields(*args, **kwargs)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Source(AbstractDateTimeModel):
     person = models.ForeignKey(
         Person,
@@ -1377,7 +1250,7 @@ class Source(AbstractDateTimeModel):
     )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class ABARating(AbstractDateTimeModel):
     ABA_RATINGS = (
         ("ewq", "Exceptionally Well Qualified"),

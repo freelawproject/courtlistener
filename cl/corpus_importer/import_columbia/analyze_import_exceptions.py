@@ -26,7 +26,7 @@ for line in open("import_columbia_output_stage_2.log"):
     if "Exception:" in line:
         if "date" not in line:
             print(line)
-        print(f"{line}\n", end="", file=open("unknown.txt", "at"))
+        print(f"{line}\n", end="", file=open("unknown.txt", "a"))
         # file_lists[line].append(currfile)
         # print(line)
 

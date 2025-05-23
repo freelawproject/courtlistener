@@ -1,7 +1,6 @@
-import contextlib
 import os
 import re
-from typing import Optional
+from collections.abc import Callable
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -61,7 +60,7 @@ def clean_docket_number(docket_number: str | None) -> str:
     return ""
 
 
-def make_docket_number_core(docket_number: Optional[str]) -> str:
+def make_docket_number_core(docket_number: str | None) -> str:
     """Make a core docket number from an existing docket number.
 
     Converts docket numbers like:
@@ -207,12 +206,14 @@ def make_upload_path(instance, filename):
         d = instance.file_with_date
     except AttributeError:
         from cl.audio.models import Audio
-        from cl.search.models import Opinion
+        from cl.search.models import Opinion, OpinionCluster
 
         if type(instance) == Audio:
             d = instance.docket.date_argued
         elif type(instance) == Opinion:
             d = instance.cluster.date_filed
+        elif type(instance) == OpinionCluster:
+            d = instance.date_filed
 
     return "%s/%s/%02d/%02d/%s" % (
         filename.split(".")[-1],
@@ -399,7 +400,7 @@ def make_choices_group_lookup(c):
     """
     d = {}
     for choice, value in c:
-        if isinstance(value, (list, tuple)):
+        if isinstance(value, (list | tuple)):
             for t in value:
                 d[t[0]] = choice
         else:
@@ -425,7 +426,7 @@ def flatten_choices(self):
     """
     flat = []
     for choice, value in self.choices:
-        if isinstance(value, (list, tuple)):
+        if isinstance(value, (list | tuple)):
             flat.extend(value)
         else:
             flat.append((choice, value))
@@ -461,29 +462,116 @@ def disable_auto_now_fields(*models):
                 field.auto_now_add = False
 
 
-@contextlib.contextmanager
-def suppress_autotime(model, fields):
-    """Disable auto_now and auto_now_add fields
+def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
+    """Make an originating docket number for an appellate case into a link (MVP version)
 
-    :param model: The model you wish to modify or an instance of it. All objects
-    of this type will be modified until the end of the managed context.
-    :param fields: The fields you wish to disable for the model.
+    **NOTE: These links are presented to users and should be subject to strict security checks.**
+
+    For example, each regex should be carefully written so it accepts only the narrowest of
+    matches. The risk is that:
+
+      - Mallory uploads a bad document via the RECAP APIs (these are open APIs).
+      - The code here parses that upload in a way to create a redirect on the federalregister.gov
+        website.
+      - federalregister.gov has an open redirect vulnerability (these are common).
+      - The user clicks a link on our site that goes to federalregister.gov, which redirects the
+        user to evilsite.com (b/c evilsite.com got through our checks here).
+      - The user is tricked on that site into doing something bad.
+
+    This is all quite unlikely, but we can ensure it doesn't happen by being strict about
+    the inputs our regular expressions capture.
+
+    :param agency: The administrative agency the case originated from
+    :param og_docket_number: The docket number where the case was originally heard.
+    :returns: A linkified version of the docket number for the user to click on, or the original if no link can be made.
     """
-    _original_values = {}
-    for field in model._meta.local_fields:
-        if field.name in fields:
-            _original_values[field.name] = {
-                "auto_now": field.auto_now,
-                "auto_now_add": field.auto_now_add,
-            }
-            field.auto_now = False
-            field.auto_now_add = False
-    try:
-        yield
-    finally:
-        for field in model._meta.local_fields:
-            if field.name in fields:
-                field.auto_now = _original_values[field.name]["auto_now"]
-                field.auto_now_add = _original_values[field.name][
-                    "auto_now_add"
-                ]
+    # Simple pattern for Federal Register citations
+    fr_match = re.search(
+        r"(\d{1,3})\s*(?:FR|Fed\.?\s*Reg\.?)\s*(\d{1,6}(?:,\d{3})*)",
+        og_docket_number,
+    )
+
+    if fr_match:
+        volume, page = fr_match.groups()
+        return f"https://www.federalregister.gov/citation/{volume}-FR-{page}"
+
+    # NLRB pattern
+    if agency == "National Labor Relations Board":
+        match = re.match(
+            r"^(?:NLRB-)?(\d{1,2})-?([A-Z]{2})-?(\d{1,6})$", og_docket_number
+        )
+        if match:
+            region, case_type, number = match.groups()
+            formatted_number = (
+                f"{region.zfill(2)}-{case_type}-{number.zfill(6)}"
+            )
+            return f"https://www.nlrb.gov/case/{formatted_number}"
+
+    # US Tax Court pattern
+    if any(x in agency for x in ("Tax", "Internal Revenue")):
+        match = re.match(
+            r"^(?:USTC-)?(\d{1,5})-(\d{2})([A-Z])?$", og_docket_number
+        )
+        if match:
+            number, year, letter_suffix = match.groups()
+            formatted_number = f"{number.zfill(5)}-{year}"
+            if letter_suffix:
+                formatted_number += letter_suffix
+            return (
+                f"https://dawson.ustaxcourt.gov/case-detail/{formatted_number}"
+            )
+
+    # EPA non-Federal Register pattern
+    if "Environmental Protection" in agency:
+        match = re.match(
+            r"^EPA-(HQ|R\d{2})-[A-Z]{2,5}-\d{4}-\d{4}$", og_docket_number
+        )
+        if match:
+            return f"https://www.regulations.gov/docket/{match.group(0)}"
+
+    """Add other agencies as feasible. Note that the Federal Register link should cover multiple agencies.
+    """
+    # If no match is found, return empty str
+    return ""
+
+
+class CSVExportMixin:
+    def get_csv_columns(self, get_column_name: bool = False) -> list[str]:
+        """Get list of column names required in a csv file.
+        If get column name is True. It will add class name to attribute
+
+        :param: get_column_name: bool. Whether add class name to attr name
+
+        :return: list of attrs of class to get into csv file"""
+        raise NotImplementedError(
+            "Subclass must implement get_csv_columns method"
+        )
+
+    def get_column_function(self) -> dict[str, Callable[[str], str]]:
+        """Get dict of attrs: function to apply on field value if it needs
+        to be pre-processed before being add to csv
+
+        returns: dict -- > {attr1: function}"""
+        raise NotImplementedError(
+            "Subclass must implement get_column_fuction method"
+        )
+
+    def to_csv_row(self) -> list[str]:
+        """Get fields in model based on attrs column names.
+        Apply function to attr value if required.
+        Return list of modified values for csv row"""
+        row = []
+        functions = self.get_column_function()
+        columns = self.get_csv_columns(get_column_name=False)
+        for field in columns:
+            attr = getattr(self, field)
+            if not attr:
+                attr = ""
+            function = functions.get(field)
+            if function:
+                attr = function(field)
+            row.append(attr)
+        return row
+
+    def add_class_name(self, attribute_name: str) -> str:
+        return f"{self.__class__.__name__.lower()}_{attribute_name}"

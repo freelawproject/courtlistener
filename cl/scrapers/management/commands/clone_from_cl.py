@@ -37,12 +37,10 @@ manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --clone-person
 manage.py clone_from_cl --type people_db.Person --id 4173 --clone-person-positions
 manage.py clone_from_cl --type search.Docket --id 5377675 --clone-person-positions
 
-Also, you can decide whether the cloned objects should be indexed in solr or not,
-this only applies for OpinionCluster and Docket objects (In the future this will need
-to be replaced with elasticsearch), for example:
-
-manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --add-to-solr
-
+Note: for cloned Opinion Clusters to appear in docket authorities pages, use the
+`find_citations_and_parantheticals_for_recap_documents` method in the Django shell.
+You can pass all RECAPDocument IDs, for example:
+`RECAPDocument.objects.values_list('pk', flat=True)`, or only a subset if needed.
 
 This is still work in progress, some data is not cloned yet.
 """
@@ -67,7 +65,6 @@ from requests import Session
 from cl.audio.models import Audio
 from cl.people_db.models import Person
 from cl.search.models import Citation, Court, Docket, Opinion, RECAPDocument
-from cl.search.tasks import add_items_to_solr
 
 VALID_TYPES = (
     "search.OpinionCluster",
@@ -117,7 +114,6 @@ def clone_opinion_cluster(
     cluster_ids: list,
     download_cluster_files: bool,
     add_docket_entries: bool,
-    add_to_solr: bool = False,
     person_positions: bool = False,
     object_type="search.OpinionCluster",
 ):
@@ -129,7 +125,6 @@ def clone_opinion_cluster(
     :param download_cluster_files: True if it should download cluster files
     :param add_docket_entries: flag to clone docket entries and recap docs
     :param person_positions: True if we should clone person positions
-    :param add_to_solr: True if we should add objects to solr
     :param object_type: OpinionCluster app name with model name
     :return: list of opinion cluster objects
     """
@@ -156,7 +151,7 @@ def clone_opinion_cluster(
 
         cluster_path = reverse(
             "opinioncluster-detail",
-            kwargs={"version": "v3", "pk": cluster_id},
+            kwargs={"version": "v4", "pk": cluster_id},
         )
         cluster_url = f"{domain}{cluster_path}"
         cluster_datum = get_json_data(cluster_url, session)
@@ -165,8 +160,9 @@ def clone_opinion_cluster(
             session,
             [docket_id],
             add_docket_entries,
+            False,
+            False,
             person_positions,
-            add_to_solr,
         )[0]
         citation_data = cluster_datum["citations"]
         panel_data = cluster_datum["panel"]
@@ -332,16 +328,6 @@ def clone_opinion_cluster(
                 reverse("view_case", args=[opinion_cluster.pk, docket.slug]),
             )
 
-        if add_to_solr:
-            # Add opinions to search engine
-            add_items_to_solr.delay(added_opinions_ids, "search.Opinion")
-
-    if add_to_solr:
-        # Add opinion clusters to search engine
-        add_items_to_solr.delay(
-            [oc.pk for oc in opinion_clusters], "search.OpinionCluster"
-        )
-
     return opinion_clusters
 
 
@@ -350,8 +336,8 @@ def clone_docket(
     docket_ids: list,
     add_docket_entries: bool,
     add_audio_files: bool,
+    add_clusters: bool,
     person_positions: bool = False,
-    add_to_solr: bool = False,
     object_type="search.Docket",
 ):
     """Download docket data from courtlistener.com and add it to local
@@ -360,9 +346,12 @@ def clone_docket(
     :param session: a Requests session
     :param docket_ids: a list of docket ids
     :param add_docket_entries: flag to clone docket entries and recap docs
+    :param add_audio_files: flag to clone related audio files
+        when cloning a docket
+    :param add_clusters: flag to clone related opinion clusters when
+        cloning a docket
     :param person_positions: True is we should clone person positions
     :param person_positions: True is we should clone person positions
-    :param add_to_solr: True if we should add objects to solr
     :param object_type: Docket app name with model name
     :return: list of docket objects
     """
@@ -375,7 +364,7 @@ def clone_docket(
         model = apps.get_model(object_type)
         docket_path = reverse(
             "docket-detail",
-            kwargs={"version": "v3", "pk": docket_id},
+            kwargs={"version": "v4", "pk": docket_id},
         )
         docket_url = f"{domain}{docket_path}"
         docket_data = None
@@ -397,6 +386,13 @@ def clone_docket(
                     session, docket_data.get("audio_files", []), docket
                 )
 
+            if add_clusters:
+                docket_data = get_json_data(docket_url, session)
+                cluster_ids = [
+                    c.split("/")[-2] for c in docket_data.get("clusters", [])
+                ]
+                clone_opinion_cluster(session, cluster_ids, True, False)
+
             continue
         except model.DoesNotExist:
             pass
@@ -410,7 +406,6 @@ def clone_docket(
             "resource_uri",
             "original_court_info",
             "absolute_url",
-            "clusters",
             "tags",
             "panel",
             "idb_data",
@@ -456,6 +451,7 @@ def clone_docket(
             )
 
             audio_files = docket_data.pop("audio_files", [])
+            clusters = docket_data.pop("clusters", [])
 
             docket = model.objects.create(**docket_data)
 
@@ -463,6 +459,9 @@ def clone_docket(
 
             if add_audio_files:
                 clone_audio_files(session, audio_files, docket)
+            if add_clusters:
+                cluster_ids = [c.split("/")[-2] for c in clusters]
+                clone_opinion_cluster(session, cluster_ids, True, False)
 
             if add_docket_entries:
                 clone_docket_entries(session, docket.pk)
@@ -474,10 +473,6 @@ def clone_docket(
                     args=[docket_data["id"], docket_data["slug"]],
                 ),
             )
-
-    if add_to_solr:
-        # Add dockets to search engine
-        add_items_to_solr.delay([doc.pk for doc in dockets], "search.Docket")
 
     return dockets
 
@@ -537,8 +532,7 @@ def clone_audio_files(
             audio.local_path_mp3.save(file_name, cf, save=False)
 
         with transaction.atomic():
-            # Prevent solr from indexing the file
-            audio.save(index=False)
+            audio.save()
             print(f"Cloned audio with id {audio_id}")
 
 
@@ -561,7 +555,7 @@ def clone_docket_entries(
 
     docket_entry_path = reverse(
         "docketentry-list",
-        kwargs={"version": "v3"},
+        kwargs={"version": "v4"},
     )
 
     # Get list of docket entries using docket id
@@ -574,8 +568,7 @@ def clone_docket_entries(
     if docket_entry_list_request.status_code == 403:
         # You don't have the required permissions to view docket entries in api
         raise CloneException(
-            "You don't have the required permissions to "
-            "clone Docket entries."
+            "You don't have the required permissions to clone Docket entries."
         )
 
     docket_entries_data.extend(docket_entry_list_data.get("results", []))
@@ -667,7 +660,7 @@ def clone_recap_documents(
                 "View cloned recap document here:",
                 reverse(
                     "recapdocument-detail",
-                    args=["v3", recap_document_data["id"]],
+                    args=["v4", recap_document_data["id"]],
                 ),
             )
 
@@ -703,7 +696,7 @@ def clone_tag(
         # Create tag
         tag_path = reverse(
             "tag-detail",
-            kwargs={"version": "v3", "pk": tag_id},
+            kwargs={"version": "v4", "pk": tag_id},
         )
         tag_url = f"{domain}{tag_path}"
         tag_data = get_json_data(tag_url, session)
@@ -720,7 +713,7 @@ def clone_tag(
 
             print(
                 "View cloned tag here:",
-                reverse("tag-detail", args=["v3", tag_id]),
+                reverse("tag-detail", args=["v4", tag_id]),
             )
 
     return created_tags
@@ -750,7 +743,7 @@ def clone_position(
             position = model.objects.get(pk=position_id, person_id=person_id)
             print(
                 "Position already exists here:",
-                reverse("position-detail", args=["v3", position.pk]),
+                reverse("position-detail", args=["v4", position.pk]),
             )
             continue
         except model.DoesNotExist:
@@ -759,7 +752,7 @@ def clone_position(
         # Create position
         position_path = reverse(
             "position-detail",
-            kwargs={"version": "v3", "pk": position_id},
+            kwargs={"version": "v4", "pk": position_id},
         )
         position_url = f"{domain}{position_path}"
         position_data = get_json_data(position_url, session)
@@ -845,7 +838,7 @@ def clone_position(
 
             print(
                 "View cloned position here:",
-                reverse("position-detail", args=["v3", position_id]),
+                reverse("position-detail", args=["v4", position_id]),
             )
 
 
@@ -853,7 +846,6 @@ def clone_person(
     session: Session,
     people_ids: list,
     positions=False,
-    add_to_solr: bool = False,
     object_type="people_db.Person",
 ):
     """Download person data from courtlistener.com and add it to local
@@ -862,7 +854,6 @@ def clone_person(
     :param session: a Requests session
     :param people_ids: a list of person ids
     :param positions: True if we should clone person positions
-    :param add_to_solr: True if we should add objects to solr
     :param object_type: Person app name with model name
     :return: list of person objects
     """
@@ -878,7 +869,7 @@ def clone_person(
             person = model.objects.get(pk=person_id)
             print(
                 "Person already exists here:",
-                reverse("person-detail", args=["v3", person.pk]),
+                reverse("person-detail", args=["v4", person.pk]),
             )
             people.append(person)
             if not positions:
@@ -889,7 +880,7 @@ def clone_person(
         # Create person
         people_path = reverse(
             "person-detail",
-            kwargs={"version": "v3", "pk": person_id},
+            kwargs={"version": "v4", "pk": person_id},
         )
 
         person_url = f"{domain}{people_path}"
@@ -937,7 +928,7 @@ def clone_person(
 
             print(
                 "View cloned person here:",
-                reverse("person-detail", args=["v3", person_id]),
+                reverse("person-detail", args=["v4", person_id]),
             )
 
         if person_positions_data:
@@ -946,12 +937,6 @@ def clone_person(
             ]
             with transaction.atomic():
                 clone_position(session, position_ids, person_id)
-
-    if add_to_solr:
-        # Add people to search engine
-        add_items_to_solr.delay(
-            [person.pk for person in people], "people_db.Person"
-        )
 
     return people
 
@@ -978,7 +963,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
             courts.append(ct)
             print(
                 "Court already exists here:",
-                reverse("court-detail", args=["v3", ct.pk]),
+                reverse("court-detail", args=["v4", ct.pk]),
             )
             continue
         except model.DoesNotExist:
@@ -987,7 +972,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
         # Create court
         court_path = reverse(
             "court-detail",
-            kwargs={"version": "v3", "pk": court_id},
+            kwargs={"version": "v4", "pk": court_id},
         )
         court_url = f"{domain}{court_path}"
         court_data = get_json_data(court_url, session)
@@ -1031,7 +1016,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
             courts.append(ct)
             print(
                 "View cloned court here:",
-                reverse("court-detail", args=["v3", court_id]),
+                reverse("court-detail", args=["v4", court_id]),
             )
 
     return courts
@@ -1051,7 +1036,6 @@ class Command(BaseCommand):
         self.add_docket_entries = False
         self.add_audio_files = False
         self.clone_person_positions = False
-        self.add_to_solr = False
 
         self.s = requests.session()
         self.s.headers = {
@@ -1106,18 +1090,19 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
+            "--add-clusters",
+            action="store_true",
+            default=False,
+            help="Use this flag to clone docket clusters when cloning "
+            "a docket.",
+        )
+
+        parser.add_argument(
             "--clone-person-positions",
             action="store_true",
             default=False,
             help="Use this flag to clone person positions. This will make more API "
             "calls.",
-        )
-
-        parser.add_argument(
-            "--add-to-solr",
-            action="store_true",
-            default=False,
-            help="Add cloned objects to solr search engine.",
         )
 
     def handle(self, *args, **options):
@@ -1126,7 +1111,6 @@ class Command(BaseCommand):
         self.download_cluster_files = options.get("download_cluster_files")
         self.add_docket_entries = options.get("add_docket_entries")
         self.clone_person_positions = options.get("clone_person_positions")
-        self.add_to_solr = options.get("add_to_solr")
 
         if not os.environ.get("CL_API_TOKEN"):
             self.stdout.write("Error: CL_API_TOKEN not set in .env file")
@@ -1146,7 +1130,6 @@ class Command(BaseCommand):
                     self.download_cluster_files,
                     self.add_docket_entries,
                     self.clone_person_positions,
-                    self.add_to_solr,
                     self.type,
                 )
             case "search.Docket":
@@ -1155,8 +1138,8 @@ class Command(BaseCommand):
                     self.ids,
                     self.add_docket_entries,
                     options["add_audio_files"],
+                    options["add_clusters"],
                     self.clone_person_positions,
-                    self.add_to_solr,
                     self.type,
                 )
             case "people_db.Person":
@@ -1164,7 +1147,6 @@ class Command(BaseCommand):
                     self.s,
                     self.ids,
                     self.clone_person_positions,
-                    self.add_to_solr,
                     self.type,
                 )
             case "search.Court":

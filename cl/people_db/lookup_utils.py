@@ -3,7 +3,6 @@ import operator
 import re
 from datetime import date, timedelta
 from functools import reduce
-from typing import List, Optional, Set, Union
 
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q, QuerySet
@@ -328,7 +327,8 @@ def find_just_name(text: str) -> str:
 
     # Next up is full names followed by a comma
     match_titles = re.search(
-        "(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-'']{2,}(\s(IV|I|II|III|V|Jr\.|JR\.|Sr\.|SR\.))?),",
+        # adding 'r' prefix to address python 3.12 strickness around escape sequences in string literals
+        r"(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-'']{2,}(\s(IV|I|II|III|V|Jr\.|JR\.|Sr\.|SR\.))?),",
         cleaned_text,
     )
     if match_titles:
@@ -360,7 +360,7 @@ def find_just_name(text: str) -> str:
 
 def extract_judge_last_name(
     text: str = "", keep_letter_case=False, require_capital=False
-) -> List[str]:
+) -> list[str]:
     """Find judge last names in a string of text.
 
     :param text: The text you wish to extract names from.
@@ -377,9 +377,9 @@ def extract_judge_last_name(
     line = text
     if "\n" in text:
         line = ""
-        for l in text.split("\n"):
-            if l:
-                line = l
+        for candidate in text.split("\n"):
+            if candidate:
+                line = candidate
             break
 
     # Strip HTML elements and unescape HTML entities.
@@ -425,11 +425,11 @@ def extract_judge_last_name(
 
 
 async def lookup_judge_by_full_name(
-    name: Union[HumanName, str],
+    name: HumanName | str,
     court_id: str,
-    event_date: Optional[date] = None,
+    event_date: date | None = None,
     require_living_judge: bool = True,
-) -> Optional[Person]:
+) -> Person | None:
     """Uniquely identifies a judge by both name and metadata.
 
     :param name: The judge's name, either as a str of the full name or as
@@ -555,7 +555,7 @@ async def lookup_judge_by_full_name(
 async def lookup_judge_by_full_name_and_set_attr(
     item: object,
     target_field: str,
-    full_name: Union[HumanName, str],
+    full_name: HumanName | str,
     court_id: str,
     event_date: date,
 ) -> None:
@@ -571,16 +571,15 @@ async def lookup_judge_by_full_name_and_set_attr(
     if not full_name:
         return None
     judge = await lookup_judge_by_full_name(full_name, court_id, event_date)
-    if judge is not None:
-        setattr(item, target_field, judge)
+    setattr(item, target_field, judge)
 
 
 async def lookup_judge_by_last_name(
     last_name: str,
     court_id: str,
-    event_date: Optional[date] = None,
+    event_date: date | None = None,
     require_living_judge: bool = True,
-) -> Optional[Person]:
+) -> Person | None:
     """Look up the judge using their last name, a date and court"""
     hn = HumanName()
     hn.last = last_name
@@ -590,11 +589,11 @@ async def lookup_judge_by_last_name(
 
 
 async def lookup_judges_by_last_name_list(
-    last_names: List[str],
+    last_names: list[str],
     court_id: str,
-    event_date: Optional[date] = None,
+    event_date: date | None = None,
     require_living_judge: bool = True,
-) -> List[Person]:
+) -> list[Person]:
     """Look up a group of judges by list of last names, a date, and a court"""
     found_people = []
     for last_name in last_names:
@@ -611,8 +610,8 @@ async def lookup_judges_by_last_name_list(
 async def lookup_judges_by_messy_str(
     s: str,
     court_id: str,
-    event_date: Optional[date] = None,
-) -> List[Person]:
+    event_date: date | None = None,
+) -> list[Person]:
     """Look up a group of judges by a messy string that might contain their
     names. (This is the least accurate way to look up judges.)
     """
@@ -622,7 +621,7 @@ async def lookup_judges_by_messy_str(
     )
 
 
-def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
+def sort_judge_list(judges: QuerySet, search_terms: set[str]) -> QuerySet:
     """Filter a list of judges by a set of search terms.
 
     This method counts exact hits on first middle last suffix and returns

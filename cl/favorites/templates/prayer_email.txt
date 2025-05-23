@@ -1,0 +1,34 @@
+{% load text_filters %}{% load humanize %}{% load tz %}{% load extras %}*****************
+CourtListener.com
+*****************
+-------------------------------------------------------
+Your Wish Has Been Granted!
+-------------------------------------------------------
+
+The document you were waiting for is now available in RECAP.
+-------------------------------------------------------
+
+{{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
+{{ docket.court }}
+~~~
+View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc
+View Community Leaderboard: https://www.courtlistener.com/prayers/top/
+
+Document Number: {{ docket_entry.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
+Date Filed: {% if docket_entry.datetime_filed %}{{ docket_entry.datetime_filed|utc|date:"M j, Y" }}{% else %}{{ docket_entry.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}
+Description: {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ docket_entry.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}
+View Document: https://www.courtlistener.com{{document_url}}
+~~~
+You requested it on {{ date_created|date:"F j, Y" }}.
+{{num_waiting}} {{ num_waiting|pluralize:"person was,people were" }} waiting for it.
+Somebody paid ${{ price }} to make it available to all of us.
+
+************************
+This alert brought to you by the 501(c)(3) non-profit Free Law Project
+ - Blog: https://free.law
+ - BlueSky: https://bsky.app/profile/free.law
+ - X: https://x.com/freelawproject
+ - Donate: https://donate.free.law/forms/supportflp
+ - Become a Member: https://donate.free.law/forms/membership
+
+Please donate to support our work.

@@ -1,5 +1,19 @@
 {% extends "base.html" %}
 
+{% comment %}
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                ATTENTION!                                  ║
+║ This template has a new version behind the use_new_design waffle flag.     ║
+║                                                                            ║
+║ When modifying this template, please also update the new version at:       ║
+║ cl/simple_pages/templates/v2_help/index.html                               ║
+║                                                                            ║
+║ Once the new design is fully implemented, all legacy templates             ║
+║ (including this one) and the waffle flag will be removed.                  ║
+╚════════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
+
 {% block title %}Getting Help – CourtListener.com{% endblock %}
 {% block footer-scripts %}
   {% include "includes/anchors.html" %}
@@ -14,6 +28,7 @@
     <p class="lead">The following help articles are currently available:</p>
     <ol>
       <li><p><a href="{% url "alert_help" %}">Help with search and docket alerts</a></p></li>
+      <li><p><a href="{% url "pray_and_pay_help" %}">Help with Pray and Pay project</a></p></li>
       <li><p><a href="{% url "recap_email_help" %}">Help with @recap.email</a></p></li>
       <li><p><a href="{% url "advanced_search" %}">Help with advanced search parameters</a></p></li>
       <li><p><a href="{% url "tag_notes_help" %}">Learn how to tag dockets and save notes</a></p></li>

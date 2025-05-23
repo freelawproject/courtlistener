@@ -6,6 +6,7 @@ parenthetical_group_index = Index("parenthetical_group")
 parenthetical_group_index.settings(
     number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
+    analysis=settings.ELASTICSEARCH_DSL["analysis"],
 )
 
 # Define oral arguments elasticsearch index

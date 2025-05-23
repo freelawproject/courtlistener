@@ -1,7 +1,6 @@
 import logging
 from collections import defaultdict
 
-import waffle
 from django.conf import settings
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import MultiSearch, Q
@@ -9,21 +8,21 @@ from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrList
 from rest_framework.exceptions import ParseError
 
-from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import (
     build_cardinality_count,
     build_es_main_query,
     build_sort_results,
+    clean_count_query,
     do_collapse_count_query,
     do_count_query,
     do_es_api_query,
     limit_inner_hits,
     merge_unavailable_fields_on_parent_document,
+    set_child_docs_and_score,
     set_results_highlights,
 )
-from cl.lib.scorched_utils import ExtraSolrInterface
-from cl.lib.utils import map_to_docket_entry_sorting
-from cl.search.constants import SEARCH_HL_TAG
+from cl.lib.search_utils import store_search_api_query
+from cl.search.constants import SEARCH_HL_TAG, cardinality_query_unique_ids
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
@@ -33,14 +32,14 @@ from cl.search.documents import (
     PersonDocument,
 )
 from cl.search.exception import ElasticBadRequestError, ElasticServerError
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, SearchQuery
 from cl.search.types import ESCursor
 
 logger = logging.getLogger(__name__)
 
 
 def get_object_list(request, cd, paginator):
-    """Perform the Solr work"""
+    """Perform the search engine work"""
     # Set the offset value
     try:
         page_number = int(request.GET.get(paginator.page_query_param, 1))
@@ -51,44 +50,25 @@ def get_object_list(request, cd, paginator):
     page_size = paginator.get_page_size(request)
     # Assume page_size = 20, then: 1 --> 0, 2 --> 20, 3 --> 40
     offset = max(0, (page_number - 1) * page_size)
-    group = False
-    if cd["type"] == SEARCH_TYPES.DOCKETS:
-        group = True
 
-    is_oral_argument_active = cd[
-        "type"
-    ] == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
-        request, "oa-es-activate"
-    )
-    is_people_active = cd[
-        "type"
-    ] == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(request, "p-es-active")
-    is_opinion_active = cd["type"] == SEARCH_TYPES.OPINION and (
-        waffle.flag_is_active(request, "o-es-search-api-active")
-    )
-    is_recap_active = cd["type"] in [
-        SEARCH_TYPES.RECAP,
-        SEARCH_TYPES.DOCKETS,
-    ] and (waffle.flag_is_active(request, "r-es-search-api-active"))
+    use_default_query = False
+    match cd["type"]:
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            search_query = AudioDocument.search()
+            use_default_query = True
+        case SEARCH_TYPES.PEOPLE:
+            search_query = PersonDocument.search()
+            use_default_query = True
+        case SEARCH_TYPES.OPINION:
+            search_query = OpinionDocument.search()
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            search_query = ESRECAPDocument.search()
+        case _:
+            raise ElasticBadRequestError("Unsupported search type.")
 
-    if is_oral_argument_active:
-        search_query = AudioDocument.search()
-    elif is_people_active:
-        search_query = PersonDocument.search()
-    elif is_opinion_active:
-        search_query = OpinionDocument.search()
-    elif is_recap_active:
-        search_query = ESRECAPDocument.search()
+    if use_default_query:
+        main_query, _, _ = build_es_main_query(search_query, cd)
     else:
-        search_query = None
-
-    if search_query and (is_people_active or is_oral_argument_active):
-        (
-            main_query,
-            child_docs_count_query,
-            top_hits_limit,
-        ) = build_es_main_query(search_query, cd)
-    elif search_query and (is_opinion_active or is_recap_active):
         cd["highlight"] = True
         highlighting_fields = {}
         if cd["type"] == SEARCH_TYPES.OPINION:
@@ -102,31 +82,14 @@ def get_object_list(request, cd, paginator):
             SEARCH_HL_TAG,
             request.version,
         )
-    else:
-        main_query = search_utils.build_main_query(
-            cd, highlight="text", facet=False, group=group
-        )
-        main_query["caller"] = "api_search"
 
-    if not is_recap_active and cd["type"] == SEARCH_TYPES.RECAP:
-        # Convert the date_filed sorting to a docket entry sorting parameter.
-        main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
-
-    if (
-        is_oral_argument_active
-        or is_people_active
-        or is_opinion_active
-        or is_recap_active
-    ):
-        sl = ESList(
-            main_query=main_query,
-            offset=offset,
-            page_size=page_size,
-            type=cd["type"],
-        )
-    else:
-        sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
-
+    sl = ESList(
+        request=request,
+        main_query=main_query,
+        offset=offset,
+        page_size=page_size,
+        type=cd["type"],
+    )
     return sl
 
 
@@ -135,8 +98,11 @@ class ESList:
     as they are queried.
     """
 
-    def __init__(self, main_query, offset, page_size, type, length=None):
+    def __init__(
+        self, request, main_query, offset, page_size, type, length=None
+    ):
         super().__init__()
+        self.request = request
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
@@ -170,7 +136,29 @@ class ESList:
         self.main_query = self.main_query[
             self.offset : self.offset + self.page_size
         ]
-        results = self.main_query.execute()
+
+        error_to_raise = None
+        try:
+            results = self.main_query.execute()
+        except (TransportError, ConnectionError, RequestError) as e:
+            error_to_raise = ElasticServerError
+        except ApiError as e:
+            if "Failed to parse query" in str(e):
+                error_to_raise = ElasticBadRequestError
+            else:
+                logger.error("Multi-search API Error: %s", e)
+                error_to_raise = ElasticServerError
+
+        # Store search query.
+        store_search_api_query(
+            request=self.request,
+            failed=bool(error_to_raise),
+            query_time=results.took if not error_to_raise else None,
+            engine=SearchQuery.ELASTICSEARCH,
+        )
+
+        if error_to_raise:
+            raise error_to_raise()
 
         # Merge unavailable fields in ES by pulling data from the DB to make
         # the API backwards compatible for People.
@@ -205,97 +193,18 @@ class ESList:
         self._item_cache.append(p_object)
 
 
-class SolrList:
-    """This implements a yielding list object that fetches items as they are
-    queried.
-    """
-
-    def __init__(self, main_query, offset, type, length=None):
-        super().__init__()
-        self.main_query = main_query
-        self.offset = offset
-        self.type = type
-        self._item_cache = []
-        if self.type == SEARCH_TYPES.OPINION:
-            self.conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-        elif self.type == SEARCH_TYPES.ORAL_ARGUMENT:
-            self.conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
-        elif self.type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-            self.conn = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
-        elif self.type == SEARCH_TYPES.PEOPLE:
-            self.conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
-        self._length = length
-
-    def __len__(self):
-        if self._length is None:
-            mq = self.main_query.copy()  # local copy for manipulation
-            mq["caller"] = "api_search_count"
-            count = self.conn.query().add_extra(**mq).count()
-            self._length = count
-        return self._length
-
-    def __iter__(self):
-        for item in range(0, len(self)):
-            try:
-                yield self._item_cache[item]
-            except IndexError:
-                yield self.__getitem__(item)
-
-    def __getitem__(self, item):
-        self.main_query["start"] = self.offset
-        r = self.conn.query().add_extra(**self.main_query).execute()
-        self.conn.conn.http_connection.close()
-        if r.group_field is None:
-            # Pull the text snippet up a level
-            for result in r.result.docs:
-                result["snippet"] = "&hellip;".join(
-                    result["solr_highlights"]["text"]
-                )
-                self._item_cache.append(ResultObject(initial=result))
-        else:
-            # Flatten group results, and pull up the text snippet as above.
-            for group in getattr(r.groups, r.group_field)["groups"]:
-                for doc in group["doclist"]["docs"]:
-                    doc["snippet"] = "&hellip;".join(
-                        doc["solr_highlights"]["text"]
-                    )
-                    self._item_cache.append(ResultObject(initial=doc))
-
-        # Now, assuming our _item_cache is all set, we just get the item.
-        if isinstance(item, slice):
-            s = slice(
-                item.start - int(self.offset),
-                item.stop - int(self.offset),
-                item.step,
-            )
-            return self._item_cache[s]
-        else:
-            # Not slicing.
-            try:
-                return self._item_cache[item]
-            except IndexError:
-                # No results!
-                return []
-
-    def append(self, p_object):
-        """Lightly override the append method, so we get items duplicated in
-        our cache.
-        """
-        self._item_cache.append(p_object)
-
-
 class CursorESList:
     """Handles the execution and postprocessing of Elasticsearch queries, as
     well as the pagination logic for cursor-based pagination.
     """
 
-    cardinality_query = {
-        SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
-        SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
-        SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
-        SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
-        SEARCH_TYPES.PEOPLE: ("id", PersonDocument),
-        SEARCH_TYPES.ORAL_ARGUMENT: ("id", AudioDocument),
+    cardinality_base_document = {
+        SEARCH_TYPES.RECAP: DocketDocument,
+        SEARCH_TYPES.DOCKETS: DocketDocument,
+        SEARCH_TYPES.RECAP_DOCUMENT: DocketDocument,
+        SEARCH_TYPES.OPINION: OpinionClusterDocument,
+        SEARCH_TYPES.PEOPLE: PersonDocument,
+        SEARCH_TYPES.ORAL_ARGUMENT: AudioDocument,
     }
 
     def __init__(
@@ -305,18 +214,19 @@ class CursorESList:
         page_size,
         search_after,
         clean_data,
+        request,
     ):
         self.main_query = main_query
         self.child_docs_query = child_docs_query
         self.page_size = page_size
         self.search_after = search_after
         self.clean_data = clean_data
+        self.request = request
         self.cursor = None
         self.results = None
         self.reverse = False
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
-
         self.cursor = cursor
         if self.cursor is not None:
             self.reverse = self.cursor.reverse
@@ -349,25 +259,33 @@ class CursorESList:
         self.main_query = self.main_query.sort(default_sorting, unique_sorting)
 
         # Cardinality query parameters
-        query = Q(self.main_query.to_dict(count=True)["query"])
-        unique_field, search_document = self.cardinality_query[
-            self.clean_data["type"]
-        ]
-        base_search = search_document.search()
+        main_count_query = clean_count_query(self.main_query)
+        unique_field = cardinality_query_unique_ids[self.clean_data["type"]]
         cardinality_query = build_cardinality_count(
-            base_search, query, unique_field
+            main_count_query, unique_field
         )
 
         # Build a cardinality query to count child documents.
         child_cardinality_query = None
         child_cardinality_count_response = None
-        if self.child_docs_query:
-            child_unique_field, _ = self.cardinality_query[
+        if (
+            self.child_docs_query
+            and self.clean_data["type"] == SEARCH_TYPES.RECAP
+        ):
+            child_unique_field = cardinality_query_unique_ids[
                 SEARCH_TYPES.RECAP_DOCUMENT
             ]
-            child_cardinality_query = build_cardinality_count(
-                base_search, self.child_docs_query, child_unique_field
+            search_document = self.cardinality_base_document[
+                self.clean_data["type"]
+            ]
+            child_count_query = search_document.search().query(
+                self.child_docs_query
             )
+            child_cardinality_query = build_cardinality_count(
+                child_count_query, child_unique_field
+            )
+
+        error_to_raise = None
         try:
             multi_search = MultiSearch()
             multi_search = multi_search.add(self.main_query).add(
@@ -375,7 +293,10 @@ class CursorESList:
             )
             # If a cardinality query is available for the search_type, add it
             # to the multi-search query.
-            if child_cardinality_query:
+            if (
+                child_cardinality_query
+                and self.clean_data["type"] == SEARCH_TYPES.RECAP
+            ):
                 multi_search = multi_search.add(child_cardinality_query)
 
             responses = multi_search.execute()
@@ -384,15 +305,25 @@ class CursorESList:
             if child_cardinality_query:
                 child_cardinality_count_response = responses[2]
         except (TransportError, ConnectionError, RequestError) as e:
-            raise ElasticServerError()
+            error_to_raise = ElasticServerError
         except ApiError as e:
             if "Failed to parse query" in str(e):
-                raise ElasticBadRequestError()
+                error_to_raise = ElasticBadRequestError
             else:
                 logger.error("Multi-search API Error: %s", e)
-                raise ElasticServerError()
-        self.process_results(self.results)
+                error_to_raise = ElasticServerError
 
+        # Store search query.
+        store_search_api_query(
+            request=self.request,
+            failed=bool(error_to_raise),
+            query_time=self.results.took if not error_to_raise else None,
+            engine=SearchQuery.ELASTICSEARCH,
+        )
+        if error_to_raise:
+            raise error_to_raise()
+
+        self.process_results(self.results)
         main_query_hits = self.results.hits.total.value
         es_results_items = [
             defaultdict(lambda: None, result.to_dict(skip_empty=False))
@@ -418,16 +349,7 @@ class CursorESList:
             "v4",
             self.clean_data["highlight"],
         )
-        for result in results:
-            child_result_objects = []
-            if hasattr(result, "child_docs"):
-                for child_doc in result.child_docs:
-                    child_result_objects.append(
-                        defaultdict(
-                            lambda: None, child_doc["_source"].to_dict()
-                        )
-                    )
-                result["child_docs"] = child_result_objects
+        set_child_docs_and_score(results, merge_score=True)
 
         if self.reverse:
             # If doing backward pagination, reverse the results of the current
@@ -476,8 +398,7 @@ class CursorESList:
         default_unique_order = {
             "type": self.clean_data["type"],
         }
-
-        unique_field, _ = self.cardinality_query[self.clean_data["type"]]
+        unique_field = cardinality_query_unique_ids[self.clean_data["type"]]
         # Use a document unique field as a unique sorting key for the current
         # search type.
         default_unique_order.update(

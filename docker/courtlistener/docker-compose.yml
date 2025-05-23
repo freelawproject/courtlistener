@@ -1,6 +1,4 @@
 # Run using `docker compose up`
-version: "3.7"
-
 networks:
   cl_net_overlay:
     driver: bridge
@@ -19,8 +17,8 @@ services:
   cl-postgresql:
     container_name: cl-postgres
     build:
-      context: ../../../courtlistener/docker/postgresql/
-      dockerfile: ../../../courtlistener/docker/postgresql/Dockerfile
+      context: "${CL_BASE_DIR:-../../}/docker/postgresql"
+      dockerfile: "./Dockerfile"
       args:
         POSTGRES_VERSION: 15.2-alpine
     ports:
@@ -40,34 +38,27 @@ services:
     networks:
       - cl_net_overlay
 
-  # Search engine
-  cl-solr:
-    container_name: cl-solr
-    image: freelawproject/solr:latest
-    ports:
-      - "8983:8983"
-    # needs chmod 777
-    volumes:
-      - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/data:/var/opt/solr/indices
-      - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/solr/cores/:/etc/opt/solr:ro
-    networks:
-      - cl_net_overlay
-
   cl-webpack:
     container_name: cl-webpack
     image: node:16
     volumes:
-      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+      - ${CL_BASE_DIR:-../../}:/opt/courtlistener
     env_file:
       - ../../.env.dev
     working_dir: /opt/courtlistener/cl
     command: sh -c 'npm install && exec npx webpack --progress --watch --mode=development'
+    healthcheck:
+      test: sh -c 'ps aux | grep -v grep | grep webpack >/dev/null 2>&1 && echo 0 || echo 1'
+      interval: 1s
+      retries: 45
+      start_period: 1s
+      timeout: 1s
 
   # Task Server
   cl-celery:
     container_name: cl-celery
     build:
-      context: "../../"
+      context: "${CL_BASE_DIR:-../../}"
       dockerfile: "./docker/django/Dockerfile"
       args:
         BUILD_ENV: dev
@@ -79,7 +70,7 @@ services:
       - cl-disclosures
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+      - ${CL_BASE_DIR:-../../}:/opt/courtlistener
     networks:
       - cl_net_overlay
     env_file:
@@ -89,10 +80,24 @@ services:
         - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
         - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
 
+  cl-tailwind-reload:
+    container_name: cl-tailwind-reload
+    working_dir: /opt/courtlistener/cl
+    image: node:16
+    volumes:
+      - ${CL_BASE_DIR:-../../}:/opt/courtlistener
+    env_file:
+      - ../../.env.dev
+    command: sh -c 'npm run dev'
+    depends_on:
+      cl-webpack:
+        condition: service_healthy
+    tty: true
+
   cl-django:
     container_name: cl-django
     build:
-      context: "../../"
+      context: "${CL_BASE_DIR:-../../}"
       dockerfile: "./docker/django/Dockerfile"
       args:
         BUILD_ENV: dev
@@ -101,7 +106,6 @@ services:
       - cl-postgresql
       - cl-redis
       - cl-celery
-      - cl-solr
       - cl-selenium
       - cl-doctor
       - cl-disclosures
@@ -111,8 +115,8 @@ services:
     user: root
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
-      - ${CL_BASE_DIR:-../../../courtlistener/.postgresql}:/root/.postgresql
+      - ${CL_BASE_DIR:-../../}:/opt/courtlistener
+      - ${CL_BASE_DIR:-../../}/.postgresql:/root/.postgresql
     networks:
       - cl_net_overlay
     env_file:
@@ -154,7 +158,7 @@ services:
 
   cl-es:
     container_name: cl-es
-    image: elasticsearch:8.8.1
+    image: elastic/elasticsearch:9.0.1
     environment:
       - discovery.type=single-node
       - cluster.name=courtlistener-cluster
@@ -176,11 +180,11 @@ services:
         soft: 500
         hard: 600
     volumes:
-      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.crt}:/usr/share/elasticsearch/config/certs/cl-es.crt
-      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.key}:/usr/share/elasticsearch/config/certs/cl-es.key
-      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/ca.crt}:/usr/share/elasticsearch/config/certs/ca.crt
-      - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/synonyms_en.txt}:/usr/share/elasticsearch/config/dictionaries/synonyms_en.txt
-      - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/stopwords_en.txt}:/usr/share/elasticsearch/config/dictionaries/stopwords_en.txt
+      - ${CL_BASE_DIR:-../../}/docker/elastic/cl-es.crt:/usr/share/elasticsearch/config/certs/cl-es.crt
+      - ${CL_BASE_DIR:-../../}/docker/elastic/cl-es.key:/usr/share/elasticsearch/config/certs/cl-es.key
+      - ${CL_BASE_DIR:-../../}/docker/elastic/ca.crt:/usr/share/elasticsearch/config/certs/ca.crt
+      - ${CL_BASE_DIR:-../../}/cl/search/elasticsearch_files/synonyms_en.txt:/usr/share/elasticsearch/config/dictionaries/synonyms_en.txt
+      - ${CL_BASE_DIR:-../../}/cl/search/elasticsearch_files/stopwords_en.txt:/usr/share/elasticsearch/config/dictionaries/stopwords_en.txt
     ports:
       - "9200:9200"
     networks:

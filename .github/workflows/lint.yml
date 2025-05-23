@@ -1,12 +1,10 @@
 name: Lint
 
 on:
+  pull_request:
   push:
     branches:
-      - '**'
-  pull_request:
-    branches:
-      - 'main'
+      - main
 
 jobs:
   lint:
@@ -17,35 +15,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           # Once codebase is updated, this can easily be changed to any specific version.
-          python-version: "3.12"
+          python-version: "3.13"
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          version: 1.7.1
-          virtualenvs-create: true
-          virtualenvs-in-project: true
+          enable-cache: true
+          version: "0.7.x"
 
-      - name: Get full Python version
-        id: full-python-version
-        run: echo "version=$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")" >> $GITHUB_OUTPUT
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock')}}-v20210414
+      - uses: pre-commit/action@v3.0.0
 
       - name: Install dependencies
-        run: poetry install
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-
-      - name: Activate venv
-        run: |
-          echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> $GITHUB_ENV
-          echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
-          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+        run: uv sync
 
       - name: Debug paths
         run: |
@@ -56,7 +37,7 @@ jobs:
       # checker below as you do so).
       - name: mypy Static Type Checker (packages)
         run: |
-          mypy \
+          uv run mypy \
           --follow-imports=skip \
           --exclude 'migrations/*' \
           -p cl.alerts \
@@ -72,7 +53,7 @@ jobs:
       # Add files here as they're ready
       - name: mypy Static Type Checker (files)
         run: |
-          mypy \
+          uv run mypy \
           --follow-imports=skip \
           --exclude 'migrations/*' \
           cl/api/api_permissions.py \
@@ -92,32 +73,8 @@ jobs:
           cl/users/management/commands/cl_retry_failed_email.py \
           cl/users/tasks.py \
           cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py \
+          cl/recap/utils.py \
           cl/search/management/commands/cl_index_parent_and_child_docs.py \
-          cl/search/management/commands/sweep_indexer.py
-
-
-
-      - name: Flynt f-string Formatter
-        run: >
-          flynt .
-          --line-length=79
-          --transform-concats
-          --fail-on-change
-
-      - name: Black Code Formatter
-        uses: psf/black@stable
-
-  lint-isort:
-    # This is an unfortunate necessity because the latest version of isort
-    # doesn't work with Python 3.10. To work around that, we simply run this
-    # in version 3.9, but someday we hope to simplify this again.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-
-      - name: isort Import Sorter
-        uses: isort/isort-action@v1
+          cl/search/management/commands/sweep_indexer.py \
+          cl/search/management/commands/pacer_bulk_fetch.py \
+          cl/search/management/commands/generate_opinion_embeddings.py

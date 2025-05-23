@@ -13,22 +13,26 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
   const [textVal, setTextVal] = React.useState<string>('');
 
   const getTags = React.useCallback(
-    async (key: string, page = 1) => await appFetch(`/api/rest/v3/tags/?user=${userId}&page=${page}`),
+    async (key: string, cursor: string | null) =>
+      await appFetch(`/api/rest/v4/tags/?user=${userId}${cursor ? `&cursor=${cursor}` : ''}`),
     []
   );
 
-  const getAssociations = React.useCallback(async (key: string, page = 1) => {
+  const getAssociations = React.useCallback(async (key: string, cursor: string | null) => {
     let associations: Association[] = [];
     let morePagesAvailable = true;
     /* fetches all the tags associated to the given docket at once */
     while (morePagesAvailable) {
-      const response = await appFetch(`/api/rest/v3/docket-tags/?docket=${docket}&tag__user=${userId}&page=${page}`);
+      const response = await appFetch(
+        `/api/rest/v4/docket-tags/?docket=${docket}&tag__user=${userId}${cursor ? `&cursor=${cursor}` : ''}`
+      );
       (response as ApiResult<Association>).results.forEach((e) => associations.unshift(e));
       const nextPage = (response as ApiResult<Association>).next;
       if (!nextPage) morePagesAvailable = false;
       if (morePagesAvailable) {
-        const matches = nextPage.match(/page=(\d+)/);
-        if (matches) page = parseInt(matches[1]);
+        const url = new URL(nextPage);
+        const searchParams = new URLSearchParams(url.search);
+        if (searchParams.has('cursor')) cursor = searchParams.get('cursor');
       }
     }
     return associations;
@@ -36,7 +40,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
 
   const postTag = React.useCallback(
     async ({ name }: { name: string }) =>
-      await appFetch('/api/rest/v3/tags/', {
+      await appFetch('/api/rest/v4/tags/', {
         method: 'POST',
         body: { name },
       }),
@@ -45,7 +49,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
 
   const postAssoc = React.useCallback(
     async ({ tag }: { tag: number }) =>
-      await appFetch('/api/rest/v3/docket-tags/', {
+      await appFetch('/api/rest/v4/docket-tags/', {
         method: 'POST',
         body: { tag, docket },
       }),
@@ -54,7 +58,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
 
   const deleteAssoc = React.useCallback(
     async ({ assocId }: { assocId: number }) =>
-      await appFetch(`/api/rest/v3/docket-tags/${assocId}/`, {
+      await appFetch(`/api/rest/v4/docket-tags/${assocId}/`, {
         method: 'DELETE',
       }),
     []
@@ -69,12 +73,17 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
     getTags,
     {
       enabled: enabled,
-      // if the lastPage has a next key, extract the page number
+      // if the lastPage has a next key, extract the cursor
       getFetchMore: (lastPage, allPages) => {
         const nextPage = (lastPage as ApiResult<Tag>).next;
         if (!nextPage) return false;
-        const matches = nextPage.match(/page=(\d+)/);
-        return matches && matches[1] ? matches[1] : false;
+        // Parse the 'next' URL and extract its query parameters.
+        const url = new URL(nextPage);
+        const searchParams = new URLSearchParams(url.search);
+        // Validate that the 'cursor' parameter exists in the query
+        if (!searchParams.has('cursor')) return false;
+        // Get and return the value of the 'cursor' parameter
+        return searchParams.get('cursor');
       },
     }
   );
@@ -183,7 +192,7 @@ export const updateTags = () => {
   //  Update our tag fields
   const updateTag = React.useCallback(
     async (tag: Tag) =>
-      await appFetch(`/api/rest/v3/tags/${tag.id}/`, {
+      await appFetch(`/api/rest/v4/tags/${tag.id}/`, {
         method: 'PUT',
         body: { ...tag },
       }),
@@ -192,7 +201,7 @@ export const updateTags = () => {
 
   const deleteTag = React.useCallback(
     async (id: number) =>
-      await appFetch(`/api/rest/v3/tags/${id}/`, {
+      await appFetch(`/api/rest/v4/tags/${id}/`, {
         method: 'DELETE',
       }),
     []

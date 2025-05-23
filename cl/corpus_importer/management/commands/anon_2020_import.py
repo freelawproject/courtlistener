@@ -2,7 +2,7 @@ import json
 import re
 from datetime import date, datetime
 from glob import iglob
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
@@ -17,14 +17,13 @@ from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
 from cl.search.models import SOURCES, Citation, Docket, Opinion, OpinionCluster
-from cl.search.tasks import add_items_to_solr
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 cnt = CaseNameTweaker()
 
 
-def find_cites(case_data: Dict[str, str]) -> List[FoundCitation]:
+def find_cites(case_data: dict[str, str]) -> list[FoundCitation]:
     """Extract citations from raw string.
 
     :param case_data: Case information from the anon 2020 db.
@@ -48,14 +47,14 @@ def find_cites(case_data: Dict[str, str]) -> List[FoundCitation]:
 def merge_or_add_opinions(
     cluster_id: int,
     html_str: str,
-    data: Dict[str, Any],
-    date_argued: Optional[date],
-    date_filed: Optional[date],
-    case_names: Dict[str, str],
+    data: dict[str, Any],
+    date_argued: date | None,
+    date_filed: date | None,
+    case_names: dict[str, str],
     status: str,
     docket_number: str,
-    found_citations: List[FoundCitation],
-) -> Optional[Docket]:
+    found_citations: list[FoundCitation],
+) -> Docket | None:
     """Merge opinions if applicable.
 
     If opinion not in system, merge or add to cluster.
@@ -161,13 +160,13 @@ def merge_or_add_opinions(
 @transaction.atomic
 def add_new_records(
     html_str: str,
-    data: Dict[str, Any],
-    date_argued: Optional[date],
-    date_filed: Optional[date],
-    case_names: Dict[str, str],
+    data: dict[str, Any],
+    date_argued: date | None,
+    date_filed: date | None,
+    case_names: dict[str, str],
     status: str,
     docket_number: str,
-    found_citations: List[FoundCitation],
+    found_citations: list[FoundCitation],
     court_id: str,
 ) -> Docket:
     """Create new records in the DB based on parsed data
@@ -208,7 +207,7 @@ def add_new_records(
         correction=data["publication_status_note"] or "",
         judges=judges.replace("{", "").replace("}", "") or "",
     )
-    cluster.save(index=False)
+    cluster.save()
 
     for citation in found_citations:
         logger.info("Adding citation for: %s", citation.corrected_citation())
@@ -235,7 +234,7 @@ def add_new_records(
     return docket
 
 
-def check_publication_status(found_cites: List[Citation]) -> str:
+def check_publication_status(found_cites: list[Citation]) -> str:
     """Identify if the opinion is published in a specific reporter.
 
     Check if one of the found citations matches published reporters.
@@ -259,9 +258,9 @@ def clean_docket_number(docket_number: str) -> str:
 
 
 def attempt_cluster_lookup(
-    citations: List[FoundCitation],
+    citations: list[FoundCitation],
     new_docket_number: str,
-) -> Optional[int]:
+) -> int | None:
     """Check if the citation in our database.
 
     If citation in found citations in our database, return cluster ID.
@@ -291,7 +290,7 @@ def attempt_cluster_lookup(
     return None
 
 
-def do_case_name(soup, data: Dict[str, Any]) -> Dict[str, str]:
+def do_case_name(soup, data: dict[str, Any]) -> dict[str, str]:
     """Extract and normalize the case name
 
     :param soup: bs4 html object of opinion.
@@ -309,7 +308,7 @@ def do_case_name(soup, data: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
-def do_docket_number(data: Dict[str, Any]) -> str:
+def do_docket_number(data: dict[str, Any]) -> str:
     """Extract the docket number
 
     :param data: The full json data dict
@@ -337,8 +336,8 @@ def find_court_id(court_str: str) -> str:
 
 
 def process_dates(
-    data: Dict[str, Any]
-) -> Tuple[Optional[date], Optional[date]]:
+    data: dict[str, Any],
+) -> tuple[date | None, date | None]:
     """Process date argued and date filed
 
     Dates in this dataset fall into two categories, argued and filed/decided.
@@ -359,8 +358,7 @@ def process_dates(
 
 def import_anon_2020_db(
     import_dir: str,
-    skip_until: Optional[str],
-    make_searchable: Optional[bool],
+    skip_until: str | None,
 ) -> None:
     """Import data from anon 2020 DB into our system.
 
@@ -372,7 +370,6 @@ def import_anon_2020_db(
 
     :param import_dir: Location of directory of import data.
     :param skip_until: ID for case we should begin processing, if any.
-    :param make_searchable: Should we add content to SOLR.
     :return: None.
     """
     directories = iglob(f"{import_dir}/*/????-*.json")
@@ -428,20 +425,11 @@ def import_anon_2020_db(
                 court_id,
             )
 
-        if make_searchable and docket:
-            add_items_to_solr.delay([docket.pk], "search.Docket")
-
 
 class Command(VerboseCommand):
     help = "Import anon 2020 DB."
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--make-searchable",
-            action="store_true",
-            help="Add items to solr as we create opinions. "
-            "Items are not searchable unless flag is raised.",
-        )
         parser.add_argument(
             "--import-dir",
             default="cl/assets/media/x-db/all_dir/",
@@ -459,5 +447,4 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         skip_until = options["skip_until"]
         import_dir = options["import_dir"]
-        make_searchable = options["make_searchable"]
-        import_anon_2020_db(import_dir, skip_until, make_searchable)
+        import_anon_2020_db(import_dir, skip_until)

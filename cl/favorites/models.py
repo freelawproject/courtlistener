@@ -2,14 +2,14 @@ import pghistory
 from django.contrib.auth.models import User
 from django.core.validators import MaxLengthValidator
 from django.db import models
+from django.utils import timezone
 
 from cl.audio.models import Audio
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Note(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -70,7 +70,7 @@ class Note(models.Model):
         )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class DocketTag(models.Model):
     """Through table linking dockets to tags"""
 
@@ -87,7 +87,13 @@ class DocketTag(models.Model):
         unique_together = (("docket", "tag"),)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), exclude=["view_count"])
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+    exclude=["view_count"],
+)
 class UserTag(AbstractDateTimeModel):
     """Tags that can be added by users to various objects"""
 
@@ -127,10 +133,15 @@ class UserTag(AbstractDateTimeModel):
 
     class Meta:
         unique_together = (("user", "name"),)
-        indexes = [models.Index(fields=["user", "name"])]
+        indexes = [
+            models.Index(
+                fields=["user", "name"],
+                name="favorites_usertag_user_id_name_54aef6fe_idx",
+            )
+        ]
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Prayer(models.Model):
     WAITING = 1
     GRANTED = 2
@@ -162,16 +173,54 @@ class Prayer(models.Model):
     )
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "recap_document"],
+                name="unique_prayer_for_user_document",
+            ),
+        ]
         indexes = [
             # When adding a new document to RECAP, we'll ask: What outstanding
             # prayers do we have for this document?
             # When loading the prayer leader board, we'll ask: Which documents
             # have the most outstanding prayers?
-            models.Index(fields=["recap_document", "status"]),
+            models.Index(
+                fields=["recap_document", "status"],
+                name="favorites_prayer_recap_document_id_status_82e2dbbb_idx",
+            ),
             # When loading docket pages, we'll ask (hundreds of times): Did
             # user ABC pray for document XYZ?
-            models.Index(fields=["recap_document", "user"]),
+            models.Index(
+                fields=["recap_document", "user"],
+                name="favorites_prayer_recap_document_id_user_id_c5d30108_idx",
+            ),
             # When a user votes, we'll ask: How many outstanding prayers did
             # user ABC make today?
-            models.Index(fields=["date_created", "user", "status"]),
+            models.Index(
+                fields=["date_created", "user", "status"],
+                name="favorites_prayer_date_created_user_id_status_880d7280_idx",
+            ),
+        ]
+
+
+# model to keep track of when we last checked whether a given PACER document was still unavailable for purchase
+class PrayerAvailability(models.Model):
+    recap_document = models.ForeignKey(
+        RECAPDocument,
+        help_text="The document people prayed for.",
+        related_name="prayeravailability",
+        on_delete=models.CASCADE,
+    )
+    last_checked = models.DateTimeField(
+        help_text="The time when the availability of this document was last checked.",
+        default=timezone.now,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recap_document"],
+                name="unique_recap_document",
+                include=["last_checked"],
+            ),
         ]

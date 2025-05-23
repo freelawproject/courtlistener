@@ -9,6 +9,7 @@ from factory import (
     RelatedFactory,
     SelfAttribute,
     SubFactory,
+    post_generation,
 )
 from factory.django import DjangoModelFactory, FileField
 from factory.fuzzy import FuzzyChoice, FuzzyText
@@ -63,7 +64,7 @@ class CourtFactory(DjangoModelFactory):
                 obj.save()
                 return obj
             except IntegrityError as exp:
-                logger.info(f"Unexpected {exp=}, {type(exp)=}")
+                logger.info("Unexpected exp=%s, type(exp)=%s", exp, type(exp))
                 kwargs["position"] = Faker(
                     "pyfloat", positive=True, right_digits=4, left_digits=3
                 ).evaluate(None, None, {"locale": None})
@@ -209,20 +210,22 @@ class OpinionClusterWithParentsFactory(
     pass
 
 
-class RECAPDocumentFactory(DjangoModelFactory):
-    class Meta:
-        model = RECAPDocument
-
-    description = Faker("text", max_nb_chars=750)
-    document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
-
-
 class DocketEntryFactory(DjangoModelFactory):
     class Meta:
         model = DocketEntry
 
     description = Faker("text", max_nb_chars=750)
+    docket = SubFactory("cl.search.factories.DocketFactory")
+
+
+class RECAPDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = RECAPDocument
+
+    description = Faker("text", max_nb_chars=750)
+    docket_entry = SubFactory(DocketEntryFactory)
+    document_type = RECAPDocument.PACER_DOCUMENT
+    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
 
 
 class DocketReuseParentMixin(DjangoModelFactory):
@@ -267,6 +270,7 @@ class DocketEntryReuseParentsFactory(
 class DocketFactory(DjangoModelFactory):
     class Meta:
         model = Docket
+        skip_postgeneration_save = True
 
     source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
     court = SubFactory(CourtFactory)
@@ -279,8 +283,37 @@ class DocketFactory(DjangoModelFactory):
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     docket_number = Faker("federal_district_docket_number")
     slug = Faker("slug")
-    filepath_local = FileField(filename=None)
     date_argued = Faker("date_object")
+    view_count = 0
+
+    """
+    This hook is necessary to make this factory compatible with the
+    `make_dev_command` by delegating the file creation to the hook, we prevent
+    the model from trying to use our storage settings when the field is not
+    explicitly requested
+    """
+
+    @post_generation
+    def filepath_local(self, create, extracted, **kwargs):
+        """Attaches a stub file to an instance of this factory."""
+        if extracted:
+            self.filepath_local = extracted
+        elif kwargs:
+            # Factory Boy uses the `evaluate` method of each field to calculate
+            # values for object creation. The FileField class only requires the
+            # extra dictionary to create the stub django file.
+            #
+            # Learn more about FactoryBoy's `FileField` class:
+            # https://github.com/FactoryBoy/factory_boy/blob/ac49fb40ec424276c3cd3ca0925ba99a626f05f7/factory/django.py#L249
+            self.filepath_local = FileField().evaluate(None, None, kwargs)
+
+        if create:
+            # Use a Docket queryset to persist filepath_local instead of calling
+            # save(), which can trigger duplicate post_save signals, potentially
+            # causing issues in certain testing scenarios.
+            Docket.objects.filter(pk=self.pk).update(
+                filepath_local=self.filepath_local
+            )
 
 
 class DocketWithChildrenFactory(DocketFactory):
@@ -295,12 +328,15 @@ class OpinionClusterFactoryMultipleOpinions(
 ):
     """Make an OpinionCluster with Docket parent and multiple opinions"""
 
+    class Meta:
+        skip_postgeneration_save = True
+
     sub_opinions = RelatedFactoryVariableList(
         factory=OpinionWithChildrenFactory,
         factory_related_name="cluster",
         size=3,  # by default create 3 opinions
     )
-    precedential_status = ("Published", "Precedential")
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
 
 
 class OpinionsCitedWithParentsFactory(DjangoModelFactory):

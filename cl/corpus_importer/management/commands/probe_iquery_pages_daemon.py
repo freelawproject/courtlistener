@@ -3,11 +3,13 @@ import time
 from django.conf import settings
 from redis import ConnectionError
 
-from cl.corpus_importer.tasks import probe_iquery_pages
-from cl.corpus_importer.utils import make_iquery_probing_key
+from cl.corpus_importer.tasks import probe_or_scrape_iquery_pages
+from cl.corpus_importer.utils import (
+    get_iquery_pacer_courts_to_scrape,
+    make_iquery_probing_key,
+)
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
-from cl.search.models import Court
 
 
 def enqueue_iquery_probe(court_id: str) -> bool:
@@ -20,17 +22,21 @@ def enqueue_iquery_probe(court_id: str) -> bool:
     return create_redis_semaphore("CACHE", key, ttl=60 * 10)
 
 
-def get_all_pacer_courts() -> list[str]:
-    """Retrieve all district and bankruptcy  PACER courts from the database.
+def get_latest_pacer_case_id_for_courts(court_ids: list[str], r) -> dict:
+    """Return the latest pacer_case_id for each given court from Redis.
 
-    :return: A list of Court IDs.
+    :param court_ids: List of court IDs to fetch the latest pacer_case_id for.
+    :param r: The redis connection to use.
+    :return: A dict mapping each court_id to its latest pacer_case_id.
     """
-    courts = (
-        Court.federal_courts.district_or_bankruptcy_pacer_courts().exclude(
-            pk__in=["uscfc", "arb", "cit"]
+    latest_case_ids = {}
+    for court_id in court_ids:
+        latest_known_pacer_case_id = r.hget(
+            "iquery:latest_known_pacer_case_id", court_id
         )
-    )
-    return list(courts.values_list("pk", flat=True))
+        if latest_known_pacer_case_id:
+            latest_case_ids[court_id] = int(latest_known_pacer_case_id)
+    return latest_case_ids
 
 
 class Command(VerboseCommand):
@@ -77,21 +83,31 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
 
         testing_iterations = options["testing_iterations"]
         # If a new court is added to the DB. We should restart the daemon.
-        court_ids = get_all_pacer_courts()
+        court_ids = get_iquery_pacer_courts_to_scrape()
         iterations_completed = 0
         r = get_redis_interface("CACHE")
         testing = True if testing_iterations else False
-        while True and settings.IQUERY_PROBE_DAEMON_ENABLED:
+        latest_case_ids = get_latest_pacer_case_id_for_courts(court_ids, r)
+
+        while True and settings.IQUERY_CASE_PROBE_DAEMON_ENABLED:
             for court_id in court_ids:
-                if r.exists(f"iquery:court_wait:{court_id}"):
+                wait_key = f"iquery:court_wait:{court_id}"
+                if r.exists(wait_key):
+                    ttl = r.ttl(wait_key)
+                    logger.info(
+                        "Skipping court %s for %s hours.",
+                        court_id,
+                        round(ttl / 3600, 2),
+                    )
                     continue
                 try:
                     newly_enqueued = enqueue_iquery_probe(court_id)
                     if newly_enqueued:
                         # No other probing being conducted for the court.
                         # Enqueue it.
-                        probe_iquery_pages.apply_async(
-                            args=(court_id, testing),
+                        latest_know_case_id_db = latest_case_ids.get(court_id)
+                        probe_or_scrape_iquery_pages.apply_async(
+                            args=(court_id, latest_know_case_id_db, testing),
                             queue=settings.CELERY_IQUERY_QUEUE,
                         )
                         logger.info(

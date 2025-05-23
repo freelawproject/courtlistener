@@ -1,6 +1,6 @@
-from datetime import date, datetime
+from collections.abc import Iterable
+from datetime import date
 from itertools import batched
-from typing import Iterable, Mapping
 
 from django.conf import settings
 from django.db.models import QuerySet
@@ -12,7 +12,10 @@ from cl.lib.es_signal_processor import (
     check_fields_that_changed,
     get_fields_to_update,
 )
-from cl.lib.redis_utils import get_redis_interface
+from cl.lib.indexing_utils import (
+    get_last_parent_document_id_processed,
+    log_last_document_indexed,
+)
 from cl.people_db.models import Person
 from cl.search.documents import (
     DocketDocument,
@@ -36,7 +39,7 @@ from cl.search.models import (
 from cl.search.signals import recap_document_field_mapping
 from cl.search.tasks import (
     index_parent_and_child_docs,
-    index_parent_or_child_docs,
+    index_parent_or_child_docs_in_es,
     remove_parent_and_child_docs_by_query,
     update_children_docs_by_query,
 )
@@ -56,49 +59,6 @@ def compose_redis_key(
     if event_doc_type:
         return f"es_{search_type}_{event_doc_type}_indexing:log"
     return f"es_{search_type}_indexing:log"
-
-
-def log_last_document_indexed(
-    document_pk: int, log_key: str
-) -> Mapping[str | bytes, int | str]:
-    """Log the last document_id indexed.
-
-    :param document_pk: The last document_id processed.
-    :param log_key: The log key to use in redis.
-    :return: The data logged to redis.
-    """
-
-    r = get_redis_interface("CACHE")
-    pipe = r.pipeline()
-    pipe.hgetall(log_key)
-    log_info: Mapping[str | bytes, int | str] = {
-        "last_document_id": document_pk,
-        "date_time": datetime.now().isoformat(),
-    }
-    pipe.hset(log_key, mapping=log_info)
-    pipe.expire(log_key, 60 * 60 * 24 * 28)  # 4 weeks
-    pipe.execute()
-
-    return log_info
-
-
-def get_last_parent_document_id_processed(
-    search_type: str, event_doc_type: EventTable | None = None
-) -> int:
-    """Get the last document ID indexed.
-
-    :param search_type: The search type key to get the last document ID.
-    :param event_doc_type: An optional EventTable enum member specifying the
-    document type being processed.
-    :return: The last document ID indexed.
-    """
-
-    r = get_redis_interface("CACHE")
-    log_key = compose_redis_key(search_type, event_doc_type)
-    stored_values = r.hgetall(log_key)
-    last_document_id = int(stored_values.get("last_document_id", 0))
-
-    return last_document_id
 
 
 def get_unique_oldest_history_rows(
@@ -246,11 +206,7 @@ def get_documents_to_update_or_remove(
 
         processed_count += len(event_ids_list)
         logger.info(
-            "\rChecking documents to update:  {}/{} ({:.0%})".format(
-                processed_count,
-                event_ids_count,
-                processed_count / event_ids_count,
-            )
+            f"\rChecking documents to update:  {processed_count}/{event_ids_count} ({processed_count / event_ids_count:.0%})"
         )
     return (
         main_documents_to_update,
@@ -343,9 +299,11 @@ class Command(VerboseCommand):
             help="Use this flag to only index documents missing in the index.",
         )
         parser.add_argument(
-            "--sweep-index",
-            action="store_true",
-            help="Whether to perform an indexing for the sweep index.",
+            "--non-null-field",
+            type=str,
+            required=False,
+            choices=["ordering_key"],
+            help="Include only documents where this field is not Null.",
         )
 
     def handle(self, *args, **options):
@@ -361,13 +319,14 @@ class Command(VerboseCommand):
         )
         if auto_resume:
             pk_offset = get_last_parent_document_id_processed(
-                search_type, update_from_event_tables
+                compose_redis_key(search_type, update_from_event_tables)
             )
             self.stdout.write(
                 f"Auto-resume enabled starting indexing from ID: {pk_offset}."
             )
         start_date: date | None = options.get("start_date", None)
         end_date: date | None = options.get("end_date", None)
+        non_null_field: str | None = options.get("non_null_field", None)
 
         es_document = None
         match search_type:
@@ -399,7 +358,7 @@ class Command(VerboseCommand):
                         .order_by("pk")
                         .values_list("pk", "docket_entry__docket_id")
                     )
-                    task_to_use = "index_parent_or_child_docs"
+                    task_to_use = "index_parent_or_child_docs_in_es"
                     es_document = ESRECAPDocument
                 else:
                     queryset = (
@@ -412,19 +371,24 @@ class Command(VerboseCommand):
                     )
                     task_to_use = "index_parent_and_child_docs"
                     if document_type == "parent":
-                        task_to_use = "index_parent_or_child_docs"
+                        task_to_use = "index_parent_or_child_docs_in_es"
                         es_document = DocketDocument
                 q = queryset.iterator()
                 count = queryset.count()
 
             case SEARCH_TYPES.OPINION:
                 if document_type == "child":
+                    filters = {"pk__gte": pk_offset}
+                    # If non_null_field is not None use it as a filter
+                    if non_null_field:
+                        filters[f"{non_null_field}__isnull"] = False
+
                     queryset = (
-                        Opinion.objects.filter(pk__gte=pk_offset)
+                        Opinion.objects.filter(**filters)
                         .order_by("pk")
                         .values_list("pk", "cluster_id")
                     )
-                    task_to_use = "index_parent_or_child_docs"
+                    task_to_use = "index_parent_or_child_docs_in_es"
                     es_document = OpinionDocument
                 else:
                     # Get Opinion Clusters objects by pk_offset.
@@ -435,7 +399,7 @@ class Command(VerboseCommand):
                     )
                     task_to_use = "index_parent_and_child_docs"
                     if document_type == "parent":
-                        task_to_use = "index_parent_or_child_docs"
+                        task_to_use = "index_parent_or_child_docs_in_es"
                         es_document = OpinionClusterDocument
 
                 q = queryset.iterator()
@@ -501,6 +465,7 @@ class Command(VerboseCommand):
         chunk = []
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue)
+        use_streaming_bulk = True if testing_mode else False
         # Indexing Parent and their child documents.
         for item in items:
             item_id = item
@@ -533,15 +498,15 @@ class Command(VerboseCommand):
                         index_parent_and_child_docs.si(
                             chunk,
                             search_type,
-                            testing_mode=testing_mode,
+                            use_streaming_bulk=True,
                         ).set(queue=queue).apply_async()
 
-                    case "index_parent_or_child_docs":
-                        index_parent_or_child_docs.si(
+                    case "index_parent_or_child_docs_in_es":
+                        index_parent_or_child_docs_in_es.si(
                             chunk,
                             search_type,
                             document_type,
-                            testing_mode=testing_mode,
+                            use_streaming_bulk=use_streaming_bulk,
                         ).set(queue=queue).apply_async()
                     case "remove_parent_and_child_docs_by_query":
                         remove_parent_and_child_docs_by_query.si(
@@ -607,7 +572,7 @@ class Command(VerboseCommand):
                 count,
                 search_type,
                 chunk_size,
-                "index_parent_or_child_docs",
+                "index_parent_or_child_docs_in_es",
             )
 
         if event_doc_type == EventTable.RECAP_DOCUMENT:
@@ -618,7 +583,7 @@ class Command(VerboseCommand):
                 count,
                 search_type,
                 1,
-                "index_parent_or_child_docs",
+                "index_parent_or_child_docs_in_es",
             )
 
         # Process child documents to update.

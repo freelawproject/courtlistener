@@ -1,11 +1,8 @@
-from typing import Dict, Optional, Union
-
 import pghistory
 from django.db import models
 from django.urls import reverse
 
 from cl.lib.models import THUMBNAIL_STATUSES, AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.people_db.models import Person
 
@@ -45,7 +42,7 @@ class CODES:
     L = "L"
     M = "M"
     N = "N"
-    O = "O"
+    O = "O"  # noqa: E741
     P1 = "P1"
     P2 = "P2"
     P3 = "P3"
@@ -102,7 +99,7 @@ class CODES:
         (X, "Failed Extraction"),
     )
 
-    VALUES: Dict[str, Dict[str, Optional[int]]] = {
+    VALUES: dict[str, dict[str, int | None]] = {
         A: {"min": 1, "max": 1_000},
         B: {"min": 1_001, "max": 2_500},
         C: {"min": 2_501, "max": 5_000},
@@ -176,7 +173,7 @@ disclosure_permissions = (
 )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class FinancialDisclosure(AbstractDateTimeModel):
     """A simple table to hold references to financial disclosure forms"""
 
@@ -256,7 +253,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
             args=(self.person.pk, self.pk, self.person.slug),
         )
 
-    def calculate_wealth(self, field_name: str) -> Dict[str, Union[str, int]]:
+    def calculate_wealth(self, field_name: str) -> dict[str, str | int]:
         """Calculate gross value of all investments in disclosure
 
         We can calculate the total investment for four fields
@@ -298,7 +295,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Investment(AbstractDateTimeModel):
     """Financial Disclosure Investments Table"""
 
@@ -385,7 +382,7 @@ class Investment(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Position(AbstractDateTimeModel):
     """Financial Disclosure Position Table"""
 
@@ -413,7 +410,7 @@ class Position(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Agreement(AbstractDateTimeModel):
     """Financial Disclosure Agreements Table"""
 
@@ -441,7 +438,7 @@ class Agreement(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class NonInvestmentIncome(AbstractDateTimeModel):
     """Financial Disclosure Non Investment Income Table"""
 
@@ -475,7 +472,7 @@ class NonInvestmentIncome(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class SpouseIncome(AbstractDateTimeModel):
     """Financial Disclosure Judge Spouse Income Table"""
 
@@ -504,7 +501,7 @@ class SpouseIncome(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Reimbursement(AbstractDateTimeModel):
     """Reimbursements listed in judicial disclosure"""
 
@@ -546,7 +543,7 @@ class Reimbursement(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Gift(AbstractDateTimeModel):
     """Financial Disclosure Gifts Table"""
 
@@ -577,7 +574,7 @@ class Gift(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Debt(AbstractDateTimeModel):
     """Financial Disclosure Judicial Debts/Liabilities Table"""
 

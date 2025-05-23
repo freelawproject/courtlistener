@@ -1,7 +1,9 @@
 name: Automate build and deploy
+
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
 
 env:
   AWS_REGION: us-west-2
@@ -14,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -33,7 +35,7 @@ jobs:
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -70,7 +72,7 @@ jobs:
       - name: Collect Static Assets
         id: collectStatic
         run: |
-          kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- python manage.py collectstatic --noinput
+          kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- ./manage.py collectstatic --noinput
       - name: Handle Collectstatic Error
         if: failure()
         run: | # Error-handling logic for collectstatic
@@ -80,7 +82,7 @@ jobs:
       - name: Check Migrations
         id: checkMigration
         run: |
-          kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- python manage.py migrate --check
+          kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- ./manage.py migrate --check
       - name: Handle Check Migrations Error
         if: failure()
         run: |
@@ -121,10 +123,20 @@ jobs:
       - name: Watch cl-retry-webhooks rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks
 
+      - name: Rollout cl-send-rt-percolator-alerts
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-send-rt-percolator-alerts cl-send-rt-percolator-alerts=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-send-rt-percolator-alerts rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-send-rt-percolator-alerts
+
       - name: Rollout cl-es-sweep-indexer
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer sweep-indexer=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-es-sweep-indexer rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer
+
+      - name: Rollout cl-iquery-probe
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-iquery-probe cl-iquery-probe=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-iquery-probe rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-iquery-probe
 
 
       # Watch "cronjobs" in k9s

@@ -1,16 +1,20 @@
 import random
 import re
 import urllib.parse
+from datetime import UTC, datetime
 
 import waffle
 from django import template
 from django.core.exceptions import ValidationError
 from django.template import Context
 from django.template.context import RequestContext
+from django.template.defaultfilters import date as date_filter
+from django.utils.dateparse import parse_datetime
 from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
+from django.utils.timezone import make_aware
 from elasticsearch_dsl import AttrDict, AttrList
 
 from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
@@ -237,7 +241,7 @@ def render_string_or_list(value: any) -> any:
     :param value: The value to be rendered.
     :return: The original value or comma-separated values.
     """
-    if isinstance(value, (list, AttrList)):
+    if isinstance(value, (list | AttrList)):
         return ", ".join(str(item) for item in value)
     return value
 
@@ -289,14 +293,9 @@ def alerts_supported(context: RequestContext, search_type: str) -> str:
     """
 
     request = context["request"]
-    return (
-        search_type == SEARCH_TYPES.OPINION
-        or search_type == SEARCH_TYPES.ORAL_ARGUMENT
-        or (
-            search_type == SEARCH_TYPES.RECAP
-            and waffle.flag_is_active(request, "recap-alerts-active")
-        )
-    )
+    if search_type == SEARCH_TYPES.RECAP:
+        return waffle.flag_is_active(request, "recap-alerts-active")
+    return search_type in (SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT)
 
 
 @register.filter
@@ -327,3 +326,121 @@ def group_courts(courts: list[Court], num_columns: int) -> list:
         start = end
 
     return groups
+
+
+@register.filter
+def format_date(date_str: str) -> str:
+    """Formats a date string in the format 'F jS, Y'. Useful for formatting
+    ES child document results where dates are not date objects."""
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        return date_filter(date_obj, "F jS, Y")
+    except (ValueError, TypeError):
+        return date_str
+
+
+@register.filter
+def parse_utc_date(datetime_object: str | datetime) -> datetime:
+    """Parse an ISO-8601 UTC datetime string or a naive datetime UTC object
+    and return a timezone-aware datetime in UTC.
+
+    :param datetime_object: A string representing a UTC datetime in ISO 8601
+    format or a naive UTC datetime object.
+    :return: A timezone-aware datetime object with UTC as the timezone.
+    """
+
+    return make_aware(
+        (
+            parse_datetime(datetime_object)
+            if isinstance(datetime_object, str)
+            else datetime_object
+        ),
+        UTC,
+    )
+
+
+@register.filter
+def datetime_in_utc(date_obj) -> str:
+    """Formats a datetime object in UTC with timezone displayed.
+    For example: 'Nov. 25, 2024, 01:28 p.m. UTC'"""
+    if date_obj is None:
+        return ""
+    try:
+        return date_filter(
+            date_obj.astimezone(UTC),
+            "M. j, Y, h:i a T",
+        )
+    except (ValueError, TypeError):
+        return date_obj
+
+
+@register.filter
+def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
+    """Build a query string that includes the docket ID and any existing query
+    parameters.
+
+    :param request_q: The current query string, if present.
+    :param docket_id: The docket_id to append to the query string.
+    :return:The query string with the docket_id included.
+    """
+
+    if request_q:
+        return f"({request_q}) AND docket_id:{docket_id}"
+    return f"docket_id:{docket_id}"
+
+
+@register.filter
+def humanize_number(value):
+    """Formats a number into a human-readable abbreviated form
+
+    :param value: The number to format. Can be an integer, float, or string representation of a number.
+    :return: The formatted number as a string. If the input cannot be converted to a number, it is returned as-is.
+
+    Example usage:
+        >>> humanize_number(500)
+        '500'
+        >>> humanize_number(1050)
+        '1K'
+        >>> humanize_number(10987)
+        '11K'
+        >>> humanize_number(1500000)
+        '1.5M'
+        >>> humanize_number(2000000000)
+        '2B'
+    """
+    try:
+        num = float(f"{value:.3g}")
+    except (TypeError, ValueError):
+        return value
+
+    if num < 1_000:
+        return str(value)
+
+    magnitude = 0
+    while abs(num) >= 1000:
+        magnitude += 1
+        num /= 1000.0
+
+    abbreviation = ["", "K", "M", "B"][magnitude]
+
+    # Round to one decimal place
+    num = round(num * 10) / 10
+
+    if num == int(num):
+        formatted = str(int(num))
+    else:
+        formatted = str(num)
+
+    return f"{formatted}{abbreviation}"
+
+
+@register.filter
+def has_attr(obj, attr_name):
+    """Return True if obj has attribute attr_name."""
+    return hasattr(obj, attr_name)
+
+
+@register.filter
+def get_attr(obj, attr_name):
+    """Return the value of the attribute attr_name."""
+    return getattr(obj, attr_name, "")

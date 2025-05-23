@@ -1,5 +1,8 @@
+import re
+
 from disposable_email_domains import blocklist
 from django import forms
+from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.forms import (
     PasswordChangeForm,
@@ -16,7 +19,7 @@ from hcaptcha.fields import hCaptchaField
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
-from cl.api.models import Webhook, WebhookEventType
+from cl.api.models import Webhook, WebhookEventType, WebhookVersions
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
@@ -87,7 +90,20 @@ class ProfileForm(ModelForm):
         }
 
 
-class UserForm(ModelForm):
+class CleanEmailMixin:
+    def clean_email(self):
+        email = self.cleaned_data.get("email")
+        user_part, domain_part = email.rsplit("@", 1)
+        blocklist.update(settings.BLOCKED_DOMAINS)
+        if domain_part in blocklist:
+            raise forms.ValidationError(
+                f"{domain_part} is a blocked email provider",
+                code="bad_email_domain",
+            )
+        return email
+
+
+class UserForm(ModelForm, CleanEmailMixin):
     email = forms.EmailField(
         required=True,
         widget=forms.TextInput(
@@ -119,18 +135,8 @@ class UserForm(ModelForm):
             ),
         }
 
-    def clean_email(self):
-        email = self.cleaned_data.get("email")
-        user_part, domain_part = email.rsplit("@", 1)
-        if domain_part in blocklist:
-            raise forms.ValidationError(
-                f"{domain_part} is a blocked email provider",
-                code="bad_email_domain",
-            )
-        return email
 
-
-class UserCreationFormExtended(UserCreationForm):
+class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     """A bit of an unusual form because instead of creating it ourselves,
     we are overriding the one from Django. Thus, instead of declaring
     everything explicitly like we normally do, we just override the
@@ -178,15 +184,13 @@ class UserCreationFormExtended(UserCreationForm):
             "last_name",
         )
 
-    def clean_email(self):
-        email = self.cleaned_data.get("email")
-        user_part, domain_part = email.rsplit("@", 1)
-        if domain_part in blocklist:
+    def clean_first_name(self):
+        first_name = self.cleaned_data.get("first_name")
+        if re.search(r"""[!"#$%&()*+,./:;<=>?@[\]_{|}~]+""", first_name):
             raise forms.ValidationError(
-                f"{domain_part} is a blocked email provider",
-                code="bad_email_domain",
+                "First name must not contain any special characters."
             )
-        return email
+        return first_name
 
 
 class EmailConfirmationForm(forms.Form):
@@ -342,18 +346,31 @@ class WebhookForm(ModelForm):
                 for i in WebhookEventType.choices
                 if i[0] == self.instance.event_type
             ]
+            instance_version = [
+                i
+                for i in WebhookVersions.choices
+                if i[0] == self.instance.version
+            ]
             self.fields["event_type"].choices = instance_type
             self.fields["event_type"].widget.attrs["readonly"] = True
+            self.fields["version"].choices = instance_version
+            self.fields["version"].widget.attrs["readonly"] = True
+
         else:
             # If we're creating a new webhook, show the webhook type options
             # that are available for the user. One webhook for each event type
             # is allowed.
             webhooks = request_user.webhooks.all()
-            used_types = [w.event_type for w in webhooks]
-            available_choices = [
-                i for i in WebhookEventType.choices if i[0] not in used_types
+            used_version_types = [
+                f"{w.event_type}_{w.version}" for w in webhooks
             ]
-            self.fields["event_type"].choices = available_choices
+            available_type_choices = {
+                w_type
+                for w_type in WebhookEventType.choices
+                for w_version in WebhookVersions.choices
+                if f"{w_type[0]}_{w_version[0]}" not in used_version_types
+            }
+            self.fields["event_type"].choices = available_type_choices
 
     class Meta:
         model = Webhook
@@ -361,6 +378,7 @@ class WebhookForm(ModelForm):
             "url",
             "event_type",
             "enabled",
+            "version",
         )
         widgets = {
             "event_type": forms.Select(
@@ -371,5 +389,8 @@ class WebhookForm(ModelForm):
             ),
             "enabled": forms.CheckboxInput(
                 attrs={"class": "webhook-checkbox"},
+            ),
+            "version": forms.Select(
+                attrs={"class": "form-control"},
             ),
         }

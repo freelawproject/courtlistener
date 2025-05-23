@@ -2,7 +2,7 @@ import json
 import os
 import time
 from datetime import date
-from typing import List, TypedDict
+from typing import TypedDict
 
 from django.conf import settings
 from django.core.management import CommandParser  # type: ignore
@@ -10,22 +10,21 @@ from redis import Redis
 from redis.exceptions import ConnectionError
 
 from cl.corpus_importer.tasks import make_docket_by_iquery
+from cl.corpus_importer.utils import get_iquery_pacer_courts_to_scrape
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import build_es_base_query
+from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.documents import DocketDocument
-from cl.search.management.commands.cl_index_parent_and_child_docs import (
-    log_last_document_indexed,
-)
 from cl.search.models import SEARCH_TYPES, Court, Docket
 from cl.search.tasks import index_dockets_in_bulk
 
 
 class OptionsType(TypedDict):
     queue: str
-    courts: List[str]
+    courts: list[str]
     court_type: str
     iterations: int
     iteration_delay: float
@@ -62,12 +61,7 @@ def confirm_es_indexing(options):
             ).set(queue=queue).apply_async()
             chunk = []
             logger.info(
-                "\rProcessed {}/{}, ({:.0%}) Dockets, last PK indexed: {},".format(
-                    processed_count,
-                    count,
-                    processed_count * 1.0 / count,
-                    d_id,
-                )
+                f"\rProcessed {processed_count}/{count}, ({processed_count * 1.0 / count:.0%}) Dockets, last PK indexed: {d_id},"
             )
         if not processed_count % 1000:
             # Log every 1000 dockets indexed.
@@ -113,7 +107,7 @@ def get_courts_to_scrape(court_type: str, court_ids: list[str]) -> list[str]:
     """
 
     court_ids_to_scrape = (
-        get_bankruptcy_courts(court_ids) + get_district_courts(court_ids)
+        get_iquery_pacer_courts_to_scrape()
         if court_type == "all"
         else (
             get_district_courts(court_ids)
@@ -168,8 +162,7 @@ def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
             court_id, options["date_filed"]
         )
         if not latest_pacer_case_id:
-            r.hdel("iquery_status", court_id)
-            continue
+            latest_pacer_case_id = "1"
         r.hset("iquery_status", court_id, latest_pacer_case_id)
         # Set the Redis keys for the iquery daemon and the sweep scraper.
         r.hset(
@@ -179,6 +172,54 @@ def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
         )
         r.hset("iquery:pacer_case_id_current", court_id, latest_pacer_case_id)
     logger.info("Finished setting starting pacer_case_ids.")
+
+
+def get_absolute_latest_pacer_case_id(
+    database: str, court_id: str
+) -> str | None:
+    """Get the most recent pacer_case_id up to today for each court.
+
+    :param database: The database to use.
+    :param court_id: The court ID.
+    :return None
+    """
+    today = date.today()
+    latest_docket = (
+        Docket.objects.using(database)
+        .filter(
+            court_id=court_id, date_filed__isnull=False, date_filed__lte=today
+        )
+        .order_by("-date_filed", "-pacer_case_id")
+        .values_list("pacer_case_id", flat=True)
+        .first()
+    )
+
+    if latest_docket:
+        return latest_docket
+    return None
+
+
+def get_and_store_latest_case_ids(options, r: Redis) -> None:
+    """Get the absolute pacer_case_ids for each court and store it in Redis.
+
+    :param options: The options from the handle method
+    :param r: The Redis DB to connect.
+    :return None
+    """
+
+    court_ids = get_iquery_pacer_courts_to_scrape()
+    database = options["database"]
+    for court_id in court_ids:
+        latest_pacer_case_id = get_absolute_latest_pacer_case_id(
+            database, court_id
+        )
+        if latest_pacer_case_id:
+            r.hset(
+                "iquery:latest_known_pacer_case_id",
+                court_id,
+                latest_pacer_case_id,
+            )
+    logger.info("Finished setting absolute latest pacer_case_ids.")
 
 
 def query_results_in_es(options):
@@ -198,7 +239,8 @@ def query_results_in_es(options):
     }
 
     search_query = DocketDocument.search()
-    s, _ = build_es_base_query(search_query, cd)
+    es_queries = build_es_base_query(search_query, cd)
+    s = es_queries.search_query
     s = s.extra(size=options["results_size"])
     response = s.execute().to_dict()
     extracted_data = [
@@ -384,6 +426,7 @@ class Command(VerboseCommand):
                 "set-case-ids",
                 "query-results",
                 "re-index-dockets",
+                "set-latest-case-ids",
             ],
             help="Which task do you want to do?",
         )
@@ -417,6 +460,12 @@ class Command(VerboseCommand):
             default=0,
             help="The parent document pk to start indexing from.",
         )
+        parser.add_argument(
+            "--database",
+            type=str,
+            default="default",
+            help="Let the user decide which DB name to use",
+        )
 
     def handle(self, *args, **options):
         r = get_redis_interface("CACHE")
@@ -431,3 +480,6 @@ class Command(VerboseCommand):
 
         if options["task"] == "re-index-dockets":
             confirm_es_indexing(options)
+
+        if options["task"] == "set-latest-case-ids":
+            get_and_store_latest_case_ids(options, r)

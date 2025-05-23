@@ -1,5 +1,9 @@
 from juriscraper.AbstractSite import logger
 
+from cl.scrapers.exceptions import (
+    ConsecutiveDuplicatesError,
+    SingleDuplicateError,
+)
 from cl.scrapers.models import UrlHash
 from cl.search.models import Court
 
@@ -19,7 +23,6 @@ class DupChecker(dict):
         self.url_hash = None
         self.dup_count = 0
         self.last_found_date = None
-        self.emulate_break = False
         super().__init__(*args, **kwargs)
 
     def _increment(self, current_date):
@@ -83,29 +86,29 @@ class DupChecker(dict):
         lookup_by="sha1",
     ):
         """Checks if a we have an `object_type` with identical content in the CL
-        corpus by looking up `lookup_value` in the `lookup_by` field. Depending
-        on the result of that, we either return True or False. True represents
-        the fact that the next item should be processed. False means that either
-        the item was a duplicate or that we've hit so many duplicates that we've
-        stopped checking (we hit a duplicate threshold). Either way, the caller
-        should move to the next item and try it.
+        corpus by looking up `lookup_value` in the `lookup_by` field.
 
-        The effect of this is that this emulates for loop constructs for
-        continue (False), break (False), return (True).
+        If the item is not a duplicate, we will return None, and the caller
+        will proceed normally
+
+        If the item is a duplicate, we will raise SingleDuplicateError
+
+        If the item is a duplicate following a series of duplicates greater than
+        our tolerance threshold, we will raise ConsecutiveDuplicatesError
+
+        If the item is a duplicate and the next item is from an already scraped
+        date, we will raise ConsecutiveDuplicatesError
 
         Following logic applies:
+         - if we do not have the item
+            - early return
          - if we have the item already
             - and if the next date is before this date
             - or if this is our duplicate threshold is exceeded
                 - break
             - otherwise
                 - continue
-         - if not
-            - carry on
         """
-        if self.emulate_break:
-            return False
-
         # check for a duplicate in the db.
         if lookup_by == "sha1":
             exists = object_type.objects.filter(sha1=lookup_value).exists()
@@ -116,41 +119,36 @@ class DupChecker(dict):
         else:
             raise NotImplementedError("Unknown lookup_by parameter.")
 
-        if exists:
-            logger.info(
-                f"Duplicate found on date: {current_date}, with lookup value: {lookup_value}"
-            )
-            self._increment(current_date)
+        if not exists:
+            return
 
-            # If the next date in the Site object is less than (before) the
-            # current date, we needn't continue because we should already have
-            # that item.
-            if next_date:
-                already_scraped_next_date = next_date < current_date
-            else:
-                already_scraped_next_date = True
-            if not self.full_crawl:
-                if already_scraped_next_date:
-                    if self.court.pk == "mich":
-                        # Michigan sometimes has multiple occurrences of the
-                        # same case with different dates on a page.
-                        return False
-                    else:
-                        logger.info(
-                            "Next case occurs prior to when we found a "
-                            "duplicate. Court is up to date."
-                        )
-                        self.emulate_break = True
-                        return False
-                elif self.dup_count >= self.dup_threshold:
-                    logger.info(
-                        f"Found {self.dup_count} duplicates in a row. Court is up to date."
-                    )
-                    self.emulate_break = True
-                    return False
-            else:
-                # This is a full crawl. Do not emulate a break, BUT be sure to
-                # say that we shouldn't press on, since the item already exists.
-                return False
+        logger.info(
+            f"Duplicate found on date: {current_date}, with lookup value: {lookup_value}"
+        )
+        self._increment(current_date)
+
+        # If the next date in the Site object is less than (before) the
+        # current date, we needn't continue because we should already have
+        # that item.
+        if next_date:
+            already_scraped_next_date = next_date < current_date
         else:
-            return True
+            already_scraped_next_date = True
+
+        # When in a full crawl, we do not raise a loop breaking
+        # `ConsecutiveDuplicatesError`
+        if not self.full_crawl:
+            if already_scraped_next_date:
+                if self.court.pk == "mich":
+                    # Michigan sometimes has multiple occurrences of the
+                    # same case with different dates on a page.
+                    raise SingleDuplicateError(logger=logger)
+
+                message = "Next case occurs prior to when we found a duplicate. Court is up to date."
+                raise ConsecutiveDuplicatesError(message, logger=logger)
+            elif self.dup_count >= self.dup_threshold:
+                message = f"Found {self.dup_count} duplicates in a row. Court is up to date."
+                raise ConsecutiveDuplicatesError(message, logger=logger)
+
+        # Full crawl or not, this is a duplicate and we shouldn't store it
+        raise SingleDuplicateError(logger=logger)

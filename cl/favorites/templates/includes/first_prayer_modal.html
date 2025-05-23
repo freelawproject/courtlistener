@@ -1,0 +1,22 @@
+<div class="modal fade" id="tutorialModal" tabindex="-1" role="dialog" aria-labelledby="tutorialModalLabel"
+  aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <h2 class="modal-title" id="tutorialModalLabel">Congratulations on your first request!</h5>
+      </div>
+      <div class="modal-body">
+        <p>By clicking 🙏, you used 1 of your 5 daily prayers asking somebody to buy a document for you from PACER. Your prayer will now show up on our <a href="{% url "top_prayers" %}">leaderboard of most-wanted PACER documents</a>, and when the community buys it for you, we'll send you an email to let you know.</p>
+      </div>
+      <div class="modal-footer flex">
+        <div class="flex learn-more-prayer-btn">
+          <a href="{% url "pray_and_pay_help" %}" class="btn btn-default">Learn more</a>
+        </div>
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Got it!</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,13 +1,13 @@
 import re
 from collections import OrderedDict
 
-import waffle
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import ChoiceField, DateField
 from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
 
+from cl.lib.courts import get_active_court_from_cache
 from cl.lib.model_helpers import flatten_choices
 from cl.people_db.models import PoliticalAffiliation, Position
 from cl.search.fields import (
@@ -15,7 +15,7 @@ from cl.search.fields import (
     FloorDateField,
     RandomChoiceField,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Court
+from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES
 
 OPINION_ORDER_BY_CHOICES = (
     ("score desc", "Relevance"),
@@ -455,8 +455,6 @@ class SearchForm(forms.Form):
         }
 
     def __init__(self, *args, **kwargs):
-        request = kwargs.pop("request", None)
-        self.is_es_form = kwargs.pop("is_es_form", None)
         self.courts = kwargs.pop("courts", None)
         super().__init__(*args, **kwargs)
 
@@ -467,18 +465,12 @@ class SearchForm(forms.Form):
         fields dict.
         """
 
-        # Default values for Solr version.
-        default_status = "Precedential"
-        status_index = 1
-        if request and waffle.flag_is_active(request, "o-es-active"):
-            self.is_es_form = True
-        if self.is_es_form:
-            # Default values for ES version.
-            default_status = "Published"
-            status_index = 0
+        # Default values for ES version.
+        default_status = "Published"
+        status_index = 0
 
         if not self.courts:
-            self.courts = Court.objects.filter(in_use=True)
+            self.courts = get_active_court_from_cache()
         for court in self.courts:
             self.fields[f"court_{court.pk}"] = forms.BooleanField(
                 label=court.short_name,
@@ -517,9 +509,9 @@ class SearchForm(forms.Form):
     #     Failure to do that will result in the query being processed correctly
     #     (search results are all good), but the form on the UI won't be
     #     cleaned up for the user, making things rather confusing.
-    #  3. We do some cleanup work in search_utils.make_stats_variable(). The
-    #     work that's done there is used to check or un-check the boxes in the
-    #     sidebar, so if you tweak how they work you'll need to tweak this
+    #  3. We do some cleanup work in elasticsearch_utils.make_es_stats_variable().
+    #     The work that's done there is used to check or un-check the boxes in
+    #     the sidebar, so if you tweak how they work you'll need to tweak this
     #     function.
     # In short: This is a nasty area. Comments this long are a bad sign for
     # the intrepid developer.
@@ -593,10 +585,7 @@ class SearchForm(forms.Form):
         Handles validation fixes that need to be performed across fields.
         """
         cleaned_data = self.cleaned_data
-
-        default_status = "stat_Precedential"
-        if self.is_es_form:
-            default_status = "stat_Published"
+        default_status = "stat_Published"
 
         # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
         for field_name in self.get_date_field_names():
@@ -646,7 +635,7 @@ class SearchForm(forms.Form):
         cleaned_data["_court_count"] = len(court_bools)
         cleaned_data["_stat_count"] = len(stat_bools)
 
-        # 4. Strip any whitespace, otherwise it crashes Solr.
+        # 4. Strip any whitespace, otherwise it crashes.
         for k, v in cleaned_data.items():
             if isinstance(v, str):
                 cleaned_data[k] = v.strip()
@@ -719,20 +708,18 @@ def clean_up_date_formats(
             )
 
 
-def _clean_form(get_params, cd, courts, is_es_form=False):
+def _clean_form(get_params, cd, courts):
     """Returns cleaned up values as a Form object."""
     # Send the user the cleaned up query
     get_params["q"] = cd["q"]
 
-    status_index = 1
-    if is_es_form:
-        status_index = 0
+    status_index = 0
     # Clean up the date formats. This is probably no longer needed since we do
     # date cleanup on the client side via our datepickers, but it's probably
     # fine to leave it here until there's a reason to remove it. It could be
     # helpful if somebody finds a way not to use the datepickers (js off, say)
     for date_field in SearchForm(
-        get_params, is_es_form=is_es_form, courts=courts
+        get_params, courts=courts
     ).get_date_field_names():
         clean_up_date_formats(cd, date_field, get_params)
 
@@ -748,6 +735,6 @@ def _clean_form(get_params, cd, courts, is_es_form=False):
         ]
 
     # Ensure that we have the cleaned_data and other related attributes set.
-    form = SearchForm(get_params, is_es_form=is_es_form, courts=courts)
+    form = SearchForm(get_params, courts=courts)
     form.is_valid()
     return form

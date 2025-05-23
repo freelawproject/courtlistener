@@ -17,7 +17,7 @@ async def make_disclosure_data(person: Person) -> tuple[str, str]:
     years = []
     ids = []
     async for yr, id in forms:
-        years.append((str(yr)))
+        years.append(str(yr))
         ids.append(str(id))
     for x in set(years):
         number = 0

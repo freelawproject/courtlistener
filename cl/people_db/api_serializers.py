@@ -255,17 +255,92 @@ class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
         fields = ("role", "docket", "party", "date_action")
 
 
+class DynamicAttorneyRoleSerializer(
+    serializers.SerializerMethodField, AttorneyRoleSerializer
+):
+    """
+    Serializes attorney role data by dynamically computing the field's value
+    using a serializer method. This combines the flexibility of the
+    SerializerMethodField class and allow us to use the schema defined in
+    AttorneyRoleSerializer.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.read_only = False
+
+
+class DynamicPartyTypeSerializer(
+    serializers.SerializerMethodField, PartyTypeSerializer
+):
+    """
+    Serializes party type data by dynamically computing the field's value
+    using a serializer method. This combines the flexibility of the
+    SerializerMethodField class and allow us to use the schema defined in
+    PartyTypeSerializer.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.read_only = False
+
+
 class PartySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
-    attorneys = AttorneyRoleSerializer(source="roles", many=True)
-    party_types = PartyTypeSerializer(many=True)
+    attorneys = DynamicAttorneyRoleSerializer()
+    party_types = DynamicPartyTypeSerializer()
+
+    def get_attorneys(self, obj: Party):
+        if hasattr(obj, "filtered_roles"):
+            data = obj.filtered_roles
+        else:
+            data = obj.roles
+
+        return AttorneyRoleSerializer(
+            data, many=True, context={"request": self.context["request"]}
+        ).data
+
+    def get_party_types(self, obj: Party):
+        if hasattr(obj, "filtered_party_types"):
+            data = obj.filtered_party_types
+        else:
+            data = obj.party_types
+
+        return PartyTypeSerializer(
+            data, many=True, context={"request": self.context["request"]}
+        ).data
 
     class Meta:
         model = Party
         fields = "__all__"
 
 
+class DynamicPartySerializer(
+    serializers.SerializerMethodField, PartyRoleSerializer
+):
+    """
+    Serializes party data by dynamically computing the field's value using a
+    serializer method. This combines the flexibility of the
+    SerializerMethodField class and allow us to use the schema defined in
+    PartyRoleSerializer.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.read_only = False
+
+
 class AttorneySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
-    parties_represented = PartyRoleSerializer(source="roles", many=True)
+    parties_represented = DynamicPartySerializer()
+
+    def get_parties_represented(self, obj: Attorney):
+        if hasattr(obj, "filtered_roles"):
+            data = obj.filtered_roles
+        else:
+            data = obj.roles
+
+        return PartyRoleSerializer(
+            data, many=True, context={"request": self.context["request"]}
+        ).data
 
     class Meta:
         model = Attorney

@@ -1,41 +1,22 @@
+from collections import defaultdict
 from datetime import timedelta
 from http import HTTPStatus
 from unittest.mock import patch
 
-from django.core import mail
+import time_machine
+from asgiref.sync import sync_to_async
 from django.test import override_settings
 from django.test.client import AsyncClient, Client
 from django.urls import reverse
 from django.utils.timezone import now
 
 from cl.donate.api_views import MembershipWebhookViewSet
-from cl.donate.factories import DonationFactory, NeonWebhookEventFactory
-from cl.donate.management.commands.cl_send_donation_reminders import (
-    Command as DonationReminderCommand,
-)
-from cl.donate.models import Donation, NeonMembership, NeonWebhookEvent
+from cl.donate.factories import NeonWebhookEventFactory
+from cl.donate.models import NeonMembership, NeonWebhookEvent
 from cl.lib.test_helpers import UserProfileWithParentsFactory
 from cl.tests.cases import TestCase
 from cl.users.models import UserProfile
-
-
-class EmailCommandTest(TestCase):
-    @classmethod
-    def setUpTestData(cls) -> None:
-        about_a_year_ago = now() - timedelta(days=354, hours=12)
-        d = DonationFactory.create(
-            send_annual_reminder=True, status=Donation.PROCESSED
-        )
-        d.date_created = about_a_year_ago
-        d.save()
-
-    def test_sending_an_email(self) -> None:
-        """Do we send emails correctly?"""
-        DonationReminderCommand().handle()
-
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("you donated $", mail.outbox[0].body)
-        self.assertIn("you donated $", mail.outbox[0].alternatives[0][0])
+from cl.users.utils import create_stub_account
 
 
 class MembershipWebhookTest(TestCase):
@@ -164,9 +145,9 @@ class MembershipWebhookTest(TestCase):
 
         self.data["eventTrigger"] = "updateMembership"
         self.data["data"]["membership"]["membershipId"] = "12344"
-        self.data["data"]["membership"][
-            "membershipName"
-        ] = "CL Membership - Tier 4"
+        self.data["data"]["membership"]["membershipName"] = (
+            "CL Membership - Tier 4"
+        )
         r = await self.async_client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
             data=self.data,
@@ -195,9 +176,9 @@ class MembershipWebhookTest(TestCase):
 
         # Update the membership level and the trigger type
         self.data["eventTrigger"] = "editMembership"
-        self.data["data"]["membership"][
-            "membershipName"
-        ] = "CL Membership - Tier 4"
+        self.data["data"]["membership"]["membershipName"] = (
+            "CL Membership - Tier 4"
+        )
 
         r = await self.async_client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
@@ -376,3 +357,101 @@ class MembershipWebhookTest(TestCase):
 
         # Check the neon_account_id was updated properly
         self.assertEqual(membership.user.profile.neon_account_id, "9524")
+
+    @patch(
+        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+    )
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_updates_account_with_recent_login(
+        self, mock_store_webhook, mock_get_account
+    ) -> None:
+        # Create two profile records - one stub, one regular user,
+        _, stub_profile = await sync_to_async(create_stub_account)(
+            {
+                "email": "test_4@email.com",
+                "first_name": "test",
+                "last_name": "test",
+            },
+            defaultdict(lambda: ""),
+        )
+
+        user_profile = await sync_to_async(UserProfileWithParentsFactory)(
+            user__email="test_4@email.com"
+        )
+        user = user_profile.user
+        # Updates last login field for the regular user
+        user.last_login = now()
+        await user.asave()
+
+        # mocks the Neon API response
+        mock_get_account.return_value = {
+            "accountId": "1246",
+            "primaryContact": {
+                "email1": "test_4@email.com",
+                "firstName": "test",
+                "lastName": "test",
+            },
+        }
+
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["accountId"] = "1246"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        # Refresh both profiles to ensure updated data
+        await stub_profile.arefresh_from_db()
+        await user_profile.arefresh_from_db()
+
+        # Verify stub account remains untouched
+        self.assertEqual(stub_profile.neon_account_id, "")
+
+        # Verify regular user account is updated with Neon data
+        self.assertEqual(user_profile.neon_account_id, "1246")
+
+
+class ProfileMembershipTest(TestCase):
+    def setUp(self) -> None:
+        self.user_profile = UserProfileWithParentsFactory()
+
+    def test_is_member_returns_true_until_termination_date_passes(self):
+        """
+        checks the `is_member` property correctly identifies a user as a member
+        until their termination date has passed
+        """
+        termination_date = now().date() + timedelta(weeks=4)
+        NeonMembership.objects.create(
+            level=NeonMembership.LEGACY,
+            user=self.user_profile.user,
+            termination_date=termination_date,
+        )
+        self.user_profile.refresh_from_db()
+
+        # Test just before the termination date
+        with time_machine.travel(
+            termination_date - timedelta(seconds=1), tick=False
+        ):
+            self.assertTrue(self.user_profile.is_member)
+
+        # Test exactly at the termination date
+        with time_machine.travel(termination_date, tick=False):
+            self.assertTrue(self.user_profile.is_member)
+
+        with time_machine.travel(
+            termination_date + timedelta(hours=4), tick=False
+        ):
+            self.assertTrue(self.user_profile.is_member)
+
+        # Test a full day after the termination date
+        with time_machine.travel(
+            termination_date + timedelta(days=1), tick=False
+        ):
+            self.assertFalse(
+                self.user_profile.is_member,
+                "Should not be a member a day after termination.",
+            )

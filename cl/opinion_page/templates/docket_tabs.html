@@ -4,6 +4,7 @@
 {% load static %}
 {% load text_filters %}
 {% load tz %}
+{% load waffle_tags %}
 
 
 {% block canonical %}{% get_canonical_element %}{% endblock %}
@@ -19,6 +20,13 @@
     <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
     <script defer type="text/javascript"
             src="{% static "js/save-notes.js" %}"></script>
+    {% if DEBUG %}
+      <script src="{% static "js/htmx.js" %}"></script>
+      <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+    {% else %}
+      <script src="{% static "js/htmx.min.js" %}"></script>
+    {% endif %}
+
     {% if request.user.is_authenticated %}
       <script defer type="text/javascript"
               src="{% static "js/toggle_settings.js" %}"></script>
@@ -39,7 +47,6 @@
             src="{% static "js/buy_pacer_modal.js" %}"></script>
 
     {% include "includes/buy_pacer_modal.html" %}
-    {% include "includes/buy_acms_modal.html" %}
     {% include "includes/date_picker.html" %}
 
     <script type="text/javascript"
@@ -47,6 +54,8 @@
     <script type="text/javascript"
             src="{% static "js/react/vendor.js" %}"></script>
 
+    <script type="text/javascript" src="{% static "js/export-csv.js" %}"></script>
+    <script src="{% static "js/pray_and_pay.js" %}"></script>
 {% endblock %}
 
 {% block nav %}
@@ -70,13 +79,14 @@
       </p>
     {% endif %}
     <h1 class="bottom inline" data-type="search.Docket" data-id="{{ docket.pk }}">
-      {{ docket|best_case_name|safe|v_wrapper }}
+      <span class="select-all">{{ docket|best_case_name|safe|v_wrapper }}</span>
       {% if docket.docket_number %}
         (<span class="select-all">{{ docket.docket_number }}</span>)
       {% endif %}
     </h1>
     {% include "includes/notes_modal.html" %}
     {% include "includes/docket_alerts_modal.html" %}
+    {% include "includes/first_prayer_modal.html" %}
 
     <h2>{{ docket.court }}</h2>
 
@@ -348,7 +358,9 @@
                 rel="nofollow"
                 data-toggle="tooltip"
                 data-placement="right"
-                title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }})</a>
+                title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }}</a>)
+              {% elif og_info.administrative_link %}
+                (<a href="{{ og_info.administrative_link }}">{{ og_info.docket_number }}</a>)
               {% else %}
                 ({{ og_info.docket_number }})
               {% endif %}
@@ -436,7 +448,7 @@
       <ul>
         {% for af in docket.audio_files.all %}
           <li>
-            <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+            <a href="{{ af.get_absolute_url }}{% querystring %}">
                 {{ af|best_case_name|safe|v_wrapper }}
             </a>
             {% if perms.audio.change_audio %}
@@ -475,12 +487,12 @@
         {% if docket.idb_data %}
         <li class="{% block nav-idb %}inactive{% endblock %}"
             role="presentation">
-          <a href="{% url "docket_idb_data" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-info-circle"></i>&nbsp;FJC Integrated Database
+          <a href="{% url "docket_idb_data" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-info-circle gray"></i>&nbsp;FJC Integrated Database
           </a>
         </li>
         {% endif %}
 
-        {% if authorities %}
+        {% if docket.authority_count %}
         <li class="{% block nav-authorities %}inactive{% endblock %}"
             role="presentation">
           <a href="{% url "docket_authorities" docket_id=docket.pk slug=docket.slug %}">Authorities

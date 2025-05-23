@@ -1,9 +1,12 @@
 import itertools
+import math
 import random
 import re
+from collections import defaultdict
+from collections.abc import Iterator
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any, Iterator, Optional, Set
+from typing import Any
 
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
@@ -25,7 +28,7 @@ from cl.people_db.lookup_utils import (
     lookup_judges_by_last_name_list,
 )
 from cl.people_db.models import Person
-from cl.search.models import Citation, Docket, Opinion, OpinionCluster
+from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -106,7 +109,48 @@ async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
         await d.asave()
 
 
-def get_start_of_quarter(d: Optional[date] = None) -> date:
+def is_bankruptcy_court(court_id: str) -> bool:
+    """Checks if a given court ID corresponds to a bankruptcy court.
+
+    This function queries the database to determine if the provided court
+    ID is associated with a federal bankruptcy court.
+
+    Args:
+        court_id: The ID of the court to check (string).
+
+    Returns:
+        True if the court ID corresponds to a bankruptcy court, False otherwise
+        (boolean).
+    """
+    bankr_court_ids = Court.federal_courts.bankruptcy_pacer_courts()
+    return bankr_court_ids.filter(pk=court_id).exists()
+
+
+def is_appellate_court(court_id: str) -> bool:
+    """Checks if the given court_id belongs to an appellate court.
+
+    :param court_id: The unique identifier of the court.
+
+    :return: True if the court_id corresponds to an appellate court,
+        False otherwise.
+    """
+    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    return appellate_court_ids.filter(pk=court_id).exists()
+
+
+async def ais_appellate_court(court_id: str) -> bool:
+    """Checks if the given court_id belongs to an appellate court.
+
+    :param court_id: The unique identifier of the court.
+
+    :return: True if the court_id corresponds to an appellate court,
+        False otherwise.
+    """
+    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    return await appellate_court_ids.filter(pk=court_id).aexists()
+
+
+def get_start_of_quarter(d: date | None = None) -> date:
     """Get the start date of the  calendar quarter requested
 
     :param d: The date to get the start date for. If None, then use current
@@ -328,7 +372,7 @@ def clean_docket_number(docket_number: str) -> str:
 
 def merge_docket_numbers(
     cluster: OpinionCluster, docket_number: str
-) -> Optional[str]:
+) -> str | None:
     """Merge docket number
 
     :param cluster: The cluster of the merging item
@@ -443,7 +487,7 @@ def merge_strings(
 
 def merge_long_fields(
     field_name: str,
-    overlapping_data: Optional[tuple[str, str]],
+    overlapping_data: tuple[str, str] | None,
     cluster_id: int,
 ) -> dict[str, Any]:
     """Merge two long text fields
@@ -473,7 +517,7 @@ def merge_long_fields(
 
 
 def merge_judges(
-    overlapping_data: Optional[tuple[str, str]],
+    overlapping_data: tuple[str, str] | None,
     cluster_id: int,
     is_columbia: bool = False,
     skip_judge_merger: bool = False,
@@ -612,11 +656,14 @@ def merge_overlapping_data(
     return data_to_update
 
 
-def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
+def add_citations_to_cluster(
+    cites: list[str], cluster_id: int, save_again_if_exists: bool = False
+) -> None:
     """Add string citations to OpinionCluster if it has not yet been added
 
     :param cites: citation list
     :param cluster_id: cluster id related to citations
+    :param save_again_if_exists: force save citation if it already exists
     :return: None
     """
     for cite in cites:
@@ -636,35 +683,52 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
             cite_type_str = citation[0].all_editions[0].reporter.cite_type
             reporter_type = map_reporter_db_cite_type(cite_type_str)
 
-        if Citation.objects.filter(
-            cluster_id=cluster_id, reporter=citation[0].corrected_reporter()
-        ).exists():
-            # Avoid adding a citation if we already have a citation from the
-            # citation's reporter
-            continue
-
-        try:
-            o, created = Citation.objects.get_or_create(
-                volume=citation[0].groups["volume"],
-                reporter=citation[0].corrected_reporter(),
-                page=citation[0].groups["page"],
-                type=reporter_type,
+        citation_params = {
+            "volume": citation[0].groups["volume"],
+            "reporter": citation[0].corrected_reporter(),
+            "page": citation[0].groups["page"],
+            "type": reporter_type,
+            "cluster_id": cluster_id,
+        }
+        citation_obj = Citation.objects.filter(**citation_params).first()
+        if citation_obj:
+            if save_again_if_exists:
+                # We already have the citation for the cluster and want to reindex it
+                citation_obj.save()
+                logger.info(
+                    f"Reindexing: {cite} added to cluster id: {cluster_id}"
+                )
+            else:
+                # Ignore and go to the next citation in the list
+                continue
+        else:
+            if Citation.objects.filter(
                 cluster_id=cluster_id,
-            )
-            if created:
+                reporter=citation[0].corrected_reporter(),
+            ).exists():
+                # Avoid adding a citation if we already have a citation from the
+                # citation's reporter.
+                logger.info(
+                    f"Can't add: {cite} to cluster id: {cluster_id}. There is already "
+                    f"a citation from that reporter."
+                )
+                continue
+            try:
+                # We don't have the citation or any citation from the reporter
+                Citation.objects.create(**citation_params)
                 logger.info(
                     f"New citation: {cite} added to cluster id: {cluster_id}"
                 )
-        except IntegrityError:
-            logger.warning(
-                f"Reporter mismatch for cluster: {cluster_id} on cite: {cite}"
-            )
+            except IntegrityError:
+                logger.warning(
+                    f"Reporter mismatch for cluster: {cluster_id} on cite: {cite}"
+                )
 
 
 def update_cluster_panel(
     cluster: OpinionCluster,
     panel_list: list[str],
-    panel_date: Optional[date] = None,
+    panel_date: date | None = None,
 ) -> None:
     """Update cluster's panel
 
@@ -710,7 +774,7 @@ def get_opinion_text(cluster: OpinionCluster) -> str:
     return soup.getText(separator=" ", strip=True)
 
 
-def winnow_case_name(case_name: str) -> Set:
+def winnow_case_name(case_name: str) -> set:
     """Reduce each case title to a set of words worth comparing
 
     :param case_name: The name of a case or combination of case names
@@ -967,7 +1031,7 @@ def match_based_text(
     possible_cases: QuerySet,
     case_name_abbreviation: str,
     citation: FullCaseCitation,
-) -> Optional[OpinionCluster]:
+) -> OpinionCluster | None:
     """Compare CL text to file content to establish duplicates
 
     :param file_characters: stripped characters to compare from file/source
@@ -1044,31 +1108,45 @@ def compute_binary_probe_jitter(testing: bool) -> int:
     :return: An integer representing the jitter value for binary probes.
     """
 
-    # Probe limit e.g: 9 probe iterations -> 256
-    probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
-    return random.randint(1, round(probe_limit * 0.05)) if not testing else 0
+    # The jitter will be a random value between 1 and half of IQUERY_MAX_PROBE.
+    return (
+        random.randint(1, round(settings.IQUERY_MAX_PROBE * 0.5))
+        if not testing
+        else 0
+    )
 
 
 def compute_next_binary_probe(
     highest_known_pacer_case_id: int, iteration: int, jitter: int
-) -> int:
+) -> tuple[int, int]:
     """Compute the next binary probe target for a given PACER case ID.
 
-    This computes the next value of a geometric binary sequence (2 ** (N - 1))
-    where N is the current probe iteration. In non-testing mode a jitter is
-    added to the next value to ensure probing values are not the same from the
-    previous iteration to increase the possibility of getting a hit.
+    This computes the next probe target using a geometric sequence
+    based on the current iteration (2 ** (iteration - 1)), with the increase
+    capped by the IQUERY_MAX_PROBE setting. Once the geometric value reaches
+    this cap, subsequent increments grow linearly by the cap value.
+    In non-testing mode, and except for the first iteration, a jitter is added
+    to the next value to ensure that probing values are not the same as in the
+    previous iteration, increasing the chances of getting a hit.
 
     :param highest_known_pacer_case_id: The final PACER case ID.
     :param iteration: The current probe iteration number.
     :param jitter: The jitter value to apply.
-    :return: The updated probe_iteration and the PACER case ID to lookup.
+    :return: The updated probe_iteration and the PACER case ID to lookup and
+    the probe offset + jitter computed.
     """
 
-    pacer_case_id_to_lookup = (
-        highest_known_pacer_case_id + (2 ** (iteration - 1)) + jitter
-    )
-    return pacer_case_id_to_lookup
+    # Avoid applying jitter on the first iteration to speed up
+    # the detection of new cases once courts catch up.
+    jitter = 0 if iteration == 1 else jitter
+    max_probe = settings.IQUERY_MAX_PROBE
+    cap_iteration = int(math.log2(max_probe)) + 1
+    if iteration < cap_iteration:
+        offset = 2 ** (iteration - 1)
+    else:
+        offset = ((iteration - cap_iteration) + 1) * max_probe
+    pacer_case_id_to_lookup = highest_known_pacer_case_id + offset + jitter
+    return pacer_case_id_to_lookup, offset + jitter
 
 
 def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:
@@ -1088,3 +1166,91 @@ def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:
         for i in range(court_blocked_attempts)
     )
     return current_wait_time, total_accumulated_time
+
+
+class CycleChecker:
+    """Keep track of a cycling list to determine each time it starts over.
+
+    We plan to iterate over dockets that are ordered by a cycling court ID, so
+    imagine if we had two courts, ca1 and ca2, we'd have rows like:
+
+        docket: 1, court: ca1
+        docket: 14, court: ca2
+        docket: 15, court: ca1
+        docket: xx, court: ca2
+
+    In other words, they'd just go back and forth. In reality, we have about
+    200 courts, but the idea is the same. This code lets us detect each time
+    the cycle has started over, even if courts stop being part of the cycle,
+    as will happen towards the end of the queryset.. For example, maybe ca1
+    finishes, and now we just have:
+
+        docket: x, court: ca2
+        docket: y, court: ca2
+        docket: z, court: ca2
+
+    That's considered cycling each time we get to a new row.
+
+    The way to use this is to just create an instance and then send it a
+    cycling list of court_id's.
+
+    Other fun requirements this hits:
+     - No need to know the length of the cycle
+     - No need to externally track the iteration count
+    """
+
+    def __init__(self) -> None:
+        self.court_counts: defaultdict = defaultdict(int)
+        self.current_iteration: int = 1
+        self.count_prev_iteration_courts: int = 0
+        self.prev_iteration_courts: set = set()
+
+    def check_if_cycled(self, court_id: str) -> bool:
+        """Check if the cycle repeated
+
+        :param court_id: The ID of the court
+        :return True if the cycle started over, else False
+        """
+        self.court_counts[court_id] += 1
+
+        if self.court_counts[court_id] == self.current_iteration:
+            # Keep track of processed courts in last cycle
+            self.prev_iteration_courts.add(court_id)
+            return False
+        else:
+            # Finished cycle and court has been seen more times than the
+            # iteration count. Bump the iteration count and return True.
+            self.current_iteration += 1
+            self.count_prev_iteration_courts = len(self.prev_iteration_courts)
+            # Clear set of previous courts processed
+            self.prev_iteration_courts.clear()
+            # Add the first item for the new iteration,
+            # when self.court_counts[court_id] != self.current_iteration
+            self.prev_iteration_courts.add(court_id)
+            return True
+
+
+def is_long_appellate_document_number(
+    document_number: str | int | None,
+) -> bool:
+    """Check whether this docket_number is longer than 9 digits, indicating that it
+    comes from a court that doesn't use regular numbering.
+
+    :param document_number: The document number
+    :return: A boolean indicating whether this is a long appellate document number.
+    """
+    return isinstance(document_number, str) and len(document_number) >= 9
+
+
+def get_iquery_pacer_courts_to_scrape() -> list[str]:
+    """Retrieve all district and bankruptcy PACER courts for the iquery scraper.
+
+    :return: A list of Court IDs.
+    """
+    return list(
+        Court.federal_courts.district_or_bankruptcy_pacer_courts()
+        .exclude(
+            in_use=False,
+        )
+        .values_list("pk", flat=True)
+    )

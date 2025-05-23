@@ -1,25 +1,21 @@
 import re
 import uuid
 from datetime import datetime, timedelta
-from decimal import Decimal
-from typing import Dict
 
 import pghistory
-from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError, ObjectDoesNotExist
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import models
-from django.db.models import Q, Sum, UniqueConstraint
+from django.db.models import Q, UniqueConstraint
 from django.utils.timezone import now
 from localflavor.us.models import USStateField
 
 from cl.api.utils import invert_user_logs
 from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 
 donation_exclusion_codes = [
     1,  # Unknown error
@@ -42,7 +38,7 @@ class BarMembership(models.Model):
         ordering = ["barMembership"]
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class UserProfile(models.Model):
     user = models.OneToOneField(
         User,
@@ -142,6 +138,10 @@ class UserProfile(models.Model):
         help_text="Unique identifier assigned by Neon CRM to a customer record",
         blank=True,
     )
+    prayers_public = models.BooleanField(
+        help_text="If enabled, the user's pending document prayers will be viewable by the public",
+        default=False,
+    )
 
     @property
     def is_member(self) -> bool:
@@ -193,7 +193,7 @@ class UserProfile(models.Model):
         return False
 
     @property
-    def recent_api_usage(self) -> Dict[str, int]:
+    def recent_api_usage(self) -> dict[str, int]:
         """Get stats about API usage for the user for the past 14 days
 
         :return: A dict of date-count pairs indicating the amount of times the
@@ -213,7 +213,9 @@ class UserProfile(models.Model):
         verbose_name_plural = "user profiles"
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class UserProfileBarMembership(UserProfile.barmembership.through):
     """A model class to track user profile barmembership m2m relation"""
 
@@ -506,7 +508,16 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
     return recap_email
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+    obj_field=pghistory.ObjForeignKey(
+        related_name="pgh_events",
+        related_query_name="pgh_events_query",
+    ),
+)
 class UserProxy(User):
     """A proxy model class to track auth user model"""
 
@@ -514,7 +525,7 @@ class UserProxy(User):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class GroupProxy(Group):
     """A proxy model class to track auth group model"""
 
@@ -522,7 +533,7 @@ class GroupProxy(Group):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class PermissionProxy(Permission):
     """A proxy model class to track auth permission model"""
 
@@ -530,7 +541,9 @@ class PermissionProxy(Permission):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class GroupPermissions(Group.permissions.through):
     """A proxy model class to track group permissions m2m relation"""
 
@@ -538,7 +551,9 @@ class GroupPermissions(Group.permissions.through):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class UserGroups(User.groups.through):
     """A proxy model class to track user groups m2m relation"""
 
@@ -546,7 +561,9 @@ class UserGroups(User.groups.through):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class UserPermissions(User.user_permissions.through):
     """A proxy model class to track user permissions m2m relation"""
 

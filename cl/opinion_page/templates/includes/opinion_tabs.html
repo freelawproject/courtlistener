@@ -1,0 +1,48 @@
+{% load extras %}
+<ul class="nav nav-tabs hidden-print nav-justified">
+    <!-- Opinion tab (always rendered) -->
+    <li role="presentation" class="{% if tab == 'opinions' or tab == '' %}active{% endif %}">
+        <a href="{% url 'view_case' cluster.pk cluster.slug %}">Opinion</a>
+    </li>
+
+    <!-- Authorities tab -->
+    <li role="presentation" class="{% if authorities_count == 0 and is_htmx %}disabled{% elif tab == 'authorities' %}active{% endif %}">
+    <a href="{% if not is_htmx or authorities_count > 0 %}{% url 'view_case_authorities' cluster.pk cluster.slug %}{% else %}#authorities{% endif %}">
+        Authorities{% if is_htmx %}&nbsp;({{ authorities_count|humanize_number }}){% endif %}
+    </a>
+    </li>
+
+    <!-- Cited By tab -->
+    <li role="presentation" class="{% if cited_by_count == 0 and es_enabled and is_htmx %}disabled{% elif tab == 'cited-by' %}active{% endif %}">
+        <a href="{% if not is_htmx or cited_by_count > 0 or not es_enabled %}{% url 'view_case_cited_by' cluster.pk cluster.slug %}{% else %}#cited-by{% endif %}">
+            Cited&nbsp;By{% if is_htmx %}&nbsp;({{ cited_by_count|humanize_number }}){% endif %}
+        </a>
+    </li>
+
+    <!-- Summaries tab -->
+    <li role="presentation" class="{% if summaries_count == 0 and is_htmx %}disabled{% elif tab == 'summaries' %}active{% endif %}">
+        <a href="{% if not is_htmx or summaries_count > 0 %}{% url 'view_case_summaries' cluster.pk cluster.slug %}{% else %}#summaries{% endif %}">
+            Summaries{% if is_htmx %}&nbsp;({{ summaries_count|humanize_number }}){% endif %}
+        </a>
+    </li>
+
+    <!-- Related Cases tab -->
+    <li role="presentation" class="{% if related_cases_count == 0 and es_enabled and is_htmx %}disabled{% elif tab == 'related-cases' %}active{% endif %}">
+        <a href="{% if not is_htmx or related_cases_count > 0 or not es_enabled %}{% url 'view_case_related_cases' cluster.pk cluster.slug %}{% else %}#related-cases{% endif %}">
+            Similar&nbsp;Cases{% if is_htmx %}&nbsp;({{ related_cases_count|humanize_number }}){% endif %}
+        </a>
+    </li>
+
+    <!-- PDF tab -->
+    {% if has_downloads %}
+        {% if "pdf" in pdf_path or cluster.filepath_pdf_harvard %}
+            <li role="presentation" class="{% if tab == 'pdf' %}active{% endif %}">
+                <a rel="nofollow" href="{% url 'view_case_pdf' cluster.pk cluster.slug %}">PDF</a>
+            </li>
+        {% else %}
+            <li role="presentation" class="disabled"><a href="#pdf">PDF</a></li>
+        {% endif %}
+    {% else %}
+        <li role="presentation" class="disabled"><a href="#pdf">PDF</a></li>
+    {% endif %}
+</ul>

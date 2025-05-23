@@ -1,17 +1,16 @@
 import datetime
 import unittest
+from collections.abc import Sized
 from functools import wraps
-from typing import Sized, cast
+from typing import cast
 
-import scorched
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.testcases import SerializeMixin
-from django.test.utils import override_settings
 from django.utils import timezone
 from lxml import etree
-from requests import Session
 
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
@@ -28,7 +27,7 @@ from cl.people_db.factories import (
     PositionFactory,
     SchoolFactory,
 )
-from cl.people_db.models import Person, Race
+from cl.people_db.models import Race
 from cl.search.constants import o_type_index_map
 from cl.search.docket_sources import DocketSources
 from cl.search.documents import DocketDocument
@@ -44,15 +43,12 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     Citation,
-    Court,
     Docket,
-    Opinion,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
 )
-from cl.search.tasks import add_items_to_solr
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.users.factories import UserProfileWithParentsFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 def midnight_pt_test(d: datetime.date) -> datetime.datetime:
@@ -119,7 +115,9 @@ opinion_cluster_v3_v4_common_fields = {
     "panel_ids": lambda x: (
         list(x["result"].cluster.panel.all().values_list("id", flat=True))
         if x["result"].cluster.panel.all()
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "dateArgued": lambda x: (
         (
@@ -176,14 +174,18 @@ opinion_document_v3_v4_common_fields = {
         if x["result"]
         .cited_opinions.all()
         .values_list("cited_opinion_id", flat=True)
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "download_url": lambda x: x["result"].download_url,
     "id": lambda x: x["result"].pk,
     "joined_by_ids": lambda x: (
         list(x["result"].joined_by.all().values_list("id", flat=True))
         if x["result"].joined_by.all()
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "type": lambda x: (
         o_type_index_map.get(x["result"].type)
@@ -197,6 +199,7 @@ opinion_document_v3_v4_common_fields = {
     "snippet": lambda x: (
         x["snippet"] if x.get("snippet") else x["result"].plain_text or ""
     ),
+    "ordering_key": lambda x: x["result"].ordering_key,
 }
 
 opinion_cluster_v3_fields = opinion_cluster_v3_v4_common_fields.copy()
@@ -476,6 +479,7 @@ v4_meta_keys = {
     "timestamp": lambda x: x["result"]
     .date_created.isoformat()
     .replace("+00:00", "Z"),
+    "score": lambda x: {"bm25": None},
 }
 
 v4_recap_meta_keys = v4_meta_keys.copy()
@@ -736,7 +740,9 @@ audio_common_fields = {
     "judge": lambda x: (
         x["judge"]
         if x.get("judge")
-        else x["result"].judges if x["result"].judges else ""
+        else x["result"].judges
+        if x["result"].judges
+        else ""
     ),
     "local_path": lambda x: (
         deepgetattr(x["result"], "local_path_mp3.name", None)
@@ -747,14 +753,18 @@ audio_common_fields = {
     "panel_ids": lambda x: (
         list(x["result"].panel.all().values_list("id", flat=True))
         if x["result"].panel.all()
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "sha1": lambda x: x["result"].sha1,
     "source": lambda x: x["result"].source,
     "snippet": lambda x: (
         x["snippet"]
         if x.get("snippet")
-        else x["result"].transcript if x["result"].stt_transcript else ""
+        else x["result"].transcript
+        if x["result"].stt_transcript
+        else ""
     ),
 }
 
@@ -780,6 +790,56 @@ audio_v4_fields.update(
         "meta": [],  # type: ignore
     }
 )
+
+
+class PrayAndPayTestCase(TestCase):
+    """Pray And Pay test case factories"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.user_2 = UserFactory()
+        cls.user_3 = UserFactory()
+
+        # Create profile for test user records
+        UserProfileWithParentsFactory(user=cls.user)
+        UserProfileWithParentsFactory(user=cls.user_2)
+        UserProfileWithParentsFactory(user=cls.user_3)
+
+        cls.rd_1 = RECAPDocumentFactory(
+            pacer_doc_id="98763421",
+            document_number="1",
+            is_available=True,
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            pacer_doc_id="98763422",
+            document_number="2",
+            is_available=False,
+        )
+
+        cls.rd_3 = RECAPDocumentFactory(
+            pacer_doc_id="98763423",
+            document_number="3",
+            is_available=False,
+        )
+        cls.rd_4 = RECAPDocumentFactory(
+            pacer_doc_id="98763424",
+            document_number="4",
+            is_available=False,
+        )
+
+        cls.rd_5 = RECAPDocumentFactory(
+            pacer_doc_id="98763425",
+            document_number="5",
+            is_available=False,
+        )
+
+        cls.rd_6 = RECAPDocumentFactory(
+            pacer_doc_id="98763426",
+            document_number="6",
+            is_available=False,
+        )
+        super().setUpTestData()
 
 
 class CourtTestCase(SimpleTestCase):
@@ -1260,7 +1320,7 @@ class RECAPSearchTestCase(SimpleTestCase):
                 source=Docket.COLUMBIA_AND_RECAP,
             ),
             entry_number=3,
-            date_filed=datetime.date(2014, 7, 19),
+            date_filed=datetime.date(2014, 7, 5),
             description="MOTION for Leave to File Amicus Discharging Debtor",
         )
         cls.rd_2 = RECAPDocumentFactory(
@@ -1288,104 +1348,18 @@ class SimpleUserDataMixin:
         super().setUpTestData()  # type: ignore
 
 
-@override_settings(
-    SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
-    SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
-    SOLR_PEOPLE_URL=settings.SOLR_PEOPLE_TEST_URL,
-    SOLR_RECAP_URL=settings.SOLR_RECAP_TEST_URL,
-    SOLR_URLS=settings.SOLR_TEST_URLS,
-    ELASTICSEARCH_DISABLED=True,
-)
-class EmptySolrTestCase(SerializeLockFileTestMixin, TestCase):
-    """Sets up an empty Solr index for tests that need to set up data manually.
-
-    Other Solr test classes subclass this one, adding additional content or
-    features.
-    """
-
-    def setUp(self) -> None:
-        # Set up testing cores in Solr and swap them in
-        self.core_name_opinion = settings.SOLR_OPINION_TEST_CORE_NAME
-        self.core_name_audio = settings.SOLR_AUDIO_TEST_CORE_NAME
-        self.core_name_people = settings.SOLR_PEOPLE_TEST_CORE_NAME
-        self.core_name_recap = settings.SOLR_RECAP_TEST_CORE_NAME
-
-        self.session = Session()
-
-        self.si_opinion = scorched.SolrInterface(
-            settings.SOLR_OPINION_URL, http_connection=self.session, mode="rw"
-        )
-        self.si_audio = scorched.SolrInterface(
-            settings.SOLR_AUDIO_URL, http_connection=self.session, mode="rw"
-        )
-        self.si_people = scorched.SolrInterface(
-            settings.SOLR_PEOPLE_URL, http_connection=self.session, mode="rw"
-        )
-        self.si_recap = scorched.SolrInterface(
-            settings.SOLR_RECAP_URL, http_connection=self.session, mode="rw"
-        )
-        self.all_sis = [
-            self.si_opinion,
-            self.si_audio,
-            self.si_people,
-            self.si_recap,
-        ]
-
-    def tearDown(self) -> None:
-        try:
-            for si in self.all_sis:
-                si.delete_all()
-                si.commit()
-        finally:
-            self.session.close()
-
-
-class SolrTestCase(
-    CourtTestCase,
-    PeopleTestCase,
-    SearchTestCase,
-    SimpleUserDataMixin,
-    EmptySolrTestCase,
-):
-    """A standard Solr test case with content included in the database,  but not
-    yet indexed into the database.
-    """
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-
-    def setUp(self) -> None:
-        # Set up some handy variables
-        super().setUp()
-
-        self.court = Court.objects.get(pk="test")
-        self.expected_num_results_opinion = 6
-        self.expected_num_results_audio = 2
-
-
-class IndexedSolrTestCase(SolrTestCase):
-    """Similar to the SolrTestCase, but the data is indexed in Solr"""
-
-    def setUp(self) -> None:
-        super().setUp()
-        obj_types = {
-            "audio.Audio": Audio,
-            "search.Opinion": Opinion,
-            "people_db.Person": Person,
-        }
-        for obj_name, obj_type in obj_types.items():
-            if obj_name == "people_db.Person":
-                items = obj_type.objects.filter(is_alias_of=None)
-                ids = [item.pk for item in items if item.is_judge]
-            else:
-                ids = obj_type.objects.all().values_list("pk", flat=True)
-            add_items_to_solr(ids, obj_name, force_commit=True)
-
-
 class SitemapTest(TestCase):
     sitemap_url: str
     expected_item_count: int
+
+    def setUpSiteDomain(self) -> None:
+        # set the domain name in the Sites framework to match the test domain name, set http url schema
+        domain = "testserver"
+        SiteModel = apps.get_model("sites", "Site")
+
+        SiteModel.objects.update_or_create(
+            pk=settings.SITE_ID, defaults={"domain": domain, "name": domain}
+        )
 
     def assert_sitemap_has_content(self) -> None:
         """Does content get into the sitemap?"""
@@ -1533,7 +1507,7 @@ class AudioESTestCase(SimpleTestCase):
             sha1="a49ada009774496ac01fb49818837e2296705c92",
         )
         cls.audio_3 = AudioFactory.create(
-            case_name="Hong Liu Yang v. Lynch-Loretta E.",
+            case_name="Hong Liu Yang v. Lynch-Loretta E. Howell",
             docket_id=cls.docket_3.pk,
             duration=653,
             judges="Joseph Information Deposition H Administrative magazine",
@@ -1552,10 +1526,10 @@ class AudioESTestCase(SimpleTestCase):
         )
         cls.audio_4.panel.add(cls.author)
         cls.audio_5 = AudioFactory.create(
-            case_name="Freedom of Inform Wikileaks",
+            case_name="Freedom of Inform Wikileaks Howells",
             docket_id=cls.docket_4.pk,
             duration=400,
-            judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate",
+            judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate Freedom of Inform Wikileaks",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
         cls.audio_1.panel.add(cls.author)

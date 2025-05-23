@@ -6,7 +6,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, Optional, TypedDict
+from typing import Any, TypedDict
 
 import requests
 from bs4 import BeautifulSoup
@@ -32,14 +32,13 @@ from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
 from cl.search.models import SOURCES, Court, Docket, Opinion, OpinionCluster
-from cl.search.tasks import add_items_to_solr
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 cnt = CaseNameTweaker()
 
 
-def validate_dt(date_str: str) -> tuple[Optional[date], bool]:
+def validate_dt(date_str: str) -> tuple[date | None, bool]:
     """
     Check if the date string is only year-month or year.
     If partial date string, make date string the first of the month
@@ -72,9 +71,9 @@ def validate_dt(date_str: str) -> tuple[Optional[date], bool]:
 
 
 def _make_glob_from_args(
-    reporter: Optional[str],
-    volumes: Optional[range],
-    page: Optional[str],
+    reporter: str | None,
+    volumes: range | None,
+    page: str | None,
 ) -> list[str]:
     """Make list of glob paths
 
@@ -118,8 +117,8 @@ def _make_glob_from_args(
 
 def filepath_list(
     reporter: str,
-    volumes: Optional[range],
-    page: Optional[str],
+    volumes: range | None,
+    page: str | None,
 ) -> list[str]:
     """Given a reporter and volume, return a sorted list of files to process
 
@@ -225,11 +224,10 @@ def parse_extra_fields(soup, fields, long_field=False) -> dict:
 
 class OptionsType(TypedDict):
     reporter: str
-    volumes: Optional[range]
+    volumes: range | None
     page: str
-    court_id: Optional[str]
-    location: Optional[str]
-    make_searchable: bool
+    court_id: str | None
+    location: str | None
     bankruptcy: bool
 
 
@@ -260,7 +258,7 @@ def merge_fixes(data: dict[str, Any], identifier: str) -> dict[str, Any]:
     return data
 
 
-def read_json(file_path: str, ia_download_url: str) -> Optional[Any]:
+def read_json(file_path: str, ia_download_url: str) -> Any | None:
     """Read JSON file and throw a warning if exceptions occur
 
     :param file_path: Filepath to JSON
@@ -293,7 +291,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     If neither is provided, code will cycle through all downloaded files.
 
     :param options: The command line options including (reporter,
-    volume court_id and make_searchable)
+    volume and court_id)
     :return: None
     """
 
@@ -301,7 +299,6 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     volumes = options["volumes"]
     page = options["page"]
     court_id = options["court_id"]
-    make_searchable = options["make_searchable"]
     is_bankruptcy = options["bankruptcy"]
 
     if not reporter and volumes:
@@ -359,7 +356,9 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             )
             if len(found_court) != 1:
                 logging.warning(
-                    f"Court not found for {data['court']['name']} at {file_path}"
+                    "Court not found for %s at %s",
+                    data["court"]["name"],
+                    file_path,
                 )
                 continue
             court_id = found_court[0]
@@ -421,7 +420,6 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             citation,
             court_id,
             file_path,
-            make_searchable,
         )
 
 
@@ -431,12 +429,11 @@ def add_new_case(
     case_name: str,
     case_name_full: str,
     case_name_short: str,
-    date_filed: Optional[date],
+    date_filed: date | None,
     is_approximate: bool,
     citation: FullCaseCitation,
-    court_id: Optional[str],
+    court_id: str | None,
     file_path: str,
-    make_searchable: bool,
 ) -> None:
     """Add new case to Courtlistener.com
 
@@ -450,7 +447,6 @@ def add_new_case(
     :param citation: The citation we use in logging and first citation parsed
     :param court_id: The CL Court ID
     :param file_path: The path to the Harvard JSON
-    :param make_searchable: Should we add this case to SOLR
     :return: None
     """
     soup = BeautifulSoup(case_body, "lxml")
@@ -498,9 +494,10 @@ def add_new_case(
         docket = update_or_create_docket(
             case_name,
             case_name_short,
-            court_id,
+            Court.objects.get(id=court_id),
             docket_string,
             Docket.HARVARD,
+            from_harvard=True,
             case_name_full=case_name_full,
             ia_needs_upload=False,
         )
@@ -539,7 +536,7 @@ def add_new_case(
             judges=judges,
             filepath_json_harvard=file_path,
         )
-        cluster.save(index=False)
+        cluster.save()
         logger.info("Saving cluster for: %s", cluster.id)
 
         logger.info("Adding citation for: %s", citation.corrected_citation())
@@ -547,9 +544,6 @@ def add_new_case(
             [c.get("cite") for c in data.get("citations", [])], cluster.id
         )
         new_op_pks = add_opinions(soup, cluster.id, citation)
-
-    if make_searchable:
-        add_items_to_solr.delay(new_op_pks, "search.Opinion")
 
     logger.info("Finished: %s", citation.corrected_citation())
     logger.info(
@@ -605,20 +599,19 @@ def add_opinions(
             per_curiam=per_curiam,
             extracted_by_ocr=True,
         )
-        # Don't index now; do so later if desired
-        op.save(index=False)
+        op.save()
         new_op_pks.append(op.pk)
     return new_op_pks
 
 
 def find_previously_imported_cases(
     data: dict[str, Any],
-    court_id: Optional[str],
+    court_id: str | None,
     date_filed: date,
     harvard_characters: str,
     case_name_full: str,
     citation: FullCaseCitation,
-) -> Optional[OpinionCluster]:
+) -> OpinionCluster | None:
     """Check if opinion is in Courtlistener
 
     :param data: The harvard data
@@ -731,12 +724,6 @@ class Command(VerboseCommand):
             "for courts-db differentiation.",
             required=False,
             default=None,
-        )
-        parser.add_argument(
-            "--make-searchable",
-            action="store_true",
-            help="Add items to solr as we create opinions. "
-            "Items are not searchable unless flag is raised.",
         )
         parser.add_argument(
             "--bankruptcy",

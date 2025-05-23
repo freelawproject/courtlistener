@@ -1,0 +1,652 @@
+{% extends "new_base.html" %}
+{% load svg_tags %}
+
+{% block title %}Components Library - CourtListener.com{% endblock %}
+
+{% block content %}
+<div>
+<c-layout-with-navigation
+  :nav_items="[
+      {'href': '#main-title', 'text': 'Component Library'},
+      {'href': '#text-components', 'text': 'Text components', 'children': [
+        {'href': '#code-block', 'text': 'Code blocks'},
+        {'href': '#two-column-list', 'text': 'Two column list'},
+        {'href': '#eyebrow', 'text': 'Eyebrow'},
+        {'href': '#copy', 'text': 'Copy to clipboard'},
+      ]},
+      {'href': '#layout-components', 'text': 'Layout components', 'children': [
+        {'href': '#expansion', 'text': 'Expansion panel'},
+        {'href': '#navigation-menu', 'text': 'Navigation menu'},
+        {'href': '#nav-layout', 'text': 'Layout with navigation'},
+        {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
+        {'href': '#data-table', 'text': 'Data table'},
+      ]},
+      {'href': '#misc', 'text': 'Other components', 'children': [
+        {'href': '#support-banner', 'text': 'Support plea banner'},
+      ]},
+  ]"
+>
+  <section class="max-w-full w-full" x-intersect.margin.-100px="show" id="main-title">
+    <c-eyebrow>CourtListener's</c-eyebrow>
+    <h1 class="">Component Library</h1>
+    <p class="mt-1">Below you will find a display of the components available in our codebase with usage notes to make development easier.</p>
+    <p>These components are available to all templates that extend from <code>new_base.html</code>. Using them doesn't require any imports or settings, they should just work!</p>
+    <p>If these aren't enough for your needs and you make a new component or tweak one of the existing ones, make sure to:</p>
+    <ul class="list-disc pl-4">
+      <li>Save the html in one of the <code>/templates/cotton/</code> directories for Django to pick it up automatically.</li>
+      <li>Read the docs! We use <a class="underline" href="https://django-cotton.com/docs/usage-patterns" target="_blank">Django Cotton</a> for components,
+        <a class="underline" href="https://alpinejs.dev/directives/data" target="_blank">AlpineJS</a> for interactivity, and
+        <a class="underline" href="https://v3.tailwindcss.com/docs/utility-first" target="_blank">Tailwind CSS</a> for styling.</li>
+      <li>Add your new component to this page with some helpful notes so other developers know to use it!</li>
+    </ul>
+  </section>
+
+  {# CODE BLOCKS #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect="show" id="code-block">
+    <h2 class="mt-6 mb-3">Code blocks</h2>
+    <p>Note this component uses <code>&lt;pre&gt;</code> tags so all whitespace will be preserved.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <c-code disable_copy>
+Sample code here.
+    </c-code>
+
+    <h4 class="mt-8">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>disable_copy</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Adding this attribute hides the copy-to-clipboard button in the top-right corner of the code block.
+          <br>Defaults to false.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>class</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          CSS classes applied to the <code>&lt;pre&gt;</code> element.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Text that will be displayed in the code block.</span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-code disable_copy&gt;
+    Sample code here.
+&lt;/c-code&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# TWO COLUMN LIST #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect="show" id="two-column-list">
+    <h2 class="mt-6 mb-3">Two column list</h2>
+    <p>Each item in the list can either be plain text, text retrieved in a specified key from a given dict, or links when both <code>href</code> and <code>label</code> keys are present.</p>
+    <h4 class="mt-3">Demo</h4>
+    <c-two-column-list
+      key="some_field"
+      link_class="underline"
+      class="my-4 p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
+      :list="[
+        {'some_field': 'First item is retrieved from custom key.'},
+        {'href': 'https://free.law', 'label': 'Second item is a link.'},
+        'Third item is plain text.',
+        {'some_field': 'Fourth item is also retrieved from custom key.'},
+      ]"
+    ></c-two-column-list>
+
+    <h4>Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>list</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          List of items that can either be strings or dicts. In case of dicts, including both <code>href</code> and <code>label</code> will render a link.
+          Otherwise, if a key is specified, the value of that key is rendered.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>link_class</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          CSS classes to add to links. For accessibility, <a class="underline" href="https://accessibleweb.com/question-answer/do-links-need-to-be-underlined/" target="_blank" rel="noopener noreferrer">it's recommended all links are always underlined</a>.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>key</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Custom key to pick the value from a dict.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>responsive</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Collapses both columns into one stacked on top of the other in small screens.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>class</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          CSS classes for the list container, appended after the built-in <code>w-full flex flex-row justify-between</code>.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <p class="mb-3">No slot</p>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-two-column-list
+  key="some_field"
+  link_class="underline"
+  class="my-4 p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
+  :list="[
+    {'some_field': 'First item is retrieved from custom key.'},
+    {'href': 'https://free.law', 'label': 'Second item is a link.'},
+    'Third item is plain text.',
+    {'some_field': 'Fourth item is also retrieved from custom key.'},
+  ]"
+&gt;&lt;/c-two-column-list>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# EYEBROW #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="eyebrow">
+    <h2 class="mt-6 mb-3">Eyebrow</h2>
+    <h4 class="mt-3">Demo</h4>
+    <c-eyebrow class="my-4">CourtListener</c-eyebrow>
+
+    <h4 class="mt-3">Props</h4>
+    <p>No props</p>
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Eyebrow's content.</span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-eyebrow&gt;CourtListener&lt;/c-eyebrow>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# COPY TO CLIPBOARD #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="copy">
+    <h2 class="mt-6 mb-3">Copy to clipboard</h2>
+    <p>Unstyled button that copies text to clipboard.</p>
+    <p>Works with click events, but also keyup events for the <kbd>Enter</kbd> and <kbd>Space</kbd> keys.</p>
+
+    <h4 class="my-3">Demo</h4>
+    <c-copy-to-clipboard
+      text_to_copy="You did it! This was copied with a single click!"
+      class="btn-outline"
+    >
+      Click to copy
+    </c-copy-to-clipboard>
+
+    <h4 class="mt-8">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>text_to_copy</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Text to be copied to clipboard when clicking the button, or when pressing either the <kbd>Enter</kbd> or <kbd>Space</kbd> keys on focus.
+          <br><strong>Important:</strong> Some characters, like double quotation marks, could break syntax. To pass a string that includes any of these characters, escape them with
+          <a class="underline" href="https://www.w3schools.com/html/html_entities.asp" target="_blank" rel="noopener noreferrer">HTML entities</a>, or use
+          <a class="underline" href="https://docs.djangoproject.com/en/5.1/ref/templates/builtins/#escapejs" target="_blank" rel="noopener noreferrer">Django's built-in <code>escapejs</code> filter</a> to do it for you.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Button content.</span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-copy-to-clipboard
+  text_to_copy="You did it! This was copied with a single click!"
+  class="btn-outline"
+&gt;
+  Click to copy
+&lt;/c-copy-to-clipboard&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# EXPANSION PANEL #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="expansion">
+    <h2 class="mt-6 mb-3">Expansion panel</h2>
+    <h4 class="mt-3">Demo</h4>
+    <c-expansion-panel title="This is a demo" class="my-4 text-primary-600 font-bold">
+      Hello!
+    </c-expansion-panel>
+
+    <h4 class="mt-3">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>title</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Title displayed.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Collapsible content.</span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-expansion-panel title="This is a demo" class="my-4 text-primary-600 font-bold"&gt;
+  Hello!
+&lt;/c-expansion-panel>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# NAVIGATION MENU #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="navigation-menu">
+    <h2 class="mt-6 mb-3">Navigation menu</h2>
+    <p>The desktop version of this component highlights the currently visible section on scroll.
+      For this feature to work, the elements referenced need to implement the intersect listener with the <code>show</code> method.
+    </p>
+    <p>This uses Alpine's intersect plugin, so the x-intersect directive can be used with
+    <a class="underline" href="https://alpinejs.dev/plugins/intersect#modifiers" target="_blank">modifiers</a> for more control;
+    see <code>x-intersect.margin.-100px="show"</code> in the new alerts help page, which adds a negative margin to the
+    intersect handler, preventing the event to be fired immediately when the element enters the viewport.</p>
+    <h4 class="mt-3">Demo</h4>
+    <p>See this page's navigation menu.</p>
+
+    <h4 class="mt-3">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>nav_items</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          List of navigation items, where each item is a dictionary with <code>href</code> and <code>text</code>.
+        </span>
+      </div>
+    </div>
+    <h4 class="mt-3">Slot</h4>
+    <p class="mb-3">No slot</p>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-navigation-menu
+  :nav_items="[
+    {'href': '#main-title', 'text': 'Component Library'},
+    {'href': '#', 'text': 'Text components', 'children': [
+      {'href': '#two-column-list-component', 'text': 'Two column list'},
+      {'href': '#eyebrow', 'text': 'Eyebrow'},
+    ]},
+    {'href': '#', 'text': 'Layout components', 'children': [
+      {'href': '#expansion', 'text': 'Expansion panel'},
+      {'href': '#navigation-menu', 'text': 'Navigation menu'},
+      {'href': '#layout-with-navigation', 'text': 'Layout with navigation'},
+    ]},
+  ]"
+&gt;&lt;/c-navigation-menu>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# LAYOUT WITH NAVIGATION #}
+  <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="nav-layout">
+    <h2 class="mt-6 mb-3">Layout with navigation</h2>
+    <p>The layout with navigation component is composed of two elements: <code>c-layout-with-navigation</code> and <code>c-layout-with-navigation.section</code>.</p>
+    <p>Only one layout per page is supported.</p>
+    <h4 class="mt-3">Demo</h4>
+    <p>See this page's layout: responsive navigation menu with a main content divided by sections.</p>
+
+    <h4 class="mt-3">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation</code>: <code>nav_items</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Same as the navigation menu: a list of navigation items, where each item is a dictionary with <code>href</code> and <code>text</code>.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation.section</code>: <code>id</code></span>
+        <div class="p-2.5 flex flex-col gap-2 max-md:max-w-full [overflow-wrap:anywhere]">
+          <div>
+            Used to identify the active section for navigation menu highlighting.
+          </div>
+          <div>Make sure the id is for the entire section that needs to be highlighted, not just a heading or a child element, otherwise the highlighting could misbehave.</div>
+        </div>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation</code> default</span>
+        <div class="p-2.5 flex flex-col gap-2 max-md:max-w-full [overflow-wrap:anywhere]">
+          <div>
+            To preserve proper spacing and ensure correct highlighting, nest all content in sections using the <code>c-layout-with-navigation.section</code> sub-component.
+          </div>
+          <div>
+            However, if you need to tweak or remove the section's intersect behavior, you can swap the sub-component for a native <code>&lt;section&gt;</code> element and it will preserve proper spacing and layout.
+          </div>
+          <div>
+            For further reference, check Alpine's docs on <a class="underline" href="https://alpinejs.dev/plugins/intersect#modifiers" target="_blank" rel="noopener noreferrer">intersect modifiers</a>.</div>
+        </div>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation.section</code> default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          A section's content which should probably have a heading.
+          <br>For further reference check the <a class="underline" href="https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/section" target="_blank" rel="noopener noreferrer">mdn web docs</a> on the <code>&lt;section&gt;</code> element.
+        </span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-layout-with-navigation
+  :nav_items="[
+    {'href': '#main-title', 'text': 'Component Library'},
+    {'href': '#text-components', 'text': 'Text components', 'children': [
+      {'href': '#code-block', 'text': 'Code blocks'},
+      {'href': '#two-column-list', 'text': 'Two column list'},
+      {'href': '#eyebrow', 'text': 'Eyebrow'},
+    ]},
+    {'href': '#layout-components', 'text': 'Layout components', 'children': [
+      {'href': '#expansion', 'text': 'Expansion panel'},
+      {'href': '#navigation-menu', 'text': 'Navigation menu'},
+      {'href': '#navigation-menu', 'text': 'Layout with navigation'},
+      {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
+    ]},
+    {'href': '#misc', 'text': 'Other components', 'children': [
+      {'href': '#support-banner', 'text': 'Support plea banner'},
+    ]},
+  ]"
+&gt;
+  &lt;c-layout-with-navigation.section id="main-title"&gt;
+    &lt;c-eyebrow&gt;CourtListener's&lt;/c-eyebrow&gt;
+    ...
+  &lt;/c-layout-with-navigation.section&gt;
+
+  &lt;c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="code-block"&gt;
+    &lt;h2 class="mt-6 mb-3"&gt;Code blocks&lt;/h2&gt;
+    ...
+  &lt;/c-layout-with-navigation.section&gt;
+
+  ...
+&lt;/c-layout-with-navigation>
+      </c-code>
+    </c-expansion-panel>
+  </c-layout-with-navigation.section>
+
+  {# TABBED CARDS #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="tabbed-cards">
+    <h2 class="mt-6 mb-3">Tabbed cards</h2>
+    <p>The tabbed component is composed of two elements: the <code>c-tabs</code> element and the <code>c-tabs.tab</code> element.
+    Include a <code>c-tabs.tab</code> element for each tab in the <code>c-tabs</code> slot.
+    </p>
+
+    <h4 class="mt-3">Demo</h4>
+    <c-tabs class="my-4" title="My tabs">
+      <c-tabs.tab name="First tab">
+        First tab panel content
+      </c-tabs.tab>
+      <c-tabs.tab name="Second tab">
+        Second tab panel content
+      </c-tabs.tab>
+      <c-tabs.tab name="Third tab">
+        Third tab panel content
+      </c-tabs.tab>
+    </c-tabs>
+
+    <h4 class="mt-3">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs</code>: <code>title</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Component title used for accessibility.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs.tab</code>: <code>name</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Tab label displayed in selector.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs</code> default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Add as many <code>c-tabs.tab</code> elements as needed.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs.tab</code> default</span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Content displayed when this tab is active.
+        </span>
+      </div>
+    </div>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-tabs title="My tabs"&gt;
+  &lt;c-tabs.tab name="First tab"&gt;
+    First tab panel content
+  &lt;/c-tabs.tab&gt;
+  &lt;c-tabs.tab name="Second tab"&gt;
+    Second tab panel content
+  &lt;/c-tabs.tab&gt;
+  &lt;c-tabs.tab name="Third tab"&gt;
+    Third tab panel content
+  &lt;/c-tabs.tab&gt;
+&lt;/c-tabs&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DATA TABLE #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="data-table">
+    <h2 class="mt-6 mb-3">Data table</h2>
+    <p>Renders a data table
+    </p>
+
+    <h4 class="my-3">Demo</h4>
+    <c-data-table
+      safe
+      caption="Usage example of data table component"
+      :columns="[
+        {'label': 'First header', 'field': 'first'},
+        {'label': 'Second header', 'field': 'second'},
+        {'label': 'Third header', 'field': 'third'},
+        {'label': 'Fourth header', 'field': 'fourth'},
+        {'label': 'Fifth header', 'field': 'fifth'},
+        {'label': 'Sixth header', 'field': 'sixth'},
+      ]"
+      :rows="[
+        {
+          'first': 'Row 1<br>This one has a line break (safe only)',
+          'second': 'Row 1, second',
+          'third': 'Row 1, third',
+          'fourth': 'Row 1, fourth',
+          'fifth': 'Row 1, fifth',
+          'sixth': 'Row 1, sixth',
+        },
+        {
+          'first': 'Row 2, first',
+          'second': 'Row 2, second',
+          'third': 'Row 2, third',
+          'fourth': 'Row 2, fourth, and this one has a longer text than the rest, to showcase how the table layout is arranged with differently sized cells.',
+          'fifth': 'Row 2, fifth',
+          'sixth': 'Row 2, sixth',
+        },
+        {
+          'first': 'Row 3, first',
+          'second': 'Row 3, second',
+          'third': 'Row 3, third',
+          'fourth': 'Row 3, fourth',
+          'fifth': 'Row 3, fifth',
+          'sixth': 'Row 3, sixth',
+        },
+        {
+          'first': 'Row 4, first',
+          'second': 'Row 4, second',
+          'third': 'Row 4, third',
+          'fourth': 'Row 4, fourth',
+          'fifth': 'Row 4, fifth',
+          'sixth': 'Row 4, sixth',
+        },
+      ]"
+      :footer="[
+        {
+          'first': 'First foot',
+          'second': 'Second foot',
+          'third': 'Third foot',
+          'fifth': 'Fifth foot',
+        },
+      ]"
+    ></c-data-table>
+
+    <h4 class="mt-8">Props</h4>
+    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>columns</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the col value for each row).
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>rows</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          List of rows in the <code>&lt;tbody&gt;</code>.
+          <br>Each element in the list is a dictionary where the keys correspond to the column fields.
+          <br>If a given field isn't present, the cell will be empty.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>footer</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          List of rows in the <code>&lt;tfoot&gt;</code>.<br>Same structure as <code>rows</code>.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>caption</code></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Table caption for accessibility.<br>Not displayed visually, but it's important to provide context for screen readers.
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>safe</code><br><span class="font-normal text-xs">(optional)</span></span>
+        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+          Marks the contents as safe, so it can render HTML inside the table.
+          <br>Defaults to false.
+          <br><strong>Warning:</strong> May allow XSS vulnerabilities if enabled on user-provided HTML, so use only with trusted content.
+        </span>
+      </div>
+    </div>
+
+    <h4 class="mt-3">Slot</h4>
+    <p class="mb-3">No slot</p>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-data-table
+  safe
+  caption="Usage example of data table component"
+  :columns="[
+    {'label': 'First header', 'field': 'first'},
+    {'label': 'Second header', 'field': 'second'},
+    {'label': 'Third header', 'field': 'third'},
+    {'label': 'Fourth header', 'field': 'fourth'},
+    {'label': 'Fifth header', 'field': 'fifth'},
+    {'label': 'Sixth header', 'field': 'sixth'},
+  ]"
+  :rows="[
+    {
+      'first': 'Row 1&lt;br&gt;This one has a line break (safe only)',
+      'second': 'Row 1, second',
+      'third': 'Row 1, third',
+      'fourth': 'Row 1, fourth',
+      'fifth': 'Row 1, fifth',
+      'sixth': 'Row 1, sixth',
+    },
+    {
+      'first': 'Row 2, first',
+      'second': 'Row 2, second',
+      'third': 'Row 2, third',
+      'fourth': 'Row 2, fourth, and this one has a longer text than the rest, to showcase how the table layout is arranged with differently sized cells.',
+      'fifth': 'Row 2, fifth',
+      'sixth': 'Row 2, sixth',
+    },
+    {
+      'first': 'Row 3, first',
+      'second': 'Row 3, second',
+      'third': 'Row 3, third',
+      'fourth': 'Row 3, fourth',
+      'fifth': 'Row 3, fifth',
+      'sixth': 'Row 3, sixth',
+    },
+    {
+      'first': 'Row 4, first',
+      'second': 'Row 4, second',
+      'third': 'Row 4, third',
+      'fourth': 'Row 4, fourth',
+      'fifth': 'Row 4, fifth',
+      'sixth': 'Row 4, sixth',
+    },
+  ]"
+  :footer="[
+    {
+      'first': 'First foot',
+      'second': 'Second foot',
+      'third': 'Third foot',
+      'fifth': 'Fifth foot',
+    },
+  ]"
+&gt;&lt;/c-data-table&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# SUPPORT PLEA BANNER #}
+  <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="support-banner">
+    <h2 class="mt-6 mb-3">Support plea banner</h2>
+    <p>Very simple component to avoid code duplication.</p>
+    <h4 class="mt-3">Demo</h4>
+    <c-support-plea-banner></c-support-plea-banner>
+
+    <h4 class="mt-3">Props</h4>
+    <p>No props</p>
+
+    <h4 class="mt-3">Slot</h4>
+    <p>No slots</p>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-support-plea-banner&gt;&lt;/c-support-plea-banner&gt;
+      </c-code>
+    </c-expansion-panel>
+  </c-layout-with-navigation.section>
+
+</c-layout-with-navigation>
+</div>
+{% endblock %}

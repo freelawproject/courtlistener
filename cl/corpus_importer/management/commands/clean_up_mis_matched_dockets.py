@@ -1,5 +1,4 @@
 # !/usr/bin/python
-# -*- coding: utf-8 -*-
 
 import requests
 from django.db.utils import OperationalError

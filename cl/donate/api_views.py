@@ -4,6 +4,7 @@ from http import HTTPStatus
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.db.models import F
 from django.http import HttpResponse
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
@@ -117,7 +118,7 @@ class MembershipWebhookViewSet(
             contact_data = neon_account["primaryContact"]
             users = User.objects.filter(
                 email__iexact=contact_data["email1"]
-            ).order_by("-last_login")
+            ).order_by(F("last_login").desc(nulls_last=True))
             if not users.exists():
                 address = self._get_address_from_neon_response(
                     contact_data["addresses"]

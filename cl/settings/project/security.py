@@ -2,9 +2,8 @@ import socket
 
 import environ
 
-from ..django import DATABASES, INSTALLED_APPS, TESTING
+from ..django import DATABASES, INSTALLED_APPS, MIDDLEWARE, TESTING
 from ..third_party.aws import AWS_S3_CUSTOM_DOMAIN
-from ..third_party.sentry import SENTRY_REPORT_URI
 
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
@@ -13,9 +12,13 @@ ALLOWED_HOSTS: list[str] = env(
     "ALLOWED_HOSTS", default=["www.courtlistener.com"]
 )
 
-EGRESS_PROXY_HOST = env(
-    "EGRESS_PROXY_HOST", default="http://cl-webhook-sentry:9090"
+EGRESS_PROXY_HOSTS: list[str] = env.list(
+    "EGRESS_PROXY_HOSTS", default=["http://cl-webhook-sentry:9090"]
 )
+WEBHOOK_EGRESS_PROXY_HOSTS: list[str] = env.list(
+    "WEBHOOK_EGRESS_PROXY_HOSTS", default=["http://cl-webhook-sentry:9090"]
+)
+
 
 SECURE_HSTS_SECONDS = 63_072_000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -30,8 +33,10 @@ if DEVELOPMENT:
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
     SESSION_COOKIE_DOMAIN = None
-    # For debug_toolbar
-    INSTALLED_APPS.append("debug_toolbar")
+    if not TESTING:
+        # Install django-debug-toolbar
+        INSTALLED_APPS.append("debug_toolbar")
+        MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
 
     hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
     INTERNAL_IPS = [".".join(ip.split(".")[:-1] + ["1"]) for ip in ips] + [

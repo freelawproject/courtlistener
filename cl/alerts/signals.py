@@ -1,4 +1,7 @@
+from functools import partial
+
 from django.conf import settings
+from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
@@ -24,9 +27,23 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
 
     match instance.alert_type:
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            es_save_alert_document.delay(instance.pk, AudioPercolator.__name__)
-        case SEARCH_TYPES.RECAP if settings.PERCOLATOR_SEARCH_ALERTS_ENABLED:
-            es_save_alert_document.delay(instance.pk, RECAPPercolator.__name__)
+            transaction.on_commit(
+                partial(
+                    es_save_alert_document.delay,
+                    instance.pk,
+                    AudioPercolator.__name__,
+                )
+            )
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if (
+            settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
+        ):
+            transaction.on_commit(
+                partial(
+                    es_save_alert_document.delay,
+                    instance.pk,
+                    RECAPPercolator.__name__,
+                )
+            )
 
 
 @receiver(

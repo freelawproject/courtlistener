@@ -1,42 +1,24 @@
 import re
-import sys
-from io import StringIO
-from unittest import mock
+from datetime import datetime
+from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
 from django.urls import reverse
+from django.utils.dateformat import format
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
 from rest_framework.test import APITestCase
 from rest_framework.utils.serializer_helpers import ReturnList
 
+from cl.alerts.management.commands.cl_send_scheduled_alerts import (
+    get_cut_off_date,
+)
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
-
-
-class OutputBlockerTestMixin:
-    """Block the output of tests so that they run a bit faster.
-
-    This is pulled from Speed Up Your Django Tests, Chapter, 4.9 "Prevent
-    Output". In Django 3.2, this should be easier via a new --buffer argument.
-    """
-
-    def _callTestMethod(self, method):
-        try:
-            out = StringIO()
-            err = StringIO()
-            with mock.patch.object(sys, "stdout", new=out), mock.patch.object(
-                sys, "stderr", new=err
-            ):
-                super()._callTestMethod(method)
-        except Exception:
-            print(out.getvalue(), end="")
-            print(err.getvalue(), end="", file=sys.stderr)
-            raise
 
 
 class OneDatabaseMixin:
@@ -87,7 +69,6 @@ class RestartSentEmailQuotaMixin:
 
 
 class SimpleTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     test.SimpleTestCase,
 ):
@@ -95,7 +76,6 @@ class SimpleTestCase(
 
 
 class TestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TestCase,
@@ -104,7 +84,6 @@ class TestCase(
 
 
 class TransactionTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TransactionTestCase,
@@ -113,7 +92,6 @@ class TransactionTestCase(
 
 
 class LiveServerTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     test.LiveServerTestCase,
@@ -122,7 +100,6 @@ class LiveServerTestCase(
 
 
 class StaticLiveServerTestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     testing.StaticLiveServerTestCase,
@@ -131,7 +108,6 @@ class StaticLiveServerTestCase(
 
 
 class APITestCase(
-    OutputBlockerTestMixin,
     OneDatabaseMixin,
     RestartRateLimitMixin,
     APITestCase,
@@ -212,18 +188,29 @@ class ESIndexTestCase(SimpleTestCase):
 
         return xml_tree
 
+    @staticmethod
+    def _get_frontend_counts_text(r):
+        """Extract and clean frontend counts text from the response content."""
+        tree = html.fromstring(r.content.decode())
+        counts_h2_element = tree.xpath('//h2[@id="result-count"]')[0]
+        counts_text = " ".join(counts_h2_element.xpath(".//text()"))
+        counts_text = counts_text.replace("&nbsp;", " ")
+        counts_text = counts_text.split()
+        return " ".join(counts_text)
+
 
 class CountESTasksTestCase(SimpleTestCase):
     def setUp(self):
         self.task_call_count = 0
 
-    def count_task_calls(self, task, *args, **kwargs) -> None:
+    def count_task_calls(
+        self, task, immutable_signature, *args, **kwargs
+    ) -> None:
         """Wraps the task to count its calls and assert the expected count."""
         # Increment the call count
         self.task_call_count += 1
-
         # Call the task
-        if task.__name__ in ["es_save_document", "update_es_document"]:
+        if immutable_signature:
             return task.s(*args, **kwargs)
         else:
             task.apply_async(args=args, kwargs=kwargs)
@@ -231,9 +218,9 @@ class CountESTasksTestCase(SimpleTestCase):
     def reset_and_assert_task_count(self, expected) -> None:
         """Resets the task call count and asserts the expected number of calls."""
 
-        assert (
-            self.task_call_count == expected
-        ), f"Expected {expected} task calls, but got {self.task_call_count}"
+        assert self.task_call_count == expected, (
+            f"Expected {expected} task calls, but got {self.task_call_count}"
+        )
         self.task_call_count = 0
 
 
@@ -251,11 +238,25 @@ class V4SearchAPIAssertions(SimpleTestCase):
         meta_expected_value = await sync_to_async(get_meta_expected_value)(
             content_to_compare
         )
-        self.assertEqual(
-            meta_value,
-            meta_expected_value,
-            f"The field '{meta_field}' does not match.",
-        )
+        if meta_field == "score":
+            # Special case for the score field. Only confirm the presence of
+            # keys and avoid comparing values, as they differ in each response.
+            self.assertEqual(
+                set(meta_value.keys()),
+                set(meta_expected_value.keys()),
+                f"The keys in field '{meta_field}' do not match.",
+            )
+            for score_value in meta_value.values():
+                self.assertIsNotNone(
+                    score_value, "The score value can't be None."
+                )
+
+        else:
+            self.assertEqual(
+                meta_value,
+                meta_expected_value,
+                f"The field '{meta_field}' does not match.",
+            )
 
     async def _test_api_fields_content(
         self,
@@ -285,6 +286,10 @@ class V4SearchAPIAssertions(SimpleTestCase):
                                     meta_value,
                                 ) in child_value.items():
                                     with self.subTest(meta_field=meta_field):
+                                        self.assertFalse(
+                                            meta_field == "score",
+                                            msg="score key should not be present in nested documents",
+                                        )
                                         await self._compare_field(
                                             meta_field,
                                             meta_value,
@@ -317,23 +322,63 @@ class V4SearchAPIAssertions(SimpleTestCase):
                         f"Parent field '{field}' does not match.",
                     )
 
-    def _test_results_ordering(self, test, field):
+    def _test_results_ordering(self, test, field, version="v4"):
         """Ensure dockets appear in the response in a specific order."""
 
-        with self.subTest(test=test, msg=f'{test["name"]}'):
+        with self.subTest(test=test, msg=f"{test['name']}"):
             r = self.client.get(
-                reverse("search-list", kwargs={"version": "v4"}),
+                reverse("search-list", kwargs={"version": version}),
                 test["search_params"],
             )
-            self.assertEqual(len(r.data["results"]), test["expected_results"])
+
+            expected_order_key = "expected_order"
+            if version == "v3":
+                expected_order_key = (
+                    "expected_order_v3"
+                    if "expected_order_v3" in test
+                    else "expected_order"
+                )
+
+            self.assertEqual(
+                len(r.data["results"]), len(test[expected_order_key])
+            )
             # Note that dockets where the date_field is null are sent to the bottom
             # of the results
             actual_order = [result[field] for result in r.data["results"]]
             self.assertEqual(
                 actual_order,
-                test["expected_order"],
-                msg=f'Expected order {test["expected_order"]}, but got {actual_order}',
+                test[expected_order_key],
+                msg=f"Expected order {test[expected_order_key]}, but got {actual_order} for "
+                f"Search type: {test['search_params']['type']}",
             )
+
+    def _assert_order_in_html(
+        self, decoded_content: str, expected_order: list
+    ) -> None:
+        """Assert that the expected order of documents appears correctly in the
+        HTML content."""
+
+        for i in range(len(expected_order) - 1):
+            self.assertTrue(
+                decoded_content.index(str(expected_order[i]))
+                < decoded_content.index(str(expected_order[i + 1])),
+                f"Expected {expected_order[i]} to appear before {expected_order[i + 1]} in the HTML content.",
+            )
+
+    async def _test_article_count(self, params, expected_count, field_name):
+        r = await self.async_client.get("/", params)
+        tree = html.fromstring(r.content.decode())
+        got = len(tree.xpath("//article"))
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in Frontend with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
 
     def _test_page_variables(
         self, response, test_case, current_page, search_type
@@ -388,8 +433,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
         return next_page, previous_page, current_page
 
 
-class RECAPAlertsAssertions:
-
+class SearchAlertsAssertions:
     @staticmethod
     def get_html_content_from_email(email_content):
         html_content = None
@@ -482,7 +526,9 @@ class RECAPAlertsAssertions:
                 case_text_cleaned = self.clean_case_title(case_text)
                 if case_title == case_text_cleaned:
                     child_hit_count = len(
-                        case.xpath("following-sibling::ul[1]/li/a")
+                        case.xpath(
+                            "following-sibling::ul[1]/li/a | following-sibling::ul[1]/li/strong"
+                        )
                     )
                     self.assertEqual(
                         child_hit_count,
@@ -511,8 +557,8 @@ class RECAPAlertsAssertions:
             child_documents = case_item.xpath("./following-sibling::ul[1]/li")
             results = []
             for li in child_documents:
-                a_tag = li.xpath(".//a")[0]
-                full_text = a_tag.text_content()
+                child_tag = li.xpath(".//a | .//strong")[0]
+                full_text = child_tag.text_content()
                 first_part = full_text.split("\u2014")[0].strip()
                 results.append(first_part)
 
@@ -539,6 +585,7 @@ class RECAPAlertsAssertions:
         expected_hits,
         case_title,
         expected_child_hits,
+        nested_field="recap_documents",
     ):
         """Confirm the following assertions for the search alert webhook:
         - An specific alert webhook was triggered.
@@ -546,23 +593,32 @@ class RECAPAlertsAssertions:
         - The specified case contains the expected number of child hits.
         """
 
+        matched_alert_name = None
+        matched_case_title = None
         for webhook in webhooks:
             if webhook["payload"]["alert"]["name"] == alert_title:
                 webhook_cases = webhook["payload"]["results"]
                 self.assertEqual(
                     len(webhook_cases),
                     expected_hits,
-                    msg=f"Did not get the right number of hits for the alert %s. "
+                    msg="Did not get the right number of hits for the alert %s. "
                     % alert_title,
                 )
+                matched_alert_name = True
                 for case in webhook["payload"]["results"]:
                     if case_title == strip_tags(case["caseName"]):
+                        matched_case_title = True
+                        if nested_field is None:
+                            self.assertTrue(nested_field not in case)
+                            continue
                         self.assertEqual(
-                            len(case["recap_documents"]),
+                            len(case[nested_field]),
                             expected_child_hits,
-                            msg=f"Did not get the right number of child documents for the case %s. "
+                            msg="Did not get the right number of child documents for the case %s. "
                             % case_title,
                         )
+        self.assertTrue(matched_alert_name, msg="Alert name didn't match")
+        self.assertTrue(matched_case_title, msg="Case title didn't match")
 
     def _count_percolator_webhook_hits_and_child_hits(
         self,
@@ -591,7 +647,7 @@ class RECAPAlertsAssertions:
                 self.assertEqual(
                     1,
                     len(hits),
-                    msg=f"Did not get the right number of hits for the case %s. "
+                    msg="Did not get the right number of hits for the case %s. "
                     % webhook["payload"]["results"][0]["caseName"],
                 )
                 alert_child_hits = alert_child_hits + len(
@@ -603,20 +659,20 @@ class RECAPAlertsAssertions:
         self.assertEqual(
             alert_title_webhooks,
             expected_hits,
-            msg=f"Did not get the right number of webhooks for alert %s. "
+            msg="Did not get the right number of webhooks for alert %s. "
             % alert_title,
         )
         self.assertEqual(
             alert_child_hits,
             expected_child_hits,
-            msg=f"Did not get the right number of child hits for alert %s. "
+            msg="Did not get the right number of child hits for alert %s. "
             % alert_title,
         )
         if expected_child_descriptions:
             self.assertEqual(
                 alert_child_ids,
                 set(expected_child_descriptions),
-                msg=f"Did not get the right child hits IDs for alert %s. "
+                msg="Did not get the right child hits IDs for alert %s. "
                 % alert_title,
             )
 
@@ -627,24 +683,67 @@ class RECAPAlertsAssertions:
         field_name,
         hl_expected,
         child_field,
+        nested_field="recap_documents",
     ):
         """Assert Hl in webhook fields."""
         for webhook in webhooks:
             if webhook["payload"]["alert"]["name"] == alert_title:
                 hit = webhook["payload"]["results"][0]
                 if child_field:
-                    child_field_content = hit["recap_documents"][0][field_name]
+                    self.assertNotIn(
+                        "score",
+                        hit[nested_field][0]["meta"],
+                        msg="score shouldn't be present on webhook nested documents",
+                    )
+                    child_field_content = hit[nested_field][0][field_name]
                     self.assertIn(
                         hl_expected,
                         child_field_content,
-                        msg=f"Did not get the HL content in field: %s. "
+                        msg="Did not get the HL content in field: %s. "
                         % field_name,
                     )
                 else:
+                    self.assertNotIn(
+                        "score",
+                        hit["meta"],
+                        msg="score shouldn't be present on webhook main document",
+                    )
                     parent_field_content = hit[field_name]
                     self.assertIn(
                         hl_expected,
                         parent_field_content,
-                        msg=f"Did not get the HL content in field: %s. "
+                        msg="Did not get the HL content in field: %s. "
                         % field_name,
                     )
+
+    def _assert_timestamp_filter(
+        self, html_content, rate, date, sweep_index=False
+    ):
+        """Confirm that timestamp filter is properly set in the
+        'View Full Results' URL.
+        """
+        view_results_url = html.fromstring(str(html_content)).xpath(
+            '//a[text()="View Full Results / Edit this Alert"]/@href'
+        )
+        parsed_url = urlparse(view_results_url[0])
+        params = parse_qs(parsed_url.query)
+        cut_off_date = get_cut_off_date(rate, date, sweep_index)
+        iso_datetime = (
+            cut_off_date.strftime("%Y-%m-%dT%H:%M:%S")
+            if isinstance(cut_off_date, datetime)
+            else cut_off_date.strftime("%Y-%m-%d")
+        )
+        self.assertIn(f"timestamp:[{iso_datetime} TO *]", params["q"][0])
+
+    def _assert_date_updated(self, date_to_compare, html_content, txt_content):
+        """Confirm that date_updated is properly set in the alert email."""
+
+        self.assertIn(
+            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            html_content,
+        )
+
+        self.assertIn(
+            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            txt_content,
+        )

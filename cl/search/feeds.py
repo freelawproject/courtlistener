@@ -1,9 +1,7 @@
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable
 
-import waffle
-from django.conf import settings
 from django.contrib.syndication.views import Feed
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -12,18 +10,16 @@ from django.utils.html import strip_tags
 from django.utils.timezone import is_naive
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl.response import Response
-from requests import Session
 
-from cl.lib import search_utils
 from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import do_es_feed_query
 from cl.lib.mime_types import lookup_mime_type
-from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_index_utils import null_map
 from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
 from cl.search.documents import ESRECAPDocument, OpinionClusterDocument
 from cl.search.exception import (
     BadProximityQuery,
+    DisallowedWildcardPattern,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
 )
@@ -87,7 +83,7 @@ class SearchFeed(Feed):
     link = "https://www.courtlistener.com/"
     author_name = "Free Law Project"
     author_email = "feeds@courtlistener.com"
-    description_template = "feeds/solr_desc_template.html"
+    description_template = "feeds/description_template.html"
     feed_copyright = "Created for the public domain by Free Law Project"
 
     def get_object(self, request, get_string):
@@ -98,74 +94,39 @@ class SearchFeed(Feed):
         For Opinions SearchFeed returns clusters.
         For RECAP SearchFeed returns RECAPDocuments.
         """
-        search_form = SearchForm(obj.GET, request=obj)
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-            order_by = "dateFiled"
-            es_search_query = None
-            with Session() as session:
-                match cd["type"]:
-                    case SEARCH_TYPES.OPINION:
-                        document_text_key = "text"
-                        if waffle.flag_is_active(obj, "o-es-active"):
-                            es_search_query = OpinionClusterDocument.search()
-                            override_params = {
-                                "order_by": f"{order_by} desc",
-                            }
-                            exclude_docs_for_empty_field = order_by
-                        else:
-                            solr = ExtraSolrInterface(
-                                settings.SOLR_OPINION_URL,
-                                http_connection=session,
-                                mode="r",
-                            )
-                    case SEARCH_TYPES.RECAP:
-                        document_text_key = "plain_text"
-                        if waffle.flag_is_active(obj, "r-es-active"):
-                            es_search_query = ESRECAPDocument.search()
-                            override_params = {
-                                "order_by": "entry_date_filed_feed desc",
-                            }
-                            exclude_docs_for_empty_field = "entry_date_filed"
-                        else:
-                            solr = ExtraSolrInterface(
-                                settings.SOLR_RECAP_URL,
-                                http_connection=session,
-                                mode="r",
-                            )
-                    case _:
-                        return []
-
-                if es_search_query:
-                    # Do a ES query.
-                    cd.update(override_params)
-                    items = do_es_feed_query(
-                        es_search_query,
-                        cd,
-                        rows=20,
-                        exclude_docs_for_empty_field=exclude_docs_for_empty_field,
-                    )
-                    cleanup_control_chars(items, document_text_key)
-
-                else:
-                    # Do a Solr query.
-                    main_params = search_utils.build_main_query(
-                        cd, highlight=False, facet=False
-                    )
-                    main_params.update(
-                        {
-                            "sort": f"{order_by} desc",
-                            "rows": "20",
-                            "start": "0",
-                            "caller": "SearchFeed",
-                        }
-                    )
-                    # Eliminate items that lack the ordering field.
-                    main_params["fq"].append(f"{order_by}:[* TO *]")
-                    items = solr.query().add_extra(**main_params).execute()
-                return items
-        else:
+        search_form = SearchForm(obj.GET)
+        if not search_form.is_valid():
             return []
+
+        cd = search_form.cleaned_data
+        order_by = "dateFiled"
+        match cd["type"]:
+            case SEARCH_TYPES.OPINION:
+                document_text_key = "text"
+                es_search_query = OpinionClusterDocument.search()
+                override_params = {
+                    "order_by": f"{order_by} desc",
+                }
+                exclude_docs_for_empty_field = order_by
+            case SEARCH_TYPES.RECAP:
+                document_text_key = "plain_text"
+                es_search_query = ESRECAPDocument.search()
+                override_params = {
+                    "order_by": "entry_date_filed_feed desc",
+                }
+                exclude_docs_for_empty_field = "entry_date_filed"
+            case _:
+                return []
+
+        cd.update(override_params)
+        items = do_es_feed_query(
+            es_search_query,
+            cd,
+            rows=20,
+            exclude_docs_for_empty_field=exclude_docs_for_empty_field,
+        )
+        cleanup_control_chars(items, document_text_key)
+        return items
 
     def item_link(self, item):
         return get_item(item)["absolute_url"]
@@ -202,7 +163,7 @@ class JurisdictionFeed(Feed):
     author_name = "Free Law Project"
     author_email = "feeds@courtlistener.com"
     feed_copyright = "Created for the public domain by Free Law Project"
-    description_template = "feeds/solr_desc_template.html"
+    description_template = "feeds/description_template.html"
 
     def title(self, obj):
         return f"CourtListener.com: All opinions for the {obj.full_name}"
@@ -214,34 +175,16 @@ class JurisdictionFeed(Feed):
         """Do a search query here. Return the first 20 results
         JurisdictionFeed return Opinions instead of Clusters.
         """
-
-        if waffle.flag_is_active(obj, "o-es-active"):
-            es_search_query = OpinionClusterDocument.search()
-            cd = {
-                "court": obj.pk,
-                "order_by": "dateFiled desc",
-                "type": SEARCH_TYPES.OPINION,
-            }
-            items = do_es_feed_query(
-                es_search_query, cd, rows=20, jurisdiction=True
-            )
-            cleanup_control_chars(items, "text", jurisdiction=True)
-        else:
-            with Session() as session:
-                solr = ExtraSolrInterface(
-                    settings.SOLR_OPINION_URL,
-                    http_connection=session,
-                    mode="r",
-                )
-                params = {
-                    "q": "*",
-                    "fq": f"court_exact:{obj.pk}",
-                    "sort": "dateFiled desc",
-                    "rows": "20",
-                    "start": "0",
-                    "caller": "JurisdictionFeed",
-                }
-                items = solr.query().add_extra(**params).execute()
+        es_search_query = OpinionClusterDocument.search()
+        cd = {
+            "court": obj.pk,
+            "order_by": "dateFiled desc",
+            "type": SEARCH_TYPES.OPINION,
+        }
+        items = do_es_feed_query(
+            es_search_query, cd, rows=20, jurisdiction=True
+        )
+        cleanup_control_chars(items, "text", jurisdiction=True)
         return items
 
     def item_link(self, item):
@@ -285,32 +228,15 @@ class AllJurisdictionsFeed(JurisdictionFeed):
 
     def items(self, obj):
         """Do a match all search query. Return the first 20 results"""
-        if waffle.flag_is_active(obj, "o-es-active"):
-            es_search_query = OpinionClusterDocument.search()
-            cd = {
-                "order_by": "dateFiled desc",
-                "type": SEARCH_TYPES.OPINION,
-            }
-            items = do_es_feed_query(
-                es_search_query, cd, rows=20, jurisdiction=True
-            )
-            cleanup_control_chars(items, "text", jurisdiction=True)
-        else:
-            with Session() as session:
-                solr = ExtraSolrInterface(
-                    settings.SOLR_OPINION_URL,
-                    http_connection=session,
-                    mode="r",
-                )
-                params = {
-                    "q": "*",
-                    "sort": "dateFiled desc",
-                    "rows": "20",
-                    "start": "0",
-                    "caller": "AllJurisdictionsFeed",
-                }
-                items = solr.query().add_extra(**params).execute()
-
+        es_search_query = OpinionClusterDocument.search()
+        cd = {
+            "order_by": "dateFiled desc",
+            "type": SEARCH_TYPES.OPINION,
+        }
+        items = do_es_feed_query(
+            es_search_query, cd, rows=20, jurisdiction=True
+        )
+        cleanup_control_chars(items, "text", jurisdiction=True)
         return items
 
 
@@ -330,6 +256,7 @@ def search_feed_error_handler(view_func: Callable) -> Callable:
             UnbalancedParenthesesQuery,
             UnbalancedQuotesQuery,
             BadProximityQuery,
+            DisallowedWildcardPattern,
             ApiError,
         ) as e:
             logger.warning("Couldn't load the feed page. Error was: %s", e)

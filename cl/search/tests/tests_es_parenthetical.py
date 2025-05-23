@@ -169,7 +169,6 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.rebuild_index("search.ParentheticalGroup")
 
     def test_filter_search(self) -> None:
         """Test filtering and search at the same time"""
@@ -465,7 +464,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            "docket_number. Expected %s, but got %s." % (expected, actual),
         )
         r = await self.async_client.get(
             reverse("show_results"),
@@ -676,8 +675,8 @@ class ParentheticalESSignalProcessorTest(
         self.o.opinions_cited.remove(self.o_2)
 
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
-        self.assertEqual(None, doc.cites)
-        self.assertEqual(None, doc.panel_ids)
+        self.assertEqual([], doc.cites)
+        self.assertEqual([], doc.panel_ids)
         self.pg_test.delete()
 
     def test_keep_in_sync_related_pa_objects_on_reverse_relation(self) -> None:
@@ -707,7 +706,7 @@ class ParentheticalESSignalProcessorTest(
         citation_lexis.delete()
         citation_neutral.delete()
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
-        self.assertEqual(None, doc.citation)
+        self.assertEqual([], doc.citation)
         self.assertEqual(None, doc.lexisCite)
         self.assertEqual(None, doc.neutralCite)
         self.pg_test.delete()
@@ -728,7 +727,7 @@ class ParentheticalESSignalProcessorTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             cluster_1 = OpinionClusterFactory(
@@ -767,7 +766,7 @@ class ParentheticalESSignalProcessorTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             pg_test.save()
@@ -778,7 +777,7 @@ class ParentheticalESSignalProcessorTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             p6 = ParentheticalFactory(
@@ -809,7 +808,7 @@ class ParentheticalESSignalProcessorTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             pg_test.opinion = o

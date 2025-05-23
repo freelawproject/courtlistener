@@ -10,6 +10,14 @@
   "eslintConfig": {
     "extends": "react-app"
   },
+  "scripts": {
+    "start": "npm run dev",
+    "build": "npm run build:clean && npm run build:tailwind",
+    "build:clean": "rimraf ../static/css/tailwind_styles.css",
+    "build:tailwind": "cross-env NODE_ENV=production tailwindcss --config ./assets/tailwind/tailwind.config.js -i ./assets/tailwind/input.css -o ./assets/static-global/css/tailwind_styles.css --minify",
+    "dev": "cross-env NODE_ENV=development tailwindcss --config ./assets/tailwind/tailwind.config.js -i ./assets/tailwind/input.css -o ./assets/static-global/css/tailwind_styles.css -w",
+    "tailwindcss": "node ./node_modules/tailwindcss/lib/cli.js"
+  },
   "author": "",
   "license": "ISC",
   "devDependencies": {
@@ -27,23 +35,27 @@
     "@types/react-router-dom": "^5.1.5",
     "@typescript-eslint/eslint-plugin": "^3.9.1",
     "@typescript-eslint/parser": "^3.9.1",
+    "autoprefixer": "^10.4.20",
     "babel-loader": "^8.1.0",
     "clean-webpack-plugin": "*",
+    "cross-env": "^7.0.3",
     "downshift": "^6.0.5",
     "eslint": "^7.7.0",
     "eslint-config-prettier": "^6.11.0",
     "eslint-plugin-prettier": "^3.1.4",
     "eslint-plugin-react": "^7.20.6",
     "js-cookie": "^2.2.1",
+    "postcss": "^8.4.49",
     "prettier": "^2.0.5",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "react-query": "^2.8.0",
     "react-router-dom": "^5.2.0",
     "react-virtual": "^2.2.1",
+    "tailwindcss": "^3.4.17",
     "terser-webpack-plugin": "^5.3.6",
     "typescript": "^4.2.4",
-    "webpack": "^5.76.0",
+    "webpack": "^5.94.0",
     "webpack-bundle-analyzer": "^4.4.1",
     "webpack-cli": "^4.10.0",
     "webpack-dev-server": "^4.10.0"

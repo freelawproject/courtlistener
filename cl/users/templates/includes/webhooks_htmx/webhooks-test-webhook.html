@@ -1,5 +1,7 @@
 <div class="row form-group">
-    <label class="col-md-3">Endpoint URL: </label><p class="col-md-9">{{ webhook.url }}</p>
+  <label class="col-md-3">Endpoint URL: </label><p class="col-md-9">{{ webhook.url }}</p>
+  <label class="col-md-3">Event Type: </label><p class="col-md-9">{{ webhook.get_event_type_display }}</p>
+  <label class="col-md-3">Version: </label><p class="col-md-9">{{ webhook.get_version_display }}</p>
 </div>
 
 <ul class="nav nav-tabs">

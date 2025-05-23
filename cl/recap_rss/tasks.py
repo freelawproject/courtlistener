@@ -5,7 +5,6 @@ import logging
 import re
 from calendar import SATURDAY, SUNDAY
 from datetime import datetime, timedelta
-from typing import Optional
 
 import requests
 from asgiref.sync import async_to_sync
@@ -58,7 +57,7 @@ def update_entry_types(court_pk: str, description: str) -> None:
         m = re.search(r"entries of type: (.+)", description)
         if not m:
             logger.error(
-                f"Unable to parse PACER RSS description: {description}"
+                "Unable to parse PACER RSS description: %s", description
             )
             return
         new_entry_types = m.group(1)
@@ -78,7 +77,7 @@ def update_entry_types(court_pk: str, description: str) -> None:
         court.save()
 
 
-def get_last_build_date(b: bytes) -> Optional[datetime]:
+def get_last_build_date(b: bytes) -> datetime | None:
     """Get the last build date for an RSS feed
 
     In this case we considered using lxml & xpath, which was 1000× faster than
@@ -200,7 +199,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         rss_feed.query()
     except requests.RequestException:
         logger.warning(
-            f"Network error trying to get RSS feed at {rss_feed.url}"
+            "Network error trying to get RSS feed at %s", rss_feed.url
         )
         abort_task(self, feed_status)
         return
@@ -220,8 +219,10 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         rss_feed.response.raise_for_status()
     except HTTPError as exc:
         logger.warning(
-            f"RSS feed down at '{court_pk}' "
-            f"({rss_feed.response.status_code}). {exc}"
+            "RSS feed down at '%s' (%s). %s",
+            court_pk,
+            rss_feed.response.status_code,
+            exc,
         )
         abort_task(self, feed_status)
         return
@@ -257,11 +258,14 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         return
 
     logger.info(
-        f"{feed_status.court_id}: Feed changed or doing a sweep. Moving on to the merge."
+        "%s: Feed changed or doing a sweep. Moving on to the merge.",
+        feed_status.court_id,
     )
     rss_feed.parse()
     logger.info(
-        f"{feed_status.court_id}: Got {len(rss_feed.data)} results to merge."
+        "%s: Got %s results to merge.",
+        feed_status.court_id,
+        len(rss_feed.data),
     )
 
     # Update RSS entry types in Court table
@@ -312,7 +316,9 @@ async def cache_hash(item_hash):
 
 
 @app.task(bind=True, max_retries=1)
-def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
+def merge_rss_feed_contents(
+    self, feed_data, court_pk, metadata_only=False
+) -> list[tuple[int, datetime]]:
     """Merge the rss feed contents into CourtListener
 
     :param self: The Celery task
@@ -320,9 +326,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
     already queried the feed and been parsed.
     :param court_pk: The CourtListener court ID.
     :param metadata_only: Whether to only do metadata and skip docket entries.
-    :returns Dict containing keys:
-      d_pks_to_alert: A list of (docket, alert_time) tuples for sending alerts
-      rds_for_solr: A list of RECAPDocument PKs for updating in Solr
+    :returns A list of (docket ids, alert_time) tuples for sending alerts
     """
     start_time = now()
 
@@ -341,7 +345,12 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
                 # in another thread/process and we had a race condition.
                 continue
             d = async_to_sync(find_docket_object)(
-                court_pk, docket["pacer_case_id"], docket["docket_number"]
+                court_pk,
+                docket["pacer_case_id"],
+                docket["docket_number"],
+                docket.get("federal_defendant_number"),
+                docket.get("federal_dn_judge_initials_assigned"),
+                docket.get("federal_dn_judge_initials_referred"),
             )
 
             d.add_recap_source()
@@ -374,19 +383,19 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
         all_rds_created.extend([rd.pk for rd in rds_created])
 
     logger.info(
-        "%s: Sending %s new RECAP documents to Solr for indexing and "
+        "%s: Sending %s new RECAP documents for indexing and "
         "sending %s dockets for alerts.",
         court_pk,
         len(all_rds_created),
         len(d_pks_to_alert),
     )
-    return {"d_pks_to_alert": d_pks_to_alert, "rds_for_solr": all_rds_created}
+    return d_pks_to_alert
 
 
 @app.task
 def mark_status_successful(feed_status_pk):
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
-    logger.info(f"Marking {feed_status.court_id} as a success.")
+    logger.info("Marking %s as a success.", feed_status.court_id)
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)
 
 

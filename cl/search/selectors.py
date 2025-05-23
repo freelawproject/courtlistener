@@ -1,5 +1,5 @@
 import natsort
-from django.db.models import F, Prefetch, QuerySet
+from django.db.models import F, Q, QuerySet
 
 from cl.search.models import OpinionCluster
 
@@ -82,8 +82,9 @@ async def get_clusters_from_citation_str(
             # There may be different page cite formats that aren't yet
             # accounted for by this code.
             clusters = OpinionCluster.objects.filter(
-                id=possible_match.id,
-                sub_opinions__html_with_citations__contains=f"*{page}",
+                Q(id=possible_match.id),
+                Q(sub_opinions__html_with_citations__contains=f"*{page}")
+                | Q(sub_opinions__xml_harvard__contains=f"*{page}"),
             ).select_related("docket__court")
             cluster_count = 1 if await clusters.aexists() else 0
 

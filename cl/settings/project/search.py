@@ -1,57 +1,16 @@
-import os
-
 import environ
 
 env = environ.FileAwareEnv()
 
-SOLR_HOST = env("SOLR_HOST", default="http://cl-solr:8983")
-SOLR_RECAP_HOST = env("SOLR_RECAP_HOST", default="http://cl-solr:8983")
-SOLR_PAGERANK_DEST_DIR = env("SOLR_PAGERANK_DEST_DIR", default="/tmp/")
-
-########
-# Solr #
-########
-SOLR_OPINION_URL = f"{SOLR_HOST}/solr/collection1"
-SOLR_AUDIO_URL = f"{SOLR_HOST}/solr/audio"
-SOLR_PEOPLE_URL = f"{SOLR_HOST}/solr/person"
-SOLR_RECAP_URL = f"{SOLR_RECAP_HOST}/solr/recap"
-SOLR_URLS = {
-    "audio.Audio": SOLR_AUDIO_URL,
-    "people_db.Person": SOLR_PEOPLE_URL,
-    "search.Docket": SOLR_RECAP_URL,
-    "search.RECAPDocument": SOLR_RECAP_URL,
-    "search.Opinion": SOLR_OPINION_URL,
-    "search.OpinionCluster": SOLR_OPINION_URL,
-}
-
-SOLR_OPINION_TEST_CORE_NAME = "opinion_test"
-SOLR_AUDIO_TEST_CORE_NAME = "audio_test"
-SOLR_PEOPLE_TEST_CORE_NAME = "person_test"
-SOLR_RECAP_TEST_CORE_NAME = "recap_test"
-
-SOLR_OPINION_TEST_URL = f"{SOLR_HOST}/solr/opinion_test"
-SOLR_AUDIO_TEST_URL = f"{SOLR_HOST}/solr/audio_test"
-SOLR_PEOPLE_TEST_URL = f"{SOLR_HOST}/solr/person_test"
-SOLR_RECAP_TEST_URL = f"{SOLR_RECAP_HOST}/solr/recap_test"
-SOLR_TEST_URLS = {
-    "audio.Audio": SOLR_AUDIO_TEST_URL,
-    "people_db.Person": SOLR_PEOPLE_TEST_URL,
-    "search.Docket": SOLR_RECAP_TEST_URL,
-    "search.RECAPDocument": SOLR_RECAP_TEST_URL,
-    "search.Opinion": SOLR_OPINION_TEST_URL,
-    "search.OpinionCluster": SOLR_OPINION_TEST_URL,
-}
-SOLR_EXAMPLE_CORE_PATH = os.path.join(
-    os.sep, "usr", "local", "solr", "example", "solr", "collection1"
-)
-SOLR_TEMP_CORE_PATH_LOCAL = os.path.join(os.sep, "tmp", "solr")
-SOLR_TEMP_CORE_PATH_DOCKER = os.path.join(os.sep, "tmp", "solr")
-
+###################
+# Export setting #
+###################
+MAX_SEARCH_RESULTS_EXPORTED = env("MAX_SEARCH_RESULTS_EXPORTED", default=250)
 
 ###################
 # Related content #
 ###################
-RELATED_COUNT = 5
+RELATED_COUNT = 20
 RELATED_USE_CACHE = True
 RELATED_CACHE_TIMEOUT = 60 * 60 * 24 * 7
 RELATED_MLT_MAXQT = 10
@@ -61,6 +20,7 @@ RELATED_MLT_MINWL = 3
 RELATED_MLT_MAXWL = 0
 RELATED_FILTER_BY_STATUS = "Precedential"
 QUERY_RESULTS_CACHE = 60 * 60 * 6
+SEARCH_RESULTS_MICRO_CACHE = 60 * 10
 
 #####################
 # Search pagination #
@@ -68,7 +28,7 @@ QUERY_RESULTS_CACHE = 60 * 60 * 6
 MAX_SEARCH_PAGINATION_DEPTH = 100
 SEARCH_PAGE_SIZE = 20
 RECAP_SEARCH_PAGE_SIZE = 10
-RECAP_CHILD_HITS_PER_RESULT = 5
+RECAP_CHILD_HITS_PER_RESULT = env("RECAP_CHILD_HITS_PER_RESULT", default=3)
 OPINION_HITS_PER_RESULT = 20
 PEOPLE_HITS_PER_RESULT = 999
 VIEW_MORE_CHILD_HITS = 99
@@ -76,3 +36,20 @@ SEARCH_API_PAGE_SIZE = 20
 # The amount of text to return from the beginning of the field if there are no
 # matching fragments to highlight.
 NO_MATCH_HL_SIZE = 500
+
+
+###################
+# SEMANTIC SEARCH #
+###################
+MIN_OPINION_SIZE = env("MIN_OPINION_SIZE", default=100)
+NLP_EMBEDDING_MODEL = env(
+    "NLP_EMBEDDING_MODEL_NAME",
+    default="freelawproject/modernbert-embed-base_finetune_512",
+)
+
+#################
+# SEARCH ALERTS #
+#################
+REAL_TIME_ALERTS_SENDING_RATE = env(
+    "REAL_TIME_ALERTS_SENDING_RATE", default=300
+)

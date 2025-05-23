@@ -1,5 +1,4 @@
 from datetime import date, datetime
-from typing import Tuple
 
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
@@ -101,7 +100,7 @@ class AsyncAPIClient(AsyncClient, APIRequestFactory):
 
 def make_client(user_pk: int) -> AsyncAPIClient:
     user = User.objects.get(pk=user_pk)
-    token, created = Token.objects.get_or_create(user=user)
+    token, created = Token.objects.get_or_create(user=user)  # type: ignore[attr-defined]
     token_header = f"Token {token}"
     client = AsyncAPIClient()
     client.credentials(HTTP_AUTHORIZATION=token_header)
@@ -110,7 +109,7 @@ def make_client(user_pk: int) -> AsyncAPIClient:
 
 def get_with_wait(
     wait: WebDriverWait,
-    locator: Tuple[str, str],
+    locator: tuple[str, str],
 ) -> WebElement:
     """Get an element from a selenium browser without all the rigamarole
 

@@ -52,7 +52,7 @@ def handle_hard_bounce(
         if notification_subtype in unexpected_events:
             # Handle unexpected notification_subtype events, log a warning
             logging.warning(
-                f"Unexpected {notification_subtype} hard bounce for {email}"
+                "Unexpected %s hard bounce for %s", notification_subtype, email
             )
         # After log the event ban the email address
         # Only ban email address if it hasn't been previously banned
@@ -192,8 +192,10 @@ def handle_soft_bounce(
             # Handle other unexpected notification_subtype events, like:
             # ContentRejected, log a warning
             logging.warning(
-                f"Unexpected {notification_subtype} soft bounce for {email}, "
-                f"message_id: {message_id}"
+                "Unexpected %s soft bounce for %s, message_id: %s",
+                notification_subtype,
+                email,
+                message_id,
             )
 
 
@@ -230,13 +232,17 @@ def get_email_body(
     html_body = ""
     for part in message.walk():
         if part.get_content_type() == "text/plain":
-            plaintext_body = part.get_payload()
-            break
+            payload = part.get_payload()
+            if isinstance(payload, str):
+                plaintext_body = payload
+                break
 
     for part in message.walk():
         if part.get_content_type() == "text/html":
-            html_body = part.get_payload()
-            break
+            payload = part.get_payload()
+            if isinstance(payload, str):
+                html_body = payload
+                break
 
     return plaintext_body, html_body
 
@@ -430,8 +436,9 @@ def enqueue_email(recipients: list[str], message_id: str) -> None:
 
     if not stored:
         logging.warning(
-            f"The message: {message_id} can't be enqueued because it "
-            "doesn't exist anymore."
+            "The message: %s can't be enqueued because it "
+            "doesn't exist anymore.",
+            message_id,
         )
         return
     for recipient in recipients:

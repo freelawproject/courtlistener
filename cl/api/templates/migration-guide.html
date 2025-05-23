@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+{% load static %}
+{% load extras %}
+
+{% block title %}V4 API Migration Guide &ndash; CourtListener.com{% endblock %}
+{% block description %}
+{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
+  </h4>
+</div>
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <h4 class="v-offset-below-3">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
+  </h4>
+  {% include "includes/toc_migration_guide_sidebar.html" %}
+</div>
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">V4 API Migration Guide</h1>
+  <p class="overview lead">
+    After several years of planning and development, we have released v4 of our APIs.
+  </p>
+  <p>
+    This upgrade responds to feedback we have received over the years and should be much better for our users — faster, more featureful, more scalable, and more accurate.
+  </p>
+  <p>
+    Unfortunately, we couldn't make these new APIs completely backwards compatible, so this guide explains what's new.
+  </p>
+
+  <h2 id="support">Support</h2>
+  <p>Questions about this migration can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our GitHub Discussions forum</a> or to our <a href="{% url "contact" %}">contact form</a>.
+  </p>
+  <p>We prefer that questions be posted in the forum so they can help others. If you are a private organization posting to that forum, we will avoid sharing details about your organization.
+  </p>
+  <p>
+    <a href="https://github.com/freelawproject/courtlistener/discussions"
+        target="_blank"
+        class="btn btn-default">Ask in GitHub Discussions</a>
+    <a href="{% url "contact" %}"
+       target="_blank"
+       class="btn btn-default">Send us a Private Message</a>
+  </p>
+
+
+  <h2 id="timeline-changes">Timeline for Changes</h2>
+  <p>v4 of the API is available now and is the default version for anybody creating new systems. Before its full release, a number of organizations beta tested it.
+  </p>
+  <p>
+    All of our APIs except for our search API are powered by our database. We do not have plans at present to deprecate
+    any of these APIs, but we'd like to remove them someday and urge you to migrate to v4 as soon as possible so we can do that.
+  </p>
+  <p>
+    That said, the v3 Search API is currently powered by Solr while v4 is powered by ElasticSearch. In <strong>nine weeks</strong> we aim to switch v3 so it uses ElasticSearch too.
+    This will change v3 in small backwards incompatible ways, but will allow us to continue supporting it even after turning off our Solr server.
+  </p>
+  <p>
+    If you are a v3 Search API user, you will soon get an email from us to communicate and discuss timelines.
+  </p>
+  <h2 id="what-if-do-nothing">What If I Do Nothing?</h2>
+  <p>
+    You might be fine. Most of the database and search APIs are only changing slightly, and v3 will be supported for some period of time.
+    But you should read this guide to see if any changes are needed to your application.
+  </p>
+  <p>The remainder of this guide is in three sections:</p>
+  <ul>
+    <li>New features you can expect</li>
+    <li>How to migrate database APIs</li>
+    <li>How to migrate search APIs</li>
+  </ul>
+  <p>
+    We're very excited to be releasing v4 of our APIs. We hope you will review these changes so we can all have a smooth transition.
+  </p>
+  <h2 id="what-to-expect">What New Features Can I Expect?</h2>
+  <h3 id="cursor-pagination">Cursor-based pagination</h3>
+  <p>Our database-powered APIs now support cursor-based pagination. This allows you to crawl very deeply in the API. In v3, any page past 100 was blocked.
+  </p>
+  <h3 id="elasticsearch">ElasticSearch</h3>
+  <p>v4 of the Search API is powered by ElasticSearch instead of Solr. This is a huge upgrade to our API and search engine.
+  </p>
+  <p>Some improvements include:</p>
+  <ul>
+    <li>In v4, all PACER cases are now searchable. In v3 you only got results if a case had a docket entry.
+    </li>
+    <li>You can search for PACER filings based on what decisions they cite.
+    </li>
+    <li>You can now search for exact words like "Deposit" and not get back results for things like "Deposition."
+    </li>
+    <li>We've added about 800 legal acronyms like "IRS" to make sure those bring back results.
+    </li>
+    <li>Better relevancy for edge cases:
+    </li>
+    <ul>
+      <li>Small words like "of," "to," and "the" are now searchable.</li>
+      <li>Camelcase words like "McDonalds" are more searchable.</li>
+      <li>Highlighting is more consistent and can be disabled for better performance.</li>
+    </ul>
+    <li>Emojis and Unicode characters are now searchable.</li>
+    <li>Docket number and other fielded searches are more robust.</li>
+    <li>Timezone handling is more consistent.</li>
+    <li>We've added a number of new searchable fields.</li>
+  </ul>
+  <p>For more details, please<a href="https://free.law/2024/01/18/new-recap-archive-search-is-live/" target="_blank"> see our blog</a>.</p>
+  <h2 id="breaking-changes">Breaking Changes to v3 of the Search API</h2>
+  <p>We cannot continue running Solr forever, but we can do our best to support v3 of the API. To do this, on <strong>November 25, 2024</strong>,
+    v3 of the Search API will be upgraded to use ElasticSearch. We expect this to support most uses, but it will cause some breaking changes, as outlined in this section.
+  </p>
+  <p>
+    We recommend all users upgrade to v4 of the API, but if that is not possible, please review this section to learn about the upcoming changes to v3 of the search API.
+  </p>
+  <h3 id="recap-breaking-changes">RECAP (type=r)</h3>
+  <ul>
+    <li>The following fields will be removed from the v3 search API when <code>type=r</code>:</li>
+    <ul>
+      <li>attorney</li>
+      <li>attorney_id</li>
+      <li>firm</li>
+      <li>firm_id</li>
+      <li>party</li>
+      <li>party_id</li>
+      <li>docket_absolute_url</li>
+    </ul>
+  </ul>
+  <ul>
+    <li>Fielded text queries that include party fields won't work, for instance:
+      <p><code>firm_id:1245 AND party:(United States)</code></p>
+    </li>
+  </ul>
+  <ul>
+      <li>The <code>type=r</code> will use a cardinality aggregation to compute the result count, which will have an error of ±6% if results are over 2000.
+      </li>
+  </ul>
+  <h3 id="opinions-breaking-changes">Opinions (type=o)</h3>
+  <ul>
+      <li>The following fields will be removed from the v3 search API when <code>type=o</code>:</li>
+      <ul>
+        <li>caseNameShort</li>
+        <li>pagerank</li>
+        <li>status_exact</li>
+        <li>non_participating_judge_ids</li>
+        <li>source</li>
+      </ul>
+      <li>The <code>date_created</code> field will be added.</li>
+      <li>The <code>snippet</code> will change. In the Solr version, it includes content from all fields, while in ElasticSearch it will display only the Opinion text content.
+      </li>
+      <li>The <code>type=o</code> will use a cardinality aggregation to compute the result count, which will have an error of ±6% if results are over 2000 hits.
+      </li>
+  </ul>
+  <h3 id="oa-breaking-changes">Oral Arguments (type=oa)</h3>
+  <ul>
+    <li>The <code>snippet</code> field currently stores a variety of fields. After the change, it will contain the audio transcription only.
+    </li>
+  </ul>
+  <h3 id="people-breaking-changes">People</h3>
+  <ul>
+    <li>No breaking changes. v3 is already switched to ElasticSearch.</li>
+  </ul>
+  <h2 id="migrate-db-apis">How Do I Migrate Database APIs to&nbsp;v4?</h2>
+  <h3 id="total-count-results">Result Count is Removed</h3>
+  <p>The total count of the results is no longer available in the response. Most users don't need this when using the API, and computing the count for each response slows down the API.
+    If this value is important to your service, let us know so we can discuss adding a new API with this feature.</p>
+  <h3 id="invalid-cursor">Invalid cursor error code: 404</h3>
+  <p>A new type of error in the v4 API is <strong>Invalid Cursor</strong> with a 404 status code.</p>
+  <p>This can happen when GET parameters are changed without getting a fresh cursor parameter. To prevent this error, do not change the GET parameters while maintaining an existing cursor parameter.
+  </p>
+  <h2 id="migrate-search-apis">How Do I Migrate the Search API to&nbsp;v4?</h2>
+  <h3 id="enhancements-v4">Enhancements in v4</h3>
+  <h4 id="enhancements-cursor-pagination">Search API crawls are no longer limited to 100 pages</h4>
+  <ul>
+    <li>Deep pagination of search results is now possible.</li>
+    <li>Users cannot directly jump to a specific page. Look at and follow the <code>next</code> and <code>previous</code> parameters provided in each response. Navigation of the API is exclusively through those keys in each API response.
+    </li>
+  </ul>
+  <h4 id="enhancements-results-sorting">Result sorting is more consistent</h4>
+  <ul>
+    <li>When sorting the API results, we now add a tie-breaking field to all responses. This ensures that ordering is consistent even when the ordering key has identical values for multiple results.
+    </li>
+    <li>If your sorting field has null values, those results will be sorted at the end of the query, regardless of whether you sort in ascending or descending order.
+      For example if you sort by a date that is null for an opinion, that opinion will go at the end of the result set.
+    </li>
+  </ul>
+  <h4 id="enhancements-highlighting">Highlighting is more consistent</h4>
+  <ul>
+    <li>When enabled, highlighting will more consistently highlight the fields in the response.</li>
+  </ul>
+  <h4 id="enhancements-empty-fields">Empty fields are standardized</h4>
+  <ul>
+      <li>Empty fields are now more consistent in their response types, and follow the conventions provided by Django.
+        This means that dates, date times, and integers return <code>null</code>, strings return an empty string, and lists return an empty array.
+      </li>
+  </ul>
+
+
+  <h3 id="v4-backwards-incompatible-changes">Backwards incompatible changes in v4</h3>
+  <h4 id="backwards-estimated-counts">High query counts are estimated</h4>
+  <ul>
+    <li>To enhance performance, query counts above 2,000 hits are approximate.
+        For queries exceeding this threshold, counts can be off by as much as six percent.
+        We recommend noting this in your interface by saying something like, "About 5,000 results," instead of presenting the value as exact.
+    </li>
+  </ul>
+
+  <h4 id="backwards-highlighting">Highlighting</h4>
+  <ul>
+    <li>To enhance performance, results are not highlighted by default. To enable highlighting, include <code>highlight=on</code> in your request.
+    </li>
+    <li>When highlighting is disabled, the first 500 characters of <code>snippet</code> fields are returned for types <code>o</code>, <code>r</code>, and <code>rd</code>.
+    </li>
+  </ul>
+  <h4 id="backwards-nested-keys">Nested keys (documents) for <code>type=o</code> and <code>type=p</code></h4>
+  <ul>
+    <li>To enhance the structure of the API, sub-opinions are now nested within clusters in case law results (<code>type=o</code>), and <code>positions</code> are nested within judges in judge results (<code>type=p</code>).
+    </li>
+  </ul>
+  <h4 id="backwards-type-r"><code>type=r</code> is now for dockets with nested documents</h4>
+  <ul>
+    <li>To align the API results with the front end results, <code>type=r</code> no longer returns a flat list of documents.
+      Instead, it now returns a list of dockets with up to three matching documents nested within each docket's <code>recap_documents</code> key.
+    </li>
+    <li>To return a flat list of documents, as in the past, try the new <code>type=rd</code> parameter.
+      This can be useful for those upgrading from v3 to v4 of the search API.
+    </li>
+    <li>If there are more than three matching documents, the <code>more_docs</code> field for the docket result will be true.
+      As in the front end, you can get the remaining documents for a docket by placing a docket ID query like:
+      <code>type=rd&amp;q=(original query) AND docket_id:XYZ</code>
+    </li>
+    <li>This response type includes two counts of the results: <code>count</code> is the number of dockets returned. <code>document_count</code> is the number of documents.
+    </li>
+  </ul>
+  <h4 id="backwards-type-rd"><code>type=rd</code> is a new result type for documents</h4>
+  <ul>
+    <li><code>type=rd</code> returns a flat list of PACER documents, and is similar to <code>type=r</code> in v3 of the API.
+      Results for this type can be queried by any docket fields except the <code>party</code> and <code>attorney</code> fields.
+    </li>
+    <li>The field differences between <code>r</code> in v3 and <code>rd</code> in v4 are that all the docket-level fields were removed:
+    </li>
+    <ul>
+      <li>assignedTo</li>
+      <li>assigned_to_id</li>
+      <li>caseName</li>
+      <li>cause</li>
+      <li>court</li>
+      <li>court_citation_string</li>
+      <li>court_exact</li>
+      <li>court_id</li>
+      <li>dateArgued</li>
+      <li>dateFiled</li>
+      <li>dateTerminated</li>
+      <li>docketNumber</li>
+      <li>jurisdictionType</li>
+      <li>juryDemand</li>
+      <li>referredTo</li>
+      <li>referred_to_id</li>
+      <li>suitNature</li>
+    </ul>
+    <li><code>docket_id</code> is still available in the <code>rd</code> type so users can identify the docket and pull additional docket data from the docket API.
+    </li>
+    <li>One field that changed is <code>entry_date_filed</code>. In <code>r</code> v3, it was a <code>datetime</code> field with PST midnight as the default time.
+      Now, it's simply a date field.
+    </li>
+    <li>The <code>timestamp</code> field has been moved to the new <code>meta</code> field, which also contains <code>date_created</code>.
+    </li>
+  </ul>
+  <h4 id="backwards-type-d"><code>type=d</code> still returns dockets</h4>
+  <ul>
+    <li><code>type=d</code> returns dockets without nested documents. If all you need in the response is the docket information, this response type will be significantly faster.
+      You can query document fields with this response type even though they will not be returned.
+    </li>
+  </ul>
+  <h4 id="backwards-removed-fields">Removed fields</h4>
+  <ul>
+    <li>The following fields have been removed from the case law search results (<code>type=o</code>):
+    </li>
+    <ul>
+      <li>caseNameShort</li>
+      <li>pagerank</li>
+      <li>status_exact</li>
+      <li>non_participating_judge_ids</li>
+    </ul>
+  </ul>
+  <h4 id="backwards-changed-fields">Changed field values</h4>
+  <ul>
+    <li>For legibility, in the case law search results (<code>type=o</code>), some <code>type</code> field values have changed:
+    </li>
+    <ul>
+      <li>010combined → combined-opinion</li>
+      <li>015unamimous → unanimous-opinion</li>
+      <li>020lead → lead-opinion</li>
+      <li>025plurality → plurality-opinion</li>
+      <li>030concurrence → concurrence-opinion</li>
+      <li>035concurrenceinpart → in-part-opinion</li>
+      <li>040dissent → dissent</li>
+      <li>050addendum → addendum</li>
+      <li>060remittitur → remittitur</li>
+      <li>070rehearing → rehearing</li>
+      <li>080onthemerits → on-the-merits</li>
+      <li>090onmotiontostrike → on-motion-to-strike</li>
+    </ul>
+  </ul>
+  <ul>
+    <li>Some of the values of the <code>status</code> field in the case law search results have changed:
+    </li>
+    <ul>
+      <li>precedential → published</li>
+      <li>non-precedential → unpublished</li>
+      <li>errata → errata</li>
+      <li>separate opinion → separate</li>
+      <li>in-chambers → in-chambers</li>
+      <li>relating-to orders → relating-to</li>
+      <li>unknown status → unknown</li>
+    </ul>
+    <li>The <code>snippet</code> field in the case law search results previously included more than one opinion text field.
+      It now only contains the best text field, based on the following priority and determined by availability:
+    </li>
+    <ul>
+      <li>html_columbia</li>
+      <li>html_lawbox</li>
+      <li>xml_harvard</li>
+      <li>html_anon_2020</li>
+      <li>html</li>
+      <li>plain_text</li>
+    </ul>
+  </ul>
+  <h4 id="backwards-date-times">Dates and times</h4>
+  <ul>
+    <li>All dates and times are in UTC instead of PST.</li>
+    <li>Date objects are now rendered as an ISO-8601 date instead of an ISO-8601 datetime.
+    </li>
+  </ul>
+  <p>The following is a full list of date fields that are now date objects (rather than datetime objects, which they were in v3):
+  </p>
+  <ul>
+    <li>types <code>r</code> and <code>d</code>:</li>
+    <ul>
+      <li>dateArgued</li>
+      <li>dateFiled</li>
+      <li>dateTerminated</li>
+    </ul>
+    <li>types <code>r</code> and <code>rd</code>:</li>
+    <ul>
+      <li><code>entry_date_filed</code> (in type <code>r</code> is available in documents nested within the <code>recap_documents key</code>)</li>
+    </ul>
+    <li>type <code>o</code>:</li>
+    <ul>
+      <li>dateArgued</li>
+      <li>dateFiled</li>
+      <li>dateReargued</li>
+      <li>dateReargumentDenied</li>
+    </ul>
+    <li>type <code>oa</code>:</li>
+    <ul>
+      <li>dateArgued</li>
+      <li>dateReargued</li>
+      <li>dateReargumentDenied</li>
+    </ul>
+    <li>type <code>p</code>:</li>
+    <ul>
+      <li>dob</li>
+      <li>dod</li>
+      <li>The following fields are available within the nested <code>positions</code> key:
+      </li>
+      <ul>
+        <li>date_confirmation</li>
+        <li>date_elected</li>
+        <li>date_hearing</li>
+        <li>date_judicial_committee_action</li>
+        <li>date_nominated</li>
+        <li>date_recess_appointment</li>
+        <li>date_referred_to_judicial_committee</li>
+        <li>date_retirement</li>
+        <li>date_start</li>
+        <li>date_termination</li>
+      </ul>
+    </ul>
+  </ul>
+  <h4 id="backwards-no-random-sorting">No more random sorting</h4>
+  <ul>
+    <li>You can no longer sort the results randomly. This was only used by developers and was difficult to support.
+    </li>
+  </ul>
+  <h4 id="backwards-stemming-synonyms">Stemming and Synonyms</h4>
+  <ul>
+    <li>To provide better relevancy, stemming and synonyms are disabled on the <code>caseName</code> fields.
+    </li>
+    <li>This is because broadening a query to include synonyms and other words with the same stem are not relevant when a user searches for a case by name.
+      For example, when searching for a case name that includes the word "Howells" results for a search on the word "Howell" would not be relevant.
+    </li>
+    <li>This change applies to both the <code>case_name</code> filter and the text query.
+    </li>
+  </ul>
+  <h4 id="backwards-get-params">Changes to GET parameters</h4>
+  <ul>
+    <li>When searching the case law status fields, the GET parameters have been changed as follows:</li>
+    <ul>
+      <li>stat_Precedential → stat_Published</li>
+      <li>stat_Non-Precedential → stat_Unpublished</li>
+      <li>stat_Errata → stat_Errata</li>
+      <li>stat_Separate Opinion → stat_Separate</li>
+      <li>stat_In-chambers → stat_In-chambers</li>
+      <li>stat_Relating-to orders → stat_Relating-to</li>
+      <li>stat_Unknown Status → stat_Unknown</li>
+    </ul>
+  </ul>
+  <h4 id="backwards-400-error">Bad Request Error Code: 400</h4>
+  <ul>
+    <li>The error can contain one of the following custom messages in the <code>detail</code>key, explaining the reason for the error:
+    </li>
+    <ul>
+      <li>The query contains unbalanced parentheses.</li>
+      <li>The query contains unbalanced quotes.</li>
+      <li>The query contains an unrecognized proximity token.</li>
+    </ul>
+  </ul>
+  <h4 id="backwards-500-error">Server Error Code: 500</h4>
+  <ul>
+    <li>Any other error, such as a connection error or a parsing error of the ElasticSearch query, will raise <code>Server Error</code> Code: <code>500</code>.</li>
+    <li>And the message in the detail key: <code>Internal Server Error. Please try again later or review your query.</code></li>
+  </ul>
+  <h4 id="backwards-404-error">Not Found Error Code: 404</h4>
+  <ul>
+    <li>In the v4 Search API or other v4 database-based endpoints using cursor pagination, the following error can be raised: <code>Not Found Error</code> Code: <code>404</code>
+    </li>
+    <li>Message in the <code>detail</code> key: <code>Invalid cursor</code>
+    </li>
+    <li>This can happen if the cursor was modified manually or if the ordering key changed and doesn't match the ordering key in the cursor.
+    </li>
+    <li>To avoid this problem, when changing the sorting key, restart your request by removing the cursor key from your request.
+    </li>
+  </ul>
+</div>
+{% endblock %}

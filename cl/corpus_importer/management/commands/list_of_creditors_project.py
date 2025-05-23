@@ -1,5 +1,4 @@
 # !/usr/bin/python
-# -*- coding: utf-8 -*-
 import csv
 import itertools
 import os
@@ -16,7 +15,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.lib.redis_utils import create_redis_semaphore
 
 CLIENT_PACER_USERNAME = os.environ.get("CLIENT_PACER_USERNAME", "")
@@ -59,7 +58,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
     base_path = options["base_path"]
     csv_files = []
     for file in options["files"]:
-        f = open(f"{base_path}/{file}", "r", encoding="utf-8")
+        f = open(f"{base_path}/{file}", encoding="utf-8")
         reader = csv.DictReader(f)
         match = regex.search(file)
         if match:
@@ -139,7 +138,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
                 )
                 throttle.maybe_wait()
                 query_and_save_list_of_creditors.si(
-                    session.cookies,
+                    SessionData(session.cookies, session.proxy_address),
                     court_id,
                     d_number_file_name,
                     docket_number,

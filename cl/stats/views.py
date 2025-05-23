@@ -6,9 +6,9 @@ from django.shortcuts import render
 from cl.celery_init import fail_task
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.utils import (
+    check_elasticsearch,
     check_postgresql,
     check_redis,
-    check_solr,
     get_replication_statuses,
 )
 
@@ -17,18 +17,13 @@ def health_check(request: HttpRequest) -> JsonResponse:
     """Check if we can connect to various services."""
     is_redis_up = check_redis()
     is_postgresql_up = check_postgresql()
-    is_solr_up = check_solr()
 
     status = HTTPStatus.OK
-    if not all([is_redis_up, is_postgresql_up, is_solr_up]):
+    if not all([is_redis_up, is_postgresql_up]):
         status = HTTPStatus.INTERNAL_SERVER_ERROR
 
     return JsonResponse(
-        {
-            "is_solr_up": is_solr_up,
-            "is_postgresql_up": is_postgresql_up,
-            "is_redis_up": is_redis_up,
-        },
+        {"is_postgresql_up": is_postgresql_up, "is_redis_up": is_redis_up},
         status=status,
     )
 
@@ -39,6 +34,19 @@ def replication_status(request: HttpRequest) -> HttpResponse:
         request,
         "replication_status.html",
         {"private": True, "statuses": statuses},
+    )
+
+
+def elasticsearch_status(request: HttpRequest) -> JsonResponse:
+    """Checks the health of the Elasticsearch cluster."""
+    is_elastic_up = check_elasticsearch()
+    return JsonResponse(
+        {"is_elastic_up": is_elastic_up},
+        status=(
+            HTTPStatus.OK
+            if is_elastic_up
+            else HTTPStatus.INTERNAL_SERVER_ERROR
+        ),
     )
 
 
