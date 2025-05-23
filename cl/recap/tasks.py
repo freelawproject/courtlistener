@@ -1475,6 +1475,10 @@ async def process_recap_acms_docket(pk):
     if og_info is not None:
         await og_info.asave()
         d.originating_court_information = og_info
+
+    # Skip the percolator request for this save if parties data will be merged
+    # afterward.
+    set_skip_percolation_if_parties_data(data["parties"], d)
     await d.asave()
 
     pacer_file = await PacerHtmlFiles.objects.acreate(
@@ -1485,10 +1489,12 @@ async def process_recap_acms_docket(pk):
         ContentFile(text.encode()),
     )
 
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
+    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     des_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
-    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
