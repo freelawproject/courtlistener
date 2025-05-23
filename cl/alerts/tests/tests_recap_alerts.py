@@ -2728,9 +2728,9 @@ class RECAPAlertsPercolatorTest(
         """Resets the helper percolator method count and asserts the expected
         number of calls."""
 
-        assert (
-            self.percolator_call_count == expected
-        ), f"Expected {expected} method calls, but got {self.percolator_call_count}"
+        assert self.percolator_call_count == expected, (
+            f"Expected {expected} method calls, but got {self.percolator_call_count}"
+        )
         self.percolator_call_count = 0
 
     @staticmethod
@@ -4203,18 +4203,21 @@ class RECAPAlertsPercolatorTest(
 
         # Confirm that only one percolation request is performed upon a Docket
         # creation and a subsequent BankruptcyData merge.
-        with mock.patch(
-            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
-            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
-                has_document_alert_hit_been_triggered, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
             ),
-        ), mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(
-            execute=True
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket = Docket(
                 court=self.court,
@@ -4241,18 +4244,21 @@ class RECAPAlertsPercolatorTest(
 
         # Confirm that only one percolation request is performed upon a Docket
         # Update and a subsequent BankruptcyData merge.
-        with mock.patch(
-            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
-            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
-                has_document_alert_hit_been_triggered, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
             ),
-        ), mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(
-            execute=True
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket.docket_number = "1:21-bk-1235"
             docket_data = DocketWithBankruptcyDataFactory(
@@ -4273,18 +4279,21 @@ class RECAPAlertsPercolatorTest(
 
         # Confirm that a regular Docket update with no subsequent BankruptcyData
         # merge triggers the percolation request.
-        with mock.patch(
-            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
-            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
-                has_document_alert_hit_been_triggered, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
             ),
-        ), mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(
-            execute=True
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket.case_name = "American vs Lorem"
             docket_data = {"docket_number": "1:21-bk-1238"}
@@ -4324,18 +4333,21 @@ class RECAPAlertsPercolatorTest(
                 },
             ]
         }
-        with mock.patch(
-            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
-            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
-                has_document_alert_hit_been_triggered, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
             ),
-        ), mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(
-            execute=True
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket.refresh_from_db()
             docket.case_name = "Lorem Parties"
@@ -4359,6 +4371,7 @@ class RECAPAlertsPercolatorTest(
         self.assertEqual(
             len(mail.outbox), 4, msg="Outgoing emails don't match."
         )
+
     def test_case_only_alerts(self, mock_prefix) -> None:
         """Confirm that case-only alerts are properly sent and that they are
         triggered only once per case. This means that if a Docket or a

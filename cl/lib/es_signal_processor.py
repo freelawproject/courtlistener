@@ -213,7 +213,7 @@ def update_es_documents(
                                 fields_map,
                                 getattr(
                                     instance, "skip_percolator_request", False
-                                )
+                                ),
                             ),
                             send_or_schedule_search_alerts.s(),
                             percolator_response_processing.s(),
