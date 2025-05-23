@@ -4182,24 +4182,28 @@ class RECAPAlertsPercolatorTest(
         updating related documents like BankruptcyInformation or Parties.
         """
 
-        AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only 7",
-            query="q=(SUBPOENAS SERVED) AND chapter:7&type=r",
-        )
-        AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only 8",
-            query="q=(SUBPOENAS SERVED) AND chapter:8&type=r",
-        )
-        AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only 9",
-            query='q="American vs Lorem"&type=r',
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 7",
+                query="q=(SUBPOENAS SERVED) AND chapter:7&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 8",
+                query="q=(SUBPOENAS SERVED) AND chapter:8&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 9",
+                query='q="American vs Lorem"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
 
         # Confirm that only one percolation request is performed upon a Docket
         # creation and a subsequent BankruptcyData merge.
@@ -4234,6 +4238,7 @@ class RECAPAlertsPercolatorTest(
             set_skip_percolation_if_bankruptcy_data(docket_data, docket)
             docket.save()
             add_bankruptcy_data_to_docket(docket, docket_data)
+
         self.reset_and_assert_percolator_count(expected=1)
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
@@ -4269,6 +4274,7 @@ class RECAPAlertsPercolatorTest(
             set_skip_percolation_if_bankruptcy_data(docket_data, docket)
             docket.save()
             add_bankruptcy_data_to_docket(docket, docket_data)
+
         self.reset_and_assert_percolator_count(expected=1)
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
@@ -4300,6 +4306,7 @@ class RECAPAlertsPercolatorTest(
             set_skip_percolation_if_bankruptcy_data(docket_data, docket)
             docket.save()
             add_bankruptcy_data_to_docket(docket, docket_data)
+
         self.reset_and_assert_percolator_count(expected=1)
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
@@ -4310,12 +4317,14 @@ class RECAPAlertsPercolatorTest(
 
         # Confirm that only one percolation request is performed upon a Docket
         # Update and a subsequent parties merge.
-        AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only 10",
-            query='atty_name="John Lorem"&type=r',
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 10",
+                query='atty_name="John Lorem"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
         data = {
             "parties": [
                 {
