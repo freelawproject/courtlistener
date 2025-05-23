@@ -75,6 +75,12 @@ def import_opinions_from_recap(
             .order_by("id")
         )
 
+        # prevent creating many single-opinion citation finding tasks
+        skip_citation_finding = True
+        logger.warning(
+            "Opinions created will not have `html_with_citatiosn`. Run `find_citations` over these opinions"
+        )
+
         throttle = CeleryThrottle(queue_name=queue)
         for recap_document in recap_documents.iterator():
             logger.info(
@@ -82,7 +88,8 @@ def import_opinions_from_recap(
             )
             throttle.maybe_wait()
             recap_document_into_opinions.apply_async(
-                args=[{}, recap_document.id], queue=queue
+                args=[{}, recap_document.id, skip_citation_finding],
+                queue=queue,
             )
             count += 1
             if total_count > 0 and count >= total_count:
