@@ -39,6 +39,7 @@
       <ul>
         <li><a href="#docket-examples">Example Usage</a></li>
       </ul>
+      <li><a href="#relative-dates-help">Help with Relative Dates</a></li>
       <li><a href="#coming-soon">Coming Soon</a></li>
     </ul>
   </div>
@@ -175,6 +176,13 @@
   <pre class="pre-scrollable">curl -X GET \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "docket-alert-list" version=version %}" </pre>
+
+  <h3 id="relative-dates-help">Help with Relative Dates</h3>
+  <p>Use relative dates in your queries to keep your searches and alerts dynamically up to date.
+  </p>
+  <p>
+    <a href="{% url "relative_dates" %}" class="btn btn-default btn-lg">Learn More</a>
+  </p>
 
   <h2 id="coming-soon">Coming Soon</h2>
   <p>We are currently developing a scalable alert system that will update you when keywords appear in PACER documents or cases. To join the beta test for this system, please <a href="{% url "contact" %}">get in touch</a>.
