@@ -14,8 +14,8 @@ document.addEventListener('DOMContentLoaded', function(){
     const mode = document.querySelector('input[name="date-mode"]:checked').value;
     const isCalendar = mode === 'calendar';
     // toggle mode forms visibility
-    calendarFields.classList.toggle('htmx-hidden-indicator', !isCalendar);
-    relativeFields.classList.toggle('htmx-hidden-indicator', isCalendar);
+    calendarFields.classList.toggle('hidden', !isCalendar);
+    relativeFields.classList.toggle('hidden', isCalendar);
     // To avoid duplicate filed_after parameters in the GET request, remove the name attribute from
     // the field that isn’t in use.
     if (isCalendar) {
