@@ -35,6 +35,8 @@
         Did you forget to close one or more quotes?
       {% elif error_message == "disallowed_wildcard_pattern" %}
          The query contains a <a href="{% url "advanced_search" %}#disallowed-wildcards">disallowed wildcard</a> pattern.
+      {% elif error_message == "invalid_relative_date_syntax" %}
+         The date entered has an invalid format.
       {% endif %}
     {% else %}
       encountered an error.

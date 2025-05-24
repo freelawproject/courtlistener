@@ -1432,7 +1432,7 @@ class OpinionsESSearchTest(
     async def test_fail_gracefully(self) -> None:
         """Do we fail gracefully when an invalid search is created?"""
         response = await self.async_client.get(
-            reverse("show_results"), {"filed_after": "-"}
+            reverse("show_results"), {"cited_gt": "test"}
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn(

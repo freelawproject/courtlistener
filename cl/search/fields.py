@@ -41,6 +41,7 @@ class FloorDateField(DateField):
         """
         if value in validators.EMPTY_VALUES or value == "MM/DD/YYYY":
             return None
+
         if isinstance(value, datetime.datetime):
             return value.date()
         if isinstance(value, datetime.date):
@@ -57,7 +58,9 @@ class FloorDateField(DateField):
                     return datetime.date(*time.strptime(value, format)[:3])
                 except (ValueError, TypeError):
                     continue
-        raise ValidationError(self.error_messages["invalid"], code="invalid")
+
+        # Potential relative date format. It will be validated upstream.
+        return value
 
 
 class CeilingDateField(DateField):
@@ -103,6 +106,7 @@ class CeilingDateField(DateField):
         """
         if value in validators.EMPTY_VALUES or value == "MM/DD/YYYY":
             return None
+
         if isinstance(value, datetime.datetime):
             return value.date()
         if isinstance(value, datetime.date):
@@ -124,7 +128,9 @@ class CeilingDateField(DateField):
                 )
 
                 return valid_date + datetime.timedelta(days=additional_days)
-        raise ValidationError(self.error_messages["invalid"], code="invalid")
+
+        # Potential relative date format. It will be validated upstream.
+        return value
 
 
 class RandomChoiceField(ChoiceField):
