@@ -43,6 +43,10 @@ from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
+from cl.alerts.utils import (
+    set_skip_percolation_if_bankruptcy_data,
+    set_skip_percolation_if_parties_data,
+)
 from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
@@ -654,6 +658,9 @@ async def process_recap_docket(pk):
         await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
+    # Skip the percolator request for this save if parties data will be merged
+    # afterward.
+    set_skip_percolation_if_parties_data(data["parties"], d)
     await d.asave()
 
     # Add the HTML to the docket in case we need it someday.
@@ -665,13 +672,16 @@ async def process_recap_docket(pk):
         ContentFile(text.encode()),
     )
 
-    items_returned, rds_created, content_updated = await add_docket_entries(
-        d, data["docket_entries"]
-    )
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     if data["parties"]:
         # Index or re-index parties only if the docket has parties.
         await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+
+    items_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
+    )
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
@@ -964,6 +974,10 @@ async def process_recap_claims_register(pk):
     d.add_recap_source()
     await update_docket_metadata(d, data)
 
+    # Skip the percolator request for this save if bankruptcy data will
+    # be merged afterward.
+    set_skip_percolation_if_bankruptcy_data(data, d)
+
     retries = 5
     while True:
         try:
@@ -1199,6 +1213,10 @@ async def process_case_query_page(pk):
         await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
+    # Skip the percolator request for this save if bankruptcy data will
+    # be merged afterward.
+    set_skip_percolation_if_bankruptcy_data(data, d)
+
     retries = 5
     while True:
         try:
@@ -1338,6 +1356,10 @@ async def process_recap_appellate_docket(pk):
     if og_info is not None:
         await og_info.asave()
         d.originating_court_information = og_info
+
+    # Skip the percolator request for this save if parties data will be merged
+    # afterward.
+    set_skip_percolation_if_parties_data(data["parties"], d)
     await d.asave()
 
     # Add the HTML to the docket in case we need it someday.
@@ -1349,13 +1371,16 @@ async def process_recap_appellate_docket(pk):
         ContentFile(text.encode()),
     )
 
-    items_returned, rds_created, content_updated = await add_docket_entries(
-        d, data["docket_entries"]
-    )
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     if data["parties"]:
         # Index or re-index parties only if the docket has parties.
         await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+
+    items_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
+    )
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
@@ -1450,6 +1475,10 @@ async def process_recap_acms_docket(pk):
     if og_info is not None:
         await og_info.asave()
         d.originating_court_information = og_info
+
+    # Skip the percolator request for this save if parties data will be merged
+    # afterward.
+    set_skip_percolation_if_parties_data(data["parties"], d)
     await d.asave()
 
     pacer_file = await PacerHtmlFiles.objects.acreate(
@@ -1460,10 +1489,12 @@ async def process_recap_acms_docket(pk):
         ContentFile(text.encode()),
     )
 
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
+    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     des_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
-    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
