@@ -61,6 +61,9 @@ from urllib3.exceptions import ReadTimeoutError
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.audio.models import Audio
 from cl.celery_init import app
+from cl.citations.tasks import (
+    find_citations_and_parentheticals_for_opinion_by_pks,
+)
 from cl.citations.utils import filter_out_non_case_law_citations
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.utils import (
@@ -2882,6 +2885,7 @@ def recap_document_into_opinions(
     self,
     task_data: TaskData | None = None,
     recap_document_id: int | None = None,
+    skip_citation_finding: bool = False,
 ) -> TaskData | None:
     """Ingest recap document into Opinions
 
@@ -2890,6 +2894,8 @@ def recap_document_into_opinions(
         command. This task should be chained after the PDF has
         been downloaded from PACER
     :param recap_document_id: The document id to inspect and import
+    :param skip_citation_finding: send true when calling from bulk work command
+        to prevent overloading the queues with single-opinion tasks
 
     :return: The same `task_data` that came as input
     """
@@ -2977,5 +2983,11 @@ def recap_document_into_opinions(
             "Successfully imported https://www.courtlistener.com/opinion/%s/decision/",
             cluster.id,
         )
+
+    if not skip_citation_finding:
+        find_citations_and_parentheticals_for_opinion_by_pks.delay(
+            [opinion.pk]
+        )
+
     # Return input task data to preserve the chain in scrape_pacer_free_opinion
     return task_data
