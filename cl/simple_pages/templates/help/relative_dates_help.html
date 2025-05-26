@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Help with Relative Dates – CourtListener.com{% endblock %}
-{% block og_title %}Help with Relative Dates – CourtListener.com{% endblock %}
+{% block title %}Help with Relative Date Queries – CourtListener.com{% endblock %}
+{% block og_title %}Help with Relative Date Queries – CourtListener.com{% endblock %}
 
-{% block description %}Learn how to use relative dates in CourtListener to make your searches and alerts more dynamic and up-to-date.{% endblock %}
-{% block og_description %}Learn how to use relative dates in CourtListener to make your searches and alerts more dynamic and up-to-date.{% endblock %}
+{% block description %}Learn how to use relative dates queries in CourtListener to make your searches and alerts more dynamic and up-to-date.{% endblock %}
+{% block og_description %}Learn how to use relative dates queries in CourtListener to make your searches and alerts more dynamic and up-to-date.{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -28,7 +28,7 @@
     </h4>
     <h3>Table of Contents</h3>
     <ul>
-      <li><a href="#relative-dates">Relative Dates</a></li>
+      <li><a href="#relative-dates">Relative Date Queries</a></li>
       <li><a href="#syntax">Allowed Syntax</a></li>
       <li><a href="#notes">Technical Notes</a></li>
     </ul>
@@ -36,17 +36,17 @@
 </div>
 
 <div class="col-xs-12 col-md-8 col-lg-6">
-  <h1 id="relative-dates">Help with Relative Dates</h1>
+  <h1 id="relative-dates">Help with Relative Date Queries</h1>
   <p class="lead">Use relative dates in your queries to keep your searches and alerts dynamically up to date.</p>
-  <p>When placing a search query into CourtListener, you can use either “Calendar” date queries or “Relative” date queries:</p>
+  <p>When placing a search query into CourtListener, you can use either "Calendar" date queries or "Relative" date queries:</p>
   <ul>
     <li>Calendar date queries let you filter before or after a given date.</li>
-    <li>Relative dates filter results dynamically based on the date the query is made by a user or system. Instead of specifying a calendar date, such a “January 1, 2025,” you can use relative time periods like <code>1 day ago</code>, <code>Past 1 month</code>, or <code>-14d</code>.</li>
+    <li>Relative dates filter results dynamically based on the date the query is made by a user or system. Instead of specifying a calendar date, such a "January 1, 2025", you can use relative time periods like <code>1 day ago</code>, <code>Past 1 month</code>, or <code>-14d</code>.</li>
   </ul>
 
   <p>Relative date queries are useful for saved or bookmarked queries, so that your query always filters to recent content.
     They are also valuable when creating alerts. Imagine you want to receive an alert whenever a recent document — filed in the past week — is made available in the  <a href="{% url "advanced_r" %}">RECAP Archive</a>.
-    With relative dates, your date range is rolling, and the “Past Week” changes in sync with the date the alert is triggered.
+    With relative dates, your date range is rolling, and the "Past Week" changes in sync with the date the alert is triggered.
   </p>
 
   <h2 id="syntax">Allowed Syntax</h2>
@@ -61,11 +61,12 @@
   </ul>
 
   <p>To filter to months or years, substitute <code>m</code>, <code>months</code>, <code>y</code>, or <code>years</code> instead of <code>d</code> or <code>days</code>.</p>
+  <p>When using the API, relative dates are accepted on all date fields, even if they are not supported by the website.</p>
 
   <h2 id="notes">Notes</h2>
   <ul>
-    <li>The past day (d) begins at 12:00am the previous day, and continues up to the time of the query.</li>
-    <li>Similarly, the past X days begin at 12:00am X days before the current day, and continue up to the current time.</li>
+    <li>The past day (d) begins at 12:00am UTC the previous day, and continues up to the time of the query.</li>
+    <li>Similarly, the past X days begin at 12:00am UTC X days before the current day, and continue up to the current time.</li>
     <li>One month (m) is equal to 30 days, so 12m is equal to 360 days, not 365 days.</li>
     <li>One year (y) is equal to 365 days regardless of leap years.</li>
   </ul>

@@ -54,7 +54,7 @@
         <h4 class="text-danger" >Did you mean:&nbsp;<a href="{% url 'show_results' %}{% querystring q=suggested_query %}">{{suggested_query}}</a></h4>
       </div>
     {% elif error_message == "invalid_relative_date_syntax" %}
-      <p><a href="{% url "relative_dates" %}">See Relative Dates documentation for help.</a></p>
+      <p><a href="{% url "relative_dates" %}">See Relative Date Queries documentation for help.</a></p>
     {% endif %}
 
     <p>Search tips:</p>
