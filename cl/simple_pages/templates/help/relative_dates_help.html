@@ -61,11 +61,19 @@
   </ul>
 
   <p>To filter to months or years, substitute <code>m</code>, <code>months</code>, <code>y</code>, or <code>years</code> instead of <code>d</code> or <code>days</code>.</p>
-  <p>When using the Search API, relative dates are accepted on all date filters, even if they are not supported by the website.</p>
+  <p>When using the <a href="{% url "search_api_help" %}">Search API</a>, relative dates are accepted on all date filters, even if they are not supported by the website.</p>
 
   <h2 id="notes">Notes</h2>
   <ul>
-    <li>The past day (d) begins at 12:00am UTC the previous day, and continues up to the time of the query.</li>
+    <li>
+      The past day (d) begins at 12:00am UTC the previous day and continues up to the time of the query.
+      <br>
+      <strong>Example:</strong> Suppose today is Monday the 26th.
+      <ul>
+        <li>If you run a "Past 1 day" query at <strong>20:00 local</strong> time in New York (Eastern Time, UTC–4, which is <strong>00:00 UTC on Tuesday the 27th</strong>), you’ll get filings from <strong>00:00 UTC Monday</strong> through <strong>00:00 UTC Tuesday</strong>.</li>
+        <li>If you run the same query at <strong>19:59 local time</strong> (which is 23:59 UTC Monday), you'll get filings from <strong>00:00 UTC Sunday</strong> through <strong>23:59 UTC Monday</strong>.</li>
+      </ul>
+    </li>
     <li>Similarly, the past X days begin at 12:00am UTC X days before the current day, and continue up to the current time.</li>
     <li>One month (m) is equal to 30 days, so 12m is equal to 360 days, not 365 days.</li>
     <li>One year (y) is equal to 365 days regardless of leap years.</li>
