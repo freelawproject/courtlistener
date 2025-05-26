@@ -1,3 +1,4 @@
+import datetime
 import re
 from collections import OrderedDict
 
@@ -591,7 +592,19 @@ class SearchForm(forms.Form):
         for field_name in self.get_date_field_names():
             before = cleaned_data.get(f"{field_name}_before")
             after = cleaned_data.get(f"{field_name}_after")
-            if before and after and (before < after):
+            if (
+                all(
+                    (
+                        before,
+                        after,
+                        not isinstance(
+                            before, str
+                        ),  # Ignore combinations of absolute and relative dates.
+                        not isinstance(after, str),
+                    )
+                )
+                and before < after
+            ):
                 # The user is requesting dates like this: <--b  a-->. Switch
                 # the dates so their query is like this: a-->   <--b
                 cleaned_data[f"{field_name}_before"] = after
@@ -698,14 +711,18 @@ def clean_up_date_formats(
 
     for time in ("before", "after"):
         field = f"{date_field}_{time}"
+        value = cd.get(field)
         if get_params.get(field) and cd.get(field) is not None:
-            # Don't use strftime. It'll fail before 1900
-            before = cd[field]
-            get_params[field] = "%02d/%02d/%s" % (
-                before.month,
-                before.day,
-                before.year,
-            )
+            if isinstance(value, datetime.date | datetime.datetime):
+                # Don't use strftime. It'll fail before 1900
+                get_params[field] = "%02d/%02d/%s" % (
+                    value.month,
+                    value.day,
+                    value.year,
+                )
+            elif isinstance(value, str):
+                # Leave relative date strings as it's.
+                get_params[field] = value
 
 
 def _clean_form(get_params, cd, courts):

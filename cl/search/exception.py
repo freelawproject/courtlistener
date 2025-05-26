@@ -62,3 +62,9 @@ class DisallowedWildcardPattern(SyntaxQueryError):
     """Query contains a disallowed wildcard pattern"""
 
     message = "The query contains a disallowed wildcard pattern."
+
+
+class InvalidRelativeDateSyntax(SyntaxQueryError):
+    """The date entered has an invalid format."""
+
+    message = "The date entered has an invalid format."
