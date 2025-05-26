@@ -28,8 +28,6 @@ INPUT_FORMATS = [
 
 
 class ParseFloorDateMixin:
-    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
-
     def _parse_floor_date(self, value):
         """Validates that the input can be converted to a date. Returns a Python
         datetime.date object or the original input if it cannot be converted.
@@ -66,8 +64,6 @@ class ParseCeilingDateMixin:
     dates represent the *last* day of the month. This allows a search for all
     documents "After 2010" to work.
     """
-
-    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
 
     @staticmethod
     def _calculate_extra_days(date_format, d):
@@ -132,6 +128,8 @@ class FloorDateOrRelativeField(DateField, ParseFloorDateMixin):
     if it's a potential relative date, which will be validated upstream.
     """
 
+    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
+
     def to_python(self, value):
         # Potential relative date format. It will be validated upstream.
         return self._parse_floor_date(value)
@@ -142,6 +140,8 @@ class FloorDateField(DateField, ParseFloorDateMixin):
     Validates whether the input is a date object or raises a ValidationError if
     the input cannot be parsed into a valid date.
     """
+
+    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
 
     def to_python(self, value):
         parsed = self._parse_floor_date(value)
@@ -158,6 +158,8 @@ class CeilingDateOrRelativeField(DateField, ParseCeilingDateMixin):
     if it's a potential relative date, which will be validated upstream.
     """
 
+    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
+
     def to_python(self, value):
         # Potential relative date format. It will be validated upstream.
         return self._parse_ceiling_date(value)
@@ -168,6 +170,8 @@ class CeilingDateField(DateField, ParseCeilingDateMixin):
     Validates whether the input is a date object or raises a ValidationError if
     the input cannot be parsed into a valid date.
     """
+
+    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
 
     def to_python(self, value):
         parsed = self._parse_ceiling_date(value)
