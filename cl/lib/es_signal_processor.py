@@ -211,6 +211,9 @@ def update_es_documents(
                                 ),
                                 (compose_app_label(instance), instance.pk),
                                 fields_map,
+                                getattr(
+                                    instance, "skip_percolator_request", False
+                                ),
                             ),
                             send_or_schedule_search_alerts.s(),
                             percolator_response_processing.s(),
@@ -804,6 +807,7 @@ class ESSignalProcessor:
                         instance.pk,
                         compose_app_label(instance),
                         self.es_document.__name__,
+                        getattr(instance, "skip_percolator_request", False),
                     ),
                     send_or_schedule_search_alerts.s(),
                     percolator_response_processing.s(),

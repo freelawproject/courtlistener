@@ -14,6 +14,10 @@ from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 
+from cl.alerts.utils import (
+    set_skip_percolation_if_bankruptcy_data,
+    set_skip_percolation_if_parties_data,
+)
 from cl.corpus_importer.utils import (
     ais_appellate_court,
     is_long_appellate_document_number,
@@ -43,6 +47,7 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
+from cl.recap.constants import bankruptcy_data_fields
 from cl.recap.models import (
     PROCESSING_STATUS,
     UPLOAD_TYPE,
@@ -1370,16 +1375,8 @@ def add_bankruptcy_data_to_docket(d: Docket, metadata: dict[str, str]) -> None:
     except BankruptcyInformation.DoesNotExist:
         bankr_data = BankruptcyInformation(docket=d)
 
-    fields = [
-        "date_converted",
-        "date_last_to_file_claims",
-        "date_last_to_file_govt",
-        "date_debtor_dismissed",
-        "chapter",
-        "trustee_str",
-    ]
     do_save = False
-    for field in fields:
+    for field in bankruptcy_data_fields:
         if metadata.get(field):
             do_save = True
             setattr(bankr_data, field, metadata[field])
@@ -1566,6 +1563,10 @@ def merge_pacer_docket_into_cl_docket(
 
     d.add_recap_source()
     async_to_sync(update_docket_metadata)(d, docket_data)
+
+    # Skip the percolator request for this save if parties data will be merged
+    # afterward.
+    set_skip_percolation_if_parties_data(docket_data["parties"], d)
     d.save()
 
     if appellate:
@@ -1588,13 +1589,16 @@ def merge_pacer_docket_into_cl_docket(
         ContentFile(report.response.text.encode()),
     )
 
-    items_returned, rds_created, content_updated = async_to_sync(
-        add_docket_entries
-    )(d, docket_data["docket_entries"], tags=tags)
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
     add_parties_and_attorneys(d, docket_data["parties"])
     if docket_data["parties"]:
         # Index or re-index parties only if the docket has parties.
         index_docket_parties_in_es.delay(d.pk)
+
+    items_returned, rds_created, content_updated = async_to_sync(
+        add_docket_entries
+    )(d, docket_data["docket_entries"], tags=tags)
     async_to_sync(process_orphan_documents)(
         rds_created, d.court_id, d.date_filed
     )
@@ -1972,6 +1976,9 @@ def save_iquery_to_docket(
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
     d.skip_iquery_sweep = skip_iquery_sweep
+    # Skip the percolator request for this save if bankruptcy data will
+    # be merged afterward.
+    set_skip_percolation_if_bankruptcy_data(iquery_data, d)
     try:
         d.save()
         add_bankruptcy_data_to_docket(d, iquery_data)
@@ -2071,6 +2078,9 @@ def process_case_query_report(
     d.add_recap_source()
     d = async_to_sync(update_docket_metadata)(d, report_data)
     d.skip_iquery_sweep = skip_iquery_sweep
+    # Skip the percolator request for this save if bankruptcy data will
+    # be merged afterward.
+    set_skip_percolation_if_bankruptcy_data(report_data, d)
     d.save()
     add_bankruptcy_data_to_docket(d, report_data)
     logger.info(
