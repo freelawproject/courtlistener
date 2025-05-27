@@ -91,6 +91,12 @@ jobs:
           exit 1
       - name: Delete Temporary Pod
         run: kubectl delete pod -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }}
+      - name: Set cl-python HPA maxReplicas
+        run: |
+          kubectl patch hpa cl-python \
+            -n ${{ env.EKS_NAMESPACE }} \
+            --type=merge \
+            -p '{"spec":{"maxReplicas":10}}'
 
       # Rollout new versions one by one (watch "deployments" in k9s)
       - name: Rollout cl-python
