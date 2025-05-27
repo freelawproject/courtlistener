@@ -68,8 +68,9 @@ def add_docket(
     except OperationalError as e:
         if "exceeds maximum" in str(e):
             docket.docket_number = (
-                "%s, See Corrections for full Docket Number"
-                % trunc(docket_number, length=5000, ellipsis="...")
+                "{}, See Corrections for full Docket Number".format(
+                    trunc(docket_number, length=5000, ellipsis="...")
+                )
             )
             docket.save()
 
