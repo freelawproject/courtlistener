@@ -54,10 +54,12 @@ from cl.citations.tasks import (
     store_opinion_citations_and_update_parentheticals,
     store_recap_citations,
 )
-from cl.citations.utils import (
+from cl.citations.unmatched_citations_utils import (
     handle_unmatched_citations,
-    make_get_citations_kwargs,
     update_unmatched_citations_status,
+)
+from cl.citations.utils import (
+    make_get_citations_kwargs,
 )
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
 from cl.search.documents import ParentheticalGroupDocument
@@ -1340,8 +1342,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             cited.cluster.citation_count,
             expected_count,
             msg="'cited' was not updated by a citation found in 'citing', or "
-            "the citation was not found. Count was: %s instead of %s"
-            % (cited.cluster.citation_count, expected_count),
+            f"the citation was not found. Count was: {cited.cluster.citation_count} instead of {expected_count}",
         )
 
     def test_opinionscited_creation(self) -> None:
@@ -1688,8 +1689,7 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             cited.cluster.citation_count,
             expected_count,
             msg="'cited' was not updated by a citation found in 'citing', or "
-            "the citation was not found. Count was: %s instead of %s"
-            % (cited.cluster.citation_count, expected_count),
+            f"the citation was not found. Count was: {cited.cluster.citation_count} instead of {expected_count}",
         )
 
     def test_index_by_doc_id(self) -> None:
@@ -3035,7 +3035,7 @@ class UnmatchedCitationTest(TransactionTestCase):
     # to MULTIPLE_RESOURCE_MATCH citations
     ambiguous_citations = [eyecite_citations.pop(2)]
     cluster = None
-    opinion = None
+    opinion: Opinion
 
     @classmethod
     def setUpClass(cls):
@@ -3135,6 +3135,7 @@ class UnmatchedCitationTest(TransactionTestCase):
             tokenizer=HYPERSCAN_TOKENIZER,
         )
         opinion = cluster.sub_opinions.first()
+        opinion.unmatched_citations.all().delete()
         handle_unmatched_citations(opinion, eyecite_citations, [], {})
         count = UnmatchedCitation.objects.filter(
             citing_opinion=opinion

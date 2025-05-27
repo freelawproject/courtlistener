@@ -777,6 +777,24 @@ class ViewRecapDocketTest(TestCase):
             court=cls.court,
             source=Docket.RECAP,
         )
+        cls.de_1 = DocketEntryFactory(
+            docket=cls.docket,
+            entry_number=11,
+            date_filed=date(2025, 1, 15),
+            description="Lorem ipsum description.",
+        )
+        cls.de_2 = DocketEntryFactory(
+            docket=cls.docket,
+            entry_number=11,
+            date_filed=date(2025, 1, 17),
+            description="Entry outside the range.",
+        )
+        RECAPDocumentFactory(
+            docket_entry=cls.de_1,
+            pacer_doc_id="005065812111",
+            document_number="005065281111",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
         cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
         cls.docket_appellate = DocketFactory(
             court=cls.court_appellate,
@@ -823,6 +841,35 @@ class ViewRecapDocketTest(TestCase):
         self.assertEqual(
             response.context["docket_entries"].number,
             response.context["docket_entries"].paginator.num_pages,
+        )
+
+    async def test_recap_docket_entry_filed_filter(self) -> None:
+        """Can we properly filter docket entries by date filed?"""
+        params = {
+            "filed_after": "01/15/2025",
+            "filed_before": "01/16/2025",
+            "order_by": "asc",
+        }
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        r = await self.async_client.get(url, query_params=params)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn(self.de_1.description, r.content.decode())
+        self.assertNotIn(self.de_2.description, r.content.decode())
+
+    async def test_recap_docket_invalid_entry_filed_filter(self) -> None:
+        """Confirm that invalid date values in the docket entry filed filter
+        produce a validation error for users.
+        """
+        params = {
+            "filed_after": "02/10/2025",
+            "filed_before": ".",
+            "order_by": "asc",
+        }
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        r = await self.async_client.get(url, query_params=params)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn(
+            "There were errors applying your filters", r.content.decode()
         )
 
 

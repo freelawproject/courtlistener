@@ -29,8 +29,8 @@ from cl.citations.parenthetical_utils import (
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.types import MatchedResourceType, SupportedCitationType
+from cl.citations.unmatched_citations_utils import handle_unmatched_citations
 from cl.citations.utils import (
-    handle_unmatched_citations,
     make_get_citations_kwargs,
 )
 from cl.search.models import (
