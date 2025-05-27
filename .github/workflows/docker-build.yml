@@ -92,12 +92,8 @@ jobs:
       - name: Delete Temporary Pod
         run: kubectl delete pod -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }}
 
-        - name: Set cl-python HPA maxReplicas
-        run: |
-          kubectl patch hpa cl-python \
-            -n ${{ env.EKS_NAMESPACE }} \
-            --type=merge \
-            -p '{"spec":{"maxReplicas":10}}'
+      - name: Set cl-python HPA maxReplicas
+        run: kubectl patch hpa cl-python -n ${{ env.EKS_NAMESPACE }} --type=merge -p '{"spec":{"maxReplicas":10}}'
 
       # Rollout new versions one by one (watch "deployments" in k9s)
       - name: Rollout cl-python
@@ -105,11 +101,7 @@ jobs:
       - name: Watch cl-python rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-python
       - name: HPA cl-python restore
-        run: |
-          kubectl patch hpa cl-python \
-            -n ${{ env.EKS_NAMESPACE }} \
-            --type=merge \
-            -p '{"spec":{"maxReplicas":32}}'
+        run: kubectl patch hpa cl-python -n ${{ env.EKS_NAMESPACE }} --type=merge -p '{"spec":{"maxReplicas":32}}'
       - name: Rollout cl-celery-prefork
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-celery-prefork rollout status
