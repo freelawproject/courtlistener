@@ -92,16 +92,38 @@ jobs:
       - name: Delete Temporary Pod
         run: kubectl delete pod -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }}
 
-      - name: Set cl-python HPA maxReplicas
-        run: kubectl patch hpa cl-python -n ${{ env.EKS_NAMESPACE }} --type=merge -p '{"spec":{"maxReplicas":10}}'
+      - name: Get original HPA maxReplicas
+        id: get_hpa_max
+        run: |
+          echo "ORIGINAL_MAX=$(kubectl get hpa cl-python \
+            -n ${{ env.EKS_NAMESPACE }} \
+            -o jsonpath='{.spec.maxReplicas}')" >> $GITHUB_OUTPUT
+      - name: Get current replica count
+        id: get_replicas
+        run: |
+          echo "REPLICAS=$(kubectl get deployment cl-python \
+            -n ${{ env.EKS_NAMESPACE }} \
+            -o jsonpath='{.status.replicas}')" \
+            >> $GITHUB_OUTPUT
+      - name: Set cl-python HPA maxReplicas to current
+        run: |
+          kubectl patch hpa cl-python \
+            -n ${{ env.EKS_NAMESPACE }} \
+            --type=merge \
+            -p "{\"spec\":{\"maxReplicas\":${{ steps.get_replicas.outputs.REPLICAS }}}}"
 
       # Rollout new versions one by one (watch "deployments" in k9s)
       - name: Rollout cl-python
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-python rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-python
-      - name: HPA cl-python restore
-        run: kubectl patch hpa cl-python -n ${{ env.EKS_NAMESPACE }} --type=merge -p '{"spec":{"maxReplicas":32}}'
+      - name: Restore original HPA maxReplicas
+        run: |
+          kubectl patch hpa cl-python \
+            -n ${{ env.EKS_NAMESPACE }} \
+            --type=merge \
+            -p "{\"spec\":{\"maxReplicas\":${{ steps.get_hpa_max.outputs.ORIGINAL_MAX }}}"
+
       - name: Rollout cl-celery-prefork
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-celery-prefork rollout status
