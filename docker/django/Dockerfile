@@ -48,15 +48,19 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync \
     $(test "$BUILD_ENV" != "dev" && echo "--no-dev")
 
+# npm install dependencies
+COPY cl/package.json cl/package-lock.json ./cl/
+RUN cd cl && \
+    npm ci
+
 COPY . .
 
-# Collect compiled assets from webpack-build stage.
+# Run Node.js build tasks
 # Note: Always produce production code and never produce source-maps
 # (run the devMiddleware for legible output)
-WORKDIR /opt/courtlistener/cl
-RUN npm install
-RUN npx webpack --mode=production --no-devtool
-RUN npm run build --no-input
+RUN cd cl && \
+    npx webpack --mode=production --no-devtool && \
+    npm run build --no-input
 
 # We log to stdout by default, but we have a config for logging here. Even if
 # we don't use this logger, we need to have the file or else Python is unhappy.
@@ -65,8 +69,6 @@ RUN mkdir /var/log/courtlistener \
     && mkdir /var/log/juriscraper \
     && chown -R www-data:www-data /var/log/juriscraper/ \
     && mkdir -p /opt/courtlistener/cl/assets/static/
-
-WORKDIR /opt/courtlistener
 
 USER root
 ## Creates a directory for Hyperscan db
