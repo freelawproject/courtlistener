@@ -34,9 +34,10 @@ ENV \
 ARG BUILD_ENV=prod
 FROM build-base AS python-base
 
-# uv install dependencies
 WORKDIR /opt/courtlistener
-COPY ./pyproject.toml ./uv.lock ./
+
+# uv install dependencies
+COPY pyproject.toml uv.lock .
 # https://docs.astral.sh/uv/guides/integration/docker/#caching
 ENV \
     UV_COMPILE_BYTECODE=1 \
@@ -47,7 +48,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync \
     $(test "$BUILD_ENV" != "dev" && echo "--no-dev")
 
-COPY . /opt/courtlistener
+COPY . .
 
 # Collect compiled assets from webpack-build stage.
 # Note: Always produce production code and never produce source-maps
