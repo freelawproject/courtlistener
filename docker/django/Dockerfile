@@ -1,12 +1,14 @@
 FROM python:3.13 AS build-base
 
-RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
+# Install apt dependencies
+# caching: https://docs.docker.com/build/cache/optimize/#use-cache-mounts
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
     --no-install-recommends \
     --assume-yes \
     --quiet=2 \
-    # So we can use Python-slim
-    build-essential gcc \
     # So postgres can compile and users can use dbshell
     libpq-dev postgresql-client \
     # So we can use webpack to compile assets
