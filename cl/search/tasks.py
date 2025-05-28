@@ -186,6 +186,7 @@ def es_save_document(
     instance_id: int,
     app_label: str,
     es_document_name: ESDocumentNameType,
+    skip_percolator_request: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Save a document in Elasticsearch using a provided callable.
 
@@ -194,6 +195,8 @@ def es_save_document(
     :param app_label: The app label and model that belongs to the document
     being added.
     :param es_document_name: A Elasticsearch DSL document name.
+    :param skip_percolator_request: Whether to skip the subsequent percolator
+    request.
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None.
@@ -277,6 +280,7 @@ def es_save_document(
     if (
         type(instance) in percolator_alerts_models_supported
         and response["_version"] == 1
+        and not skip_percolator_request
     ):
         # Only send search alerts when a new instance of a model that support
         # Alerts is indexed in ES _version:1
@@ -490,6 +494,7 @@ def update_es_document(
     main_instance_data: tuple[str, int],
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
+    skip_percolator_request: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
@@ -502,6 +507,7 @@ def update_es_document(
     update doesn't involve a related instance.
     :param fields_map: A dict containing fields that can be updated or None if
     mapping is not required for the update.
+    :param skip_percolator_request: Whether to skip the subsequent percolator request
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None
@@ -552,7 +558,7 @@ def update_es_document(
         main_app_label in ["search.RECAPDocument", "search.Docket"]
         and not related_instance_app_label == "search.DocketEntry"
         or related_instance_app_label in ["search.BankruptcyInformation"]
-    ):
+    ) and not skip_percolator_request:
         doc = es_doc.prepare(main_model_instance)
         return SaveESDocumentReturn(
             document_id=str(main_instance_id),

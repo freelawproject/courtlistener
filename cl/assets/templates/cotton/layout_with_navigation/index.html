@@ -1,7 +1,7 @@
 <div
-  data-first-active="about"
+  {{ attrs }}
   x-data="intersect"
-  class="w-full flex max-md:flex-wrap"
+  class="w-full flex max-md:flex-wrap md:gap-5"
   data-intersect-id-attr="intersectTarget"
   data-active-item-classes="font-semibold border-l-2 border-l-primary-600 text-primary-600"
   data-inactive-item-classes="font-normal border-l border-l-greyscale-200"
@@ -10,7 +10,7 @@
     :nav_items="{{ nav_items }}"
   ></c-navigation-menu>
 
-  <article class="flex flex-col gap-11 items-start max-md:pt-4 max-w-full md:max-w-[calc(100%-var(--nav-menu-width))]">
+  <article class="flex flex-col gap-11 items-start max-md:pt-4 max-w-full md:max-w-[calc(100%-var(--nav-menu-width))] [&_section]:flex [&_section]:flex-col [&_section]:gap-4">
     {{ slot }}
   </article>
 </div>
