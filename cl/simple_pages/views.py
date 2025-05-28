@@ -481,8 +481,8 @@ async def old_terms(request: HttpRequest, v: str) -> HttpResponse:
         request,
         f"terms/{v}.html",
         {
-            "title": "Archived Terms of Service and Policies, v%s – "
-            "CourtListener.com" % v,
+            "title": f"Archived Terms of Service and Policies, v{v} – "
+            "CourtListener.com",
             "private": True,
             "is_archived": True,
         },

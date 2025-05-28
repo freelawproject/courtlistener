@@ -165,13 +165,7 @@ lint.ignore = [
   "SIM105",
   # if-else-block-instead-of-if-exp
   "SIM108",
-  # printf-string-formatting
-  "UP031",
-  # unnecessary-collection-call
-  "C408",
   # To fix:
-  "E402",
-  "E721",
   "E722",
   "E731",
   "F403",
