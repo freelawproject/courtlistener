@@ -104,7 +104,32 @@ from cl.users.models import EmailSent
 
 
 class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
-    fixtures = ["test_court.json"]
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user_no_member = UserProfileWithParentsFactory()
+        cls.user_no_member.user.password = make_password("password")
+        cls.user_no_member.user.save()
+
+        cls.user_member = UserProfileWithParentsFactory()
+        cls.user_member.user.password = make_password("password")
+        cls.user_member.user.save()
+
+        cls.membership_termination_date = now() + timedelta(days=1)
+        NeonMembership.objects.create(
+            level=NeonMembership.LEGACY,
+            user=cls.user_member.user,
+            termination_date=cls.membership_termination_date,
+        )
+
+        cls.user_member_tier_1 = UserProfileWithParentsFactory()
+        cls.user_member_tier_1.user.password = make_password("password")
+        cls.user_member_tier_1.user.save()
+        NeonMembership.objects.create(
+            level=NeonMembership.TIER_1,
+            user=cls.user_member_tier_1.user,
+            termination_date=cls.membership_termination_date,
+        )
 
     def setUp(self) -> None:
         # Set up some handy variables
@@ -112,7 +137,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             "query": "q=asdf",
             "name": "dummy alert",
             "rate": "dly",
-            "alert_type": SEARCH_TYPES.RECAP,
+            "alert_type": SEARCH_TYPES.OPINION,
         }
         self.alert = Alert.objects.create(user_id=1001, **self.alert_params)
 
@@ -132,12 +157,221 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         r = await self.async_client.post(
             reverse("show_results"), self.alert_params, follow=True
         )
+
         self.assertEqual(r.redirect_chain[0][1], 302)
         self.assertIn("successfully", r.content.decode())
         self.assertEqual(await alert_user.acount(), 1)
         alert_created = await alert_user.afirst()
         if alert_created:
-            self.assertEqual(alert_created.alert_type, SEARCH_TYPES.RECAP)
+            self.assertEqual(alert_created.alert_type, SEARCH_TYPES.OPINION)
+        await self.async_client.alogout()
+
+    async def test_non_recap_rt_alert_succeeds_for_member(self) -> None:
+        """Confirm that RT alert creation for non-RECAP alerts succeeds for
+        members.
+        """
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.user_member.user.username, password="password"
+            )
+        )
+        rt_alert_params = self.alert_params.copy()
+        rt_alert_params["rate"] = Alert.REAL_TIME
+        r = await self.async_client.post(
+            reverse("show_results"), rt_alert_params, follow=True
+        )
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", r.content.decode())
+
+        alert_user = Alert.objects.filter(user=self.user_member.user)
+        self.assertEqual(await alert_user.acount(), 1)
+        alert_created = await alert_user.afirst()
+        if alert_created:
+            self.assertEqual(alert_created.alert_type, SEARCH_TYPES.OPINION)
+            self.assertEqual(alert_created.rate, Alert.REAL_TIME)
+        await self.async_client.alogout()
+
+    async def test_fail_non_recap_rt_alert_for_no_member(self) -> None:
+        """Confirm that RT alert creation for non-RECAP alerts displays the
+        regular limitation message for non-members.
+        """
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.user_no_member.user.username, password="password"
+            )
+        )
+        rt_alert_params = self.alert_params.copy()
+        rt_alert_params["rate"] = Alert.REAL_TIME
+        r = await self.async_client.post(
+            reverse("show_results"), rt_alert_params, follow=True
+        )
+        self.assertIn("only supported for members", r.content.decode())
+        self.assertIn(
+            "Please select another rate or become a member to create this alert.",
+            r.content.decode(),
+        )
+
+        alert_user = Alert.objects.filter(user=self.user_no_member.user)
+        self.assertEqual(await alert_user.acount(), 0)
+        await self.async_client.alogout()
+
+    async def test_fail_non_recap_rt_alert_for_expired_membership(
+        self,
+    ) -> None:
+        """Confirm that RT alert creation for non-RECAP alerts displays the
+        regular limitation message for expired memberships.
+        """
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.user_member.user.username, password="password"
+            )
+        )
+        rt_alert_params = self.alert_params.copy()
+        rt_alert_params["rate"] = Alert.REAL_TIME
+        with time_machine.travel(
+            self.membership_termination_date + timedelta(days=2), tick=False
+        ):
+            r = await self.async_client.post(
+                reverse("show_results"), rt_alert_params, follow=True
+            )
+        self.assertIn("only supported for members", r.content.decode())
+        self.assertIn(
+            "Please select another rate or become a member to create this alert.",
+            r.content.decode(),
+        )
+
+        alert_user = Alert.objects.filter(user=self.user_no_member.user)
+        self.assertEqual(await alert_user.acount(), 0)
+        await self.async_client.alogout()
+
+    async def test_non_member_recap_rt_alert_fails(self):
+        """RECAP + REAL_TIME should be rejected for free users."""
+        assert await self.async_client.alogin(
+            username=self.user_no_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.REAL_TIME
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertIn(
+            "You must be a Member to create Real Time alerts.", content
+        )
+        alerts = Alert.objects.filter(user=self.user_no_member.user)
+        self.assertEqual(await alerts.acount(), 0)
+        await self.async_client.alogout()
+
+    async def test_legacy_member_recap_rt_alert_fails_when_over_quota(self):
+        """RECAP + REAL_TIME should be rejected once the legacy member hits
+        their quota (0)."""
+        assert await self.async_client.alogin(
+            username=self.user_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.REAL_TIME
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertIn("allows only 0 Real Time alerts;", content)
+        alerts = Alert.objects.filter(user=self.user_member.user)
+        self.assertEqual(await alerts.acount(), 0)
+
+        await self.async_client.alogout()
+
+    async def test_non_member_recap_other_rate_alert(self):
+        """Non-RT RECAP alerts should be rejected once a free user exceeds 5 alerts."""
+
+        # Non-member inside the quota.
+        assert await self.async_client.alogin(
+            username=self.user_no_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.DOCKETS
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", content)
+
+        # 1 new alert should be created
+        alerts = Alert.objects.filter(user=self.user_no_member.user)
+        self.assertEqual(await alerts.acount(), 1)
+
+        # Add 4 more other rate alerts.
+        await sync_to_async(AlertFactory.create_batch)(
+            4,
+            user=self.user_no_member.user,
+            rate=Alert.WEEKLY,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        assert await self.async_client.alogin(
+            username=self.user_no_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.RECAP
+
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertIn(
+            "Free plan allows only 5 Daily, Weekly or Monthly alerts", content
+        )
+
+        # no new alert should be created
+        alerts = Alert.objects.filter(user=self.user_no_member.user)
+        self.assertEqual(await alerts.acount(), 5)
+        await self.async_client.alogout()
+
+    async def test_member_recap_other_rate_alert(self):
+        """Non-RT RECAP alerts should be rejected once a free user exceeds 5 alerts."""
+
+        # Member inside the quota.
+        assert await self.async_client.alogin(
+            username=self.user_member_tier_1.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", content)
+
+        # 1 new alert should be created
+        alerts = Alert.objects.filter(user=self.user_member_tier_1.user)
+        self.assertEqual(await alerts.acount(), 1)
+
+        # Create 10 additional alerts to reach the allowed quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            4,
+            user=self.user_member_tier_1.user,
+            rate=Alert.DAILY,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_member_tier_1.user,
+            rate=Alert.MONTHLY,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        assert await self.async_client.alogin(
+            username=self.user_member_tier_1.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertIn(
+            "Tier 1 plan allows only 10 Daily, Weekly or Monthly alerts;",
+            content,
+        )
+
+        # no new alert should be created
+        self.assertEqual(await alerts.acount(), 10)
         await self.async_client.alogout()
 
     async def test_fail_gracefully(self) -> None:
@@ -203,7 +437,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         self.assertIn(
             "Please confirm your unsubscription", response.content.decode()
         )
-        self.assertIn("Your daily RECAP alert", response.content.decode())
+        self.assertIn("Your daily opinion alert", response.content.decode())
         self.assertIn("Unsubscribe", response.content.decode())
 
     async def test_can_we_disable_alert_using_the_one_click_link(

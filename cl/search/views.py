@@ -6,7 +6,7 @@ from cache_memoize import cache_memoize
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.template.response import TemplateResponse
@@ -16,10 +16,12 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from waffle.decorators import waffle_flag
 
+from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
+from cl.donate.models import NeonMembership
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import get_only_status_facets
 from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
@@ -280,8 +282,35 @@ def show_results(request: HttpRequest) -> HttpResponse:
     alert_form.fields["name"].widget.attrs["value"] = render_dict[
         "search_summary_str"
     ]
-    render_dict.update({"alert_form": alert_form})
 
+    # Build the context for the limitations of RECAP alerts.
+    user = request.user
+    level = user.membership.level if user.profile.is_member else "free"
+    # Get the rate counts.
+    counts = Alert.objects.filter(
+        Q(user=user)
+        & Q(rate=Alert.REAL_TIME)
+        & Q(alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS])
+    ).count()
+
+    alerts_context = {
+        "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
+        "level": level,
+        "counts": counts,
+        "limits": RECAP_ALERT_QUOTAS,
+        "names": {
+            "free": "Free",
+            NeonMembership.LEGACY: "Legacy",
+            NeonMembership.TIER_1: "Tier 1",
+            NeonMembership.TIER_2: "Tier 2",
+            NeonMembership.TIER_3: "Tier 3",
+            NeonMembership.TIER_4: "Tier 4",
+            NeonMembership.EDU: "EDU",
+        },
+    }
+    render_dict.update(
+        {"alert_form": alert_form, "alerts_context": alerts_context}
+    )
     return TemplateResponse(request, "search.html", render_dict)
 
 
