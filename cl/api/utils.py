@@ -435,12 +435,7 @@ class LoggingMixin:
         if user.is_authenticated:
             if user_count in self.milestones:
                 Event.objects.create(
-                    description="User '%s' has placed their %s API %s request."
-                    % (
-                        user.username,
-                        intcomma(ordinal(user_count)),
-                        api_version,
-                    ),
+                    description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
                     user=user,
                 )
 

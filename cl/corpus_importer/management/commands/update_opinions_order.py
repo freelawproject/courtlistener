@@ -227,8 +227,9 @@ class Command(VerboseCommand):
     def valid_actions(self, s):
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
-                "Unable to parse action. Valid actions are: %s"
-                % (", ".join(self.VALID_ACTIONS.keys()))
+                "Unable to parse action. Valid actions are: {}".format(
+                    ", ".join(self.VALID_ACTIONS.keys())
+                )
             )
 
         return self.VALID_ACTIONS[s]
@@ -250,8 +251,9 @@ class Command(VerboseCommand):
             "--action",
             type=self.valid_actions,
             required=True,
-            help="The action you wish to take. Valid choices are: %s"
-            % (", ".join(self.VALID_ACTIONS.keys())),
+            help="The action you wish to take. Valid choices are: {}".format(
+                ", ".join(self.VALID_ACTIONS.keys())
+            ),
         )
         parser.add_argument(
             "--delay",

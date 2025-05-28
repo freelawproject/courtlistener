@@ -715,10 +715,8 @@ def clean_up_date_formats(
         if get_params.get(field) and cd.get(field) is not None:
             if isinstance(value, datetime.date | datetime.datetime):
                 # Don't use strftime. It'll fail before 1900
-                get_params[field] = "%02d/%02d/%s" % (
-                    value.month,
-                    value.day,
-                    value.year,
+                get_params[field] = (
+                    f"{value.month:02d}/{value.day:02d}/{value.year}"
                 )
             elif isinstance(value, str):
                 # Leave relative date strings as it's.
