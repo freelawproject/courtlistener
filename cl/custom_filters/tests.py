@@ -82,9 +82,9 @@ class TestNaturalDuration(SimpleTestCase):
             self.assertEqual(
                 actual_result,
                 expected_result,
-                msg="Could not convert %s to dict.\n"
-                "  Got:      %s\n"
-                "  Expected: %s" % (test, actual_result, expected_result),
+                msg=f"Could not convert {test} to dict.\n"
+                f"  Got:      {actual_result}\n"
+                f"  Expected: {expected_result}",
             )
 
     def test_weird_values(self) -> None:
@@ -98,9 +98,9 @@ class TestNaturalDuration(SimpleTestCase):
             self.assertEqual(
                 actual_result,
                 expected_result,
-                msg="Error with weird value: %s.\n"
-                "  Got:      %s\n"
-                "  Expected: %s" % (test, actual_result, expected_result),
+                msg=f"Error with weird value: {test}.\n"
+                f"  Got:      {actual_result}\n"
+                f"  Expected: {expected_result}",
             )
 
 

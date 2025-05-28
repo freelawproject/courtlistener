@@ -305,14 +305,15 @@ class TestStringUtils(SimpleTestCase):
             self.assertEqual(
                 result,
                 test_dict["result"],
-                msg="Failed with dict: %s.\n"
-                "%s != %s" % (test_dict, result, test_dict["result"]),
+                msg="Failed with dict: {}.\n{} != {}".format(
+                    test_dict, result, test_dict["result"]
+                ),
             )
             self.assertTrue(
                 len(result) <= test_dict["length"],
-                msg="Failed with dict: %s.\n"
-                "%s is longer than %s"
-                % (test_dict, result, test_dict["length"]),
+                msg="Failed with dict: {}.\n{} is longer than {}".format(
+                    test_dict, result, test_dict["length"]
+                ),
             )
 
     def test_anonymize(self) -> None:

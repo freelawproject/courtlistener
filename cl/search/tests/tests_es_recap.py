@@ -126,11 +126,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in Frontend with %s "
+            msg=f"Did not get the right number of search results in Frontend with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -143,9 +143,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of child documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n" % (field_name, expected_count, got),
+            msg=f"Did not get the right number of child documents {field_name}\n"
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n",
         )
 
     def _compare_child_entry_date_filed(
@@ -167,8 +167,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             meta_data_value,
             expected_date,
             msg="Did not get the right expected entry date filed \n"
-            "Expected: %s\n"
-            "     Got: %s\n\n" % (expected_date, meta_data_value),
+            f"Expected: {expected_date}\n"
+            f"     Got: {meta_data_value}\n\n",
         )
 
     def _assert_results_header_content(self, html_content, expected_text):
@@ -196,10 +196,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             total_query_results,
             parent_expected,
-            msg="Did not get the right number of parent documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            % (field_name, parent_expected, total_query_results),
+            msg=f"Did not get the right number of parent documents {field_name}\n"
+            f"Expected: {parent_expected}\n"
+            f"     Got: {total_query_results}\n\n",
         )
         return hits.to_dict()
 
@@ -230,9 +229,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             expected_count,
             got,
-            msg="Did not get the right number of child documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n" % (field_name, expected_count, got),
+            msg=f"Did not get the right number of child documents {field_name}\n"
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n",
         )
 
     @staticmethod
@@ -3549,11 +3548,11 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -4185,11 +4184,11 @@ class RECAPSearchAPIV4Test(
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -6578,10 +6577,9 @@ class RECAPIndexingTest(
         self.assertEqual(
             total_query_results,
             parent_expected,
-            msg="Did not get the right number of parent documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            % (field_name, parent_expected, total_query_results),
+            msg=f"Did not get the right number of parent documents {field_name}\n"
+            f"Expected: {parent_expected}\n"
+            f"     Got: {total_query_results}\n\n",
         )
         return hits.to_dict()
 

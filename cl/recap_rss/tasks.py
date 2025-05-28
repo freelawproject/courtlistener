@@ -238,7 +238,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         try:
             raise Exception(
                 "No last build date in RSS document returned by "
-                "PACER: %s" % feed_status.court_id
+                f"PACER: {feed_status.court_id}"
             )
         except Exception as exc:
             logger.warning(str(exc))

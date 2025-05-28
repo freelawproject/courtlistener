@@ -259,7 +259,7 @@ async def clean_up_recap_document_file(item: RECAPDocument) -> None:
     :return: None
     """
 
-    if type(item) == RECAPDocument:
+    if isinstance(item, RECAPDocument):
         await sync_to_async(item.filepath_local.delete)()
         item.sha1 = ""
         item.date_upload = None
