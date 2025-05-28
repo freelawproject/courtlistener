@@ -168,6 +168,13 @@ async def prayer_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/prayer_help.html", context)
 
 
+async def relative_dates(request: HttpRequest) -> HttpResponse:
+    context = {
+        "private": False,
+    }
+    return TemplateResponse(request, "help/relative_dates_help.html", context)
+
+
 async def tag_notes_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/tags_help.html", {"private": False})
 
@@ -484,6 +491,7 @@ async def old_terms(request: HttpRequest, v: str) -> HttpResponse:
             "title": f"Archived Terms of Service and Policies, v{v} – "
             "CourtListener.com",
             "private": True,
+            "is_archived": True,
         },
     )
 
