@@ -1,4 +1,4 @@
-FROM python:3.13-slim AS build-base
+FROM python:3.13 AS build-base
 
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
@@ -6,7 +6,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     --assume-yes \
     --quiet=2 \
     # So we can use Python-slim
-    build-essential gcc python3-dev\
+    build-essential gcc \
     # So postgres can compile and users can use dbshell
     libpq-dev postgresql-client \
     # So we can use webpack to compile assets
