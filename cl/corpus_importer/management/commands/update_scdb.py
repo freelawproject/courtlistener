@@ -86,8 +86,8 @@ class Command(VerboseCommand):
 
         if self.skip_human_review:
             logger.info(
-                "\nSkipped %s items in SCDB which came up for human "
-                "review." % self.skipped_count
+                "\nSkipped %s items in SCDB which came up for human review.",
+                self.skipped_count,
             )
 
     @staticmethod
@@ -141,8 +141,9 @@ class Command(VerboseCommand):
             else:
                 # The values were the same.
                 logger.info(
-                    "'%s' field unchanged -- old and new values were "
-                    "the same: %s" % (attribute, new_value)
+                    "'%s' field unchanged -- old and new values were the same: %s",
+                    attribute,
+                    new_value,
                 )
         return ok
 
@@ -293,14 +294,12 @@ class Command(VerboseCommand):
     def get_human_review(self, clusters, d):
         for i, cluster in enumerate(clusters):
             logger.info(
-                "%s: Cluster %s (%0.3f sim):"
-                % (
-                    i,
-                    cluster.pk,
-                    gen_diff_ratio(
-                        cluster.case_name.lower(), d["caseName"].lower()
-                    ),
-                )
+                "%s: Cluster %s (%.3f sim):",
+                i,
+                cluster.pk,
+                gen_diff_ratio(
+                    cluster.case_name.lower(), d["caseName"].lower()
+                ),
             )
             logger.info(
                 f"https://www.courtlistener.com{cluster.get_absolute_url()}"
