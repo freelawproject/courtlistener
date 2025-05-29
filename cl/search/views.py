@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, date, datetime, timedelta
 from urllib.parse import quote
 
@@ -235,7 +236,8 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     # This is a GET with parameters
     # User placed a search or is trying to edit an alert
-    if request.GET.get("edit_alert"):
+    edit_alert = "edit_alert" in request.GET
+    if edit_alert:
         # They're editing an alert
         if request.user.is_anonymous:
             return HttpResponseRedirect(
@@ -285,31 +287,39 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     # Build the context for the limitations of RECAP alerts.
     user = request.user
-    level = user.membership.level if user.profile.is_member else "free"
-    # Get the rate counts.
-    counts = Alert.objects.filter(
-        Q(user=user)
-        & Q(rate=Alert.REAL_TIME)
-        & Q(alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS])
-    ).count()
-
-    alerts_context = {
-        "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
-        "level": level,
-        "counts": counts,
-        "limits": RECAP_ALERT_QUOTAS,
-        "names": {
-            "free": "Free",
-            NeonMembership.LEGACY: "Legacy",
-            NeonMembership.TIER_1: "Tier 1",
-            NeonMembership.TIER_2: "Tier 2",
-            NeonMembership.TIER_3: "Tier 3",
-            NeonMembership.TIER_4: "Tier 4",
-            NeonMembership.EDU: "EDU",
-        },
-    }
+    alerts_context_json = None
+    if user.is_authenticated:
+        level = user.membership.level if user.profile.is_member else "free"
+        # Get the rate counts.
+        counts = Alert.objects.filter(
+            user=user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        ).aggregate(
+            rt=Count("pk", filter=Q(rate=Alert.REAL_TIME)),
+            other_rates=Count(
+                "pk",
+                filter=Q(rate__in=[Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY]),
+            ),
+        )
+        alerts_context = {
+            "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
+            "level": level,
+            "counts": counts,
+            "limits": RECAP_ALERT_QUOTAS,
+            "editAlert": edit_alert,
+            "names": {
+                "free": "Free",
+                NeonMembership.LEGACY: "Legacy",
+                NeonMembership.TIER_1: "Tier 1",
+                NeonMembership.TIER_2: "Tier 2",
+                NeonMembership.TIER_3: "Tier 3",
+                NeonMembership.TIER_4: "Tier 4",
+                NeonMembership.EDU: "EDU",
+            },
+        }
+        alerts_context_json = json.dumps(alerts_context)
     render_dict.update(
-        {"alert_form": alert_form, "alerts_context": alerts_context}
+        {"alert_form": alert_form, "alerts_context": alerts_context_json}
     )
     return TemplateResponse(request, "search.html", render_dict)
 

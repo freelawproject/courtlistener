@@ -51,6 +51,12 @@ class CreateAlertForm(ModelForm):
 
     def clean_rate(self):
         rate = self.cleaned_data["rate"]
+
+        alert_being_edited = self.instance and self.instance.pk
+        if alert_being_edited and rate == Alert.OFF:
+            # Don't check quotas when the user disables their alert.
+            return rate
+
         quotas_key = (
             Alert.REAL_TIME if rate == Alert.REAL_TIME else "other_rates"
         )
@@ -71,25 +77,32 @@ class CreateAlertForm(ModelForm):
         # Only check quotas for RECAP or DOCKETS alerts
         if self.current_type in {SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS}:
             allowed = quotas.get(level_key, quotas.get("free", 0))
-            # Count usage
+
+            query_params = {"user": self.user}
             if rate == Alert.REAL_TIME:
-                used = Alert.objects.filter(
-                    user=self.user,
-                    rate=Alert.REAL_TIME,
-                    alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
-                ).count()
+                query_params["rate"] = Alert.REAL_TIME
                 label = dict(Alert.FREQUENCY)[Alert.REAL_TIME]
             else:
-                used = Alert.objects.filter(
-                    user=self.user,
-                    rate__in=[Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY],
-                ).count()
+                query_params["rate__in"] = [
+                    Alert.DAILY,
+                    Alert.WEEKLY,
+                    Alert.MONTHLY,
+                ]
                 label = "Daily, Weekly or Monthly"
 
-            if used >= allowed:
+            alerts_count = Alert.objects.filter(
+                **query_params,
+                alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+            )
+            if alert_being_edited:
+                # exclude the alert being edited from the count
+                alerts_count = alerts_count.exclude(pk=self.instance.pk)
+            used = alerts_count.count()
+
+            if used + 1 > allowed:
+                # Count the alert being saved toward the allowed limit.
                 raise ValidationError(
-                    f"Your {plan_name} plan allows only {allowed} {label} alerts; "
-                    f"you already have {used}."
+                    f"Your {plan_name} plan allows only {allowed} {label} alerts; you already have {used}."
                 )
 
         return rate

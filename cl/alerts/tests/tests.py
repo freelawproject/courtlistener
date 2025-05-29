@@ -245,7 +245,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_non_member_recap_rt_alert_fails(self):
-        """RECAP + REAL_TIME should be rejected for free users."""
+        """RECAP RT alerts should be rejected for free users."""
         assert await self.async_client.alogin(
             username=self.user_no_member.user.username, password="password"
         )
@@ -261,9 +261,66 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         self.assertEqual(await alerts.acount(), 0)
         await self.async_client.alogout()
 
+    async def test_recap_rt_alert_for_member(self) -> None:
+        """Confirm that RT alert creation for RECAP alerts succeeds for
+        members within their quota.
+        """
+        # Non-RECAP alerts do not count toward the RECAP alerts quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_member_tier_1.user,
+            rate=Alert.MONTHLY,
+            alert_type=SEARCH_TYPES.OPINION,
+        )
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.user_member_tier_1.user.username,
+                password="password",
+            )
+        )
+        rt_alert_params = self.alert_params.copy()
+        rt_alert_params["rate"] = Alert.REAL_TIME
+        rt_alert_params["alert_type"] = SEARCH_TYPES.RECAP
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, rt_alert_params, follow=True)
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", r.content.decode())
+
+        alert_user = Alert.objects.filter(
+            user=self.user_member_tier_1.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        self.assertEqual(await alert_user.acount(), 1)
+        alert_created = await alert_user.afirst()
+        self.assertEqual(alert_created.alert_type, SEARCH_TYPES.RECAP)
+        self.assertEqual(alert_created.rate, Alert.REAL_TIME)
+
+        # Add 4 more rt alerts.
+        await sync_to_async(AlertFactory.create_batch)(
+            4,
+            user=self.user_member_tier_1.user,
+            rate=Alert.REAL_TIME,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        assert await self.async_client.alogin(
+            username=self.user_member_tier_1.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.REAL_TIME
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertIn("Tier 1 plan allows only 5 Real Time alerts", content)
+
+        # no new alert should be created
+        self.assertEqual(await alert_user.acount(), 5)
+        await self.async_client.alogout()
+
     async def test_legacy_member_recap_rt_alert_fails_when_over_quota(self):
         """RECAP + REAL_TIME should be rejected once the legacy member hits
-        their quota (0)."""
+        their quota (0).
+        """
         assert await self.async_client.alogin(
             username=self.user_member.user.username, password="password"
         )
@@ -279,7 +336,17 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_non_member_recap_other_rate_alert(self):
-        """Non-RT RECAP alerts should be rejected once a free user exceeds 5 alerts."""
+        """Non-RT RECAP alerts should be rejected once a free user exceeds the
+        quota.
+        """
+
+        # Non-RECAP alerts do not count toward the RECAP alerts quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_no_member.user,
+            rate=Alert.MONTHLY,
+            alert_type=SEARCH_TYPES.OPINION,
+        )
 
         # Non-member inside the quota.
         assert await self.async_client.alogin(
@@ -295,7 +362,10 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         self.assertIn("successfully", content)
 
         # 1 new alert should be created
-        alerts = Alert.objects.filter(user=self.user_no_member.user)
+        alerts = Alert.objects.filter(
+            user=self.user_no_member.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
         self.assertEqual(await alerts.acount(), 1)
 
         # Add 4 more other rate alerts.
@@ -320,12 +390,21 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
 
         # no new alert should be created
-        alerts = Alert.objects.filter(user=self.user_no_member.user)
         self.assertEqual(await alerts.acount(), 5)
         await self.async_client.alogout()
 
     async def test_member_recap_other_rate_alert(self):
-        """Non-RT RECAP alerts should be rejected once a free user exceeds 5 alerts."""
+        """Non-RT RECAP alerts should be rejected once the member exceeds
+        the allowed quota.
+        """
+
+        # Non-RECAP alerts do not count toward the RECAP alerts quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_member_tier_1.user,
+            rate=Alert.MONTHLY,
+            alert_type=SEARCH_TYPES.OPINION,
+        )
 
         # Member inside the quota.
         assert await self.async_client.alogin(
@@ -341,7 +420,10 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         self.assertIn("successfully", content)
 
         # 1 new alert should be created
-        alerts = Alert.objects.filter(user=self.user_member_tier_1.user)
+        alerts = Alert.objects.filter(
+            user=self.user_member_tier_1.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
         self.assertEqual(await alerts.acount(), 1)
 
         # Create 10 additional alerts to reach the allowed quota.
@@ -372,6 +454,75 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
 
         # no new alert should be created
         self.assertEqual(await alerts.acount(), 10)
+        await self.async_client.alogout()
+
+    async def test_edit_alert_constraints(self):
+        """Confirm that alerts can be edited even if the user is over their
+        quota. Also confirm that they can’t change an off alert to an active
+        alert if doing so would exceed the quota.
+        """
+
+        # Create 5 RECAP alerts that would hit the user quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_member_tier_1.user,
+            rate=Alert.REAL_TIME,
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        alerts = Alert.objects.filter(
+            user=self.user_member_tier_1.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        alert_to_edit = await alerts.afirst()
+        # Member is over quota but can still edit alerts.
+        # User is turning off the alert.
+        assert await self.async_client.alogin(
+            username=self.user_member_tier_1.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.OFF
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        params["edit_alert"] = alert_to_edit.pk
+        url = (
+            reverse("show_results")
+            + f"?type={SEARCH_TYPES.RECAP}&edit_alert={alert_to_edit.pk}"
+        )
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", content)
+
+        # User now has one alert available. Creation succeeds.
+        assert await self.async_client.alogin(
+            username=self.user_member_tier_1.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.REAL_TIME
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", content)
+        self.assertEqual(await alerts.acount(), 6)
+
+        # Attempting to toggle an alert from “off” to an active state that
+        # exceeds the quota should fail.
+        assert await self.async_client.alogin(
+            username=self.user_member_tier_1.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.REAL_TIME
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        params["edit_alert"] = alert_to_edit.pk
+        url = (
+            reverse("show_results")
+            + f"?type={SEARCH_TYPES.RECAP}&edit_alert={alert_to_edit.pk}"
+        )
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertIn("Tier 1 plan allows only 5 Real Time alerts", content)
         await self.async_client.alogout()
 
     async def test_fail_gracefully(self) -> None:

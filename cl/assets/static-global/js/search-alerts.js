@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function recapAlerts() {
     const rateValue = rateSelect.value;
     const userLevel = alertsContext.level;
+    const editAlert = alertsContext.editAlert;
     const membership = alertsContext.names[userLevel] || 'Free';
     const rateGroup = rateValue === 'rt' ? 'rt' : 'other_rates';
     const rateLabel = rateValue === 'rt' ? 'Real Time' : 'Daily, Weekly or Monthly';
@@ -37,7 +38,8 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
-    if (used >= allowed) {
+    if (used >= allowed && !editAlert) {
+      // Show the limit warning if the quota has been reached and the user is not editing their alerts.
       limitMsg.textContent = `Your ${membership} membership allows only ${allowed} "${rateLabel}" alerts; you already have ${used}.`;
       quotaWarning.classList.remove('hidden');
       saveBtn.disabled = true;

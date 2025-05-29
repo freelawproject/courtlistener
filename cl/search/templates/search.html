@@ -55,10 +55,12 @@
   {% flag "recap_relative_date_filter" %}
     <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
   {% endflag %}
-  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
-    const alertsContext = {{ alerts_context|safe }};
-  </script>
-  <script type="text/javascript" src="{% static "js/search-alerts.js" %}"></script>
+  {% if alerts_context %}
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+      const alertsContext = {{ alerts_context|safe }};
+    </script>
+    <script type="text/javascript" src="{% static "js/search-alerts.js" %}"></script>
+  {% endif %}
   {% include "includes/date_picker.html" %}
   {% if alert_form.errors or request.GET.show_alert_modal %}
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">
