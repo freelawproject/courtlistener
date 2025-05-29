@@ -333,6 +333,45 @@ div.jp-volume-bar-value {
 	height:5px;
 }
 
+/* Add styles for the new speed bar, positioning it below the volume bar */
+div.jp-speed-bar {
+    position: absolute;
+    overflow:hidden;
+    background: url("jplayer.blue.monday.jpg") 0 -250px repeat-x;
+    width:46px; /* Same width as volume bar */
+    height:5px; /* Same height as volume bar */
+    cursor: pointer;
+    top: 53px; /* Position below Volume bar */
+    left:330px; /* Same horizontal position as volume bar */
+}
+div.jp-speed-bar-value {
+    background: url("jplayer.blue.monday.jpg") 0 -256px repeat-x;
+    width:0px;
+    height:5px; /* Same height as volume bar value */
+}
+
+/* Style for the speed icon */
+i.jp-speed-icon {
+    position: absolute;
+    top: 46px; /* Align vertically with speed bar */
+    left: 307px;
+    color: #999;
+    font-size: 1em;
+}
+
+/* Style for the speed display text */
+span.jp-speed-text {
+    position: absolute;
+    top: 53px; /* Align top edge with speed bar's top */
+    left: 385px;
+    font-size: .64em;
+	font-style: oblique;
+    color: #666; /* Match other text color */
+    width: 30px; /* Fixed width to prevent layout shifts */
+    text-align: right;
+    line-height: 5px; /* Try to vertically center with the 5px bar */
+}
+
 /* @end */
 
 /* @group current time and duration */
@@ -611,6 +650,46 @@ a.jp-shuffle-off:hover {
 	background: url("jplayer.blue.monday.jpg") -90px -270px no-repeat;
 }
 
+
+/* @end */
+
+/* @group Playback Speed Controls */
+
+div.jp-speed-holder {
+  position: absolute;
+  top: 50px; /* Aligns with jp-time-holder */
+  left: 215px;
+  width: 200px;
+}
+
+span.jp-speed-label {
+  font-size: .64em;
+  font-style: oblique;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+
+button.jp-speed {
+  font-size: .60em; /* Smaller font for buttons */
+  padding: 1px 4px;
+  margin: 0 1px;
+  cursor: pointer;
+  border: 1px solid #009be3;
+  background-color: #eee;
+  color: #0d88c1;
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
+button.jp-speed:hover {
+  background-color: #ddd;
+}
+
+button.jp-speed.jp-speed-active {
+  background-color: #009be3;
+  color: #fff;
+  font-weight: bold;
+}
 
 /* @end */
 
