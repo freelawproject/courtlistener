@@ -1,4 +1,3 @@
-import json
 from datetime import UTC, date, datetime, timedelta
 from urllib.parse import quote
 
@@ -287,7 +286,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     # Build the context for the limitations of RECAP alerts.
     user = request.user
-    alerts_context_json = None
+    alerts_context = None
     if user.is_authenticated:
         level = user.membership.level if user.profile.is_member else "free"
         # Get the rate counts.
@@ -317,9 +316,8 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 NeonMembership.EDU: "EDU",
             },
         }
-        alerts_context_json = json.dumps(alerts_context)
     render_dict.update(
-        {"alert_form": alert_form, "alerts_context": alerts_context_json}
+        {"alert_form": alert_form, "alerts_context": alerts_context}
     )
     return TemplateResponse(request, "search.html", render_dict)
 

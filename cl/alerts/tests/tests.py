@@ -292,8 +292,9 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
         self.assertEqual(await alert_user.acount(), 1)
         alert_created = await alert_user.afirst()
-        self.assertEqual(alert_created.alert_type, SEARCH_TYPES.RECAP)
-        self.assertEqual(alert_created.rate, Alert.REAL_TIME)
+        if alert_created:
+            self.assertEqual(alert_created.alert_type, SEARCH_TYPES.RECAP)
+            self.assertEqual(alert_created.rate, Alert.REAL_TIME)
 
         # Add 4 more rt alerts.
         await sync_to_async(AlertFactory.create_batch)(
