@@ -1,0 +1,77 @@
+/* Styles for Transcript Display */
+.transcript-segment { /* Changed from transcript-word */
+  cursor: pointer;
+  padding: 5px 2px; /* Add vertical padding for paragraphs */
+  margin-bottom: 5px; /* Add space between segments */
+  transition: background-color 0.2s ease-in-out;
+  display: flex; /* Use flexbox for layout */
+  align-items: baseline; /* Align timestamp and text nicely */
+}
+.transcript-timestamp {
+  min-width: 55px; /* Ensure space for HH:MM:SS */
+  margin-right: 10px;
+  font-family: monospace; /* Monospaced font for consistent width */
+  font-size: 0.9em;
+  color: #555; /* Dim the timestamp slightly */
+}
+.transcript-segment-text { /* New class for text part */
+  flex-grow: 1; /* Allow text to take remaining space */
+}
+.transcript-segment:hover {
+  background-color: #e0e0e0; /* Light gray highlight on hover */
+}
+.transcript-current-segment { /* Changed class name */
+   background-color: #ffec8b; /* Yellow highlight for current word */
+   font-weight: bold;
+}
+#transcript-container {
+  width: 100%; /* Ensure it fills parent column */
+  margin-top: 20px;
+}
+
+#transcript-container h3 {
+  padding-left: 15px;
+}
+
+#transcript-text {
+    white-space: pre-wrap; /* Respect spaces and wrap text */
+    /* Apply scrolling and styling here */
+    max-height: 400px; /* Or desired height */
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    line-height: 1.6;
+    margin-top: 10px; /* Add some space below search controls */
+}
+.transcript-segment.transcript-search-match { /* Target segments */
+   background-color: #add8e6; /* Light blue */
+   border: 1px solid #87ceeb;
+}
+.transcript-segment.transcript-search-match:hover {
+   background-color: #add8e6; /* preserve on hover */
+}
+.transcript-segment.transcript-search-current-match {
+   background-color: #90ee90; /* Light green */
+   border: 1px solid #3cb371;
+   box-shadow: 0 0 5px rgba(60, 179, 113, 0.7);
+}
+.transcript-segment.transcript-search-current-match:hover {
+   background-color: #90ee90; /* preserve on hover */
+}
+.search-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Space between elements */
+  margin-bottom: 10px; /* Space below the controls */
+  padding: 0 15px; /* Add horizontal padding */
+}
+.search-controls input {
+  flex-grow: 1; /* Allow input to take available space */
+}
+.search-controls button {
+  padding: 5px 10px;
+}
+.search-controls span { /* Style for the count */
+    font-size: 0.9em;
+    color: #333;
+}
