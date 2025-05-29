@@ -182,8 +182,8 @@ class ESIndexTestCase(SimpleTestCase):
                 self.assertEqual(
                     node_count,
                     count,
-                    msg="Did not find %s node(s) with XPath query: %s. "
-                    "Instead found: %s" % (count, test_content, node_count),
+                    msg=f"Did not find {count} node(s) with XPath query: {test_content}. "
+                    f"Instead found: {node_count}",
                 )
 
         return xml_tree
@@ -372,11 +372,11 @@ class V4SearchAPIAssertions(SimpleTestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in Frontend with %s "
+            msg=f"Did not get the right number of search results in Frontend with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -452,7 +452,7 @@ class SearchAlertsAssertions:
             got,
             expected_count,
             msg="Did not get the right number of alerts in the email. "
-            "Expected: %s - Got: %s\n\n" % (expected_count, got),
+            f"Expected: {expected_count} - Got: {got}\n\n",
         )
 
     @staticmethod
@@ -514,9 +514,8 @@ class SearchAlertsAssertions:
         self.assertEqual(
             len(alert_cases),
             expected_hits,
-            msg="Did not get the right number of hits for the alert %s. "
-            "Expected: %s - Got: %s\n\n"
-            % (alert_title, expected_hits, len(alert_cases)),
+            msg=f"Did not get the right number of hits for the alert {alert_title}. "
+            f"Expected: {expected_hits} - Got: {len(alert_cases)}\n\n",
         )
         if case_title:
             for case in alert_cases:
@@ -533,9 +532,8 @@ class SearchAlertsAssertions:
                     self.assertEqual(
                         child_hit_count,
                         expected_child_hits,
-                        msg="Did not get the right number of child hits for the case %s. "
-                        "Expected: %s - Got: %s\n\n"
-                        % (case_title, expected_child_hits, child_hit_count),
+                        msg=f"Did not get the right number of child hits for the case {case_title}. "
+                        f"Expected: {expected_child_hits} - Got: {child_hit_count}\n\n",
                     )
                     break
 
@@ -601,8 +599,7 @@ class SearchAlertsAssertions:
                 self.assertEqual(
                     len(webhook_cases),
                     expected_hits,
-                    msg="Did not get the right number of hits for the alert %s. "
-                    % alert_title,
+                    msg=f"Did not get the right number of hits for the alert {alert_title}. ",
                 )
                 matched_alert_name = True
                 for case in webhook["payload"]["results"]:
@@ -614,8 +611,7 @@ class SearchAlertsAssertions:
                         self.assertEqual(
                             len(case[nested_field]),
                             expected_child_hits,
-                            msg="Did not get the right number of child documents for the case %s. "
-                            % case_title,
+                            msg=f"Did not get the right number of child documents for the case {case_title}. ",
                         )
         self.assertTrue(matched_alert_name, msg="Alert name didn't match")
         self.assertTrue(matched_case_title, msg="Case title didn't match")
@@ -647,8 +643,9 @@ class SearchAlertsAssertions:
                 self.assertEqual(
                     1,
                     len(hits),
-                    msg="Did not get the right number of hits for the case %s. "
-                    % webhook["payload"]["results"][0]["caseName"],
+                    msg="Did not get the right number of hits for the case {}. ".format(
+                        webhook["payload"]["results"][0]["caseName"]
+                    ),
                 )
                 alert_child_hits = alert_child_hits + len(
                     webhook["payload"]["results"][0]["recap_documents"]
@@ -659,21 +656,18 @@ class SearchAlertsAssertions:
         self.assertEqual(
             alert_title_webhooks,
             expected_hits,
-            msg="Did not get the right number of webhooks for alert %s. "
-            % alert_title,
+            msg=f"Did not get the right number of webhooks for alert {alert_title}. ",
         )
         self.assertEqual(
             alert_child_hits,
             expected_child_hits,
-            msg="Did not get the right number of child hits for alert %s. "
-            % alert_title,
+            msg=f"Did not get the right number of child hits for alert {alert_title}. ",
         )
         if expected_child_descriptions:
             self.assertEqual(
                 alert_child_ids,
                 set(expected_child_descriptions),
-                msg="Did not get the right child hits IDs for alert %s. "
-                % alert_title,
+                msg=f"Did not get the right child hits IDs for alert {alert_title}. ",
             )
 
     def _assert_webhook_hit_hl(
@@ -699,8 +693,7 @@ class SearchAlertsAssertions:
                     self.assertIn(
                         hl_expected,
                         child_field_content,
-                        msg="Did not get the HL content in field: %s. "
-                        % field_name,
+                        msg=f"Did not get the HL content in field: {field_name}. ",
                     )
                 else:
                     self.assertNotIn(
@@ -712,8 +705,7 @@ class SearchAlertsAssertions:
                     self.assertIn(
                         hl_expected,
                         parent_field_content,
-                        msg="Did not get the HL content in field: %s. "
-                        % field_name,
+                        msg=f"Did not get the HL content in field: {field_name}. ",
                     )
 
     def _assert_timestamp_filter(

@@ -152,8 +152,8 @@ def parse_file(file_path):
                 o for o in info["opinions"] if o["type"] == current_type
             ]
             if relevant_opinions:
-                relevant_opinions[-1]["opinion"] += "\n%s" % "\n".join(
-                    last_texts
+                relevant_opinions[-1]["opinion"] += "\n{}".format(
+                    "\n".join(last_texts)
                 )
                 relevant_opinions[-1]["opinion_texts"].extend(last_texts)
             else:

@@ -115,8 +115,16 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         "cl.recap.tasks.is_docket_entry_sealed",
         return_value=False,
     )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+    )
     async def test_email_processing_queue_create(
-        self, mock_is_docket_entry_sealed, mock_bucket_open, mock_cookies
+        self,
+        mock_download_pacer_pdf_by_rd,
+        mock_is_docket_entry_sealed,
+        mock_bucket_open,
+        mock_cookies,
     ):
         self.assertEqual(await EmailProcessingQueue.objects.acount(), 0)
         await self.async_client.post(self.path, self.data, format="json")
