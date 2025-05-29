@@ -1,5 +1,6 @@
 import csv
 import io
+import random
 from datetime import datetime
 from itertools import batched
 from typing import Any
@@ -43,6 +44,10 @@ JUDICIAL_POSITIONS: list[str] = [
     for key, value in Position.POSITION_TYPE_GROUPS.items()
     if value == "Judge"
 ]
+
+BUCKET_ARN = "arn:aws:s3:::bulk-customer-data"
+
+ROLE_ARN = "arn:aws:iam::968642441645:role/bulk-customer-data-batch"
 
 
 def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
@@ -221,7 +226,7 @@ def upload_manifest(
     base_filename: str,
     options: dict[str, Any],
     batch_counter: int | None = None,
-) -> None:
+) -> tuple[str, dict[str, Any]]:
     """
     Generates a CSV manifest file containing S3 object keys derived from record
     ID batches and uploads it to the specified S3 bucket.
@@ -251,6 +256,11 @@ def upload_manifest(
                 contain all IDs in the batch separated by underscores.
         batch_counter (int, optional): An optional integer to append to the
             filename for distinguishing between multiple manifest files.
+
+    Returns:
+        tuple[str, dict[str, Any]]: A tuple containing:
+            - The S3 ARN of the newly uploaded manifest file.
+            - A dictionary with the uploaded file's ETag and other properties.
     """
     bucket_name = options["bucket_name"]
     # Write the content of the csv file to a buffer and upload it
@@ -287,11 +297,13 @@ def upload_manifest(
             if batch_counter
             else base_filename
         )
-        s3_client.put_object(
+        arn = f"arn:aws:s3:::{bucket_name}/{name}"
+        manifest_data = s3_client.put_object(
             Key=name,
             Bucket=bucket_name,
             Body=csvfile.getvalue().encode("utf-8"),
         )
+    return arn, manifest_data
 
 
 def export_records_in_batches(
@@ -389,14 +401,7 @@ def export_records_in_batches(
             },
         )
         logger.info(
-            "\rRetrieved {}/{}, ({:.0%}), last PK processed: {},".format(
-                record_count + records_processed,
-                total_number_of_records,
-                (record_count + records_processed)
-                * 1.0
-                / total_number_of_records,
-                last_pk,
-            )
+            f"\rRetrieved {record_count + records_processed}/{total_number_of_records}, ({(record_count + records_processed) * 1.0 / total_number_of_records:.0%}), last PK processed: {last_pk},"
         )
 
     # Removes the key from the cache after a successful execution
@@ -587,6 +592,93 @@ def upload_list_of_records_for_users(
         )
 
 
+def get_account_id() -> str:
+    """
+    Retrieves the AWS account ID of the current execution role.
+
+    :return: The AWS account ID.
+    """
+    sts_client = boto3.client("sts")
+    return sts_client.get_caller_identity().get("Account")
+
+
+def get_lambda_arns() -> dict[str, str]:
+    """
+    Retrieves a dictionary of AWS Lambda function names and their ARNs.
+
+    :return: A dictionary where keys are Lambda function names (str) and values
+        are their corresponding ARNs (str).
+    """
+    lambda_client = boto3.client("lambda", region_name="us-west-2")
+    request = lambda_client.list_functions()
+    return {f["FunctionName"]: f["FunctionArn"] for f in request["Functions"]}
+
+
+def create_and_execute_batch_job(
+    record_type: str, manifest_arn: str, manifest_etag: str
+) -> None:
+    """
+    Creates and executes an S3 Batch Operations job to process records of a
+    specific type.
+
+    This function dynamically selects the appropriate AWS Lambda function based
+    on the `record_type` and then creates an S3 Batch Operations job. The job
+    is configured to invoke the chosen Lambda function for each object listed
+    in the provided S3 manifest.
+
+    Args:
+        record_type (str): The type of record to process.
+        manifest_arn (str): ARN of the S3 manifest file.
+        manifest_etag (str): The ETag of the manifest file
+
+    """
+    match record_type:
+        case SEARCH_TYPES.OPINION:
+            lambda_name = "case_law_bulk_export"
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            lambda_name = "oral_argument_bulk_export"
+        case SEARCH_TYPES.PEOPLE:
+            lambda_name = "judges_bulk_export"
+        case "fd":
+            lambda_name = "financial_disclosure_bulk_export/"
+        case _:
+            raise NotImplementedError(
+                f"Record type '{record_type}' is not supported."
+            )
+
+    account_id = get_account_id()
+    lambda_arns_dict = get_lambda_arns()
+    s3_control = boto3.client("s3control", region_name="us-west-2")
+    s3_control.create_job(
+        AccountId=account_id,
+        ConfirmationRequired=False,
+        Operation={
+            "LambdaInvoke": {
+                "FunctionArn": lambda_arns_dict[lambda_name],
+                "InvocationSchemaVersion": "2.0",
+            },
+        },
+        Report={
+            "Bucket": BUCKET_ARN,
+            "Format": "Report_CSV_20180820",
+            "Enabled": True,
+            "ReportScope": "AllTasks",
+        },
+        Manifest={
+            "Spec": {
+                "Format": "S3BatchOperations_CSV_20180820",
+                "Fields": ["Bucket", "Key"],
+            },
+            "Location": {
+                "ObjectArn": manifest_arn,
+                "ETag": manifest_etag,
+            },
+        },
+        Priority=random.randint(0, 10),
+        RoleArn=ROLE_ARN,
+    )
+
+
 def compute_monthly_export(
     record_type: str, timestamp: datetime, options: dict[str, Any]
 ):
@@ -610,10 +702,11 @@ def compute_monthly_export(
     record_ids = get_monthly_record_ids_by_type(
         record_type, timestamp, all_records=options["all_records"]
     )
-    upload_manifest(record_ids, filename, options)
+    arn, manifest_data = upload_manifest(record_ids, filename, options)
     upload_list_of_records_for_users(
         record_type, options["bucket_name"], record_ids
     )
+    create_and_execute_batch_job(record_type, arn, manifest_data["ETag"])
 
 
 class Command(VerboseCommand):
