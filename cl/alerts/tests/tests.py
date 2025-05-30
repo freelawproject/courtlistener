@@ -312,7 +312,10 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn("Tier 1 plan allows only 5 Real Time alerts", content)
+        self.assertIn(
+            "You've used all of the alerts included with your membership.",
+            content,
+        )
 
         # no new alert should be created
         self.assertEqual(await alert_user.acount(), 5)
@@ -330,7 +333,10 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn("allows only 0 Real Time alerts;", content)
+        self.assertIn(
+            "You've used all of the alerts included with your membership.",
+            content,
+        )
         alerts = Alert.objects.filter(user=self.user_member.user)
         self.assertEqual(await alerts.acount(), 0)
 
@@ -386,9 +392,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn(
-            "Free plan allows only 5 Daily, Weekly or Monthly alerts", content
-        )
+        self.assertIn("To create more than 5 alerts", content)
 
         # no new alert should be created
         self.assertEqual(await alerts.acount(), 5)
@@ -449,7 +453,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
         self.assertIn(
-            "Tier 1 plan allows only 10 Daily, Weekly or Monthly alerts;",
+            "You've used all of the alerts included with your membership.",
             content,
         )
 
@@ -523,7 +527,10 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn("Tier 1 plan allows only 5 Real Time alerts", content)
+        self.assertIn(
+            "You've used all of the alerts included with your membership.",
+            content,
+        )
         await self.async_client.alogout()
 
     async def test_fail_gracefully(self) -> None:

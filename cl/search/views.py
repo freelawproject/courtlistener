@@ -21,7 +21,6 @@ from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
-from cl.donate.models import NeonMembership
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import get_only_status_facets
 from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
@@ -127,6 +126,31 @@ def show_results(request: HttpRequest) -> HttpResponse:
         "get_string_sans_alert": get_string_sans_alert,
     }
 
+    edit_alert = "edit_alert" in request.GET
+    # Build the context for the limitations of RECAP alerts.
+    user = request.user
+    alerts_context = None
+    if user.is_authenticated:
+        level = user.membership.level if user.profile.is_member else "free"
+        # Get the rate counts.
+        counts = Alert.objects.filter(
+            user=user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        ).aggregate(
+            rt=Count("pk", filter=Q(rate=Alert.REAL_TIME)),
+            other_rates=Count(
+                "pk",
+                filter=Q(rate__in=[Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY]),
+            ),
+        )
+        alerts_context = {
+            "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
+            "level": level,
+            "counts": counts,
+            "limits": RECAP_ALERT_QUOTAS,
+            "editAlert": edit_alert,
+        }
+
     if request.method == "POST":
         # The user is trying to save an alert.
         alert_form = CreateAlertForm(
@@ -173,7 +197,9 @@ def show_results(request: HttpRequest) -> HttpResponse:
             # Invalid form. Do the search again and show them the alert form
             # with the errors
             render_dict.update(do_es_search(request.GET.copy()))
-            render_dict.update({"alert_form": alert_form})
+            render_dict.update(
+                {"alert_form": alert_form, "alerts_context": alerts_context}
+            )
             return TemplateResponse(request, "search.html", render_dict)
 
     # This is a GET request: Either a search or the homepage
@@ -235,7 +261,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     # This is a GET with parameters
     # User placed a search or is trying to edit an alert
-    edit_alert = "edit_alert" in request.GET
     if edit_alert:
         # They're editing an alert
         if request.user.is_anonymous:
@@ -283,39 +308,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
     alert_form.fields["name"].widget.attrs["value"] = render_dict[
         "search_summary_str"
     ]
-
-    # Build the context for the limitations of RECAP alerts.
-    user = request.user
-    alerts_context = None
-    if user.is_authenticated:
-        level = user.membership.level if user.profile.is_member else "free"
-        # Get the rate counts.
-        counts = Alert.objects.filter(
-            user=user,
-            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
-        ).aggregate(
-            rt=Count("pk", filter=Q(rate=Alert.REAL_TIME)),
-            other_rates=Count(
-                "pk",
-                filter=Q(rate__in=[Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY]),
-            ),
-        )
-        alerts_context = {
-            "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
-            "level": level,
-            "counts": counts,
-            "limits": RECAP_ALERT_QUOTAS,
-            "editAlert": edit_alert,
-            "names": {
-                "free": "Free",
-                NeonMembership.LEGACY: "Legacy",
-                NeonMembership.TIER_1: "Tier 1",
-                NeonMembership.TIER_2: "Tier 2",
-                NeonMembership.TIER_3: "Tier 3",
-                NeonMembership.TIER_4: "Tier 4",
-                NeonMembership.EDU: "EDU",
-            },
-        }
     render_dict.update(
         {"alert_form": alert_form, "alerts_context": alerts_context}
     )

@@ -64,9 +64,8 @@ class CreateAlertForm(ModelForm):
         is_member = self.user.profile.is_member
         if is_member:
             level_key = self.user.membership.level
-            plan_name = self.user.membership.get_level_display()
         else:
-            level_key, plan_name = "free", "Free"
+            level_key = "free"
 
         # Only members can create RT alerts
         if rate == Alert.REAL_TIME and not is_member:
@@ -81,15 +80,12 @@ class CreateAlertForm(ModelForm):
             query_params = {"user": self.user}
             if rate == Alert.REAL_TIME:
                 query_params["rate"] = Alert.REAL_TIME
-                label = dict(Alert.FREQUENCY)[Alert.REAL_TIME]
             else:
                 query_params["rate__in"] = [
                     Alert.DAILY,
                     Alert.WEEKLY,
                     Alert.MONTHLY,
                 ]
-                label = "Daily, Weekly or Monthly"
-
             alerts_count = Alert.objects.filter(
                 **query_params,
                 alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
@@ -100,10 +96,14 @@ class CreateAlertForm(ModelForm):
             used = alerts_count.count()
 
             if used + 1 > allowed:
-                # Count the alert being saved toward the allowed limit.
-                raise ValidationError(
-                    f"Your {plan_name} plan allows only {allowed} {label} alerts; you already have {used}."
+                msg = (
+                    "You've used all of the alerts included with your membership. "
+                    "To create this alert, upgrade your membership or disable a RECAP Alert."
+                    if is_member
+                    else f"To create more than {quotas.get('free')} alerts and to gain access to "
+                    "real time alerts, please join Free Law project as a member."
                 )
+                raise ValidationError(msg)
 
         return rate
 

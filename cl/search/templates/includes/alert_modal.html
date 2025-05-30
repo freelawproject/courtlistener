@@ -110,8 +110,12 @@
                 <p><a href="{% url "faq" %}#real-time-alerts" target="_blank">Real Time alerts</a> are only supported for members of <a href="https://free.law/">Free Law Project</a>.</p>
                 <p>Please select another rate or become a member to create this alert.</p>
               {% else %}
-                <p class="limit-message"></p>
-                <p>Please select a different rate, become a member, or upgrade your membership to create this alert.</p>
+                <p id="msg-rt-free" class="hidden">You must be a member to create real-time alerts. Please join Free.law or choose a different rate to create this alert.</p>
+                <p id="msg-quota-free" class="hidden">To create more than {{ alerts_context.limits.other_rates.free }} alerts and to gain access to real time alerts, please join Free Law project as a member.</p>
+                <p id="msg-quota-member" class="hidden">
+                  You've used all of the alerts included with your membership.
+                  To create this alert, upgrade your membership or <a href="{% url 'profile_alerts' %}">disable a RECAP alert</a>.
+                </p>
               {% endif %}
 
               <p class="bottom">
