@@ -130,7 +130,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     # Build the context for the limitations of RECAP alerts.
     user = request.user
     alerts_context = None
-    if user.is_authenticated:
+    if user.is_authenticated and hasattr(user, "profile"):
         level = user.membership.level if user.profile.is_member else "free"
         # Get the rate counts.
         counts = Alert.objects.filter(

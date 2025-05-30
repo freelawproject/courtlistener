@@ -57,7 +57,7 @@
               <label for="id_rate">How often should we notify you?</label>
               {{ alert_form.rate }}
               {% if alert_form.rate.errors %}
-                <p class="help-block">
+                <p class="help-block link-red">
                   {% for error in alert_form.rate.errors %}
                     {{ error|escape }}
                   {% endfor %}
