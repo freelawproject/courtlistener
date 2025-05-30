@@ -49,17 +49,17 @@
           role="menu"
         >
           <li
-            class="px-4 py-1.5 text-md text-greyscale-800 flex hover:bg-greyscale-50"
+            class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
           >
-            <a href="https://donate.free.law/forms/supportflp" target="_blank" class="flex justify-start gap-2">
+            <a href="https://donate.free.law/forms/supportflp" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
               {% svg "money_hand" class="text-greyscale-500" aria_hidden="true" %}
               Make a Donation
             </a>
           </li>
           <li
-            class="px-4 py-1.5 text-md text-greyscale-800 flex hover:bg-greyscale-50"
+            class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
           >
-            <a href="https://donate.free.law/forms/membership" target="_blank" class="flex justify-start gap-2">
+            <a href="https://donate.free.law/forms/membership" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
               {% svg "group" class="text-greyscale-500" aria_hidden="true" %}
               Become a Member
             </a>
@@ -295,11 +295,14 @@
       {#   Signed-out button   #}
       <div class="flex flex-row flex-nowrap items-center">
         {% if request.path != "/sign-out/" %}
-          <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" class="btn-ghost">Login</a>
+          <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" class="btn-ghost md:h-9">Login</a>
         {% else %}
-          <a href="{% url "sign-in" %}" class="btn-ghost">Login</a>
+          <a href="{% url "sign-in" %}" class="btn-ghost md:h-9">Login</a>
         {% endif %}
-        <a href="{% url "register" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" class="btn-grey">Sign Up</a>
+        <a
+          href="{% url "register" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}"
+          class="btn-grey md:h-9 {% if variant == 'homepage' %}bg-white{% endif %} "
+        >Sign Up</a>
       </div>
     {% endif %}
   </div>
