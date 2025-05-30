@@ -195,7 +195,9 @@
                 role="menuitem"
                 aria-label="Go to Alerts page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "bell" aria_hidden="true" class="text-greyscale-400" %}Alerts
+              >
+                {% svg "bell" aria_hidden="true" class="text-greyscale-400" %}
+                Alerts
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
@@ -204,7 +206,9 @@
                 role="menuitem"
                 aria-label="Go to Notes page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "bookmark" aria_hidden="true" class="text-greyscale-400" %}Notes
+              >
+                {% svg "bookmark" aria_hidden="true" class="text-greyscale-400" %}
+                Notes
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
@@ -213,7 +217,31 @@
                 role="menuitem"
                 aria-label="Go to Tags page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "tag" aria_hidden="true" class="text-greyscale-400" %}Tags
+              >
+                {% svg "tag" aria_hidden="true" class="text-greyscale-400" %}
+                Tags
+              </a>
+            </li>
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <a
+                href="{% url "view_visualizations" %}"
+                role="menuitem"
+                aria-label="Go to Visualizations page"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+              >
+                {% svg "graph_up" aria_hidden="true" class="text-greyscale-400" %}
+                Visualizations
+              </a>
+            </li>
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <a
+                href="{% url "view_api" %}"
+                role="menuitem"
+                aria-label="Go to Developer Tools page"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+              >
+                {% svg "code" aria_hidden="true" class="text-greyscale-400" %}
+                Developer Tools
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
@@ -222,7 +250,9 @@
                 role="menuitem"
                 aria-label="Go to Prayers page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "donate" aria_hidden="true" class="text-greyscale-400" %}Prayers
+              >
+                {% svg "donate" aria_hidden="true" class="text-greyscale-400" %}
+                Prayers
               </a>
             </li>
             <div aria-hidden="true" class="h-1 bg-greyscale-100 my-1 w-full"></div>
@@ -232,7 +262,9 @@
                 role="menuitem"
                 aria-label="Go to Your Support page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "donate" aria_hidden="true" class="text-greyscale-400" %}Your Support
+              >
+                {% svg "donate" aria_hidden="true" class="text-greyscale-400" %}
+                Your Support
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
@@ -241,7 +273,9 @@
                 role="menuitem"
                 aria-label="Go to Account page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "avatar_outline" aria_hidden="true" class="text-greyscale-400" %}Account
+              >
+                {% svg "avatar_outline" aria_hidden="true" class="text-greyscale-400" %}
+                Account
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
