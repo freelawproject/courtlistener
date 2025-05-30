@@ -73,7 +73,7 @@ class CreateAlertForm(ModelForm):
         # Only members can create RT alerts
         if rate == Alert.REAL_TIME and not is_member:
             msg = format_html(
-                "You must be a <a href='{}' target='_blank'>Member</a> to create Real Time alerts.",
+                "You must be a <a href='{}' target='_blank'>member</a> to create Real Time alerts.",
                 flp_membership,
             )
             raise ValidationError(msg)
