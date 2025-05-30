@@ -2,6 +2,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('header', () => ({
     profileMenuExpanded: false,
     scopeMenuExpanded: false,
+    supportMenuExpanded: false,
     selected: 'Case Law',
     searchScopes: [{ label: 'Case Law' }, { label: 'RECAP Archive' }, { label: 'Oral Arguments' }, { label: 'Judges' }],
     get profileCaretClass() {
@@ -9,6 +10,12 @@ document.addEventListener('alpine:init', () => {
     },
     get scopeCaretClass() {
       return this.scopeMenuExpanded ? 'transform rotate-180' : '';
+    },
+    toggleSupportMenu() {
+      this.supportMenuExpanded = !this.supportMenuExpanded;
+    },
+    closeSupportMenu() {
+      this.supportMenuExpanded = false;
     },
     toggleProfileMenu() {
       this.profileMenuExpanded = !this.profileMenuExpanded;
@@ -25,6 +32,8 @@ document.addEventListener('alpine:init', () => {
     selectScope() {
       this.selected = this.$el.dataset?.scope;
       this.scopeMenuExpanded = false;
+      const searchInput = document.getElementById("header-search-bar");
+      this.$focus.focus(searchInput);
     },
     isActiveScope() {
       return this.$el.dataset?.scope === this.selected;

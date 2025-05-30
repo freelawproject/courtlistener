@@ -9,16 +9,21 @@
   <a href="#main" class="skip-link">Skip to main content</a>
   <a href="#footer" class="skip-link">Skip to footer</a>
 
+  {# HOMEPAGE VARIANT #}
   {% if variant == "homepage" %}
       <div class="relative">
         <button
           type="button"
-          x-on:click="toggleScopeMenu"
-          class="btn-primary"
+          x-on:click="toggleSupportMenu"
+          class="btn-primary z-10"
+          aria-controls="header-support-menu"
+          aria-haspopup="menu"
+          x-bind:aria-expanded="supportMenuExpanded"
+          aria-label="Toggle menu to support Free Law Project"
         >
           Support FLP
           <span
-            x-bind:class="scopeCaretClass"
+            x-bind:class="supportCaretClass"
             class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
             aria-hidden="true"
           >{% svg 'chevron' class="w-full h-full text-white" %}
@@ -27,8 +32,10 @@
 
         {#  support menu  #}
         <menu
-          x-show="scopeMenuExpanded"
-          x-on:click.outside="closeScopeMenu"
+          id="header-support-menu"
+          x-data="focus"
+          x-show="supportMenuExpanded"
+          x-on:click.outside="closeSupportMenu"
           x-on:keyup.esc="closeProfileMenu"
           x-on:keyup.right="focusNext"
           x-on:keyup.left="focusPrevious"
@@ -44,8 +51,8 @@
           <li
             class="px-4 py-1.5 text-md text-greyscale-800 flex hover:bg-greyscale-50"
           >
-            <a href="https://donate.free.law/forms/membership" target="_blank" class="flex justify-start gap-2">
-              {% svg "money_hand" class="text-greyscale-500" %}
+            <a href="https://donate.free.law/forms/supportflp" target="_blank" class="flex justify-start gap-2">
+              {% svg "money_hand" class="text-greyscale-500" aria_hidden="true" %}
               Make a Donation
             </a>
           </li>
@@ -53,38 +60,44 @@
             class="px-4 py-1.5 text-md text-greyscale-800 flex hover:bg-greyscale-50"
           >
             <a href="https://donate.free.law/forms/membership" target="_blank" class="flex justify-start gap-2">
-              {% svg "group" class="text-greyscale-500" %}
+              {% svg "group" class="text-greyscale-500" aria_hidden="true" %}
               Become a Member
             </a>
           </li>
         </menu>
       </div>
 
+  {# DEFAULT VARIANT #}
   {% else %}
     {# COURTLISTENER LOGO #}
-    <a href="/" class="w-[226px] min-w-[226px] flex justify-start" aria-label="Go to homepage">
+    <a href="/" class="w-[226px] md:min-w-[226px] flex justify-start" aria-label="Go to homepage">
       <img src="{% static "png/logo.png" %}" class="md:h-21 md:w-45 h-12 w-[106px]" alt="CourtListener Logo">
     </a>
 
     {# SEARCH BAR #}
-    <form class="w-full relative hidden md:flex flex-row flex-nowrap h-12">
+    <form class="w-full relative hidden lg:flex flex-row flex-nowrap h-12">
       {#  scope selector  #}
       <button
         type="button"
+        aria-controls="header-scope-menu"
+        aria-haspopup="menu"
         x-on:click="toggleScopeMenu"
         class="btn-outline !rounded-r-none rounded-l-xl border-greyscale-200 my-[1px]"
+        aria-label="Select search scope"
       >
         <span class="text-sm text-greyscale-600" x-text="selected"></span>
         <span
           x-bind:class="scopeCaretClass"
           class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
           aria-hidden="true"
-        >{% svg 'chevron' class="w-full h-full text-greyscale-400" %}
+        >{% svg 'chevron' class="w-full h-full text-greyscale-400" aria_hidden="true" %}
         </span>
       </button>
 
       {#  scope menu  #}
       <menu
+        id="header-scope-menu"
+        x-data="focus"
         x-show="scopeMenuExpanded"
         x-on:click.outside="closeScopeMenu"
         x-on:keyup.esc="closeProfileMenu"
@@ -97,16 +110,21 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
         class="z-20 absolute left-0 top-14 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+        role="menu"
       >
         <template x-for="scope in searchScopes">
           <li
             x-bind:key="scope.label"
             x-on:click="selectScope"
             x-bind:data-scope="scope.label"
-            class="px-4 py-1.5 text-md font-cooper text-greyscale-800 flex justify-between hover:bg-greyscale-50"
+            class="px-4 py-1.5 text-md font-cooper text-greyscale-800 flex hover:bg-greyscale-50"
+            role="menuitem"
+            x-bind:id="scope.label"
           >
-            <span x-text="scope.label"></span>
-            {% svg "check" x_show="isActiveScope" x_bind__data_scope="scope.label" class="text-primary-600" %}
+            <button type="button" class="flex justify-between w-full">
+              <span x-text="scope.label"></span>
+              {% svg "check" x_show="isActiveScope" x_bind__data_scope="scope.label" class="text-primary-600" aria_hidden="true" %}
+            </button>
           </li>
         </template>
       </menu>
@@ -115,7 +133,8 @@
       <div class="[&:has(input:focus)]:ring-2 bg-greyscale-200 flex flex-row gap-2 items-center pl-4 pr-2 flex-grow">
         {% svg "magnifier" class="text-greyscale-400 flex-grow-0" %}
         <div class="bg-greyscale-200 flex-grow">
-          <input class="bg-greyscale-200 placeholder:text-sm placeholder:text-greyscale-500 focus-visible:ring-0 focus-visible:outline-none bg-none" placeholder="Enter keyword(s)">
+          <label for="header-search-bar" class="sr-only" type="text">Search <span x-text="selected"></span></label>
+          <input id="header-search-bar" type="search" class="bg-greyscale-200 placeholder:text-sm placeholder:text-greyscale-500 focus-visible:ring-0 focus-visible:outline-none bg-none" placeholder="Enter keyword(s)">
         </div>
         <button type="button" class="p-2 rounded-[10px] border border-greyscale-200 bg-white">
           {% svg "brackets" class="text-greyscale-500" %}
@@ -125,6 +144,7 @@
     </form>
   {% endif %}
 
+  {# ALL VARIANTS #}
   {# ACCOUNT BUTTON(S) #}
   <div class="w-[--profile-menu-width] flex justify-end items-center relative">
     {% if request.user.is_authenticated %}
@@ -132,8 +152,11 @@
         {#   Signed-in button   #}
         <button
           x-on:click="toggleProfileMenu"
-          class="{% if variant == "homepage" %}btn bg-greyscale-200{% endif %} btn-outline text-greyscale-800 outline-greyscale-400 rounded-[10px] px-2.5 py-2 text-sm items-center"
+          class="bg-white btn-outline text-greyscale-800 outline-greyscale-400 rounded-[10px] px-2.5 py-2 text-sm items-center"
           type="button"
+          aria-haspopup="menu"
+          aria-controls="header-profile-menu"
+          x-bind:aria-expanded="profileMenuExpanded"
         >
           {% svg "avatar" class="border-greyscale-300 border rounded-full" %}
           Profile
@@ -148,6 +171,7 @@
         {#   Signed-in menu   #}
         <nav>
           <ul
+            id="header-profile-menu"
             x-data="focus"
             x-show="profileMenuExpanded"
             x-on:click.outside="closeProfileMenu"
@@ -157,7 +181,7 @@
             class="absolute right-0 z-10 mt-2 w-[--profile-menu-width] rounded-lg bg-white py-2 shadow-lg border border-greyscale-200 focus-visible:outline-hidden list-none pl-0"
             tabindex="-1"
             role="menu"
-            aria-label="Navigation"
+            aria-label="Account navigation"
             x-transition:enter="transition ease-out duration-300"
             x-transition:enter-start="opacity-0"
             x-transition:enter-end="opacity-100"
@@ -169,32 +193,36 @@
               <a
                 href="{% url "profile_alerts" %}"
                 role="menuitem"
+                aria-label="Go to Alerts page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "bell" class="text-greyscale-400" %}Alerts
+              >{% svg "bell" aria_hidden="true" class="text-greyscale-400" %}Alerts
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
               <a
                 href="{% url "profile_notes" %}"
                 role="menuitem"
+                aria-label="Go to Notes page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "bookmark" class="text-greyscale-400" %}Notes
+              >{% svg "bookmark" aria_hidden="true" class="text-greyscale-400" %}Notes
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
               <a
                 href="{% url "tag_list" username=user.username %}"
                 role="menuitem"
+                aria-label="Go to Tags page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "tag" class="text-greyscale-400" %}Tags
+              >{% svg "tag" aria_hidden="true" class="text-greyscale-400" %}Tags
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
               <a
                 href="{% url 'user_prayers' user.username %}"
                 role="menuitem"
+                aria-label="Go to Prayers page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "donate" class="text-greyscale-400" %}Prayers
+              >{% svg "donate" aria_hidden="true" class="text-greyscale-400" %}Prayers
               </a>
             </li>
             <div aria-hidden="true" class="h-1 bg-greyscale-100 my-1 w-full"></div>
@@ -202,23 +230,25 @@
               <a
                 href="{% url "profile_your_support" %}"
                 role="menuitem"
+                aria-label="Go to Your Support page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "donate" class="text-greyscale-400" %}Your Support
+              >{% svg "donate" aria_hidden="true" class="text-greyscale-400" %}Your Support
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
               <a
                 href="{% url "view_settings" %}"
                 role="menuitem"
+                aria-label="Go to Account page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >{% svg "avatar_outline" class="text-greyscale-400" %}Account
+              >{% svg "avatar_outline" aria_hidden="true" class="text-greyscale-400" %}Account
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
               <form id="logout-form" method="post" action="/sign-out/">
                 {% csrf_token %}
                 <button type="submit" class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2 w-full">
-                  {% svg "sign_out" class="text-greyscale-400" %}
+                  {% svg "sign_out" aria_hidden="true" class="text-greyscale-400" %}
                   Sign out
                 </button>
               </form>
