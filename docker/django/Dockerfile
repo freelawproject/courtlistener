@@ -1,12 +1,14 @@
-FROM python:3.13-slim AS build-base
+FROM python:3.13 AS build-base
 
-RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
+# Install apt dependencies
+# caching: https://docs.docker.com/build/cache/optimize/#use-cache-mounts
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update --quiet=2 && \
     apt-get install \
     --no-install-recommends \
     --assume-yes \
     --quiet=2 \
-    # So we can use Python-slim
-    build-essential gcc python3-dev\
     # So postgres can compile and users can use dbshell
     libpq-dev postgresql-client \
     # So we can use webpack to compile assets
@@ -32,28 +34,33 @@ ENV \
 ARG BUILD_ENV=prod
 FROM build-base AS python-base
 
-# uv install dependencies
 WORKDIR /opt/courtlistener
-COPY ./pyproject.toml ./uv.lock ./
+
+# uv install dependencies
+COPY pyproject.toml uv.lock .
 # https://docs.astral.sh/uv/guides/integration/docker/#caching
 ENV \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    UV_PROJECT_ENVIRONMENT=/opt/venv
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync \
     $(test "$BUILD_ENV" != "dev" && echo "--no-dev")
-ENV PATH="/opt/venv/bin:$PATH"
 
-COPY . /opt/courtlistener
+# npm install dependencies
+COPY cl/package.json cl/package-lock.json ./cl/
+RUN cd cl && \
+    npm ci
 
-# Collect compiled assets from webpack-build stage.
+COPY . .
+
+# Run Node.js build tasks
 # Note: Always produce production code and never produce source-maps
 # (run the devMiddleware for legible output)
-WORKDIR /opt/courtlistener/cl
-RUN npm install
-RUN npx webpack --mode=production --no-devtool
-RUN npm run build --no-input
+RUN cd cl && \
+    npx webpack --mode=production --no-devtool && \
+    npm run build --no-input
 
 # We log to stdout by default, but we have a config for logging here. Even if
 # we don't use this logger, we need to have the file or else Python is unhappy.
@@ -62,8 +69,6 @@ RUN mkdir /var/log/courtlistener \
     && mkdir /var/log/juriscraper \
     && chown -R www-data:www-data /var/log/juriscraper/ \
     && mkdir -p /opt/courtlistener/cl/assets/static/
-
-WORKDIR /opt/courtlistener
 
 USER root
 ## Creates a directory for Hyperscan db

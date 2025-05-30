@@ -2344,8 +2344,8 @@ def update_rd_metadata(
             msg = f"{r_msg}: {court_id=}, {rd_pk=}"
         else:
             msg = (
-                "Unable to get PDF for RECAP Document '%s' "
-                "at '%s' with doc id '%s'" % (rd_pk, court_id, pacer_doc_id)
+                f"Unable to get PDF for RECAP Document '{rd_pk}' "
+                f"at '{court_id}' with doc id '{pacer_doc_id}'"
             )
         self.request.chain = None
         return False, msg

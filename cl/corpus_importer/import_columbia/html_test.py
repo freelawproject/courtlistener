@@ -2,6 +2,7 @@ import fnmatch
 import os
 import re
 import xml.etree.ElementTree as ET
+from collections import Counter
 from glob import glob
 from random import shuffle
 
@@ -504,8 +505,8 @@ def parse_file(file_path, court_fallback=""):
                 o for o in info["opinions"] if o["type"] == current_type
             ]
             if relevant_opinions:
-                relevant_opinions[-1]["opinion"] += "\n%s" % "\n".join(
-                    last_texts
+                relevant_opinions[-1]["opinion"] += "\n{}".format(
+                    "\n".join(last_texts)
                 )
                 relevant_opinions[-1]["opinion_texts"].extend(last_texts)
             else:
@@ -685,7 +686,6 @@ os.chdir("/home/elliott/freelawmachine/flp/columbia_data/opinions")
 folders = glob("*")
 folders.sort()
 
-from collections import Counter
 
 html_tab: Counter = Counter()
 

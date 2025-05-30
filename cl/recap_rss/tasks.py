@@ -28,6 +28,7 @@ from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
     add_docket_entries,
     find_docket_object,
+    set_skip_percolation_if_bankruptcy_data,
     update_docket_metadata,
 )
 from cl.recap_rss.models import RssFeedData, RssFeedStatus, RssItemCache
@@ -237,7 +238,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         try:
             raise Exception(
                 "No last build date in RSS document returned by "
-                "PACER: %s" % feed_status.court_id
+                f"PACER: {feed_status.court_id}"
             )
         except Exception as exc:
             logger.warning(str(exc))
@@ -356,6 +357,10 @@ def merge_rss_feed_contents(
             async_to_sync(update_docket_metadata)(d, docket)
             if not d.pacer_case_id:
                 d.pacer_case_id = docket["pacer_case_id"]
+
+            # Skip the percolator request for this save if bankruptcy data will
+            # be merged afterward.
+            set_skip_percolation_if_bankruptcy_data(docket, d)
             try:
                 d.save()
                 add_bankruptcy_data_to_docket(d, docket)
