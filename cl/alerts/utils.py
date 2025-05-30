@@ -31,6 +31,7 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
+from cl.recap.constants import bankruptcy_data_fields
 from cl.search.constants import (
     ALERTS_HL_TAG,
     SEARCH_RECAP_CHILD_HL_FIELDS,
@@ -685,6 +686,32 @@ def prepare_percolator_content(
             )
 
     return percolator_index, es_document_index, documents_to_percolate
+
+
+def set_skip_percolation_if_bankruptcy_data(
+    docket_data: dict[str, Any], d: Docket
+) -> None:
+    """Set skip percolation flag if bankruptcy data is present.
+
+    :param docket_data: A dict containing the docket data fields.
+    :param d: The docket to be saved.
+    :return: None
+    """
+    if bool(set(docket_data.keys()) & set(bankruptcy_data_fields)):
+        d.skip_percolator_request = True
+
+
+def set_skip_percolation_if_parties_data(
+    parties_data: list[dict[str, Any]], d: Docket
+) -> None:
+    """Set skip percolation flag if parties data is present.
+
+    :param parties_data: A list of dicts containing the parties data.
+    :param d: The docket to be saved.
+    :return: None
+    """
+    if parties_data:
+        d.skip_percolator_request = True
 
 
 def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:

@@ -211,6 +211,9 @@ def update_es_documents(
                                 ),
                                 (compose_app_label(instance), instance.pk),
                                 fields_map,
+                                getattr(
+                                    instance, "skip_percolator_request", False
+                                ),
                             ),
                             send_or_schedule_search_alerts.s(),
                             percolator_response_processing.s(),
@@ -629,7 +632,7 @@ def allow_es_audio_indexing(
     :return: True if indexing should be avoided, False otherwise.
     """
 
-    if type(instance) == Audio and (
+    if isinstance(instance, Audio) and (
         update_fields and "processing_complete" in update_fields
     ):
         # Allow indexing Audio instances for which 'processing_complete' is
@@ -790,7 +793,7 @@ class ESSignalProcessor:
         if (
             created
             and mapping_fields.get("self", None)
-            and type(instance) != Audio
+            and not isinstance(instance, Audio)
         ) or (
             allow_es_audio_indexing(instance, update_fields)
             and mapping_fields.get("self", None)
@@ -804,6 +807,7 @@ class ESSignalProcessor:
                         instance.pk,
                         compose_app_label(instance),
                         self.es_document.__name__,
+                        getattr(instance, "skip_percolator_request", False),
                     ),
                     send_or_schedule_search_alerts.s(),
                     percolator_response_processing.s(),

@@ -50,6 +50,7 @@ from cl.lib.utils import (
     cleanup_main_query,
     get_array_of_selected_fields,
     map_to_docket_entry_sorting,
+    parse_string_date,
     perform_special_character_replacements,
 )
 from cl.people_db.models import Position
@@ -81,6 +82,7 @@ from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
     ElasticBadRequestError,
+    InvalidRelativeDateSyntax,
     QueryType,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
@@ -172,28 +174,44 @@ def build_daterange_query(
     after: datetime.date | str,
     relation: Literal["INTERSECTS", "CONTAINS", "WITHIN", None] = None,
 ) -> list[Range]:
-    """Given field name and date range limits returns ElasticSearch range query or None
+    """Given field name and date range limits returns ElasticSearch absolute
+    range query or None
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html#ranges-on-dates
 
-    :param field: elasticsearch index fieldname
+    If a relative date string in the allowed syntax is provided, it is
+    converted to an ES-compatible date math syntax to query a relative date.
+
+    :param field: The date field name
     :param before: datetime upper limit
     :param after: datetime lower limit
     :param relation: Indicates how the range query matches values for range fields
     :return: Empty list or list with DSL Range query
     """
 
+    if not any([before, after]):
+        return []
+
     params = {}
-    if any([before, after]):
-        if isinstance(after, datetime.date):
-            params["gte"] = f"{after.isoformat()}T00:00:00Z"
-        if isinstance(before, datetime.date):
-            params["lte"] = f"{before.isoformat()}T23:59:59Z"
-        if relation is not None:
-            allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-            assert relation in allowed_relations, (
-                f"'{relation}' is not an allowed relation."
-            )
-            params["relation"] = relation
+    # Build an absolute date range if the provided values are date objects.
+    if isinstance(after, datetime.date):
+        params["gte"] = f"{after.isoformat()}T00:00:00Z"
+    if isinstance(before, datetime.date):
+        params["lte"] = f"{before.isoformat()}T23:59:59Z"
+    if relation is not None:
+        allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
+        assert relation in allowed_relations, (
+            f"'{relation}' is not an allowed relation."
+        )
+        params["relation"] = relation
+
+    # Try parsing the date when it’s a relative date, and override the
+    # gte and lte parameters.
+    gte = parse_string_date(after)
+    lte = parse_string_date(before)
+    if gte is not None:
+        params["gte"] = gte
+    if lte is not None:
+        params["lte"] = lte
 
     if params:
         return [Q("range", **{field: params})]
@@ -3088,6 +3106,7 @@ def do_es_api_query(
         UnbalancedQuotesQuery,
         BadProximityQuery,
         DisallowedWildcardPattern,
+        InvalidRelativeDateSyntax,
     ) as e:
         raise ElasticBadRequestError(detail=e.message)
 
@@ -3232,7 +3251,7 @@ def do_collapse_count_query(
 
 def do_es_alert_estimation_query(
     search_query: Search, cd: CleanData, day_count: int
-) -> int:
+) -> tuple[int, int]:
     """Builds an ES alert estimation query based on the provided search query,
      clean data, and day count.
 
@@ -3243,6 +3262,7 @@ def do_es_alert_estimation_query(
     :return: An integer representing the alert estimation.
     """
 
+    total_recap_case_only_estimation = 0
     match cd["type"]:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP:
             after_field = "filed_after"
@@ -3284,21 +3304,43 @@ def do_es_alert_estimation_query(
         child_docs_count_query = build_child_docs_query(child_docs_query, cd)
         child_total = 0
         if child_docs_count_query:
-            child_docs_count_query = search_query.query(child_docs_count_query)
-            child_total_query = child_docs_count_query.extra(
+            child_docs_count_query_all = search_query.query(
+                child_docs_count_query
+            )
+            child_total_query = child_docs_count_query_all.extra(
                 size=0, track_total_hits=True
             )
             multi_search = multi_search.add(child_total_query)
+
+            # Count RECAPDocuments aggregating by docket_id for case only alerts
+            rd_case_only_query = search_query.query(child_docs_count_query)
+            rd_case_only_query.aggs.bucket(
+                "unique_documents",
+                "cardinality",
+                field="docket_id",
+                precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
+            )
+            rd_case_only_query = rd_case_only_query.extra(
+                size=0, track_total_hits=False
+            )
+            multi_search = multi_search.add(rd_case_only_query)
 
         responses = multi_search.execute()
         parent_total = responses[0].hits.total.value
         if child_docs_count_query:
             child_doc_count_response = responses[1]
             child_total = child_doc_count_response.hits.total.value
-        total_recap_estimation = parent_total + child_total
-        return total_recap_estimation
 
-    return estimation_query.count()
+            # Case only count
+            child_doc_count_response_case_only = responses[2]
+            child_total_case_only = child_doc_count_response_case_only.aggregations.unique_documents.value
+            total_recap_case_only_estimation = max(
+                parent_total, child_total_case_only
+            )
+        total_recap_estimation = parent_total + child_total
+        return total_recap_estimation, total_recap_case_only_estimation
+
+    return estimation_query.count(), total_recap_case_only_estimation
 
 
 def do_es_sweep_alert_query(

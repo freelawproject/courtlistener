@@ -140,7 +140,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             alert = hit.alert
             doc_content = json_date_parser(hit.document_content)
             match hit.alert.alert_type:
-                case SEARCH_TYPES.RECAP:
+                case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
                     main_doc_id = doc_content.get("docket_id")
                 case SEARCH_TYPES.ORAL_ARGUMENT:
                     main_doc_id = doc_content.get("id")
@@ -163,8 +163,12 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
         hits = []
         for alert, documents in merged_hits.items():
-            search_type = alert.alert_type
-
+            # Override the search type to RECAP for case-only alerts (DOCKETS)
+            search_type = (
+                SEARCH_TYPES.RECAP
+                if alert.alert_type == SEARCH_TYPES.DOCKETS
+                else alert.alert_type
+            )
             # Override query n in the 'View Full Results' URL to
             # include a filter by timestamp.
             cut_off_date = get_cut_off_date(rate, now_time)

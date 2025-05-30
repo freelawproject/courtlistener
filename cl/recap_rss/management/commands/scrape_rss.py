@@ -69,7 +69,7 @@ class Command(VerboseCommand):
                     print(
                         "Another instance of this program is running with "
                         "this combination of courts. Only one instance "
-                        "can crawl these courts at a time: '%s'" % court_str
+                        f"can crawl these courts at a time: '{court_str}'"
                     )
                     sys.exit(1)
 

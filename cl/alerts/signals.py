@@ -34,7 +34,7 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
                     AudioPercolator.__name__,
                 )
             )
-        case SEARCH_TYPES.RECAP if (
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if (
             settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
         ):
             transaction.on_commit(

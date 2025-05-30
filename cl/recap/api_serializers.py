@@ -102,9 +102,10 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             )
             if not court_ids.filter(pk=attrs["court"].pk).exists():
                 raise ValidationError(
-                    "%s is not a district or bankruptcy court ID. Did you "
-                    "mean to use the upload_type for appellate dockets?"
-                    % attrs["court"]
+                    "{} is not a district or bankruptcy court ID. Did you "
+                    "mean to use the upload_type for appellate dockets?".format(
+                        attrs["court"]
+                    )
                 )
 
         if attrs["upload_type"] == UPLOAD_TYPE.CLAIMS_REGISTER:
@@ -114,8 +115,8 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             )
             if not bankruptcy_court_ids.filter(pk=attrs["court"].pk).exists():
                 raise ValidationError(
-                    "%s is not a bankruptcy court ID. Only bankruptcy cases "
-                    "should have claims registry pages." % attrs["court"]
+                    "{} is not a bankruptcy court ID. Only bankruptcy cases "
+                    "should have claims registry pages.".format(attrs["court"])
                 )
 
         if attrs["upload_type"] in [
@@ -129,8 +130,8 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             # Appellate court dockets. Is the court valid?
             if not is_appellate_court(attrs["court"].pk):
                 raise ValidationError(
-                    "%s is not an appellate court ID. Did you mean to use the "
-                    "upload_type for district dockets?" % attrs["court"]
+                    "{} is not an appellate court ID. Did you mean to use the "
+                    "upload_type for district dockets?".format(attrs["court"])
                 )
 
         if attrs["upload_type"] == UPLOAD_TYPE.PDF:
@@ -363,9 +364,9 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
             rd = attrs["recap_document"]
             if rd.is_available:
                 raise ValidationError(
-                    "Cannot fetch a PDF for recap_document %s. That document "
+                    f"Cannot fetch a PDF for recap_document {rd.pk}. That document "
                     "is already marked as available in our database "
-                    "(is_available = True)." % rd.pk
+                    "(is_available = True)."
                 )
 
         # Do the PACER credentials work?

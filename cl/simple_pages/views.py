@@ -168,6 +168,13 @@ async def prayer_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/prayer_help.html", context)
 
 
+async def relative_dates(request: HttpRequest) -> HttpResponse:
+    context = {
+        "private": False,
+    }
+    return TemplateResponse(request, "help/relative_dates_help.html", context)
+
+
 async def tag_notes_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/tags_help.html", {"private": False})
 
@@ -305,7 +312,15 @@ async def coverage_oa(request: HttpRequest) -> HttpResponse:
         request,
         "help/coverage_oa.html",
         {
-            "courts_with_oral_argument_scrapers": oral_argument_courts,
+            "courts_with_oral_argument_scrapers": oral_argument_courts,  # -> can be safely removed once new design is launched
+            "courts_list": [
+                {
+                    "href": f"/?q=&court_{court.pk}=on&order_by=dateArgued+desc&type=oa",
+                    "label": court,
+                    "ref": "nofollow",
+                }
+                async for court in oral_argument_courts
+            ],
             "private": False,
         },
     )
@@ -473,9 +488,10 @@ async def old_terms(request: HttpRequest, v: str) -> HttpResponse:
         request,
         f"terms/{v}.html",
         {
-            "title": "Archived Terms of Service and Policies, v%s – "
-            "CourtListener.com" % v,
+            "title": f"Archived Terms of Service and Policies, v{v} – "
+            "CourtListener.com",
             "private": True,
+            "is_archived": True,
         },
     )
 
