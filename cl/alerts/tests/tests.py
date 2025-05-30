@@ -254,9 +254,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn(
-            "You must be a Member to create Real Time alerts.", content
-        )
+        self.assertIn("to create Real Time alerts.", content)
         alerts = Alert.objects.filter(user=self.user_no_member.user)
         self.assertEqual(await alerts.acount(), 0)
         await self.async_client.alogout()

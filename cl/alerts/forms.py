@@ -2,6 +2,8 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from django.forms.widgets import HiddenInput, Select, TextInput
+from django.urls import reverse
+from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
 
 from cl.alerts.constants import RECAP_ALERT_QUOTAS
@@ -67,11 +69,14 @@ class CreateAlertForm(ModelForm):
         else:
             level_key = "free"
 
+        flp_membership = "https://donate.free.law/forms/membership"
         # Only members can create RT alerts
         if rate == Alert.REAL_TIME and not is_member:
-            raise ValidationError(
-                "You must be a Member to create Real Time alerts."
+            msg = format_html(
+                "You must be a <a href='{}' target='_blank'>Member</a> to create Real Time alerts.",
+                flp_membership,
             )
+            raise ValidationError(msg)
 
         # Only check quotas for RECAP or DOCKETS alerts
         if self.current_type in {SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS}:
@@ -94,15 +99,24 @@ class CreateAlertForm(ModelForm):
                 # exclude the alert being edited from the count
                 alerts_count = alerts_count.exclude(pk=self.instance.pk)
             used = alerts_count.count()
+            profile_url = reverse("profile_alerts")
 
             if used + 1 > allowed:
-                msg = (
-                    "You've used all of the alerts included with your membership. "
-                    "To create this alert, upgrade your membership or disable a RECAP Alert."
-                    if is_member
-                    else f"To create more than {quotas.get('free')} alerts and to gain access to "
-                    "real time alerts, please join Free Law project as a member."
-                )
+                if is_member:
+                    msg = format_html(
+                        "You've used all of the alerts included with your membership. "
+                        "To create this alert, <a href='{}' target='_blank'>upgrade your membership</a> or "
+                        "<a href='{}'>disable a RECAP Alert</a>.",
+                        flp_membership,
+                        profile_url,
+                    )
+                else:
+                    msg = format_html(
+                        "To create more than {} alerts and to gain access to real time alerts, "
+                        "please join <a href='{}' target='_blank'>Free Law project</a> as a member.",
+                        quotas.get("free"),
+                        flp_membership,
+                    )
                 raise ValidationError(msg)
 
         return rate

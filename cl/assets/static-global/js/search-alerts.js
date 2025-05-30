@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       // Show the limit warning if the quota has been reached and the user is not editing their alerts.
       quotaWarning.classList.remove('hidden');
-      //saveBtn.disabled = true;
+      saveBtn.disabled = true;
     }
   }
 
