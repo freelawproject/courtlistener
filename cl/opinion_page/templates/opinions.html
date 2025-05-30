@@ -117,7 +117,7 @@
           </div>
         {% endif %}
 
-        {% if cluster.sub_opinions.all.first.extracted_by_ocr or "U" in cluster.source and tab == "opinions" %}
+        {% if tab == "opinions" and cluster.sub_opinions.all.first.extracted_by_ocr or "U" in cluster.source %}
             <div class="col-sm-12 alert-warning alert v-offset-above-2">
                 <p class="bottom">The text of this document was obtained by analyzing a scanned document and may have typos.
                 </p>
