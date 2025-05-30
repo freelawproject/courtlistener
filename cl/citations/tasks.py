@@ -265,8 +265,7 @@ def store_opinion_citations_and_update_parentheticals(
         )
         handle_unmatched_citations(
             opinion,
-            unmatched_citations,
-            ambiguous_matches,
+            unmatched_citations + ambiguous_matches,
             citation_resolutions,
         )
 

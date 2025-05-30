@@ -41,6 +41,7 @@ from cl.citations.group_parentheticals import (
     get_representative_parenthetical,
 )
 from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_FLAG,
     MULTIPLE_MATCHES_RESOURCE,
     NO_MATCH_RESOURCE,
     do_resolve_citations,
@@ -3034,6 +3035,7 @@ class UnmatchedCitationTest(TransactionTestCase):
     # select one to mark as ambiguous; as happens on the resolution flow
     # to MULTIPLE_RESOURCE_MATCH citations
     ambiguous_citations = [eyecite_citations.pop(2)]
+    setattr(ambiguous_citations[0], MULTIPLE_MATCHES_FLAG, True)
     cluster = None
     opinion: Opinion
 
@@ -3046,7 +3048,7 @@ class UnmatchedCitationTest(TransactionTestCase):
     def test_1st_creation(self) -> None:
         """Can we save unmatched citations?"""
         handle_unmatched_citations(
-            self.opinion, self.eyecite_citations, self.ambiguous_citations, {}
+            self.opinion, self.eyecite_citations + self.ambiguous_citations, {}
         )
         unmatched_citations = list(
             UnmatchedCitation.objects.filter(citing_opinion=self.opinion).all()
@@ -3135,8 +3137,7 @@ class UnmatchedCitationTest(TransactionTestCase):
             tokenizer=HYPERSCAN_TOKENIZER,
         )
         opinion = cluster.sub_opinions.first()
-        opinion.unmatched_citations.all().delete()
-        handle_unmatched_citations(opinion, eyecite_citations, [], {})
+        handle_unmatched_citations(opinion, eyecite_citations, {})
         count = UnmatchedCitation.objects.filter(
             citing_opinion=opinion
         ).count()

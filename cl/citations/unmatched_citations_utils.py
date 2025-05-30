@@ -2,6 +2,7 @@ import logging
 
 from eyecite.models import CitationBase, FullCaseCitation
 
+from cl.citations.match_citations import MULTIPLE_MATCHES_FLAG
 from cl.citations.models import UnmatchedCitation
 from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import Opinion
@@ -95,7 +96,6 @@ def update_unmatched_citations_status(
 
 def store_unmatched_citations(
     unmatched_citations: list[CitationBase],
-    ambiguous_matches: list[CitationBase],
     opinion: Opinion,
 ) -> None:
     """Bulk create UnmatchedCitation instances cited by an opinion
@@ -103,18 +103,17 @@ def store_unmatched_citations(
     Only FullCaseCitations provide useful information for resolution
     updates. Other types are discarded
 
-    :param unmatched_citations: citations with 0 matches
-    :param ambiguous_matches: citations with more than 1 match
+    :param unmatched_citations: citations with 0 matches or more than 1 match
     :param opinion: the citing opinion
     :return None:
     """
     unmatched_citations_to_store = []
     seen_citations = set()
 
-    for index, unmatched_citation in enumerate(
-        unmatched_citations + ambiguous_matches, 1
-    ):
-        has_multiple_matches = index > len(unmatched_citations)
+    for unmatched_citation in unmatched_citations:
+        has_multiple_matches = getattr(
+            unmatched_citation, MULTIPLE_MATCHES_FLAG, False
+        )
 
         citation_object = UnmatchedCitation.create_from_eyecite(
             unmatched_citation, opinion, has_multiple_matches
@@ -135,7 +134,6 @@ def store_unmatched_citations(
 def handle_unmatched_citations(
     citing_opinion: Opinion,
     unmatched_citations: list[CitationBase],
-    ambiguous_matches: list[CitationBase],
     citation_resolutions: dict[
         MatchedResourceType, list[SupportedCitationType]
     ],
@@ -143,12 +141,13 @@ def handle_unmatched_citations(
     """Store valid UnmatchedCitations or update their status
 
     :param citing_opinion: the cited opinion
-    :param unmatched_citations: citations with 0 matches
-    :param ambiguous_matches: citations with more than 1 match
+    :param unmatched_citations: citations with 0 resolution matches or more
+        than 1 match
+    :param citation_resolutions: mapper with valid resolutions
 
     :return None
     """
-    if not (unmatched_citations or ambiguous_matches):
+    if not unmatched_citations:
         return
 
     self_citations = [str(c) for c in citing_opinion.cluster.citations.all()]
@@ -157,13 +156,7 @@ def handle_unmatched_citations(
         for c in unmatched_citations
         if unmatched_citation_is_valid(c, self_citations)
     ]
-    valid_ambiguous = [
-        c
-        for c in ambiguous_matches
-        if unmatched_citation_is_valid(c, self_citations)
-    ]
-
-    if not (valid_unmatched or valid_ambiguous):
+    if not valid_unmatched:
         return
 
     existing_unmatched_citations = list(
@@ -171,9 +164,7 @@ def handle_unmatched_citations(
     )
 
     if not existing_unmatched_citations:
-        store_unmatched_citations(
-            valid_unmatched, valid_ambiguous, citing_opinion
-        )
+        store_unmatched_citations(valid_unmatched, citing_opinion)
         return
 
     resolved_citations = {
@@ -195,10 +186,5 @@ def handle_unmatched_citations(
         for c in valid_unmatched
         if c.matched_text() not in existing_unmatched_strings
     ]
-    new_ambiguous = [
-        c
-        for c in valid_ambiguous
-        if c.matched_text() not in existing_unmatched_strings
-    ]
-    if new_unmatched or new_ambiguous:
-        store_unmatched_citations(new_unmatched, new_ambiguous, citing_opinion)
+    if new_unmatched:
+        store_unmatched_citations(new_unmatched, citing_opinion)
