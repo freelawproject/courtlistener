@@ -41,6 +41,7 @@ from cl.citations.group_parentheticals import (
     get_representative_parenthetical,
 )
 from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_FLAG,
     MULTIPLE_MATCHES_RESOURCE,
     NO_MATCH_RESOURCE,
     do_resolve_citations,
@@ -53,10 +54,14 @@ from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_opinion_citations_and_update_parentheticals,
     store_recap_citations,
-    store_unmatched_citations,
+)
+from cl.citations.unmatched_citations_utils import (
+    handle_unmatched_citations,
     update_unmatched_citations_status,
 )
-from cl.citations.utils import make_get_citations_kwargs
+from cl.citations.utils import (
+    make_get_citations_kwargs,
+)
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
 from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
@@ -3030,8 +3035,9 @@ class UnmatchedCitationTest(TransactionTestCase):
     # select one to mark as ambiguous; as happens on the resolution flow
     # to MULTIPLE_RESOURCE_MATCH citations
     ambiguous_citations = [eyecite_citations.pop(2)]
+    setattr(ambiguous_citations[0], MULTIPLE_MATCHES_FLAG, True)
     cluster = None
-    opinion = None
+    opinion: Opinion
 
     @classmethod
     def setUpClass(cls):
@@ -3041,8 +3047,8 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     def test_1st_creation(self) -> None:
         """Can we save unmatched citations?"""
-        store_unmatched_citations(
-            self.eyecite_citations, self.ambiguous_citations, self.opinion
+        handle_unmatched_citations(
+            self.opinion, self.eyecite_citations + self.ambiguous_citations, {}
         )
         unmatched_citations = list(
             UnmatchedCitation.objects.filter(citing_opinion=self.opinion).all()
@@ -3096,8 +3102,15 @@ class UnmatchedCitationTest(TransactionTestCase):
             found_count == 2,
             f"There should be 2 found UnmatchedCitations, there are {found_count}",
         )
-
-        update_unmatched_citations_status(citation_resolutions, self.opinion)
+        existing_unmatched_citations = list(
+            self.opinion.unmatched_citations.all()
+        )
+        resolved_citations = {
+            c.matched_text() for v in citation_resolutions.values() for c in v
+        }
+        update_unmatched_citations_status(
+            resolved_citations, existing_unmatched_citations
+        )
         should_resolve.refresh_from_db()
         should_not_resolve.refresh_from_db()
 
@@ -3124,7 +3137,7 @@ class UnmatchedCitationTest(TransactionTestCase):
             tokenizer=HYPERSCAN_TOKENIZER,
         )
         opinion = cluster.sub_opinions.first()
-        store_unmatched_citations(eyecite_citations, [], opinion)
+        handle_unmatched_citations(opinion, eyecite_citations, {})
         count = UnmatchedCitation.objects.filter(
             citing_opinion=opinion
         ).count()
