@@ -177,13 +177,7 @@ $(document).ready(function() {
                 const isPlaybackJustStarted = typeof lastPlayPosition === 'undefined' || lastPlayPosition < 3;
 
                 // Don't auto-scroll at beginning of playback
-                if (isFirstSegment && isPlaybackJustStarted) {
-                    // Just update highlighting without scrolling
-                    updateSegmentHighlighting(foundSegmentDiv, currentSegmentDiv);
-                } else {
-                    // Update highlighting with scrolling
-                    updateSegmentHighlighting(foundSegmentDiv, currentSegmentDiv);
-                }
+                updateSegmentHighlighting(foundSegmentDiv, currentSegmentDiv);
 
                 currentSegmentDiv = foundSegmentDiv;
 
