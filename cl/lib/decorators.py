@@ -1,8 +1,8 @@
 import logging
 import time
+from collections.abc import Callable
 from functools import wraps
 from hashlib import md5
-from typing import Callable, Tuple, Type, Union
 from urllib.parse import urlparse
 
 from asgiref.sync import sync_to_async
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def retry(
-    ExceptionToCheck: Union[Type[Exception], Tuple[Type[Exception], ...]],
+    ExceptionToCheck: type[Exception] | tuple[type[Exception], ...],
     tries: int = 4,
     delay: float = 3,
     backoff: float = 2,
@@ -46,11 +46,12 @@ def retry(
                 try:
                     return f(*args, **kwargs)
                 except ExceptionToCheck as e:
-                    msg = "%s, Retrying in %d seconds..." % (str(e), mdelay)
+                    msg = "%s, Retrying in %s seconds..."
+                    params = (e, mdelay)
                     if logger:
-                        logger.warning(msg)
+                        logger.warning(msg, *params)
                     else:
-                        print(msg)
+                        print(msg % params)
                     time.sleep(mdelay)
                     mtries -= 1
                     mdelay *= backoff

@@ -1,8 +1,8 @@
 import environ
 
-env = environ.FileAwareEnv()
-
 from ..django import TESTING
+
+env = environ.FileAwareEnv()
 
 if TESTING:
     ELASTICSEARCH_DISABLED = True

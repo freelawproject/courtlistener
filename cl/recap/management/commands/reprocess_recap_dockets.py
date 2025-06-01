@@ -46,9 +46,7 @@ def extract_unextracted_rds(queue: str) -> None:
             ).apply_async()
             chunk = []
             sys.stdout.write(
-                "\rProcessed {}/{} ({:.0%})".format(
-                    processed_count, count, processed_count * 1.0 / count
-                )
+                f"\rProcessed {processed_count}/{count} ({processed_count * 1.0 / count:.0%})"
             )
             sys.stdout.flush()
     sys.stdout.write("\n")
@@ -116,7 +114,7 @@ class Command(VerboseCommand):
             except IntegrityError:
                 # Happens when there's wonkiness in the source data. Move on.
                 continue
-            except (XMLSyntaxError, IOError):
+            except (OSError, XMLSyntaxError):
                 # Happens when the local IA XML file is empty. Not sure why
                 # these happen.
                 xml_error_ids.append(d.pk)

@@ -189,7 +189,7 @@ def es_search_db_for_full_citation(
     )
     if full_citation.metadata.court:
         filters.append(
-            (Q("term", **{"court_id.raw": full_citation.metadata.court}))
+            Q("term", **{"court_id.raw": full_citation.metadata.court})
         )
 
     # Take 1: Use a phrase query to search the citation field.

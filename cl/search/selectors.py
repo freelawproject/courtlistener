@@ -1,5 +1,5 @@
 import natsort
-from django.db.models import F, Prefetch, Q, QuerySet
+from django.db.models import F, Q, QuerySet
 
 from cl.search.models import OpinionCluster
 

@@ -1,17 +1,74 @@
 @import 'fonts.css';
 
 @tailwind base;
+
+@layer base {
+  :root {
+    --nav-menu-width: 222px;
+    --mobile-main-padding: theme(spacing.4);
+    --padded-full-width: calc(100vw - (2 * var(--mobile-main-padding)));
+  }
+  code {
+    @apply font-sans text-sm bg-brand-100 text-brand-600 border border-brand-300 rounded-[2px] px-1;
+  }
+  select {
+    @apply border bg-white py-3 px-3.5 rounded-[10px] text-sm font-medium text-greyscale-900;
+  }
+  h1 {
+    @apply font-cooper text-display-sm font-semibold md:text-display-lg;
+  }
+  h2 {
+    @apply text-display-xs font-semibold text-greyscale-900;
+  }
+  h3 {
+    @apply text-xl font-semibold text-greyscale-900;
+  }
+  h4 {
+    @apply text-lg font-semibold text-greyscale-900;
+  }
+  ul {
+    @apply list-disc pl-6;
+  }
+  ol {
+    @apply list-decimal pl-6;
+  }
+  blockquote {
+    @apply border-l-4 border-l-greyscale-200 pl-6 py-2 text-xl font-normal first-of-type:mt-2 [&_blockquote:last-of-type]:-mb-2;
+  }
+  table {
+    @apply table;
+  }
+  tr {
+    @apply has-[th[scope="col"]]:bg-greyscale-100 has-[th[scope="col"]]:rounded-lg w-full border-b border-greyscale-200 text-sm font-normal;
+  }
+  th {
+    @apply p-2 text-start text-greyscale-700 font-normal;
+  }
+  td {
+    @apply p-2;
+  }
+}
+
 @tailwind components;
 
 @layer components {
   .btn {
-    @apply py-2.5 px-3.5 rounded-lg w-fit text-sm font-normal;
+    @apply py-2.5 px-3.5 rounded-lg w-fit text-sm font-normal flex gap-1;
   }
   .btn-primary {
-    @apply btn text-white bg-primary-600 hover:bg-primary-700 outline-none focus:ring-4 focus:ring-primary-200 disabled:bg-primary-100 disabled:text-primary-400;
+    @apply btn text-white bg-primary-600 hover:bg-primary-700 outline-none focus:ring-4 focus:ring-primary-300 disabled:bg-primary-100 disabled:text-primary-400;
   }
   .btn-outline {
     @apply btn text-greyscale-700 hover:bg-greyscale-100 outline outline-1 outline-greyscale-300 focus:ring-4 focus:ring-greyscale-200 disabled:outline-greyscale-200 disabled:text-greyscale-400;
+  }
+  .btn-dark {
+    @apply btn text-white bg-greyscale-900 hover:bg-greyscale-800 outline-none focus:ring-4 focus:ring-greyscale-400 disabled:bg-greyscale-400 disabled:text-greyscale-200;
+  }
+  .banner {
+    @apply flex flex-col gap-4 rounded-2xl bg-greyscale-100 border-2 border-greyscale-200 justify-between;
+  }
+  .textbox {
+    @apply text-md font-normal py-3 px-4 rounded-[10px] border border-greyscale-300;
   }
 }
 
@@ -19,6 +76,9 @@
 
 @layer utilities {
   .btn-xl {
-    @apply py-3 px-4.5;
+    @apply py-3 px-4.5 text-md;
+  }
+  .lead {
+    @apply text-xl text-greyscale-700 font-normal;
   }
 }

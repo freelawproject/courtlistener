@@ -150,7 +150,6 @@ class Command(VerboseCommand):
                 continue
             # Check if adding this opinion would exceed the batch size.
             if current_batch_size + token_count > token_count_limit:
-
                 # Send the current batch since adding this opinion would break the limit.
                 self.send_batch(
                     current_batch, embedding_queue, upload_queue, database

@@ -1,5 +1,4 @@
 import json
-import logging
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
@@ -103,8 +102,8 @@ class UserTest(LiveServerTestCase):
             self.assertEqual(
                 r.status_code,
                 HTTPStatus.OK,
-                msg="Got wrong status code for page at: {path}. "
-                "Status Code: {code}".format(path=path, code=r.status_code),
+                msg=f"Got wrong status code for page at: {path}. "
+                f"Status Code: {r.status_code}",
             )
 
     @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
@@ -165,17 +164,15 @@ class UserTest(LiveServerTestCase):
                     self.assertNotIn(
                         next_param,
                         response.content.decode(),
-                        msg="'%s' found in HTML of response. This suggests it was "
-                        "not cleaned by the sanitize_redirection function."
-                        % next_param,
+                        msg=f"'{next_param}' found in HTML of response. This suggests it was "
+                        "not cleaned by the sanitize_redirection function.",
                     )
                 else:
                     self.assertIn(
                         next_param,
                         response.content.decode(),
-                        msg="'%s' not found in HTML of response. This suggests it "
-                        "was sanitized when it should not have been."
-                        % next_param,
+                        msg=f"'{next_param}' not found in HTML of response. This suggests it "
+                        "was sanitized when it should not have been.",
                     )
 
     async def test_prevent_text_injection_in_success_registration(self):
@@ -203,18 +200,17 @@ class UserTest(LiveServerTestCase):
                     self.assertNotIn(
                         email,
                         response.content.decode(),
-                        msg="'%s' found in HTML of response. This indicates a "
+                        msg=f"'{email}' found in HTML of response. This indicates a "
                         "potential security vulnerability. The view likely "
-                        "failed to properly validate it." % email,
+                        "failed to properly validate it.",
                     )
                 else:
                     self.assertIn(
                         email,
                         response.content.decode(),
-                        msg="'%s' not found in HTML of response. This suggests a "
+                        msg=f"'{email}' not found in HTML of response. This suggests a "
                         "a potential issue with the validation logic. The email "
-                        "address may have been incorrectly identified as invalid"
-                        % email,
+                        "address may have been incorrectly identified as invalid",
                     )
 
     async def test_login_redirects(self) -> None:
@@ -253,17 +249,15 @@ class UserTest(LiveServerTestCase):
                     self.assertNotIn(
                         f'value="{next_param}"',
                         response.content.decode(),
-                        msg="'%s' found in HTML of response. This suggests it was "
-                        "not cleaned by the sanitize_redirection function."
-                        % next_param,
+                        msg=f"'{next_param}' found in HTML of response. This suggests it was "
+                        "not cleaned by the sanitize_redirection function.",
                     )
                 else:
                     self.assertIn(
                         f'value="{next_param}"',
                         response.content.decode(),
-                        msg="'%s' not found in HTML of response. This suggests it "
-                        "was sanitized when it should not have been."
-                        % next_param,
+                        msg=f"'{next_param}' not found in HTML of response. This suggests it "
+                        "was sanitized when it should not have been.",
                     )
 
 
@@ -340,7 +334,7 @@ class UserDataTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
         self.assertIn(
             "has been confirmed",
@@ -371,7 +365,7 @@ class UserDataTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
         ups = UserProfile.objects.filter(pk__in=[up.pk for up in ups])
         async for up in ups:
@@ -790,10 +784,11 @@ class SNSWebhookTest(TestCase):
             signals.bounce_received,
         )
         # Check if warning is logged
-        warning_part_one = "Unexpected ContentRejected soft bounce for "
-        warning_part_two = "bounce@simulator.amazonses.com, message_id: "
         mock_logging.warning.assert_called_with(
-            f"{warning_part_one}{warning_part_two}"
+            "Unexpected %s soft bounce for %s, message_id: %s",
+            "ContentRejected",
+            "bounce@simulator.amazonses.com",
+            "",
         )
 
     def test_handle_soft_bounce_create_back_off(self) -> None:
@@ -1060,10 +1055,10 @@ class SNSWebhookTest(TestCase):
             signals.bounce_received,
         )
         # Check if a warning is logged
-        warning_part_one = "Unexpected Suppressed hard bounce for "
-        warning_part_two = "bounce@simulator.amazonses.com"
         mock_logging.warning.assert_called_with(
-            f"{warning_part_one}{warning_part_two}"
+            "Unexpected %s hard bounce for %s",
+            "Suppressed",
+            "bounce@simulator.amazonses.com",
         )
         email_ban_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
@@ -2440,8 +2435,8 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Check if warning is logged
         mock_logging.warning.assert_called_with(
-            "The message: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0 can't be "
-            "enqueued because it doesn't exist anymore."
+            "The message: %s can't be enqueued because it doesn't exist anymore.",
+            "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0",
         )
 
     def test_compose_message_from_db_retrieve_user_email(self) -> None:
@@ -3555,7 +3550,6 @@ class WebhooksHTMXTests(APITestCase):
 @override_settings(DEVELOPMENT=False)
 @patch("cl.users.tasks.NeonClient")
 class NeonAccountCreationTest(TestCase):
-
     async def test_can_send_email_for_multiple_neon_accounts(
         self, mock_neon_client
     ) -> None:
@@ -3580,7 +3574,7 @@ class NeonAccountCreationTest(TestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
 
         self.assertIn("[Action Needed]:", mail.outbox[-1].subject)
@@ -3620,7 +3614,7 @@ class NeonAccountCreationTest(TestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
 
         await up.arefresh_from_db()
@@ -3649,7 +3643,7 @@ class NeonAccountCreationTest(TestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
 
         await up.arefresh_from_db()
@@ -3660,7 +3654,6 @@ class NeonAccountCreationTest(TestCase):
 @patch("cl.users.views.create_neon_account")
 @patch("cl.users.views.update_neon_account")
 class NeonAccountUpdateTest(TestCase):
-
     def setUp(self) -> None:
         self.client = AsyncClient()
         self.up = UserProfileWithParentsFactory.create(

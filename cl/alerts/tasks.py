@@ -2,7 +2,6 @@ import copy
 from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
-from typing import List
 from urllib.parse import urlencode
 
 from asgiref.sync import async_to_sync
@@ -46,7 +45,7 @@ from cl.lib.redis_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import Docket, DocketEntry
+from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
 from cl.search.types import (
     ESDocumentNameType,
     SaveESDocumentReturn,
@@ -369,7 +368,7 @@ def send_alert_and_webhook(
 
 
 @app.task(ignore_result=True)
-def send_alerts_and_webhooks(data: list[tuple[int, datetime]]) -> List[int]:
+def send_alerts_and_webhooks(data: list[tuple[int, datetime]]) -> list[int]:
     """Send many docket alerts at one time without making numerous calls
     to the send_alert_and_webhook function.
 
@@ -570,6 +569,19 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         if not alert_triggered:
             continue
 
+        alert_triggered_id = alert_triggered.pk
+        case_only_alert = (
+            True
+            if alert_triggered.alert_type == SEARCH_TYPES.DOCKETS
+            else False
+        )
+        if case_only_alert and has_document_alert_hit_been_triggered(
+            r, alert_triggered_id, "co", document_content_copy["docket_id"]
+        ):
+            # The RECAP case-only alert has already been triggered by this case.
+            # Ignore it.
+            continue
+
         alert_user: UserProfile.user = alert_triggered.user
         # Set highlight if available in response.
         match app_label_model:
@@ -577,36 +589,44 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 # Filter out RECAPDocuments and set the document id to the
                 # Redis RECAPDocument alert hits set.
                 if not include_recap_document_hit(
-                    alert_triggered.pk, recap_document_hits, docket_hits
+                    alert_triggered_id, recap_document_hits, docket_hits
                 ) or has_document_alert_hit_been_triggered(
-                    r, alert_triggered.pk, "r", document_content_copy["id"]
+                    r, alert_triggered_id, "r", document_content_copy["id"]
                 ):
                     continue
                 transform_percolator_child_document(
                     document_content_copy, hit.meta
                 )
                 add_document_hit_to_alert_set(
-                    r, alert_triggered.pk, "r", document_content_copy["id"]
+                    r, alert_triggered_id, "r", document_content_copy["id"]
                 )
                 object_id = document_content_copy["docket_id"]
+                # Mark case-only alert as triggered.
+                add_document_hit_to_alert_set(
+                    r, alert_triggered_id, "co", object_id
+                )
                 child_document = True
             case "search.Docket":
                 # Filter out Dockets and set the document id to the
                 # Redis Docket alert hits set.
                 if has_document_alert_hit_been_triggered(
                     r,
-                    alert_triggered.pk,
+                    alert_triggered_id,
                     "d",
                     document_content_copy["docket_id"],
                 ):
                     continue
                 add_document_hit_to_alert_set(
                     r,
-                    alert_triggered.pk,
+                    alert_triggered_id,
                     "d",
                     document_content_copy["docket_id"],
                 )
                 object_id = document_content_copy["docket_id"]
+                # Mark case-only alert as triggered.
+                add_document_hit_to_alert_set(
+                    r, alert_triggered_id, "co", object_id
+                )
                 child_document = False
             case "audio.Audio":
                 object_id = document_content_copy["id"]
@@ -619,9 +639,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
 
         if hasattr(hit.meta, "highlight"):
             document_content_copy["meta"] = {}
-            document_content_copy["meta"][
-                "highlight"
-            ] = hit.meta.highlight.to_dict()
+            document_content_copy["meta"]["highlight"] = (
+                hit.meta.highlight.to_dict()
+            )
 
         # Override order_by to show the latest items when clicking the
         # "View Full Results" button.
@@ -649,7 +669,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
             continue
         # Schedule RT, DAILY, WEEKLY and MONTHLY Alerts
         if scheduled_alert_hits_limit_reached(
-            alert_triggered.pk,
+            alert_triggered_id,
             alert_triggered.user.pk,
             instance_content_type,
             object_id,

@@ -1,13 +1,13 @@
 import logging
 from http.client import ResponseNotReady
-from typing import Dict, List, Set, Tuple
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
+from django.db.utils import OperationalError
 from eyecite import get_citations
-from eyecite.models import CitationBase, FullCaseCitation
+from eyecite.models import CitationBase
 from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.celery_init import app
@@ -21,12 +21,18 @@ from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
-from cl.citations.models import UnmatchedCitation
-from cl.citations.parenthetical_utils import create_parenthetical_groups
+from cl.citations.parenthetical_utils import (
+    create_parenthetical_groups,
+    disconnect_parenthetical_group_signals,
+    reconnect_parenthetical_group_signals,
+)
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.types import MatchedResourceType, SupportedCitationType
-from cl.citations.utils import make_get_citations_kwargs
+from cl.citations.unmatched_citations_utils import handle_unmatched_citations
+from cl.citations.utils import (
+    make_get_citations_kwargs,
+)
 from cl.search.models import (
     Opinion,
     OpinionCluster,
@@ -36,7 +42,7 @@ from cl.search.models import (
 )
 from cl.search.tasks import index_related_cites_fields
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
@@ -47,8 +53,8 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 @app.task
 def identify_parallel_citations(
-    citations: List[SupportedCitationType],
-) -> Set[Tuple[SupportedCitationType, ...]]:
+    citations: list[SupportedCitationType],
+) -> set[tuple[SupportedCitationType, ...]]:
     """Work through a list of citations and identify ones that are physically
     near each other in the document.
 
@@ -85,7 +91,7 @@ def identify_parallel_citations(
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_and_parantheticals_for_recap_documents(
-    self, doc_ids: List[int]
+    self, doc_ids: list[int]
 ):
     """Find citations and authored parentheticals for search.RECAPDocument objects.
 
@@ -93,13 +99,13 @@ def find_citations_and_parantheticals_for_recap_documents(
 
     :return: None
     """
-    documents: QuerySet[
-        RECAPDocument, RECAPDocument
-    ] = RECAPDocument.objects.filter(pk__in=doc_ids).filter(
-        ocr_status__in=[
-            RECAPDocument.OCR_UNNECESSARY,
-            RECAPDocument.OCR_COMPLETE,
-        ]
+    documents: QuerySet[RECAPDocument, RECAPDocument] = (
+        RECAPDocument.objects.filter(pk__in=doc_ids).filter(
+            ocr_status__in=[
+                RECAPDocument.OCR_UNNECESSARY,
+                RECAPDocument.OCR_COMPLETE,
+            ]
+        )
     )
 
     for d in documents:
@@ -113,29 +119,59 @@ def find_citations_and_parantheticals_for_recap_documents(
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
-    opinion_pks: List[int],
+    opinion_pks: list[int],
+    disconnect_pg_signals: bool = False,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
+    :param disconnect_pg_signals: True if ParentheticalGroup post_save and
+        post_delete signals should be disconnected; useful in batch jobs
+        from the `find_citations` command
+
     :return: None
     """
     opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
         pk__in=opinion_pks
     )
-    for opinion in opinions:
-        try:
-            # delivery_info does not exist in test environment
-            children_queue = (self.request.delivery_info or {}).get(
-                "routing_key", settings.CELERY_ETL_TASK_QUEUE
-            )
-            store_opinion_citations_and_update_parentheticals(
-                opinion,
-                children_queue,
-            )
-        except ResponseNotReady as e:
-            # Threading problem in httplib.
-            raise self.retry(exc=e, countdown=2)
+    # delivery_info does not exist in test environment
+    children_queue = (self.request.delivery_info or {}).get(
+        "routing_key", settings.CELERY_ETL_TASK_QUEUE
+    )
+
+    if disconnect_pg_signals:
+        disconnect_parenthetical_group_signals()
+    try:
+        for index, opinion in enumerate(opinions):
+            try:
+                store_opinion_citations_and_update_parentheticals(
+                    opinion,
+                    children_queue,
+                )
+            except ResponseNotReady as e:
+                # Threading problem in httplib.
+                raise self.retry(exc=e, countdown=2)
+            except OperationalError:
+                # delay deadlocked tasks, and continue regular process
+                find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
+                    ([opinion.id], disconnect_pg_signals), countdown=60
+                )
+            except Exception as e:
+                # do not retry the whole loop on an unknown exception
+                end_index = min(len(opinions) - 1, index + 1)
+                ids = [o.id for o in opinions[end_index:]]
+                if ids:
+                    raise self.retry(
+                        exc=e,
+                        countdown=60,
+                        kwargs={
+                            "opinion_pks": ids,
+                            "disconnect_pg_signals": disconnect_pg_signals,
+                        },
+                    )
+    finally:
+        if disconnect_pg_signals:
+            reconnect_parenthetical_group_signals()
 
 
 def store_opinion_citations_and_update_parentheticals(
@@ -146,7 +182,7 @@ def store_opinion_citations_and_update_parentheticals(
     Updates counts of citations to other opinions within a given court opinion,
     parenthetical info for the cited opinions, and stores unmatched citations
 
-    :param opinion: A search.Opinion object.
+    :param opinion: A search.Opinion object
     :param queue: celery queue to send the child tasks to
     :return: None
     """
@@ -154,15 +190,15 @@ def store_opinion_citations_and_update_parentheticals(
     # If the source has marked up text, pass it so it can be used to find
     # ReferenceCitations. This is handled by `make_get_citations_kwargs`
     get_citations_kwargs = make_get_citations_kwargs(opinion)
-    citations: List[CitationBase] = get_citations(
+    citations: list[CitationBase] = get_citations(
         tokenizer=HYPERSCAN_TOKENIZER,
         **get_citations_kwargs,
     )
 
     # Resolve all those different citation objects to Opinion objects,
     # using a variety of heuristics.
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
     ] = do_resolve_citations(citations, opinion)
 
     # Generate the citing opinion's new HTML with inline citation links
@@ -174,29 +210,12 @@ def store_opinion_citations_and_update_parentheticals(
         opinion.save()
         return
 
-    # Put apart the unmatched citations
+    # Put apart the unmatched citations and ambiguous citations
     unmatched_citations = citation_resolutions.pop(NO_MATCH_RESOURCE, [])
-
-    # Delete citations with multiple matches
     ambiguous_matches = citation_resolutions.pop(MULTIPLE_MATCHES_RESOURCE, [])
 
-    # Increase the citation count for the cluster of each matched opinion
-    # if that cluster has not already been cited by this opinion. First,
-    # calculate a list of the IDs of every opinion whose cluster will need
-    # updating.
-
-    currently_cited_opinions = opinion.opinions_cited.all().values_list(
-        "pk", flat=True
-    )
-
-    opinion_ids_to_update = {
-        o.pk
-        for o in citation_resolutions.keys()
-        if o.pk not in currently_cited_opinions
-    }
-
     clusters_to_update_par_groups_for = set()
-    parentheticals: List[Parenthetical] = []
+    parentheticals: list[Parenthetical] = []
 
     for _opinion, _citations in citation_resolutions.items():
         # Currently, eyecite has a bug where parallel citations are
@@ -222,28 +241,33 @@ def store_opinion_citations_and_update_parentheticals(
                     )
                 )
 
-    # If the opinion has been processed previously, we update it's
-    # associated UnmatchedCitations.status. If not, we store them all
-    update_unmatched_status = UnmatchedCitation.objects.filter(
-        citing_opinion=opinion
-    ).exists()
+    # Increase the citation count for the cluster of each matched opinion
+    # if that cluster has not already been cited by this opinion. First,
+    # calculate a list of the IDs of every opinion whose cluster will need
+    # updating.
+    currently_cited_opinions = OpinionsCited.objects.filter(
+        citing_opinion_id=opinion.pk
+    ).values_list("cited_opinion_id", flat=True)
+    cluster_ids_to_update = {
+        o.cluster.pk
+        for o in citation_resolutions.keys()
+        if o.pk not in currently_cited_opinions
+    }
 
     # Finally, commit these changes to the database in a single
-    # transcation block.
+    # transaction block.
     with transaction.atomic():
         opinion_clusters_to_update = OpinionCluster.objects.filter(
-            sub_opinions__pk__in=opinion_ids_to_update
+            id__in=cluster_ids_to_update
         )
         opinion_clusters_to_update.update(
             citation_count=F("citation_count") + 1
         )
-
-        if update_unmatched_status:
-            update_unmatched_citations_status(citation_resolutions, opinion)
-        elif unmatched_citations or ambiguous_matches:
-            store_unmatched_citations(
-                unmatched_citations, ambiguous_matches, opinion
-            )
+        handle_unmatched_citations(
+            opinion,
+            unmatched_citations + ambiguous_matches,
+            citation_resolutions,
+        )
 
         # Nuke existing citations and parentheticals
         OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
@@ -273,130 +297,11 @@ def store_opinion_citations_and_update_parentheticals(
         opinion.save()
 
     # Update changes in ES.
-    cluster_ids_to_update = list(
-        opinion_clusters_to_update.values_list("id", flat=True)
-    )
     index_related_cites_fields.apply_async(
         args=(
             OpinionsCited.__name__,
             opinion.pk,
-            cluster_ids_to_update,
+            list(cluster_ids_to_update),
         ),
         queue=queue_for_children,
     )
-
-
-def update_unmatched_citations_status(
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
-    ],
-    citing_opinion: Opinion,
-) -> None:
-    """Check if previously unmatched citations have been resolved and
-    updates UnmatchedCitation.status accordingly
-
-    We assume no new UnmatchedCitations will be created after the first run
-
-    :param citation_resolutions: dict whose values are resolved citations
-    :param citing_opinion: the opinion
-    :return None:
-    """
-    resolved_citations = {
-        c.matched_text() for v in citation_resolutions.values() for c in v
-    }
-
-    # try to update the status of FOUND and FAILED_* UnmatchedCitations
-    found_citations = UnmatchedCitation.objects.filter(
-        citing_opinion=citing_opinion
-    ).exclude(
-        status__in=[UnmatchedCitation.UNMATCHED, UnmatchedCitation.RESOLVED]
-    )
-    for found in found_citations:
-        if found.citation_string in resolved_citations:
-            found.status = UnmatchedCitation.RESOLVED
-        else:
-            if found.status in [
-                UnmatchedCitation.FAILED,
-                UnmatchedCitation.FAILED_AMBIGUOUS,
-            ]:
-                continue
-            found.status = UnmatchedCitation.FAILED
-        found.save()
-
-
-def store_unmatched_citations(
-    unmatched_citations: List[CitationBase],
-    ambiguous_matches: List[CitationBase],
-    opinion: Opinion,
-) -> None:
-    """Bulk create UnmatchedCitation instances cited by an opinion
-
-    Only FullCaseCitations provide useful information for resolution
-    updates. Other types are discarded
-
-    :param unmatched_citations: citations with 0 matches
-    :param ambiguous_matches: citations with more than 1 match
-    :param opinion: the citing opinion
-    :return None:
-    """
-    unmatched_citations_to_store = []
-    seen_citations = set()
-    citations_to_this_cluster = [
-        str(c) for c in opinion.cluster.citations.all()
-    ]
-
-    for index, unmatched_citation in enumerate(
-        unmatched_citations + ambiguous_matches, 1
-    ):
-        has_multiple_matches = index > len(unmatched_citations)
-
-        if not isinstance(unmatched_citation, FullCaseCitation):
-            continue
-
-        # handle bugs in eyecite that make it return FullCitations with null
-        # values in required fields
-        groups = unmatched_citation.groups
-        if (
-            not groups.get("reporter")
-            or not groups.get("volume")
-            or not groups.get("page")
-        ):
-            logger.error(
-                "Unexpected null value in FullCaseCitation %s",
-                unmatched_citation,
-            )
-            continue
-        if not groups.get("volume").isdigit():
-            logger.error(
-                "Unexpected non-integer volume value in FullCaseCitation %s",
-                unmatched_citation,
-            )
-            continue
-
-        # This would raise a DataError, we have seen cases from bad OCR or
-        # citation lookalikes. See #5191
-        if int(groups["volume"]) >= 32_767:
-            continue
-
-        citation_object = UnmatchedCitation.create_from_eyecite(
-            unmatched_citation, opinion, has_multiple_matches
-        )
-
-        # use to prevent Integrity error from duplicates
-        citation_str = str(citation_object)
-        if citation_str in seen_citations:
-            continue
-        seen_citations.add(citation_str)
-
-        # avoid storing self citations as unmatched; the self citation will
-        # usually be found at the beginning of the opinion's text
-        # Note that both Citation.__str__ and UnmatchedCitation.__str__ use
-        # the standardized volume, reporter and page values, so they are
-        # comparable
-        if citation_str in citations_to_this_cluster:
-            continue
-
-        unmatched_citations_to_store.append(citation_object)
-
-    if unmatched_citations_to_store:
-        UnmatchedCitation.objects.bulk_create(unmatched_citations_to_store)

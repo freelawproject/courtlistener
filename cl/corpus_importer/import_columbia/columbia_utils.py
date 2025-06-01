@@ -1,10 +1,14 @@
 import itertools
 import re
 from datetime import date
-from typing import Any, Optional
+from typing import Any
 
 import dateutil.parser as dparser
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import (
+    BeautifulSoup,
+    NavigableString,
+    Tag,  # noqa: F401
+)
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
 from cl.people_db.lookup_utils import extract_judge_last_name
@@ -168,7 +172,7 @@ def read_xml_to_soup(filepath: str) -> BeautifulSoup:
     :param filepath: path to xml file
     :return: BeautifulSoup object of parsed content
     """
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         file_content = f.read()
         file_content = fix_xml_tags(file_content)
 
@@ -195,9 +199,7 @@ def add_floating_opinion(
             op_type = opinions[-1].get("type")
 
     # Get rid of double spaces from floating content
-    opinion_content = re.sub(
-        " +", " ", "\n".join(floating_content)
-    ).strip()  # type: str
+    opinion_content = re.sub(" +", " ", "\n".join(floating_content)).strip()  # type: str
     if opinion_content:
         opinions.append(
             {
@@ -212,7 +214,7 @@ def add_floating_opinion(
 
 def extract_columbia_opinions(
     outer_opinion: BeautifulSoup,
-) -> list[Optional[dict]]:
+) -> list[dict | None]:
     """Get the opinions of the soup object
 
     We extract all possible opinions from BeautifulSoup, with and without
@@ -334,9 +336,7 @@ def merge_opinions(
     return opinions, current_order
 
 
-def is_per_curiam_opinion(
-    content: Optional[str], byline: Optional[str]
-) -> bool:
+def is_per_curiam_opinion(content: str | None, byline: str | None) -> bool:
     """Check if opinion author is per curiam
 
     :param content: opinion content

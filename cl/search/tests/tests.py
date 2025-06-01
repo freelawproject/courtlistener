@@ -1,7 +1,6 @@
 import datetime
 import io
 import re
-from datetime import date
 from http import HTTPStatus
 from unittest import mock
 from urllib.parse import parse_qs
@@ -26,10 +25,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
-from cl.lib.elasticsearch_utils import simplify_estimated_count
+from cl.lib.elasticsearch_utils import (
+    build_daterange_query,
+    simplify_estimated_count,
+)
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -53,6 +54,7 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.exception import InvalidRelativeDateSyntax
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
@@ -101,7 +103,9 @@ class ModelTest(TestCase):
             case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         self.oc = OpinionCluster.objects.create(
-            case_name="Blah", docket=self.docket, date_filed=date(2010, 1, 1)
+            case_name="Blah",
+            docket=self.docket,
+            date_filed=datetime.date(2010, 1, 1),
         )
         self.o = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
         self.c = Citation.objects.create(
@@ -128,12 +132,12 @@ class ModelTest(TestCase):
             case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         docket.save()
-        self.oc.date_filed = date(1899, 1, 1)
+        self.oc.date_filed = datetime.date(1899, 1, 1)
         self.oc.save()
 
         try:
             cf = ContentFile(io.BytesIO(b"blah").read())
-            self.o.file_with_date = date(1899, 1, 1)
+            self.o.file_with_date = datetime.date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
             self.o.save()
         except ValueError:
@@ -198,7 +202,7 @@ class ModelTest(TestCase):
             docket=DocketFactory(
                 court=court,
             ),
-            date_filed=date(1978, 3, 10),
+            date_filed=datetime.date(1978, 3, 10),
             source="U",
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
@@ -1392,6 +1396,103 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     msg="Failed for V3",
                 )
 
+    def test_absolute_dates_filter(self, court_cache_key_mock):
+        """Confirm that passing absolute dates returns the expected absolute
+        filter in ISO format.
+        """
+        filed_before = datetime.date(2025, 5, 1)
+        filed_after = datetime.date(2025, 5, 18)
+        qs = build_daterange_query(
+            "dateFiled", before=filed_before, after=filed_after
+        )
+        # Assert the filters.
+        body = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(body["gte"], "2025-05-18T00:00:00Z")
+        self.assertEqual(body["lte"], "2025-05-01T23:59:59Z")
+        self.assertNotIn("time_zone", body)
+
+    def test_all_relative_syntaxes(self, court_cache_key_mock):
+        """Confirms that build_daterange_query is able to parse and convert
+        the different allowed relative date syntaxes into an ES-compatible date
+         math expression.
+        """
+        cases = {
+            # days
+            "1d ago": "now-1d/d",
+            "7d ago": "now-7d/d",
+            "5 days ago": "now-5d/d",
+            "-10d": "now-10d/d",
+            "-10d ago": "now-10d/d",
+            "10d": False,  # Invalid syntax
+            "10 days": False,  # Invalid syntax
+            "past 3 days": "now-3d/d",
+            # months (30d each)
+            "1m ago": "now-30d/d",
+            "2M ago": "now-60d/d",
+            "2m": False,  # Invalid syntax
+            "3 months ago": "now-90d/d",
+            "-4m": "now-120d/d",
+            "4 months": False,  # Invalid syntax
+            "-5 months ago": "now-150d/d",
+            "past 6 months": "now-180d/d",
+            # years (365d each)
+            "1y ago": "now-365d/d",
+            "2Y ago": "now-730d/d",
+            "2y": False,  # Invalid syntax
+            "3 years ago": "now-1095d/d",
+            "4 years": False,  # Invalid syntax
+            "-1y": "now-365d/d",
+            "-2 years": "now-730d/d",
+            "past 1 year": "now-365d/d",
+            "invalid 3 syntax": False,  # Invalid syntax
+        }
+
+        for user_input, expected_math in cases.items():
+            with self.subTest(user_input=user_input):
+                if not expected_math:
+                    # Assert invalid syntaxes.
+                    with self.assertRaises(InvalidRelativeDateSyntax):
+                        build_daterange_query(
+                            "dateFiled", before="", after=user_input
+                        )
+                else:
+                    qs = build_daterange_query(
+                        "dateFiled", before="", after=user_input
+                    )
+                    # Assert the validity of the relative range filter.
+                    self.assertEqual(len(qs), 1)
+                    query_dict = qs[0].to_dict()["range"]["dateFiled"]
+                    self.assertEqual(query_dict.get("gte"), expected_math)
+                    self.assertNotIn("lte", query_dict)
+
+    def test_before_and_after_relative(self, court_cache_key_mock):
+        """Confirm that both values, before and after are compatible with the
+        relative date syntaxes.
+        """
+        qs = build_daterange_query(
+            "dateFiled",
+            before="7 days ago",
+            after="1d ago",
+        )
+        self.assertEqual(len(qs), 1)
+        query_dict = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(query_dict["gte"], "now-1d/d")
+        self.assertEqual(query_dict["lte"], "now-7d/d")
+
+    def test_mixed_absolute_and_relative(self, court_cache_key_mock):
+        """Confirm that the range filter is compatible with mixed requests,
+        where one value may be absolute and the other relative,
+        as might occur in API calls.
+        """
+        qs = build_daterange_query(
+            "dateFiled", before=datetime.date(2025, 5, 10), after="2 days ago"
+        )
+        self.assertEqual(len(qs), 1)
+
+        body = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(body["gte"], "now-2d/d")
+        self.assertEqual(body["lte"], "2025-05-10T23:59:59Z")
+
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
     """Common tests for the Search API V4 endpoints."""
@@ -1951,7 +2052,7 @@ class SaveSearchQueryTest(TestCase):
     def test_search_api_v4_query_saving(self) -> None:
         """Do we save queries on all V4 Search endpoints"""
         for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+            url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
             self.client.get(url)
             # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
@@ -1976,7 +2077,7 @@ class SaveSearchQueryTest(TestCase):
     def test_failed_es_search_v4_api_queries(self) -> None:
         """Do we flag failed v4 API queries properly?"""
         query = "type=r&q=contains/sproximity token"
-        url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+        url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 400)
         last_query = SearchQuery.objects.last()
@@ -1993,7 +2094,7 @@ class SaveSearchQueryTest(TestCase):
     def test_search_es_api_v3_query_saving(self) -> None:
         """Do we save queries on all V3 Search endpoints"""
         for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+            url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
             self.client.get(url)
             # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
@@ -2018,7 +2119,7 @@ class SaveSearchQueryTest(TestCase):
     def test_failed_es_search_v3_api_queries(self) -> None:
         """Do we flag failed ES v3 API queries properly?"""
         query = "type=r&q=contains/sproximity token"
-        url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+        url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 500)
         last_query = SearchQuery.objects.last()
@@ -2042,7 +2143,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -2062,7 +2163,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -2079,7 +2180,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,

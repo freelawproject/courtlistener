@@ -1,6 +1,7 @@
 import sys
 import time
-from typing import Iterable, List, cast
+from collections.abc import Iterable
+from typing import cast
 
 from django.core.management import CommandError
 from django.core.management.base import CommandParser
@@ -17,7 +18,7 @@ from cl.lib.types import OptionsType
 from cl.search.models import Courthouse, Opinion
 
 DEFAULT_THROTTLE_MIN_ITEMS = 50
-DEFAULT_OPINIONS_PER_TASK = 100
+DEFAULT_OPINIONS_PER_TASK = 50
 
 
 class Command(VerboseCommand):
@@ -101,8 +102,14 @@ class Command(VerboseCommand):
             type=int,
             help="Number of opinions in a single parent task",
         )
+        parser.add_argument(
+            "--disconnect-elastic-signals",
+            action="store_true",
+            default=False,
+            help="Disconnect ElasticSearch signals for ParentheticalGroups",
+        )
 
-    def handle(self, *args: List[str], **options: OptionsType) -> None:
+    def handle(self, *args: list[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None
@@ -168,16 +175,23 @@ class Command(VerboseCommand):
             query = Opinion.objects.all()
             sys.stdout.write("Deleting all UnmatchedCitation rows")
             UnmatchedCitation.objects.all().delete()
+            # force disconnection for batch jobs
+            disconnect_elastic_signals = True
+        else:
+            disconnect_elastic_signals = cast(
+                bool, options["disconnect_elastic_signals"]
+            )
 
         self.count = query.count()
         self.average_per_s = 0.0
-        self.timings: List[float] = []
+        self.timings: list[float] = []
         opinion_pks = query.values_list("pk", flat=True).iterator()
         self.update_documents(
             opinion_pks,
             cast(str, options["queue"]),
             cast(int, options["throttle_min_items"]),
             cast(int, options["opinions_per_task"]),
+            disconnect_elastic_signals,
         )
 
     def log_progress(self, processed_count: int, last_pk: int) -> None:
@@ -210,6 +224,7 @@ class Command(VerboseCommand):
         queue_name: str,
         throttle_min_items: int = DEFAULT_THROTTLE_MIN_ITEMS,
         opinions_per_task: int = DEFAULT_OPINIONS_PER_TASK,
+        disconnect_elastic_signals: bool = False,
     ) -> None:
         sys.stdout.write(f"Graph size is {self.count:d} nodes.\n")
         sys.stdout.flush()
@@ -226,7 +241,7 @@ class Command(VerboseCommand):
             chunk.append(opinion_pk)
             if processed_count % opinions_per_task == 0 or last_item:
                 find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-                    args=(chunk,),
+                    args=(chunk, disconnect_elastic_signals),
                     queue=queue_name,
                 )
                 chunk = []

@@ -1,6 +1,5 @@
 import logging
 from http import HTTPStatus
-from urllib.parse import urljoin
 
 from celery import Task
 from django.conf import settings

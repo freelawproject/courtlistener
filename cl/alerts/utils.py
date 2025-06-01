@@ -1,7 +1,7 @@
 import copy
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any, Set
+from typing import Any
 from urllib.parse import parse_qs
 
 from django.apps import apps
@@ -31,6 +31,7 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
+from cl.recap.constants import bankruptcy_data_fields
 from cl.search.constants import (
     ALERTS_HL_TAG,
     SEARCH_RECAP_CHILD_HL_FIELDS,
@@ -507,22 +508,22 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
             )
 
             match parent_filters, string_query:
-                case [], []:
+                case [[], []]:
                     NotImplementedError(
                         "Indexing match-all queries is not supported."
                     )
-                case [], _:
+                case [[], _]:
                     plain_query = Q(
                         "bool",
                         should=string_query,
                         minimum_should_match=1,
                     )
-                case _, []:
+                case [_, []]:
                     plain_query = Q(
                         "bool",
                         filter=parent_filters,
                     )
-                case _, _:
+                case [_, _]:
                     plain_query = Q(
                         "bool",
                         filter=parent_filters,
@@ -596,7 +597,7 @@ def get_field_names(mapping_dict):
 def select_es_document_fields(
     es_document_class: ESModelClassType,
     main_document: ESDictDocument,
-    fields_to_ignore: Set[str],
+    fields_to_ignore: set[str],
 ) -> ESDictDocument:
     """Select specific required fields from an Elasticsearch document.
 
@@ -618,7 +619,9 @@ def select_es_document_fields(
     }
 
 
-def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
+def prepare_percolator_content(
+    app_label: str, document_id: str
+) -> tuple[
     str,
     str | None,
     tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None,
@@ -683,6 +686,32 @@ def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
             )
 
     return percolator_index, es_document_index, documents_to_percolate
+
+
+def set_skip_percolation_if_bankruptcy_data(
+    docket_data: dict[str, Any], d: Docket
+) -> None:
+    """Set skip percolation flag if bankruptcy data is present.
+
+    :param docket_data: A dict containing the docket data fields.
+    :param d: The docket to be saved.
+    :return: None
+    """
+    if bool(set(docket_data.keys()) & set(bankruptcy_data_fields)):
+        d.skip_percolator_request = True
+
+
+def set_skip_percolation_if_parties_data(
+    parties_data: list[dict[str, Any]], d: Docket
+) -> None:
+    """Set skip percolation flag if parties data is present.
+
+    :param parties_data: A list of dicts containing the parties data.
+    :param d: The docket to be saved.
+    :return: None
+    """
+    if parties_data:
+        d.skip_percolator_request = True
 
 
 def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:

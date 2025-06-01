@@ -144,6 +144,16 @@ class DocketDataFactory(DictFactory):
     federal_defendant_number = Faker("pyint", min_value=1, max_value=999)
 
 
+class DocketWithBankruptcyDataFactory(DictFactory):
+    court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
+    case_name = Faker("case_name")
+    docket_number = Faker("federal_district_docket_number")
+    date_filed = Faker("date_object")
+    ordered_by = "date_filed"
+    chapter = Faker("pyint", min_value=1, max_value=100)
+    trustee_str = Faker("text", max_nb_chars=15)
+
+
 class DocketEntryWithAttachmentsDataFactory(MinuteDocketEntryDataFactory):
     attachments = List([SubFactory(AppellateAttachmentPageFactory)])
 

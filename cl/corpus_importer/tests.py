@@ -87,6 +87,7 @@ from cl.corpus_importer.utils import (
     merge_strings,
     winnow_case_name,
 )
+from cl.favorites.models import PrayerAvailability
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import (
@@ -104,16 +105,18 @@ from cl.people_db.lookup_utils import (
     find_just_name,
 )
 from cl.people_db.models import Attorney, AttorneyOrganization, Party, Position
-from cl.recap.management.commands.pacer_iquery_scraper import (
+from cl.recap.management.commands.nightly_pacer_updates import (
     get_docket_ids_docket_alerts,
     get_docket_ids_missing_info,
     get_docket_ids_week_ago_no_case_name,
+    get_recap_documents_pray_and_pay,
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.factories import (
     CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
     OpinionClusterFactoryMultipleOpinions,
@@ -121,6 +124,7 @@ from cl.search.factories import (
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -375,8 +379,8 @@ class CourtMatchingTest(SimpleTestCase):
             self.assertEqual(
                 got,
                 d["answer"],
-                msg="\nDid not get court we expected: '%s'.\n"
-                "               Instead we got: '%s'" % (d["answer"], got),
+                msg="\nDid not get court we expected: '{}'.\n"
+                "               Instead we got: '{}'".format(d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -584,12 +588,7 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-            "Got %s, expected %s: \n%s"
-            % (
-                actual_num_attorneys,
-                expected_num_attorneys,
-                first_party_attorneys,
-            ),
+            f"Got {actual_num_attorneys}, expected {expected_num_attorneys}: \n{first_party_attorneys}",
         )
 
         first_attorney = first_party_attorneys[0]
@@ -600,7 +599,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+            f"Got {actual_num_roles}, expected {expected_num_roles}",
         )
 
     def test_num_queries_ok(self) -> None:
@@ -1924,7 +1923,7 @@ class HarvardMergerTests(TestCase):
         all_data = fetch_non_harvard_data(case_data)
 
         self.assertEqual(
-            all_data.get("syllabus"), "<p> This is a syllabus " "example.</p>"
+            all_data.get("syllabus"), "<p> This is a syllabus example.</p>"
         )
         self.assertEqual(all_data.get("judges"), "Broyles, Gardner, MacIntyre")
         self.assertEqual(
@@ -2480,9 +2479,9 @@ class ScrapeIqueryPagesTest(TestCase):
             "The court %s website is probably down. Aborting the probe task.",
             self.court_hib.pk,
         )
-        assert (
-            expected_call in mock_logger.warning.mock_calls
-        ), "Expected Timeout warning call was not triggered."
+        assert expected_call in mock_logger.warning.mock_calls, (
+            "Expected Timeout warning call was not triggered."
+        )
 
     @patch(
         "cl.corpus_importer.tasks.CaseQuery",
@@ -2515,15 +2514,16 @@ class ScrapeIqueryPagesTest(TestCase):
             ### Create a Docket with a pacer_case_id bigger than highest_known_pacer_case_id
             # IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED is False. So no signal should
             # be processed.
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
-            ), patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 DocketFactory(
                     court=self.court_gand,
@@ -2551,13 +2551,15 @@ class ScrapeIqueryPagesTest(TestCase):
             )
 
             ### Create a Docket with a pacer_case_id smaller than highest_known_pacer_case_id
-            with patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 DocketFactory(
                     court=self.court_gand,
@@ -2588,13 +2590,15 @@ class ScrapeIqueryPagesTest(TestCase):
 
             ### Create a Docket with a pacer_case_id bigger than highest_known_pacer_case_id
             r.hset("iquery:pacer_case_id_current", self.court_gand.pk, 5)
-            with patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 DocketFactory(
                     court=self.court_gand,
@@ -2623,13 +2627,15 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(int(highest_known_pacer_case_id), 8)
 
             ### Create an appellate RECAP docket, it should be ignored
-            with patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 DocketFactory(
                     court=self.court_ca1,
@@ -2655,15 +2661,16 @@ class ScrapeIqueryPagesTest(TestCase):
             # Simulate a highest_known_pacer_case_id  = 8
             r.hset("iquery:highest_known_pacer_case_id", self.court_cand.pk, 8)
             r.hset("iquery:pacer_case_id_current", self.court_cand.pk, 8)
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
-            ), patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True),
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 # Execute the probing task
                 probe_or_scrape_iquery_pages.delay(
@@ -2713,15 +2720,16 @@ class ScrapeIqueryPagesTest(TestCase):
             # Simulate a highest_known_pacer_case_id  = 8
             r.hset("iquery:highest_known_pacer_case_id", self.court_txed.pk, 8)
             r.hset("iquery:pacer_case_id_current", self.court_txed.pk, 8)
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
-            ), patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 # Execute the probing task
                 probe_or_scrape_iquery_pages.delay(
@@ -3054,17 +3062,17 @@ class ScrapeIqueryPagesTest(TestCase):
             r = get_redis_interface("CACHE")
             r.hset("iquery:highest_known_pacer_case_id", self.court_gand.pk, 5)
             # Test case with IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
-            ), patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
-            ), patch(
-                "cl.scrapers.tasks.get_or_cache_pacer_cookies"
+            with (
+                override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
+                patch("cl.scrapers.tasks.get_or_cache_pacer_cookies"),
             ):
                 update_docket_info_iquery.apply_async(
                     args=(docket_gand.pk, docket_gand.court_id)
@@ -3074,17 +3082,17 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(mock_iquery_sweep.call_count, 0)
 
             # Test case with IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
-            ), patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
-            ), patch(
-                "cl.scrapers.tasks.get_or_cache_pacer_cookies"
+            with (
+                override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True),
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
+                patch("cl.scrapers.tasks.get_or_cache_pacer_cookies"),
             ):
                 update_docket_info_iquery.apply_async(
                     args=(docket_cand.pk, docket_cand.court_id)
@@ -3100,8 +3108,8 @@ class ScrapeIqueryPagesTest(TestCase):
                 dispatch_uid=test_dispatch_uid,
             )
 
-    def test_pacer_iquery_scraper_queries(self, mock_cookies):
-        """Test pacer_iquery_scraper command queries."""
+    def test_nightly_pacer_updates_queries(self, mock_cookies):
+        """Test nightly_pacer_updates command queries."""
 
         d_1 = DocketFactory(
             source=Docket.RECAP,
@@ -3166,6 +3174,69 @@ class ScrapeIqueryPagesTest(TestCase):
             {d_1.pk, d_2.pk},
             msg="Wrong IDs returned by get_docket_ids_week_ago_no_case_name",
         )
+
+    def test_can_retrieve_old_prayers_to_check(self, mock_cookies):
+        """Verifies retrieval of old, unchecked RECAP documents for 'pray and pay'."""
+        mock_date = now().replace(day=1, hour=5)
+        # Create DocketEntry instances with different filing dates
+        ten_days_old_entry = DocketEntryFactory(
+            date_filed=mock_date - timedelta(days=10)
+        )
+        ninety_one_days_old_entry = DocketEntryFactory(
+            date_filed=mock_date - timedelta(days=91)
+        )
+        ninety_five_days_old_entry = DocketEntryFactory(
+            date_filed=mock_date - timedelta(days=95)
+        )
+
+        # Create RECAPDocument instances associated with the DocketEntry instances
+        rd_1 = RECAPDocumentFactory(docket_entry=ten_days_old_entry)
+        rd_2 = RECAPDocumentFactory(
+            docket_entry=ninety_one_days_old_entry,
+        )
+        rd_3 = RECAPDocumentFactory(
+            docket_entry=ninety_one_days_old_entry,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+        rd_4 = RECAPDocumentFactory(
+            docket_entry=ninety_five_days_old_entry,
+        )
+        rd_5 = RECAPDocumentFactory(
+            docket_entry=ninety_five_days_old_entry,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+
+        # Simulate PrayerAvailability records with different last_checked dates
+        PrayerAvailability.objects.create(
+            recap_document=rd_1, last_checked=mock_date - timedelta(days=3)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_2, last_checked=mock_date - timedelta(days=3)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_3, last_checked=mock_date - timedelta(days=1)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_4, last_checked=mock_date - timedelta(days=7)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_5, last_checked=mock_date - timedelta(days=2)
+        )
+
+        # Retrieve the RECAP documents that should be checked
+        with time_machine.travel(mock_date, tick=False):
+            recap_documents = get_recap_documents_pray_and_pay()
+
+        self.assertIn(rd_2, recap_documents)
+        self.assertIn(rd_4, recap_documents)
+        # Not old enough
+        self.assertNotIn(rd_1, recap_documents)
+        # Not expected: Last Checked on the same day it should have been unsealed
+        self.assertNotIn(rd_3, recap_documents)
+        # Not expected: Checked after it should have been unsealed
+        self.assertNotIn(rd_5, recap_documents)
 
     def test_get_latest_pacer_case_id_for_courts(self, mock_cookies):
         """Test get_latest_pacer_case_id_for_courts helper."""
@@ -3271,11 +3342,16 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
 
-        with override_settings(
-            IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
-        ), patch("cl.lib.decorators.time.sleep") as mock_sleep, patch(
-            "cl.corpus_importer.tasks.query_iquery_page", return_value=({}, "")
-        ) as mock_query_iquery_page:
+        with (
+            override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
+            ),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch(
+                "cl.corpus_importer.tasks.query_iquery_page",
+                return_value=({}, ""),
+            ) as mock_query_iquery_page,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -3302,11 +3378,16 @@ class ScrapeIqueryPagesTest(TestCase):
             dockets.count(), 1, msg="Docket number doesn't match."
         )
 
-        with override_settings(
-            IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
-        ), patch("cl.lib.decorators.time.sleep") as mock_sleep, patch(
-            "cl.corpus_importer.tasks.query_iquery_page", return_value=({}, "")
-        ) as mock_query_iquery_page:
+        with (
+            override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
+            ),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch(
+                "cl.corpus_importer.tasks.query_iquery_page",
+                return_value=({}, ""),
+            ) as mock_query_iquery_page,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -3335,12 +3416,13 @@ class ScrapeIqueryPagesTest(TestCase):
             dispatch_uid=test_dispatch_uid,
         )
         try:
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
-            ), patch(
-                "cl.lib.decorators.time.sleep"
-            ) as mock_sleep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                override_settings(
+                    IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
+                    IQUERY_FIXED_SWEEP=10,
+                ),
+                patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 call_command(
                     "probe_iquery_pages_daemon",
@@ -3446,7 +3528,6 @@ class CaseNamesTest(SimpleTestCase):
 
 
 class AWSManifestTest(TestCase):
-
     def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
 

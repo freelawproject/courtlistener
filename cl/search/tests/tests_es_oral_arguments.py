@@ -56,11 +56,11 @@ class OASearchAPICommonTests(AudioESTestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -393,9 +393,10 @@ class OAV3SearchAPITests(
         """Confirm fields in V3 ES Oral Arguments Search API results."""
         mock_date = now()
         print("Mock date", mock_date)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             audio_1 = AudioFactory.create(
                 case_name="United States v. Lee ",
                 case_name_full="a_random_title",
@@ -518,11 +519,11 @@ class OAV4SearchAPITests(
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -558,9 +559,10 @@ class OAV4SearchAPITests(
         """Confirm  empty fields values in V4 OA Search API results."""
 
         mock_date = now().replace(day=15, hour=0)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory.create(
                 docket_number="",
                 court_id=self.court_1.pk,
@@ -1233,7 +1235,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
     def test_oa_docket_number_filtering(self) -> None:
@@ -1253,15 +1255,18 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "docket number. Expected %s, but got %s." % (expected, actual),
+            f"docket number. Expected {expected}, but got {actual}.",
         )
         self.assertIn("SEC", r.content.decode())
 
         # Filter by docket_number containing repeated numbers like: 1:21-bk-0021
-        with mock.patch(
-            "cl.lib.es_signal_processor.allow_es_audio_indexing",
-            side_effect=lambda x, y: True,
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory.create(
                 docket_number="1:21-bk-0021",
                 court_id=self.court_1.pk,
@@ -1288,7 +1293,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             self.get_article_count(r),
             1,
             msg="Did not get expected number of results when filtering by "
-            "docket number. Expected %s, but got %s." % (expected, actual),
+            f"docket number. Expected {expected}, but got {actual}.",
         )
         self.assertIn("Lorem Ipsum", r.content.decode())
         self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
@@ -1302,13 +1307,17 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         mock_date = now().replace(
             day=29, hour=0, minute=0, second=0, microsecond=0
         )
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
-            with mock.patch(
-                "cl.lib.es_signal_processor.allow_es_audio_indexing",
-                side_effect=lambda x, y: True,
-            ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            with (
+                mock.patch(
+                    "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                    side_effect=lambda x, y: True,
+                ),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
                 audio = AudioFactory.create(
                     case_name="Lorem Ipsum Natural Gas",
                     docket_id=self.docket_2.pk,
@@ -1372,7 +1381,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (expected, actual),
+            f"jurisdiction. Expected {expected}, but got {actual}.",
         )
 
     def test_oa_date_argued_filtering(self) -> None:
@@ -1397,7 +1406,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "argued_after. Expected %s, but got %s." % (actual, expected),
+            f"argued_after. Expected {actual}, but got {expected}.",
         )
         self.assertIn(
             "SEC v. Frank J. Information, WikiLeaks",
@@ -1423,7 +1432,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
         # Text query filtered by case_name
@@ -1443,7 +1452,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
         # Text query filtered by case_name and judge
@@ -1464,7 +1473,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
         # Text query filtered by argued_after. Notice that out of two audios
@@ -1484,7 +1493,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
     def test_oa_advanced_search_not_query(self) -> None:
@@ -2596,7 +2605,6 @@ class OralArgumentsSearchDecayRelevancyTest(
 
     @classmethod
     def setUpTestData(cls):
-
         # Same keywords but different dateArgued
         with cls.captureOnCommitCallbacks(execute=True):
             cls.docket_old = DocketFactory.create(
