@@ -22,7 +22,6 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 
 from cl.lib.bot_detector import is_bot
 from cl.lib.http import is_ajax
-from cl.lib.view_utils import increment_view_count
 from cl.stats.utils import tally_stat
 from cl.visualizations.forms import VizEditForm, VizForm
 from cl.visualizations.models import Referer, SCOTUSMap
@@ -40,7 +39,6 @@ async def render_visualization_page(
     embed: bool,
 ) -> HttpResponse:
     viz = await aget_object_or_404(SCOTUSMap, pk=pk)
-    await increment_view_count(viz, request)
 
     status = None
     if viz.deleted:

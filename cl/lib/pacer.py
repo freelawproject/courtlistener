@@ -245,8 +245,8 @@ def process_docket_data(
         report = ClaimsRegister(court_id)
     else:
         raise NotImplementedError(
-            "The report type with id '%s' is not yet "
-            "supported. Perhaps you need to add it?" % report_type
+            f"The report type with id '{report_type}' is not yet "
+            "supported. Perhaps you need to add it?"
         )
 
     if filepath:

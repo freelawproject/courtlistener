@@ -3264,7 +3264,13 @@ class RecapAttPageFetchApiTest(TestCase):
         self.fq.refresh_from_db()
         self.assertEqual(self.fq.status, PROCESSING_STATUS.NEEDS_INFO)
 
-    def test_fetch_att_page_no_cookies(self, mock_court_accessible) -> None:
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        return_value=None,
+    )
+    def test_fetch_att_page_no_cookies(
+        self, mock_get_cookies, mock_court_accessible
+    ) -> None:
         result = do_pacer_fetch(self.fq)
         result.get()
 
@@ -3765,9 +3771,8 @@ class RecapZipTaskTest(TestCase):
         self.assertEqual(
             expected_new_pq_count,
             actual_new_pq_count,
-            msg="Should have %s pq items in the DB, two from inside the zip, "
-            "and one for the zip itself. Instead got %s."
-            % (expected_new_pq_count, actual_new_pq_count),
+            msg=f"Should have {expected_new_pq_count} pq items in the DB, two from inside the zip, "
+            f"and one for the zip itself. Instead got {actual_new_pq_count}.",
         )
 
         # Wait for all the tasks to finish

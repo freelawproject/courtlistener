@@ -50,6 +50,7 @@ from cl.search.documents import (
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
+    InvalidRelativeDateSyntax,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
 )
@@ -258,7 +259,7 @@ async def clean_up_recap_document_file(item: RECAPDocument) -> None:
     :return: None
     """
 
-    if type(item) == RECAPDocument:
+    if isinstance(item, RECAPDocument):
         await sync_to_async(item.filepath_local.delete)()
         item.sha1 = ""
         item.date_upload = None
@@ -592,6 +593,9 @@ def do_es_search(
         except DisallowedWildcardPattern:
             error = True
             error_message = "disallowed_wildcard_pattern"
+        except InvalidRelativeDateSyntax:
+            error = True
+            error_message = "invalid_relative_date_syntax"
         finally:
             # Make sure to always call the _clean_form method
             search_form = _clean_form(

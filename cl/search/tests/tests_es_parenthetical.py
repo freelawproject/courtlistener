@@ -447,7 +447,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
         r = await self.async_client.get(
@@ -464,7 +464,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "docket_number. Expected %s, but got %s." % (expected, actual),
+            f"docket_number. Expected {expected}, but got {actual}.",
         )
         r = await self.async_client.get(
             reverse("show_results"),
@@ -480,7 +480,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
         r = await self.async_client.get(
             reverse("show_results"),
@@ -496,7 +496,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
         self.assertTrue(
             r.content.decode().index("Riley")

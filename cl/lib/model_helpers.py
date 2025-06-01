@@ -1,4 +1,3 @@
-import contextlib
 import os
 import re
 from collections.abc import Callable
@@ -106,7 +105,7 @@ def make_path(root: str, filename: str) -> str:
     """
     d = now()
     return os.path.join(
-        root, f"{d.year}", "%02d" % d.month, "%02d" % d.day, filename
+        root, f"{d.year}", f"{d.month:02d}", f"{d.day:02d}", filename
     )
 
 
@@ -148,22 +147,18 @@ def make_pdf_path(instance, filename, thumbs=False):
     from cl.lasc.models import LASCPDF
     from cl.search.models import ClaimHistory, RECAPDocument
 
-    if type(instance) == RECAPDocument:
+    if isinstance(instance, RECAPDocument):
         root = "recap"
         court_id = instance.docket_entry.docket.court_id
         pacer_case_id = instance.docket_entry.docket.pacer_case_id
-    elif type(instance) == ClaimHistory:
+    elif isinstance(instance, ClaimHistory):
         root = "claim"
         court_id = instance.claim.docket.court_id
         pacer_case_id = instance.pacer_case_id
-    elif type(instance) == LASCPDF:
+    elif isinstance(instance, LASCPDF):
         slug = slugify(trunc(filename, 40))
         root = f"/us/state/ca/lasc/{instance.docket_number}/"
-        file_name = "gov.ca.lasc.%s.%s.%s.pdf" % (
-            instance.docket_number,
-            instance.document_id,
-            slug,
-        )
+        file_name = f"gov.ca.lasc.{instance.docket_number}.{instance.document_id}.{slug}.pdf"
 
         return os.path.join(root, file_name)
     else:
@@ -209,20 +204,14 @@ def make_upload_path(instance, filename):
         from cl.audio.models import Audio
         from cl.search.models import Opinion, OpinionCluster
 
-        if type(instance) == Audio:
+        if isinstance(instance, Audio):
             d = instance.docket.date_argued
-        elif type(instance) == Opinion:
+        elif isinstance(instance, Opinion):
             d = instance.cluster.date_filed
-        elif type(instance) == OpinionCluster:
+        elif isinstance(instance, OpinionCluster):
             d = instance.date_filed
 
-    return "%s/%s/%02d/%02d/%s" % (
-        filename.split(".")[-1],
-        d.year,
-        d.month,
-        d.day,
-        get_valid_filename(filename),
-    )
+    return f"{filename.split('.')[-1]}/{d.year}/{d.month:02d}/{d.day:02d}/{get_valid_filename(filename)}"
 
 
 def validate_partial_date(instance, fields):
@@ -243,8 +232,8 @@ def validate_partial_date(instance, fields):
             raise ValidationError(
                 {
                     f"date_{field}": "Date and granularity must both be complete "
-                    "or blank. Hint: The values are: date: %s, "
-                    "granularity: %s" % (d, granularity)
+                    f"or blank. Hint: The values are: date: {d}, "
+                    f"granularity: {granularity}"
                 }
             )
 
@@ -276,14 +265,8 @@ def validate_is_not_alias(instance, fields):
         if referenced_object is not None and referenced_object.is_alias:
             raise ValidationError(
                 {
-                    field: 'Cannot set "%s" field to an alias of a "%s". Hint: '
-                    '"%s" is an alias of "%s"'
-                    % (
-                        field,
-                        type(referenced_object).__name__,
-                        referenced_object,
-                        referenced_object.is_alias_of,
-                    )
+                    field: f'Cannot set "{field}" field to an alias of a "{type(referenced_object).__name__}". Hint: '
+                    f'"{referenced_object}" is an alias of "{referenced_object.is_alias_of}"'
                 }
             )
 
@@ -314,12 +297,12 @@ def validate_nomination_fields_ok(instance):
         if selection_type_group == "Election" and instance.date_nominated:
             raise ValidationError(
                 "Cannot have a nomination date for a position with how_selected of "
-                "%s" % instance.get_how_selected_display()
+                f"{instance.get_how_selected_display()}"
             )
         if selection_type_group == "Appointment" and instance.date_elected:
             raise ValidationError(
                 "Cannot have an election date for a position with how_selected of "
-                "%s" % instance.get_how_selected_display()
+                f"{instance.get_how_selected_display()}"
             )
 
 
@@ -336,16 +319,15 @@ def validate_supervisor(instance):
             raise ValidationError(
                 {
                     "supervisor": "The supervisor field can only be set to a "
-                    "judge, but '%s' does not appear to have ever "
-                    "been a judge." % sup.name_full
+                    f"judge, but '{sup.name_full}' does not appear to have ever "
+                    "been a judge."
                 }
             )
 
     if sup and not instance.is_clerkship:
         raise ValidationError(
-            "You have configured a supervisor for this field ('%s'), but it "
-            "the position_type is not a clerkship. Instead it's: '%s'"
-            % (sup.name_full, instance.position_type)
+            f"You have configured a supervisor for this field ('{sup.name_full}'), but it "
+            f"the position_type is not a clerkship. Instead it's: '{instance.position_type}'"
         )
 
 
@@ -359,8 +341,9 @@ def validate_all_or_none(instance, fields):
     none_complete = completed_fields == 0
     if not any([all_complete, none_complete]):
         raise ValidationError(
-            "%s of the following fields are complete, but either all of them need to be, or none of them need to be: %s"
-            % (completed_fields, ", ".join(fields))
+            "{} of the following fields are complete, but either all of them need to be, or none of them need to be: {}".format(
+                completed_fields, ", ".join(fields)
+            )
         )
 
 
@@ -369,8 +352,8 @@ def validate_exactly_n(instance, n, fields):
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields != n:
         raise ValidationError(
-            "Exactly %s of the following fields can be completed (currently "
-            "%s are): %s" % (n, completed_fields, ", ".join(fields))
+            "Exactly {} of the following fields can be completed (currently "
+            "{} are): {}".format(n, completed_fields, ", ".join(fields))
         )
 
 
@@ -379,8 +362,8 @@ def validate_at_most_n(instance, n, fields):
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields > n:
         raise ValidationError(
-            "Exactly %s of the following fields can be completed (currently "
-            "%s are): %s" % (n, completed_fields, ", ".join(fields))
+            "Exactly {} of the following fields can be completed (currently "
+            "{} are): {}".format(n, completed_fields, ", ".join(fields))
         )
 
 
@@ -461,34 +444,6 @@ def disable_auto_now_fields(*models):
                 field.auto_now = False
             if hasattr(field, "auto_now_add"):
                 field.auto_now_add = False
-
-
-@contextlib.contextmanager
-def suppress_autotime(model, fields):
-    """Disable auto_now and auto_now_add fields
-
-    :param model: The model you wish to modify or an instance of it. All objects
-    of this type will be modified until the end of the managed context.
-    :param fields: The fields you wish to disable for the model.
-    """
-    _original_values = {}
-    for field in model._meta.local_fields:
-        if field.name in fields:
-            _original_values[field.name] = {
-                "auto_now": field.auto_now,
-                "auto_now_add": field.auto_now_add,
-            }
-            field.auto_now = False
-            field.auto_now_add = False
-    try:
-        yield
-    finally:
-        for field in model._meta.local_fields:
-            if field.name in fields:
-                field.auto_now = _original_values[field.name]["auto_now"]
-                field.auto_now_add = _original_values[field.name][
-                    "auto_now_add"
-                ]
 
 
 def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:

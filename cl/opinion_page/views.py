@@ -66,7 +66,6 @@ from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
-from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -343,7 +342,6 @@ async def view_docket(
     sort_order_asc = True
     form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
-    await increment_view_count(docket, request)
 
     de_list = await fetch_docket_entries(docket)
 

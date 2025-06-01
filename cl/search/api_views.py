@@ -252,7 +252,10 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
     queryset = (
         Opinion.objects.select_related("cluster", "author")
-        .prefetch_related("opinions_cited", "joined_by")
+        .prefetch_related(
+            "joined_by",
+            Prefetch("opinions_cited", queryset=Opinion.objects.only("id")),
+        )
         .order_by("-id")
     )
 
