@@ -650,47 +650,6 @@ a.jp-shuffle-off:hover {
 	background: url("jplayer.blue.monday.jpg") -90px -270px no-repeat;
 }
 
-
-/* @end */
-
-/* @group Playback Speed Controls */
-
-div.jp-speed-holder {
-  position: absolute;
-  top: 50px; /* Aligns with jp-time-holder */
-  left: 215px;
-  width: 200px;
-}
-
-span.jp-speed-label {
-  font-size: .64em;
-  font-style: oblique;
-  vertical-align: middle;
-  margin-right: 5px;
-}
-
-button.jp-speed {
-  font-size: .60em; /* Smaller font for buttons */
-  padding: 1px 4px;
-  margin: 0 1px;
-  cursor: pointer;
-  border: 1px solid #009be3;
-  background-color: #eee;
-  color: #0d88c1;
-  border-radius: 3px;
-  vertical-align: middle;
-}
-
-button.jp-speed:hover {
-  background-color: #ddd;
-}
-
-button.jp-speed.jp-speed-active {
-  background-color: #009be3;
-  color: #fff;
-  font-weight: bold;
-}
-
 /* @end */
 
 /* @group NO SOLUTION error feedback */
