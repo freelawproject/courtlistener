@@ -33,8 +33,8 @@ $(document).ready(function() {
         });
     }, {
         root: transcriptTextEl[0],
-        rootMargin: '10px',
-        threshold: 0.5
+        rootMargin: '0px',
+        threshold: 1.0
     });
 
     // State for current karaoke segment and last play position
