@@ -640,7 +640,7 @@ def create_and_execute_batch_job(
         case SEARCH_TYPES.PEOPLE:
             lambda_name = "judges_bulk_export"
         case "fd":
-            lambda_name = "financial_disclosure_bulk_export/"
+            lambda_name = "financial_disclosure_bulk_export"
         case _:
             raise NotImplementedError(
                 f"Record type '{record_type}' is not supported."
