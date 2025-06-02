@@ -1,7 +1,8 @@
 import fnmatch
 import os
 import re
-import xml.etree.cElementTree as ET
+import xml.etree.ElementTree as ET
+from collections import Counter
 from glob import glob
 from random import shuffle
 
@@ -504,8 +505,8 @@ def parse_file(file_path, court_fallback=""):
                 o for o in info["opinions"] if o["type"] == current_type
             ]
             if relevant_opinions:
-                relevant_opinions[-1]["opinion"] += "\n%s" % "\n".join(
-                    last_texts
+                relevant_opinions[-1]["opinion"] += "\n{}".format(
+                    "\n".join(last_texts)
                 )
                 relevant_opinions[-1]["opinion_texts"].extend(last_texts)
             else:
@@ -545,7 +546,7 @@ def get_text(file_path):
 
     :param file_path: A path the file to be parsed.
     """
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         file_string = f.read()
     raw_info = {}
     # used when associating a byline of an opinion with the opinion's text
@@ -685,7 +686,6 @@ os.chdir("/home/elliott/freelawmachine/flp/columbia_data/opinions")
 folders = glob("*")
 folders.sort()
 
-from collections import Counter
 
 html_tab: Counter = Counter()
 
@@ -700,7 +700,7 @@ for folder in folders:
         newname = path.replace("/", "_")
         if len(parsed["dates"]) == 0:
             print(path)
-            print(open(path).read(), file=open(f"_nodate/{newname}", "wt"))
+            print(open(path).read(), file=open(f"_nodate/{newname}", "w"))
             continue
 
         if len(parsed["dates"][0]) == 0:

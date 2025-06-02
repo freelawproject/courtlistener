@@ -83,6 +83,7 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -776,6 +777,24 @@ class ViewRecapDocketTest(TestCase):
             court=cls.court,
             source=Docket.RECAP,
         )
+        cls.de_1 = DocketEntryFactory(
+            docket=cls.docket,
+            entry_number=11,
+            date_filed=date(2025, 1, 15),
+            description="Lorem ipsum description.",
+        )
+        cls.de_2 = DocketEntryFactory(
+            docket=cls.docket,
+            entry_number=11,
+            date_filed=date(2025, 1, 17),
+            description="Entry outside the range.",
+        )
+        RECAPDocumentFactory(
+            docket_entry=cls.de_1,
+            pacer_doc_id="005065812111",
+            document_number="005065281111",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
         cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
         cls.docket_appellate = DocketFactory(
             court=cls.court_appellate,
@@ -805,39 +824,6 @@ class ViewRecapDocketTest(TestCase):
         )
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
-    async def test_docket_view_counts_increment_by_one(self) -> None:
-        """Test the view count for a Docket increments on page view"""
-
-        old_view_count = self.docket.view_count
-        r = await self.async_client.get(
-            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
-        )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        await self.docket.arefresh_from_db(fields=["view_count"])
-        self.assertEqual(old_view_count + 1, self.docket.view_count)
-
-    async def test_appellate_docket_no_pacer_case_id_increment_view_count(
-        self,
-    ) -> None:
-        """Test the view count for a RECAP Docket without pacer_case_id
-        increments on page view
-        """
-
-        # Set pacer_case_id blank
-        await Docket.objects.filter(pk=self.docket_appellate.pk).aupdate(
-            pacer_case_id=None
-        )
-        old_view_count = self.docket_appellate.view_count
-        r = await self.async_client.get(
-            reverse(
-                "view_docket",
-                args=[self.docket_appellate.pk, self.docket_appellate.slug],
-            )
-        )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        await self.docket_appellate.arefresh_from_db(fields=["view_count"])
-        self.assertEqual(old_view_count + 1, self.docket_appellate.view_count)
-
     async def test_pagination_returns_last_page_if_page_out_of_range(self):
         """
         Verify that the Docket view handles out-of-range page requests by returning
@@ -855,6 +841,35 @@ class ViewRecapDocketTest(TestCase):
         self.assertEqual(
             response.context["docket_entries"].number,
             response.context["docket_entries"].paginator.num_pages,
+        )
+
+    async def test_recap_docket_entry_filed_filter(self) -> None:
+        """Can we properly filter docket entries by date filed?"""
+        params = {
+            "filed_after": "01/15/2025",
+            "filed_before": "01/16/2025",
+            "order_by": "asc",
+        }
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        r = await self.async_client.get(url, query_params=params)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn(self.de_1.description, r.content.decode())
+        self.assertNotIn(self.de_2.description, r.content.decode())
+
+    async def test_recap_docket_invalid_entry_filed_filter(self) -> None:
+        """Confirm that invalid date values in the docket entry filed filter
+        produce a validation error for users.
+        """
+        params = {
+            "filed_after": "02/10/2025",
+            "filed_before": ".",
+            "order_by": "asc",
+        }
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        r = await self.async_client.get(url, query_params=params)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn(
+            "There were errors applying your filters", r.content.decode()
         )
 
 
@@ -1014,13 +1029,82 @@ class DocketSitemapTest(SitemapTest):
         )
 
     def setUp(self) -> None:
+        self.setUpSiteDomain()
+
         self.sitemap_url = reverse(
-            "sitemaps", kwargs={"section": SEARCH_TYPES.RECAP}
+            "sitemaps-pregenerated", kwargs={"section": SEARCH_TYPES.RECAP}
         )
         self.expected_item_count = 2
 
+    def test_is_the_sitemap_generated_and_have_content(self) -> None:
+        """Is content generated and read properly from the cache into the sitemap?"""
+
+        with self.assertRaises(
+            NotImplementedError,
+            msg="Did not get a NotImplementedError exception before generating the sitemap.",
+        ):
+            _ = self.client.get(self.sitemap_url)
+
+        generate_urls_chunk()
+
+        response = self.client.get(self.sitemap_url)
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get a 200 OK status code after generating the sitemap.",
+        )
+
     def test_does_the_sitemap_have_content(self) -> None:
+        generate_urls_chunk()
         super().assert_sitemap_has_content()
+
+
+class DocketEmptySitemapTest(SitemapTest):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Excluded b/c old
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=False,
+            view_count=0,
+            date_filed=datetime.date.today() - datetime.timedelta(days=60),
+        )
+        # Excluded b/c blocked
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=True,
+            view_count=50,
+            date_filed=datetime.date.today(),
+        )
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=True,
+        )
+
+    def setUp(self) -> None:
+        self.setUpSiteDomain()
+
+        self.sitemap_url = reverse(
+            "sitemaps-pregenerated", kwargs={"section": SEARCH_TYPES.RECAP}
+        )
+
+    def test_is_the_sitemap_generated_and_have_content(self) -> None:
+        """Is content generated and read properly from the cache into the sitemap?"""
+
+        with self.assertRaises(
+            NotImplementedError,
+            msg="Did not get a NotImplementedError exception before generating the sitemap.",
+        ):
+            _ = self.client.get(self.sitemap_url)
+
+        generate_urls_chunk()
+
+        response = self.client.get(self.sitemap_url)
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get a 200 OK status code after generating the sitemap.",
+        )
 
 
 class BlockedSitemapTest(SitemapTest):

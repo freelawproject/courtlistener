@@ -1,7 +1,7 @@
 import random
 import re
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import waffle
 from django import template
@@ -241,7 +241,7 @@ def render_string_or_list(value: any) -> any:
     :param value: The value to be rendered.
     :return: The original value or comma-separated values.
     """
-    if isinstance(value, (list, AttrList)):
+    if isinstance(value, (list | AttrList)):
         return ", ".join(str(item) for item in value)
     return value
 
@@ -355,7 +355,7 @@ def parse_utc_date(datetime_object: str | datetime) -> datetime:
             if isinstance(datetime_object, str)
             else datetime_object
         ),
-        timezone.utc,
+        UTC,
     )
 
 
@@ -367,7 +367,7 @@ def datetime_in_utc(date_obj) -> str:
         return ""
     try:
         return date_filter(
-            date_obj.astimezone(timezone.utc),
+            date_obj.astimezone(UTC),
             "M. j, Y, h:i a T",
         )
     except (ValueError, TypeError):
@@ -432,3 +432,15 @@ def humanize_number(value):
         formatted = str(num)
 
     return f"{formatted}{abbreviation}"
+
+
+@register.filter
+def has_attr(obj, attr_name):
+    """Return True if obj has attribute attr_name."""
+    return hasattr(obj, attr_name)
+
+
+@register.filter
+def get_attr(obj, attr_name):
+    """Return the value of the attribute attr_name."""
+    return getattr(obj, attr_name, "")

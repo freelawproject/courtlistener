@@ -5,17 +5,17 @@ import re
 import time
 import traceback
 from collections import defaultdict
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
-from typing import Any, Callable, Dict, List, Literal
+from typing import Any, Literal
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.paginator import Page
-from django.db.models import Case
+from django.db.models import Case, QuerySet, TextField, When
 from django.db.models import Q as QObject
-from django.db.models import QuerySet, TextField, When
 from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
 from django.http.request import QueryDict
@@ -50,6 +50,7 @@ from cl.lib.utils import (
     cleanup_main_query,
     get_array_of_selected_fields,
     map_to_docket_entry_sorting,
+    parse_string_date,
     perform_special_character_replacements,
 )
 from cl.people_db.models import Position
@@ -81,6 +82,7 @@ from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
     ElasticBadRequestError,
+    InvalidRelativeDateSyntax,
     QueryType,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
@@ -106,7 +108,6 @@ def elasticsearch_enabled(func: Callable) -> Callable:
 
 
 class CSVSerializableDocumentMixin:
-
     @classmethod
     def get_csv_headers(cls) -> list[str]:
         """
@@ -159,9 +160,9 @@ def build_numeric_range_query(
     params: ESRangeQueryParams = {"gte": lower_bound, "lte": upper_bound}
     if relation is not None:
         allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-        assert (
-            relation in allowed_relations
-        ), f"'{relation}' is not an allowed relation."
+        assert relation in allowed_relations, (
+            f"'{relation}' is not an allowed relation."
+        )
         params["relation"] = relation
 
     return [Q("range", **{field: params})]
@@ -173,28 +174,44 @@ def build_daterange_query(
     after: datetime.date | str,
     relation: Literal["INTERSECTS", "CONTAINS", "WITHIN", None] = None,
 ) -> list[Range]:
-    """Given field name and date range limits returns ElasticSearch range query or None
+    """Given field name and date range limits returns ElasticSearch absolute
+    range query or None
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html#ranges-on-dates
 
-    :param field: elasticsearch index fieldname
+    If a relative date string in the allowed syntax is provided, it is
+    converted to an ES-compatible date math syntax to query a relative date.
+
+    :param field: The date field name
     :param before: datetime upper limit
     :param after: datetime lower limit
     :param relation: Indicates how the range query matches values for range fields
     :return: Empty list or list with DSL Range query
     """
 
+    if not any([before, after]):
+        return []
+
     params = {}
-    if any([before, after]):
-        if isinstance(after, datetime.date):
-            params["gte"] = f"{after.isoformat()}T00:00:00Z"
-        if isinstance(before, datetime.date):
-            params["lte"] = f"{before.isoformat()}T23:59:59Z"
-        if relation is not None:
-            allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-            assert (
-                relation in allowed_relations
-            ), f"'{relation}' is not an allowed relation."
-            params["relation"] = relation
+    # Build an absolute date range if the provided values are date objects.
+    if isinstance(after, datetime.date):
+        params["gte"] = f"{after.isoformat()}T00:00:00Z"
+    if isinstance(before, datetime.date):
+        params["lte"] = f"{before.isoformat()}T23:59:59Z"
+    if relation is not None:
+        allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
+        assert relation in allowed_relations, (
+            f"'{relation}' is not an allowed relation."
+        )
+        params["relation"] = relation
+
+    # Try parsing the date when it’s a relative date, and override the
+    # gte and lte parameters.
+    gte = parse_string_date(after)
+    lte = parse_string_date(before)
+    if gte is not None:
+        params["gte"] = gte
+    if lte is not None:
+        params["lte"] = lte
 
     if params:
         return [Q("range", **{field: params})]
@@ -223,7 +240,7 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
 
     document_list = [
         {
-            "_id": f'o_{pair["pk"]}',
+            "_id": f"o_{pair['pk']}",
             "routing": pair["cluster_id"],
             # Important to match documents in the production cluster
         }
@@ -254,7 +271,7 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
     return bool_query
 
 
-def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
+def make_es_boost_list(fields: dict[str, float]) -> list[str]:
     """Constructs a list of Elasticsearch fields with their corresponding
     boost values.
 
@@ -507,7 +524,7 @@ def build_term_query(
     return [Q("term", **{field: value})]
 
 
-def build_text_filter(field: str, value: str) -> List:
+def build_text_filter(field: str, value: str) -> list:
     """Given a field and value, return Elasticsearch match_phrase query or [].
     "match_phrase" Returns documents that contain the exact phrase in a
     provided field, by default match_phrase has a slop of 0 that requires all
@@ -573,7 +590,7 @@ def build_sort_results(
     cd: CleanData,
     toggle_sorting: bool = False,
     api_version: Literal["v3", "v4"] | None = None,
-) -> Dict:
+) -> dict:
     """Given cleaned data, find order_by value and return dict to use with
     ElasticSearch sort
 
@@ -777,7 +794,7 @@ def extend_selected_courts_with_child_courts(
     return list(unique_courts)
 
 
-def build_es_plain_filters(cd: CleanData) -> List:
+def build_es_plain_filters(cd: CleanData) -> list:
     """Builds elasticsearch filters based on the CleanData object.
 
     :param cd: An object containing cleaned user data.
@@ -1903,7 +1920,7 @@ def fill_position_mapping(
                 if callable(field_value):
                     field_value = field_value()
                 elif isinstance(
-                    field_value, (datetime.datetime, datetime.date)
+                    field_value, (datetime.datetime | datetime.date)
                 ):
                     field_value = midnight_pt(field_value)
 
@@ -2367,7 +2384,7 @@ def build_has_child_filters(cd: CleanData) -> list[QueryString | Range]:
     return queries_list
 
 
-def build_join_es_filters(cd: CleanData) -> List:
+def build_join_es_filters(cd: CleanData) -> list:
     """Builds parent join elasticsearch filters based on the CleanData object.
 
     :param cd: An object containing cleaned user data.
@@ -2754,20 +2771,20 @@ def build_full_join_es_queries(
 
         # Build the child query based on child_filters and child child_text_query
         match child_filters, child_text_query:
-            case [], []:
+            case [[], []]:
                 pass
-            case [], _:
+            case [[], _]:
                 child_docs_query = Q(
                     "bool",
                     should=child_text_query,
                     minimum_should_match=1,
                 )
-            case _, []:
+            case [_, []]:
                 child_docs_query = Q(
                     "bool",
                     filter=child_filters,
                 )
-            case _, _:
+            case [_, _]:
                 child_docs_query = Q(
                     "bool",
                     filter=child_filters,
@@ -2837,22 +2854,22 @@ def build_full_join_es_queries(
         }
         default_parent_filter = parent_filter_dict[child_type]
         match parent_filters, string_query:
-            case [], []:
+            case [[], []]:
                 pass
-            case [], _:
+            case [[], _]:
                 parent_query = Q(
                     "bool",
                     filter=default_parent_filter,
                     should=string_query,
                     minimum_should_match=1,
                 )
-            case _, []:
+            case [_, []]:
                 parent_filters.extend([default_parent_filter])
                 parent_query = Q(
                     "bool",
                     filter=parent_filters,
                 )
-            case _, _:
+            case [_, _]:
                 parent_filters.extend([default_parent_filter])
                 parent_query = Q(
                     "bool",
@@ -2989,9 +3006,9 @@ def do_count_query(
         total_results = search_query.count()
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            f"Error on count query request: {search_query.to_dict()}"
+            "Error on count query request: %s", search_query.to_dict()
         )
-        logger.warning(f"Error was: {e}")
+        logger.warning("Error was: %s", e)
         # Required for the paginator class to work, as it expects an integer.
         total_results = 0
     return total_results
@@ -3089,6 +3106,7 @@ def do_es_api_query(
         UnbalancedQuotesQuery,
         BadProximityQuery,
         DisallowedWildcardPattern,
+        InvalidRelativeDateSyntax,
     ) as e:
         raise ElasticBadRequestError(detail=e.message)
 
@@ -3224,16 +3242,16 @@ def do_collapse_count_query(
         )
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            f"Error on count query request: {search_query.to_dict()}"
+            "Error on count query request: %s", search_query.to_dict()
         )
-        logger.warning(f"Error was: {e}")
+        logger.warning("Error was: %s", e)
         total_results = 0
     return total_results
 
 
 def do_es_alert_estimation_query(
     search_query: Search, cd: CleanData, day_count: int
-) -> int:
+) -> tuple[int, int]:
     """Builds an ES alert estimation query based on the provided search query,
      clean data, and day count.
 
@@ -3244,6 +3262,7 @@ def do_es_alert_estimation_query(
     :return: An integer representing the alert estimation.
     """
 
+    total_recap_case_only_estimation = 0
     match cd["type"]:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP:
             after_field = "filed_after"
@@ -3285,21 +3304,43 @@ def do_es_alert_estimation_query(
         child_docs_count_query = build_child_docs_query(child_docs_query, cd)
         child_total = 0
         if child_docs_count_query:
-            child_docs_count_query = search_query.query(child_docs_count_query)
-            child_total_query = child_docs_count_query.extra(
+            child_docs_count_query_all = search_query.query(
+                child_docs_count_query
+            )
+            child_total_query = child_docs_count_query_all.extra(
                 size=0, track_total_hits=True
             )
             multi_search = multi_search.add(child_total_query)
+
+            # Count RECAPDocuments aggregating by docket_id for case only alerts
+            rd_case_only_query = search_query.query(child_docs_count_query)
+            rd_case_only_query.aggs.bucket(
+                "unique_documents",
+                "cardinality",
+                field="docket_id",
+                precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
+            )
+            rd_case_only_query = rd_case_only_query.extra(
+                size=0, track_total_hits=False
+            )
+            multi_search = multi_search.add(rd_case_only_query)
 
         responses = multi_search.execute()
         parent_total = responses[0].hits.total.value
         if child_docs_count_query:
             child_doc_count_response = responses[1]
             child_total = child_doc_count_response.hits.total.value
-        total_recap_estimation = parent_total + child_total
-        return total_recap_estimation
 
-    return estimation_query.count()
+            # Case only count
+            child_doc_count_response_case_only = responses[2]
+            child_total_case_only = child_doc_count_response_case_only.aggregations.unique_documents.value
+            total_recap_case_only_estimation = max(
+                parent_total, child_total_case_only
+            )
+        total_recap_estimation = parent_total + child_total
+        return total_recap_estimation, total_recap_case_only_estimation
+
+    return estimation_query.count(), total_recap_case_only_estimation
 
 
 def do_es_sweep_alert_query(

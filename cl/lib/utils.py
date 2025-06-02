@@ -1,16 +1,40 @@
+import datetime
 import re
 from collections.abc import Iterable
+from collections.abc import Iterable as IterableType
 from itertools import chain, islice, tee
+from re import Match
 from typing import Any
-from typing import Iterable as IterableType
-from typing import Match, Optional, Tuple
 
 from django.core.cache import cache
 
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData
-from cl.search.exception import DisallowedWildcardPattern, QueryType
+from cl.search.exception import (
+    DisallowedWildcardPattern,
+    InvalidRelativeDateSyntax,
+    QueryType,
+)
+
+RELATIVE_DATES_SYNTAX = re.compile(
+    r"""
+    ^\s*                   # Start of string, allow leading whitespaces
+    (?:past\s*)?           # Optional 'past'
+    (?P<minus>-?)          # Optional '-' minus sign
+    \s*                    # Optional whitespace
+    (?P<number>\d+)        # One or more digits
+    \s*                    # Optional whitespace
+    (?P<unit>              # Capturing group for units.
+        d|day|days         #   'd', 'day', or 'days'
+      | m|month|months     #   'm', 'month', or 'months'
+      | y|year|years       #   'y', 'year', or 'years'
+    )
+    (?:\s*ago)?            # Optional 'ago
+    \s*$                   # Optional trailing whitespace
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
 
 
 class _UNSPECIFIED:
@@ -82,18 +106,18 @@ def is_iter(item: Any) -> bool:
     return isinstance(item, Iterable)
 
 
-def remove_duplicate_dicts(l: list[dict]) -> list[dict]:
+def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
     """Given a list of dicts, remove any that are the same.
 
     See: https://stackoverflow.com/a/9427216/64911
     """
-    return [dict(t) for t in {tuple(d.items()) for d in l}]
+    return [dict(t) for t in {tuple(d.items()) for d in dicts}]
 
 
 def human_sort(
-    unordered_list: IterableType[str | Tuple[str, Any]],
-    key: Optional[str] = None,
-) -> IterableType[str | Tuple[str, Any]]:
+    unordered_list: IterableType[str | tuple[str, Any]],
+    key: str | None = None,
+) -> IterableType[str | tuple[str, Any]]:
     """Human sort Lists of strings or list of dictionaries
 
     :param unordered_list: The list we want to sort
@@ -490,3 +514,71 @@ def append_value_in_cache(key, value):
     cached_docs.append(value)
     one_month = 60 * 60 * 24 * 7 * 4
     cache.set(key, cached_docs, timeout=one_month)
+
+
+def convert_to_es_date_match(date_string: str) -> str:
+    """Parse and convert a provided relative-date string into an ES date-math
+    expression.
+
+    Raises ValueError for anything that isn’t explicitly:
+      - negative (e.g: '-10d', '-5 months ago')
+      - suffixed 'ago'    (e.g: '5d ago', '3 years ago')
+      - prefixed 'past '  (e.g: 'past 7 days', 'past 1 year')
+
+    ValueError examples:
+      5d
+      10m
+      1y
+    :param date_string: The provided relative date string to parse.
+    :return: the ES compatible date-math expression as a string.
+    """
+
+    date_string_clean = date_string.strip().lower()
+    rd_matched = RELATIVE_DATES_SYNTAX.match(date_string_clean)
+    if not rd_matched:
+        raise ValueError(f"Invalid relative-date syntax: {date_string!r}")
+
+    # Reject ambiguous relative dates that have no '-', no 'ago' or no 'past'
+    minus = rd_matched.group("minus")
+    if (
+        minus == ""
+        and not date_string_clean.endswith("ago")
+        and not date_string_clean.startswith("past ")
+    ):
+        raise ValueError(
+            f"Ambiguous relative-date (no minus/ago/past): {date_string!r}"
+        )
+
+    number = int(rd_matched.group("number"))
+    unit_key = rd_matched.group("unit").lower()
+
+    # Since we need to support custom day values for months and years:
+    # m = 30 days and y = 365 days, do the math.
+    if unit_key in ("m", "month", "months"):
+        number *= 30
+    elif unit_key in ("y", "year", "years"):
+        number *= 365
+
+    return f"now-{number}d/d"
+
+
+def parse_string_date(date_value: datetime.date | str) -> str | None:
+    """Parse a provided relative string date or ignore incompatible relative
+    date syntax.
+    :param date_value: The relative date to parse.
+    :return: The ES-compatible date math expression as a string, or None if
+    the date syntax is incompatible.
+    """
+
+    if not date_value:
+        return None
+
+    # No relative date string. Ignore it.
+    if not isinstance(date_value, str):
+        return None
+
+    # Try to parse the relative string.
+    try:
+        return convert_to_es_date_match(date_value)
+    except ValueError:
+        raise InvalidRelativeDateSyntax(QueryType.FILTER)

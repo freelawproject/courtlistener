@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from typing import Any, DefaultDict
+from typing import Any
 
 import pytz
 from asgiref.sync import async_to_sync
@@ -132,15 +132,15 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
         ).select_related("user", "alert")
 
         # Group scheduled hits by Alert and the main_doc_id
-        grouped_hits: DefaultDict[
-            Alert, DefaultDict[int, list[dict[str, Any]]]
+        grouped_hits: defaultdict[
+            Alert, defaultdict[int, list[dict[str, Any]]]
         ] = defaultdict(lambda: defaultdict(list))
         alerts_to_update = set()
         for hit in scheduled_hits:
             alert = hit.alert
             doc_content = json_date_parser(hit.document_content)
             match hit.alert.alert_type:
-                case SEARCH_TYPES.RECAP:
+                case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
                     main_doc_id = doc_content.get("docket_id")
                 case SEARCH_TYPES.ORAL_ARGUMENT:
                     main_doc_id = doc_content.get("id")
@@ -152,7 +152,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
         # Merge child documents with the same main_doc_id if the document dict
         # contains the child_docs key.
-        merged_hits: DefaultDict[Alert, list[dict[str, Any]]] = defaultdict(
+        merged_hits: defaultdict[Alert, list[dict[str, Any]]] = defaultdict(
             list
         )
         for alert, document_groups in grouped_hits.items():
@@ -163,8 +163,12 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
         hits = []
         for alert, documents in merged_hits.items():
-            search_type = alert.alert_type
-
+            # Override the search type to RECAP for case-only alerts (DOCKETS)
+            search_type = (
+                SEARCH_TYPES.RECAP
+                if alert.alert_type == SEARCH_TYPES.DOCKETS
+                else alert.alert_type
+            )
             # Override query n in the 'View Full Results' URL to
             # include a filter by timestamp.
             cut_off_date = get_cut_off_date(rate, now_time)

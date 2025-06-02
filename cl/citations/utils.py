@@ -164,7 +164,7 @@ def filter_out_non_case_law_citations(
     return [
         c
         for c in citations
-        if isinstance(c, (FullCaseCitation, ShortCaseCitation))
+        if isinstance(c, (FullCaseCitation | ShortCaseCitation))
     ]
 
 
@@ -184,7 +184,7 @@ def filter_out_non_case_law_and_non_valid_citations(
     return [
         c
         for c in citations
-        if isinstance(c, (FullCaseCitation, ShortCaseCitation))
+        if isinstance(c, (FullCaseCitation | ShortCaseCitation))
         and c.groups.get("volume", None)
         and c.groups.get("page", None)
     ]

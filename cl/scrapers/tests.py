@@ -601,8 +601,8 @@ class AudioFileTaskTest(TestCase):
             measured_duration,
             expected_duration,
             delta=5,
-            msg="We should end up with the proper duration of about %s. "
-            "Instead we got %s." % (expected_duration, measured_duration),
+            msg=f"We should end up with the proper duration of about {expected_duration}. "
+            f"Instead we got {measured_duration}.",
         )
 
     def test_audio_conversion(self) -> None:
@@ -725,8 +725,11 @@ class ScrapeCitationsTest(TestCase):
     def test_citation_scraper(self):
         """Test if citation scraper creates a citation or ignores duplicates"""
         cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
-        with mock.patch(f"{cmd}.sha1", side_effect=self.hashes), mock.patch(
-            f"{cmd}.get_binary_content", return_value="placeholder"
+        with (
+            mock.patch(f"{cmd}.sha1", side_effect=self.hashes),
+            mock.patch(
+                f"{cmd}.get_binary_content", return_value="placeholder"
+            ),
         ):
             cl_back_scrape_citations.Command().scrape_court(self.mock_site)
 

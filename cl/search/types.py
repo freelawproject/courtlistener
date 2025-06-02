@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import Any, Literal, Type, Union
+from typing import Any, Literal
 
 from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrList
@@ -32,58 +32,58 @@ from cl.search.models import (
     RECAPDocument,
 )
 
-ESModelType = Union[
-    Citation,
-    Docket,
-    Opinion,
-    OpinionCluster,
-    Parenthetical,
-    ParentheticalGroup,
-    Audio,
-    Person,
-    Position,
-    Education,
-    RECAPDocument,
-]
+ESModelType = (
+    Citation
+    | Docket
+    | Opinion
+    | OpinionCluster
+    | Parenthetical
+    | ParentheticalGroup
+    | Audio
+    | Person
+    | Position
+    | Education
+    | RECAPDocument
+)
 
-ESModelClassType = Union[
-    Type[Citation],
-    Type[Docket],
-    Type[DocketEntry],
-    Type[Opinion],
-    Type[OpinionCluster],
-    Type[Parenthetical],
-    Type[ParentheticalGroup],
-    Type[Audio],
-    Type[Person],
-    Type[Position],
-    Type[Education],
-    Type[RECAPDocument],
-    Type[ESRECAPBaseDocument],
-]
+ESModelClassType = (
+    type[Citation]
+    | type[Docket]
+    | type[DocketEntry]
+    | type[Opinion]
+    | type[OpinionCluster]
+    | type[Parenthetical]
+    | type[ParentheticalGroup]
+    | type[Audio]
+    | type[Person]
+    | type[Position]
+    | type[Education]
+    | type[RECAPDocument]
+    | type[ESRECAPBaseDocument]
+)
 
-ESDocumentInstanceType = Union[
-    AudioDocument,
-    ParentheticalGroupDocument,
-    AudioPercolator,
-    PersonDocument,
-    PositionDocument,
-    ESRECAPDocument,
-    OpinionDocument,
-    OpinionClusterDocument,
-]
+ESDocumentInstanceType = (
+    AudioDocument
+    | ParentheticalGroupDocument
+    | AudioPercolator
+    | PersonDocument
+    | PositionDocument
+    | ESRECAPDocument
+    | OpinionDocument
+    | OpinionClusterDocument
+)
 
-ESDocumentClassType = Union[
-    Type[AudioDocument],
-    Type[ParentheticalGroupDocument],
-    Type[AudioPercolator],
-    Type[PersonDocument],
-    Type[PositionDocument],
-    Type[DocketDocument],
-    Type[OpinionDocument],
-    Type[OpinionClusterDocument],
-    Type[ESRECAPDocument],
-]
+ESDocumentClassType = (
+    type[AudioDocument]
+    | type[ParentheticalGroupDocument]
+    | type[AudioPercolator]
+    | type[PersonDocument]
+    | type[PositionDocument]
+    | type[DocketDocument]
+    | type[OpinionDocument]
+    | type[OpinionClusterDocument]
+    | type[ESRECAPDocument]
+)
 
 ESDocumentNameType = Literal[
     "AudioDocument",

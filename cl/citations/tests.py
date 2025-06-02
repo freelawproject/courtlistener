@@ -1,9 +1,8 @@
 import itertools
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
-from typing import List, Tuple
 from unittest import mock
 from unittest.mock import Mock, patch
 
@@ -13,8 +12,10 @@ from bs4 import BeautifulSoup
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
 from django.core.management import call_command
+from django.db.models.signals import post_delete, post_save
 from django.test import override_settings
 from django.urls import reverse
+from elasticsearch import NotFoundError
 from eyecite import get_citations
 from eyecite.test_factories import (
     case_citation,
@@ -40,6 +41,7 @@ from cl.citations.group_parentheticals import (
     get_representative_parenthetical,
 )
 from cl.citations.match_citations import (
+    MULTIPLE_MATCHES_FLAG,
     MULTIPLE_MATCHES_RESOURCE,
     NO_MATCH_RESOURCE,
     do_resolve_citations,
@@ -52,11 +54,16 @@ from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_opinion_citations_and_update_parentheticals,
     store_recap_citations,
-    store_unmatched_citations,
+)
+from cl.citations.unmatched_citations_utils import (
+    handle_unmatched_citations,
     update_unmatched_citations_status,
 )
-from cl.citations.utils import make_get_citations_kwargs
+from cl.citations.utils import (
+    make_get_citations_kwargs,
+)
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
+from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -350,14 +357,14 @@ class CitationTextTest(SimpleTestCase):
 
             # Pincited reference
             ('See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>403 U. S. 388 (1971). '
-             ' The legal issue there was whether a <em>Bivens </em> at 122 action can be employed...',
+             ' The legal issue there was whether a <em>Bivens </em> at 122, action can be employed...',
 
              'See <em>Bivens </em>v. <em>Six Unknown Fed. Narcotics Agents, </em>'
              '<span class="citation" data-id="MATCH_ID">'
              f'<a href="MATCH_URL" {aria_description}>403 U. S. 388</a></span> (1971).  '
              'The legal issue there was whether a <span class="citation" data-id="MATCH_ID">'
              f'<a href="MATCH_URL#122" {aria_description}>'
-             '<em>Bivens </em> at 122</a></span> action can be employed...'
+             '<em>Bivens </em> at 122</a></span>, action can be employed...'
             ),
             # pin cite before citation with S.Ct.
             (
@@ -652,11 +659,12 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
 
 
 class CitationObjectTest(ESIndexTestCase, TestCase):
-    fixtures: List = []
+    fixtures: list = []
 
     @classmethod
     def setUpTestData(cls) -> None:
         cls.rebuild_index("search.OpinionCluster")
+        cls.rebuild_index("search.ParentheticalGroup")
         super().setUpTestData()
         # Courts
         cls.court_scotus = CourtFactory(id="scotus")
@@ -1335,8 +1343,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             cited.cluster.citation_count,
             expected_count,
             msg="'cited' was not updated by a citation found in 'citing', or "
-            "the citation was not found. Count was: %s instead of %s"
-            % (cited.cluster.citation_count, expected_count),
+            f"the citation was not found. Count was: {cited.cluster.citation_count} instead of {expected_count}",
         )
 
     def test_opinionscited_creation(self) -> None:
@@ -1512,6 +1519,49 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             "Should fall back to ID sorting when no ordering_keys exist",
         )
 
+    def test_signal_disconnection(self) -> None:
+        """Can ParentheticalGroup signals be disconnected and reconnected?"""
+
+        # from `test_opinionscited_creation` we know that opinion5 should
+        # have Parentheticals for
+        opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
+        find_citations_and_parentheticals_for_opinion_by_pks(
+            opinion_pks=[opinion5.pk], disconnect_pg_signals=True
+        )
+        self.assertEqual(
+            post_save.receivers[-1][0][0],
+            "update_related_parentheticalgroup_documents_in_es_index_parentheticalgroup",
+        )
+        self.assertEqual(
+            post_delete.receivers[-1][0][0],
+            "remove_parentheticalgroup_from_es_index_parentheticalgroup",
+        )
+        par = Parenthetical.objects.first()
+        pg = ParentheticalGroup(
+            opinion=par.described_opinion,
+            representative=par,
+            score=0.5,
+            size=1,
+        )
+        pg.save()
+        pg_id = pg.id
+        self.rebuild_index("search.ParentheticalGroup")
+        try:
+            ParentheticalGroupDocument.get(id=pg_id)
+        except NotFoundError:
+            self.fail(
+                "Signal should create a ParentheticalGroupDocument on ParentheticalGroup save"
+            )
+
+        pg.delete()
+        try:
+            ParentheticalGroupDocument.get(id=pg_id)
+            self.fail(
+                "Signal should delete the ParentheticalGroupDocument on ParentheticalGroup delete"
+            )
+        except NotFoundError:
+            pass
+
 
 class CitationFeedTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
@@ -1553,7 +1603,7 @@ class CitationFeedTest(
         case name?
         """
         new_case_name = (
-            "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & " "CO., \u2014"
+            "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & CO., \u2014"
         )
         await OpinionCluster.objects.filter(
             pk=self.opinion_cluster_1.pk
@@ -1572,7 +1622,7 @@ class CitationFeedTest(
 class CitationCommandTest(ESIndexTestCase, TestCase):
     """Test a variety of the ways that find_citations can be called."""
 
-    fixtures: List = []
+    fixtures: list = []
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1640,8 +1690,7 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             cited.cluster.citation_count,
             expected_count,
             msg="'cited' was not updated by a citation found in 'citing', or "
-            "the citation was not found. Count was: %s instead of %s"
-            % (cited.cluster.citation_count, expected_count),
+            f"the citation was not found. Count was: {cited.cluster.citation_count} instead of {expected_count}",
         )
 
     def test_index_by_doc_id(self) -> None:
@@ -1803,7 +1852,7 @@ class FilterParentheticalTest(SimpleTestCase):
                 )
 
 
-DescriptionUtilityTestCase = Tuple[Tuple[str, int], Tuple[str, int], int]
+DescriptionUtilityTestCase = tuple[tuple[str, int], tuple[str, int], int]
 
 
 class DescriptionScoreTest(SimpleTestCase):
@@ -1814,7 +1863,7 @@ class DescriptionScoreTest(SimpleTestCase):
         by a human)
         """
         minimum_accuracy = 0.9
-        test_cases: List[DescriptionUtilityTestCase] = [
+        test_cases: list[DescriptionUtilityTestCase] = [
             (
                 (
                     "holding that a State may not require a parade to include a group if the parade's organizer disagrees with the group's message",
@@ -1956,7 +2005,7 @@ class DescriptionScoreTest(SimpleTestCase):
         self.assertGreater(result, 0)
 
     def _print_failed_cases(
-        self, failed_cases: List[DescriptionUtilityTestCase]
+        self, failed_cases: list[DescriptionUtilityTestCase]
     ) -> str:
         output = ""
         for case in failed_cases:
@@ -2282,7 +2331,6 @@ class GroupParentheticalsTest(SimpleTestCase):
 class CitationLookUpApiTest(
     CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
-
     @classmethod
     def setUpTestData(cls) -> None:
         UserProfileWithParentsFactory.create(
@@ -2493,7 +2541,6 @@ class CitationLookUpApiTest(
     async def test_can_handle_ambiguous_reporter_variations(
         self, cache_key_mock
     ) -> None:
-
         handy_citation = await sync_to_async(
             CitationWithParentsFactory.create
         )(volume=1, reporter="Handy", page="150", type=1)
@@ -2803,7 +2850,7 @@ class CitationLookUpApiTest(
         throttle_logic_mock.return_value = "citation_throttle_test"
         # Throttle users for 1 minute if they query for the exact number of
         # citations allowed by the rate limit.
-        test_date = datetime(1970, 1, 1, 0, 0, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 0, 0, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False) as traveler:
             ten_citations = "56 F.2d 9, " * 10
             r = await self.async_client.post(
@@ -2847,7 +2894,7 @@ class CitationLookUpApiTest(
         self, get_rate_mock, throttle_logic_mock
     ) -> None:
         throttle_logic_mock.return_value = "citation_throttle_test"
-        test_date = datetime(1970, 1, 1, 0, 1, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 0, 1, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False) as traveler:
             fifteen_citations = "56 F.2d 9, " * 15
             r = await self.async_client.post(
@@ -2885,7 +2932,7 @@ class CitationLookUpApiTest(
             expected_time = test_date + timedelta(minutes=1)
             self.assertEqual(data["wait_until"], expected_time.isoformat())
 
-        test_date = datetime(1970, 1, 1, 0, 2, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 0, 2, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False) as traveler:
             fifteen_citations = "56 F.2d 9, " * 15
             r = await self.async_client.post(
@@ -2937,7 +2984,7 @@ class CitationLookUpApiTest(
         throttle_logic_mock.return_value = "citation_throttle_test"
         # throttle users that exceeds the max number of citations by a
         # significant margin.
-        test_date = datetime(1970, 1, 1, 4, 0, tzinfo=timezone.utc)
+        test_date = datetime(1970, 1, 1, 4, 0, tzinfo=UTC)
         with time_machine.travel(test_date, tick=False):
             sixty_citations = "56 F.2d 9, " * 60
             r = await self.async_client.post(
@@ -2988,8 +3035,9 @@ class UnmatchedCitationTest(TransactionTestCase):
     # select one to mark as ambiguous; as happens on the resolution flow
     # to MULTIPLE_RESOURCE_MATCH citations
     ambiguous_citations = [eyecite_citations.pop(2)]
+    setattr(ambiguous_citations[0], MULTIPLE_MATCHES_FLAG, True)
     cluster = None
-    opinion = None
+    opinion: Opinion
 
     @classmethod
     def setUpClass(cls):
@@ -2999,8 +3047,8 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     def test_1st_creation(self) -> None:
         """Can we save unmatched citations?"""
-        store_unmatched_citations(
-            self.eyecite_citations, self.ambiguous_citations, self.opinion
+        handle_unmatched_citations(
+            self.opinion, self.eyecite_citations + self.ambiguous_citations, {}
         )
         unmatched_citations = list(
             UnmatchedCitation.objects.filter(citing_opinion=self.opinion).all()
@@ -3054,8 +3102,15 @@ class UnmatchedCitationTest(TransactionTestCase):
             found_count == 2,
             f"There should be 2 found UnmatchedCitations, there are {found_count}",
         )
-
-        update_unmatched_citations_status(citation_resolutions, self.opinion)
+        existing_unmatched_citations = list(
+            self.opinion.unmatched_citations.all()
+        )
+        resolved_citations = {
+            c.matched_text() for v in citation_resolutions.values() for c in v
+        }
+        update_unmatched_citations_status(
+            resolved_citations, existing_unmatched_citations
+        )
         should_resolve.refresh_from_db()
         should_not_resolve.refresh_from_db()
 
@@ -3082,7 +3137,7 @@ class UnmatchedCitationTest(TransactionTestCase):
             tokenizer=HYPERSCAN_TOKENIZER,
         )
         opinion = cluster.sub_opinions.first()
-        store_unmatched_citations(eyecite_citations, [], opinion)
+        handle_unmatched_citations(opinion, eyecite_citations, {})
         count = UnmatchedCitation.objects.filter(
             citing_opinion=opinion
         ).count()

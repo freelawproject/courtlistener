@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any, Optional, Tuple
+from typing import Any
 from zipfile import ZipFile
 
 import requests
@@ -37,11 +37,16 @@ from juriscraper.pacer import (
     S3NotificationEmail,
 )
 from juriscraper.pacer.email import DocketType
+from lxml.etree import ParserError
 from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
+from cl.alerts.utils import (
+    set_skip_percolation_if_bankruptcy_data,
+    set_skip_percolation_if_parties_data,
+)
 from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
@@ -106,7 +111,10 @@ from cl.recap.utils import (
     get_court_id_from_fetch_queue,
     get_main_rds,
 )
-from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
+from cl.scrapers.tasks import (
+    extract_recap_pdf,
+    extract_recap_pdf_base,  # noqa: F401
+)
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import index_docket_parties_in_es
 
@@ -273,7 +281,7 @@ async def process_recap_pdf(pk):
         None if not pq.attachment_number else pq.attachment_number
     )
 
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq} ")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
     try:
         # Attempt to get RECAPDocument instance.
         # It is possible for this instance to not have a document yet,
@@ -303,7 +311,8 @@ async def process_recap_pdf(pk):
                 # different upload task that hasn't yet been processed).
                 logger.warning(
                     "Unable to find docket for processing queue '%s'. "
-                    "Retrying if max_retries is not exceeded." % pq
+                    "Retrying if max_retries is not exceeded.",
+                    pq,
                 )
                 error_message = "Unable to find docket for item."
                 if retries > 0:
@@ -334,7 +343,8 @@ async def process_recap_pdf(pk):
                 )
             except DocketEntry.DoesNotExist:
                 logger.warning(
-                    f"Unable to find docket entry for processing queue '{pq}'."
+                    "Unable to find docket entry for processing queue '%s'.",
+                    pq,
                 )
                 msg = "Unable to find docket entry for item."
                 if retries > 0:
@@ -403,7 +413,7 @@ async def process_recap_pdf(pk):
     try:
         with pq.filepath_local.open("rb") as f:
             new_sha1 = hashlib.file_digest(f, "sha1").hexdigest()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -439,9 +449,9 @@ async def process_recap_pdf(pk):
             )
             if response.is_success:
                 rd.page_count = int(response.text)
-                assert isinstance(
-                    rd.page_count, (int, type(None))
-                ), "page_count must be an int or None."
+                assert isinstance(rd.page_count, (int | type(None))), (
+                    "page_count must be an int or None."
+                )
             rd.file_size = rd.filepath_local.size
 
         rd.ocr_status = None
@@ -504,9 +514,8 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
                     continue
                 await mark_pq_status(
                     pq,
-                    "Zip too large; possible zip bomb. File in zip named %s "
-                    "would be %s bytes expanded."
-                    % (zip_info.filename, zip_info.file_size),
+                    f"Zip too large; possible zip bomb. File in zip named {zip_info.filename} "
+                    f"would be {zip_info.file_size} bytes expanded.",
                     PROCESSING_STATUS.INVALID_CONTENT,
                 )
                 return {"new_pqs": [], "tasks": []}
@@ -592,11 +601,11 @@ async def process_recap_docket(pk):
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -620,7 +629,7 @@ async def process_recap_docket(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed of item {pq}")
+    logger.info("Parsing completed of item %s", pq)
 
     if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
@@ -648,6 +657,9 @@ async def process_recap_docket(pk):
         await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
+    # Skip the percolator request for this save if parties data will be merged
+    # afterward.
+    set_skip_percolation_if_parties_data(data["parties"], d)
     await d.asave()
 
     # Add the HTML to the docket in case we need it someday.
@@ -659,13 +671,16 @@ async def process_recap_docket(pk):
         ContentFile(text.encode()),
     )
 
-    items_returned, rds_created, content_updated = await add_docket_entries(
-        d, data["docket_entries"]
-    )
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     if data["parties"]:
         # Index or re-index parties only if the docket has parties.
         await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+
+    items_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
+    )
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
@@ -690,7 +705,7 @@ async def get_att_data_from_pq(
     try:
         with pq.filepath_local.open("rb") as file:
             text = file.read().decode("utf-8")
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return pq, {}, None
@@ -842,7 +857,7 @@ async def process_recap_attachment(
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     pq, att_data, text = await get_att_data_from_pq(pq)
     if not att_data:
@@ -906,11 +921,11 @@ async def process_recap_claims_register(pk):
         return None
 
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -936,7 +951,7 @@ async def process_recap_claims_register(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed for item {pq}")
+    logger.info("Parsing completed for item %s", pq)
 
     if not data:
         # Bad HTML
@@ -957,6 +972,10 @@ async def process_recap_claims_register(pk):
     # Merge the contents into CL
     d.add_recap_source()
     await update_docket_metadata(d, data)
+
+    # Skip the percolator request for this save if bankruptcy data will
+    # be merged afterward.
+    set_skip_percolation_if_bankruptcy_data(data, d)
 
     retries = 5
     while True:
@@ -1012,11 +1031,11 @@ async def process_recap_docket_history_report(pk):
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -1042,7 +1061,7 @@ async def process_recap_docket_history_report(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed for item {pq}")
+    logger.info("Parsing completed for item %s", pq)
 
     if data == {}:
         # Bad docket history page.
@@ -1130,11 +1149,11 @@ async def process_case_query_page(pk):
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -1160,7 +1179,7 @@ async def process_case_query_page(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed for item {pq}")
+    logger.info("Parsing completed for item %s", pq)
 
     if data == {}:
         # Bad docket iquery page.
@@ -1192,6 +1211,10 @@ async def process_case_query_page(pk):
         await associate_related_instances(pq, d_id=d.pk)
         await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
+
+    # Skip the percolator request for this save if bankruptcy data will
+    # be merged afterward.
+    set_skip_percolation_if_bankruptcy_data(data, d)
 
     retries = 5
     while True:
@@ -1271,12 +1294,12 @@ async def process_recap_appellate_docket(pk):
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info(
-        f"Processing Appellate RECAP item (debug is: {pq.debug}): {pq}"
+        "Processing Appellate RECAP item (debug is: %s): %s", pq.debug, pq
     )
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -1300,7 +1323,7 @@ async def process_recap_appellate_docket(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed of item {pq}")
+    logger.info("Parsing completed of item %s", pq)
 
     if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
@@ -1332,6 +1355,10 @@ async def process_recap_appellate_docket(pk):
     if og_info is not None:
         await og_info.asave()
         d.originating_court_information = og_info
+
+    # Skip the percolator request for this save if parties data will be merged
+    # afterward.
+    set_skip_percolation_if_parties_data(data["parties"], d)
     await d.asave()
 
     # Add the HTML to the docket in case we need it someday.
@@ -1343,13 +1370,16 @@ async def process_recap_appellate_docket(pk):
         ContentFile(text.encode()),
     )
 
-    items_returned, rds_created, content_updated = await add_docket_entries(
-        d, data["docket_entries"]
-    )
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     if data["parties"]:
         # Index or re-index parties only if the docket has parties.
         await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+
+    items_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
+    )
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
@@ -1384,11 +1414,11 @@ async def process_recap_acms_docket(pk):
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing ACMS RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing ACMS RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
@@ -1412,7 +1442,7 @@ async def process_recap_acms_docket(pk):
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed of item {pq}")
+    logger.info("Parsing completed of item %s", pq)
 
     if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
@@ -1444,6 +1474,10 @@ async def process_recap_acms_docket(pk):
     if og_info is not None:
         await og_info.asave()
         d.originating_court_information = og_info
+
+    # Skip the percolator request for this save if parties data will be merged
+    # afterward.
+    set_skip_percolation_if_parties_data(data["parties"], d)
     await d.asave()
 
     pacer_file = await PacerHtmlFiles.objects.acreate(
@@ -1454,10 +1488,12 @@ async def process_recap_acms_docket(pk):
         ContentFile(text.encode()),
     )
 
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
+    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     des_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
-    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
@@ -1473,7 +1509,7 @@ async def process_recap_acms_docket(pk):
 
 async def process_recap_acms_appellate_attachment(
     pk: int,
-) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
+) -> tuple[int, str, list[RECAPDocument]] | None:
     """Process an uploaded appellate attachment page.
     :param pk: The primary key of the processing queue item you want to work on
     :return: Tuple indicating the status of the processing, a related
@@ -1481,11 +1517,11 @@ async def process_recap_acms_appellate_attachment(
     """
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         pq_status, msg = await mark_pq_status(
             pq, msg, PROCESSING_STATUS.FAILED
@@ -1514,7 +1550,7 @@ async def process_recap_acms_appellate_attachment(
             PROCESSING_STATUS.FAILED,
         )
         return None
-    logger.info(f"Parsing completed of item {pq}")
+    logger.info("Parsing completed of item %s", pq)
 
     if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
@@ -1562,7 +1598,7 @@ async def process_recap_acms_appellate_attachment(
 
 async def process_recap_appellate_attachment(
     pk: int,
-) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
+) -> tuple[int, str, list[RECAPDocument]] | None:
     """Process an uploaded appellate attachment page.
 
     :param self: The Celery task
@@ -1573,11 +1609,11 @@ async def process_recap_appellate_attachment(
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+    logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
 
     try:
         text = pq.filepath_local.read().decode()
-    except IOError as exc:
+    except OSError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         pq_status, msg = await mark_pq_status(
             pq, msg, PROCESSING_STATUS.FAILED
@@ -1585,7 +1621,7 @@ async def process_recap_appellate_attachment(
         return pq_status, msg, []
 
     att_data = get_data_from_appellate_att_report(text, pq.court_id)
-    logger.info(f"Parsing completed for item {pq}")
+    logger.info("Parsing completed for item %s", pq)
 
     if att_data == {}:
         # Bad attachment page.
@@ -1852,8 +1888,8 @@ def update_docket_from_hidden_api(data):
 
 
 def fetch_pacer_doc_by_rd_base(
-    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
-) -> Optional[int]:
+    self, rd_pk: int, fq_pk: int, magic_number: str | None = None
+) -> int | None:
     """Fetch a PACER PDF by rd_pk
 
     This is very similar to get_pacer_doc_by_rd, except that it manages
@@ -1989,8 +2025,8 @@ def fetch_pacer_doc_by_rd_base(
 )
 @transaction.atomic
 def fetch_pacer_doc_by_rd(
-    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
-) -> Optional[int]:
+    self, rd_pk: int, fq_pk: int, magic_number: str | None = None
+) -> int | None:
     """Celery task wrapper for fetch_pacer_doc_by_rd_base
 
     :param self: The celery task.
@@ -2037,7 +2073,7 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
 
 @app.task(
     bind=True,
-    autoretry_for=(RedisConnectionError, PacerLoginException),
+    autoretry_for=(RedisConnectionError, PacerLoginException, ParserError),
     max_retries=5,
     interval_start=5,
     interval_step=5,
@@ -2072,10 +2108,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
 
     mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
     if not pacer_doc_id:
-        msg = (
-            "Unable to get attachment page: Unknown pacer_doc_id for "
-            "RECAP Document object %s" % rd.pk
-        )
+        msg = f"Unable to get attachment page: Unknown pacer_doc_id for RECAP Document object {rd.pk}"
         mark_fq_status(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
         self.request.chain = None
         return []
@@ -2095,6 +2128,13 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
 
     try:
         r = get_att_report_by_rd(rd, session_data)
+    except ParserError as exc:
+        if self.request.retries == self.max_retries:
+            msg = "ParserError while getting attachment page"
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return []
+        raise self.retry(exc=exc)
     except HTTPError as exc:
         msg = "Failed to get attachment page from network."
         if exc.response.status_code in [
@@ -2106,7 +2146,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
                 self.request.chain = None
                 return []
             logger.info(
-                f"Ran into HTTPError: {exc.response.status_code}. Retrying."
+                "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
             raise self.retry(exc=exc)
         else:
@@ -2656,7 +2696,8 @@ def get_attachment_page_by_url(att_page_url: str, court_id: str) -> str | None:
     """
 
     logger.info(
-        f"Querying the email notice attachment page endpoint at URL: {att_page_url}"
+        "Querying the email notice attachment page endpoint at URL: %s",
+        att_page_url,
     )
     req_timeout = (60, 300)
     att_response = requests.get(att_page_url, timeout=req_timeout)
@@ -2707,7 +2748,7 @@ def save_pacer_doc_from_pq(
     fq: PacerFetchQueue,
     pq: ProcessingQueue,
     magic_number: str | None,
-) -> Optional[int]:
+) -> int | None:
     """Save the PDF binary previously downloaded and stored in a PQ object to
     the corresponding RECAPDocument.
 
@@ -3157,7 +3198,7 @@ def replicate_recap_email_to_subdockets(
 )
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
-) -> Optional[list[int]]:
+) -> list[int] | None:
     """Processes a recap.email when it comes in, fetches the free document and
     triggers docket alerts and webhooks.
 
@@ -3232,9 +3273,9 @@ def process_recap_email(
             epq.court_id, pacer_doc_id, pq
         )
         if appellate_doc_num:
-            data["dockets"][0]["docket_entries"][0][
-                "document_number"
-            ] = appellate_doc_num
+            data["dockets"][0]["docket_entries"][0]["document_number"] = (
+                appellate_doc_num
+            )
 
     unique_case_ids = []
     got_content_updated = False
