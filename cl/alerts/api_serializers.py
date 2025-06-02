@@ -50,13 +50,13 @@ class SearchAlertSerializer(
         alert_type_query = qd.get("type")
         alert_type_request = attrs.get("alert_type")
 
+        recap_supported_types = [
+            alert_type for alert_type, _ in SEARCH_TYPES.RECAP_ALERT_TYPES
+        ]
         # If the request provided an alert_type and the query type is
         # RECAP or DOCKETS, validate alert_type_request against RECAP-specific
         # valid types.
-        if alert_type_request and alert_type_query in [
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.DOCKETS,
-        ]:
+        if alert_type_request and alert_type_query in recap_supported_types:
             try:
                 validate_recap_alert_type(alert_type_request)
             except ValidationError:
@@ -70,6 +70,17 @@ class SearchAlertSerializer(
             attrs["alert_type"] = alert_type_request
 
             return attrs
+        elif (
+            not alert_type_request
+            and alert_type_query in recap_supported_types
+        ):
+            raise serializers.ValidationError(
+                {
+                    "alert_type": "Please provide an alert type for your RECAP search query. "
+                    "For notifications on cases only, use the d type. "
+                    "For notifications on both cases and filings, use the r type."
+                }
+            )
 
         # Validate the alert type specified in the query for non-RECAP alerts.
         if alert_type_query:

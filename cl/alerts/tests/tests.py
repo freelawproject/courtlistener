@@ -760,6 +760,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
             self.client,
             alert_name="alert_1",
             alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+            alert_type=SEARCH_TYPES.RECAP,
         )
 
         alert_1_data = alert_1.json()
@@ -849,6 +850,27 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
                 self.assertIn(
                     "The specified alert type is not valid for the given RECAP search query.",
                     alert_created.json()["alert_type"],
+                )
+
+    async def test_alert_type_not_provided_for_recap_alert(self) -> None:
+        """Confirm that if alert_type is not provided in a RECAP search query,
+        an error is raised.
+        """
+
+        test_cases = [SEARCH_TYPES.DOCKETS, SEARCH_TYPES.RECAP]
+        for search_type in test_cases:
+            with self.subTest(search_type=search_type):
+                alert_created = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=RECAP query &type={search_type}",
+                )
+                self.assertEqual(
+                    alert_created.status_code, HTTPStatus.BAD_REQUEST
+                )
+                self.assertIn(
+                    "Please provide an alert type for your RECAP search query.",
+                    alert_created.json()["alert_type"][0],
                 )
 
     async def test_alert_type_is_ignored_in_non_recap_alerts(self) -> None:
