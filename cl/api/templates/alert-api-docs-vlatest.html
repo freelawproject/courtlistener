@@ -76,7 +76,10 @@
       <li><code>wly</code> — Weekly</li>
       <li><code>mly</code> — Monthly</li>
     </ul>
-    <li><strong><code>alert_typ</code></strong> &mdash; Whether you want alerts for cases only, or for both cases and filings. For notifications on Cases only: the alert is created with <code>alert_type = SEARCH_TYPES.DOCKETS </code> ("d"). For notifications on both Cases and Filings: the alert is created with the regular <code>alert_type = SEARCH_TYPES.RECAP</code> ("r").</li>
+    <li><strong><code>alert_type</code></strong> &mdash; This is an optional field. It is specifically useful for RECAP Search alerts, where you can specify whether you want alerts for cases only or for both cases and filings.
+      For notifications on Cases only, use the <code>d</code> type. For notifications on both cases and filings, use the <code>r</code> type.
+      For other alert types (Case Law or Oral Arguments), this value is not required, and if provided, it will be overridden by the type in the value from the <code>query</code> field.
+    </li>
   </ul>
   <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
   <pre class="pre-scrollable">curl -X OPTIONS \
