@@ -2,7 +2,6 @@ import logging
 import random
 import traceback
 from collections import defaultdict
-from typing import List, Optional, Tuple, Union
 
 import httpx
 import requests
@@ -39,7 +38,7 @@ from cl.search.models import Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
-ExtractProcessResult = Tuple[str, Optional[str]]
+ExtractProcessResult = tuple[str, str | None]
 
 
 def update_document_from_text(
@@ -153,7 +152,8 @@ def extract_doc_content(
     )
     if not response.is_success:
         logger.error(
-            f"Error from document-extract microservice: {response.status_code}",
+            "Error from document-extract microservice: %s",
+            response.status_code,
             extra=dict(
                 opinion_id=opinion.id,
                 url=opinion.download_url,
@@ -190,16 +190,19 @@ def extract_doc_content(
     if data["page_count"]:
         opinion.page_count = data["page_count"]
 
-    assert isinstance(
-        content, str
-    ), f"content must be of type str, not {type(content)}"
+    assert isinstance(content, str), (
+        f"content must be of type str, not {type(content)}"
+    )
 
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion, juriscraper_module)
 
     if data["err"]:
         logger.error(
-            f"****Error: {data['err']}, extracting text from {extension}: {opinion}****"
+            "****Error: %s, extracting text from %s: %s****",
+            data["err"],
+            extension,
+            opinion,
         )
         return
 
@@ -274,10 +277,10 @@ def find_and_merge_versions(self, pk: int) -> None:
 )
 def extract_recap_pdf(
     self,
-    pks: Union[int, List[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> List[int]:
+) -> list[int]:
     """Celery task wrapper for extract_recap_pdf_base
     Extract the contents from a RECAP PDF if necessary.
 
@@ -309,10 +312,10 @@ def extract_recap_pdf(
 
 
 async def extract_recap_pdf_base(
-    pks: Union[int, List[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> List[int]:
+) -> list[int]:
     """Extract the contents from a RECAP PDF if necessary.
 
     :param pks: The RECAPDocument pk or list of pks to work on.
@@ -326,7 +329,7 @@ async def extract_recap_pdf_base(
     if not is_iter(pks):
         pks = [pks]
 
-    processed: List[int] = []
+    processed: list[int] = []
     for pk in pks:
         rd = await RECAPDocument.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:

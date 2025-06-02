@@ -1,12 +1,11 @@
 import logging
 import re
 from datetime import datetime
-from typing import Dict, List, Tuple, TypeVar
+from typing import TypeVar
 
 import nh3
 import pghistory
 import pytz
-import tiktoken
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
@@ -322,8 +321,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     )
     ordering_judge_str = models.TextField(
         help_text=(
-            "The judge that issued the final order in the case, as a "
-            "string."
+            "The judge that issued the final order in the case, as a string."
         ),
         blank=True,
     )
@@ -447,8 +445,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     idb_data = models.OneToOneField(
         "recap.FjcIntegratedDatabase",
         help_text=(
-            "Data from the FJC Integrated Database associated with this "
-            "case."
+            "Data from the FJC Integrated Database associated with this case."
         ),
         related_name="docket",
         on_delete=models.SET_NULL,
@@ -1383,12 +1380,7 @@ class RECAPDocument(
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
     def __str__(self) -> str:
-        return "%s: Docket_%s , document_number_%s , attachment_number_%s" % (
-            self.pk,
-            self.docket_entry.docket.docket_number,
-            self.document_number,
-            self.attachment_number,
-        )
+        return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
     def get_absolute_url(self) -> str:
         if not self.document_number:
@@ -1552,7 +1544,7 @@ class RECAPDocument(
                     raise ValidationError(
                         "Multiple duplicate values violate save constraint "
                         "and we are unable to fix it automatically for "
-                        "rd: %s" % self.pk
+                        f"rd: {self.pk}"
                     )
                 else:
                     # Only one duplicate. Attempt auto-resolution.
@@ -1569,8 +1561,7 @@ class RECAPDocument(
                     raise ValidationError(
                         "Duplicate values violate save constraint and we are "
                         "unable to fix it because the items have different "
-                        "pacer_doc_id values. The rds are %s and %s "
-                        % (self.pk, other.pk)
+                        f"pacer_doc_id values. The rds are {self.pk} and {other.pk} "
                     )
 
         if update_fields is not None:
@@ -1825,24 +1816,19 @@ class Claim(AbstractDateTimeModel):
     )
     description = models.TextField(
         help_text=(
-            "The description of the claim that appears on the claim "
-            "register."
+            "The description of the claim that appears on the claim register."
         ),
         blank=True,
     )
     remarks = models.TextField(
         help_text=(
-            "The remarks of the claim that appear on the claim " "register."
+            "The remarks of the claim that appear on the claim register."
         ),
         blank=True,
     )
 
     def __str__(self) -> str:
-        return "Claim #%s on docket %s with pk %s" % (
-            self.claim_number,
-            self.docket_id,
-            self.pk,
-        )
+        return f"Claim #{self.claim_number} on docket {self.docket_id} with pk {self.pk}"
 
 
 @pghistory.track(
@@ -1875,9 +1861,8 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     claim_document_type = models.IntegerField(
         help_text=(
             "The type of document that is used in the history row for "
-            "the claim. One of: %s"
-        )
-        % ", ".join([f"{t[0]} ({t[1]})" for t in CLAIM_TYPES]),
+            "the claim. One of: {}"
+        ).format(", ".join([f"{t[0]} ({t[1]})" for t in CLAIM_TYPES])),
         choices=CLAIM_TYPES,
     )
     description = models.TextField(
@@ -1947,7 +1932,8 @@ class FederalCourtsQuerySet(models.QuerySet):
 
     def appellate_pacer_courts(self) -> models.QuerySet:
         return self.filter(
-            Q(jurisdiction=Court.FEDERAL_APPELLATE) |
+            Q(jurisdiction=Court.FEDERAL_APPELLATE)
+            |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
             end_date__isnull=True,
@@ -2184,8 +2170,9 @@ class Court(models.Model):
         null=True,
     )
     jurisdiction = models.CharField(
-        help_text="the jurisdiction of the court, one of: %s"
-        % ", ".join(f"{t[0]} ({t[1]})" for t in JURISDICTIONS),
+        help_text="the jurisdiction of the court, one of: {}".format(
+            ", ".join(f"{t[0]} ({t[1]})" for t in JURISDICTIONS)
+        ),
         max_length=3,
         choices=JURISDICTIONS,
     )
@@ -2424,8 +2411,9 @@ class OpinionCluster(AbstractDateTimeModel):
         null=True,
     )
     source = models.CharField(
-        help_text="the source of the cluster, one of: %s"
-        % ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES),
+        help_text="the source of the cluster, one of: {}".format(
+            ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES)
+        ),
         max_length=10,
         choices=SOURCES.NAMES,
         blank=True,
@@ -2450,7 +2438,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     syllabus = models.TextField(
         help_text=(
-            "A summary of the issues presented in the case and the " "outcome."
+            "A summary of the issues presented in the case and the outcome."
         ),
         blank=True,
     )
@@ -2531,14 +2519,15 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     citation_count = models.IntegerField(
         help_text=(
-            "The number of times this document is cited by other " "opinion"
+            "The number of times this document is cited by other opinion"
         ),
         default=0,
         db_index=True,
     )
     precedential_status = models.CharField(
-        help_text="The precedential status of document, one of: "
-        "%s" % ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES]),
+        help_text="The precedential status of document, one of: {}".format(
+            ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES])
+        ),
         max_length=50,
         blank=True,
         choices=PRECEDENTIAL_STATUS.NAMES,
@@ -3147,7 +3136,7 @@ class OpinionQuerySet(models.QuerySet):
         )
 
 
-@pghistory.track()
+@pghistory.track(exclude=["html_with_citations"])
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
@@ -3216,14 +3205,13 @@ class Opinion(AbstractDateTimeModel):
         "people_db.Person",
         related_name="opinions_joined",
         help_text=(
-            "Other judges that joined the primary author " "in this opinion"
+            "Other judges that joined the primary author in this opinion"
         ),
         blank=True,
     )
     joined_by_str = models.TextField(
         help_text=(
-            "Other judges that joined the primary author "
-            "in this opinion str"
+            "Other judges that joined the primary author in this opinion str"
         ),
         blank=True,
     )
@@ -3392,8 +3380,8 @@ class Opinion(AbstractDateTimeModel):
 
     def save(
         self,
-        *args: List,
-        **kwargs: Dict,
+        *args: list,
+        **kwargs: dict,
     ) -> None:
         self.clean()
         super().save(*args, **kwargs)
@@ -3638,7 +3626,7 @@ class Tag(AbstractDateTimeModel):
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
 
-    def tag_object(self, thing: TaggableType) -> Tuple["Tag", bool]:
+    def tag_object(self, thing: TaggableType) -> tuple["Tag", bool]:
         """Atomically add a tag to an item.
 
         Django has a system for adding to a m2m relationship like the ones
@@ -3659,19 +3647,19 @@ class Tag(AbstractDateTimeModel):
         wish to tag.
         :return: A tuple with the tag and whether a new item was created
         """
-        if type(thing) == Docket:
+        if isinstance(thing, Docket):
             return self.dockets.through.objects.get_or_create(
                 docket_id=thing.pk, tag_id=self.pk
             )
-        elif type(thing) == DocketEntry:
+        elif isinstance(thing, DocketEntry):
             return self.docket_entries.through.objects.get_or_create(
                 docketentry_id=thing.pk, tag_id=self.pk
             )
-        elif type(thing) == RECAPDocument:
+        elif isinstance(thing, RECAPDocument):
             return self.recap_documents.through.objects.get_or_create(
                 recapdocument_id=thing.pk, tag_id=self.pk
             )
-        elif type(thing) == Claim:
+        elif isinstance(thing, Claim):
             return self.claims.through.objects.get_or_create(
                 claim_id=thing.pk, tag_id=self.pk
             )
@@ -3736,6 +3724,7 @@ class SEARCH_TYPES:
     SUPPORTED_ALERT_TYPES = (
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
+        (DOCKETS, "RECAP Dockets"),
         (ORAL_ARGUMENT, "Oral Arguments"),
     )
 

@@ -568,8 +568,7 @@ def clone_docket_entries(
     if docket_entry_list_request.status_code == 403:
         # You don't have the required permissions to view docket entries in api
         raise CloneException(
-            "You don't have the required permissions to "
-            "clone Docket entries."
+            "You don't have the required permissions to clone Docket entries."
         )
 
     docket_entries_data.extend(docket_entry_list_data.get("results", []))
@@ -1048,8 +1047,9 @@ class Command(BaseCommand):
             "--type",
             type=str,
             choices=VALID_TYPES,
-            help="Object type to clone. Current choices are %s"
-            % ", ".join(VALID_TYPES),
+            help="Object type to clone. Current choices are {}".format(
+                ", ".join(VALID_TYPES)
+            ),
             required=True,
         )
 

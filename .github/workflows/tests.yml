@@ -1,12 +1,10 @@
 name: docker build and test
 
 on:
+  pull_request:
   push:
     branches:
-      - "**"
-  pull_request:
-    branches:
-      - "main"
+      - main
 
 jobs:
   build:
@@ -103,11 +101,11 @@ jobs:
 
       # Run the checks and tests
       - name: Check if migrations are missing
-        run: docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
+        run: docker exec cl-django ./manage.py makemigrations --check --dry-run
       - name: Run the tests!
         run: >
           docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
-          python /opt/courtlistener/manage.py test
+          ./manage.py test
           cl --verbosity=2 ${{ matrix.tag_flags }} --parallel
       - name: Export selenium results from docker to host
         if: failure()

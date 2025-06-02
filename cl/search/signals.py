@@ -38,7 +38,6 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
-    OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
@@ -507,7 +506,7 @@ o_cluster_field_mapping = {
 
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
-_pa_signal_processor = ESSignalProcessor(
+pa_signal_processor = ESSignalProcessor(
     ParentheticalGroup,
     ParentheticalGroupDocument,
     pa_field_mapping,
@@ -575,7 +574,7 @@ def handle_recap_doc_change(
 
     if (
         instance.es_rd_field_tracker.has_changed("is_available")
-        and instance.is_available == True
+        and instance.is_available
     ):
         send_prayer_emails(instance)
 

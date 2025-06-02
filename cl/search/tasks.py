@@ -4,11 +4,12 @@ import io
 import json
 import logging
 import uuid
+from collections.abc import Generator
 from datetime import date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Generator
+from typing import Any
 
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -82,7 +83,6 @@ from cl.search.models import (
     SEARCH_TYPES,
     Docket,
     DocketEntry,
-    DocketEvent,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -163,7 +163,7 @@ def get_instance_from_db(
         return model.objects.get(pk=instance_id)
     except ObjectDoesNotExist:
         logger.warning(
-            f"The %s with ID %s doesn't exists and it cannot be updated in ES.",
+            "The %s with ID %s doesn't exists and it cannot be updated in ES.",
             model.__name__,
             instance_id,
         )
@@ -186,6 +186,7 @@ def es_save_document(
     instance_id: int,
     app_label: str,
     es_document_name: ESDocumentNameType,
+    skip_percolator_request: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Save a document in Elasticsearch using a provided callable.
 
@@ -194,6 +195,8 @@ def es_save_document(
     :param app_label: The app label and model that belongs to the document
     being added.
     :param es_document_name: A Elasticsearch DSL document name.
+    :param skip_percolator_request: Whether to skip the subsequent percolator
+    request.
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None.
@@ -277,6 +280,7 @@ def es_save_document(
     if (
         type(instance) in percolator_alerts_models_supported
         and response["_version"] == 1
+        and not skip_percolator_request
     ):
         # Only send search alerts when a new instance of a model that support
         # Alerts is indexed in ES _version:1
@@ -375,7 +379,7 @@ def document_fields_to_update(
 
     if fields_to_update:
         # If fields to update, append the timestamp to be updated too.
-        prepare_timestamp = getattr(es_document(), f"prepare_timestamp", None)
+        prepare_timestamp = getattr(es_document(), "prepare_timestamp", None)
         if prepare_timestamp:
             field_value = prepare_timestamp(main_instance)
             fields_to_update["timestamp"] = field_value
@@ -466,7 +470,7 @@ def email_search_results(self: Task, user_id: int, query: str):
 
     # Generate a filename for the CSV attachment with timestamp
     now = datetime.now()
-    filename = f'search_results_{now.strftime("%Y%m%d_%H%M%S")}.csv'
+    filename = f"search_results_{now.strftime('%Y%m%d_%H%M%S')}.csv"
 
     # Send email with attachments
     message.attach(filename, csv_content, "text/csv")
@@ -490,6 +494,7 @@ def update_es_document(
     main_instance_data: tuple[str, int],
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
+    skip_percolator_request: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
@@ -502,6 +507,7 @@ def update_es_document(
     update doesn't involve a related instance.
     :param fields_map: A dict containing fields that can be updated or None if
     mapping is not required for the update.
+    :param skip_percolator_request: Whether to skip the subsequent percolator request
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None
@@ -552,7 +558,7 @@ def update_es_document(
         main_app_label in ["search.RECAPDocument", "search.Docket"]
         and not related_instance_app_label == "search.DocketEntry"
         or related_instance_app_label in ["search.BankruptcyInformation"]
-    ):
+    ) and not skip_percolator_request:
         doc = es_doc.prepare(main_model_instance)
         return SaveESDocumentReturn(
             document_id=str(main_instance_id),
@@ -630,8 +636,10 @@ def get_doc_from_es(
             )
         except (ConflictError, RequestError) as exc:
             logger.error(
-                f"Error indexing the {es_document.Django.model.__name__.capitalize()} with ID: {instance_id}. "
-                f"Exception was: {type(exc).__name__}"
+                "Error indexing the %s with ID: %s. Exception was: %s",
+                es_document.Django.model.__name__.capitalize(),
+                instance_id,
+                type(exc).__name__,
             )
 
         return None
@@ -900,7 +908,7 @@ def bulk_indexing_generator(
     base_doc: dict[str, str],
     child_id_property: str | None = None,
     parent_id: int | None = None,
-) -> Generator[ESDictDocument, None, None]:
+) -> Generator[ESDictDocument]:
     """Generate ES documents for bulk indexing.
 
     :param docs_query_set: The queryset of model instances to be indexed.
@@ -1086,8 +1094,10 @@ def index_parent_and_child_docs(
                 )
             except (ConflictError, RequestError) as exc:
                 logger.error(
-                    f"Error indexing the {model_label} with ID: {instance_id}. "
-                    f"Exception was: {type(exc).__name__}"
+                    "Error indexing the %s with ID: %s. Exception was: %s",
+                    model_label,
+                    instance_id,
+                    type(exc).__name__,
                 )
                 continue
 
@@ -1108,8 +1118,10 @@ def index_parent_and_child_docs(
 
         if failed_child_docs:
             logger.error(
-                f"Error indexing child documents from the {model_label}"
-                f" with ID: {instance_id}. Child IDs are: {failed_child_docs}"
+                "Error indexing child documents from the %s with ID: %s. Child IDs are: %s",
+                model_label,
+                instance_id,
+                failed_child_docs,
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -1192,8 +1204,9 @@ def index_parent_or_child_docs_in_es(
         if failed_docs:
             model_label = child_es_document.Django.model.__name__.capitalize()
             logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
+                "Error indexing documents from %s, Failed Doc IDs are: %s",
+                model_label,
+                failed_docs,
             )
 
     if document_type == "parent":
@@ -1207,8 +1220,9 @@ def index_parent_or_child_docs_in_es(
         if failed_docs:
             model_label = parent_es_document.Django.model.__name__.capitalize()
             logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
+                "Error indexing documents from %s, Failed Doc IDs are: %s",
+                model_label,
+                failed_docs,
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -1257,8 +1271,8 @@ def remove_document_from_es_index(
             es_document._index.refresh()
     except NotFoundError:
         logger.info(
-            f"The document with ID: %s can't be deleted from the %s index,"
-            f" it doesn't exist.",
+            "The document with ID: %s can't be deleted from the %s index,"
+            " it doesn't exist.",
             instance_id,
             es_document._index._name,
         )
@@ -1323,7 +1337,7 @@ def index_dockets_in_bulk(
                 failed_docs.append(info["index"]["_id"])
 
     if failed_docs:
-        logger.error(f"Error indexing Dockets in bulk IDs are: {failed_docs}")
+        logger.error("Error indexing Dockets in bulk IDs are: %s", failed_docs)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.

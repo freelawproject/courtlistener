@@ -6,19 +6,20 @@ from http import HTTPStatus
 from unittest import mock
 
 import time_machine
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import admin
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import AsyncClient, RequestFactory, override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
 
+from cl.alerts.utils import add_cutoff_timestamp_filter
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     compute_lowest_possible_estimate,
@@ -43,7 +44,6 @@ from cl.lib.test_helpers import (
     v4_meta_keys,
     v4_recap_meta_keys,
 )
-from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
     AttorneyFactory,
     AttorneyOrganizationFactory,
@@ -126,11 +126,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in Frontend with %s "
+            msg=f"Did not get the right number of search results in Frontend with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -143,9 +143,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of child documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n" % (field_name, expected_count, got),
+            msg=f"Did not get the right number of child documents {field_name}\n"
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n",
         )
 
     def _compare_child_entry_date_filed(
@@ -155,7 +155,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         tree = html.fromstring(html_content)
         article = tree.xpath("//article")[article]
         col_md_offset_half_elements = article.xpath(
-            f".//div[@class='bottom']//div[@class='col-md-offset-half']"
+            ".//div[@class='bottom']//div[@class='col-md-offset-half']"
         )
         col_md_offset_half_elem = col_md_offset_half_elements[child_index]
         inline_element = col_md_offset_half_elem.xpath(
@@ -167,8 +167,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             meta_data_value,
             expected_date,
             msg="Did not get the right expected entry date filed \n"
-            "Expected: %s\n"
-            "     Got: %s\n\n" % (expected_date, meta_data_value),
+            f"Expected: {expected_date}\n"
+            f"     Got: {meta_data_value}\n\n",
         )
 
     def _assert_results_header_content(self, html_content, expected_text):
@@ -196,10 +196,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             total_query_results,
             parent_expected,
-            msg="Did not get the right number of parent documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            % (field_name, parent_expected, total_query_results),
+            msg=f"Did not get the right number of parent documents {field_name}\n"
+            f"Expected: {parent_expected}\n"
+            f"     Got: {total_query_results}\n\n",
         )
         return hits.to_dict()
 
@@ -230,9 +229,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             expected_count,
             got,
-            msg="Did not get the right number of child documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n" % (field_name, expected_count, got),
+            msg=f"Did not get the right number of child documents {field_name}\n"
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n",
         )
 
     @staticmethod
@@ -2355,40 +2354,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
 
-    @mock.patch("cl.lib.es_signal_processor.chain")
-    async def test_avoid_updating_docket_in_es_on_view_count_increment(
-        self, mock_es_save_chain
-    ) -> None:
-        """Confirm a docket is not updated in ES on a view_count increment."""
-
-        with self.captureOnCommitCallbacks(execute=True):
-            docket = await sync_to_async(DocketFactory)(
-                court=self.court,
-                case_name="Lorem Ipsum",
-                case_name_full="Jackson & Sons Holdings vs. Bank",
-                date_filed=datetime.date(2015, 8, 16),
-                date_argued=datetime.date(2013, 5, 20),
-                docket_number="1:21-bk-1234",
-                assigned_to=None,
-                referred_to=None,
-                nature_of_suit="440",
-                source=Docket.RECAP,
-            )
-        # Restart save chain mock count.
-        mock_es_save_chain.reset_mock()
-        self.assertEqual(mock_es_save_chain.call_count, 0)
-
-        request_factory = AsyncClient()
-        request = await request_factory.get("/docket/")
-        with mock.patch("cl.lib.view_utils.is_bot", return_value=False):
-            # Increase the view_count.
-            await increment_view_count(docket, request)
-
-        # The save chain shouldn't be called.
-        self.assertEqual(mock_es_save_chain.call_count, 0)
-        with self.captureOnCommitCallbacks(execute=True):
-            await docket.adelete()
-
     async def test_fail_rd_type_gracefully_frontend(self) -> None:
         """Confirm that the rd type fails gracefully in the frontend."""
 
@@ -2407,7 +2372,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         dockets_to_remove = []
         # Add dockets with no documents
         with self.captureOnCommitCallbacks(execute=True):
-
             # District document initial document available
             de_1 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
@@ -2964,6 +2928,196 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         de.docket.delete()
         docket_2.delete()
 
+    def test_timestamp_filtering(self) -> None:
+        """Confirm the timestamp fielded filter works properly"""
+
+        # Add docket with no document
+        mock_date = now().replace(
+            day=29, hour=0, minute=0, second=0, microsecond=0
+        )
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Lorem vs Natural Gas ",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="5:90-cv-04007",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(params["q"], mock_date)
+        # Docket with mock_date as timestamp should be found.
+        async_to_sync(self._test_article_count)(params, 1, "timestamp")
+
+        # Filter by date:
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date.date()
+        )
+        # Docket with mock_date as timestamp should be found.
+        async_to_sync(self._test_article_count)(params, 1, "timestamp")
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date + datetime.timedelta(seconds=1)
+        )
+        # Querying for a timestamp one second greater than mock_date shouldn't return any results.
+        async_to_sync(self._test_article_count)(params, 0, "timestamp")
+
+        # Test timestamp filter for RDs.
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            entry = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="1",
+                is_available=False,
+                page_count=5,
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="2",
+                is_available=True,
+                page_count=5,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "New File",
+            "available_only": True,
+        }
+        params["q"] = add_cutoff_timestamp_filter(params["q"], mock_date)
+        # RECAPDocument with mock_date as timestamp should be found.
+        r = async_to_sync(self._test_article_count)(params, 1, "timestamp")
+        self._count_child_documents(0, r.content.decode(), 1, "timestamp")
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "New File",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date + datetime.timedelta(seconds=1)
+        )
+        # Querying for a timestamp one second greater than mock_date shouldn't return any results.
+        async_to_sync(self._test_article_count)(params, 0, "timestamp")
+
+        docket.delete()
+
+    def test_relative_dates_filtering(self):
+        """Confirm that the relative date filter works properly by returning
+        the expected documents within the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            d_1 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23456",
+                docket_number="55-1234",
+            )
+            # 40 days ago
+            d_2 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23457",
+                docket_number="56-1234",
+            )
+            # 400 days ago
+            d_3 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23458",
+                docket_number="57-1234",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No case within the range.
+            ("9d ago", [d_1]),  # Only the 9-day old
+            ("past 10 days", [d_1]),  # Only the 9-day old
+            ("30d ago", [d_1]),  # only the 9-day old
+            ("60d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1m ago", [d_1]),  # only the 9-day old
+            ("2m ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("365d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1y ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("2y ago", [d_1, d_2, d_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                cd = {**params, "filed_after": relative_date}
+                r = async_to_sync(self._test_article_count)(
+                    cd,
+                    len(expected_cases),
+                    f"filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for docket in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(docket.docket_number, r.content.decode())
+
+        d_1.delete()
+        d_2.delete()
+        d_3.delete()
+
+    def test_invalid_relative_date_syntax(self):
+        """Confirm that a custom error is displayed to users when they enter an
+        invalid relative date syntax.
+        """
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+        test_cases = ["1d", "5 day", "invalid date", "12/05-23"]
+        for invalid_date in test_cases:
+            with self.subTest(expr=invalid_date):
+                cd = {**params, "filed_after": invalid_date}
+                r = async_to_sync(self._test_article_count)(
+                    cd, 0, "Invalid date syntax."
+                )
+                self.assertIn(
+                    "The date entered has an invalid format.",
+                    r.content.decode(),
+                )
+
 
 class RECAPSearchDecayRelevancyTest(
     ESIndexTestCase, V4SearchAPIAssertions, TestCase
@@ -3263,7 +3417,7 @@ class RECAPSearchDecayRelevancyTest(
                 r = async_to_sync(self._test_article_count)(
                     test["search_params"],
                     len(test["expected_order_frontend"]),
-                    f"Failed count {test["name"]}",
+                    f"Failed count {test['name']}",
                 )
                 self._assert_order_in_html(
                     r.content.decode(), test["expected_order_frontend"]
@@ -3293,7 +3447,6 @@ class RECAPSearchDecayRelevancyTest(
 
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
-
     version_api = "v3"
     skip_common_tests = True
 
@@ -3395,11 +3548,11 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -4031,11 +4184,11 @@ class RECAPSearchAPIV4Test(
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -4488,9 +4641,12 @@ class RECAPSearchAPIV4Test(
 
         original_datetime = now().replace(day=1, hour=5, minute=0)
         for search_params in all_tests:
-            with self.subTest(
-                search_params=search_params, msg="Test stable scores."
-            ), time_machine.travel(original_datetime, tick=False) as traveler:
+            with (
+                self.subTest(
+                    search_params=search_params, msg="Test stable scores."
+                ),
+                time_machine.travel(original_datetime, tick=False) as traveler,
+            ):
                 # Two first-page requests (no cursor) made on the same day will
                 # now have consistent scores because scores are now computed
                 # based on the same day's date.
@@ -5564,6 +5720,119 @@ class RECAPSearchAPIV4Test(
         with self.captureOnCommitCallbacks(execute=True):
             d.delete()
 
+    def test_relative_dates_filtering(self):
+        """Confirm that the relative date filter in the API works properly by returning
+        the expected documents within the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            d_1 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23456",
+                docket_number="55-1234",
+            )
+            # 40 days ago
+            d_2 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23457",
+                docket_number="56-1234",
+            )
+            # 400 days ago
+            d_3 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23458",
+                docket_number="57-1234",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No case within the range.
+            ("9d ago", [d_1]),  # Only the 9-day old
+            ("past 10 days", [d_1]),  # Only the 9-day old
+            ("30d ago", [d_1]),  # only the 9-day old
+            ("60d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1m ago", [d_1]),  # only the 9-day old
+            ("2m ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("365d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1y ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("2y ago", [d_1, d_2, d_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                search_params = {**params, "filed_after": relative_date}
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertEqual(
+                    len(r.data["results"]),
+                    len(expected_cases),
+                    f"filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for docket in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(docket.docket_number, r.content.decode())
+
+        # Test a relative date range that is supported in the API.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+            "filed_after": "1y ago",
+            "filed_before": "30d ago",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            cd,
+        )
+
+        # only the d_2 docket falls between 365d and 30d ago
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertIn(d_2.docket_number, r.content.decode())
+
+        d_1.delete()
+        d_2.delete()
+        d_3.delete()
+
+    def test_invalid_relative_date_syntax(self):
+        """Confirm that a custom error is displayed to users when they enter an
+        invalid relative date syntax.
+        """
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+        test_cases = ["1d", "5 day", "invalid date", "12/05-23"]
+        for invalid_date in test_cases:
+            with self.subTest(expr=invalid_date):
+                search_params = {**params, "filed_after": invalid_date}
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertIn(
+                    "The date entered has an invalid format.",
+                    r.content.decode(),
+                )
+
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     """Tests for RECAP Search Feed"""
@@ -5771,10 +6040,13 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         """Can we remove control characters in the plain_text for a proper XML
         rendering?
         """
-        with mock.patch(
-            "cl.search.documents.escape",
-            return_value="Lorem ipsum control chars \x07\x08\x0b.",
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            mock.patch(
+                "cl.search.documents.escape",
+                return_value="Lorem ipsum control chars \x07\x08\x0b.",
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             de_1 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -6231,9 +6503,10 @@ class IndexDocketRECAPDocumentsCommandTest(
         request = self.factory.post(url)
         queryset = RECAPDocument.objects.filter(pk__in=[rd_1.pk])
         mock_date = now().replace(day=15, hour=0)
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_documents"
-        ), time_machine.travel(mock_date, tick=False):
+        with (
+            mock.patch("cl.lib.es_signal_processor.update_es_documents"),
+            time_machine.travel(mock_date, tick=False),
+        ):
             recap_admin.seal_documents(request, queryset)
 
         recap_admin.message_user.assert_called_once_with(
@@ -6304,10 +6577,9 @@ class RECAPIndexingTest(
         self.assertEqual(
             total_query_results,
             parent_expected,
-            msg="Did not get the right number of parent documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            % (field_name, parent_expected, total_query_results),
+            msg=f"Did not get the right number of parent documents {field_name}\n"
+            f"Expected: {parent_expected}\n"
+            f"     Got: {total_query_results}\n\n",
         )
         return hits.to_dict()
 

@@ -317,7 +317,7 @@ def add_case_from_filepath(filepath):
     :return: None
     """
     query = LASCSearch(None)
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         original_data = f.read()
 
     case_data = query._parse_case_data(json.loads(original_data))

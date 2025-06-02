@@ -7,6 +7,7 @@ from django.core import mail
 from django.core.management import call_command
 from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils.dateformat import format
 from django.utils.timezone import now
 from elasticsearch_dsl import Q, connections
 
@@ -23,8 +24,11 @@ from cl.alerts.models import (
 )
 from cl.alerts.utils import (
     build_plain_percolator_query,
+    has_document_alert_hit_been_triggered,
     percolate_es_document,
     prepare_percolator_content,
+    set_skip_percolation_if_bankruptcy_data,
+    set_skip_percolation_if_parties_data,
 )
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
@@ -38,6 +42,11 @@ from cl.people_db.factories import (
     AttorneyOrganizationFactory,
     PartyFactory,
     PartyTypeFactory,
+)
+from cl.recap.factories import DocketWithBankruptcyDataFactory
+from cl.recap.mergers import (
+    add_bankruptcy_data_to_docket,
+    add_parties_and_attorneys,
 )
 from cl.search.documents import (
     DocketDocument,
@@ -78,9 +87,10 @@ class RECAPAlertsSweepIndexTest(
         date_now = midnight_pt(now().date())
         cls.mock_date_indexing = date_now - datetime.timedelta(days=1)
         cls.mock_date = date_now
-        with time_machine.travel(
-            cls.mock_date_indexing, tick=False
-        ), cls.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(cls.mock_date_indexing, tick=False),
+            cls.captureOnCommitCallbacks(execute=True),
+        ):
             super().setUpTestData()
 
             cls.user_profile = UserProfileWithParentsFactory()
@@ -117,7 +127,7 @@ class RECAPAlertsSweepIndexTest(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test RT RECAP Alert",
-            query='q="401 Civil"&type=r',
+            query="docket_number=1:21-bk-1234&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
         dly_recap_alert = AlertFactory(
@@ -135,13 +145,17 @@ class RECAPAlertsSweepIndexTest(
             alert_type=SEARCH_TYPES.RECAP,
         )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
+            alerts_runtime_naive = datetime.datetime.now()
 
         # Only the RECAP RT alert for a member and the RECAP DLY alert are sent.
         self.assertEqual(
@@ -150,7 +164,38 @@ class RECAPAlertsSweepIndexTest(
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(rt_recap_alert.name, html_content)
 
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content,
+            Alert.REAL_TIME,
+            alerts_runtime_naive,
+            sweep_index=True,
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        rt_recap_alert.refresh_from_db()
+        self.assertEqual(
+            rt_recap_alert.date_last_hit,
+            self.mock_date,
+            msg="Alert date of last hit didn't match.",
+        )
+
         html_content = self.get_html_content_from_email(mail.outbox[1])
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.DAILY, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        dly_recap_alert.refresh_from_db()
+        self.assertEqual(
+            dly_recap_alert.date_last_hit,
+            self.mock_date,
+            msg="Alert date of last hit didn't match.",
+        )
+
         self.assertIn(dly_recap_alert.name, html_content)
 
     def test_index_daily_recap_documents(self, mock_prefix) -> None:
@@ -201,9 +246,10 @@ class RECAPAlertsSweepIndexTest(
 
         # Index Docket changed today + their RECAPDocuments indexed on
         # previous days
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -213,9 +259,10 @@ class RECAPAlertsSweepIndexTest(
 
         # Its related RD is ingested two days before.
         mock_two_days_before = self.mock_date - datetime.timedelta(days=2)
-        with time_machine.travel(
-            mock_two_days_before, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_two_days_before, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -245,9 +292,10 @@ class RECAPAlertsSweepIndexTest(
 
         # Index a RECAPDocument changed today including its parent Docket
         # indexed on previous days.
-        with time_machine.travel(
-            mock_two_days_before, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_two_days_before, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket_2 = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE OFF",
@@ -256,9 +304,10 @@ class RECAPAlertsSweepIndexTest(
             )
 
         # Its related RD is ingested yesterday.
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de_2 = DocketEntryWithParentsFactory(
                 docket=docket_2,
                 entry_number=1,
@@ -288,9 +337,10 @@ class RECAPAlertsSweepIndexTest(
         # Docket and RD created on previous days, will be used later to confirm
         # documents got indexed into the sweep index after partial updates.
         mock_five_days_before = self.mock_date - datetime.timedelta(days=5)
-        with time_machine.travel(
-            mock_five_days_before, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_five_days_before, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket_old = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED LOREM OFF",
@@ -331,9 +381,10 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Update the documents yesterday:
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             rd_old_2.document_number = 3
             rd_old_2.save()
 
@@ -352,9 +403,10 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Update the Docket yesterday:
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket_old.case_name = "SUBPOENAS SERVED LOREM OFF UPDATED"
             docket_old.save()
 
@@ -405,12 +457,15 @@ class RECAPAlertsSweepIndexTest(
             query='q="401 Civil"&type=r',
             alert_type=SEARCH_TYPES.RECAP,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -443,9 +498,10 @@ class RECAPAlertsSweepIndexTest(
         )
         # Simulate docket is ingested a day before.
         one_day_before = self.mock_date_indexing - datetime.timedelta(days=1)
-        with time_machine.travel(
-            one_day_before, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(one_day_before, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -459,9 +515,10 @@ class RECAPAlertsSweepIndexTest(
             )
 
         # Its related RD is ingested yesterday.
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -478,12 +535,15 @@ class RECAPAlertsSweepIndexTest(
                 plain_text="plain text for 018036652436",
             )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
         # The RD ingestion's shouldn't match the docket-only alert.
         self.assertEqual(
@@ -498,12 +558,15 @@ class RECAPAlertsSweepIndexTest(
             query='q="plain text for 018036652436"&type=r',
             alert_type=SEARCH_TYPES.RECAP,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
         # 1 New alert should be triggered.
         self.assertEqual(
@@ -530,23 +593,42 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(recap_only_alert.name, txt_email)
         self.assertIn(rd.description, txt_email)
 
+        # Confirm that the document timestamp "Date Updated" is rendered in the alert
+        self._assert_date_updated(
+            self.mock_date_indexing, html_content, txt_email
+        )
+
+        # Confirm docket entries are sorted by order_by=desc in the docket URL
+        self.assertIn(
+            f"https://www.courtlistener.com{alert_de.docket.get_absolute_url()}?order_by=desc",
+            html_content,
+        )
+        self.assertIn(
+            f"https://www.courtlistener.com{alert_de.docket.get_absolute_url()}?order_by=desc",
+            txt_email,
+        )
+
         # Trigger the same alert again to confirm that no new alert is
         # triggered because previous hits have already triggered the same alert
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
         # No new alert should be triggered.
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
 
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # Create a new RD for the same DocketEntry to confirm this new RD is
             # properly included in the alert email.
             rd_2 = RECAPDocumentFactory(
@@ -559,12 +641,15 @@ class RECAPAlertsSweepIndexTest(
                 plain_text="plain text for 018036652436",
             )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing only the new RD created.
@@ -589,12 +674,15 @@ class RECAPAlertsSweepIndexTest(
             query=f"q=docket_entry_id:{alert_de.pk}&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing two RDs (rd and rd_2)
@@ -624,12 +712,15 @@ class RECAPAlertsSweepIndexTest(
             query=f'q="Motion to File 2"&docket_number={docket.docket_number}&type=r',
             alert_type=SEARCH_TYPES.RECAP,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing one RD (rd_2)
@@ -681,12 +772,15 @@ class RECAPAlertsSweepIndexTest(
             query=f"q=docket_id:{self.de.docket.pk} OR pacer_doc_id:{self.rd_2.pacer_doc_id}&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing a Docket-only hit and a
@@ -728,12 +822,15 @@ class RECAPAlertsSweepIndexTest(
             query=f"q=docket_id:{self.de.docket.pk} OR pacer_doc_id:{self.rd.pacer_doc_id}&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered, containing the RD document nested
@@ -772,15 +869,16 @@ class RECAPAlertsSweepIndexTest(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object text query",
-            query=f'q="United states"&type=r',
+            query='q="United states"&type=r',
             alert_type=SEARCH_TYPES.RECAP,
         )
         mock_two_days_before = self.mock_date_indexing - datetime.timedelta(
             days=2
         )
-        with time_machine.travel(
-            mock_two_days_before, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_two_days_before, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory(
                 court=self.court,
                 case_name="United States of America",
@@ -788,12 +886,15 @@ class RECAPAlertsSweepIndexTest(
                 source=Docket.RECAP,
             )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # No alert should be triggered since the matched docket was not
@@ -804,9 +905,10 @@ class RECAPAlertsSweepIndexTest(
 
         # Index new documents that match cross_object_alert_text, an RD, and
         # an empty docket.
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -828,12 +930,15 @@ class RECAPAlertsSweepIndexTest(
                 source=Docket.RECAP,
             )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # An alert should be triggered containing two hits. One matched by
@@ -865,19 +970,23 @@ class RECAPAlertsSweepIndexTest(
             [],
         )
         # Modify 1:21-bk-1009 docket today:
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket.cause = "405 Civil"
             docket.save()
 
         # Trigger the alert again:
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing the docket as a hit with
@@ -902,12 +1011,15 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Trigger alert again:
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
         # No new alerts should be triggered.
         self.assertEqual(
@@ -916,9 +1028,10 @@ class RECAPAlertsSweepIndexTest(
 
         # Index new documents that match cross_object_alert_text, an RD, and
         # an empty docket.
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             rd_4 = RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Hearing new",
@@ -946,12 +1059,15 @@ class RECAPAlertsSweepIndexTest(
             f"pacer_doc_id:{rd_3.pacer_doc_id})&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered, containing the RD document nested below
@@ -1004,12 +1120,15 @@ class RECAPAlertsSweepIndexTest(
             f"pacer_doc_id:{rd_3.pacer_doc_id})&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered, containing rd_3 document nested below
@@ -1058,12 +1177,15 @@ class RECAPAlertsSweepIndexTest(
             alert_type=SEARCH_TYPES.RECAP,
         )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
         error = "ApiError(200, 'N/A', 'Failed to parse query [test AND :]')"
         mock_logger.warning.assert_called_with(
@@ -1083,9 +1205,10 @@ class RECAPAlertsSweepIndexTest(
         """
 
         indexing_date = self.mock_date - datetime.timedelta(days=5)
-        with time_machine.travel(
-            indexing_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(indexing_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED 5 Days Ago",
@@ -1140,9 +1263,10 @@ class RECAPAlertsSweepIndexTest(
         results for this Case" button.
         """
 
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de = DocketEntryWithParentsFactory(
                 docket=self.de.docket,
                 entry_number=1,
@@ -1153,9 +1277,9 @@ class RECAPAlertsSweepIndexTest(
             for i in range(4):
                 rd = RECAPDocumentFactory(
                     docket_entry=alert_de,
-                    description=f"Motion to File {i+1}",
-                    document_number=f"{i+1}",
-                    pacer_doc_id=f"018036652436{i+1}",
+                    description=f"Motion to File {i + 1}",
+                    document_number=f"{i + 1}",
+                    pacer_doc_id=f"018036652436{i + 1}",
                 )
                 if i < 3:
                     # Omit the last alert to compare. Only up to 3 should be
@@ -1169,12 +1293,15 @@ class RECAPAlertsSweepIndexTest(
             query=f"q=docket_entry_id:{alert_de.pk}&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -1230,9 +1357,10 @@ class RECAPAlertsSweepIndexTest(
             alert_type=SEARCH_TYPES.RECAP,
         )
 
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de = DocketEntryWithParentsFactory(
                 docket=self.de.docket,
                 entry_number=2,
@@ -1241,9 +1369,9 @@ class RECAPAlertsSweepIndexTest(
             )
             rd = RECAPDocumentFactory(
                 docket_entry=alert_de,
-                description=f"Motion to File Party Test",
+                description="Motion to File Party Test",
                 document_number="2",
-                pacer_doc_id=f"01803665243325",
+                pacer_doc_id="01803665243325",
             )
             firm = AttorneyOrganizationFactory(
                 name="Associates LLP 3", lookup_key="firm_llp_2"
@@ -1263,12 +1391,15 @@ class RECAPAlertsSweepIndexTest(
             )
             index_docket_parties_in_es.delay(self.de.docket.pk)
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -1294,12 +1425,15 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Trigger alert again.
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # Shouldn't be sent again.
@@ -1321,12 +1455,15 @@ class RECAPAlertsSweepIndexTest(
             alert_type=SEARCH_TYPES.RECAP,
         )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -1345,12 +1482,15 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Trigger alert again.
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # Shouldn't be sent again.
@@ -1366,13 +1506,14 @@ class RECAPAlertsSweepIndexTest(
         alert are limited to SCHEDULED_ALERT_HITS_LIMIT (3) hits.
         """
 
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory(
                 court=self.court,
-                case_name=f"SUBPOENAS SERVED CASE",
-                docket_number=f"1:21-bk-123",
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-123",
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
@@ -1442,12 +1583,15 @@ class RECAPAlertsSweepIndexTest(
             alert_type=SEARCH_TYPES.RECAP,
         )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -1631,12 +1775,15 @@ class RECAPAlertsSweepIndexTest(
             query=f'q="401 Civil" id:{self.rd.pk}&type=r',
             alert_type=SEARCH_TYPES.RECAP,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # Weekly and monthly alerts are not sent right away but are scheduled as
@@ -1653,13 +1800,33 @@ class RECAPAlertsSweepIndexTest(
         )
         self.assertEqual(len(webhook_events), 3)
 
-        # Send scheduled Weekly alerts and check assertions.
-        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+        week_ago = self.mock_date + datetime.timedelta(days=7)
+        with time_machine.travel(week_ago, tick=False):
+            # Send scheduled Weekly alerts and check assertions.
+            call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+            alerts_runtime_naive = datetime.datetime.now()
+
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
+
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
+
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.WEEKLY, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        docket_only_alert.refresh_from_db()
+        self.assertEqual(
+            docket_only_alert.date_last_hit,
+            week_ago,
+            msg="Alert date of last hit didn't match.",
+        )
+
         self._count_alert_hits_and_child_hits(
             html_content,
             docket_only_alert.name,
@@ -1686,14 +1853,36 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(cross_object_alert_with_hl.name, txt_email)
         self.assertIn(self.rd.description, txt_email)
 
-        # Send  scheduled Monthly alerts and check assertions.
-        current_date = now().replace(day=28, hour=0)
+        # Confirm that the document timestamp "Date Updated" is rendered in the alert
+        self._assert_date_updated(
+            self.mock_date_indexing, html_content, txt_email
+        )
+
+        # Send scheduled Monthly alerts and check assertions.
+        current_date = now().replace(day=1, hour=8)
         with time_machine.travel(current_date, tick=False):
             call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
+            alerts_runtime_naive = datetime.datetime.now()
+
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
         html_content = self.get_html_content_from_email(mail.outbox[1])
+
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.MONTHLY, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        recap_only_alert.refresh_from_db()
+        self.assertEqual(
+            recap_only_alert.date_last_hit,
+            current_date,
+            msg="Alert date of last hit didn't match.",
+        )
+
         self._count_alert_hits_and_child_hits(
             html_content,
             recap_only_alert.name,
@@ -1713,6 +1902,11 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(self.rd.description, txt_email)
         self.assertIn(self.rd_att.description, txt_email)
 
+        # Confirm that the document timestamp "Date Updated" is rendered in the alert
+        self._assert_date_updated(
+            self.mock_date_indexing, html_content, txt_email
+        )
+
     def test_alert_frequency_estimation(self, mock_prefix) -> None:
         """Test alert frequency ES API endpoint for RECAP Alerts."""
 
@@ -1727,9 +1921,10 @@ class RECAPAlertsSweepIndexTest(
             search_params,
         )
         self.assertEqual(r.json()["count"], 0)
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # Docket filed today.
             docket = DocketFactory(
                 court=self.court,
@@ -1759,6 +1954,12 @@ class RECAPAlertsSweepIndexTest(
                 document_number="1",
                 pacer_doc_id="018036652450",
             )
+            RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Frequency Test RECAP 2",
+                document_number="2",
+                pacer_doc_id="0180366524502",
+            )
 
         r = self.client.get(
             reverse(
@@ -1766,12 +1967,81 @@ class RECAPAlertsSweepIndexTest(
             ),
             search_params,
         )
-        # 2 expected hits in the last 100 days. One docket filed today + one
-        # RECAPDocument filed today.
-        self.assertEqual(r.json()["count"], 2)
+        # 3 expected hits in the last 100 days for regular alerts.
+        # 1 expected hits in the last 100 days for case only alerts.
+        self.assertEqual(r.json()["count"], 3)
+        self.assertEqual(r.json()["count_case_only"], 1)
+
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # RECAPDocument filed today that belongs to a docket filed outside
+            # the estimation range.
+            date_outside_range = now() - datetime.timedelta(days=102)
+            alert_de_2 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Frequency Test RECAP 2",
+                    docket_number="1:21-bk-12452",
+                    source=Docket.RECAP,
+                    date_filed=date_outside_range.date(),
+                ),
+                entry_number=1,
+                date_filed=now().date(),
+            )
+            RECAPDocumentFactory(
+                docket_entry=alert_de_2,
+                description="Frequency Test RECAP 2",
+                document_number="1",
+                pacer_doc_id="018036652453",
+            )
+            RECAPDocumentFactory(
+                docket_entry=alert_de_2,
+                description="Frequency Test RECAP 2",
+                document_number="2",
+                pacer_doc_id="01803665245023",
+            )
+
+        r = self.client.get(
+            reverse(
+                "alert_frequency", kwargs={"version": "4", "day_count": "100"}
+            ),
+            search_params,
+        )
+        # 5 expected hits in the last 100 days regular alerts.
+        # 2 expected hits in the last 100 days for case only alerts.
+        self.assertEqual(r.json()["count"], 5)
+        self.assertEqual(r.json()["count_case_only"], 2)
+
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # Docket filed today.
+            docket_2 = DocketFactory(
+                court=self.court,
+                case_name="Frequency Test RECAP 3",
+                docket_number="1:21-bk-12497",
+                source=Docket.RECAP,
+                date_filed=now().date(),
+            )
+
+        r = self.client.get(
+            reverse(
+                "alert_frequency", kwargs={"version": "4", "day_count": "100"}
+            ),
+            search_params,
+        )
+        # 6 expected hits in the last 100 days regular alerts.
+        # 2 expected hits in the last 100 days for case only alerts.
+        self.assertEqual(r.json()["count"], 6)
+        self.assertEqual(r.json()["count_case_only"], 2, "error")
 
         docket.delete()
+        docket_2.delete()
         alert_de.docket.delete()
+        alert_de_2.docket.delete()
 
     @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
     def test_percolator_plus_sweep_alerts_integration(
@@ -1785,27 +2055,28 @@ class RECAPAlertsSweepIndexTest(
         RECAPPercolator._index.delete(ignore=404)
         RECAPPercolator.init()
 
-        docket_only_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only",
-            query='q="410 Civil"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        cross_object_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Cross-object",
-            query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        cross_object_alert_after_update = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Cross-object 2",
-            query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE UPDATED"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only",
+                query='q="410 Civil"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            cross_object_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Cross-object",
+                query='q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            cross_object_alert_after_update = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Cross-object 2",
+                query='q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE UPDATED"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
 
         with mock.patch("cl.users.signals.notify_new_or_updated_webhook"):
             webhook_2_1 = WebhookFactory(
@@ -1816,20 +2087,20 @@ class RECAPAlertsSweepIndexTest(
                 version=2,
             )
 
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(
-            execute=True
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket = DocketFactory(
                 court=self.court,
-                case_name=f"SUBPOENAS SERVED CASE",
-                docket_number=f"1:21-bk-227",
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-227",
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
@@ -1905,7 +2176,7 @@ class RECAPAlertsSweepIndexTest(
             0,
         )
 
-        # The cross_object_alert-only alert contain q nested child hits.
+        # The cross_object_alert-only alert contain 1 nested child hits.
         self._count_alert_hits_and_child_hits(
             html_content,
             cross_object_alert.name,
@@ -1915,15 +2186,15 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Now update the docket case_name to match cross_object_alert_after_update
-        with time_machine.travel(
-            self.mock_date_indexing, tick=False
-        ), mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(
-            execute=True
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket.case_name = "SUBPOENAS SERVED CASE UPDATED"
             docket.save()
@@ -1939,12 +2210,15 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # The missing alert should be sent by the Sweep index alert approach.
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -2024,6 +2298,348 @@ class RECAPAlertsSweepIndexTest(
 
         docket.delete()
 
+    def test_case_only_alerts(self, mock_prefix) -> None:
+        """Confirm that case-only alerts are properly sent and that they are
+        triggered only once per case. This means that if a Docket or a
+        RECAPDocument belonging to the case triggers the alert, subsequent
+        changes to the Docket or the ingestion of another matching
+        RECAPDocument for the same case will not trigger the alert again.
+        """
+
+        # Test: Case-only alert Docket Only query
+        docket_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Case Only Alert Docket Only query",
+            query='q="405 Civil"&type=r',
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        one_day_future = self.mock_date + datetime.timedelta(days=1)
+        with (
+            time_machine.travel(one_day_future, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                docket_number="1:23-bk-1239",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+                cause="405 Civil",
+                jurisdiction_type="U.S. Government Defendant",
+                jury_demand="1,000,000",
+            )
+
+        two_day_future = self.mock_date + datetime.timedelta(days=2)
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(two_day_future, tick=False),
+        ):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # The docket-only alert query should be triggered.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match...."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(docket_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The docket-only alert doesn't contain any nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_only_alert.name,
+            1,
+            docket.case_name,
+            0,
+        )
+
+        # Update the docket on a different day. The case-only alert should not
+        # be triggered again.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.docket_number = "1:23-bk-1240"
+            docket.save()
+
+        # No new alerts should be triggered for the case only alert.
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox),
+            1,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        # Confirm that a different Docket can still trigger the case-only alert.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket_2 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE 2",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                docket_number="1:23-bk-1250",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+                cause="405 Civil",
+                jurisdiction_type="U.S. Government Defendant",
+                jury_demand="1,000",
+            )
+
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self.assertIn(docket_only_alert.name, html_content)
+        self.assertIn(docket_2.case_name, html_content)
+
+        # Ingest RECAPDocuments for additional test cases.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            alert_de = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File",
+                document_number="1",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652436",
+                plain_text="plain text for 018036652436",
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File 2",
+                document_number="2",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652437",
+                plain_text="plain text for 018036652437",
+            )
+
+        # Test: Case-only alert RECAP only query.
+        recap_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.WEEKLY,
+            name="Test Case Only Alert RECAP Only",
+            query='q="plain text for 018036652436"&type=r',
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+        ):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # Trigger the scheduled weekly alert.
+        week_ago = self.mock_date + datetime.timedelta(days=7)
+        with time_machine.travel(week_ago, tick=False):
+            # Send scheduled Weekly alerts.
+            call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+
+        # The recap_only alert should be triggered by rd.
+        self.assertEqual(
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[2])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            recap_only_alert.name,
+            alert_de.docket.case_name,
+            [rd.description],
+        )
+
+        # Ingest a new document that potentially could trigger the recap_only
+        # alert again.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Hearing",
+                document_number="3",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652438",
+                plain_text="plain text for 018036652436",
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+        ):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        with time_machine.travel(week_ago, tick=False):
+            # Send scheduled Weekly alerts.
+            call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+
+        # No new alert should be triggered again, since rd_3 belongs to the
+        # same case for which the alert has already been triggered.
+        self.assertEqual(
+            len(mail.outbox),
+            3,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        # Test: Case-only alert Cross-object query.
+        cross_object_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Case Only Alert Cross-object query",
+            query=f'q="Motion to File"&docket_number={docket.docket_number}&type=r',
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+        ):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # A new alert should be triggered containing two RDs, rd and rd_2
+        self.assertEqual(
+            len(mail.outbox), 4, msg="Outgoing emails don't match."
+        )
+
+        html_content = self.get_html_content_from_email(mail.outbox[3])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            cross_object_alert.name,
+            alert_de.docket.case_name,
+            [rd.description, rd_2.description],
+        )
+
+        webhook_events = WebhookEvent.objects.all().values_list(
+            "content", flat=True
+        )
+        # Assert webhook event child hits.
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
+            cross_object_alert.name,
+            1,
+            alert_de.docket.case_name,
+            2,
+        )
+        # Assert email text version:
+        txt_email = mail.outbox[3].body
+        self.assertIn(cross_object_alert.name, txt_email)
+        self.assertIn(rd.description, txt_email)
+
+        # Ingest a new document that can trigger the case only alert.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File 3",
+                document_number="4",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652439",
+                plain_text="plain text for 018036652439",
+            )
+
+        # No new alerts should be triggered for the case only alert.
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox),
+            4,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        # Test: Case-only alert Docket OR RECAPDocument query.
+        docket_or_rd_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Case Only Alert Docket OR RECAPDocument query",
+            query=f"q=short_description:Hearing OR docketNumber:{docket.docket_number}&type=r",
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+        ):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # A new alert should be triggered containing rd_3
+        self.assertEqual(
+            len(mail.outbox), 5, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[4])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            docket_or_rd_alert.name,
+            alert_de.docket.case_name,
+            [rd_3.description],
+        )
+
+        # Change a document that potentially could trigger the docket_or_rd_alert
+        # alert again.
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd_2.description = "Hearing"
+            rd_2.save()
+
+        # No new alerts should be triggered, since rd_2 belongs to the same
+        # case from which the alert has already been triggered.
+        with time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox),
+            5,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        docket.delete()
+        docket_only_alert.delete()
+        docket_2.delete()
+
 
 @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
 @mock.patch(
@@ -2041,7 +2657,10 @@ class RECAPAlertsPercolatorTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
-        cls.mock_date = now()
+        date_now = midnight_pt(now().date())
+        cls.mock_date = date_now.replace(
+            hour=20, minute=0, second=0, microsecond=0
+        )
         with time_machine.travel(cls.mock_date, tick=False):
             super().setUpTestData()
             cls.docket_3 = DocketFactory(
@@ -2093,6 +2712,26 @@ class RECAPAlertsPercolatorTest(
         keys = self.r.keys("alert_hits_percolator:*")
         if keys:
             self.r.delete(*keys)
+
+        self.percolator_call_count = 0
+
+    def count_percolator_calls(self, method, *args, **kwargs) -> None:
+        """Wraps the helper percolator method to count its calls and assert
+        the expected count."""
+        # Increment the call count
+        self.percolator_call_count += 1
+
+        # Call the method
+        return method(*args, **kwargs)
+
+    def reset_and_assert_percolator_count(self, expected) -> None:
+        """Resets the helper percolator method count and asserts the expected
+        number of calls."""
+
+        assert self.percolator_call_count == expected, (
+            f"Expected {expected} method calls, but got {self.percolator_call_count}"
+        )
+        self.percolator_call_count = 0
 
     @staticmethod
     def confirm_query_matched(response, query_id) -> bool:
@@ -2506,13 +3145,14 @@ class RECAPAlertsPercolatorTest(
     ) -> None:
         """Test a RECAP alert is removed from the RECAPPercolator index."""
 
-        docket_only_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.WEEKLY,
-            name="Test Alert Docket Only",
-            query='q="401 Civil"&type=r&order_by=score desc',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.WEEKLY,
+                name="Test Alert Docket Only",
+                query='q="401 Civil"&type=r&order_by=score desc',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert.pk),
             msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
@@ -2532,14 +3172,15 @@ class RECAPAlertsPercolatorTest(
             msg=f"Alert id: {docket_only_alert_id} was not indexed.",
         )
 
-        # Index an alert with Docket filters.
-        docket_only_alert_filter = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.WEEKLY,
-            name="Test Alert Docket Only",
-            query='q="401 Civil"&case_name="Lorem Ipsum"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            # Index an alert with Docket filters.
+            docket_only_alert_filter = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.WEEKLY,
+                name="Test Alert Docket Only",
+                query='q="401 Civil"&case_name="Lorem Ipsum"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert_filter.pk),
             msg=f"Alert id: {docket_only_alert_filter.pk} was not indexed.",
@@ -2556,21 +3197,28 @@ class RECAPAlertsPercolatorTest(
     def test_percolate_document_on_ingestion(self, mock_prefix) -> None:
         """Confirm a Docket or RECAPDocument is percolated upon ingestion."""
 
-        docket_only_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only 1",
-            query='q="SUBPOENAS SERVED CASE"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        docket_indexing_time = self.mock_date - datetime.timedelta(seconds=15)
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 1",
+                query='q="SUBPOENAS SERVED CASE"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            time_machine.travel(docket_indexing_time, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory(
                 court=self.court,
+                date_filed=datetime.date(2024, 8, 19),
                 case_name="SUBPOENAS SERVED CASE",
                 docket_number="1:21-bk-1234",
                 source=Docket.RECAP,
@@ -2582,6 +3230,8 @@ class RECAPAlertsPercolatorTest(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
         html_content = self.get_html_content_from_email(mail.outbox[0])
+        txt_content = mail.outbox[0].body
+
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 1)
         # The docket-only alert doesn't contain any nested child hits.
@@ -2593,19 +3243,32 @@ class RECAPAlertsPercolatorTest(
             0,
         )
 
-        recap_only_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert RECAP Only 2",
-            query='q="plain text for 018036652436"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
+        # Confirm that the Docket timestamp "Date Updated" is rendered in the alert
+        self.assertIn(
+            format(docket_indexing_time, "F jS, Y h:i a T"), html_content
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        self.assertIn(
+            format(docket_indexing_time, "F jS, Y h:i a T"), txt_content
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert RECAP Only 2",
+                query='q="plain text for 018036652436"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2646,20 +3309,28 @@ class RECAPAlertsPercolatorTest(
             1,
         )
 
-        # Related DE. RD creation.
-        de_entry_field_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert RECAP Only 3",
-            query='q="Hearing for Leave"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        txt_email = mail.outbox[1].body
+        # Confirm that the document timestamp "Date Updated" is rendered in the alert
+        self._assert_date_updated(self.mock_date, html_content, txt_email)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            # Related DE. RD creation.
+            de_entry_field_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert RECAP Only 3",
+                query='q="Hearing for Leave"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de_2 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2699,20 +3370,24 @@ class RECAPAlertsPercolatorTest(
             1,
         )
 
-        # DE/RD update.
-        de_entry_field_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert RECAP Only 4",
-            query='q="Hearing to File Updated"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with self.captureOnCommitCallbacks(execute=True):
+            # DE/RD update.
+            de_entry_field_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert RECAP Only 4",
+                query='q="Hearing to File Updated"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de_2.description = "Hearing to File Updated"
             alert_de_2.save()
 
@@ -2725,12 +3400,15 @@ class RECAPAlertsPercolatorTest(
 
         # Alert is triggered only after a RECAPDocument creation/update to avoid
         # percolating the same document twice.
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             rd_2.document_number = 1
             rd_2.save()
 
@@ -2753,20 +3431,24 @@ class RECAPAlertsPercolatorTest(
             1,
         )
 
-        # Docket update.
-        docket_update_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only 5",
-            query='q="SUBPOENAS SERVED LOREM"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with self.captureOnCommitCallbacks(execute=True):
+            # Docket update.
+            docket_update_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 5",
+                query='q="SUBPOENAS SERVED LOREM"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket.case_name = "SUBPOENAS SERVED LOREM"
             docket.save()
 
@@ -2787,20 +3469,24 @@ class RECAPAlertsPercolatorTest(
             0,
         )
 
-        # Percolate Docket upon Bankruptcy data is added/updated.
-        docket_only_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only 6",
-            query="q=(SUBPOENAS SERVED) AND chapter:7&type=r",
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with self.captureOnCommitCallbacks(execute=True):
+            # Percolate Docket upon Bankruptcy data is added/updated.
+            docket_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 6",
+                query="q=(SUBPOENAS SERVED) AND chapter:7&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             BankruptcyInformationFactory(docket=docket, chapter="7")
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
@@ -2812,14 +3498,15 @@ class RECAPAlertsPercolatorTest(
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 1)
 
-        # Percolate Docket upon parties data is added/updated.
-        docket_only_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only 7",
-            query='atty_name="John Lorem"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            # Percolate Docket upon parties data is added/updated.
+            docket_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 7",
+                query='atty_name="John Lorem"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
         firm = AttorneyOrganizationFactory(
             name="Associates LLP 2", lookup_key="firm_llp"
         )
@@ -2836,15 +3523,18 @@ class RECAPAlertsPercolatorTest(
             ),
             docket=docket,
         )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
         ):
             index_docket_parties_in_es.delay(docket.pk)
@@ -2861,19 +3551,23 @@ class RECAPAlertsPercolatorTest(
     def test_recap_alerts_highlighting(self, mock_prefix) -> None:
         """Confirm RECAP Search alerts are properly highlighted."""
 
-        docket_only_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only",
-            query='q="SUBPOENAS SERVED CASE"&docket_number="1:21-bk-1234"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only",
+                query='q="SUBPOENAS SERVED CASE"&docket_number="1:21-bk-1234"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -2892,19 +3586,23 @@ class RECAPAlertsPercolatorTest(
         self.assertIn(f"<strong>{docket.case_name}</strong>", html_content)
         self.assertIn(f"<strong>{docket.docket_number}</strong>", html_content)
 
-        recap_only_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert RECAP Only",
-            query='q="plain text for 018036652000"&description="Affidavit Of Compliance"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert RECAP Only",
+                query='q="plain text for 018036652000"&description="Affidavit Of Compliance"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2942,16 +3640,20 @@ class RECAPAlertsPercolatorTest(
     def test_group_percolator_alerts(self, mock_prefix) -> None:
         """Test group Percolator RECAP Alerts in an email and hits."""
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory(
                 court=self.court,
-                case_name=f"SUBPOENAS SERVED CASE",
-                docket_number=f"1:21-bk-123",
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-123",
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
@@ -2988,9 +3690,9 @@ class RECAPAlertsPercolatorTest(
             for i in range(5):
                 rd = RECAPDocumentFactory(
                     docket_entry=alert_de,
-                    description=f"Motion to File {i+2}",
-                    document_number=f"{i+2}",
-                    pacer_doc_id=f"018036652436{i+2}",
+                    description=f"Motion to File {i + 2}",
+                    document_number=f"{i + 2}",
+                    pacer_doc_id=f"018036652436{i + 2}",
                 )
                 if i < 4:
                     # Omit the last alert to compare. Only up to 5 should be
@@ -2998,37 +3700,39 @@ class RECAPAlertsPercolatorTest(
                     rd_descriptions.append(rd.description)
 
                 rd_ids.append(rd.pk)
-            docket_only_alert = AlertFactory(
-                user=self.user_profile.user,
-                rate=Alert.REAL_TIME,
-                name="Test Alert Docket Only",
-                query='q="410 Civil"&type=r',
-                alert_type=SEARCH_TYPES.RECAP,
-            )
-            docket_only_alert_no_member = AlertFactory(
-                user=self.user_profile_no_member.user,
-                rate=Alert.REAL_TIME,
-                name="Test Alert Docket Only",
-                query='q="410 Civil"&type=r',
-                alert_type=SEARCH_TYPES.RECAP,
-            )
-            recap_only_alert = AlertFactory(
-                user=self.user_profile.user,
-                rate=Alert.REAL_TIME,
-                name="Test Alert RECAP Only Docket Entry",
-                query=f"q=docket_entry_id:{alert_de.pk}&type=r",
-                alert_type=SEARCH_TYPES.RECAP,
-            )
-            cross_object_alert_with_hl = AlertFactory(
-                user=self.user_profile.user,
-                rate=Alert.REAL_TIME,
-                name="Test Alert Cross-object",
-                query=f'q="File Amicus Curiae" AND "Motion to File 1" AND '
-                f'"plain text lorem" AND "410 Civil" AND '
-                f"id:{rd_1.pk}&docket_number={docket.docket_number}"
-                f'&case_name="{docket.case_name}"&type=r',
-                alert_type=SEARCH_TYPES.RECAP,
-            )
+
+            with self.captureOnCommitCallbacks(execute=True):
+                docket_only_alert = AlertFactory(
+                    user=self.user_profile.user,
+                    rate=Alert.REAL_TIME,
+                    name="Test Alert Docket Only",
+                    query='q="410 Civil"&type=r',
+                    alert_type=SEARCH_TYPES.RECAP,
+                )
+                docket_only_alert_no_member = AlertFactory(
+                    user=self.user_profile_no_member.user,
+                    rate=Alert.REAL_TIME,
+                    name="Test Alert Docket Only",
+                    query='q="410 Civil"&type=r',
+                    alert_type=SEARCH_TYPES.RECAP,
+                )
+                recap_only_alert = AlertFactory(
+                    user=self.user_profile.user,
+                    rate=Alert.REAL_TIME,
+                    name="Test Alert RECAP Only Docket Entry",
+                    query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+                    alert_type=SEARCH_TYPES.RECAP,
+                )
+                cross_object_alert_with_hl = AlertFactory(
+                    user=self.user_profile.user,
+                    rate=Alert.REAL_TIME,
+                    name="Test Alert Cross-object",
+                    query=f'q="File Amicus Curiae" AND "Motion to File 1" AND '
+                    f'"plain text lorem" AND "410 Civil" AND '
+                    f"id:{rd_1.pk}&docket_number={docket.docket_number}"
+                    f'&case_name="{docket.case_name}"&type=r',
+                    alert_type=SEARCH_TYPES.RECAP,
+                )
 
         self.assertEqual(
             len(mail.outbox), 0, msg="Outgoing emails don't match."
@@ -3074,7 +3778,12 @@ class RECAPAlertsPercolatorTest(
             None,
         )
 
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        rt_mock_date_sent = self.mock_date + datetime.timedelta(
+            seconds=settings.REAL_TIME_ALERTS_SENDING_RATE
+        )
+        with time_machine.travel(rt_mock_date_sent, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+            alerts_runtime_naive = datetime.datetime.now()
 
         # Only one email should be triggered because email alerts for
         # non-members are omitted.
@@ -3084,6 +3793,21 @@ class RECAPAlertsPercolatorTest(
 
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
+
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.REAL_TIME, alerts_runtime_naive
+        )
+
+        # Confirm Alert date_last_hit is updated.
+        docket_only_alert.refresh_from_db()
+        self.assertEqual(
+            docket_only_alert.date_last_hit,
+            rt_mock_date_sent,
+            msg="Alert date of last hit didn't match.",
+        )
+
         txt_email = mail.outbox[0].body
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 3)
@@ -3239,21 +3963,25 @@ class RECAPAlertsPercolatorTest(
         scheduled_hits = ScheduledAlertHit.objects.all()
         self.assertEqual(len(scheduled_hits), 0)
 
-        # The following test should match the Docket-only query on docket
-        # ingestion
-        docket_only_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Docket Only Not Triggered",
-            query='q="405 Civil"&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with self.captureOnCommitCallbacks(execute=True):
+            # The following test should match the Docket-only query on docket
+            # ingestion
+            docket_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only Not Triggered",
+                query='q="405 Civil"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -3285,28 +4013,32 @@ class RECAPAlertsPercolatorTest(
             0,
         )
 
-        # Test "AND" and "OR" cross object alert queries.
-        cross_object_alert_d_and_rd_field = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Cross-object query AND",
-            query=f'q="405 Civil" AND pacer_doc_id:018036652436&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
-        cross_object_alert_d_or_rd_field = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Cross-object query OR",
-            query=f'q="018036652436" OR cause:405&type=r',
-            alert_type=SEARCH_TYPES.RECAP,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            # Test "AND" and "OR" cross object alert queries.
+            cross_object_alert_d_and_rd_field = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Cross-object query AND",
+                query='q="405 Civil" AND pacer_doc_id:018036652436&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            cross_object_alert_d_or_rd_field = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Cross-object query OR",
+                query='q="018036652436" OR cause:405&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
         # RD ingestion.
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -3371,29 +4103,33 @@ class RECAPAlertsPercolatorTest(
         alerts_created_user_1 = []
         alerts_created_user_2 = []
         for i in range(6):
-            docket_only_alert = AlertFactory(
-                user=self.user_profile.user,
-                rate=Alert.WEEKLY,
-                name=f"Test Alert Docket Only {i}",
-                query='q="405 Civil"&type=r',
-                alert_type=SEARCH_TYPES.RECAP,
-            )
-            alerts_created_user_1.append(docket_only_alert)
-            docket_only_alert_2 = AlertFactory(
-                user=self.user_profile_no_member.user,
-                rate=Alert.WEEKLY,
-                name=f"Test Alert Docket Only {i}",
-                query='q="405 Civil"&type=r',
-                alert_type=SEARCH_TYPES.RECAP,
-            )
-            alerts_created_user_2.append(docket_only_alert_2)
+            with self.captureOnCommitCallbacks(execute=True):
+                docket_only_alert = AlertFactory(
+                    user=self.user_profile.user,
+                    rate=Alert.WEEKLY,
+                    name=f"Test Alert Docket Only {i}",
+                    query='q="405 Civil"&type=r',
+                    alert_type=SEARCH_TYPES.RECAP,
+                )
+                alerts_created_user_1.append(docket_only_alert)
+                docket_only_alert_2 = AlertFactory(
+                    user=self.user_profile_no_member.user,
+                    rate=Alert.WEEKLY,
+                    name=f"Test Alert Docket Only {i}",
+                    query='q="405 Civil"&type=r',
+                    alert_type=SEARCH_TYPES.RECAP,
+                )
+                alerts_created_user_2.append(docket_only_alert_2)
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -3438,3 +4174,563 @@ class RECAPAlertsPercolatorTest(
                 self.assertIn(alert.name, html_content)
 
         docket.delete()
+
+    def test_count_percolator_requests_on_related_documents(
+        self, mock_prefix
+    ) -> None:
+        """Confirm a percolator request is performed only once when adding or
+        updating related documents like BankruptcyInformation or Parties.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 7",
+                query="q=(SUBPOENAS SERVED) AND chapter:7&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 8",
+                query="q=(SUBPOENAS SERVED) AND chapter:8&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 9",
+                query='q="American vs Lorem"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        # Confirm that only one percolation request is performed upon a Docket
+        # creation and a subsequent BankruptcyData merge.
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = Docket(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-1234",
+                source=Docket.RECAP,
+                pacer_case_id="999555",
+            )
+            docket_data = DocketWithBankruptcyDataFactory(
+                court_id=docket.court_id,
+                case_name=docket.case_name,
+                chapter=7,
+            )
+            set_skip_percolation_if_bankruptcy_data(docket_data, docket)
+            docket.save()
+            add_bankruptcy_data_to_docket(docket, docket_data)
+
+        self.reset_and_assert_percolator_count(expected=1)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        # Restore skip_percolator_request flag.
+        docket.skip_percolator_request = False
+
+        # Confirm that only one percolation request is performed upon a Docket
+        # Update and a subsequent BankruptcyData merge.
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.docket_number = "1:21-bk-1235"
+            docket_data = DocketWithBankruptcyDataFactory(
+                court_id=docket.court_id,
+                case_name=docket.case_name,
+                chapter=8,
+            )
+            set_skip_percolation_if_bankruptcy_data(docket_data, docket)
+            docket.save()
+            add_bankruptcy_data_to_docket(docket, docket_data)
+
+        self.reset_and_assert_percolator_count(expected=1)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        # Restore skip_percolator_request flag.
+        docket.skip_percolator_request = False
+
+        # Confirm that a regular Docket update with no subsequent BankruptcyData
+        # merge triggers the percolation request.
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.case_name = "American vs Lorem"
+            docket_data = {"docket_number": "1:21-bk-1238"}
+            set_skip_percolation_if_bankruptcy_data(docket_data, docket)
+            docket.save()
+            add_bankruptcy_data_to_docket(docket, docket_data)
+
+        self.reset_and_assert_percolator_count(expected=1)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
+        )
+        # Restore skip_percolator_request flag.
+        docket.skip_percolator_request = False
+
+        # Confirm that only one percolation request is performed upon a Docket
+        # Update and a subsequent parties merge.
+        with self.captureOnCommitCallbacks(execute=True):
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only 10",
+                query='atty_name="John Lorem"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+        data = {
+            "parties": [
+                {
+                    "attorneys": [
+                        {
+                            "contact": "Lane Powell",
+                            "name": "John Lorem",
+                            "roles": [],
+                        }
+                    ],
+                    "date_terminated": None,
+                    "extra_info": "",
+                    "name": "Insurance Company",
+                    "type": "Plaintiff",
+                },
+            ]
+        }
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.refresh_from_db()
+            docket.case_name = "Lorem Parties"
+            set_skip_percolation_if_parties_data(data["parties"], docket)
+            docket.save()
+        # No percolation on docket update.
+        self.reset_and_assert_percolator_count(expected=0)
+
+        with mock.patch(
+            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
+                has_document_alert_hit_been_triggered, *args, **kwargs
+            ),
+        ):
+            add_parties_and_attorneys(docket, data["parties"])
+            index_docket_parties_in_es.delay(docket.pk)
+
+        # Percolation is performed upon the merging of parties.
+        self.reset_and_assert_percolator_count(expected=1)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 4, msg="Outgoing emails don't match."
+        )
+
+    def test_case_only_alerts(self, mock_prefix) -> None:
+        """Confirm that case-only alerts are properly sent and that they are
+        triggered only once per case. This means that if a Docket or a
+        RECAPDocument belonging to the case triggers the alert, subsequent
+        changes to the Docket or the ingestion of another matching
+        RECAPDocument for the same case will not trigger the alert again.
+        """
+
+        # Test: Case-only alert Docket Only query
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.WEEKLY,
+                name="Test Case Only Alert Docket Only query",
+                query='q="405 Civil"&type=r',
+                alert_type=SEARCH_TYPES.DOCKETS,
+            )
+
+        self.assertTrue(RECAPPercolator.exists(id=docket_only_alert.pk))
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                docket_number="1:23-bk-1256",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+                cause="405 Civil",
+                jurisdiction_type="U.S. Government Defendant",
+                jury_demand="1,000,000",
+            )
+
+        # Send scheduled Weekly alerts.
+        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+
+        # The docket-only alert query should be triggered.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match...."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(docket_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The docket-only alert doesn't contain any nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_only_alert.name,
+            1,
+            docket.case_name,
+            0,
+        )
+
+        # Update the docket the case-only alert should not
+        # be triggered again.
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.docket_number = "1:23-bk-1240"
+            docket.save()
+
+        # No new alerts should be triggered for the case only alert.
+        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+        self.assertEqual(
+            len(mail.outbox),
+            1,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        # Confirm that a different Docket can still trigger the case-only alert.
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket_2 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE 2",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                docket_number="1:23-bk-1250",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+                cause="405 Civil",
+                jurisdiction_type="U.S. Government Defendant",
+                jury_demand="1,000",
+            )
+
+        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self.assertIn(docket_only_alert.name, html_content)
+        self.assertIn(docket_2.case_name, html_content)
+
+        # Test: Case-only alert RECAP only query.
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Case Only Alert RECAP Only",
+                query='q="plain text for 018036652436"&type=r',
+                alert_type=SEARCH_TYPES.DOCKETS,
+            )
+
+        # Ingest RECAPDocuments for additional test cases.
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            alert_de = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File",
+                document_number="1",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652436",
+                plain_text="plain text for 018036652436",
+            )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # The recap_only alert should be triggered by rd.
+        self.assertEqual(
+            len(mail.outbox), 3, msg="3 Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[2])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            recap_only_alert.name,
+            alert_de.docket.case_name,
+            [rd.description],
+        )
+
+        # Ingest a new document that potentially could trigger the recap_only
+        # alert again.
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Hearing",
+                document_number="3",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652438",
+                plain_text="plain text for 018036652436",
+            )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # No new alert should be triggered again, since rd_3 belongs to the
+        # same case for which the alert has already been triggered.
+        self.assertEqual(
+            len(mail.outbox),
+            3,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        # Test: Case-only alert Cross-object query.
+        with self.captureOnCommitCallbacks(execute=True):
+            cross_object_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Case Only Alert Cross-object query",
+                query=f'q="Motion to File"&docket_number={docket.docket_number}&type=r',
+                alert_type=SEARCH_TYPES.DOCKETS,
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File 2",
+                document_number="2",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652437",
+                plain_text="plain text for 018036652437",
+            )
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # A new alert should be triggered containing two RDs, rd and rd_2
+        self.assertEqual(
+            len(mail.outbox), 4, msg="Outgoing emails don't match."
+        )
+
+        html_content = self.get_html_content_from_email(mail.outbox[3])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            cross_object_alert.name,
+            alert_de.docket.case_name,
+            [rd_2.description],
+        )
+
+        webhook_events = WebhookEvent.objects.all().values_list(
+            "content", flat=True
+        )
+        # Assert webhook event child hits.
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
+            cross_object_alert.name,
+            1,
+            alert_de.docket.case_name,
+            1,
+        )
+        # Assert email text version:
+        txt_email = mail.outbox[3].body
+        self.assertIn(cross_object_alert.name, txt_email)
+        self.assertIn(rd.description, txt_email)
+
+        # Ingest a new document that can trigger the case only alert.
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File 3",
+                document_number="4",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652439",
+                plain_text="plain text for 018036652439",
+            )
+
+        # No new alerts should be triggered for the case only alert.
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox),
+            4,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        # Test: Case-only alert Docket OR RECAPDocument query.
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_or_rd_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Case Only Alert Docket OR RECAPDocument query",
+                query=f"q=short_description:Hearing OR docketNumber:{docket.docket_number}&type=r",
+                alert_type=SEARCH_TYPES.DOCKETS,
+            )
+
+        # Ingest a new document that can trigger the docket_or_rd_alert
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Hearing",
+                document_number="5",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652439",
+                plain_text="plain text for 018036652439",
+            )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # A new alert should be triggered containing rd_3
+        self.assertEqual(
+            len(mail.outbox), 5, msg="Error outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[4])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            docket_or_rd_alert.name,
+            alert_de.docket.case_name,
+            [rd_3.description],
+        )
+
+        # Change a document that potentially could trigger the docket_or_rd_alert
+        # alert again.
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd_2.description = "Hearing"
+            rd_2.save()
+
+        # No new alerts should be triggered, since rd_2 belongs to the same
+        # case from which the alert has already been triggered.
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox),
+            5,
+            msg="No new alert should be triggered for this case-only alert.",
+        )
+
+        docket_only_alert.delete()
+        docket.delete()
+        docket_2.delete()

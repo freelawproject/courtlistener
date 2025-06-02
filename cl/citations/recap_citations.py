@@ -1,5 +1,3 @@
-from typing import Dict, List
-
 from django.db import transaction
 from eyecite import get_citations
 from eyecite.models import CitationBase
@@ -27,7 +25,7 @@ def store_recap_citations(document: RECAPDocument) -> None:
     :return: None
     """
     # Extract the citations from the document's text
-    citations: List[CitationBase] = get_citations(
+    citations: list[CitationBase] = get_citations(
         tokenizer=HYPERSCAN_TOKENIZER, **make_get_citations_kwargs(document)
     )
 
@@ -37,8 +35,8 @@ def store_recap_citations(document: RECAPDocument) -> None:
 
     # Resolve all those different citation objects to Opinion objects,
     # using a variety of heuristics.
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
     ] = do_resolve_citations(citations, document)
 
     # Delete the unmatched citations

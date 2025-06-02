@@ -86,8 +86,8 @@ class Command(VerboseCommand):
 
         if self.skip_human_review:
             logger.info(
-                "\nSkipped %s items in SCDB which came up for human "
-                "review." % self.skipped_count
+                "\nSkipped %s items in SCDB which came up for human review.",
+                self.skipped_count,
             )
 
     @staticmethod
@@ -133,21 +133,17 @@ class Command(VerboseCommand):
 
             if values_differ:
                 logger.warning(
-                    "WARNING: Didn't set '{attr}' attribute on obj {obj_id} "
+                    f"WARNING: Didn't set '{attribute}' attribute on obj {obj.pk} "
                     "because it already had a value, but the new value "
-                    "('{new}') differs from current value ('{current}')".format(
-                        attr=attribute,
-                        obj_id=obj.pk,
-                        new=new_value,
-                        current=force_bytes(current_value),
-                    )
+                    f"('{new_value}') differs from current value ('{force_bytes(current_value)}')"
                 )
                 ok = False
             else:
                 # The values were the same.
                 logger.info(
-                    "'%s' field unchanged -- old and new values were "
-                    "the same: %s" % (attribute, new_value)
+                    "'%s' field unchanged -- old and new values were the same: %s",
+                    attribute,
+                    new_value,
                 )
         return ok
 
@@ -207,10 +203,8 @@ class Command(VerboseCommand):
         Take that item and enhance it with the SCDB content.
         """
         logger.info(
-            "Enhancing cluster {id} with data from SCDB ("
-            "https://www.courtlistener.com{path}).".format(
-                id=cluster.pk, path=cluster.get_absolute_url()
-            )
+            f"Enhancing cluster {cluster.pk} with data from SCDB ("
+            f"https://www.courtlistener.com{cluster.get_absolute_url()})."
         )
         attribute_tuples = [
             (cluster, "scdb_votes_majority", scdb_info["majVotes"]),
@@ -236,7 +230,7 @@ class Command(VerboseCommand):
         else:
             logger.info(
                 "Item not saved due to collision or error. Please edit by "
-                "hand: scdb_ok: {scdb}".format(scdb=scdb_ok)
+                f"hand: scdb_ok: {scdb_ok}"
             )
 
     @staticmethod
@@ -300,14 +294,12 @@ class Command(VerboseCommand):
     def get_human_review(self, clusters, d):
         for i, cluster in enumerate(clusters):
             logger.info(
-                "%s: Cluster %s (%0.3f sim):"
-                % (
-                    i,
-                    cluster.pk,
-                    gen_diff_ratio(
-                        cluster.case_name.lower(), d["caseName"].lower()
-                    ),
-                )
+                "%s: Cluster %s (%.3f sim):",
+                i,
+                cluster.pk,
+                gen_diff_ratio(
+                    cluster.case_name.lower(), d["caseName"].lower()
+                ),
             )
             logger.info(
                 f"https://www.courtlistener.com{cluster.get_absolute_url()}"
