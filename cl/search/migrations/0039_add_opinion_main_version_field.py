@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("search", "0037_alter_citation_type_noop"),
+        ("search", "0038_untrack_opinions_field"),
     ]
 
     operations = [
