@@ -45,8 +45,6 @@ JUDICIAL_POSITIONS: list[str] = [
     if value == "Judge"
 ]
 
-BUCKET_ARN = "arn:aws:s3:::bulk-customer-data"
-
 ROLE_ARN = "arn:aws:iam::968642441645:role/bulk-customer-data-batch"
 
 
@@ -626,7 +624,7 @@ def get_lambda_arns() -> dict[str, str]:
 
 
 def create_and_execute_batch_job(
-    record_type: str, manifest_arn: str, manifest_etag: str
+    record_type: str, bucket_name: str, manifest_arn: str, manifest_etag: str
 ) -> None:
     """
     Creates and executes an S3 Batch Operations job to process records of a
@@ -639,6 +637,7 @@ def create_and_execute_batch_job(
 
     Args:
         record_type (str): The type of record to process.
+        bucket_name (str): The name of the bucket.
         manifest_arn (str): ARN of the S3 manifest file.
         manifest_etag (str): The ETag of the manifest file
 
@@ -670,7 +669,7 @@ def create_and_execute_batch_job(
             },
         },
         Report={
-            "Bucket": BUCKET_ARN,
+            "Bucket": f"arn:aws:s3:::{bucket_name}",
             "Format": "Report_CSV_20180820",
             "Enabled": True,
             "ReportScope": "AllTasks",
@@ -717,7 +716,9 @@ def compute_monthly_export(
     upload_list_of_records_for_users(
         record_type, options["bucket_name"], record_ids
     )
-    create_and_execute_batch_job(record_type, arn, manifest_data["ETag"])
+    create_and_execute_batch_job(
+        record_type, options["bucket_name"], arn, manifest_data["ETag"]
+    )
 
 
 class Command(VerboseCommand):
