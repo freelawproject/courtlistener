@@ -606,14 +606,18 @@ def get_account_id() -> str:
     return sts_client.get_caller_identity().get("Account")
 
 
-def get_lambda_arns() -> dict[str, str]:
+def get_lambda_arns(region_name: str = "us-west-2") -> dict[str, str]:
     """
     Retrieves a dictionary of AWS Lambda function names and their ARNs.
+    Args:
+        region_name (str): The AWS region (e.g., 'us-east-1', 'eu-west-2')
+            from which to retrieve Lambda function information.
 
-    :return: A dictionary where keys are Lambda function names (str) and values
+    Returns:
+        A dictionary where keys are Lambda function names (str) and values
         are their corresponding ARNs (str).
     """
-    lambda_client = boto3.client("lambda", region_name="us-west-2")
+    lambda_client = boto3.client("lambda", region_name=region_name)
     paginator = lambda_client.get_paginator("list_functions")
     lambda_arns = {}
     for page in paginator.paginate():
@@ -624,7 +628,11 @@ def get_lambda_arns() -> dict[str, str]:
 
 
 def create_and_execute_batch_job(
-    record_type: str, bucket_name: str, manifest_arn: str, manifest_etag: str
+    record_type: str,
+    bucket_name: str,
+    region_name: str,
+    manifest_arn: str,
+    manifest_etag: str,
 ) -> None:
     """
     Creates and executes an S3 Batch Operations job to process records of a
@@ -638,6 +646,8 @@ def create_and_execute_batch_job(
     Args:
         record_type (str): The type of record to process.
         bucket_name (str): The name of the bucket.
+        region_name (str): The AWS region where the S3 Batch Operations job
+            will be created and executed.
         manifest_arn (str): ARN of the S3 manifest file.
         manifest_etag (str): The ETag of the manifest file
 
@@ -657,8 +667,8 @@ def create_and_execute_batch_job(
             )
 
     account_id = get_account_id()
-    lambda_arns_dict = get_lambda_arns()
-    s3_control = boto3.client("s3control", region_name="us-west-2")
+    lambda_arns_dict = get_lambda_arns(region_name)
+    s3_control = boto3.client("s3control", region_name=region_name)
     s3_control.create_job(
         AccountId=account_id,
         ConfirmationRequired=False,
@@ -717,7 +727,11 @@ def compute_monthly_export(
         record_type, options["bucket_name"], record_ids
     )
     create_and_execute_batch_job(
-        record_type, options["bucket_name"], arn, manifest_data["ETag"]
+        record_type,
+        options["bucket_name"],
+        options["region_name"],
+        arn,
+        manifest_data["ETag"],
     )
 
 
@@ -750,6 +764,12 @@ class Command(VerboseCommand):
             "--bucket-name",
             help="The name of the bucket to store documents.",
             required=True,
+        )
+        parser.add_argument(
+            "--region-name",
+            type=str,
+            help="The AWS region where the S3 bucket is located.",
+            default="us-west-2",
         )
         parser.add_argument(
             "--query-batch-size",
