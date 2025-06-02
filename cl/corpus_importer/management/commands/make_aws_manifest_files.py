@@ -401,7 +401,13 @@ def export_records_in_batches(
             },
         )
         logger.info(
-            f"\rRetrieved {record_count + records_processed}/{total_number_of_records}, ({(record_count + records_processed) * 1.0 / total_number_of_records:.0%}), last PK processed: {last_pk},"
+            "\rRetrieved %d/%d (%.0f%%), last PK processed: %s",
+            record_count + records_processed,
+            total_number_of_records,
+            (record_count + records_processed)
+            * 100.0
+            / total_number_of_records,
+            last_pk,
         )
 
     # Removes the key from the cache after a successful execution
