@@ -18,6 +18,11 @@ function formatTime(totalSeconds) {
 $(document).ready(function() {
     // --- Transcript Handling ---
     const transcriptContainer = $('#transcript-container');
+    // If transcript container doesn't exist (controlled by the 'transcript_feature' Waffle flag in the template),
+    // don't run any transcript logic.
+    if (!transcriptContainer.length) {
+        return;
+    }
     // Allow overriding the jPlayer selector via data attribute on the container, default to #jquery_jplayer_1
     const playerSelector = transcriptContainer.data('player-selector') || '#jquery_jplayer_1';
     const $player = $(playerSelector);

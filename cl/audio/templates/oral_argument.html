@@ -20,7 +20,9 @@
 
     <link type="text/css" href="{% static "skin/jplayer.blue.monday.css" %}"
           rel="stylesheet"/>
+    {% if transcript_feature_active %}
     <link type="text/css" href="{% static "skin/transcript.css" %}" rel="stylesheet"/>
+    {% endif %}
 
 {% endblock %}
 
@@ -32,10 +34,12 @@
   <script defer type="text/javascript"
           src="{% static "js/jquery.jplayer.min.js" %}"></script>
 
+  {% if transcript_feature_active %}
   {{ transcript_segments_data|json_script:"transcript-segment-data" }}
 
   <script defer type="text/javascript"
           src="{% static "js/transcript.js" %}" nonce="{{ request.csp_nonce }}"></script>
+  {% endif %}
 
   <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     $(document).ready(function () {
@@ -257,6 +261,7 @@
         {% endif %}
     </article>
 
+    {% if transcript_feature_active %}
     <div id="transcript-container" class="transcript">
         <h3>Transcript</h3>
         {% if transcript_segments_data %}
@@ -271,5 +276,6 @@
             <p>Transcript data is not available.</p>
         </div>
     </div>
+    {% endif %}
 
 {% endblock %}

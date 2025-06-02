@@ -3,6 +3,8 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import never_cache
+import waffle
+from asgiref.sync import sync_to_async
 
 from cl.audio.models import Audio, AudioTranscriptionMetadata
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -27,16 +29,19 @@ async def view_audio_file(
 
     # --- Fetch transcript metadata ---
     segments_list = []
-    try:
-        metadata_obj = await AudioTranscriptionMetadata.objects.aget(audio=af)
-        # Extract the 'segments' list instead of 'words'
-        segments_list = metadata_obj.metadata.get("segments", [])
-        # Validate if segments_list is actually a list
-        if not isinstance(segments_list, list):
-            segments_list = []  # Reset to empty list if format is unexpected
+    # Check if the 'transcript_feature' Waffle flag is active for the current request
+    transcript_active = await sync_to_async(waffle.flag_is_active, thread_sensitive=True)(request, 'transcript_feature')
+    if transcript_active:
+        try:
+            metadata_obj = await AudioTranscriptionMetadata.objects.aget(audio=af)
+            # Extract the 'segments' list instead of 'words'
+            segments_list = metadata_obj.metadata.get("segments", [])
+            # Validate if segments_list is actually a list
+            if not isinstance(segments_list, list):
+                segments_list = []  # Reset to empty list if format is unexpected
 
-    except AudioTranscriptionMetadata.DoesNotExist:
-        pass
+        except AudioTranscriptionMetadata.DoesNotExist:
+            pass
 
     # --- End transcript metadata fetch ---
 
@@ -67,5 +72,6 @@ async def view_audio_file(
             "get_string": get_string,
             "private": af.blocked,
             "transcript_segments_data": segments_list,
+            "transcript_feature_active": transcript_active,
         },
     )
