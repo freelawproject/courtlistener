@@ -825,7 +825,7 @@ def es_save_alert_document(
         logger.warning("Skipping invalid query for Alert ID: %s", alert.pk)
         return None
 
-    meta = {"id": alert.pk}
+    meta: dict[str, int | str] = {"id": alert.pk}
     if custom_index_name:
         meta["index"] = custom_index_name
     doc_indexed = es_document(meta=meta, **alert_doc).save(
