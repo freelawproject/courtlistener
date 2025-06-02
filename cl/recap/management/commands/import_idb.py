@@ -76,8 +76,9 @@ class Command(VerboseCommand, CommandUtils):
         )
         parser.add_argument(
             "--filetype",
-            help="The type of file from FJC. One of: %s"
-            % "\n ".join(f"{t[0]}: {t[1]}" for t in DATASET_SOURCES),
+            help="The type of file from FJC. One of: {}".format(
+                "\n ".join(f"{t[0]}: {t[1]}" for t in DATASET_SOURCES)
+            ),
             required=True,
             type=int,
         )
@@ -276,8 +277,8 @@ class Command(VerboseCommand, CommandUtils):
                 row["CIRCUIT"] = matches[0]
             else:
                 raise Exception(
-                    "Unable to match CIRCUIT column value %s to "
-                    "Court object" % row["CIRCUIT"]
+                    "Unable to match CIRCUIT column value {} to "
+                    "Court object".format(row["CIRCUIT"])
                 )
 
         if row["DISTRICT"]:
@@ -294,8 +295,8 @@ class Command(VerboseCommand, CommandUtils):
                 row["DISTRICT"] = matches[0]
             else:
                 raise Exception(
-                    "Unable to match DISTRICT column value %s to "
-                    "Court object" % row["DISTRICT"]
+                    "Unable to match DISTRICT column value {} to "
+                    "Court object".format(row["DISTRICT"])
                 )
 
     def convert_to_cl_data_model(self, row, source):
@@ -311,15 +312,15 @@ class Command(VerboseCommand, CommandUtils):
         for k, v in IDB_FIELD_DATA.items():
             if self.filetype in v["sources"]:
                 self.field_mappings[k] = v["field"]
-                if v["type"] == int:
+                if v["type"] is int:
                     self.int_fields.append(k)
-                elif v["type"] == str:
+                elif v["type"] is str:
                     self.str_fields.append(k)
-                elif v["type"] == bool:
+                elif v["type"] is bool:
                     self.bool_fields.append(k)
-                elif v["type"] == date:
+                elif v["type"] is date:
                     self.date_fields.append(k)
-                elif v["type"] == Court:
+                elif v["type"] is Court:
                     self.court_fields.append(k)
         self.nullable_fields = (
             self.int_fields + self.date_fields + self.bool_fields
