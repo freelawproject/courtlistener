@@ -1533,3 +1533,13 @@ COURT_TIMEZONES = {
     "wyb": "US/Mountain",
     "wyd": "US/Mountain",
 }
+
+
+bankruptcy_data_fields = [
+    "date_converted",
+    "date_last_to_file_claims",
+    "date_last_to_file_govt",
+    "date_debtor_dismissed",
+    "chapter",
+    "trustee_str",
+]

@@ -58,11 +58,11 @@ class PeopleSearchAPICommonTests(CourtTestCase, PeopleTestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results with %s "
+            msg=f"Did not get the right number of search results with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -609,11 +609,11 @@ class PeopleV4APISearchTest(
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results with %s "
+            msg=f"Did not get the right number of search results with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -1282,11 +1282,11 @@ class PeopleSearchTestElasticSearch(
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results with %s "
+            msg=f"Did not get the right number of search results with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 

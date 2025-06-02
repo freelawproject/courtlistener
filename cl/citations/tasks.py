@@ -7,7 +7,7 @@ from django.db.models import F
 from django.db.models.query import QuerySet
 from django.db.utils import OperationalError
 from eyecite import get_citations
-from eyecite.models import CitationBase, FullCaseCitation
+from eyecite.models import CitationBase
 from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.celery_init import app
@@ -21,7 +21,6 @@ from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
-from cl.citations.models import UnmatchedCitation
 from cl.citations.parenthetical_utils import (
     create_parenthetical_groups,
     disconnect_parenthetical_group_signals,
@@ -30,7 +29,10 @@ from cl.citations.parenthetical_utils import (
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.types import MatchedResourceType, SupportedCitationType
-from cl.citations.utils import make_get_citations_kwargs
+from cl.citations.unmatched_citations_utils import handle_unmatched_citations
+from cl.citations.utils import (
+    make_get_citations_kwargs,
+)
 from cl.search.models import (
     Opinion,
     OpinionCluster,
@@ -208,26 +210,9 @@ def store_opinion_citations_and_update_parentheticals(
         opinion.save()
         return
 
-    # Put apart the unmatched citations
+    # Put apart the unmatched citations and ambiguous citations
     unmatched_citations = citation_resolutions.pop(NO_MATCH_RESOURCE, [])
-
-    # Delete citations with multiple matches
     ambiguous_matches = citation_resolutions.pop(MULTIPLE_MATCHES_RESOURCE, [])
-
-    # Increase the citation count for the cluster of each matched opinion
-    # if that cluster has not already been cited by this opinion. First,
-    # calculate a list of the IDs of every opinion whose cluster will need
-    # updating.
-
-    currently_cited_opinions = opinion.opinions_cited.all().values_list(
-        "pk", flat=True
-    )
-
-    opinion_ids_to_update = {
-        o.pk
-        for o in citation_resolutions.keys()
-        if o.pk not in currently_cited_opinions
-    }
 
     clusters_to_update_par_groups_for = set()
     parentheticals: list[Parenthetical] = []
@@ -256,28 +241,33 @@ def store_opinion_citations_and_update_parentheticals(
                     )
                 )
 
-    # If the opinion has been processed previously, we update it's
-    # associated UnmatchedCitations.status. If not, we store them all
-    update_unmatched_status = UnmatchedCitation.objects.filter(
-        citing_opinion=opinion
-    ).exists()
+    # Increase the citation count for the cluster of each matched opinion
+    # if that cluster has not already been cited by this opinion. First,
+    # calculate a list of the IDs of every opinion whose cluster will need
+    # updating.
+    currently_cited_opinions = OpinionsCited.objects.filter(
+        citing_opinion_id=opinion.pk
+    ).values_list("cited_opinion_id", flat=True)
+    cluster_ids_to_update = {
+        o.cluster.pk
+        for o in citation_resolutions.keys()
+        if o.pk not in currently_cited_opinions
+    }
 
     # Finally, commit these changes to the database in a single
-    # transcation block.
+    # transaction block.
     with transaction.atomic():
         opinion_clusters_to_update = OpinionCluster.objects.filter(
-            sub_opinions__pk__in=opinion_ids_to_update
+            id__in=cluster_ids_to_update
         )
         opinion_clusters_to_update.update(
             citation_count=F("citation_count") + 1
         )
-
-        if update_unmatched_status:
-            update_unmatched_citations_status(citation_resolutions, opinion)
-        elif unmatched_citations or ambiguous_matches:
-            store_unmatched_citations(
-                unmatched_citations, ambiguous_matches, opinion
-            )
+        handle_unmatched_citations(
+            opinion,
+            unmatched_citations + ambiguous_matches,
+            citation_resolutions,
+        )
 
         # Nuke existing citations and parentheticals
         OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
@@ -307,130 +297,11 @@ def store_opinion_citations_and_update_parentheticals(
         opinion.save()
 
     # Update changes in ES.
-    cluster_ids_to_update = list(
-        opinion_clusters_to_update.values_list("id", flat=True)
-    )
     index_related_cites_fields.apply_async(
         args=(
             OpinionsCited.__name__,
             opinion.pk,
-            cluster_ids_to_update,
+            list(cluster_ids_to_update),
         ),
         queue=queue_for_children,
     )
-
-
-def update_unmatched_citations_status(
-    citation_resolutions: dict[
-        MatchedResourceType, list[SupportedCitationType]
-    ],
-    citing_opinion: Opinion,
-) -> None:
-    """Check if previously unmatched citations have been resolved and
-    updates UnmatchedCitation.status accordingly
-
-    We assume no new UnmatchedCitations will be created after the first run
-
-    :param citation_resolutions: dict whose values are resolved citations
-    :param citing_opinion: the opinion
-    :return None:
-    """
-    resolved_citations = {
-        c.matched_text() for v in citation_resolutions.values() for c in v
-    }
-
-    # try to update the status of FOUND and FAILED_* UnmatchedCitations
-    found_citations = UnmatchedCitation.objects.filter(
-        citing_opinion=citing_opinion
-    ).exclude(
-        status__in=[UnmatchedCitation.UNMATCHED, UnmatchedCitation.RESOLVED]
-    )
-    for found in found_citations:
-        if found.citation_string in resolved_citations:
-            found.status = UnmatchedCitation.RESOLVED
-        else:
-            if found.status in [
-                UnmatchedCitation.FAILED,
-                UnmatchedCitation.FAILED_AMBIGUOUS,
-            ]:
-                continue
-            found.status = UnmatchedCitation.FAILED
-        found.save()
-
-
-def store_unmatched_citations(
-    unmatched_citations: list[CitationBase],
-    ambiguous_matches: list[CitationBase],
-    opinion: Opinion,
-) -> None:
-    """Bulk create UnmatchedCitation instances cited by an opinion
-
-    Only FullCaseCitations provide useful information for resolution
-    updates. Other types are discarded
-
-    :param unmatched_citations: citations with 0 matches
-    :param ambiguous_matches: citations with more than 1 match
-    :param opinion: the citing opinion
-    :return None:
-    """
-    unmatched_citations_to_store = []
-    seen_citations = set()
-    citations_to_this_cluster = [
-        str(c) for c in opinion.cluster.citations.all()
-    ]
-
-    for index, unmatched_citation in enumerate(
-        unmatched_citations + ambiguous_matches, 1
-    ):
-        has_multiple_matches = index > len(unmatched_citations)
-
-        if not isinstance(unmatched_citation, FullCaseCitation):
-            continue
-
-        # handle bugs in eyecite that make it return FullCitations with null
-        # values in required fields
-        groups = unmatched_citation.groups
-        if (
-            not groups.get("reporter")
-            or not groups.get("volume")
-            or not groups.get("page")
-        ):
-            logger.error(
-                "Unexpected null value in FullCaseCitation %s",
-                unmatched_citation,
-            )
-            continue
-        if not groups.get("volume").isdigit():
-            logger.error(
-                "Unexpected non-integer volume value in FullCaseCitation %s",
-                unmatched_citation,
-            )
-            continue
-
-        # This would raise a DataError, we have seen cases from bad OCR or
-        # citation lookalikes. See #5191
-        if int(groups["volume"]) >= 32_767:
-            continue
-
-        citation_object = UnmatchedCitation.create_from_eyecite(
-            unmatched_citation, opinion, has_multiple_matches
-        )
-
-        # use to prevent Integrity error from duplicates
-        citation_str = str(citation_object)
-        if citation_str in seen_citations:
-            continue
-        seen_citations.add(citation_str)
-
-        # avoid storing self citations as unmatched; the self citation will
-        # usually be found at the beginning of the opinion's text
-        # Note that both Citation.__str__ and UnmatchedCitation.__str__ use
-        # the standardized volume, reporter and page values, so they are
-        # comparable
-        if citation_str in citations_to_this_cluster:
-            continue
-
-        unmatched_citations_to_store.append(citation_object)
-
-    if unmatched_citations_to_store:
-        UnmatchedCitation.objects.bulk_create(unmatched_citations_to_store)

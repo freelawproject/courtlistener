@@ -601,8 +601,8 @@ class AudioFileTaskTest(TestCase):
             measured_duration,
             expected_duration,
             delta=5,
-            msg="We should end up with the proper duration of about %s. "
-            "Instead we got %s." % (expected_duration, measured_duration),
+            msg=f"We should end up with the proper duration of about {expected_duration}. "
+            f"Instead we got {measured_duration}.",
         )
 
     def test_audio_conversion(self) -> None:
