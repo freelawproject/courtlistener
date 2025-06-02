@@ -1,10 +1,12 @@
 import itertools
+import math
 import random
 import re
 from collections import defaultdict
+from collections.abc import Iterator
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any, Iterator, Optional, Set
+from typing import Any
 
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
@@ -148,7 +150,7 @@ async def ais_appellate_court(court_id: str) -> bool:
     return await appellate_court_ids.filter(pk=court_id).aexists()
 
 
-def get_start_of_quarter(d: Optional[date] = None) -> date:
+def get_start_of_quarter(d: date | None = None) -> date:
     """Get the start date of the  calendar quarter requested
 
     :param d: The date to get the start date for. If None, then use current
@@ -370,7 +372,7 @@ def clean_docket_number(docket_number: str) -> str:
 
 def merge_docket_numbers(
     cluster: OpinionCluster, docket_number: str
-) -> Optional[str]:
+) -> str | None:
     """Merge docket number
 
     :param cluster: The cluster of the merging item
@@ -485,7 +487,7 @@ def merge_strings(
 
 def merge_long_fields(
     field_name: str,
-    overlapping_data: Optional[tuple[str, str]],
+    overlapping_data: tuple[str, str] | None,
     cluster_id: int,
 ) -> dict[str, Any]:
     """Merge two long text fields
@@ -515,7 +517,7 @@ def merge_long_fields(
 
 
 def merge_judges(
-    overlapping_data: Optional[tuple[str, str]],
+    overlapping_data: tuple[str, str] | None,
     cluster_id: int,
     is_columbia: bool = False,
     skip_judge_merger: bool = False,
@@ -726,7 +728,7 @@ def add_citations_to_cluster(
 def update_cluster_panel(
     cluster: OpinionCluster,
     panel_list: list[str],
-    panel_date: Optional[date] = None,
+    panel_date: date | None = None,
 ) -> None:
     """Update cluster's panel
 
@@ -772,7 +774,7 @@ def get_opinion_text(cluster: OpinionCluster) -> str:
     return soup.getText(separator=" ", strip=True)
 
 
-def winnow_case_name(case_name: str) -> Set:
+def winnow_case_name(case_name: str) -> set:
     """Reduce each case title to a set of words worth comparing
 
     :param case_name: The name of a case or combination of case names
@@ -1029,7 +1031,7 @@ def match_based_text(
     possible_cases: QuerySet,
     case_name_abbreviation: str,
     citation: FullCaseCitation,
-) -> Optional[OpinionCluster]:
+) -> OpinionCluster | None:
     """Compare CL text to file content to establish duplicates
 
     :param file_characters: stripped characters to compare from file/source
@@ -1106,31 +1108,45 @@ def compute_binary_probe_jitter(testing: bool) -> int:
     :return: An integer representing the jitter value for binary probes.
     """
 
-    # Probe limit e.g: 9 probe iterations -> 256
-    probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
-    return random.randint(1, round(probe_limit * 0.05)) if not testing else 0
+    # The jitter will be a random value between 1 and half of IQUERY_MAX_PROBE.
+    return (
+        random.randint(1, round(settings.IQUERY_MAX_PROBE * 0.5))
+        if not testing
+        else 0
+    )
 
 
 def compute_next_binary_probe(
     highest_known_pacer_case_id: int, iteration: int, jitter: int
-) -> int:
+) -> tuple[int, int]:
     """Compute the next binary probe target for a given PACER case ID.
 
-    This computes the next value of a geometric binary sequence (2 ** (N - 1))
-    where N is the current probe iteration. In non-testing mode a jitter is
-    added to the next value to ensure probing values are not the same from the
-    previous iteration to increase the possibility of getting a hit.
+    This computes the next probe target using a geometric sequence
+    based on the current iteration (2 ** (iteration - 1)), with the increase
+    capped by the IQUERY_MAX_PROBE setting. Once the geometric value reaches
+    this cap, subsequent increments grow linearly by the cap value.
+    In non-testing mode, and except for the first iteration, a jitter is added
+    to the next value to ensure that probing values are not the same as in the
+    previous iteration, increasing the chances of getting a hit.
 
     :param highest_known_pacer_case_id: The final PACER case ID.
     :param iteration: The current probe iteration number.
     :param jitter: The jitter value to apply.
-    :return: The updated probe_iteration and the PACER case ID to lookup.
+    :return: The updated probe_iteration and the PACER case ID to lookup and
+    the probe offset + jitter computed.
     """
 
-    pacer_case_id_to_lookup = (
-        highest_known_pacer_case_id + (2 ** (iteration - 1)) + jitter
-    )
-    return pacer_case_id_to_lookup
+    # Avoid applying jitter on the first iteration to speed up
+    # the detection of new cases once courts catch up.
+    jitter = 0 if iteration == 1 else jitter
+    max_probe = settings.IQUERY_MAX_PROBE
+    cap_iteration = int(math.log2(max_probe)) + 1
+    if iteration < cap_iteration:
+        offset = 2 ** (iteration - 1)
+    else:
+        offset = ((iteration - cap_iteration) + 1) * max_probe
+    pacer_case_id_to_lookup = highest_known_pacer_case_id + offset + jitter
+    return pacer_case_id_to_lookup, offset + jitter
 
 
 def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:

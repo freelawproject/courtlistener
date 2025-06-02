@@ -1221,7 +1221,6 @@ class ESRECAPBaseDocument(DSLDocument):
 class ESRECAPDocument(
     CSVSerializableDocumentMixin, RECAPBaseDocument, ESRECAPBaseDocument
 ):
-
     class Django:
         model = RECAPDocument
         ignore_signals = True
@@ -1448,7 +1447,6 @@ class DocketBaseDocument(DSLDocument):
 class DocketDocument(
     CSVSerializableDocumentMixin, DocketBaseDocument, RECAPBaseDocument
 ):
-
     @classmethod
     def get_csv_headers(cls) -> list[str]:
         return [
@@ -2252,7 +2250,6 @@ class RECAPSweepDocument(DocketDocument, ESRECAPDocument):
 
 
 class ESRECAPSweepDocument(ESRECAPBaseDocument):
-
     class Index:
         name = "recap_document_sweep"
         settings = {
@@ -2398,4 +2395,4 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
 
         cd = search_form.cleaned_data
         query = build_plain_percolator_query(cd)
-        return query.to_dict()
+        return query.to_dict() if query else None

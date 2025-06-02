@@ -1,6 +1,7 @@
 import sys
 import time
-from typing import Iterable, List, cast
+from collections.abc import Iterable
+from typing import cast
 
 from django.core.management import CommandError
 from django.core.management.base import CommandParser
@@ -15,6 +16,9 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.types import OptionsType
 from cl.search.models import Courthouse, Opinion
+
+DEFAULT_THROTTLE_MIN_ITEMS = 50
+DEFAULT_OPINIONS_PER_TASK = 50
 
 
 class Command(VerboseCommand):
@@ -83,8 +87,29 @@ class Command(VerboseCommand):
             default="batch1",
             help="The celery queue where the tasks should be processed.",
         )
+        parser.add_argument(
+            "--throttle-min-items",
+            default=DEFAULT_THROTTLE_MIN_ITEMS,
+            type=int,
+            help=(
+                "Control the max number of tasks sent to Celery. To be used "
+                "on `CeleryThrottle.update_min_items`"
+            ),
+        )
+        parser.add_argument(
+            "--opinions-per-task",
+            default=DEFAULT_OPINIONS_PER_TASK,
+            type=int,
+            help="Number of opinions in a single parent task",
+        )
+        parser.add_argument(
+            "--disconnect-elastic-signals",
+            action="store_true",
+            default=False,
+            help="Disconnect ElasticSearch signals for ParentheticalGroups",
+        )
 
-    def handle(self, *args: List[str], **options: OptionsType) -> None:
+    def handle(self, *args: list[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None
@@ -150,12 +175,24 @@ class Command(VerboseCommand):
             query = Opinion.objects.all()
             sys.stdout.write("Deleting all UnmatchedCitation rows")
             UnmatchedCitation.objects.all().delete()
+            # force disconnection for batch jobs
+            disconnect_elastic_signals = True
+        else:
+            disconnect_elastic_signals = cast(
+                bool, options["disconnect_elastic_signals"]
+            )
 
         self.count = query.count()
         self.average_per_s = 0.0
-        self.timings: List[float] = []
+        self.timings: list[float] = []
         opinion_pks = query.values_list("pk", flat=True).iterator()
-        self.update_documents(opinion_pks, cast(str, options["queue"]))
+        self.update_documents(
+            opinion_pks,
+            cast(str, options["queue"]),
+            cast(int, options["throttle_min_items"]),
+            cast(int, options["opinions_per_task"]),
+            disconnect_elastic_signals,
+        )
 
     def log_progress(self, processed_count: int, last_pk: int) -> None:
         if processed_count % 1000 == 1:
@@ -181,22 +218,30 @@ class Command(VerboseCommand):
         )
         sys.stdout.flush()
 
-    def update_documents(self, opinion_pks: Iterable, queue_name: str) -> None:
+    def update_documents(
+        self,
+        opinion_pks: Iterable,
+        queue_name: str,
+        throttle_min_items: int = DEFAULT_THROTTLE_MIN_ITEMS,
+        opinions_per_task: int = DEFAULT_OPINIONS_PER_TASK,
+        disconnect_elastic_signals: bool = False,
+    ) -> None:
         sys.stdout.write(f"Graph size is {self.count:d} nodes.\n")
         sys.stdout.flush()
 
         chunk = []
-        chunk_size = 100
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue_name)
+        throttle.update_min_items(throttle_min_items)
+
         for opinion_pk in opinion_pks:
             throttle.maybe_wait()
             processed_count += 1
             last_item = self.count == processed_count
             chunk.append(opinion_pk)
-            if processed_count % chunk_size == 0 or last_item:
+            if processed_count % opinions_per_task == 0 or last_item:
                 find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-                    args=(chunk,),
+                    args=(chunk, disconnect_elastic_signals),
                     queue=queue_name,
                 )
                 chunk = []

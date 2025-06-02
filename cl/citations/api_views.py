@@ -3,7 +3,6 @@ from http import HTTPStatus
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db.models import QuerySet
-from django.template.defaultfilters import slugify
 from django.utils.safestring import SafeString
 from eyecite.models import FullCaseCitation, ShortCaseCitation
 from rest_framework.exceptions import NotFound
@@ -20,7 +19,11 @@ from cl.citations.api_serializers import (
     CitationAPIResponseSerializer,
 )
 from cl.citations.types import CitationAPIResponse
-from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
+from cl.citations.utils import (
+    SLUGIFIED_EDITIONS,
+    get_canonicals_from_reporter,
+    slugify_reporter,
+)
 from cl.search.models import OpinionCluster
 from cl.search.selectors import get_clusters_from_citation_str
 
@@ -51,7 +54,6 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
                 return Response([])
 
             for idx, citation in enumerate(self.citation_list):
-
                 start_index, end_index = citation.span()
                 citation_data = {
                     "citation": citation.matched_text(),
@@ -117,7 +119,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         Returns:
             str: canonical name for the reporter.
         """
-        potential_canonicals = get_canonicals_from_reporter(slugify(reporter))
+        potential_canonicals = get_canonicals_from_reporter(reporter)
 
         if len(potential_canonicals) == 0:
             # Couldn't find it as a variation. Give up.
@@ -146,7 +148,9 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         """
         # Look up the reporter to get its proper version (so-2d -> So. 2d)
         proper_reporter: None | str | list[SafeString]
-        proper_reporter = SLUGIFIED_EDITIONS.get(slugify(reporter), None)
+        proper_reporter = SLUGIFIED_EDITIONS.get(
+            slugify_reporter(reporter), None
+        )
         if not proper_reporter:
             try:
                 proper_reporter = self._attempt_reporter_variation(reporter)
@@ -179,7 +183,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
             return {
                 "normalized_citations": normalized_citations,
                 "status": HTTPStatus.NOT_FOUND,
-                "error_message": f"Citation not found: '{ citation_str }'",
+                "error_message": f"Citation not found: '{citation_str}'",
             }
 
         return {

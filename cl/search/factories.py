@@ -64,7 +64,7 @@ class CourtFactory(DjangoModelFactory):
                 obj.save()
                 return obj
             except IntegrityError as exp:
-                logger.info(f"Unexpected {exp=}, {type(exp)=}")
+                logger.info("Unexpected exp=%s, type(exp)=%s", exp, type(exp))
                 kwargs["position"] = Faker(
                     "pyfloat", positive=True, right_digits=4, left_digits=3
                 ).evaluate(None, None, {"locale": None})
@@ -284,6 +284,7 @@ class DocketFactory(DjangoModelFactory):
     docket_number = Faker("federal_district_docket_number")
     slug = Faker("slug")
     date_argued = Faker("date_object")
+    view_count = 0
 
     """
     This hook is necessary to make this factory compatible with the
@@ -327,12 +328,15 @@ class OpinionClusterFactoryMultipleOpinions(
 ):
     """Make an OpinionCluster with Docket parent and multiple opinions"""
 
+    class Meta:
+        skip_postgeneration_save = True
+
     sub_opinions = RelatedFactoryVariableList(
         factory=OpinionWithChildrenFactory,
         factory_related_name="cluster",
         size=3,  # by default create 3 opinions
     )
-    precedential_status = ("Published", "Precedential")
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
 
 
 class OpinionsCitedWithParentsFactory(DjangoModelFactory):

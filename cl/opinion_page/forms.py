@@ -1,6 +1,7 @@
 import logging
+from collections.abc import MutableMapping
 from datetime import datetime
-from typing import Any, MutableMapping
+from typing import Any
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -388,12 +389,8 @@ class BaseCourtUploadForm(forms.Form):
             "panel",
         ]:
             if field_name in self.fields:
-                self.fields[
-                    field_name
-                ].queryset = judges_qs  # type: ignore[attr-defined]
-                self.fields[
-                    field_name
-                ].label_from_instance = self.person_label  # type: ignore[attr-defined]
+                self.fields[field_name].queryset = judges_qs  # type: ignore[attr-defined]
+                self.fields[field_name].label_from_instance = self.person_label  # type: ignore[attr-defined]
 
     def validate_neutral_citation(self) -> None:
         """Validate if we already have the neutral citation in the system
@@ -414,11 +411,7 @@ class BaseCourtUploadForm(forms.Form):
                     "cite_page",
                     ValidationError(
                         format_html(
-                            'Citation already in database. See: <a href="%s">%s</a>'
-                            % (
-                                cite.get_absolute_url(),
-                                cite.cluster.case_name,
-                            ),
+                            f'Citation already in database. See: <a href="{cite.get_absolute_url()}">{cite.cluster.case_name}</a>',
                         )
                     ),
                 )
@@ -438,8 +431,7 @@ class BaseCourtUploadForm(forms.Form):
                 "pdf_upload",
                 ValidationError(
                     format_html(
-                        'Document already in database. See: <a href="%s">%s</a>'
-                        % (op.get_absolute_url(), op.cluster.case_name),
+                        f'Document already in database. See: <a href="{op.get_absolute_url()}">{op.cluster.case_name}</a>',
                     )
                 ),
             )
@@ -530,7 +522,9 @@ class BaseCourtUploadForm(forms.Form):
         )
 
         logging.info(
-            f"Successfully added object cluster: {cluster.id} for {self.cleaned_data.get('court_str')}"
+            "Successfully added object cluster: %s for %s",
+            cluster.id,
+            self.cleaned_data.get("court_str"),
         )
 
         return cluster

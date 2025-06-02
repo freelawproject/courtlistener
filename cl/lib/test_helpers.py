@@ -1,8 +1,11 @@
 import datetime
 import unittest
+from collections.abc import Sized
 from functools import wraps
-from typing import Sized, cast
+from typing import cast
 
+from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.testcases import SerializeMixin
@@ -24,7 +27,7 @@ from cl.people_db.factories import (
     PositionFactory,
     SchoolFactory,
 )
-from cl.people_db.models import Person, Race
+from cl.people_db.models import Race
 from cl.search.constants import o_type_index_map
 from cl.search.docket_sources import DocketSources
 from cl.search.documents import DocketDocument
@@ -45,7 +48,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.users.factories import UserProfileWithParentsFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 def midnight_pt_test(d: datetime.date) -> datetime.datetime:
@@ -112,7 +115,9 @@ opinion_cluster_v3_v4_common_fields = {
     "panel_ids": lambda x: (
         list(x["result"].cluster.panel.all().values_list("id", flat=True))
         if x["result"].cluster.panel.all()
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "dateArgued": lambda x: (
         (
@@ -169,14 +174,18 @@ opinion_document_v3_v4_common_fields = {
         if x["result"]
         .cited_opinions.all()
         .values_list("cited_opinion_id", flat=True)
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "download_url": lambda x: x["result"].download_url,
     "id": lambda x: x["result"].pk,
     "joined_by_ids": lambda x: (
         list(x["result"].joined_by.all().values_list("id", flat=True))
         if x["result"].joined_by.all()
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "type": lambda x: (
         o_type_index_map.get(x["result"].type)
@@ -731,7 +740,9 @@ audio_common_fields = {
     "judge": lambda x: (
         x["judge"]
         if x.get("judge")
-        else x["result"].judges if x["result"].judges else ""
+        else x["result"].judges
+        if x["result"].judges
+        else ""
     ),
     "local_path": lambda x: (
         deepgetattr(x["result"], "local_path_mp3.name", None)
@@ -742,14 +753,18 @@ audio_common_fields = {
     "panel_ids": lambda x: (
         list(x["result"].panel.all().values_list("id", flat=True))
         if x["result"].panel.all()
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "sha1": lambda x: x["result"].sha1,
     "source": lambda x: x["result"].source,
     "snippet": lambda x: (
         x["snippet"]
         if x.get("snippet")
-        else x["result"].transcript if x["result"].stt_transcript else ""
+        else x["result"].transcript
+        if x["result"].stt_transcript
+        else ""
     ),
 }
 
@@ -775,6 +790,56 @@ audio_v4_fields.update(
         "meta": [],  # type: ignore
     }
 )
+
+
+class PrayAndPayTestCase(TestCase):
+    """Pray And Pay test case factories"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.user_2 = UserFactory()
+        cls.user_3 = UserFactory()
+
+        # Create profile for test user records
+        UserProfileWithParentsFactory(user=cls.user)
+        UserProfileWithParentsFactory(user=cls.user_2)
+        UserProfileWithParentsFactory(user=cls.user_3)
+
+        cls.rd_1 = RECAPDocumentFactory(
+            pacer_doc_id="98763421",
+            document_number="1",
+            is_available=True,
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            pacer_doc_id="98763422",
+            document_number="2",
+            is_available=False,
+        )
+
+        cls.rd_3 = RECAPDocumentFactory(
+            pacer_doc_id="98763423",
+            document_number="3",
+            is_available=False,
+        )
+        cls.rd_4 = RECAPDocumentFactory(
+            pacer_doc_id="98763424",
+            document_number="4",
+            is_available=False,
+        )
+
+        cls.rd_5 = RECAPDocumentFactory(
+            pacer_doc_id="98763425",
+            document_number="5",
+            is_available=False,
+        )
+
+        cls.rd_6 = RECAPDocumentFactory(
+            pacer_doc_id="98763426",
+            document_number="6",
+            is_available=False,
+        )
+        super().setUpTestData()
 
 
 class CourtTestCase(SimpleTestCase):
@@ -1286,6 +1351,15 @@ class SimpleUserDataMixin:
 class SitemapTest(TestCase):
     sitemap_url: str
     expected_item_count: int
+
+    def setUpSiteDomain(self) -> None:
+        # set the domain name in the Sites framework to match the test domain name, set http url schema
+        domain = "testserver"
+        SiteModel = apps.get_model("sites", "Site")
+
+        SiteModel.objects.update_or_create(
+            pk=settings.SITE_ID, defaults={"domain": domain, "name": domain}
+        )
 
     def assert_sitemap_has_content(self) -> None:
         """Does content get into the sitemap?"""

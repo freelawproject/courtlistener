@@ -2,6 +2,7 @@ import copy
 import datetime
 import time
 import traceback
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import pytz
@@ -11,22 +12,27 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from django.utils import timezone
 from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import RequestError, TransportError
+from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import connections
 from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrList
 from redis import Redis
 
+from cl.alerts.management.commands.cl_send_scheduled_alerts import (
+    get_cut_off_date,
+)
 from cl.alerts.models import Alert, ScheduledAlertHit
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import (
     TaskCompletionStatus,
     add_document_hit_to_alert_set,
     has_document_alert_hit_been_triggered,
+    override_alert_query,
     scheduled_alert_hits_limit_reached,
 )
 from cl.api.models import WebhookEventType
 from cl.api.tasks import send_search_alert_webhook_es
+from cl.lib.argparse_types import valid_date_time
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.date_time import dt_as_local_date
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
@@ -39,12 +45,33 @@ from cl.search.documents import (
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
+    InvalidRelativeDateSyntax,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
 )
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
+
+
+@dataclass
+class AlertHitsToProcess:
+    """Dataclass for storing alert hits to process and related metadata.
+
+    :param results: List of hits from the main query.
+    :param parent_results: The elasticsearch response targeting parent documents if any.
+    :param child_results: The elasticsearch response targeting child documents if any.
+    :param alert_id: The ID of the alert being processed.
+    :param query_date: The date when the query was executed.
+    :param case_only_alert: Boolean flag indicating if this is a case-only alert.
+    """
+
+    results: list[Hit]
+    parent_results: Response | None
+    child_results: Response | None
+    alert_id: int
+    query_date: datetime.date
+    case_only_alert: bool
 
 
 def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
@@ -125,6 +152,7 @@ def index_daily_recap_documents(
     r: Redis,
     source_index_name: str,
     target_index: type[RECAPSweepDocument] | type[ESRECAPSweepDocument],
+    query_date: datetime.datetime,
     testing: bool = False,
     only_rd: bool = False,
 ) -> int:
@@ -137,6 +165,7 @@ def index_daily_recap_documents(
     documents will be queried.
     :param target_index: The target Elasticsearch index to which documents will
      be re-indexed.
+    :param query_date: The query date to which documents will be queried.
     :param testing: Boolean flag for testing mode.
     :param only_rd: Whether to reindex only RECAPDocuments into the
     ESRECAPSweepDocument index.
@@ -164,29 +193,23 @@ def index_daily_recap_documents(
         # it and proceed with sending alerts.
         return 0
 
-    if not r.exists("alert_sweep:query_date"):
-        # In case of a failure, store the date when alerts should be queried in
-        # Redis, so the command can be resumed.
-        local_now = timezone.localtime().replace(tzinfo=None)
-        local_midnight = local_now.replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        r.set("alert_sweep:query_date", local_midnight.isoformat())
-
-    else:
-        # If "alert_sweep:query_date" already exists get it from Redis.
-        local_midnight_str: str = str(r.get("alert_sweep:query_date"))
-        local_midnight = datetime.datetime.fromisoformat(local_midnight_str)
-        logger.info(f"Resuming re-indexing process for date: {local_midnight}")
+    logger.info(
+        "Starting %s re-indexing process for date: %s",
+        target_index._index._name,
+        query_date,
+    )
 
     es = connections.get_connection()
     # Convert the local (PDT) midnight time to UTC
     local_timezone = pytz.timezone(timezone.get_current_timezone_name())
-    local_midnight_localized = local_timezone.localize(local_midnight)
-    local_midnight_utc = local_midnight_localized.astimezone(pytz.utc)
-    next_day_utc = local_midnight_utc + datetime.timedelta(days=1)
-
-    today_datetime_iso = local_midnight_utc.isoformat().replace("+00:00", "Z")
+    query_date_local_midnight_localized = local_timezone.localize(query_date)
+    query_date_local_midnight_utc = (
+        query_date_local_midnight_localized.astimezone(pytz.utc)
+    )
+    next_day_utc = query_date_local_midnight_utc + datetime.timedelta(days=1)
+    query_date_datetime_iso = (
+        query_date_local_midnight_utc.isoformat().replace("+00:00", "Z")
+    )
     next_day_utc_iso = next_day_utc.isoformat().replace("+00:00", "Z")
     # Re Index API query.
     query = (
@@ -200,7 +223,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": today_datetime_iso,
+                                            "gte": query_date_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -216,7 +239,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": today_datetime_iso,
+                                        "gte": query_date_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -230,7 +253,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": today_datetime_iso,
+                                            "gte": query_date_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -246,7 +269,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": today_datetime_iso,
+                                        "gte": query_date_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -267,7 +290,7 @@ def index_daily_recap_documents(
                             "query": {
                                 "range": {
                                     "timestamp": {
-                                        "gte": today_datetime_iso,
+                                        "gte": query_date_datetime_iso,
                                         "lt": next_day_utc_iso,
                                     }
                                 }
@@ -281,7 +304,7 @@ def index_daily_recap_documents(
                                 {
                                     "range": {
                                         "timestamp": {
-                                            "gte": today_datetime_iso,
+                                            "gte": query_date_datetime_iso,
                                             "lt": next_day_utc_iso,
                                         }
                                     }
@@ -297,6 +320,9 @@ def index_daily_recap_documents(
 
     if not r.exists("alert_sweep:task_id"):
         # Remove the index from the previous day and create a new one.
+        logger.info(
+            "Deleting %s index from previous day.", target_index._index._name
+        )
         target_index._index.delete(ignore=404)
         target_index.init()
         target_index_name = target_index._index._name
@@ -338,11 +364,19 @@ def index_daily_recap_documents(
         response = es.reindex(**params)
         # Store the task ID in Redis
         task_id = response["task"]
-        r.set("alert_sweep:task_id", task_id)
-        logger.info(f"Re-indexing task scheduled ID: {task_id}")
+        r.set("alert_sweep:task_id", task_id, ex=3600 * 12)
+        logger.info(
+            "Re-indexing task for index %s scheduled with ID: %s",
+            target_index_name,
+            task_id,
+        )
     else:
         task_id = r.get("alert_sweep:task_id")
-        logger.info(f"Resuming re-index task ID: {task_id}")
+        logger.info(
+            "Resuming re-index task for index %s with ID: %s",
+            target_index._index._name,
+            task_id,
+        )
 
     initial_wait = 0.01 if testing else 60.0
     time.sleep(initial_wait)
@@ -457,6 +491,7 @@ def query_alerts(
         UnbalancedQuotesQuery,
         BadProximityQuery,
         DisallowedWildcardPattern,
+        InvalidRelativeDateSyntax,
         TransportError,
         ConnectionError,
         RequestError,
@@ -464,27 +499,32 @@ def query_alerts(
         traceback.print_exc()
         logger.info(f"Search for this alert failed: {search_params}\n")
         return None, None, None
+    except ApiError as e:
+        traceback.print_exc()
+        logger.warning(
+            "ApiError when querying an alert from the sweep index: %s", str(e)
+        )
+        return None, None, None
 
 
 def process_alert_hits(
-    r: Redis,
-    results: list[Hit],
-    parent_results: Response | None,
-    child_results: Response | None,
-    alert_id: int,
-    query_date: datetime.date,
+    r: Redis, hits_to_process: AlertHitsToProcess
 ) -> list[Hit]:
     """Process alert hits by filtering and prepare the results to send based
     on alert conditions.
 
     :param r: The Redis instance.
-    :param results: A list of Hit objects containing search results.
-    :param parent_results: The ES Response for the docket-only query.
-    :param child_results: The ES Response for the RECAPDocument-only query.
-    :param alert_id: The ID of the alert being processed.
-    :param query_date: The daily re_index query date.
+    :param hits_to_process: A `AlertHitsToProcess` instance.
     :return: A list of Hit objects that are filtered and prepared to be sent.
     """
+
+    results = hits_to_process.results
+    parent_results = hits_to_process.parent_results
+    child_results = hits_to_process.child_results
+    alert_id = hits_to_process.alert_id
+    query_date = hits_to_process.query_date
+    case_only_alert = hits_to_process.case_only_alert
+
     docket_hits = parent_results.hits if parent_results else []
     docket_ids = [int(d.docket_id) for d in docket_hits]
 
@@ -493,6 +533,13 @@ def process_alert_hits(
     results_to_send = []
     if len(results) > 0:
         for hit in results:
+            if case_only_alert and has_document_alert_hit_been_triggered(
+                r, alert_id, "co", hit.docket_id
+            ):
+                # The RECAP case-only alert has already been triggered by this case.
+                # Ignore it.
+                continue
+
             if hit.docket_id in docket_ids:
                 # Possible Docket-only alert
                 rds_to_send = filter_rd_alert_hits(
@@ -504,8 +551,15 @@ def process_alert_hits(
                 )
                 if rds_to_send:
                     # Docket OR RECAPDocument alert.
+                    # This includes hits triggered by an alert that can
+                    # match Dockets or RECAPDocuments at the same time.
+                    # e.g: q=docket_id:34238745 OR pacer_doc_id:1014052133
                     hit["child_docs"] = rds_to_send
                     results_to_send.append(hit)
+                    # Mark case-only alert as triggered.
+                    add_document_hit_to_alert_set(
+                        r, alert_id, "co", hit.docket_id
+                    )
                     if should_docket_hit_be_included(
                         r, alert_id, hit.docket_id, query_date
                     ):
@@ -517,19 +571,33 @@ def process_alert_hits(
                     r, alert_id, hit.docket_id, query_date
                 ):
                     # Docket-only alert
+                    # This alert query matched only Dockets.
+                    # e.g: docket_number=23-43434
                     hit["child_docs"] = []
                     results_to_send.append(hit)
+                    # Mark case-only alert as triggered.
+                    add_document_hit_to_alert_set(
+                        r, alert_id, "co", hit.docket_id
+                    )
                     add_document_hit_to_alert_set(
                         r, alert_id, "d", hit.docket_id
                     )
             else:
                 # RECAPDocument-only alerts or cross-object alerts
+                # This alert query matched either only RECAPDocuments
+                # e.g., document_number:1
+                # or a combination of RECAPDocument fields and Docket-level fields,
+                # e.g., document_number:1 & docket_number:23-43434
                 rds_to_send = filter_rd_alert_hits(
                     r, alert_id, hit["child_docs"], rd_ids
                 )
                 if rds_to_send:
                     hit["child_docs"] = rds_to_send
                     results_to_send.append(hit)
+                    # Mark case-only alert as triggered.
+                    add_document_hit_to_alert_set(
+                        r, alert_id, "co", hit.docket_id
+                    )
     return results_to_send
 
 
@@ -554,44 +622,72 @@ def send_search_alert_webhooks(
 
 
 def query_and_send_alerts(
-    r: Redis, rate: Literal["rt", "dly"], query_date: datetime.date
+    r: Redis,
+    rate: Literal["rt", "dly"],
+    query_date: datetime.datetime,
+    custom_date: bool = False,
 ) -> None:
     """Query the sweep index and send alerts based on the specified rate
     and date.
 
     :param r: The Redis interface.
     :param rate: The rate at which to query alerts.
-    :param query_date: The daily re_index query date.
+    :param query_date: The daily re_index query datetime.
+    :param custom_date: If true, send alerts on a custom date.
     :return: None.
     """
-
     alert_users: UserProfile.user = User.objects.filter(
-        alerts__rate=rate
+        alerts__rate=rate,
+        alerts__alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
     ).distinct()
-    alerts_sent_count = 0
-    now_time = datetime.datetime.now()
+    total_alerts_sent_count = 0
+    sent_time = datetime.datetime.now() if not custom_date else query_date
     for user in alert_users:
         if rate == Alert.REAL_TIME and not user.profile.is_member:
             continue
-        alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
-        logger.info(f"Running alerts for user '{user}': {alerts}")
+        alerts = user.alerts.filter(
+            rate=rate,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        logger.info(
+            "Running '%s' alerts for user '%s': %s", rate, user, alerts
+        )
 
         hits = []
-        alerts_to_update = []
+        alerts_sent = []
         for alert in alerts:
             search_params = QueryDict(alert.query.encode(), mutable=True)
+            case_only_alert = (
+                True if alert.alert_type == SEARCH_TYPES.DOCKETS else False
+            )
+            # Override the alert type to RECAP, since DOCKETS alerts should
+            # behave exactly like RECAP alerts.
+            search_params["type"] = SEARCH_TYPES.RECAP
             results, parent_results, child_results = query_alerts(
                 search_params
             )
             if not results:
                 continue
-            alerts_to_update.append(alert.pk)
             search_type = search_params.get("type", SEARCH_TYPES.RECAP)
-            results_to_send = process_alert_hits(
-                r, results, parent_results, child_results, alert.pk, query_date
+
+            hits_to_process = AlertHitsToProcess(
+                results=results,
+                parent_results=parent_results,
+                child_results=child_results,
+                alert_id=alert.pk,
+                query_date=query_date.date(),
+                case_only_alert=case_only_alert,
             )
+            results_to_send = process_alert_hits(r, hits_to_process)
             if not results_to_send:
                 continue
+            alerts_sent.append(alert.pk)
+
+            # Override query in the 'View Full Results' URL to
+            # include a filter by timestamp.
+            cut_off_date = get_cut_off_date(rate, sent_time, True, custom_date)
+            qd = override_alert_query(alert, cut_off_date)
+            alert.query_run = qd.urlencode()  # type: ignore
             hits.append(
                 [
                     alert,
@@ -600,23 +696,29 @@ def query_and_send_alerts(
                     len(results_to_send),
                 ]
             )
-            alert.query_run = search_params.urlencode()  # type: ignore
-            alert.date_last_hit = timezone.now()
-            alert.save()
-
             # Send webhooks
             send_search_alert_webhooks(user, results_to_send, alert.pk)
 
         if hits:
             send_search_alert_emails.delay([(user.pk, hits)])
-            alerts_sent_count += 1
+            total_alerts_sent_count += 1
+            logger.info(
+                "Sent %s '%s' alerts for user '%s'",
+                len(alerts_sent),
+                rate,
+                user,
+            )
 
         # Update Alert's date_last_hit in bulk.
-        Alert.objects.filter(id__in=alerts_to_update).update(
-            date_last_hit=now_time
+        Alert.objects.filter(id__in=alerts_sent).update(
+            date_last_hit=sent_time
         )
-        async_to_sync(tally_stat)(f"alerts.sent.{rate}", inc=alerts_sent_count)
-        logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
+
+    # Log and tally the total alerts sent
+    async_to_sync(tally_stat)(
+        f"alerts.sent.{rate}", inc=total_alerts_sent_count
+    )
+    logger.info(f"Sent {total_alerts_sent_count} {rate} email alerts.")
 
 
 def query_and_schedule_alerts(
@@ -631,25 +733,44 @@ def query_and_schedule_alerts(
     :return: None.
     """
 
-    alert_users = User.objects.filter(alerts__rate=rate).distinct()
+    alert_users = User.objects.filter(
+        alerts__alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+    ).distinct()
     docket_content_type = ContentType.objects.get(
         app_label="search", model="docket"
     )
     for user in alert_users:
-        alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
-        logger.info(f"Running '{rate}' alerts for user '{user}': {alerts}")
+        alerts = user.alerts.filter(
+            rate=rate,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        logger.info(
+            "Running '%s' alerts for user '%s': %s", rate, user, alerts
+        )
         scheduled_hits_to_create = []
         for alert in alerts:
             search_params = QueryDict(alert.query.encode(), mutable=True)
             results, parent_results, child_results = query_alerts(
                 search_params
             )
+            case_only_alert = (
+                True if alert.alert_type == SEARCH_TYPES.DOCKETS else False
+            )
+            # Override the alert type to RECAP, since DOCKETS alerts should
+            # behave exactly like RECAP alerts.
+            search_params["type"] = SEARCH_TYPES.RECAP
             if not results:
                 continue
 
-            results_to_send = process_alert_hits(
-                r, results, parent_results, child_results, alert.pk, query_date
+            hits_to_process = AlertHitsToProcess(
+                results=results,
+                parent_results=parent_results,
+                child_results=child_results,
+                alert_id=alert.pk,
+                query_date=query_date,
+                case_only_alert=case_only_alert,
             )
+            results_to_send = process_alert_hits(r, hits_to_process)
             if not results_to_send:
                 continue
             for hit in results_to_send:
@@ -682,6 +803,25 @@ def query_and_schedule_alerts(
         # Create scheduled WEEKLY and MONTHLY Alerts in bulk.
         if scheduled_hits_to_create:
             ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
+            logger.info(
+                "Scheduled %s '%s' alerts for user '%s'",
+                len(scheduled_hits_to_create),
+                rate,
+                user,
+            )
+
+
+def get_day_before_query_date() -> datetime.datetime:
+    """Get the datetime representing the day before the current local date.
+
+    :return: A naive datetime object representing midnight of the day before
+    the current local date.
+    """
+    local_now = timezone.localtime().replace(tzinfo=None)
+    local_midnight = local_now.replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    return local_midnight - datetime.timedelta(days=1)
 
 
 class Command(VerboseCommand):
@@ -697,17 +837,37 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--testing-mode",
             action="store_true",
+            default=False,
             help="Use this flag for testing purposes.",
+        )
+        parser.add_argument(
+            "--query-date",
+            type=valid_date_time,
+            help="Query date in ISO-8601 format.",
         )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        testing_mode = options.get("testing_mode", False)
+        testing_mode = options["testing_mode"]
         r = get_redis_interface("CACHE")
+        query_date: datetime.datetime | None = options["query_date"]
+        custom_date = True if query_date else False
+
+        if query_date is not None:
+            # Convert the provided query_date to midnight.
+            query_date = query_date.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ).replace(tzinfo=None)
+        else:
+            # Date query from previous day since the command currently runs
+            # early each day.
+            query_date = get_day_before_query_date()
+
         index_daily_recap_documents(
             r,
             DocketDocument._index._name,
             RECAPSweepDocument,
+            query_date,
             testing=testing_mode,
         )
         if not testing_mode:
@@ -718,6 +878,7 @@ class Command(VerboseCommand):
             r,
             DocketDocument._index._name,
             ESRECAPSweepDocument,
+            query_date,
             testing=testing_mode,
             only_rd=True,
         )
@@ -726,17 +887,9 @@ class Command(VerboseCommand):
             # can be omitted in case of a failure.
             r.set("alert_sweep:rd_re_index_completed", 1, ex=3600 * 12)
 
-        query_date = timezone.localtime(
-            timezone.make_aware(
-                datetime.datetime.fromisoformat(
-                    str(r.get("alert_sweep:query_date"))
-                )
-            )
-        ).date()
-        query_and_send_alerts(r, Alert.REAL_TIME, query_date)
-        query_and_send_alerts(r, Alert.DAILY, query_date)
-        query_and_schedule_alerts(r, Alert.WEEKLY, query_date)
-        query_and_schedule_alerts(r, Alert.MONTHLY, query_date)
+        query_and_send_alerts(r, Alert.REAL_TIME, query_date, custom_date)
+        query_and_send_alerts(r, Alert.DAILY, query_date, custom_date)
+        query_and_schedule_alerts(r, Alert.WEEKLY, query_date.date())
+        query_and_schedule_alerts(r, Alert.MONTHLY, query_date.date())
         r.delete("alert_sweep:main_re_index_completed")
         r.delete("alert_sweep:rd_re_index_completed")
-        r.delete("alert_sweep:query_date")

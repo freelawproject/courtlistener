@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+
+import tiktoken
 
 
 def camel_to_snake(key: str) -> str:
@@ -11,7 +12,7 @@ def camel_to_snake(key: str) -> str:
     return re.sub(r"([a-z])([A-Z])", r"\1_\2", key).lower()
 
 
-def trunc(s: str, length: int, ellipsis: Optional[str] = None) -> str:
+def trunc(s: str, length: int, ellipsis: str | None = None) -> str:
     """Truncates a string at a good length.
 
     Finds the rightmost space in a string, and truncates there. Lacking such
@@ -132,3 +133,10 @@ def normalize_dashes(text: str) -> str:
         normal_dash,
         text,
     )
+
+
+def get_token_count_from_string(string: str) -> int:
+    """Returns the number of tokens in a text string."""
+    encoding = tiktoken.get_encoding("cl100k_base")
+    num_tokens = len(encoding.encode(string))
+    return num_tokens

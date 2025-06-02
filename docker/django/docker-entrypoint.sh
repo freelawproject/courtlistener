@@ -14,9 +14,9 @@ case "$1" in
         --prefetch-multiplier=${CELERY_PREFETCH_MULTIPLIER:-1}
     ;;
 'web-dev')
-    python /opt/courtlistener/manage.py migrate
-    python /opt/courtlistener/manage.py createcachetable
-    exec python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
+    ./manage.py migrate
+    ./manage.py createcachetable
+    exec ./manage.py runserver 0.0.0.0:8000
     ;;
 'web-prod')
     # Tips:
@@ -30,24 +30,24 @@ case "$1" in
         --worker-class cl.workers.UvicornWorker \
         --limit-request-line 6000 \
         --timeout 0 \
-        --max-requests 1000 \
+        --max-requests 500 \
         --max-requests-jitter 50 \
         --bind 0.0.0.0:8000
     ;;
 'rss-scraper')
-    exec /opt/courtlistener/manage.py scrape_rss
+    exec ./manage.py scrape_rss
     ;;
 'retry-webhooks')
-    exec /opt/courtlistener/manage.py cl_retry_webhooks
+    exec ./manage.py cl_retry_webhooks
     ;;
 'sweep-indexer')
-    exec /opt/courtlistener/manage.py sweep_indexer
+    exec ./manage.py sweep_indexer
     ;;
 'probe-iquery-pages-daemon')
-    exec /opt/courtlistener/manage.py probe_iquery_pages_daemon
+    exec ./manage.py probe_iquery_pages_daemon
     ;;
 'cl-send-rt-percolator-alerts')
-    exec /opt/courtlistener/manage.py cl_send_rt_percolator_alerts
+    exec ./manage.py cl_send_rt_percolator_alerts
     ;;
 *)
     echo "Unknown command"

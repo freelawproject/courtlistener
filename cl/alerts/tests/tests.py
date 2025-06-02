@@ -2,11 +2,11 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest import mock
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import urlencode
 
 import pytz
 import time_machine
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
@@ -17,11 +17,11 @@ from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
-from lxml import html
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
+from cl.alerts.forms import CreateAlertForm
 from cl.alerts.management.commands.cl_send_alerts import (
     get_cut_off_end_date,
     get_cut_off_start_date,
@@ -48,6 +48,7 @@ from cl.alerts.tasks import (
 from cl.alerts.utils import (
     InvalidDateError,
     build_alert_email_subject,
+    is_match_all_query,
     percolate_es_document,
 )
 from cl.api.factories import WebhookFactory
@@ -480,7 +481,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         cls.user_2 = UserFactory()
 
     def setUp(self) -> None:
-        self.alert_path = reverse("alert-list", kwargs={"version": "v3"})
+        self.alert_path = reverse("alert-list", kwargs={"version": "v4"})
         self.client = make_client(self.user_1.pk)
         self.client_2 = make_client(self.user_2.pk)
 
@@ -523,61 +524,64 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         # Get the alerts for user_1, should be 2
         response = await self.client.get(self.alert_path)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(response.json()["count"], 2)
+        self.assertEqual(len(response.json()["results"]), 2)
 
         # Get the alerts for user_2, should be 1
         response_2 = await self.client_2.get(self.alert_path)
         self.assertEqual(response_2.status_code, HTTPStatus.OK)
-        self.assertEqual(response_2.json()["count"], 1)
+        self.assertEqual(len(response_2.json()["results"]), 1)
 
-    async def test_delete_alert(self) -> None:
+    def test_delete_alert(self) -> None:
         """Can we delete an alert?
         Avoid users from deleting other users' alerts.
         """
 
-        # Make two alerts for user_1
-        alert_1 = await self.make_an_alert(
-            self.client,
-            alert_name="alert_1",
-            alert_query=f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
-        )
-        alert_2 = await self.make_an_alert(self.client, alert_name="alert_2")
+        with self.captureOnCommitCallbacks(execute=True):
+            # Make two alerts for user_1
+            alert_1 = async_to_sync(self.make_an_alert)(
+                self.client,
+                alert_name="alert_1",
+                alert_query=f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
+            )
+            alert_2 = async_to_sync(self.make_an_alert)(
+                self.client, alert_name="alert_2"
+            )
 
         search_alert = Alert.objects.all()
-        self.assertEqual(await search_alert.acount(), 2)
+        self.assertEqual(search_alert.count(), 2)
 
         # Confirm alert is indexed in ES
         alert_1_id = alert_1.json()["id"]
         self.assertTrue(
             AudioPercolator.exists(id=alert_1_id),
-            msg=f"Alert id: {alert_1.json()["id"]} was not indexed.",
+            msg=f"Alert id: {alert_1.json()['id']} was not indexed.",
         )
 
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_1.json()["id"], "version": "v4"},
         )
 
         # Delete the alert for user_1
-        response = await self.client.delete(alert_1_path_detail)
+        response = async_to_sync(self.client.delete)(alert_1_path_detail)
         self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
-        self.assertEqual(await search_alert.acount(), 1)
+        self.assertEqual(search_alert.count(), 1)
 
         # Confirm alert was removed from ES
         self.assertFalse(
             AudioPercolator.exists(id=alert_1_id),
-            msg=f"Alert id: {alert_1.json()["id"]} shouldn't be indexed.",
+            msg=f"Alert id: {alert_1.json()['id']} shouldn't be indexed.",
         )
 
         alert_2_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_2.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_2.json()["id"], "version": "v4"},
         )
 
         # user_2 tries to delete a user_1 alert, it should fail
-        response = await self.client_2.delete(alert_2_path_detail)
+        response = async_to_sync(self.client_2.delete)(alert_2_path_detail)
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-        self.assertEqual(await search_alert.acount(), 1)
+        self.assertEqual(search_alert.count(), 1)
 
     async def test_alert_detail(self) -> None:
         """Can we get the details of an alert?
@@ -590,7 +594,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         self.assertEqual(await search_alert.acount(), 1)
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_1.json()["id"], "version": "v4"},
         )
 
         # Get the alert detail for user_1
@@ -602,20 +606,21 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         response = await self.client_2.get(alert_1_path_detail)
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
-    async def test_alert_update(self) -> None:
+    def test_alert_update(self) -> None:
         """Can we update an alert?"""
 
-        # Make one alerts for user_1
-        alert_1 = await self.make_an_alert(
-            self.client,
-            alert_name="alert_1",
-            alert_query=f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            # Make one alerts for user_1
+            alert_1 = async_to_sync(self.make_an_alert)(
+                self.client,
+                alert_name="alert_1",
+                alert_query=f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
+            )
         self.assertEqual(
             alert_1.json()["alert_type"], SEARCH_TYPES.ORAL_ARGUMENT
         )
         search_alert = Alert.objects.all()
-        self.assertEqual(await search_alert.acount(), 1)
+        self.assertEqual(search_alert.count(), 1)
 
         # Confirm alert is indexed in ES upon creation.
         doc = AudioPercolator.get(id=alert_1.json()["id"])
@@ -625,7 +630,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
 
         alert_1_path_detail = reverse(
             "alert-detail",
-            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+            kwargs={"pk": alert_1.json()["id"], "version": "v4"},
         )
 
         # Update the alert
@@ -634,7 +639,10 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
             "query": f"q=testing_2_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
             "rate": Alert.REAL_TIME,
         }
-        response = await self.client.put(alert_1_path_detail, data_updated)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = async_to_sync(self.client.put)(
+                alert_1_path_detail, data_updated
+            )
 
         # Check that the alert was updated
         self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -660,6 +668,118 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         )
         search_alert = Alert.objects.all()
         self.assertEqual(await search_alert.acount(), 0)
+
+    async def test_can_validate_required_fields(self) -> None:
+        # Test creation with missing required fields:
+        response = await self.client.post(self.alert_path, {}, format="json")
+
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("This field is required.", response.json()["name"])
+        self.assertIn("This field is required.", response.json()["query"])
+        self.assertIn("This field is required.", response.json()["rate"])
+
+        # Create a valid alert for subsequent update testing:
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+        )
+        alert_1_data = alert_1.json()
+        # Try to update an alert using a PUT request with missing required
+        # fields:
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1_data["id"], "version": "v4"},
+        )
+        data_updated = {"name": "alert_1_updated"}  # Missing query and rate
+        response = await self.client.put(alert_1_path_detail, data_updated)
+
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("This field is required.", response.json()["query"])
+        self.assertIn("This field is required.", response.json()["rate"])
+
+    async def test_can_update_alert_using_patch_request(self) -> None:
+        # Create an initial alert for testing:
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+        )
+        alert_1_data = alert_1.json()
+
+        # Verify initial alert state:
+        self.assertEqual(alert_1_data["alert_type"], SEARCH_TYPES.OPINION)
+        search_alert = Alert.objects.all()
+        self.assertEqual(await search_alert.acount(), 1)
+
+        # Construct the detail URL for the alert:
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1_data["id"], "version": "v4"},
+        )
+
+        # Update the alert's name:
+        data_updated = {"name": "alert_1_updated"}
+        response = await self.client.patch(alert_1_path_detail, data_updated)
+
+        # Check that the alert was updated
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["name"], "alert_1_updated")
+        self.assertEqual(response.json()["id"], alert_1_data["id"])
+
+        # Update the alert's rate:
+        data_updated = {"rate": "wly"}
+        response = await self.client.patch(alert_1_path_detail, data_updated)
+
+        # Verify successful rate update, and that name persists:
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["id"], alert_1_data["id"])
+        self.assertEqual(response.json()["name"], "alert_1_updated")
+        self.assertEqual(response.json()["rate"], "wly")
+
+    async def test_avoid_saving_match_all_alerts(self) -> None:
+        """Confirm that creating/updating a match-all alert query is rejected."""
+
+        # Match all alert fails on creation:
+        match_all_alert = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=&type={SEARCH_TYPES.RECAP}",
+        )
+        self.assertEqual(match_all_alert.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "You can't create a match-all alert. Please try narrowing your query.",
+            match_all_alert.json()["query"],
+        )
+
+        # Try validation on update. Create a valid alert first.
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+        )
+
+        alert_1_data = alert_1.json()
+        # Try to update the alert to a match-all query
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1_data["id"], "version": "v4"},
+        )
+        data_updated = {
+            "name": "alert_1_updated",
+            "query": "type=r&order_by=score+desc&",
+            "rate": Alert.DAILY,
+            "alert_type": SEARCH_TYPES.RECAP,
+        }
+        response = await self.client.put(
+            alert_1_path_detail, data_updated, format="json"
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "You can't create a match-all alert. Please try narrowing your query.",
+            response.json()["query"],
+        )
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
@@ -691,87 +811,88 @@ class SearchAlertsWebhooksTest(
             enabled=True,
         )
         unpublished_status = PRECEDENTIAL_STATUS.UNPUBLISHED
-        cls.search_alert = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert O",
-            query=f"q=California&type=o&stat_{unpublished_status}=on",
-            alert_type=SEARCH_TYPES.OPINION,
-        )
-        cls.search_alert_rt = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert O rt",
-            query=f"type=o&stat_{unpublished_status}=on",
-            alert_type=SEARCH_TYPES.OPINION,
-        )
-        cls.search_alert_rt_1 = AlertFactory(
-            user=cls.user_profile_1.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert O rt",
-            query=f"type=o&stat_{unpublished_status}=on",
-            alert_type=SEARCH_TYPES.OPINION,
-        )
-        cls.search_alert_oa = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA",
-            query="type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        cls.search_alert_o_wly = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.WEEKLY,
-            name="Test Alert O wly",
-            query=f"type=o&stat_{unpublished_status}=on",
-            alert_type=SEARCH_TYPES.OPINION,
-        )
-        cls.search_alert_o_mly = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.MONTHLY,
-            name="Test Alert O mly",
-            query=f"type=o&stat_{unpublished_status}=on",
-            alert_type=SEARCH_TYPES.OPINION,
-        )
+        with cls.captureOnCommitCallbacks(execute=True):
+            cls.search_alert = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert O",
+                query=f"q=California&type=o&stat_{unpublished_status}=on",
+                alert_type=SEARCH_TYPES.OPINION,
+            )
+            cls.search_alert_rt = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert O rt",
+                query=f"type=o&stat_{unpublished_status}=on",
+                alert_type=SEARCH_TYPES.OPINION,
+            )
+            cls.search_alert_rt_1 = AlertFactory(
+                user=cls.user_profile_1.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert O rt",
+                query=f"type=o&stat_{unpublished_status}=on",
+                alert_type=SEARCH_TYPES.OPINION,
+            )
+            cls.search_alert_oa = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA",
+                query="type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            cls.search_alert_o_wly = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.WEEKLY,
+                name="Test Alert O wly",
+                query=f"type=o&stat_{unpublished_status}=on",
+                alert_type=SEARCH_TYPES.OPINION,
+            )
+            cls.search_alert_o_mly = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.MONTHLY,
+                name="Test Alert O mly",
+                query=f"type=o&stat_{unpublished_status}=on",
+                alert_type=SEARCH_TYPES.OPINION,
+            )
 
-        cls.user_profile_2 = UserProfileWithParentsFactory()
-        cls.webhook_disabled = WebhookFactory(
-            user=cls.user_profile_2.user,
-            event_type=WebhookEventType.SEARCH_ALERT,
-            url="https://example.com/",
-            enabled=False,
-        )
-        cls.search_alert_2 = AlertFactory(
-            user=cls.user_profile_2.user,
-            rate=Alert.DAILY,
-            name="Test Alert O Disabled",
-            query=f"type=o&stat_{unpublished_status}=on",
-            alert_type=SEARCH_TYPES.OPINION,
-        )
-        cls.search_alert_2_1 = AlertFactory(
-            user=cls.user_profile_2.user,
-            rate=Alert.DAILY,
-            name="Test Alert O Copy",
-            query=f"type=o&stat_{unpublished_status}=on",
-            alert_type=SEARCH_TYPES.OPINION,
-        )
-        cls.user_profile_3 = UserProfileWithParentsFactory(
-            user__email="test_3@email.com"
-        )
-        cls.webhook_user_3 = WebhookFactory(
-            user=cls.user_profile_3.user,
-            event_type=WebhookEventType.SEARCH_ALERT,
-            url="https://example.com/",
-            enabled=True,
-            version=1,
-        )
-        cls.search_alert_3 = AlertFactory(
-            user=cls.user_profile_3.user,
-            rate=Alert.DAILY,
-            name="Test Alert 2 O Enabled",
-            query=f"q=California hearing&type=o&stat_{unpublished_status}=on",
-            alert_type=SEARCH_TYPES.OPINION,
-        )
+            cls.user_profile_2 = UserProfileWithParentsFactory()
+            cls.webhook_disabled = WebhookFactory(
+                user=cls.user_profile_2.user,
+                event_type=WebhookEventType.SEARCH_ALERT,
+                url="https://example.com/",
+                enabled=False,
+            )
+            cls.search_alert_2 = AlertFactory(
+                user=cls.user_profile_2.user,
+                rate=Alert.DAILY,
+                name="Test Alert O Disabled",
+                query=f"type=o&stat_{unpublished_status}=on",
+                alert_type=SEARCH_TYPES.OPINION,
+            )
+            cls.search_alert_2_1 = AlertFactory(
+                user=cls.user_profile_2.user,
+                rate=Alert.DAILY,
+                name="Test Alert O Copy",
+                query=f"type=o&stat_{unpublished_status}=on",
+                alert_type=SEARCH_TYPES.OPINION,
+            )
+            cls.user_profile_3 = UserProfileWithParentsFactory(
+                user__email="test_3@email.com"
+            )
+            cls.webhook_user_3 = WebhookFactory(
+                user=cls.user_profile_3.user,
+                event_type=WebhookEventType.SEARCH_ALERT,
+                url="https://example.com/",
+                enabled=True,
+                version=1,
+            )
+            cls.search_alert_3 = AlertFactory(
+                user=cls.user_profile_3.user,
+                rate=Alert.DAILY,
+                name="Test Alert 2 O Enabled",
+                query=f"q=California hearing&type=o&stat_{unpublished_status}=on",
+                alert_type=SEARCH_TYPES.OPINION,
+            )
         cls.c1 = CourtFactory(
             id="canb", jurisdiction="I", citation_string="Bankr. C.D. Cal."
         )
@@ -867,12 +988,17 @@ class SearchAlertsWebhooksTest(
                 type=Opinion.LEAD,
             )
 
-            with mock.patch(
-                "cl.scrapers.tasks.microservice",
-                side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
-            ), mock.patch(
-                "cl.lib.es_signal_processor.allow_es_audio_indexing",
-                side_effect=lambda x, y: True,
+            with (
+                mock.patch(
+                    "cl.scrapers.tasks.microservice",
+                    side_effect=lambda *args, **kwargs: MockResponse(
+                        200, b"10"
+                    ),
+                ),
+                mock.patch(
+                    "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                    side_effect=lambda x, y: True,
+                ),
             ):
                 cls.dly_oral_argument = AudioWithParentsFactory.create(
                     case_name="Dly Test OA",
@@ -916,12 +1042,15 @@ class SearchAlertsWebhooksTest(
         search_alerts = Alert.objects.all()
         self.assertEqual(len(search_alerts), 9, msg="Alerts doesn't match.")
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+            time_machine.travel(self.mock_date, tick=False),
+        ):
             # Send Opinion Alerts
             call_command("cl_send_alerts", rate="dly")
             # Send ES Alerts (Only OA for now)
@@ -1029,10 +1158,10 @@ class SearchAlertsWebhooksTest(
         )
 
         self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
-        self.assertEqual(
-            mail.outbox[1].subject,
-            f"2 Alerts have hits: {self.search_alert_2.name}, {self.search_alert_2_1.name}",
-        )
+        subject = mail.outbox[1].subject
+        self.assertIn("2 Alerts have hits:", subject)
+        self.assertIn(self.search_alert_2.name, subject)
+        self.assertIn(self.search_alert_2_1.name, subject)
         self.assertIn("daily opinion alert", mail.outbox[1].body)
 
         params = {
@@ -1239,9 +1368,10 @@ class SearchAlertsWebhooksTest(
             msg="mly error",
         )
 
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # Get ready the RT opinion for the test.
             rt_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
@@ -1358,9 +1488,10 @@ class SearchAlertsWebhooksTest(
         self.assertEqual(r.json()["count"], 0)
 
         mock_date = now().replace(day=1, hour=5)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             frequency_o = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 cluster__case_name="Frequency Test O",
@@ -1393,9 +1524,8 @@ class SearchAlertsWebhooksTest(
 
 
 class SearchAlertsUtilsTest(SimpleTestCase):
-
     def test_get_cut_off_dates(self):
-        """Confirm get_cut_off_date and get_cut_off_end_date return the right
+        """Confirm get_cut_off_start_date and get_cut_off_end_date return the right
         values according to the input date.
         """
 
@@ -1575,9 +1705,13 @@ class SearchAlertsUtilsTest(SimpleTestCase):
                 },
             ],
         }
+        mock_date = now().replace(day=27, hour=5)
         for rate, test_cases in test_cases.items():
             for test_case in test_cases:
-                with self.subTest(rate=rate, test_case=test_case):
+                with (
+                    self.subTest(rate=rate, test_case=test_case),
+                    time_machine.travel(mock_date, tick=False),
+                ):
                     expected_date_start = date(
                         test_case["year"],
                         test_case["cut_off_month"],
@@ -1599,6 +1733,162 @@ class SearchAlertsUtilsTest(SimpleTestCase):
 
                     self.assertEqual(date_start, expected_date_start)
                     self.assertEqual(date_end, expected_date_end)
+
+    @override_settings(REAL_TIME_ALERTS_SENDING_RATE=60)
+    def test_cut_off_date_for_scheduled_alerts(self):
+        """Confirm get_cut_off_date return the right
+        values according to the input date.
+        """
+        test_cases = {
+            Alert.DAILY: [
+                {
+                    "input_dt": datetime(2025, 5, 1, 12, 0, 0),
+                    "expected": date(2025, 4, 30),
+                    "custom_date": False,
+                },
+                {
+                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
+                    "expected": date(2025, 2, 28),
+                    "custom_date": False,
+                },
+                {
+                    "input_dt": datetime(2025, 5, 1, 12, 0, 0),
+                    "expected": date(2025, 5, 1),
+                    "custom_date": True,
+                },
+                {
+                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
+                    "expected": date(2025, 3, 1),
+                    "custom_date": True,
+                },
+            ],
+            Alert.WEEKLY: [
+                {
+                    "input_dt": datetime(2025, 5, 8, 9, 30, 0),
+                    "expected": date(2025, 5, 1),
+                },
+                {
+                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
+                    "expected": date(2025, 2, 22),
+                },
+            ],
+            Alert.MONTHLY: [
+                {
+                    "input_dt": datetime(2025, 5, 1, 0, 0, 0),
+                    "expected": date(2025, 4, 1),
+                },
+                {
+                    "input_dt": datetime(2025, 1, 1, 0, 0, 0),
+                    "expected": date(2024, 12, 1),
+                },
+            ],
+            Alert.REAL_TIME: [
+                # Consider multiple test cases for timezone differences
+                # and daylight saving time.
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": datetime(
+                        2025, 5, 2, 12, 1, 0, tzinfo=pytz.UTC
+                    ),
+                },
+                {
+                    "input_dt": datetime(2025, 3, 2, 5, 2, 1),
+                    "expected": datetime(
+                        2025, 3, 2, 13, 1, 0, tzinfo=pytz.UTC
+                    ),
+                },
+                {
+                    "input_dt": datetime(2025, 5, 1, 0, 0, 0),
+                    "expected": datetime(
+                        2025, 5, 1, 6, 58, 59, tzinfo=pytz.UTC
+                    ),
+                },
+                {
+                    "input_dt": datetime(2025, 4, 30, 18, 0, 0),
+                    "expected": datetime(
+                        2025, 5, 1, 0, 58, 59, tzinfo=pytz.UTC
+                    ),
+                },
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": date(2025, 5, 1),
+                    "sweep_index": True,
+                    "custom_date": False,
+                },
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": date(2025, 5, 2),
+                    "sweep_index": True,
+                    "custom_date": True,
+                },
+                {
+                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
+                    "expected": datetime(
+                        2025, 5, 2, 12, 1, 0, tzinfo=pytz.UTC
+                    ),
+                    "sweep_index": False,
+                    "custom_date": True,
+                },
+            ],
+        }
+        for rate, cases in test_cases.items():
+            for case in cases:
+                with self.subTest(rate=rate, case=case):
+                    dt = case["input_dt"]
+                    custom_date = case.get("custom_date", False)
+                    sweep_index = case.get("sweep_index", False)
+                    result = get_cut_off_date(
+                        rate, dt, sweep_index, custom_date
+                    )
+                    expected = case["expected"]
+                    self.assertEqual(result, expected)
+
+    def test_is_match_all_query(self):
+        """Confirm is_match_all_query correctly detects match-all
+        or non-match-all queries based on the input query string.
+        """
+
+        test_cases = {
+            "type=o&docket_number=&order_by=score+desc&stat_Published=": True,
+            "type=r&order_by=score+desc&": True,
+            "type=r&q=&order_by=score+desc&": True,
+            "filter=": True,
+            "type=r": True,
+            "type=o&order_by=score+desc&q=    ": True,
+            "order_by=score+desc": True,
+            "": True,
+            "q=People%20v%20Martinez&type=o&order_by=score%20desc&stat_Published=on": False,
+            "type=oa&docket_number=19-1010&order_by=score+desc&": False,
+            "type=oa&docket_number=19-1010&order_by=score+desc&stat_Published=": False,
+            "q=hello": False,
+            "filter=value": False,
+        }
+
+        for query_string, expected in test_cases.items():
+            with self.subTest(query_string=query_string):
+                self.assertEqual(is_match_all_query(query_string), expected)
+
+    def test_clean_query_raises_validation_error_for_match_all(self):
+        """Confirm CreateAlertForm.clean_query raises ValidationError
+        when the query is a match-all query.
+        """
+        test_user = UserProfileWithParentsFactory()
+        form = CreateAlertForm(
+            data={
+                "name": "Test Alert",
+                "query": "type=r&order_by=score+desc",
+                "rate": Alert.DAILY,
+                "alert_type": SEARCH_TYPES.RECAP,
+            },
+            user=test_user.user,
+        )
+        is_valid = form.is_valid()
+        self.assertFalse(is_valid)
+        self.assertIn("query", form.errors)
+        self.assertIn(
+            "You can't create a match-all alert. Please try narrowing your query.",
+            form.errors["query"],
+        )
 
 
 class DocketAlertAPITests(APITestCase):
@@ -1745,7 +2035,8 @@ class DocketAlertAPITests(APITestCase):
         self.assertEqual(await docket_alert.acount(), 1)
         docket_alert_first = await docket_alert.afirst()
         self.assertEqual(
-            docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION  # type: ignore[union-attr]
+            docket_alert_first.alert_type,  # type: ignore[union-attr]
+            DocketAlert.SUBSCRIPTION,
         )
         docket_alert_1_path_detail = reverse(
             "docket-alert-detail",
@@ -1784,7 +2075,8 @@ class DocketAlertAPITests(APITestCase):
         self.assertEqual(await docket_alert.acount(), 1)
         docket_alert_first = await docket_alert.afirst()
         self.assertEqual(
-            docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION  # type: ignore[union-attr]
+            docket_alert_first.alert_type,  # type: ignore[union-attr]
+            DocketAlert.SUBSCRIPTION,
         )
         docket_alert_1_path_detail = reverse(
             "docket-alert-detail",
@@ -2402,55 +2694,56 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             url="https://example.com/",
             enabled=True,
         )
-        cls.search_alert = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert OA",
-            query="q=RT+Test+OA+19-5735&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        cls.search_alert_2 = AlertFactory(
-            user=cls.user_profile_2.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert OA 2",
-            query="q=RT+Test+OA&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        cls.search_alert_3 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA Daily",
-            query="q=Test+OA&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        cls.search_alert_4 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA Daily 2",
-            query="q=DLY+Test+V2+19-5741&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        cls.search_alert_5 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.WEEKLY,
-            name="Test Alert OA Weekly",
-            query="q=Test+OA&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        cls.search_alert_6 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.MONTHLY,
-            name="Test Alert OA Monthly",
-            query="q=Test+OA&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        cls.search_alert_7 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert OA RT Docket ID",
-            query=f"q=docket_id:{cls.docket.pk}&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
+        with cls.captureOnCommitCallbacks(execute=True):
+            cls.search_alert = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert OA",
+                query="q=RT+Test+OA+19-5735&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            cls.search_alert_2 = AlertFactory(
+                user=cls.user_profile_2.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert OA 2",
+                query="q=RT+Test+OA&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            cls.search_alert_3 = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA Daily",
+                query="q=Test+OA&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            cls.search_alert_4 = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA Daily 2",
+                query="q=DLY+Test+V2+19-5741&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            cls.search_alert_5 = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.WEEKLY,
+                name="Test Alert OA Weekly",
+                query="q=Test+OA&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            cls.search_alert_6 = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.MONTHLY,
+                name="Test Alert OA Monthly",
+                query="q=Test+OA&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            cls.search_alert_7 = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert OA RT Docket ID",
+                query=f"q=docket_id:{cls.docket.pk}&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
 
     @classmethod
     def tearDownClass(cls):
@@ -2474,9 +2767,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertEqual(r.json()["count"], 0)
 
         mock_date = now().replace(day=1, hour=5)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="Frequency Test OA",
@@ -2497,16 +2791,17 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     def test_send_oa_search_alert_webhooks(self, mock_abort_audio):
         """Can we send RT OA search alerts?"""
 
+        mock_date = now().replace(day=1, hour=5)
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(day=1, hour=5)
-            with time_machine.travel(
-                mock_date, tick=False
-            ), self.captureOnCommitCallbacks(execute=True):
+            with (
+                time_machine.travel(mock_date, tick=False),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
                 # When the Audio object is created it should trigger an alert.
                 transcript = "RT Test OA transcript."
                 rt_oral_argument = AudioWithParentsFactory.create(
@@ -2523,6 +2818,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         # Send RT alerts
         with time_machine.travel(mock_date, tick=False):
             call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+            alerts_runtime_naive = datetime.now()
         # Confirm Alert date_last_hit is updated.
         self.search_alert.refresh_from_db()
         self.search_alert_2.refresh_from_db()
@@ -2578,12 +2874,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertIn("<strong>19-5735</strong>", html_content)
         self.assertIn("<strong>RT Test OA</strong>", html_content)
 
-        # Confirm that order_by is overridden in the 'View Full Results' URL by
-        # dateArgued+desc.
-        view_results_url = html.fromstring(str(html_content)).xpath(
-            '//a[text()="View Full Results / Edit this Alert"]/@href'
+        # Confirm that query overridden in the 'View Full Results' URL to
+        # include a filter by timestamp.
+        self._assert_timestamp_filter(
+            html_content, Alert.REAL_TIME, alerts_runtime_naive
         )
-        self.assertIn("order_by=dateArgued+desc", view_results_url[0])
 
         # The right alert type template is used.
         self.assertIn("oral argument", html_content)
@@ -2639,9 +2934,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             ),
         ):
             mock_date = now().replace(day=1, hour=5)
-            with time_machine.travel(
-                mock_date, tick=False
-            ), self.captureOnCommitCallbacks(execute=True):
+            with (
+                time_machine.travel(mock_date, tick=False),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
                 # When the Audio object is created it should trigger an alert.
                 transcript = "This a different transcript."
                 rt_oral_argument_2 = AudioWithParentsFactory.create(
@@ -2689,12 +2985,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
 
     def test_send_alert_on_document_creation(self, mock_abort_audio):
         """Avoid sending Search Alerts on document updates."""
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="RT Test OA",
@@ -2720,12 +3019,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 4)
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # Audio object is updated.
             rt_oral_argument.sha1 = "12345"
             rt_oral_argument.save()
@@ -2747,14 +3049,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         """Can we update and delete an alert, and expect these changes to be
         properly reflected in Elasticsearch?"""
 
-        # Create a new alert.
-        search_alert_1 = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert OA",
-            query="type=oa&docket_number=19-1010&order_by=score desc",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            # Create a new alert.
+            search_alert_1 = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert OA",
+                query="type=oa&docket_number=19-1010&order_by=score desc",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
 
         # Confirm it was properly indexed in ES.
         search_alert_1_id = search_alert_1.pk
@@ -2764,10 +3067,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertIn("'rate': 'rt'", response_str)
         self.assertNotIn("function_score", response_str)
 
-        # Update Alert
-        search_alert_1.query = "type=oa&docket_number=19-1020"
-        search_alert_1.rate = "dly"
-        search_alert_1.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            # Update Alert
+            search_alert_1.query = "type=oa&docket_number=19-1020"
+            search_alert_1.rate = "dly"
+            search_alert_1.save()
 
         doc = AudioPercolator.get(id=search_alert_1_id)
         response_str = str(doc.to_dict())
@@ -2829,28 +3133,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 html_content = content
                 break
 
-        # Confirm that order_by is overridden in the 'View Full Results'
-        # URL by dateArgued+desc.
-        view_results_url = html.fromstring(str(html_content)).xpath(
-            '//a[text()="View Full Results / Edit this Alert"]/@href'
-        )
-
-        parsed_url = urlparse(view_results_url[0])
-        params = parse_qs(parsed_url.query)
-        self.assertEqual("dateArgued desc", params["order_by"][0])
-
         if previous_date:
             self.assertEqual(search_alert.date_last_hit, previous_date)
         else:
             self.assertEqual(search_alert.date_last_hit, mock_date)
-
-            # Confirm that argued_after is properly set in the
+            # Confirm that timestamp filter is properly set in the
             # 'View Full Results' URL.
-            cut_off_date = get_cut_off_date(rate, mock_date.date())
-            date_in_query = datetime.strptime(
-                params["argued_after"][0], "%m/%d/%Y"
-            ).date()
-            self.assertEqual(cut_off_date, date_in_query)
+            self._assert_timestamp_filter(html_content, rate, mock_date)
 
         # Confirm stored alerts instances status is set to SENT.
         scheduled_hits = ScheduledAlertHit.objects.filter(alert__rate=rate)
@@ -2975,27 +3264,30 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     )
     def test_group_alerts_and_hits(self, mock_logger, mock_abort_audio):
         """"""
-
-        rt_oa_search_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test RT Alert OA",
-            query="q=docketNumber:19-5739 OR docketNumber:19-5740&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        rt_oa_search_alert_2 = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test RT Alert OA 2",
-            query="q=docketNumber:19-5741&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with self.captureOnCommitCallbacks(execute=True):
+            rt_oa_search_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test RT Alert OA",
+                query="q=docketNumber:19-5739 OR docketNumber:19-5740&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            rt_oa_search_alert_2 = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test RT Alert OA 2",
+                query="q=docketNumber:19-5741&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument_1 = AudioWithParentsFactory.create(
                 case_name="DLY Test OA",
@@ -3035,10 +3327,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertIn(rt_oral_argument_1.case_name, text_content)
         self.assertIn(rt_oral_argument_2.case_name, text_content)
         self.assertIn(rt_oral_argument_3.case_name, text_content)
-        self.assertEqual(
-            mail.outbox[0].subject,
-            f"2 Alerts have hits: {rt_oa_search_alert.name}, {rt_oa_search_alert_2.name}",
-        )
+        subject = mail.outbox[0].subject
+        self.assertIn("2 Alerts have hits:", subject)
+        self.assertIn(rt_oa_search_alert.name, subject)
+        self.assertIn(rt_oa_search_alert_2.name, subject)
 
         # Assert html version.
         html_content = self.get_html_content_from_email(mail.outbox[0])
@@ -3109,10 +3401,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             len(mail.outbox), 2, msg="Wrong number of emails sent."
         )
         text_content = mail.outbox[1].body
-        self.assertEqual(
-            mail.outbox[1].subject,
-            f"2 Alerts have hits: {self.search_alert_3.name}, {self.search_alert_4.name}",
-        )
+        subject = mail.outbox[1].subject
+        self.assertIn("2 Alerts have hits:", subject)
+        self.assertIn(self.search_alert_3.name, subject)
+        self.assertIn(self.search_alert_4.name, subject)
 
         # The right alert type template is used.
         self.assertIn("oral argument", text_content)
@@ -3197,14 +3489,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 url="https://example.com/",
                 enabled=True,
             )
-            alert = AlertFactory.create(
-                user=user_profile.user,
-                rate=Alert.REAL_TIME,
-                name=f"Test Alert RT {i}",
-                query="q=RT+Test+OA&type=oa",
-                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-            )
-            alerts_created.append(alert)
+            with self.captureOnCommitCallbacks(execute=True):
+                alert = AlertFactory.create(
+                    user=user_profile.user,
+                    rate=Alert.REAL_TIME,
+                    name=f"Test Alert RT {i}",
+                    query="q=RT+Test+OA&type=oa",
+                    alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+                )
+                alerts_created.append(alert)
 
         webhooks = Webhook.objects.all()
         self.assertEqual(len(webhooks), 11)
@@ -3218,12 +3511,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         mail.outbox = []
 
         # Trigger RT alerts adding a document that matches the alerts.
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="RT Test OA",
                 docket__court=self.court_1,
@@ -3277,22 +3573,26 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 url="https://example.com/",
                 enabled=True,
             )
-            alert = AlertFactory.create(
-                user=user_profile.user,
-                rate=Alert.DAILY,
-                name=f"Test Alert OA {i}",
-                query="q=OA&+19-5735&type=oa",
-                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-            )
-            alerts_created.append(alert)
+            with self.captureOnCommitCallbacks(execute=True):
+                alert = AlertFactory.create(
+                    user=user_profile.user,
+                    rate=Alert.DAILY,
+                    name=f"Test Alert OA {i}",
+                    query="q=OA&+19-5735&type=oa",
+                    alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+                )
+                alerts_created.append(alert)
             # Create a new document that triggers each existing alert created
             # at this stage.
-            with mock.patch(
-                "cl.api.webhooks.requests.post",
-                side_effect=lambda *args, **kwargs: MockResponse(
-                    200, mock_raw=True
+            with (
+                mock.patch(
+                    "cl.api.webhooks.requests.post",
+                    side_effect=lambda *args, **kwargs: MockResponse(
+                        200, mock_raw=True
+                    ),
                 ),
-            ), self.captureOnCommitCallbacks(execute=True):
+                self.captureOnCommitCallbacks(execute=True),
+            ):
                 audio = AudioWithParentsFactory.create(
                     case_name="Test OA",
                     docket__court=self.court_1,
@@ -3353,23 +3653,27 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
 
         alerts_created = []
         for i in range(6):
-            user_profile = UserProfileWithParentsFactory.create()
-            alert = AlertFactory.create(
-                user=user_profile.user,
-                rate=Alert.REAL_TIME,
-                name=f"Test Alert RT {i}",
-                query="q=Lorem+Ipsum+20-5739&type=oa",
-                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-            )
-            alerts_created.append(alert)
+            with self.captureOnCommitCallbacks(execute=True):
+                user_profile = UserProfileWithParentsFactory.create()
+                alert = AlertFactory.create(
+                    user=user_profile.user,
+                    rate=Alert.REAL_TIME,
+                    name=f"Test Alert RT {i}",
+                    query="q=Lorem+Ipsum+20-5739&type=oa",
+                    alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+                )
+                alerts_created.append(alert)
 
         # Save a document to percolate it later.
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="Lorem Ipsum",
                 docket__court=self.court_1,
@@ -3388,10 +3692,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             result.id for result in percolator_responses.main_response.hits
         ]
 
-        # Update the first in the previous batch.
-        alert_to_modify = alerts_created[0]
-        alert_to_modify.rate = "dly"
-        alert_to_modify.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            # Update the first in the previous batch.
+            alert_to_modify = alerts_created[0]
+            alert_to_modify.rate = "dly"
+            alert_to_modify.save()
 
         # Percolate the next page.
         search_after = percolator_responses.main_response.hits[-1].meta.sort
@@ -3413,20 +3718,21 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     ):
         """Can we avoid sending or_scheduling disabled search alerts?."""
 
-        rt_alert_disabled = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.OFF,
-            name="Test Alert OA Daily",
-            query="q=Disabled+Alert&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        dly_alert_disabled = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.OFF,
-            name="Test Alert OA Daily",
-            query="q=Disabled+Alert&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            rt_alert_disabled = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.OFF,
+                name="Test Alert OA Daily",
+                query="q=Disabled+Alert&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            dly_alert_disabled = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.OFF,
+                name="Test Alert OA Daily",
+                query="q=Disabled+Alert&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -3459,19 +3765,23 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         """Can we prevent re-sending scheduled alerts that have already been
         sent?"""
 
-        dly_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA Daily",
-            query="q=Scheduled+Alert&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with self.captureOnCommitCallbacks(execute=True):
+            dly_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA Daily",
+                query="q=Scheduled+Alert&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # When the Audio object is created it should trigger an alert.
             oral_argument = AudioWithParentsFactory.create(
                 case_name="Scheduled+Alert",
@@ -3511,9 +3821,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
 
         # Create a new Audio Document which will schedule a new DLY Alert hit.
         mock_date = now() + timedelta(days=DAYS_TO_DELETE - 5)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             oral_argument_2 = AudioWithParentsFactory.create(
                 case_name="Scheduled+Alert",
                 docket__court=self.court_1,
@@ -3554,20 +3865,24 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         )
         self.assertEqual(all_alert_hits[0].pk, scheduled_alert_pk)
 
-        # Create a MONTHLY Alert
-        dly_alert_2 = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.MONTHLY,
-            name="Test Alert OA MONTHLY",
-            query="q=Monthly+Hit&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with self.captureOnCommitCallbacks(execute=True):
+            # Create a MONTHLY Alert
+            dly_alert_2 = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.MONTHLY,
+                name="Test Alert OA MONTHLY",
+                query="q=Monthly+Hit&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
-        ), self.captureOnCommitCallbacks(execute=True):
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             # Schedule the MONTHLY Alert hit.
             oral_argument_3 = AudioWithParentsFactory.create(
                 case_name="Monthly+Hit",
@@ -3606,27 +3921,28 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     def test_scheduled_hits_limit(self, mock_abort_audio):
         """Confirm we only store the max number of alert hits set in settings."""
 
-        alert_1 = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA Daily 1",
-            query="q=USA+vs+Bank+&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        alert_2 = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA Daily 2",
-            query="q=Texas+vs+Corp&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        alert_3 = AlertFactory(
-            user=self.user_profile_2.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA Daily 3",
-            query="q=Texas+vs+Corp&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            alert_1 = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA Daily 1",
+                query="q=USA+vs+Bank+&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            alert_2 = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA Daily 2",
+                query="q=Texas+vs+Corp&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            alert_3 = AlertFactory(
+                user=self.user_profile_2.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA Daily 3",
+                query="q=Texas+vs+Corp&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
 
         oa_created = []
         for i in range(4):
@@ -3696,6 +4012,7 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
     def setUpTestData(cls):
         cls.user_profile = UserProfileWithParentsFactory()
         cls.user_profile_2 = UserProfileWithParentsFactory()
+
         cls.search_alert = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
@@ -3782,11 +4099,11 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         call_command(
             "cl_index_search_alerts",
             pk_offset=0,
-            alert_type=SEARCH_TYPES.RECAP,
+            alert_type=SEARCH_TYPES.PEOPLE,
         )
 
         mock_logger.info.assert_called_with(
-            f"'{SEARCH_TYPES.RECAP}' Alert type indexing is not supported yet."
+            f"'{SEARCH_TYPES.PEOPLE}' Alert type indexing is not supported yet."
         )
 
     @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
@@ -3820,20 +4137,21 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
     def test_avoid_indexing_no_valid_alert_query(self):
         """Confirm invalid alert queries are not indexed."""
 
-        not_valid_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA Daily 2",
-            query="q=DLY+Test+V2&type=oa&argued_after=1",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
-        valid_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA Daily 2",
-            query="q=DLY+Test+V2&type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            not_valid_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA Daily 2",
+                query="q=DLY+Test+V2&type=oa&argued_after=1",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+            valid_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA Daily 2",
+                query="q=DLY+Test+V2&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
         # Call cl_index_search_alerts command.
         call_command(
             "cl_index_search_alerts",
@@ -3853,7 +4171,6 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
 
 
 class OneClickUnsubscribeTests(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.user_profile = UserProfileWithParentsFactory()
@@ -3884,7 +4201,6 @@ class OneClickUnsubscribeTests(TestCase):
 
 @override_settings(EMAIL_BACKEND="cl.lib.email_backends.EmailBackend")
 class EmailWithSurrogatesTest(TestCase):
-
     def setUp(self):
         EmailSent.objects.all().delete()
 
