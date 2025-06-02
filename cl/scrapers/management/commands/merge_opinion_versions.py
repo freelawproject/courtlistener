@@ -2,7 +2,6 @@ import itertools
 import re
 from collections import defaultdict
 from difflib import Differ, SequenceMatcher
-from typing import Union
 
 from django.db import transaction
 from django.db.models import Count, Q, QuerySet
@@ -323,8 +322,8 @@ def text_is_similar(text1: str, text2: str) -> bool:
 
 
 def update_referencing_objects(
-    main_object: Union[OpinionCluster, Docket],
-    version_object: Union[OpinionCluster, Docket],
+    main_object: OpinionCluster | Docket,
+    version_object: OpinionCluster | Docket,
 ):
     """Make all objects referencing to `version_object` point to `main_object`
 
@@ -358,8 +357,8 @@ def update_referencing_objects(
 
 
 def merge_metadata(
-    main_object: Union[Opinion, OpinionCluster, Docket],
-    version_object: Union[Opinion, OpinionCluster, Docket],
+    main_object: Opinion | OpinionCluster | Docket,
+    version_object: Opinion | OpinionCluster | Docket,
 ) -> bool:
     """Merge `fields_to_merge` from `version_object` into `main_object`
 
@@ -592,7 +591,7 @@ def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
 
 def merge_versions_by_text_similarity(
     main_opinion: Opinion,
-    versions: Union[QuerySet[Opinion], list[Opinion]],
+    versions: QuerySet[Opinion] | list[Opinion],
     stats: dict,
 ) -> None:
     """Compare text of main and candidate version opinions; merge if similar
