@@ -610,8 +610,13 @@ def get_lambda_arns() -> dict[str, str]:
         are their corresponding ARNs (str).
     """
     lambda_client = boto3.client("lambda", region_name="us-west-2")
-    request = lambda_client.list_functions()
-    return {f["FunctionName"]: f["FunctionArn"] for f in request["Functions"]}
+    paginator = lambda_client.get_paginator("list_functions")
+    lambda_arns = {}
+    for page in paginator.paginate():
+        for function in page.get("Functions", []):
+            lambda_arns[function["FunctionName"]] = function["FunctionArn"]
+
+    return lambda_arns
 
 
 def create_and_execute_batch_job(
