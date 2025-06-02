@@ -7,7 +7,6 @@ from django.core.management import CommandError
 from django.core.management.base import CommandParser
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 
-from cl.citations.models import UnmatchedCitation
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
@@ -108,6 +107,15 @@ class Command(VerboseCommand):
             default=False,
             help="Disconnect ElasticSearch signals for ParentheticalGroups",
         )
+        parser.add_argument(
+            "--disable-citation-count-update",
+            action="store_true",
+            default=False,
+            help=(
+                "Disconnect OpinionCluster.citation_count and related ES "
+                "documents update"
+            ),
+        )
 
     def handle(self, *args: list[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
@@ -172,14 +180,15 @@ class Command(VerboseCommand):
         if options.get("no_html_with_citations"):
             query = query.filter(html_with_citations="")
         if options.get("all"):
-            query = Opinion.objects.all()
-            sys.stdout.write("Deleting all UnmatchedCitation rows")
-            UnmatchedCitation.objects.all().delete()
             # force disconnection for batch jobs
             disconnect_elastic_signals = True
+            disable_citation_count_update = True
         else:
             disconnect_elastic_signals = cast(
                 bool, options["disconnect_elastic_signals"]
+            )
+            disable_citation_count_update = cast(
+                bool, options["disable_citation_count_update"]
             )
 
         self.count = query.count()
@@ -192,6 +201,7 @@ class Command(VerboseCommand):
             cast(int, options["throttle_min_items"]),
             cast(int, options["opinions_per_task"]),
             disconnect_elastic_signals,
+            disable_citation_count_update,
         )
 
     def log_progress(self, processed_count: int, last_pk: int) -> None:
@@ -225,6 +235,7 @@ class Command(VerboseCommand):
         throttle_min_items: int = DEFAULT_THROTTLE_MIN_ITEMS,
         opinions_per_task: int = DEFAULT_OPINIONS_PER_TASK,
         disconnect_elastic_signals: bool = False,
+        disable_citation_count_update: bool = False,
     ) -> None:
         sys.stdout.write(f"Graph size is {self.count:d} nodes.\n")
         sys.stdout.flush()
@@ -241,7 +252,11 @@ class Command(VerboseCommand):
             chunk.append(opinion_pk)
             if processed_count % opinions_per_task == 0 or last_item:
                 find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-                    args=(chunk, disconnect_elastic_signals),
+                    args=(
+                        chunk,
+                        disconnect_elastic_signals,
+                        disable_citation_count_update,
+                    ),
                     queue=queue_name,
                 )
                 chunk = []
