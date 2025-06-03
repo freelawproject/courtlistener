@@ -22,6 +22,7 @@
       {'href': '#creating-search-alerts', 'text': 'Creating Alerts'},
       {'href': '#enabling-real-time-alerts', 'text': 'Enabling Real Time Alerts'},
       {'href': '#recap-search-alerts-limitations', 'text': 'Limitations of Real-Time RECAP Search Alerts'},
+      {'href': '#recap-cases-or-filings', 'text': 'RECAP Cases or Filings'},
       {'href': '#editing-search-alerts', 'text': 'Editing/Deleting an Alert'},
       {'href': '#disabling-search-alerts', 'text': 'Disabling an Alert'},
       {'href': '#courts', 'text': 'Supported Courts'},
@@ -249,6 +250,20 @@
     <p>As a workaround to build alerts that involve party and attorney conditions along with a filing description, use the sidebar filters instead of the main query box.</p>
   </c-layout-with-navigation.section>
 
+  {# RECAP Search Alerts for Cases or Filings #}
+  <c-layout-with-navigation.section id="recap-cases-or-filings">
+    <h3>RECAP Search Alerts for Cases or Filings</h3>
+  <p>For RECAP Search Alerts, you can choose whether you’d like alerts for new cases only, or for both new cases and new filings:</p>
+  <figure class="bg-greyscale-50 p-2 rounded-2xl">
+      <img
+        src="{% static "png/logo.png" %}"
+        alt="screenshot of alert selection for cases or filings"
+        class="max-w-full"
+        height="388"
+        width="">
+    </figure>
+  </c-layout-with-navigation.section>
+  
   {# Editing or Deleting a Search Alert #}
   <c-layout-with-navigation.section id="editing-search-alerts">
     <h3>Editing or Deleting a Search Alert</h3>
