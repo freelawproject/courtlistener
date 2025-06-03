@@ -180,6 +180,7 @@ class Command(VerboseCommand):
         if options.get("no_html_with_citations"):
             query = query.filter(html_with_citations="")
         if options.get("all"):
+            query = Opinion.objects.all()
             # force disconnection for batch jobs
             disconnect_elastic_signals = True
             disable_citation_count_update = True
