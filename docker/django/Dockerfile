@@ -4,7 +4,7 @@ FROM python:3.13 AS build-base
 # caching: https://docs.docker.com/build/cache/optimize/#use-cache-mounts
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update --option "Acquire::Retries=3" --quiet=2 && \
+    apt-get update --quiet=2 && \
     apt-get install \
     --no-install-recommends \
     --assume-yes \

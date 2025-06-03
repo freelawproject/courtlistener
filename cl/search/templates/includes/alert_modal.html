@@ -75,17 +75,16 @@
                 {% for radio in alert_form.alert_type %}
                   <div class="radio">
                     <div class="row">
-                      <div class="col-xs-8">
+                      <div class="flex col-xs-12">
                         <label for="{{ radio.id_for_label }}">
                           {{ radio.tag }} {{ radio.choice_label }}
                         </label>
-                      </div>
-                      <div class="col-xs-4 text-right hidden-xs">
-                        <div
-                          class="text-muted hidden-xs"
-                          id="{% if forloop.first %}alert-estimate-case-only{% else %}alert-estimate{% endif %}">
-                          <i class="fa fa-spinner fa-pulse gray"></i>
-                          <span>Loading alert frequency&hellip;</span>
+                        <div class="ml-auto hidden-xs">
+                          <div class="text-muted hidden-xs"
+                            id="{% if forloop.first %}alert-estimate-case-only{% else %}alert-estimate{% endif %}">
+                            <i class="fa fa-spinner fa-pulse gray"></i>
+                            <span>Loading alert frequency&hellip;</span>
+                          </div>
                         </div>
                       </div>
                     </div>

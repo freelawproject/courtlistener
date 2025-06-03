@@ -2368,7 +2368,7 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
     percolator_query = PercolatorField()
 
     class Index:
-        name = "recap_percolator"
+        name = "recap_percolator_index"
         settings = {
             "number_of_shards": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_SHARDS,
             "number_of_replicas": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_REPLICAS,
@@ -2395,4 +2395,4 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
 
         cd = search_form.cleaned_data
         query = build_plain_percolator_query(cd)
-        return query.to_dict()
+        return query.to_dict() if query else None
