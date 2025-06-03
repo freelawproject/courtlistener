@@ -50,30 +50,28 @@ class SearchAlertSerializer(
         alert_type_query = qd.get("type")
         alert_type_request = attrs.get("alert_type")
 
+        # If no 'type' is provided in the query parameters, default the alert
+        # to an OPINION alert.
+        if not alert_type_query:
+            attrs["alert_type"] = SEARCH_TYPES.OPINION
+            return attrs
+
         recap_supported_types = [
             alert_type for alert_type, _ in SEARCH_TYPES.RECAP_ALERT_TYPES
         ]
-        # If the request provided an alert_type and the query type is
-        # RECAP or DOCKETS, validate alert_type_request against RECAP-specific
-        # valid types.
-        if alert_type_request and alert_type_query in recap_supported_types:
+        # For non-RECAP alert types specified in the query, validate against
+        # all supported types.
+        if alert_type_query not in recap_supported_types:
             try:
-                validate_recap_alert_type(alert_type_request)
-            except ValidationError:
-                raise serializers.ValidationError(
-                    {
-                        "alert_type": "The specified alert type is not valid "
-                        "for the given RECAP search query."
-                    }
-                )
-            # If the provided alert_type_request is valid for the RECAP query, use it.
-            attrs["alert_type"] = alert_type_request
-
+                validate_alert_type(alert_type_query)
+            except ValidationError as e:
+                raise serializers.ValidationError({"alert_type": e.messages})
+            attrs["alert_type"] = alert_type_query
             return attrs
-        elif (
-            not alert_type_request
-            and alert_type_query in recap_supported_types
-        ):
+
+        # If the query specifies a RECAP alert type, make sure an 'alert_type'
+        # is also provided in the request body.
+        if not alert_type_request:
             raise serializers.ValidationError(
                 {
                     "alert_type": "Please provide an alert type for your RECAP search query. "
@@ -82,16 +80,19 @@ class SearchAlertSerializer(
                 }
             )
 
-        # Validate the alert type specified in the query for non-RECAP alerts.
-        if alert_type_query:
-            try:
-                validate_alert_type(alert_type_query)
-                attrs["alert_type"] = alert_type_query
-            except ValidationError as e:
-                raise serializers.ValidationError({"alert_type": e.messages})
-        else:
-            # If not type provided in the query it's an OPINION Alert.
-            attrs["alert_type"] = SEARCH_TYPES.OPINION
+        # For RECAP or DOCKETS query types, validate the requested
+        # 'alert_type' against RECAP-specific valid types.
+        try:
+            validate_recap_alert_type(alert_type_request)
+        except ValidationError:
+            raise serializers.ValidationError(
+                {
+                    "alert_type": "The specified alert type is not valid "
+                    "for the given RECAP search query."
+                }
+            )
+        # If the requested RECAP alert type is valid, use it.
+        attrs["alert_type"] = alert_type_request
         return attrs
 
     def create(self, validated_data):
