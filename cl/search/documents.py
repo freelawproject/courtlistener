@@ -2395,4 +2395,4 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
 
         cd = search_form.cleaned_data
         query = build_plain_percolator_query(cd)
-        return query.to_dict()
+        return query.to_dict() if query else None
