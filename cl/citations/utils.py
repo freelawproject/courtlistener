@@ -223,3 +223,31 @@ def make_get_citations_kwargs(document) -> dict:
         }
 
     return kwargs
+
+
+def get_cited_clusters_ids_to_update(
+    resolutions, citing_opinion_id: int
+) -> list[int]:
+    """Get ids for clusters that need their `citation_count` updated
+
+    Increase the citation count for the cluster of each matched opinion
+    if that cluster has not already been cited by this opinion.
+
+    :param resolutions: an iterable of opinion objects
+    :param citing_opinion_id: the citing opinion
+
+    :return: the list of OpinionCluster ids for update
+    """
+    # prevent circular imports
+    OpinionsCited = apps.get_model("search.OpinionsCited")
+
+    currently_cited_opinions = OpinionsCited.objects.filter(
+        citing_opinion_id=citing_opinion_id
+    ).values_list("cited_opinion_id", flat=True)
+
+    cluster_ids_to_update = {
+        o.cluster.pk
+        for o in resolutions
+        if o.pk not in currently_cited_opinions
+    }
+    return list(cluster_ids_to_update)
