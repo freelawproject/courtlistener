@@ -1,0 +1,18 @@
+{% extends "new_base.html" %}
+{% load svg_tags %}
+
+{% block title %}Non-Profit Free Legal Search Engine and Alert System – CourtListener.com{% endblock %}
+
+{% block header %}
+  <c-header variant="homepage" class="bg-greyscale-100"></c-header>
+{% endblock %}
+
+{% block content_wrapper %}
+<div class="w-full h-[100vh] bg-greyscale-100">
+  <div class="flex justify-center">
+    <div class="w-[310px] h-35">
+      {% svg "logos/courtlistener" class="bg-greyscale-800" %}
+    </div>
+  </div>
+</div>
+{% endblock %}
