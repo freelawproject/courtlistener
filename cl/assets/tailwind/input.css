@@ -16,7 +16,7 @@
     @apply border bg-white py-3 px-3.5 rounded-[10px] text-sm font-medium text-greyscale-900;
   }
   h1 {
-    @apply font-cooper font-medium text-display-xs md:font-semibold md:text-display-lg;
+    @apply font-cooper text-display-sm font-semibold md:text-display-lg;
   }
   h2 {
     @apply text-display-xs font-semibold text-greyscale-900;

@@ -212,6 +212,10 @@ header {
   flex-direction: column;
 }
 
+.ml-auto {
+  margin-left: auto;
+}
+
 ul.outdent {
   padding-left: 20px;
 }
