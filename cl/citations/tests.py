@@ -1562,6 +1562,26 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         except NotFoundError:
             pass
 
+    def test_citation_count_not_updated(self) -> None:
+        """Can we disable citation count updates?"""
+        opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
+        # for a citation count to be updated, there needs to be no
+        # OpinionsCited from that citing opinion
+        OpinionsCited.objects.filter(citing_opinion_id=opinion5).delete()
+        cited_count = OpinionCluster(
+            id=self.citation2.cluster_id
+        ).citation_count
+
+        find_citations_and_parentheticals_for_opinion_by_pks(
+            opinion_pks=[opinion5.pk], disable_citation_count_update=True
+        )
+        new_count = OpinionCluster(id=self.citation2.cluster_id).citation_count
+        self.assertEqual(
+            cited_count,
+            new_count,
+            "citation_count was update even when update was disabled",
+        )
+
 
 class CitationFeedTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
