@@ -13,14 +13,35 @@ from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import SEARCH_TYPES, Docket
 
 
-def validate_alert_type(value):
+def check_valid_alert_type_or_raise_error(
+    value: str, valid_types: dict
+) -> None:
+    """Validate the alert type against allowed values.
+
+    :param value: The alert type to validate.
+    :param valid_types: A Dict containing the allowed alert types.
+    :return: None. Raises a ValidationError if the alert type is not supported.
+    """
+    if value not in valid_types:
+        raise ValidationError(f"Unsupported alert type: {value}")
+
+
+def validate_alert_type(value: str) -> None:
     """Validate if the provided alert type is supported.
     :param value: The alert type to validate.
     :return: None.
     """
     valid_types = dict(SEARCH_TYPES.SUPPORTED_ALERT_TYPES)
-    if value not in valid_types:
-        raise ValidationError(f"Unsupported alert type: {value}")
+    check_valid_alert_type_or_raise_error(value, valid_types)
+
+
+def validate_recap_alert_type(value: str) -> None:
+    """Validate if the provided alert type is supported RECAP type.
+    :param value: The alert type to validate.
+    :return: None.
+    """
+    valid_types = dict(SEARCH_TYPES.RECAP_ALERT_TYPES)
+    check_valid_alert_type_or_raise_error(value, valid_types)
 
 
 @pghistory.track()

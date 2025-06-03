@@ -1,7 +1,6 @@
 import logging
 from http.client import ResponseNotReady
 
-from django.conf import settings
 from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
@@ -31,6 +30,7 @@ from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.citations.unmatched_citations_utils import handle_unmatched_citations
 from cl.citations.utils import (
+    get_cited_clusters_ids_to_update,
     make_get_citations_kwargs,
 )
 from cl.search.models import (
@@ -121,6 +121,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
     opinion_pks: list[int],
     disconnect_pg_signals: bool = False,
+    disable_citation_count_update: bool = False,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
@@ -128,25 +129,25 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     :param disconnect_pg_signals: True if ParentheticalGroup post_save and
         post_delete signals should be disconnected; useful in batch jobs
         from the `find_citations` command
+    :param disable_citation_count_update: if True,
+        OpinionCluster.citation_count and related ElasticSearch fields will not
+        be updated. Useful to prevent database overloading during bulk work
 
     :return: None
     """
     opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
         pk__in=opinion_pks
     )
-    # delivery_info does not exist in test environment
-    children_queue = (self.request.delivery_info or {}).get(
-        "routing_key", settings.CELERY_ETL_TASK_QUEUE
-    )
 
     if disconnect_pg_signals:
         disconnect_parenthetical_group_signals()
+
+    update_citation_count = not disable_citation_count_update
     try:
         for index, opinion in enumerate(opinions):
             try:
                 store_opinion_citations_and_update_parentheticals(
-                    opinion,
-                    children_queue,
+                    opinion, update_citation_count
                 )
             except ResponseNotReady as e:
                 # Threading problem in httplib.
@@ -154,7 +155,12 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
             except OperationalError:
                 # delay deadlocked tasks, and continue regular process
                 find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-                    ([opinion.id], disconnect_pg_signals), countdown=60
+                    (
+                        [opinion.id],
+                        disconnect_pg_signals,
+                        disable_citation_count_update,
+                    ),
+                    countdown=60,
                 )
             except Exception as e:
                 # do not retry the whole loop on an unknown exception
@@ -167,6 +173,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                         kwargs={
                             "opinion_pks": ids,
                             "disconnect_pg_signals": disconnect_pg_signals,
+                            "disable_citation_count_update": disable_citation_count_update,
                         },
                     )
     finally:
@@ -176,14 +183,18 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
 
 def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion,
-    queue_for_children: str = settings.CELERY_ETL_TASK_QUEUE,
+    update_citation_count: bool = True,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion,
     parenthetical info for the cited opinions, and stores unmatched citations
 
     :param opinion: A search.Opinion object
-    :param queue: celery queue to send the child tasks to
+    :param update_citation_count: if False, do NOT update the DB or Elastic:
+        - OpinionCluster.citation_count
+        - `index_related_cites_fields` that updates OpinionDocument and
+            OpinionClusterDocument
+        this is useful to prevent database overloading during bulk work
     :return: None
     """
     # Extract the citations from the opinion's text
@@ -241,28 +252,20 @@ def store_opinion_citations_and_update_parentheticals(
                     )
                 )
 
-    # Increase the citation count for the cluster of each matched opinion
-    # if that cluster has not already been cited by this opinion. First,
-    # calculate a list of the IDs of every opinion whose cluster will need
-    # updating.
-    currently_cited_opinions = OpinionsCited.objects.filter(
-        citing_opinion_id=opinion.pk
-    ).values_list("cited_opinion_id", flat=True)
-    cluster_ids_to_update = {
-        o.cluster.pk
-        for o in citation_resolutions.keys()
-        if o.pk not in currently_cited_opinions
-    }
+    # need to update the citation_count of cited clusters
+    cluster_ids_to_update: list[int] = []
 
     # Finally, commit these changes to the database in a single
     # transaction block.
     with transaction.atomic():
-        opinion_clusters_to_update = OpinionCluster.objects.filter(
-            id__in=cluster_ids_to_update
-        )
-        opinion_clusters_to_update.update(
-            citation_count=F("citation_count") + 1
-        )
+        if update_citation_count:
+            cluster_ids_to_update = get_cited_clusters_ids_to_update(
+                citation_resolutions.keys(), opinion.pk
+            )
+            OpinionCluster.objects.filter(id__in=cluster_ids_to_update).update(
+                citation_count=F("citation_count") + 1
+            )
+
         handle_unmatched_citations(
             opinion,
             unmatched_citations + ambiguous_matches,
@@ -296,12 +299,13 @@ def store_opinion_citations_and_update_parentheticals(
         # Save all the changes to the citing opinion
         opinion.save()
 
-    # Update changes in ES.
-    index_related_cites_fields.apply_async(
-        args=(
+    # Updates the ElasticSearch index
+    # - OpinionClusterDocument.citeCount
+    # - OpinionDocument.citeCount
+    # - OpinionDocument.cites
+    if update_citation_count:
+        index_related_cites_fields.delay(
             OpinionsCited.__name__,
             opinion.pk,
-            list(cluster_ids_to_update),
-        ),
-        queue=queue_for_children,
-    )
+            cluster_ids_to_update,
+        )
