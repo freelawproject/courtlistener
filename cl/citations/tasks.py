@@ -158,7 +158,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                     (
                         [opinion.id],
                         disconnect_pg_signals,
-                        update_citation_count,
+                        disable_citation_count_update,
                     ),
                     countdown=60,
                 )
@@ -173,7 +173,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                         kwargs={
                             "opinion_pks": ids,
                             "disconnect_pg_signals": disconnect_pg_signals,
-                            "update_citation_count": update_citation_count,
+                            "disable_citation_count_update": disable_citation_count_update,
                         },
                     )
     finally:
