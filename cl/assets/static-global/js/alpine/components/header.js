@@ -11,6 +11,9 @@ document.addEventListener('alpine:init', () => {
     get scopeCaretClass() {
       return this.scopeMenuExpanded ? 'transform rotate-180' : '';
     },
+    get supportCaretClass() {
+      return this.supportMenuExpanded ? 'transform rotate-180' : '';
+    },
     toggleSupportMenu() {
       this.supportMenuExpanded = !this.supportMenuExpanded;
     },
