@@ -70,9 +70,11 @@
   {# DEFAULT VARIANT #}
   {% else %}
     {# COURTLISTENER LOGO #}
-    <a href="/" class="w-[226px] md:min-w-[226px] flex justify-start" aria-label="Go to homepage">
-      <img src="{% static "png/logo.png" %}" class="md:h-21 md:w-45 h-12 w-[106px]" alt="CourtListener Logo">
-    </a>
+    <div class="w-[226px] md:min-w-[226px] flex justify-start" aria-label="Go to homepage">
+      <div class="md:h-21 md:w-45 h-12 w-[106px]">
+        {% svg "logos/courtlistener" %}
+      </div>
+    </div>
 
     {# SEARCH BAR #}
     <form class="w-full relative hidden lg:flex flex-row flex-nowrap h-12">
