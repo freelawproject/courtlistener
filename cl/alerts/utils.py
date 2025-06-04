@@ -7,7 +7,6 @@ from urllib.parse import parse_qs
 from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ObjectDoesNotExist
 from django.http import QueryDict
 from elasticsearch_dsl import MultiSearch, Q, Search
 from elasticsearch_dsl.query import Query
@@ -21,7 +20,6 @@ from cl.alerts.models import (
     ScheduledAlertHit,
 )
 from cl.lib.command_utils import logger
-from cl.lib.decorators import retry
 from cl.lib.elasticsearch_utils import (
     add_es_highlighting,
     add_fields_boosting,
@@ -621,7 +619,6 @@ def select_es_document_fields(
     }
 
 
-@retry(ObjectDoesNotExist, tries=3, delay=0.25, backoff=2)
 def prepare_percolator_content(
     app_label: str, document_id: str
 ) -> tuple[
