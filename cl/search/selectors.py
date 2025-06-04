@@ -1,7 +1,7 @@
 import natsort
-from django.db.models import F, Q, QuerySet
+from django.db.models import Q, QuerySet
 
-from cl.search.models import OpinionCluster
+from cl.search.models import Citation, OpinionCluster
 
 
 async def get_clusters_from_citation_str(
@@ -50,12 +50,10 @@ async def get_clusters_from_citation_str(
         # Create a list of the closest opinion clusters id and page to the
         # input citation
         closest_opinion_clusters = [
-            opinion
-            async for opinion in OpinionCluster.objects.filter(
-                citations__reporter=reporter, citations__volume=volume
-            )
-            .annotate(cite_page=(F("citations__page")))
-            .values_list("id", "cite_page")
+            c
+            async for c in Citation.objects.filter(
+                reporter=reporter, volume=volume
+            ).values_list("cluster_id", "page")
         ]
 
         # Create a temporal item and add it to the values list

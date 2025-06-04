@@ -494,12 +494,15 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         alert_name="testing_name",
         alert_query="q=testing_query&",
         alert_rate="dly",
+        alert_type=None,
     ):
         data = {
             "name": alert_name,
             "query": alert_query,
             "rate": alert_rate,
         }
+        if alert_type:
+            data["alert_type"] = alert_type
         return await client.post(self.alert_path, data, format="json")
 
     async def test_make_an_alert(self) -> None:
@@ -757,6 +760,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
             self.client,
             alert_name="alert_1",
             alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+            alert_type=SEARCH_TYPES.RECAP,
         )
 
         alert_1_data = alert_1.json()
@@ -780,6 +784,112 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
             "You can't create a match-all alert. Please try narrowing your query.",
             response.json()["query"],
         )
+
+    async def test_saving_case_only_and_recap_alert(self) -> None:
+        """Confirm a case only and both cases and filings alert can be
+        created/updated from the API."""
+
+        test_cases = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+
+        for search_type in test_cases:
+            with self.subTest(search_type=search_type):
+                alert_created = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=case only &type={SEARCH_TYPES.RECAP}",
+                    alert_type=search_type,
+                )
+                self.assertEqual(alert_created.status_code, HTTPStatus.CREATED)
+                alert_created_data = alert_created.json()
+                self.assertEqual(alert_created_data["alert_type"], search_type)
+
+        # Try validation on update. Create a RECAP alert first.
+        recap_alert = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=RECAP alert &type={SEARCH_TYPES.RECAP}",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        alert_alert_data = recap_alert.json()
+        # Try to update the alert to a case only alert.
+        alert_alert_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_alert_data["id"], "version": "v4"},
+        )
+        data_updated = {
+            "name": "alert_alert_updated",
+            "query": "q=recap&type=r&order_by=score+desc&",
+            "rate": Alert.DAILY,
+            "alert_type": SEARCH_TYPES.DOCKETS,
+        }
+        response = await self.client.put(
+            alert_alert_path_detail, data_updated, format="json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        alert_data = response.json()
+        self.assertEqual(alert_data["alert_type"], SEARCH_TYPES.DOCKETS)
+
+    async def test_invalid_recap_alert_type_fails(self) -> None:
+        """Confirm that an error is raised if an invalid alert_type is
+        provided for a RECAP search query.
+        """
+
+        # Set a non-RECAP search type for a RECAP alert query.
+        test_cases = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+        for search_type in test_cases:
+            with self.subTest(search_type=search_type):
+                alert_created = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=RECAP query &type={search_type}",
+                    alert_type=SEARCH_TYPES.OPINION,
+                )
+                self.assertEqual(
+                    alert_created.status_code, HTTPStatus.BAD_REQUEST
+                )
+                self.assertIn(
+                    "The specified alert type is not valid for the given RECAP search query.",
+                    alert_created.json()["alert_type"],
+                )
+
+    async def test_alert_type_not_provided_for_recap_alert(self) -> None:
+        """Confirm that if alert_type is not provided in a RECAP search query,
+        an error is raised.
+        """
+
+        test_cases = [SEARCH_TYPES.DOCKETS, SEARCH_TYPES.RECAP]
+        for search_type in test_cases:
+            with self.subTest(search_type=search_type):
+                alert_created = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=RECAP query &type={search_type}",
+                )
+                self.assertEqual(
+                    alert_created.status_code, HTTPStatus.BAD_REQUEST
+                )
+                self.assertIn(
+                    "Please provide an alert type for your RECAP search query.",
+                    alert_created.json()["alert_type"][0],
+                )
+
+    async def test_alert_type_is_ignored_in_non_recap_alerts(self) -> None:
+        """Confirm that if alert_type is provided in the request, it is ignored.
+        The alert type is instead determined from the alert’s search query.
+        """
+
+        test_cases = [SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT]
+        for search_type in test_cases:
+            with self.subTest(search_type=search_type):
+                alert_created = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=RECAP query &type={search_type}",
+                    alert_type=SEARCH_TYPES.DOCKETS,
+                )
+                self.assertEqual(alert_created.status_code, HTTPStatus.CREATED)
+                alert_created_data = alert_created.json()
+                self.assertEqual(alert_created_data["alert_type"], search_type)
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
@@ -4099,11 +4209,11 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         call_command(
             "cl_index_search_alerts",
             pk_offset=0,
-            alert_type=SEARCH_TYPES.RECAP,
+            alert_type=SEARCH_TYPES.PEOPLE,
         )
 
         mock_logger.info.assert_called_with(
-            f"'{SEARCH_TYPES.RECAP}' Alert type indexing is not supported yet."
+            f"'{SEARCH_TYPES.PEOPLE}' Alert type indexing is not supported yet."
         )
 
     @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
