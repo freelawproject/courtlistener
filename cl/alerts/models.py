@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils.crypto import get_random_string
+from model_utils import FieldTracker
 
 from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import SEARCH_TYPES, Docket
@@ -93,6 +94,7 @@ class Alert(AbstractDateTimeModel):
         "purposes.",
         max_length=40,
     )
+    tracker = FieldTracker(fields=["alert_type"])
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
@@ -104,7 +106,31 @@ class Alert(AbstractDateTimeModel):
         """Ensure we get a token when we save the first time."""
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
+
         super().save(*args, **kwargs)
+
+    def alert_type_changed(self) -> None:
+        """Check if alert_type has changed in an allowed way.
+
+        Raises ValidationError: If alert_type was changed from or to a non-RECAP
+         or non-DOCKET type. This prevents alerts from being indexed into an
+         incompatible percolator index while still remaining in the old one.
+        :return: None if alert_type hasn't changed or change is allowed.
+        """
+        if self.pk is None or not self.tracker.has_changed("alert_type"):
+            return
+        old = self.tracker.previous("alert_type")
+        new = self.alert_type
+        allowed = {SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS}
+        if not {old, new}.issubset(allowed):
+            raise ValidationError(
+                {
+                    "alert_type": (
+                        "You cannot change alert_type once set, "
+                        "unless switching between RECAP 'r' and 'd' types."
+                    )
+                }
+            )
 
 
 class DocketAlertManager(models.Manager):

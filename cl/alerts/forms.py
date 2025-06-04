@@ -73,6 +73,16 @@ class CreateAlertForm(ModelForm):
         else:
             return query
 
+    def clean_alert_type(self):
+        alert_type = self.cleaned_data["alert_type"]
+        try:
+            # Update the instance's alert_type to compare it with its old value
+            self.instance.alert_type = alert_type
+            self.instance.alert_type_changed()
+        except ValidationError as e:
+            raise ValidationError(e.message_dict["alert_type"])
+        return alert_type
+
     class Meta:
         model = Alert
         exclude = ("user", "secret_key")

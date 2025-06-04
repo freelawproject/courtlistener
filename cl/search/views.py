@@ -1,4 +1,5 @@
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 from urllib.parse import quote
 
 from asgiref.sync import async_to_sync
@@ -95,6 +96,24 @@ def get_homepage_stats():
     return homepage_data
 
 
+def _handle_invalid_form(
+    request: HttpRequest,
+    alert_form: CreateAlertForm,
+    render_dict: dict[str, Any],
+) -> TemplateResponse:
+    """Handle invalid form by updating render dict and returning error response.
+
+    :param request: The HTTP request object containing GET parameters.
+    :param alert_form: The invalid CreateAlertForm instance.
+    :param render_dict: The template context dictionary to be rendered.
+
+    :return: The TemplateResponse
+    """
+    render_dict.update(do_es_search(request.GET.copy()))
+    render_dict.update({"alert_form": alert_form})
+    return TemplateResponse(request, "search.html", render_dict)
+
+
 @never_cache
 def show_results(request: HttpRequest) -> HttpResponse:
     """
@@ -136,43 +155,43 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 ),
             },
         )
-        if alert_form.is_valid():
-            cd = alert_form.cleaned_data
-
-            # save the alert
-            if request.POST.get("edit_alert"):
-                # check if the user can edit this, or if they are url hacking
-                alert = get_object_or_404(
-                    Alert,
-                    pk=request.POST.get("edit_alert"),
-                    user=request.user,
-                )
-                alert_form = CreateAlertForm(
-                    cd, instance=alert, user=request.user
-                )
-                alert_form.save()
-                action = "edited"
-            else:
-                alert_form = CreateAlertForm(cd, user=request.user)
-                alert = alert_form.save(commit=False)
-                alert.user = request.user
-                alert.save()
-
-                action = "created"
-            messages.add_message(
-                request,
-                messages.SUCCESS,
-                f"Your alert was {action} successfully.",
-            )
-
-            # and redirect to the alerts page
-            return HttpResponseRedirect(reverse("profile_alerts"))
-        else:
+        if not alert_form.is_valid():
             # Invalid form. Do the search again and show them the alert form
             # with the errors
-            render_dict.update(do_es_search(request.GET.copy()))
-            render_dict.update({"alert_form": alert_form})
-            return TemplateResponse(request, "search.html", render_dict)
+            return _handle_invalid_form(request, alert_form, render_dict)
+
+        cd = alert_form.cleaned_data
+        # Handle alert editing or creation
+        if request.POST.get("edit_alert"):
+            # check if the user can edit this, or if they are url hacking
+            alert = get_object_or_404(
+                Alert,
+                pk=request.POST.get("edit_alert"),
+                user=request.user,
+            )
+            alert_form = CreateAlertForm(cd, instance=alert, user=request.user)
+
+            if not alert_form.is_valid():
+                # Invalid form. Do the search again and show them the alert form
+                # with the errors
+                return _handle_invalid_form(request, alert_form, render_dict)
+
+            alert_form.save()
+            action = "edited"
+        else:
+            alert_form = CreateAlertForm(cd, user=request.user)
+            alert = alert_form.save(commit=False)
+            alert.user = request.user
+            alert.save()
+            action = "created"
+
+        messages.add_message(
+            request,
+            messages.SUCCESS,
+            f"Your alert was {action} successfully.",
+        )
+        # and redirect to the alerts page
+        return HttpResponseRedirect(reverse("profile_alerts"))
 
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
