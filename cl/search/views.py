@@ -144,12 +144,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 user=request.user,
             )
             alert_form_context["instance"] = alert
-            alert_form = CreateAlertForm(**alert_form_context)
             action = "edited"
         else:
-            alert_form = CreateAlertForm(**alert_form_context)
             action = "created"
 
+        alert_form = CreateAlertForm(**alert_form_context)
         if not alert_form.is_valid():
             # Invalid form. Do the search again and show them the alert form
             # with the errors
