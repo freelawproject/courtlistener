@@ -17,6 +17,7 @@ from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
+from lxml import html
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -131,6 +132,20 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             termination_date=cls.membership_termination_date,
         )
 
+    def assert_form_validation_error(self, expected: str, html_content: str):
+        html_doc = html.fromstring(html_content)
+        validation_error = html_doc.xpath(
+            '//p[contains(@class, "help-block")]'
+        )
+        assert validation_error, "No validation error found"
+
+        error_text = validation_error[0].text_content().strip()
+        self.assertIn(
+            expected,
+            error_text,
+            f"Expected {expected!r} not found in validation error:\n{error_text}",
+        )
+
     def setUp(self) -> None:
         # Set up some handy variables
         self.alert_params = {
@@ -234,6 +249,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             r = await self.async_client.post(
                 reverse("show_results"), rt_alert_params, follow=True
             )
+
         self.assertIn("only supported for members", r.content.decode())
         self.assertIn(
             "Please select another rate or become a member to create this alert.",
@@ -254,7 +270,9 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn("to create Real Time alerts.", content)
+        self.assert_form_validation_error(
+            "to create Real Time alerts.", content
+        )
         alerts = Alert.objects.filter(user=self.user_no_member.user)
         self.assertEqual(await alerts.acount(), 0)
         await self.async_client.alogout()
@@ -301,16 +319,13 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             rate=Alert.REAL_TIME,
             alert_type=SEARCH_TYPES.DOCKETS,
         )
-        assert await self.async_client.alogin(
-            username=self.user_member_tier_1.user.username, password="password"
-        )
         params = self.alert_params.copy()
         params["rate"] = Alert.REAL_TIME
         params["alert_type"] = SEARCH_TYPES.RECAP
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn(
+        self.assert_form_validation_error(
             "You've used all of the alerts included with your membership.",
             content,
         )
@@ -331,7 +346,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn(
+        self.assert_form_validation_error(
             "You've used all of the alerts included with your membership.",
             content,
         )
@@ -380,9 +395,6 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             rate=Alert.WEEKLY,
             alert_type=SEARCH_TYPES.DOCKETS,
         )
-        assert await self.async_client.alogin(
-            username=self.user_no_member.user.username, password="password"
-        )
         params = self.alert_params.copy()
         params["rate"] = Alert.DAILY
         params["alert_type"] = SEARCH_TYPES.RECAP
@@ -390,7 +402,9 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn("To create more than 5 alerts", content)
+        self.assert_form_validation_error(
+            "To create more than 5 alerts", content
+        )
 
         # no new alert should be created
         self.assertEqual(await alerts.acount(), 5)
@@ -442,15 +456,12 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             rate=Alert.MONTHLY,
             alert_type=SEARCH_TYPES.DOCKETS,
         )
-        assert await self.async_client.alogin(
-            username=self.user_member_tier_1.user.username, password="password"
-        )
         params = self.alert_params.copy()
         params["rate"] = Alert.DAILY
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn(
+        self.assert_form_validation_error(
             "You've used all of the alerts included with your membership.",
             content,
         )
@@ -467,9 +478,9 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
 
         # Create 5 RECAP alerts that would hit the user quota.
         await sync_to_async(AlertFactory.create_batch)(
-            5,
+            10,
             user=self.user_member_tier_1.user,
-            rate=Alert.REAL_TIME,
+            rate=Alert.WEEKLY,
             alert_type=SEARCH_TYPES.RECAP,
         )
 
@@ -478,6 +489,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
         )
         alert_to_edit = await alerts.afirst()
+
         # Member is over quota but can still edit alerts.
         # User is turning off the alert.
         assert await self.async_client.alogin(
@@ -497,26 +509,24 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         self.assertIn("successfully", content)
 
         # User now has one alert available. Creation succeeds.
-        assert await self.async_client.alogin(
-            username=self.user_member_tier_1.user.username, password="password"
-        )
         params = self.alert_params.copy()
-        params["rate"] = Alert.REAL_TIME
+        params["rate"] = Alert.DAILY
         params["alert_type"] = SEARCH_TYPES.RECAP
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
         self.assertEqual(r.redirect_chain[0][1], 302)
         self.assertIn("successfully", content)
-        self.assertEqual(await alerts.acount(), 6)
+        alerts = Alert.objects.filter(
+            user=self.user_member_tier_1.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        self.assertEqual(await alerts.acount(), 11)
 
         # Attempting to toggle an alert from “off” to an active state that
         # exceeds the quota should fail.
-        assert await self.async_client.alogin(
-            username=self.user_member_tier_1.user.username, password="password"
-        )
         params = self.alert_params.copy()
-        params["rate"] = Alert.REAL_TIME
+        params["rate"] = Alert.MONTHLY
         params["alert_type"] = SEARCH_TYPES.RECAP
         params["edit_alert"] = alert_to_edit.pk
         url = (
@@ -525,8 +535,58 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
-        self.assertIn(
+        self.assert_form_validation_error(
             "You've used all of the alerts included with your membership.",
+            content,
+        )
+        await self.async_client.alogout()
+
+    async def test_edit_alert_constraints_non_member(self):
+        """Confirm that alerts can be edited even if a non-member user is over
+        their quota. But they can't create additional alerts once the limit
+        is reached.
+        """
+
+        # Create 5 RECAP alerts that would hit the user quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_no_member.user,
+            rate=Alert.DAILY,
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        alerts = Alert.objects.filter(
+            user=self.user_no_member.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        alert_to_edit = await alerts.afirst()
+        # Member is over quota but can still edit alerts.
+        assert await self.async_client.alogin(
+            username=self.user_no_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        params["edit_alert"] = alert_to_edit.pk
+        url = (
+            reverse("show_results")
+            + f"?type={SEARCH_TYPES.RECAP}&edit_alert={alert_to_edit.pk}"
+        )
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", content)
+
+        # The user has now reached the alert limit for non-members.
+        # Any further attempt to create an alert should fail.
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assert_form_validation_error(
+            "To create more than 5 alerts and to gain access to real time alerts",
             content,
         )
         await self.async_client.alogout()
@@ -561,7 +621,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, 200)
         self.assertIn("error creating your alert", r.content.decode())
-        self.assertIn(
+        self.assert_form_validation_error(
             f"{SEARCH_TYPES.PEOPLE} is not one of the available choices.",
             r.content.decode(),
         )
@@ -619,7 +679,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, new_rate)
 
-    async def test_disallows_alert_rate_change_for_non_recap_alerts(self):
+    async def test_disallows_alert_type_change_for_non_recap_alerts(self):
         """Confirm that a frontend request that changes the alert_type in a
         non-recap alert fails.
         """
@@ -637,7 +697,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         params["edit_alert"] = alert_to_edit.pk
         url = (
             reverse("show_results")
-            + f"?type={SEARCH_TYPES.RECAP}&edit_alert={alert_to_edit.pk}"
+            + f"?type={SEARCH_TYPES.OPINION}&edit_alert={alert_to_edit.pk}"
         )
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
