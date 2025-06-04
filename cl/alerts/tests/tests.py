@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
+from typing import cast
 from unittest import mock
 from urllib.parse import urlencode
 
@@ -18,6 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
 from lxml import html
+from lxml.html import HtmlElement
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -134,8 +136,9 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
 
     def assert_form_validation_error(self, expected: str, html_content: str):
         html_doc = html.fromstring(html_content)
-        validation_error = html_doc.xpath(
-            '//p[contains(@class, "help-block")]'
+        validation_error = cast(
+            list[HtmlElement],
+            html_doc.xpath('//p[contains(@class, "help-block")]'),
         )
         assert validation_error, "No validation error found"
 
