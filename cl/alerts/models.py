@@ -108,7 +108,7 @@ class Alert(AbstractDateTimeModel):
             self.secret_key = get_random_string(length=40)
         super().save(*args, **kwargs)
 
-    def alert_type_changed(self) -> None:
+    def validate_alert_type_change(self) -> None:
         """Check if alert_type has changed in an allowed way.
 
         Raises ValidationError: If alert_type was changed from or to a non-RECAP

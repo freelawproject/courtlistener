@@ -1,5 +1,4 @@
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
 from urllib.parse import quote
 
 from asgiref.sync import async_to_sync
@@ -96,24 +95,6 @@ def get_homepage_stats():
     return homepage_data
 
 
-def _handle_invalid_form(
-    request: HttpRequest,
-    alert_form: CreateAlertForm,
-    render_dict: dict[str, Any],
-) -> TemplateResponse:
-    """Handle invalid form by updating render dict and returning error response.
-
-    :param request: The HTTP request object containing GET parameters.
-    :param alert_form: The invalid CreateAlertForm instance.
-    :param render_dict: The template context dictionary to be rendered.
-
-    :return: The TemplateResponse
-    """
-    render_dict.update(do_es_search(request.GET.copy()))
-    render_dict.update({"alert_form": alert_form})
-    return TemplateResponse(request, "search.html", render_dict)
-
-
 @never_cache
 def show_results(request: HttpRequest) -> HttpResponse:
     """
@@ -145,22 +126,15 @@ def show_results(request: HttpRequest) -> HttpResponse:
     }
 
     if request.method == "POST":
-        # The user is trying to save an alert.
-        alert_form = CreateAlertForm(
-            request.POST,
-            user=request.user,
-            initial={
+        alert_form_context = {
+            "data": request.POST,
+            "user": request.user,
+            "initial": {
                 "original_alert_type": request.GET.get(
                     "type", SEARCH_TYPES.OPINION
                 ),
             },
-        )
-        if not alert_form.is_valid():
-            # Invalid form. Do the search again and show them the alert form
-            # with the errors
-            return _handle_invalid_form(request, alert_form, render_dict)
-
-        cd = alert_form.cleaned_data
+        }
         # Handle alert editing or creation
         if request.POST.get("edit_alert"):
             # check if the user can edit this, or if they are url hacking
@@ -169,21 +143,24 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 pk=request.POST.get("edit_alert"),
                 user=request.user,
             )
-            alert_form = CreateAlertForm(cd, instance=alert, user=request.user)
-
-            if not alert_form.is_valid():
-                # Invalid form. Do the search again and show them the alert form
-                # with the errors
-                return _handle_invalid_form(request, alert_form, render_dict)
-
-            alert_form.save()
+            alert_form_context["instance"] = alert
+            alert_form = CreateAlertForm(**alert_form_context)
             action = "edited"
         else:
-            alert_form = CreateAlertForm(cd, user=request.user)
-            alert = alert_form.save(commit=False)
-            alert.user = request.user
-            alert.save()
+            alert_form = CreateAlertForm(**alert_form_context)
             action = "created"
+
+        if not alert_form.is_valid():
+            # Invalid form. Do the search again and show them the alert form
+            # with the errors
+            render_dict.update(do_es_search(request.GET.copy()))
+            render_dict.update({"alert_form": alert_form})
+            return TemplateResponse(request, "search.html", render_dict)
+
+        alert = alert_form.save(commit=(action == "edited"))
+        if action == "created":
+            alert.user = request.user
+            alert_form.save()
 
         messages.add_message(
             request,
