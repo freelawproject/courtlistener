@@ -126,53 +126,48 @@ def show_results(request: HttpRequest) -> HttpResponse:
     }
 
     if request.method == "POST":
-        # The user is trying to save an alert.
-        alert_form = CreateAlertForm(
-            request.POST,
-            user=request.user,
-            initial={
+        alert_form_context = {
+            "data": request.POST,
+            "user": request.user,
+            "initial": {
                 "original_alert_type": request.GET.get(
                     "type", SEARCH_TYPES.OPINION
                 ),
             },
-        )
-        if alert_form.is_valid():
-            cd = alert_form.cleaned_data
-
-            # save the alert
-            if request.POST.get("edit_alert"):
-                # check if the user can edit this, or if they are url hacking
-                alert = get_object_or_404(
-                    Alert,
-                    pk=request.POST.get("edit_alert"),
-                    user=request.user,
-                )
-                alert_form = CreateAlertForm(
-                    cd, instance=alert, user=request.user
-                )
-                alert_form.save()
-                action = "edited"
-            else:
-                alert_form = CreateAlertForm(cd, user=request.user)
-                alert = alert_form.save(commit=False)
-                alert.user = request.user
-                alert.save()
-
-                action = "created"
-            messages.add_message(
-                request,
-                messages.SUCCESS,
-                f"Your alert was {action} successfully.",
+        }
+        # Handle alert editing or creation
+        if request.POST.get("edit_alert"):
+            # check if the user can edit this, or if they are url hacking
+            alert = get_object_or_404(
+                Alert,
+                pk=request.POST.get("edit_alert"),
+                user=request.user,
             )
-
-            # and redirect to the alerts page
-            return HttpResponseRedirect(reverse("profile_alerts"))
+            alert_form_context["instance"] = alert
+            action = "edited"
         else:
+            action = "created"
+
+        alert_form = CreateAlertForm(**alert_form_context)
+        if not alert_form.is_valid():
             # Invalid form. Do the search again and show them the alert form
             # with the errors
             render_dict.update(do_es_search(request.GET.copy()))
             render_dict.update({"alert_form": alert_form})
             return TemplateResponse(request, "search.html", render_dict)
+
+        alert = alert_form.save(commit=(action == "edited"))
+        if action == "created":
+            alert.user = request.user
+            alert_form.save()
+
+        messages.add_message(
+            request,
+            messages.SUCCESS,
+            f"Your alert was {action} successfully.",
+        )
+        # and redirect to the alerts page
+        return HttpResponseRedirect(reverse("profile_alerts"))
 
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
