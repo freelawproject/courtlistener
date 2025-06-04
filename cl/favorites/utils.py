@@ -254,7 +254,7 @@ async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
         .aaggregate(Sum("price", default=0.0))
     )
 
-    return cost["price__sum"]
+    return round(cost["price__sum"], 1)
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
@@ -355,8 +355,6 @@ async def get_lifetime_prayer_stats(
     cache_key = f"prayer-stats-{status}"
 
     data = await cache.aget(cache_key)
-    if data is not None:
-        return PrayerStats(**data)
 
     prayer_by_status = Prayer.objects.filter(status=status)
 
