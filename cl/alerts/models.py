@@ -106,7 +106,6 @@ class Alert(AbstractDateTimeModel):
         """Ensure we get a token when we save the first time."""
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
-
         super().save(*args, **kwargs)
 
     def alert_type_changed(self) -> None:

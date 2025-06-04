@@ -74,6 +74,8 @@ class CreateAlertForm(ModelForm):
             return query
 
     def clean_alert_type(self):
+        # On alert updates, validates that the alert_type hasn't changed in a
+        # disallowed way.
         alert_type = self.cleaned_data["alert_type"]
         try:
             # Update the instance's alert_type to compare it with its old value
