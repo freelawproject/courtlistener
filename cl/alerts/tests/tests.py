@@ -619,6 +619,60 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, new_rate)
 
+    async def test_disallows_alert_rate_change_for_non_recap_alerts(self):
+        """Confirm that a frontend request that changes the alert_type in a
+        non-recap alert fails.
+        """
+        alert_to_edit = await sync_to_async(AlertFactory)(
+            user=self.user_member.user,
+            rate=Alert.REAL_TIME,
+            query=f"q=test&type={SEARCH_TYPES.OPINION}",
+        )
+        assert await self.async_client.alogin(
+            username=self.user_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.OFF
+        params["query"] = f"q=test&type={SEARCH_TYPES.ORAL_ARGUMENT}"
+        params["edit_alert"] = alert_to_edit.pk
+        url = (
+            reverse("show_results")
+            + f"?type={SEARCH_TYPES.RECAP}&edit_alert={alert_to_edit.pk}"
+        )
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertIn("You cannot change alert_type once set", content)
+        await self.async_client.alogout()
+
+    async def test_alert_type_change_for_recap_alerts(self):
+        """Confirm that a frontend request that changes the alert_type in a
+        recap alert succeeds."""
+        alert_to_edit = await sync_to_async(AlertFactory)(
+            user=self.user_member.user,
+            rate=Alert.REAL_TIME,
+            query=f"q=test&type={SEARCH_TYPES.RECAP}",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        assert await self.async_client.alogin(
+            username=self.user_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.OFF
+        params["query"] = f"q=test&type={SEARCH_TYPES.RECAP}"
+        params["alert_type"] = SEARCH_TYPES.DOCKETS
+        params["edit_alert"] = alert_to_edit.pk
+        url = (
+            reverse("show_results")
+            + f"?type={SEARCH_TYPES.RECAP}&edit_alert={alert_to_edit.pk}"
+        )
+        r = await self.async_client.post(url, params, follow=True)
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", r.content.decode())
+
+        await alert_to_edit.arefresh_from_db()
+        self.assertEqual(alert_to_edit.alert_type, SEARCH_TYPES.DOCKETS)
+        await self.async_client.alogout()
+
 
 class DocketAlertTest(TestCase):
     """Do docket alerts work properly?"""
@@ -1281,6 +1335,76 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
                 self.assertEqual(alert_created.status_code, HTTPStatus.CREATED)
                 alert_created_data = alert_created.json()
                 self.assertEqual(alert_created_data["alert_type"], search_type)
+
+    async def test_disallows_alert_type_change_for_non_recap_alerts(
+        self,
+    ) -> None:
+        """Confirm that an API request that changes the alert_type in a
+        non-recap alert fails.
+        """
+        # Create an initial alert for testing:
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+        )
+        alert_1_data = alert_1.json()
+        # Construct the detail URL for the alert:
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1_data["id"], "version": "v4"},
+        )
+
+        # Update the alert's search type:
+        data_updated = {
+            "query": f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}"
+        }
+        response = await self.client.patch(alert_1_path_detail, data_updated)
+
+        # Check that the alert_type change request fails.
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "You cannot change alert_type once set",
+            response.json()["alert_type"][0],
+        )
+
+    async def test_alert_type_change_for_recap_alerts(self) -> None:
+        """Confirm that an API request that changes the alert_type in a recap
+        alert succeeds."""
+        test_cases = {
+            SEARCH_TYPES.DOCKETS: SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.RECAP: SEARCH_TYPES.DOCKETS,
+        }
+        for search_type, search_type_target in test_cases.items():
+            with self.subTest(search_type=search_type):
+                # Create an initial alert for testing:
+                alert_1 = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=testing_query&type={search_type}",
+                    alert_type=search_type,
+                )
+                alert_1_data = alert_1.json()
+                # Construct the detail URL for the alert:
+                alert_1_path_detail = reverse(
+                    "alert-detail",
+                    kwargs={"pk": alert_1_data["id"], "version": "v4"},
+                )
+
+                # Update the alert's search type:
+                data_updated = {
+                    "query": f"q=testing_query&type={search_type_target}",
+                    "alert_type": search_type_target,
+                }
+                response = await self.client.patch(
+                    alert_1_path_detail, data_updated
+                )
+
+                # Check that the alert_type change succeeds.
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                self.assertEqual(
+                    response.json()["alert_type"], search_type_target
+                )
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
