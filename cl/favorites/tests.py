@@ -28,6 +28,7 @@ from cl.favorites.models import (
 )
 from cl.favorites.tasks import check_prayer_pacer
 from cl.favorites.utils import (
+    compute_prayer_total_cost,
     create_prayer,
     delete_prayer,
     get_existing_prayers_in_bulk,
@@ -1384,6 +1385,46 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             expected_url=reverse("top_prayers"),
             target_status_code=HTTPStatus.OK,
         )
+
+    async def test_total_prayer_cost_is_rounded(self) -> None:
+        """Verifies that the total prayer cost is rounded to one decimal place."""
+        # Ensure relevant documents have their page_count set to 0 or None
+        # initially
+        self.rd_2.page_count = 0
+        await self.rd_2.asave()
+        self.rd_3.page_count = 0
+        await self.rd_3.asave()
+        self.rd_4.page_count = 0
+        await self.rd_4.asave()
+        self.rd_5.page_count = None
+        await self.rd_5.asave()
+
+        # Create prayer requests, ensuring a mix of users and documents
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_3)
+        await create_prayer(self.user_2, self.rd_4)
+        await create_prayer(self.user, self.rd_5)
+
+        # All 4 documents with prayers currently fall back to the default cost
+        # of 0.91. Total expected cost: 4 * 0.91 = 3.64, rounded to 3.6
+        total_cost = await compute_prayer_total_cost(
+            Prayer.objects.filter(status=Prayer.WAITING).all()
+        )
+        self.assertEqual(total_cost, 3.6)
+
+        # Update page count for rd_2
+        # New cost for rd_2: 5 pages * 0.1 per page = 0.50
+        self.rd_2.page_count = 5
+        await self.rd_2.asave()
+
+        # Recalculate expected cost:
+        #   - rd_2: 5 pages * 0.1/page = 0.50
+        #   - rd_3, rd_4, rd_5: 3 * 0.91 (default cost) = 2.73
+        # Total: 0.5 + 2.73 = 3.23. Rounded to 1 decimal place: 3.2
+        total_cost = await compute_prayer_total_cost(
+            Prayer.objects.filter(status=Prayer.WAITING).all()
+        )
+        self.assertEqual(total_cost, 3.2)
 
 
 @patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
