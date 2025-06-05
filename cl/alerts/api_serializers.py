@@ -34,7 +34,9 @@ class SearchAlertSerializer(
         """Validate the query type and set default for alert_type if not
         provided."""
 
-        query = attrs.get("query", "")
+        # Get the query from the request or fall back to the instance, as done
+        # during PATCH requests.
+        query = attrs.get("query") or getattr(self.instance, "query", "")
         if not query:
             return attrs
 
@@ -99,6 +101,17 @@ class SearchAlertSerializer(
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        # On alert updates, validates that the alert_type hasn't changed in a
+        # disallowed way.
+        alert_type = validated_data.get("alert_type")
+        if alert_type:
+            try:
+                # Update the instance's alert_type to compare it with its old value
+                self.instance.alert_type = alert_type
+                self.instance.validate_alert_type_change()
+            except ValidationError as e:
+                raise serializers.ValidationError(e.message_dict)
+
         return super().update(instance, validated_data)
 
 

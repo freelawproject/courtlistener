@@ -197,8 +197,6 @@ class NeonMembership(AbstractDateTimeModel):
     TIER_2 = 4
     TIER_3 = 5
     TIER_4 = 6
-    TIER_5 = 7
-    PLATINUM = 8
     EDU = 9
     GROUP_SMALLEST = 10
     GROUP_SMALL = 11
@@ -212,8 +210,6 @@ class NeonMembership(AbstractDateTimeModel):
         (TIER_2, "CL Membership - Tier 2"),
         (TIER_3, "CL Membership - Tier 3"),
         (TIER_4, "CL Membership - Tier 4"),
-        (TIER_5, "CL Membership - Tier 5"),
-        (PLATINUM, "CL Platinum Membership"),
         (EDU, "EDU Membership"),
         (GROUP_SMALLEST, "Group Membership - Smallest"),
         (GROUP_SMALL, "Group Membership - Small"),
