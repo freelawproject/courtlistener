@@ -345,7 +345,10 @@
                 <div class="row">
                   {% flag "recap_relative_date_filter" %}
                     <div class="col-sm-6">
-                      {% include "includes/calendar-and-relative-date-fields.html" %}
+                      {% include "includes/calendar-and-relative-date-fields.html" with field_prefix="filed" after_field="filed_after" before_field="filed_before" label="Date Filed:" %}
+                    </div>
+                    <div class="col-sm-6">
+                      {% include "includes/calendar-and-relative-date-fields.html" with field_prefix="entry_date_filed" after_field="entry_date_filed_after" before_field="entry_date_filed_before" label="Entry Filed:" %}
                     </div>
                   {% else %}
                     <div class="col-sm-3">
@@ -360,27 +363,42 @@
                             {{ search_form.filed_before }}
                         </div>
                     </div>
-                  {% endflag %}
                     <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.entry_date_filed_after.label_tag }}
+                            {{ search_form.entry_date_filed_after }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.entry_date_filed_before.label_tag }}
+                            {{ search_form.entry_date_filed_before }}
+                        </div>
+                    </div>
+
+                  {% endflag %}
+                </div>
+                <div class="row">
+                  <div class="col-sm-4">
                         <div class="form-group">
                             {{ search_form.document_number.label_tag }}
                             {{ search_form.document_number }}
                         </div>
                     </div>
-                    <div class="col-sm-3">
+                    <div class="col-sm-4">
                         <div class="form-group">
                             {{ search_form.attachment_number.label_tag }}
                             {{ search_form.attachment_number }}
                         </div>
                     </div>
-                </div>
-                <div class="row">
                     <div class="col-sm-4">
                         <div class="form-group">
                             {{ search_form.assigned_to.label_tag }}
                             {{ search_form.assigned_to }}
                         </div>
                     </div>
+                </div>
+                <div class="row">
                     <div class="col-sm-4">
                         <div class="form-group">
                             {{ search_form.referred_to.label_tag }}
