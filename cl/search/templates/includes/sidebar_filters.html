@@ -125,40 +125,10 @@
           {{ search_form.cause }}
         </div>
 
-        {% flag "recap_relative_date_filter" %}
-          <!-- Calendar and relative date filed fields support -->
-          {% include "includes/calendar-and-relative-date-fields.html" with field_prefix="filed" after_field="filed_after" before_field="filed_before" label="Date Filed:" %}
-          {% include "includes/calendar-and-relative-date-fields.html" with field_prefix="entry_date_filed" after_field="entry_date_filed_after" before_field="entry_date_filed_before" label="Entry Filed:" %}
-        {% else %}
-          <div class="row">
-            <div class="col-md-6">
-              <div class="form-group{% if search_form.filed_after.errors %} has-error{% endif %}">
-                {{ search_form.filed_after.label_tag }}
-                {{ search_form.filed_after }}
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="form-group{% if search_form.filed_before.errors %} has-error{% endif %}">
-                {{ search_form.filed_before.label_tag }}
-                {{ search_form.filed_before }}
-              </div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-6">
-              <div class="form-group{% if search_form.entry_date_filed_after.errors %} has-error{% endif %}">
-                {{ search_form.entry_date_filed_after.label_tag }}
-                {{ search_form.entry_date_filed_after }}
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="form-group{% if search_form.entry_date_filed_before.errors %} has-error{% endif %}">
-                {{ search_form.entry_date_filed_before.label_tag }}
-                {{ search_form.entry_date_filed_before }}
-              </div>
-            </div>
-          </div>
-        {% endflag %}
+
+        <!-- Calendar and relative date filed fields support -->
+        {% include "includes/calendar-and-relative-date-fields.html" with field_prefix="filed" after_field="filed_after" before_field="filed_before" %}
+        {% include "includes/calendar-and-relative-date-fields.html" with field_prefix="entry_date_filed" after_field="entry_date_filed_after" before_field="entry_date_filed_before" label="Entry Date" %}
         <div class="row">
           <div class="col-md-6">
             <div class="form-group">

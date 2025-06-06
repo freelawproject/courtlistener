@@ -2,7 +2,7 @@
 
 <div class="form-group date-filter-mode" data-field-prefix="{{ field_prefix }}">
   <div>
-    <label>{{ label|default:"Date Filed:" }}</label>
+    <label>{{ label|default:"Docket Date" }}</label>
     <label class="radio-inline">
       <input type="radio" name="{{ field_prefix }}-date-mode" value="calendar"
         {% get_request_value request.GET after_field as after_value %}
@@ -67,10 +67,10 @@
           <li data-value="1d ago">Past Day</li>
           <li data-value="7d ago">Past Week</li>
           <li data-value="14d ago">Past 2 Weeks</li>
-          <li data-value="-1m ago">Past Month</li>
-          <li data-value="-3m ago">Past 3 Months</li>
-          <li data-value="-6m ago">Past 6 Months</li>
-          <li data-value="-1y ago">Past Year</li>
+          <li data-value="1m ago">Past Month</li>
+          <li data-value="3m ago">Past 3 Months</li>
+          <li data-value="6m ago">Past 6 Months</li>
+          <li data-value="1y ago">Past Year</li>
         </ul>
       </div>
       <p class="text-right"><a href="{% url "relative_dates" %}">Help</a></p>
