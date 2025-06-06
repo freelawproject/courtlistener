@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
@@ -11,6 +12,7 @@ from django.utils.dateformat import format
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
+from lxml.html import HtmlElement
 from rest_framework.test import APITestCase
 from rest_framework.utils.serializer_helpers import ReturnList
 
@@ -739,3 +741,15 @@ class SearchAlertsAssertions:
             f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
             txt_content,
         )
+
+    @staticmethod
+    def _extract_snippet_content(html_content: str):
+        html_doc = html.fromstring(html_content)
+        snippet_content = cast(
+            list[HtmlElement],
+            html_doc.xpath('//*[self::p or self::span][@id="snippet"]'),
+        )
+        assert snippet_content, "No snippet found"
+
+        snippet_text = snippet_content[0].text_content().strip()
+        return snippet_text.replace("…", "").replace("&hellip;", "")

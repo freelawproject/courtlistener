@@ -3350,6 +3350,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
     side_effect=lambda x, y: True,
 )
+@override_settings(NO_MATCH_HL_SIZE=100)
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     """Test ES Search Alerts"""
 
@@ -3387,7 +3388,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 user=cls.user_profile.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert OA",
-                query="q=RT+Test+OA+19-5735&type=oa",
+                query="q=RT+Test+OA+19-5735&case_name=Audio&judge=John+Smith&type=oa",
                 alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
             )
             cls.search_alert_2 = AlertFactory(
@@ -3491,9 +3492,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 self.captureOnCommitCallbacks(execute=True),
             ):
                 # When the Audio object is created it should trigger an alert.
-                transcript = "RT Test OA transcript."
+                transcript = (
+                    "RT Test OA transcript Fusce luctus, eros vitae "
+                    "iaculis tincidunt, sem ligula maximus est, "
+                    "in pulvinar lacus augue eget enim. Nam viverra "
+                    "leo ut lectus varius, a dapibus ante lobortis. "
+                )
                 rt_oral_argument = AudioWithParentsFactory.create(
-                    case_name="RT Test OA",
+                    case_name="Audio Case",
                     docket__court=self.court_1,
                     docket__date_argued=now().date(),
                     docket__docket_number="19-5735",
@@ -3556,11 +3562,17 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 html_content = content
                 break
 
-        # Case name is not highlighted in email alert.
-        self.assertIn(rt_oral_argument.case_name, html_content)
-        # Highlighting tags are set for other fields.
+        # Highlighting tags are set for matched fields.
         self.assertIn("<strong>19-5735</strong>", html_content)
         self.assertIn("<strong>RT Test OA</strong>", html_content)
+        self.assertIn("<strong>Audio</strong>", html_content)
+        self.assertIn("<strong>John</strong>", html_content)
+        self.assertIn("<strong>Smith</strong>", html_content)
+
+        # Confirm that the snippet is truncated to the fragment_size defined
+        # for the field when it's HL.
+        snippet = self._extract_snippet_content(html_content)
+        self.assertTrue(len(snippet) < len(transcript))
 
         # Confirm that query overridden in the 'View Full Results' URL to
         # include a filter by timestamp.
@@ -3627,7 +3639,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 self.captureOnCommitCallbacks(execute=True),
             ):
                 # When the Audio object is created it should trigger an alert.
-                transcript = "This a different transcript."
+                transcript = (
+                    "This a different transcript Curabitur id lorem "
+                    "vel orci aliquam commodo vitae a neque. Nam a "
+                    "nulla mi. Fusce elementum felis eget luctus "
+                    "venenatis. Cras tincidunt a dolor ac commodo. "
+                    "Duis vel turpis hendrerit, consequat dui quis, "
+                    "tincidunt elit"
+                )
                 rt_oral_argument_2 = AudioWithParentsFactory.create(
                     case_name="No HL OA Alert",
                     docket=self.docket,
@@ -3645,7 +3664,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertIn(rt_oral_argument_2.case_name, text_content)
         self.assertIn(rt_oral_argument_2.judges, text_content)
         self.assertIn(rt_oral_argument_2.docket.docket_number, text_content)
-        self.assertIn(rt_oral_argument_2.transcript, text_content)
+        self.assertIn("This a different transcript", text_content)
         self.assertIn(
             rt_oral_argument_2.docket.court.citation_string, text_content
         )
@@ -3661,11 +3680,16 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertIn(rt_oral_argument_2.case_name, html_content)
         self.assertIn(rt_oral_argument_2.judges, html_content)
         self.assertIn(rt_oral_argument_2.docket.docket_number, html_content)
-        self.assertIn(rt_oral_argument_2.transcript, html_content)
+        self.assertIn("This a different transcript", html_content)
         self.assertIn(
             rt_oral_argument_2.docket.court.citation_string,
             html_content.replace("&nbsp;", " "),
         )
+
+        # Confirm that the snippet is truncated to the fragment_size defined
+        # for the field when no HL is matched.
+        snippet = self._extract_snippet_content(html_content)
+        self.assertTrue(len(snippet) < len(transcript))
 
         webhook_events.delete()
         rt_oral_argument.delete()
@@ -3684,10 +3708,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         ):
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument = AudioWithParentsFactory.create(
-                case_name="RT Test OA",
+                case_name="RT Audio Test OA",
                 docket__court=self.court_1,
                 docket__date_argued=now().date(),
                 docket__docket_number="19-5735",
+                judges="John Smith",
             )
 
         # Send RT alerts
@@ -4209,10 +4234,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             self.captureOnCommitCallbacks(execute=True),
         ):
             rt_oral_argument = AudioWithParentsFactory.create(
-                case_name="RT Test OA",
+                case_name="RT Audio Test OA",
                 docket__court=self.court_1,
                 docket__date_argued=now().date(),
                 docket__docket_number="19-5735",
+                judges="John Smith",
             )
 
         # Send RT alerts
@@ -4375,6 +4401,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             str(rt_oral_argument.pk),
             AudioPercolator._index._name,
             document_index,
+            app_label="audio.Audio",
         )
         ids_in_results = [
             result.id for result in percolator_responses.main_response.hits
@@ -4392,6 +4419,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             str(rt_oral_argument.pk),
             AudioPercolator._index._name,
             document_index,
+            app_label="audio.Audio",
             main_search_after=search_after,
         )
 

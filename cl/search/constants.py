@@ -114,6 +114,7 @@ SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = {
     "text": 100,
 }
 SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = {
+    "caseName": 0,
     "text": 100,
     "docketNumber": 0,
     "judge": 0,

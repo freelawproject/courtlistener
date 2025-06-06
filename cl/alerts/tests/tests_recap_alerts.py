@@ -2646,6 +2646,7 @@ class RECAPAlertsSweepIndexTest(
     "cl.alerts.utils.get_alerts_set_prefix",
     return_value="alert_hits_percolator",
 )
+@override_settings(NO_MATCH_HL_SIZE=100)
 class RECAPAlertsPercolatorTest(
     RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
@@ -3000,6 +3001,7 @@ class RECAPAlertsPercolatorTest(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
+            app_label="search.Docket",
         )
         expected_queries = 0
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -3017,6 +3019,7 @@ class RECAPAlertsPercolatorTest(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
+            app_label="search.Docket",
         )
         expected_queries = 0
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -3034,6 +3037,7 @@ class RECAPAlertsPercolatorTest(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
+            app_label="search.Docket",
         )
         expected_queries = 1
         self.assertEqual(
@@ -3059,6 +3063,7 @@ class RECAPAlertsPercolatorTest(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
+            app_label="search.Docket",
         )
         expected_queries = 2
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -3084,6 +3089,7 @@ class RECAPAlertsPercolatorTest(
             str(self.docket_3.pk),
             RECAPPercolator._index._name,
             document_index_alias,
+            app_label="search.Docket",
         )
         expected_queries = 1
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -3104,6 +3110,7 @@ class RECAPAlertsPercolatorTest(
             str(self.de_1.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
+            app_label="search.Docket",
         )
         expected_queries = 1
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -3124,6 +3131,7 @@ class RECAPAlertsPercolatorTest(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
+            app_label="search.Docket",
         )
         expected_queries = 3
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -3287,7 +3295,10 @@ class RECAPAlertsPercolatorTest(
                 is_available=True,
                 page_count=5,
                 pacer_doc_id="018036652436",
-                plain_text="plain text for 018036652436",
+                plain_text="plain text for 018036652436 Curabitur id lorem vel "
+                "orci aliquam commodo vitae a neque. Nam a nulla mi."
+                " Fusce elementum felis eget luctus venenatis. Cras "
+                "tincidunt a dolor ac commodo. Duis vel turpis hendrerit",
             )
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
@@ -3308,6 +3319,10 @@ class RECAPAlertsPercolatorTest(
             alert_de.docket.case_name,
             1,
         )
+        # Confirm that the snippet is truncated to the fragment_size defined
+        # for the field when it's HL.
+        snippet = self._extract_snippet_content(html_content)
+        self.assertTrue(len(snippet) < len(rd.plain_text))
 
         txt_email = mail.outbox[1].body
         # Confirm that the document timestamp "Date Updated" is rendered in the alert
@@ -3349,7 +3364,10 @@ class RECAPAlertsPercolatorTest(
                 is_available=True,
                 page_count=5,
                 pacer_doc_id="01803665477",
-                plain_text="plain text for 01803665477",
+                plain_text="plain text for 01803665477 Curabitur id lorem vel "
+                "orci aliquam commodo vitae a neque. Nam a nulla mi."
+                " Fusce elementum felis eget luctus venenatis. Cras "
+                "tincidunt a dolor ac commodo. Duis vel turpis hendrerit",
             )
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
@@ -3369,6 +3387,11 @@ class RECAPAlertsPercolatorTest(
             alert_de_2.docket.case_name,
             1,
         )
+
+        # Confirm that the snippet is truncated to the fragment_size defined
+        # for the field when no HL is matched.
+        snippet = self._extract_snippet_content(html_content)
+        self.assertTrue(len(snippet) < len(rd_2.plain_text))
 
         with self.captureOnCommitCallbacks(execute=True):
             # DE/RD update.

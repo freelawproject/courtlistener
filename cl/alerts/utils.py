@@ -227,9 +227,17 @@ def percolate_es_document(
                     percolate_query_parent,
                     search_after=d_search_after,
                 )
-        case _:
+        case "search.Docket":
             s = add_es_highlighting(
                 s, {"type": SEARCH_TYPES.RECAP}, alerts=True
+            )
+        case "audio.Audio":
+            s = add_es_highlighting(
+                s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
+            )
+        case _:
+            raise NotImplementedError(
+                "Percolator search alerts not supported for %s", app_label
             )
 
     s = s.source(excludes=["percolator_query"])
