@@ -2,7 +2,7 @@ import logging
 import pickle
 import re
 from collections.abc import Callable
-from typing import Any, Dict, List, Optional, Tuple, TypedDict
+from typing import Any, TypedDict
 from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -50,6 +50,7 @@ from cl.search.documents import (
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
+    InvalidRelativeDateSyntax,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
 )
@@ -80,7 +81,7 @@ def check_pagination_depth(page_number):
 
 def make_get_string(
     request: HttpRequest,
-    nuke_fields: Optional[List[str]] = None,
+    nuke_fields: list[str] | None = None,
 ) -> str:
     """Makes a get string from the request object. If necessary, it removes
     the pagination parameters.
@@ -100,9 +101,9 @@ def make_get_string(
 
 
 def merge_form_with_courts(
-    courts: Dict,
+    courts: dict,
     search_form: SearchForm,
-) -> Tuple[Dict[str, List], str, str]:
+) -> tuple[dict[str, list], str, str]:
     """Merges the courts dict with the values from the search form.
 
     Final value is like (note that order is significant):
@@ -164,7 +165,7 @@ def merge_form_with_courts(
                     break
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
-    court_tabs: Dict[str, List] = {
+    court_tabs: dict[str, list] = {
         "federal": [],
         "district": [],
         "state": [],
@@ -239,11 +240,11 @@ async def add_depth_counts(
             return None
         else:
             for result in search_results.object_list:
-                result["citation_depth"] = (
-                    await get_citation_depth_between_clusters(
-                        citing_cluster_pk=result["cluster_id"],
-                        cited_cluster_pk=cited_cluster.pk,
-                    )
+                result[
+                    "citation_depth"
+                ] = await get_citation_depth_between_clusters(
+                    citing_cluster_pk=result["cluster_id"],
+                    cited_cluster_pk=cited_cluster.pk,
                 )
             return cited_cluster
     else:
@@ -258,7 +259,7 @@ async def clean_up_recap_document_file(item: RECAPDocument) -> None:
     :return: None
     """
 
-    if type(item) == RECAPDocument:
+    if isinstance(item, RECAPDocument):
         await sync_to_async(item.filepath_local.delete)()
         item.sha1 = ""
         item.date_upload = None
@@ -592,6 +593,9 @@ def do_es_search(
         except DisallowedWildcardPattern:
             error = True
             error_message = "disallowed_wildcard_pattern"
+        except InvalidRelativeDateSyntax:
+            error = True
+            error_message = "invalid_relative_date_syntax"
         finally:
             # Make sure to always call the _clean_form method
             search_form = _clean_form(

@@ -13,6 +13,10 @@ from cl.stats.utils import (
 )
 
 
+def heartbeat(request: HttpRequest) -> HttpResponse:
+    return HttpResponse("OK", content_type="text/plain")
+
+
 def health_check(request: HttpRequest) -> JsonResponse:
     """Check if we can connect to various services."""
     is_redis_up = check_redis()
@@ -62,7 +66,7 @@ def redis_writes(request: HttpRequest) -> HttpResponse:
     if v > 100:
         r.set(key, 0)
 
-    return HttpResponse("Successful Redis write.")
+    return HttpResponse("Successful Redis write.", content_type="text/plain")
 
 
 def sentry_fail(request: HttpRequest) -> HttpResponse:

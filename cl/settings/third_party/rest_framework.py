@@ -29,6 +29,7 @@ REST_FRAMEWORK = {
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
         # Sock puppets
+        "bobjase27": "1/hour",
         "Kejik5": "1/hour",
         "PRpl.Kane": "1/hour",
         "PeterZH": "1/hour",
@@ -39,7 +40,14 @@ REST_FRAMEWORK = {
         "texoya9545": "1/hour",
         "nedah94680": "1/hour",
         "robowiy352": "1/hour",
+        "cl_api_5": "1/hour",
+        "cl_api_4": "1/hour",
+        "cl_api_1": "1/hour",
+        "cl_api_2": "1/hour",
+        "cl_api_3": "1/hour",
         # Multiple accounts
+        "court_account_n1": "1/hour",
+        "court_account_n2": "1/hour",
         "sophia@newyorklawreview.com": "1/hour",
         "gab@newyorklawreview.com": "1/hour",
         "james@newyorklawreview.com": "1/hour",
@@ -50,10 +58,8 @@ REST_FRAMEWORK = {
         "yancy_closer": "1/hour",
         "phx_major": "1/hour",
         "giraffe_counsel_2025": "1/hour",
-        "yoway_3897": "1/hour",
         "deantaylor2025": "1/hour",
         "yoway_3897": "1/hour",
-        # Multiple accounts
         "api_1": "1/hour",
         "api_2": "1/hour",
         "api_account_1": "1/hour",
@@ -75,6 +81,14 @@ REST_FRAMEWORK = {
         "BruceWayne": "1/hour",
         "mibefis809": "1/hour",
         # Unresponsive
+        "raj@bizcord.com": "1/hour",
+        "angelsburger": "1/hour",
+        "patrielburger": "1/hour",
+        "redchair255": "1/hour",
+        "rapsanetwork": "1/hour",
+        "courtlistener_api": "1/hour",
+        "bobjase24": "1/hour",
+        "bobjase25": "1/hour",
         "victorchaps": "1/hour",
         "AlirezaMirrokni": "1/hour",
         "court_test_account": "1/hour",
@@ -128,6 +142,9 @@ REST_FRAMEWORK = {
         "manu.jose": "10/hour",
         "shishir": "10/hour",
         "shishir.kumar": "10/hour",
+        # hitting '/api/rest/v4/opinions/' causes counts and high CPU usage
+        "arivdc": "10/hour",
+        "Mpits003": "1/hour",
         # Throttling up.
         "JonasHappel": "10000/hour",
         "YFIN": "430000/day",
@@ -141,7 +158,10 @@ REST_FRAMEWORK = {
         "WarrenLex": "20000/hour",  # For big litigation days (wow)
         "quevon24": "500000/hour",  # Perform tests, clone cases in local env
     },
-    "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES": {},
+    "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES": {
+        "jafrank": "180/minute",
+        "LexText": "180/minute",
+    },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.BasicAuthentication",

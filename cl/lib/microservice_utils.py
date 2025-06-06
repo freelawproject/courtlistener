@@ -47,7 +47,7 @@ async def microservice(
     # Handle our documents based on the type of model object
     # Sadly these are not uniform
     if item:
-        if type(item) == RECAPDocument:
+        if isinstance(item, RECAPDocument):
             try:
                 files = {
                     "file": (
@@ -58,14 +58,14 @@ async def microservice(
             except FileNotFoundError:
                 # The file is no longer available, clean it up in DB
                 await clean_up_recap_document_file(item)
-        elif type(item) == Opinion:
+        elif isinstance(item, Opinion):
             files = {
                 "file": (
                     item.local_path.name,
                     item.local_path.open(mode="rb"),
                 )
             }
-        elif type(item) == Audio:
+        elif isinstance(item, Audio):
             match service:
                 case "downsize-audio":
                     files = {

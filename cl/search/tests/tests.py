@@ -1,6 +1,6 @@
 import datetime
 import io
-from datetime import date
+import re
 from http import HTTPStatus
 from unittest import mock
 from urllib.parse import parse_qs
@@ -25,10 +25,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
-from cl.lib.elasticsearch_utils import simplify_estimated_count
+from cl.lib.elasticsearch_utils import (
+    build_daterange_query,
+    simplify_estimated_count,
+)
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -52,6 +54,7 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.exception import InvalidRelativeDateSyntax
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
@@ -100,7 +103,9 @@ class ModelTest(TestCase):
             case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         self.oc = OpinionCluster.objects.create(
-            case_name="Blah", docket=self.docket, date_filed=date(2010, 1, 1)
+            case_name="Blah",
+            docket=self.docket,
+            date_filed=datetime.date(2010, 1, 1),
         )
         self.o = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
         self.c = Citation.objects.create(
@@ -127,12 +132,12 @@ class ModelTest(TestCase):
             case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         docket.save()
-        self.oc.date_filed = date(1899, 1, 1)
+        self.oc.date_filed = datetime.date(1899, 1, 1)
         self.oc.save()
 
         try:
             cf = ContentFile(io.BytesIO(b"blah").read())
-            self.o.file_with_date = date(1899, 1, 1)
+            self.o.file_with_date = datetime.date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
             self.o.save()
         except ValueError:
@@ -197,7 +202,7 @@ class ModelTest(TestCase):
             docket=DocketFactory(
                 court=court,
             ),
-            date_filed=date(1978, 3, 10),
+            date_filed=datetime.date(1978, 3, 10),
             source="U",
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
@@ -384,6 +389,10 @@ class RECAPDocumentValidationTest(TestCase):
         self.assertIsNotNone(document.id)
 
 
+@mock.patch(
+    "cl.lib.courts.get_cache_key_for_court_list",
+    return_value="common_search:minimal-court-list",
+)
 class ESCommonSearchTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -422,7 +431,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                html_columbia="<p>Code, &#167; 1-815 </p>",
+                html_columbia="<p>Code, &#167; 1-815 Lorem §247 $247 %247 ¶247</p>",
                 plain_text="",
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
@@ -448,7 +457,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                plain_text="Strickland Motion",
+                plain_text="Strickland Motion 247",
             ),
         )
         OpinionClusterFactoryWithChildrenAndParents(
@@ -493,7 +502,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         """Get the article count in a query response"""
         return len(html.fromstring(r.content.decode()).xpath("//article"))
 
-    def test_get_child_court_ids_for_parents(self) -> None:
+    def test_get_child_court_ids_for_parents(
+        self, court_cache_key_mock
+    ) -> None:
         def compare_strings_regardless_order(str1, str2):
             set1 = {s.strip('" ').strip() for s in str1.split("OR")}
             set2 = {s.strip('" ').strip() for s in str2.split("OR")}
@@ -508,61 +519,62 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             )
         )
 
-        # Get all the courts of ny_child_l1_1 at all lower levels.
-        parent_child_courts = get_child_court_ids_for_parents(
-            '"ny_child_l1_1"'
-        )
-        self.assertTrue(
-            compare_strings_regardless_order(
-                parent_child_courts,
-                '"ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+        with self.assertNumQueries(0):
+            # Get all the courts of ny_child_l1_1 at all lower levels.
+            parent_child_courts = get_child_court_ids_for_parents(
+                '"ny_child_l1_1"'
             )
-        )
-
-        # Get all the courts of ny_child_l1_2 at all lower levels.
-        parent_child_courts = get_child_court_ids_for_parents(
-            '"ny_child_l2_1"'
-        )
-        self.assertTrue(
-            compare_strings_regardless_order(
-                parent_child_courts, '"ny_child_l2_1" OR "ny_child_l3_1"'
+            self.assertTrue(
+                compare_strings_regardless_order(
+                    parent_child_courts,
+                    '"ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+                )
             )
-        )
 
-        # Get all the courts of ny_child_l3_1, no child courts, retrieve itself.
-        parent_child_courts = get_child_court_ids_for_parents(
-            '"ny_child_l3_1"'
-        )
-        self.assertTrue(
-            compare_strings_regardless_order(
-                parent_child_courts, '"ny_child_l3_1"'
+            # Get all the courts of ny_child_l1_2 at all lower levels.
+            parent_child_courts = get_child_court_ids_for_parents(
+                '"ny_child_l2_1"'
             )
-        )
-
-        # Confirm courts are not duplicated if a parent-child court is included
-        # in the query:
-        parent_child_courts = get_child_court_ids_for_parents(
-            '"ny_child_l1_1" OR "ny_child_l2_1"'
-        )
-        self.assertTrue(
-            compare_strings_regardless_order(
-                parent_child_courts,
-                '"ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+            self.assertTrue(
+                compare_strings_regardless_order(
+                    parent_child_courts, '"ny_child_l2_1" OR "ny_child_l3_1"'
+                )
             )
-        )
 
-        # Get all courts from 2 different parent courts 'canb' and 'gand'.
-        parent_child_courts = get_child_court_ids_for_parents(
-            '"canb" OR "gand"'
-        )
-        self.assertTrue(
-            compare_strings_regardless_order(
-                parent_child_courts,
-                '"canb" OR "ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1" OR "gand" OR "ga_child_l1_1"',
+            # Get all the courts of ny_child_l3_1, no child courts, retrieve itself.
+            parent_child_courts = get_child_court_ids_for_parents(
+                '"ny_child_l3_1"'
             )
-        )
+            self.assertTrue(
+                compare_strings_regardless_order(
+                    parent_child_courts, '"ny_child_l3_1"'
+                )
+            )
 
-    def test_modify_court_id_queries(self) -> None:
+            # Confirm courts are not duplicated if a parent-child court is included
+            # in the query:
+            parent_child_courts = get_child_court_ids_for_parents(
+                '"ny_child_l1_1" OR "ny_child_l2_1"'
+            )
+            self.assertTrue(
+                compare_strings_regardless_order(
+                    parent_child_courts,
+                    '"ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+                )
+            )
+
+            # Get all courts from 2 different parent courts 'canb' and 'gand'.
+            parent_child_courts = get_child_court_ids_for_parents(
+                '"canb" OR "gand"'
+            )
+            self.assertTrue(
+                compare_strings_regardless_order(
+                    parent_child_courts,
+                    '"canb" OR "ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1" OR "gand" OR "ga_child_l1_1"',
+                )
+            )
+
+    def test_modify_court_id_queries(self, court_cache_key_mock) -> None:
         """Test parse_court_id_query method, it should properly parse a
         court_id query
         """
@@ -602,7 +614,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             output_str = modify_court_id_queries(test["input"])
             self.assertEqual(output_str, test["output"])
 
-    async def test_filter_parent_child_courts(self) -> None:
+    async def test_filter_parent_child_courts(
+        self, court_cache_key_mock
+    ) -> None:
         """Does filtering in a given parent court return opinions from the
         parent and its child courts?
         """
@@ -637,7 +651,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertIn("National", r.content.decode())
         self.assertIn("Nevada", r.content.decode())
 
-    async def test_advanced_search_parent_child_courts(self) -> None:
+    async def test_advanced_search_parent_child_courts(
+        self, court_cache_key_mock
+    ) -> None:
         """Does querying in a given parent court return opinions from the
         parent and its child courts?
         """
@@ -687,7 +703,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertIn("National", r.content.decode())
         self.assertIn("Nevada", r.content.decode())
 
-    async def test_es_bad_syntax_proximity_tokens(self) -> None:
+    async def test_es_bad_syntax_proximity_tokens(
+        self, court_cache_key_mock
+    ) -> None:
         """Can we make a suggestion for queries that use unrecognized proximity
         search?
         """
@@ -731,7 +749,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             r.content.decode(),
         )
 
-    async def test_es_unbalanced_quotes(self) -> None:
+    async def test_es_unbalanced_quotes(self, court_cache_key_mock) -> None:
         """Can we make a suggestion for queries that use include unbalanced
         quotes?
         """
@@ -763,7 +781,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertNotIn("Did you mean:", r.content.decode())
 
-    def test_handle_unbalanced_parentheses(self) -> None:
+    def test_handle_unbalanced_parentheses(self, court_cache_key_mock) -> None:
         """Can we make a suggestion for queries that use include unbalanced
         parentheses?
         """
@@ -814,7 +832,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertNotIn("Did you mean", r.content.decode())
 
-    def test_round_estimated_search_counts(self) -> None:
+    def test_round_estimated_search_counts(self, court_cache_key_mock) -> None:
         """Confirm search counts above the threshold are properly rounded"""
 
         tests = [
@@ -838,7 +856,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             with self.subTest(test=test, msg="Test estimated search counts."):
                 self.assertEqual(simplify_estimated_count(test[0]), test[1])
 
-    def test_avoid_wrapping_boosted_numbers_in_quotes(self) -> None:
+    def test_avoid_wrapping_boosted_numbers_in_quotes(
+        self, court_cache_key_mock
+    ) -> None:
         """Confirm that numbers in boost queries are not wrapped in quotes
         that makes the query to fail.
         """
@@ -852,7 +872,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertNotIn("encountered an error", r.content.decode())
 
-    def test_raise_forbidden_error_on_depth_pagination(self) -> None:
+    def test_raise_forbidden_error_on_depth_pagination(
+        self, court_cache_key_mock
+    ) -> None:
         """Confirm that a 403 Forbidden error is raised on depth pagination."""
         search_params = {
             "type": SEARCH_TYPES.OPINION,
@@ -865,7 +887,62 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
-    def test_query_cleanup_function(self) -> None:
+    async def test_avoid_splitting_terms_on_special_chars(
+        self, court_cache_key_mock
+    ) -> None:
+        """Can we avoid splitting words in queries such as §247 and phrases
+        like "§247"?
+        """
+
+        special_chars_exceptions = ["§", "$", "%", "¶"]
+        # A search for phrase "§247" shouldn't match "247"
+        for special_char in special_chars_exceptions:
+            with self.subTest(
+                special_char=special_char, msg="Phrase query and special char."
+            ):
+                r = await self.async_client.get(
+                    reverse("show_results"), {"q": f'"{special_char}247"'}
+                )
+                actual = self.get_article_count(r)
+                self.assertEqual(
+                    actual, 1, msg="Didn't get the right number of results"
+                )
+                self.assertIn("1:21-cv-1234", r.content.decode())
+
+        # A search for phrase "247" shouldn't match "§247"
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": '"247"'}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(
+            actual, 1, msg="Didn't get the right number of results"
+        )
+        self.assertIn("34-2535", r.content.decode())
+
+        # A search for §247 shouldn't match 247
+        for special_char in special_chars_exceptions:
+            with self.subTest(
+                special_char=special_char,
+                msg="Non-phrase query and special char.",
+            ):
+                r = await self.async_client.get(
+                    reverse("show_results"), {"q": f"{special_char}247"}
+                )
+                actual = self.get_article_count(r)
+                self.assertEqual(
+                    actual, 1, msg="Didn't get the right number of results"
+                )
+                self.assertIn("1:21-cv-1234", r.content.decode())
+
+        # A search for 247 shouldn't match §247
+        r = await self.async_client.get(reverse("show_results"), {"q": "247"})
+        actual = self.get_article_count(r)
+        self.assertEqual(
+            actual, 1, msg="Didn't get the right number of results"
+        )
+        self.assertIn("34-2535", r.content.decode())
+
+    def test_query_cleanup_function(self, court_cache_key_mock) -> None:
         # Send string of search_query to the function and expect it
         # to be encoded properly
         q_a = (
@@ -984,12 +1061,16 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 'docketNumber:"docket number 2"',
                 'docketNumber:"docket number 2"',
             ),
+            ("§242", "§242"),
+            ("$242", "$242"),
+            ("%242", "%242"),
+            ("¶242", "¶242"),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
             self.assertEqual(cleanup_main_query(q), a)
 
-    def test_built_in_search_connectors(self) -> None:
+    def test_built_in_search_connectors(self, court_cache_key_mock) -> None:
         """Verify that built in ES search connectors return the expected results."""
 
         tests = [
@@ -1055,7 +1136,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                         msg=f"Failed on: {test_case['label']} missing {expected_str}",
                     )
 
-    def test_support_search_connectors(self) -> None:
+    def test_support_search_connectors(self, court_cache_key_mock) -> None:
         """Verify that new supported custom search connectors yield the
         expected results.
         """
@@ -1142,7 +1223,9 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                         msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
                     )
 
-    def test_support_search_connectors_filters(self) -> None:
+    def test_support_search_connectors_filters(
+        self, court_cache_key_mock
+    ) -> None:
         """Verify that new supported custom search connectors yield the
         expected results.
         """
@@ -1229,7 +1312,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                         msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
                     )
 
-    def test_disallowed_wildcard_pattern(self) -> None:
+    def test_disallowed_wildcard_pattern(self, court_cache_key_mock) -> None:
         """Verify that expensive wildcard queries thrown an error."""
 
         tests = [
@@ -1313,6 +1396,103 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     msg="Failed for V3",
                 )
 
+    def test_absolute_dates_filter(self, court_cache_key_mock):
+        """Confirm that passing absolute dates returns the expected absolute
+        filter in ISO format.
+        """
+        filed_before = datetime.date(2025, 5, 1)
+        filed_after = datetime.date(2025, 5, 18)
+        qs = build_daterange_query(
+            "dateFiled", before=filed_before, after=filed_after
+        )
+        # Assert the filters.
+        body = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(body["gte"], "2025-05-18T00:00:00Z")
+        self.assertEqual(body["lte"], "2025-05-01T23:59:59Z")
+        self.assertNotIn("time_zone", body)
+
+    def test_all_relative_syntaxes(self, court_cache_key_mock):
+        """Confirms that build_daterange_query is able to parse and convert
+        the different allowed relative date syntaxes into an ES-compatible date
+         math expression.
+        """
+        cases = {
+            # days
+            "1d ago": "now-1d/d",
+            "7d ago": "now-7d/d",
+            "5 days ago": "now-5d/d",
+            "-10d": "now-10d/d",
+            "-10d ago": "now-10d/d",
+            "10d": False,  # Invalid syntax
+            "10 days": False,  # Invalid syntax
+            "past 3 days": "now-3d/d",
+            # months (30d each)
+            "1m ago": "now-30d/d",
+            "2M ago": "now-60d/d",
+            "2m": False,  # Invalid syntax
+            "3 months ago": "now-90d/d",
+            "-4m": "now-120d/d",
+            "4 months": False,  # Invalid syntax
+            "-5 months ago": "now-150d/d",
+            "past 6 months": "now-180d/d",
+            # years (365d each)
+            "1y ago": "now-365d/d",
+            "2Y ago": "now-730d/d",
+            "2y": False,  # Invalid syntax
+            "3 years ago": "now-1095d/d",
+            "4 years": False,  # Invalid syntax
+            "-1y": "now-365d/d",
+            "-2 years": "now-730d/d",
+            "past 1 year": "now-365d/d",
+            "invalid 3 syntax": False,  # Invalid syntax
+        }
+
+        for user_input, expected_math in cases.items():
+            with self.subTest(user_input=user_input):
+                if not expected_math:
+                    # Assert invalid syntaxes.
+                    with self.assertRaises(InvalidRelativeDateSyntax):
+                        build_daterange_query(
+                            "dateFiled", before="", after=user_input
+                        )
+                else:
+                    qs = build_daterange_query(
+                        "dateFiled", before="", after=user_input
+                    )
+                    # Assert the validity of the relative range filter.
+                    self.assertEqual(len(qs), 1)
+                    query_dict = qs[0].to_dict()["range"]["dateFiled"]
+                    self.assertEqual(query_dict.get("gte"), expected_math)
+                    self.assertNotIn("lte", query_dict)
+
+    def test_before_and_after_relative(self, court_cache_key_mock):
+        """Confirm that both values, before and after are compatible with the
+        relative date syntaxes.
+        """
+        qs = build_daterange_query(
+            "dateFiled",
+            before="7 days ago",
+            after="1d ago",
+        )
+        self.assertEqual(len(qs), 1)
+        query_dict = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(query_dict["gte"], "now-1d/d")
+        self.assertEqual(query_dict["lte"], "now-7d/d")
+
+    def test_mixed_absolute_and_relative(self, court_cache_key_mock):
+        """Confirm that the range filter is compatible with mixed requests,
+        where one value may be absolute and the other relative,
+        as might occur in API calls.
+        """
+        qs = build_daterange_query(
+            "dateFiled", before=datetime.date(2025, 5, 10), after="2 days ago"
+        )
+        self.assertEqual(len(qs), 1)
+
+        body = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(body["gte"], "now-2d/d")
+        self.assertEqual(body["lte"], "2025-05-10T23:59:59Z")
+
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
     """Common tests for the Search API V4 endpoints."""
@@ -1380,7 +1560,6 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         )
 
 
-@override_flag("ui_flag_for_o", False)
 class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
@@ -1467,10 +1646,9 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         for result in search_results.find_elements(By.TAG_NAME, "article"):
             self.assertIn("1337", result.text)
 
-    @override_flag("ui_flag_for_o", False)
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_opinion_search_result_detail_page(self) -> None:
-        # Dora navitages to CL and does a simple wild card search
+        # Dora navigates to CL and does a simple wild card search
         self.browser.get(self.live_server_url)
         self.browser.find_element(By.ID, "id_q").send_keys("voutila")
         self.browser.find_element(By.ID, "id_q").submit()
@@ -1482,22 +1660,20 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
 
         # She is brought to the detail page for the results
         self.assertNotIn("Search Results", self.browser.title)
-        article_text = self.browser.find_element(By.TAG_NAME, "article").text
 
         # and she can see lots of detail! This includes things like:
         # The name of the jurisdiction/court,
         # the status of the Opinion, any citations, the docket number,
         # the Judges, and a unique fingerpring ID
         meta_data = self.browser.find_elements(
-            By.CSS_SELECTOR, ".meta-data-header"
+            By.CSS_SELECTOR, ".case-details li strong"
         )
         headers = [
-            "Filed:",
-            "Precedential Status:",
             "Citations:",
             "Docket Number:",
-            "Author:",
-            "Nature of suit:",
+            "Nature of Suit:",
+            "Posture:",
+            "Full Case Name:",
         ]
         for header in headers:
             self.assertIn(header, [meta.text for meta in meta_data])
@@ -1505,61 +1681,90 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         # The complete body of the opinion is also displayed for her to
         # read on the page
         self.assertNotEqual(
-            self.browser.find_element(By.ID, "opinion-content").text.strip(),
+            self.browser.find_element(By.ID, "opinion").text.strip(),
             "",
         )
 
-        # She wants to dig a big deeper into the influence of this Opinion,
-        # so she's able to see links to the first five citations on the left
-        # and a link to the full list
-        cited_by = self.browser.find_element(By.ID, "cited-by")
-        self.assertIn(
-            "Cited By", cited_by.find_element(By.TAG_NAME, "h3").text
+        # Verify "Cited By" tab exists and it has a count on it
+        cited_by_tab = self.browser.find_element(
+            By.XPATH,
+            '//ul[contains(@class, "nav-tabs")]//li//a[contains(., "Cited\u00a0By")]',
         )
-        citations = cited_by.find_elements(By.TAG_NAME, "li")
-        self.assertTrue(0 < len(citations) < 6)
+        self.assertIsNotNone(cited_by_tab, "'Cited By' tab does not exist")
+        cited_by_count = re.search(r"\((\d+)\)", cited_by_tab.text)
+        self.assertIsNotNone(
+            cited_by_count,
+            '"Cited By" tab text must contain a number in parentheses (e.g., "(13)")',
+        )
+        cited_by_count = int(cited_by_count.group(1))
+        self.assertGreaterEqual(
+            cited_by_count, 1, f"Wrong Cited By count: {cited_by_count}"
+        )
 
-        # She clicks the "Full List of Citations" link and is brought to
-        # a SERP page with all the citations, generated by a query
-        full_list = cited_by.find_element(By.LINK_TEXT, "View Citing Opinions")
-        full_list.click()
-
-        # She notices this submits a new query targeting anything citing the
-        # original opinion she was viewing. She notices she's back on the SERP
-        self.assertIn("Search Results for", self.browser.title)
-        query = self.browser.find_element(By.ID, "id_q").get_attribute("value")
-        self.assertIn("cites:", query)
-
-        # She wants to go back to the Opinion page, so she clicks back in her
-        # browser, expecting to return to the Opinion details
+        # Go to cited by page and verify we loaded it correctly and then go back to main page
+        cited_by_tab.click()
+        section_title = self.browser.find_element(
+            By.CSS_SELECTOR, ".opinion-section-title"
+        )
+        self.assertIn(
+            "Cited By",
+            section_title.text,
+            f'Expected "Cited By" in section title, got: "{section_title.text}"',
+        )
+        cited_by_elements = self.browser.find_elements(
+            By.CSS_SELECTOR, "div#cited-by article"
+        )
+        self.assertGreaterEqual(
+            len(cited_by_elements),
+            1,
+            "Cited by expected at least 1 <article> element, found none",
+        )
         self.browser.back()
-        self.assertNotIn("Search Results", self.browser.title)
-        self.assertEqual(
-            self.browser.find_element(By.TAG_NAME, "article").text,
-            article_text,
+
+        # Verify "Authorities" tab exists and it has a count on it
+        authorities_tab = self.browser.find_element(
+            By.XPATH,
+            '//ul[contains(@class, "nav-tabs")]//li//a[contains(., "Authorities")]',
+        )
+        self.assertIsNotNone(
+            authorities_tab, "'Authorities' tab does not exist"
+        )
+        authorities_count = re.search(r"\((\d+)\)", authorities_tab.text)
+        self.assertIsNotNone(
+            authorities_count,
+            '"Authorities" tab text must contain a number in parentheses (e.g., "(13)")',
+        )
+        authorities_count = int(authorities_count.group(1))
+        self.assertGreaterEqual(
+            authorities_count,
+            1,
+            f"Wrong Authorities count: {authorities_count}",
         )
 
-        # She now wants to see details on the list of Opinions cited within
-        # this particular opinion. She notices an abbreviated list on the left,
-        # and can click into a Full Table of Authorities. (She does so.)
-        authorities = self.browser.find_element(By.ID, "authorities")
+        # Go to authorities page and verify we loaded it correctly and then go back to main page
+        authorities_tab.click()
+        section_title = self.browser.find_element(
+            By.CSS_SELECTOR, ".opinion-section-title"
+        )
         self.assertIn(
-            "Authorities", authorities.find_element(By.TAG_NAME, "h3").text
+            "Table of Authorities",
+            section_title.text,
+            f'Expected "Table of Authorities" in section title, got: "{section_title.text}"',
         )
-        authority_links = authorities.find_elements(By.TAG_NAME, "li")
-        self.assertTrue(0 < len(authority_links) < 6)
-        self.click_link_for_new_page("View All Authorities")
-        self.assertIn("Table of Authorities", self.browser.title)
+        authorities_elements = self.browser.find_elements(
+            By.CSS_SELECTOR, "div#authorities article"
+        )
+        self.assertGreaterEqual(
+            len(authorities_elements),
+            1,
+            "Table of authorities expected at least 1 <article> element, found none",
+        )
+        self.browser.back()
 
-        # Like before, she's just curious of the list and clicks Back to
-        # Document.
-        self.click_link_for_new_page("Back to Opinion")
-
-        # And she's back at the Opinion in question and pretty happy about that
-        self.assertNotIn("Table of Authorities", self.browser.title)
-        self.assertEqual(
-            self.browser.find_element(By.TAG_NAME, "article").text,
-            article_text,
+        # Verify we returned to opinion main page
+        self.assertNotEqual(
+            self.browser.find_element(By.ID, "opinion").text.strip(),
+            "",
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -1847,7 +2052,7 @@ class SaveSearchQueryTest(TestCase):
     def test_search_api_v4_query_saving(self) -> None:
         """Do we save queries on all V4 Search endpoints"""
         for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+            url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
             self.client.get(url)
             # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
@@ -1872,7 +2077,7 @@ class SaveSearchQueryTest(TestCase):
     def test_failed_es_search_v4_api_queries(self) -> None:
         """Do we flag failed v4 API queries properly?"""
         query = "type=r&q=contains/sproximity token"
-        url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+        url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 400)
         last_query = SearchQuery.objects.last()
@@ -1889,7 +2094,7 @@ class SaveSearchQueryTest(TestCase):
     def test_search_es_api_v3_query_saving(self) -> None:
         """Do we save queries on all V3 Search endpoints"""
         for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+            url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
             self.client.get(url)
             # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
@@ -1914,7 +2119,7 @@ class SaveSearchQueryTest(TestCase):
     def test_failed_es_search_v3_api_queries(self) -> None:
         """Do we flag failed ES v3 API queries properly?"""
         query = "type=r&q=contains/sproximity token"
-        url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+        url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 500)
         last_query = SearchQuery.objects.last()
@@ -1938,7 +2143,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -1958,7 +2163,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -1975,7 +2180,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -3166,3 +3371,131 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
         self.assertFalse(
             OpinionClusterDocument.exists(ES_CHILD_ID(opinion_2.pk).OPINION)
         )
+
+
+class OpinionQuerySetWithBestTextTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        court = CourtFactory(
+            id="canb",
+            jurisdiction="FB",
+        )
+        cls.opinion_cluster_1 = OpinionClusterFactory(
+            docket=DocketFactory(
+                court=court,
+                docket_number="1:21-cv-1234",
+                source=Docket.HARVARD,
+            ),
+            date_filed=datetime.date(2020, 8, 15),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        cls.opinion_html_with_citations = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 1",
+            html_with_citations="HTML with citations content",
+            html_columbia="Other version",
+            html_lawbox="Other version",
+            xml_harvard="Other version",
+            html_anon_2020="Other version",
+            html="Other version",
+        )
+        cls.opinion_html_columbia = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 2",
+            html_with_citations="",
+            html_columbia="HTML columbia content",
+            html_lawbox="Other version",
+            xml_harvard="",
+            html_anon_2020="Other version",
+            html="Other version",
+        )
+        cls.opinion_html_lawbox = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 3",
+            html_with_citations="",
+            html_columbia="",
+            html_lawbox="HTML lawbox content",
+            xml_harvard="",
+            html_anon_2020="Other version",
+            html="Other version",
+        )
+        cls.opinion_xml_harvard = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 4",
+            html_with_citations="",
+            html_columbia="Other version",
+            html_lawbox="Other version",
+            xml_harvard="XML harvard content",
+            html_anon_2020="Other version",
+            html="Other version",
+        )
+        cls.opinion_html_anon_2020 = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 5",
+            html_with_citations="",
+            html_columbia="",
+            html_lawbox="",
+            xml_harvard="",
+            html_anon_2020="HTML anon 2020 content",
+            html="Other version",
+        )
+        cls.opinion_html = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 6",
+            html_with_citations="",
+            html_columbia="",
+            html_lawbox="",
+            xml_harvard="",
+            html_anon_2020="",
+            html="HTML content",
+        )
+        cls.opinion_plain_text = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback",
+            html_with_citations="",
+            html_columbia="",
+            html_lawbox="",
+            xml_harvard="",
+            html_anon_2020="",
+            html="",
+        )
+
+    def test_with_best_text_annotation(self):
+        """Test that with_best_text annotates the Opinion queryset with the
+        correct  best_text and best_text_source values based on the
+        prioritization of OPINION_TEXT_SOURCE_FIELDS.
+        """
+        qs = Opinion.objects.all().with_best_text()
+
+        o_html_citations = qs.get(pk=self.opinion_html_with_citations.pk)
+        o_html_columbia = qs.get(pk=self.opinion_html_columbia.pk)
+        o_html_lawbox = qs.get(pk=self.opinion_html_lawbox.pk)
+        o_xml_harvard = qs.get(pk=self.opinion_xml_harvard.pk)
+        o_html_anon = qs.get(pk=self.opinion_html_anon_2020.pk)
+        o_html = qs.get(pk=self.opinion_html.pk)
+        o_plain_text = qs.get(pk=self.opinion_plain_text.pk)
+
+        self.assertEqual(
+            o_html_citations.best_text, "HTML with citations content"
+        )
+        self.assertEqual(
+            o_html_citations.best_text_source, "html_with_citations"
+        )
+
+        self.assertEqual(o_html_columbia.best_text, "HTML columbia content")
+        self.assertEqual(o_html_columbia.best_text_source, "html_columbia")
+
+        self.assertEqual(o_html_lawbox.best_text, "HTML lawbox content")
+        self.assertEqual(o_html_lawbox.best_text_source, "html_lawbox")
+
+        self.assertEqual(o_xml_harvard.best_text, "XML harvard content")
+        self.assertEqual(o_xml_harvard.best_text_source, "xml_harvard")
+
+        self.assertEqual(o_html_anon.best_text, "HTML anon 2020 content")
+        self.assertEqual(o_html_anon.best_text_source, "html_anon_2020")
+
+        self.assertEqual(o_html.best_text, "HTML content")
+        self.assertEqual(o_html.best_text_source, "html")
+
+        self.assertEqual(o_plain_text.best_text, "Plain text fallback")
+        self.assertEqual(o_plain_text.best_text_source, "plain_text")

@@ -12,7 +12,6 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterFactory,
 )
-from cl.search.models import Court, Docket, OpinionCluster
 from cl.tests.cases import TestCase
 
 logging.basicConfig(level=logging.DEBUG)

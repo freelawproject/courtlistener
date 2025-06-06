@@ -12,6 +12,7 @@ The document you were waiting for is now available in RECAP.
 {{ docket.court }}
 ~~~
 View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc
+View Community Leaderboard: https://www.courtlistener.com/prayers/top/
 
 Document Number: {{ docket_entry.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
 Date Filed: {% if docket_entry.datetime_filed %}{{ docket_entry.datetime_filed|utc|date:"M j, Y" }}{% else %}{{ docket_entry.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}

@@ -27,20 +27,14 @@ INPUT_FORMATS = [
 ]
 
 
-class FloorDateField(DateField):
-    """Simply overrides the DateField to give it a better name. Corrects
-    placeholder value where browsers fail to implement it correctly.
-    """
-
-    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
-
-    def to_python(self, value):
-        """
-        Validates that the input can be converted to a date. Returns a Python
-        datetime.date object.
+class ParseFloorDateMixin:
+    def _parse_floor_date(self, value):
+        """Validates that the input can be converted to a date. Returns a Python
+        datetime.date object or the original input if it cannot be converted.
         """
         if value in validators.EMPTY_VALUES or value == "MM/DD/YYYY":
             return None
+
         if isinstance(value, datetime.datetime):
             return value.date()
         if isinstance(value, datetime.date):
@@ -57,20 +51,19 @@ class FloorDateField(DateField):
                     return datetime.date(*time.strptime(value, format)[:3])
                 except (ValueError, TypeError):
                     continue
-        raise ValidationError(self.error_messages["invalid"], code="invalid")
+
+        # Unable to parse the value as a date. Returning the original value.
+        return value
 
 
-class CeilingDateField(DateField):
-    """Implements a DateField where partial input is accepted.
-
+class ParseCeilingDateMixin:
+    """
     Uses django.forms.fields.DateField as a starting point, and then allows
     users to input partial dates such as 2011-12. However, instead of assuming
     such dates correspond with the first of the month, it assumes that such
     dates represent the *last* day of the month. This allows a search for all
     documents "After 2010" to work.
     """
-
-    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
 
     @staticmethod
     def _calculate_extra_days(date_format, d):
@@ -96,13 +89,13 @@ class CeilingDateField(DateField):
         # time period.
         return num_days - 1
 
-    def to_python(self, value):
-        """
-        Validates that the input can be converted to a date. Returns a
-        Python datetime.datetime object.
+    def _parse_ceiling_date(self, value):
+        """Validates that the input can be converted to a date. Returns a Python
+        datetime.date object or the original input if it cannot be converted.
         """
         if value in validators.EMPTY_VALUES or value == "MM/DD/YYYY":
             return None
+
         if isinstance(value, datetime.datetime):
             return value.date()
         if isinstance(value, datetime.date):
@@ -124,7 +117,69 @@ class CeilingDateField(DateField):
                 )
 
                 return valid_date + datetime.timedelta(days=additional_days)
-        raise ValidationError(self.error_messages["invalid"], code="invalid")
+
+        # Unable to parse the value as a date. Returning the original value.
+        return value
+
+
+class FloorDateOrRelativeField(DateField, ParseFloorDateMixin):
+    """Simply overrides the DateField to give it a better name.
+    Validates whether the input is a date object or returns the original value
+    if it's a potential relative date, which will be validated upstream.
+    """
+
+    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
+
+    def to_python(self, value):
+        # Potential relative date format. It will be validated upstream.
+        return self._parse_floor_date(value)
+
+
+class FloorDateField(DateField, ParseFloorDateMixin):
+    """Simply overrides the DateField to give it a better name.
+    Validates whether the input is a date object or raises a ValidationError if
+    the input cannot be parsed into a valid date.
+    """
+
+    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
+
+    def to_python(self, value):
+        parsed = self._parse_floor_date(value)
+        if parsed is not None and not isinstance(parsed, datetime.date):
+            raise ValidationError(
+                self.error_messages["invalid"], code="invalid"
+            )
+        return parsed
+
+
+class CeilingDateOrRelativeField(DateField, ParseCeilingDateMixin):
+    """Implements a DateField where partial input is accepted.
+    Validates whether the input is a date object or returns the original value
+    if it's a potential relative date, which will be validated upstream.
+    """
+
+    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
+
+    def to_python(self, value):
+        # Potential relative date format. It will be validated upstream.
+        return self._parse_ceiling_date(value)
+
+
+class CeilingDateField(DateField, ParseCeilingDateMixin):
+    """Implements a DateField where partial input is accepted.
+    Validates whether the input is a date object or raises a ValidationError if
+    the input cannot be parsed into a valid date.
+    """
+
+    input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
+
+    def to_python(self, value):
+        parsed = self._parse_ceiling_date(value)
+        if parsed is not None and not isinstance(parsed, datetime.date):
+            raise ValidationError(
+                self.error_messages["invalid"], code="invalid"
+            )
+        return parsed
 
 
 class RandomChoiceField(ChoiceField):

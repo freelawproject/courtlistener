@@ -34,10 +34,9 @@
           </div>
           <form action="" method="post">{% csrf_token %}
             {{ alert_form.query }}
-            {{ alert_form.alert_type}}
-            {% if alert_form.alert_type.errors %}
+           {% if alert_form.query.errors %}
               <p class="help-block">
-                {% for error in alert_form.alert_type.errors %}
+                {% for error in alert_form.query.errors %}
                   {{ error|escape }}
                 {% endfor %}
               </p>
@@ -58,7 +57,7 @@
               <label for="id_rate">How often should we notify you?</label>
               {{ alert_form.rate }}
               {% if alert_form.rate.errors %}
-                <p class="help-block">
+                <p class="help-block link-red">
                   {% for error in alert_form.rate.errors %}
                     {{ error|escape }}
                   {% endfor %}
@@ -66,12 +65,57 @@
               {% endif %}
             </div>
 
-            {# Hidden unless shown by JS #}
-            <div class="alert alert-warning hidden"
-                 id="donate-for-rt">
-              <p>CourtListener is a project of <a href="https://free.law" target="_blank">Free Law Project</a>, a federally-recognized 501(c)(3) non-profit. <a href="{% url "faq" %}#real-time-alerts" target="_blank">Real Time alerts</a> are only supported for members of <a href="https://free.law/">Free Law Project</a>.
+            {# Hide it for search types other than RECAP #}
+            {% if alert_form.alert_type.is_hidden %}
+              {{ alert_form.alert_type }}
+            {# Show the radio button for case-only alerts #}
+            {% else %}
+              <div class="form-group">
+                <label>{{ alert_form.alert_type.label }}</label>
+                {% for radio in alert_form.alert_type %}
+                  <div class="radio">
+                    <div class="row">
+                      <div class="flex col-xs-12">
+                        <label for="{{ radio.id_for_label }}">
+                          {{ radio.tag }} {{ radio.choice_label }}
+                        </label>
+                        <div class="ml-auto hidden-xs">
+                          <div class="text-muted hidden-xs"
+                            id="{% if forloop.first %}alert-estimate-case-only{% else %}alert-estimate{% endif %}">
+                            <i class="fa fa-spinner fa-pulse gray"></i>
+                            <span>Loading alert frequency&hellip;</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if alert_form.alert_type.errors %}
+              <p class="help-block">
+                {% for error in alert_form.alert_type.errors %}
+                  {{ error|escape }}
+                {% endfor %}
               </p>
-              <p>Please select another rate or become a member to create this alert.</p>
+            {% endif %}
+
+
+            {# Hidden unless shown by JS #}
+            <div id="quota-warning" class="alert alert-warning hidden">
+              <p>CourtListener is a project of <a href="https://free.law" target="_blank">Free Law Project</a>, a federally-recognized 501(c)(3) non-profit.</p>
+
+              {% if search_form.type.value != SEARCH_TYPES.RECAP %}
+                <p><a href="{% url "faq" %}#real-time-alerts" target="_blank">Real Time alerts</a> are only supported for members of <a href="https://free.law/">Free Law Project</a>.</p>
+                <p>Please select another rate or become a member to create this alert.</p>
+              {% else %}
+                <p id="msg-rt-free" class="hidden">You must be a member to create real-time alerts. Please join Free.law or choose a different rate to create this alert.</p>
+                <p id="msg-quota-free" class="hidden">To create more than {{ alerts_context.limits.other_rates.free }} alerts and to gain access to real time alerts, please join Free Law project as a member.</p>
+                <p id="msg-quota-member" class="hidden">
+                  You've used all of the alerts included with your membership.
+                  To create this alert, upgrade your membership or <a href="{% url 'profile_alerts' %}">disable a RECAP alert</a>.
+                </p>
+              {% endif %}
 
               <p class="bottom">
                 <a href="https://donate.free.law/forms/membership"
@@ -97,10 +141,12 @@
               </p>
             {% endif %}
             <div class="row v-offset-above-2">
-              <div class="hidden-xs col-sm-4" id="alert-estimate">
-                <p class="v-offset-above-1"><i class="fa fa-spinner fa-pulse gray"></i><span> Loading alert frequency&hellip;</span></p>
-              </div>
-              <div class="col-xs-12 col-sm-8">
+              {% if search_form.type.value != SEARCH_TYPES.RECAP %}
+                <div class="hidden-xs col-sm-4" id="alert-estimate">
+                  <p class="v-offset-above-1"><i class="fa fa-spinner fa-pulse gray"></i><span> Loading alert frequency&hellip;</span></p>
+                </div>
+              {% endif %}
+              <div class="col-xs-12  {% if search_form.type.value != SEARCH_TYPES.RECAP %}col-sm-8{% else %}col-sm-12{% endif %}">
                 <p class="text-right">
                   {% if request.GET.edit_alert %}
                     <a class="btn btn-danger btn-lg" href="{% url "delete_alert_confirm" request.GET.edit_alert %}"><i class="fa fa-trash-o"></i> Delete Alert</a>

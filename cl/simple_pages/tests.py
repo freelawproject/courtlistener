@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from asgiref.sync import sync_to_async
@@ -175,7 +175,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
 
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
-        reverse_params: List[Dict[str, Any]] = [
+        reverse_params: list[dict[str, Any]] = [
             # Coverage
             {"viewname": "coverage"},
             {"viewname": "coverage_fds"},
@@ -217,6 +217,12 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "rest_change_log"},
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
+            # Monitoring pages
+            {"viewname": "heartbeat"},
+            {"viewname": "health_check"},
+            {"viewname": "check_redis_writes"},
+            {"viewname": "elastic_status"},
+            {"viewname": "replication_status"},
         ]
         for reverse_param in reverse_params:
             with self.subTest(

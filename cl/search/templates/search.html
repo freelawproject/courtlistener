@@ -3,6 +3,7 @@
 {% load text_filters %}
 {% load extras %}
 {% load static %}
+{% load waffle_tags %}
 
 {% block message %}{% endblock %}
 
@@ -51,6 +52,18 @@
 
 {% block footer-scripts %}
   <script src="{% static "js/progress-bar.js" %}"></script>
+  {% flag "recap_relative_date_filter" %}
+    <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
+  {% endflag %}
+  {% if alerts_context %}
+    {{ alerts_context|json_script:"alerts-data" }}
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+      const alertsContext = JSON.parse(
+        document.getElementById("alerts-data").textContent
+      );
+    </script>
+    <script type="text/javascript" src="{% static "js/search-alerts.js" %}"></script>
+  {% endif %}
   {% include "includes/date_picker.html" %}
   {% if alert_form.errors or request.GET.show_alert_modal %}
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">
@@ -69,6 +82,9 @@
       const estimate = $(this).find('#alert-estimate');
       const icon = estimate.find('i');
       const msg = estimate.find('span');
+      const estimate_case_only = $(this).find('#alert-estimate-case-only');
+      const icon_co = estimate_case_only.find('i');
+      const msg_co = estimate_case_only.find('span');
       const numDaysToEstimate = 100;
       $.ajax({
         url: "{% url "alert_frequency" version=3 day_count=100 %}" + window.location.search,
@@ -88,6 +104,10 @@
             modalBody.removeClass("hidden");
             icon.removeClass('fa-spinner fa-pulse fa-warning').addClass('fa-clock-o');
             msg.text(" " + data.count + " hits in the last 100 days")
+
+            // Case only count for RECAP
+            icon_co.removeClass('fa-spinner fa-pulse fa-warning').addClass('fa-clock-o');
+            msg_co.text(" " + data.count_case_only + " hits in the last 100 days")
           }
         },
         error: function(){

@@ -15,6 +15,7 @@ from cl import settings
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
+from cl.lib.utils import append_value_in_cache
 from cl.recap.models import PROCESSING_STATUS, REQUEST_TYPE, PacerFetchQueue
 from cl.recap.tasks import fetch_pacer_doc_by_rd_and_mark_fq_completed
 from cl.scrapers.tasks import extract_recap_pdf
@@ -92,15 +93,6 @@ def is_retry_interval_elapsed(
         enough_time_elapsed(date_created, exponential_backoff),
         next_time_to_wait,
     )
-
-
-def append_value_in_cache(key, value):
-    cached_docs = cache.get(key)
-    if cached_docs is None:
-        cached_docs = []
-    cached_docs.append(value)
-    one_month = 60 * 60 * 24 * 7 * 4
-    cache.set(key, cached_docs, timeout=one_month)
 
 
 class Command(VerboseCommand):

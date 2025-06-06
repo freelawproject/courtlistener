@@ -1,17 +1,25 @@
+import asyncio
 import csv
 import io
+import json
 import logging
+import uuid
+from collections.abc import Generator
 from datetime import date, datetime
 from importlib import import_module
+from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Generator
+from typing import Any
 
+from botocore import exceptions as botocore_exception
 from celery import Task
 from celery.canvas import chain
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
 from django.http import QueryDict
@@ -31,6 +39,13 @@ from elasticsearch.helpers import (
     streaming_bulk,
 )
 from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
+from httpx import (
+    HTTPStatusError,
+    NetworkError,
+    ReadError,
+    RemoteProtocolError,
+    TimeoutException,
+)
 
 from cl.alerts.tasks import (
     percolator_response_processing,
@@ -39,7 +54,9 @@ from cl.alerts.tasks import (
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
+from cl.lib.db_tools import log_db_connection_info
 from cl.lib.elasticsearch_utils import build_daterange_query
+from cl.lib.microservice_utils import microservice
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
@@ -48,6 +65,7 @@ from cl.lib.search_utils import (
     fetch_es_results_for_csv,
     get_headers_and_transformations_for_search_export,
 )
+from cl.lib.storage import S3IntelligentTieringStorage
 from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
@@ -65,7 +83,6 @@ from cl.search.models import (
     SEARCH_TYPES,
     Docket,
     DocketEntry,
-    DocketEvent,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -146,9 +163,11 @@ def get_instance_from_db(
         return model.objects.get(pk=instance_id)
     except ObjectDoesNotExist:
         logger.warning(
-            f"The {model.__name__} with ID {instance_id} doesn't exists and it"
-            "cannot be updated in ES."
+            "The %s with ID %s doesn't exists and it cannot be updated in ES.",
+            model.__name__,
+            instance_id,
         )
+        log_db_connection_info(model.__name__, instance_id)
         return None
 
 
@@ -167,6 +186,7 @@ def es_save_document(
     instance_id: int,
     app_label: str,
     es_document_name: ESDocumentNameType,
+    skip_percolator_request: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Save a document in Elasticsearch using a provided callable.
 
@@ -175,6 +195,8 @@ def es_save_document(
     :param app_label: The app label and model that belongs to the document
     being added.
     :param es_document_name: A Elasticsearch DSL document name.
+    :param skip_percolator_request: Whether to skip the subsequent percolator
+    request.
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None.
@@ -258,6 +280,7 @@ def es_save_document(
     if (
         type(instance) in percolator_alerts_models_supported
         and response["_version"] == 1
+        and not skip_percolator_request
     ):
         # Only send search alerts when a new instance of a model that support
         # Alerts is indexed in ES _version:1
@@ -356,7 +379,7 @@ def document_fields_to_update(
 
     if fields_to_update:
         # If fields to update, append the timestamp to be updated too.
-        prepare_timestamp = getattr(es_document(), f"prepare_timestamp", None)
+        prepare_timestamp = getattr(es_document(), "prepare_timestamp", None)
         if prepare_timestamp:
             field_value = prepare_timestamp(main_instance)
             fields_to_update["timestamp"] = field_value
@@ -447,7 +470,7 @@ def email_search_results(self: Task, user_id: int, query: str):
 
     # Generate a filename for the CSV attachment with timestamp
     now = datetime.now()
-    filename = f'search_results_{now.strftime("%Y%m%d_%H%M%S")}.csv'
+    filename = f"search_results_{now.strftime('%Y%m%d_%H%M%S')}.csv"
 
     # Send email with attachments
     message.attach(filename, csv_content, "text/csv")
@@ -471,6 +494,7 @@ def update_es_document(
     main_instance_data: tuple[str, int],
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
+    skip_percolator_request: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
@@ -483,6 +507,7 @@ def update_es_document(
     update doesn't involve a related instance.
     :param fields_map: A dict containing fields that can be updated or None if
     mapping is not required for the update.
+    :param skip_percolator_request: Whether to skip the subsequent percolator request
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None
@@ -533,7 +558,7 @@ def update_es_document(
         main_app_label in ["search.RECAPDocument", "search.Docket"]
         and not related_instance_app_label == "search.DocketEntry"
         or related_instance_app_label in ["search.BankruptcyInformation"]
-    ):
+    ) and not skip_percolator_request:
         doc = es_doc.prepare(main_model_instance)
         return SaveESDocumentReturn(
             document_id=str(main_instance_id),
@@ -611,8 +636,10 @@ def get_doc_from_es(
             )
         except (ConflictError, RequestError) as exc:
             logger.error(
-                f"Error indexing the {es_document.Django.model.__name__.capitalize()} with ID: {instance_id}. "
-                f"Exception was: {type(exc).__name__}"
+                "Error indexing the %s with ID: %s. Exception was: %s",
+                es_document.Django.model.__name__.capitalize(),
+                instance_id,
+                type(exc).__name__,
             )
 
         return None
@@ -881,7 +908,7 @@ def bulk_indexing_generator(
     base_doc: dict[str, str],
     child_id_property: str | None = None,
     parent_id: int | None = None,
-) -> Generator[ESDictDocument, None, None]:
+) -> Generator[ESDictDocument]:
     """Generate ES documents for bulk indexing.
 
     :param docs_query_set: The queryset of model instances to be indexed.
@@ -1067,8 +1094,10 @@ def index_parent_and_child_docs(
                 )
             except (ConflictError, RequestError) as exc:
                 logger.error(
-                    f"Error indexing the {model_label} with ID: {instance_id}. "
-                    f"Exception was: {type(exc).__name__}"
+                    "Error indexing the %s with ID: %s. Exception was: %s",
+                    model_label,
+                    instance_id,
+                    type(exc).__name__,
                 )
                 continue
 
@@ -1089,8 +1118,10 @@ def index_parent_and_child_docs(
 
         if failed_child_docs:
             logger.error(
-                f"Error indexing child documents from the {model_label}"
-                f" with ID: {instance_id}. Child IDs are: {failed_child_docs}"
+                "Error indexing child documents from the %s with ID: %s. Child IDs are: %s",
+                model_label,
+                instance_id,
+                failed_child_docs,
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -1173,8 +1204,9 @@ def index_parent_or_child_docs_in_es(
         if failed_docs:
             model_label = child_es_document.Django.model.__name__.capitalize()
             logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
+                "Error indexing documents from %s, Failed Doc IDs are: %s",
+                model_label,
+                failed_docs,
             )
 
     if document_type == "parent":
@@ -1188,8 +1220,9 @@ def index_parent_or_child_docs_in_es(
         if failed_docs:
             model_label = parent_es_document.Django.model.__name__.capitalize()
             logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
+                "Error indexing documents from %s, Failed Doc IDs are: %s",
+                model_label,
+                failed_docs,
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -1238,8 +1271,8 @@ def remove_document_from_es_index(
             es_document._index.refresh()
     except NotFoundError:
         logger.info(
-            f"The document with ID: %s can't be deleted from the %s index,"
-            f" it doesn't exist.",
+            "The document with ID: %s can't be deleted from the %s index,"
+            " it doesn't exist.",
             instance_id,
             es_document._index._name,
         )
@@ -1304,7 +1337,7 @@ def index_dockets_in_bulk(
                 failed_docs.append(info["index"]["_id"])
 
     if failed_docs:
-        logger.error(f"Error indexing Dockets in bulk IDs are: {failed_docs}")
+        logger.error("Error indexing Dockets in bulk IDs are: %s", failed_docs)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -1681,3 +1714,175 @@ def remove_documents_by_query(
         es_document._index.refresh()
 
     return response
+
+
+def inception_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the inception batch microservice.
+
+    param batch: A list of dictionaries, where each dictionary represents an
+    opinion document with the following keys:
+    "id": The Opinion ID.
+    "text": The content of the opinion.
+    :return: A list of dictionaries, each containing the embeddings for the
+    corresponding opinion document as returned  by the inception microservice.
+    """
+
+    data = json.dumps(batch)
+    response = asyncio.run(
+        microservice(
+            service="inception-batch",
+            method="POST",
+            data=data,
+        )
+    )
+    return response.json()
+
+
+def embeddings_cache_key():
+    return "embeddings:"
+
+
+def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
+    return f"{embeddings_cache_key()}{batch_uuid}-{batch_range}"
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+        ReadError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
+def create_opinion_text_embeddings(
+    self, batch: list[int], database
+) -> str | None:
+    """Get embeddings for Opinion texts from inception.
+
+    :param self: The Celery task.
+    :param batch: A list of Opinion IDs representing the batch to process.
+    :param database: The database to be used during processing.
+    :return: The cache key used to temporarily store embeddings.
+    """
+    opinions = (
+        Opinion.objects.filter(id__in=batch).with_best_text().using(database)
+    )
+    opinions_to_vectorize = [
+        {"id": opinion.pk, "text": opinion.clean_text} for opinion in opinions
+    ]
+    if not opinions_to_vectorize:
+        self.request.chain = None
+        return None
+
+    batch_range = f"{batch[0]}_{batch[-1]}"
+    batch_request = {"documents": opinions_to_vectorize}
+    embeddings = inception_batch_request(batch_request)
+    # Use a UUID to guarantee the uniqueness of this batch of stored embeddings
+    batch_uuid = str(uuid.uuid4().hex)
+    cache_key = get_embeddings_cache_key(batch_uuid, batch_range)
+    cache.set(cache_key, embeddings, 60 * 30)
+    return cache_key
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
+def save_embeddings(
+    self,
+    cache_key: str,
+    directory: str = "opinions",
+) -> None:
+    """Save embeddings to S3.
+
+    The embeddings list is the response from a batch request to the
+    inception microservice, which has the following structure:
+
+    [
+        {
+            'id': 1,
+            'embeddings': [
+                {
+                    'chunk_number': 1,
+                    'chunk': 'search_document: First test document',
+                    'embedding': [-0.01209942298567295...]
+                },
+                {
+                    'chunk_number': 2,
+                    'chunk': 'search_document: First test document',
+                    'embedding': [-1.01200886298552476...]
+                },
+            ]
+        },
+        {
+            'id': 2,
+            'embeddings': [
+                {
+                    'chunk_number': 1,
+                    'chunk': 'search_document: Second test document',
+                    'embedding': [0.07617326825857162...]
+                },
+            ]
+        },
+    ]
+
+    Each object uploaded to S3 is a JSON file containing one of the items
+    in the previous list.
+
+    For example, if uploading a batch of opinion embeddings, each file will
+    be stored embeddings/opinions/freelawproject/modernbert-embed-base_finetune_512/{opinion_id}.json
+
+    :param self: The Celery task.
+    :param cache_key: The cache key used to temporarily store the embeddings.
+    :param directory: The directory where the embeddings will be stored.
+    :return: None.
+    """
+
+    embeddings = cache.get(cache_key, None)
+    if embeddings is None:
+        batch_range = cache_key.rsplit("-", 1)[-1]
+        logger.error(
+            "Embeddings for the opinion range %s are missing from Redis",
+            batch_range,
+        )
+        return None
+
+    if not isinstance(embeddings, list):
+        if isinstance(embeddings, dict):
+            logger.error(
+                "Received API error response in embeddings: %s",
+                json.dumps(embeddings, default=str),
+            )
+        else:
+            logger.error(
+                "Unexpected data type for embeddings: %s (%s)",
+                str(embeddings)[:200],
+                type(embeddings),
+            )
+        return None
+
+    storage = S3IntelligentTieringStorage()
+    for embedding_record in embeddings:
+        record_id = embedding_record["id"]
+        file_contents = json.dumps(embedding_record)
+        file_path = str(
+            PurePosixPath(
+                "embeddings",
+                directory,
+                settings.NLP_EMBEDDING_MODEL,
+                f"{record_id}.json",
+            )
+        )
+        storage.save(file_path, ContentFile(file_contents))
+
+    # Delete the cache key after the saving process is complete.
+    cache.delete(cache_key)

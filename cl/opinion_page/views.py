@@ -2,7 +2,7 @@ import datetime
 from collections import OrderedDict, defaultdict
 from datetime import timedelta
 from http import HTTPStatus
-from typing import Any, Dict, Union
+from typing import Any
 from urllib.parse import urlencode
 
 import eyecite
@@ -13,19 +13,20 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import IntegerField, Prefetch, QuerySet
 from django.db.models.functions import Cast
-from django.http import HttpRequest, HttpResponseRedirect
+from django.http import (
+    HttpRequest,
+    HttpResponseRedirect,
+)
 from django.http.response import (
     Http404,
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
-    HttpResponseServerError,
 )
 from django.shortcuts import (  # type: ignore[attr-defined]
     aget_object_or_404,
     render,
 )
-from django.template.defaultfilters import slugify
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
@@ -45,6 +46,7 @@ from cl.citations.utils import (
     SLUGIFIED_EDITIONS,
     filter_out_non_case_law_citations,
     get_canonicals_from_reporter,
+    slugify_reporter,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
@@ -64,7 +66,6 @@ from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
-from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -75,16 +76,13 @@ from cl.opinion_page.forms import (
     TennWorkCompAppUploadForm,
     TennWorkCompClUploadForm,
 )
-from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import (
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
-    es_get_citing_and_related_clusters_with_cache,
     es_get_related_clusters_with_cache,
     es_related_case_count,
     generate_docket_entries_csv_data,
-    get_case_title,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -95,7 +93,6 @@ from cl.search.models import (
     Court,
     Docket,
     DocketEntry,
-    Opinion,
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
@@ -345,7 +342,6 @@ async def view_docket(
     sort_order_asc = True
     form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
-    await increment_view_count(docket, request)
 
     de_list = await fetch_docket_entries(docket)
 
@@ -474,7 +470,7 @@ async def view_parties(
             return paginator.page(paginator.num_pages)
 
     party_types_paginator = await paginate_parties(party_types, page)
-    parties: Dict[str, list] = {}
+    parties: dict[str, list] = {}
     async for party_type in party_types_paginator.object_list:
         if party_type.name not in parties:
             parties[party_type.name] = []
@@ -691,7 +687,8 @@ async def view_recap_document(
     rd = await make_thumb_if_needed(request, rd)
     try:
         note = await Note.objects.aget(
-            recap_doc_id=rd.pk, user=await request.auser()  # type: ignore[attr-defined]
+            recap_doc_id=rd.pk,
+            user=await request.auser(),  # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
         # Not saved in notes or anonymous user
@@ -763,7 +760,8 @@ async def view_recap_authorities(
 
     try:
         note = await Note.objects.aget(
-            recap_doc_id=rd.pk, user=await request.auser()  # type: ignore[attr-defined]
+            recap_doc_id=rd.pk,
+            user=await request.auser(),  # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
         # Not saved in notes or anonymous user
@@ -795,132 +793,6 @@ async def view_recap_authorities(
     )
 
 
-@never_cache
-async def view_opinion_old(
-    request: HttpRequest, pk: int, _: str
-) -> HttpResponse:
-    """Using the cluster ID, return the cluster of opinions.
-
-    We also test if the cluster ID has a user note, and send data
-    if needed. If it's a note, we send the bound form for the note so
-    it can populate the form on the page. If it has note a note, we send the
-    unbound form.
-    """
-    # Look up the court, cluster, title and note information
-    cluster: OpinionCluster = await aget_object_or_404(
-        OpinionCluster.objects.prefetch_related(
-            Prefetch(
-                "sub_opinions",
-                queryset=Opinion.objects.order_by("ordering_key"),
-            )
-        ),
-        pk=pk,
-    )
-    title = ", ".join(
-        [
-            s
-            for s in [
-                trunc(best_case_name(cluster), 100, ellipsis="..."),
-                await cluster.acitation_string(),
-            ]
-            if s.strip()
-        ]
-    )
-    has_downloads = False
-    async for sub_opinion in cluster.sub_opinions.all():
-        if sub_opinion.local_path or sub_opinion.download_url:
-            has_downloads = True
-            break
-    get_string = make_get_string(request)
-
-    try:
-        note = await Note.objects.aget(
-            cluster_id=cluster.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
-            # type: ignore[attr-defined]
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not note or anonymous user
-        note_form = NoteForm(
-            initial={
-                "cluster_id": cluster.pk,
-                "name": trunc(best_case_name(cluster), 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
-
-    queries_timeout = False
-    results = await es_get_citing_and_related_clusters_with_cache(
-        cluster, request
-    )
-    related_clusters = results.related_clusters
-    sub_opinion_ids = results.sub_opinion_pks
-    related_search_params = results.url_search_params
-    citing_clusters = results.citing_clusters
-    citing_cluster_count = results.citing_cluster_count
-    queries_timeout = results.timeout
-
-    get_parenthetical_groups = await get_or_create_parenthetical_groups(
-        cluster,
-    )
-    parenthetical_groups = get_parenthetical_groups.prefetch_related(
-        "representative",
-    )[:3]
-
-    # Identify opinions updated/added in partnership with v|lex for 3 years
-    three_years_ago = (
-        datetime.datetime.now() - timedelta(days=3 * 365)
-    ).date()
-    date_created = cluster.date_created.date()
-    sponsored = (
-        datetime.datetime(2022, 6, 1).date()
-        <= date_created
-        <= datetime.datetime(2024, 1, 31).date()
-        and date_created > three_years_ago
-    )
-
-    view_authorities_url = reverse(
-        "view_case_authorities", args=[cluster.pk, cluster.slug]
-    )
-    authorities_context: AuthoritiesContext = AuthoritiesContext(
-        citation_record=cluster,
-        query_string=request.META["QUERY_STRING"],
-        total_authorities_count=await cluster.aauthority_count(),
-        view_all_url=view_authorities_url,
-        doc_type="opinion",
-    )
-    await authorities_context.post_init()
-
-    return TemplateResponse(
-        request,
-        "opinion.html",
-        {
-            "title": title,
-            "caption": await cluster.acaption(),
-            "cluster": cluster,
-            "has_downloads": has_downloads,
-            "note_form": note_form,
-            "get_string": get_string,
-            "private": cluster.blocked,
-            "citing_clusters": citing_clusters,
-            "citing_cluster_count": citing_cluster_count,
-            "authorities_context": authorities_context,
-            "top_parenthetical_groups": parenthetical_groups,
-            "summaries_count": await cluster.parentheticals.acount(),
-            "sub_opinion_ids": sub_opinion_ids,
-            "related_algorithm": "mlt",
-            "related_clusters": related_clusters,
-            "related_cluster_ids": [
-                item["cluster_id"] for item in related_clusters
-            ],
-            "related_search_params": f"&{urlencode(related_search_params)}",
-            "sponsored": sponsored,
-            "queries_timeout": queries_timeout,
-        },
-    )
-
-
 async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
     """Generate the context for downloads
 
@@ -931,7 +803,7 @@ async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
     pdf_path = None
     if cluster.filepath_pdf_harvard:
         has_downloads = True
-        pdf_path = cluster.filepath_pdf_harvard
+        pdf_path = cluster.filepath_pdf_harvard.url
     else:
         async for sub_opinion in cluster.sub_opinions.all():
             if str(sub_opinion.local_path).endswith(".pdf"):
@@ -1034,13 +906,6 @@ async def render_opinion_view(
     :param additional_context: Any additional context to be passed to the view
     :return: HttpResponse
     """
-    ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
-        request, "ui_flag_for_o"
-    )
-
-    if not any([ui_flag_for_o]):
-        return await view_opinion_old(request, cluster.pk, "str")
-
     context = await setup_opinion_context(cluster, request, tab=tab)
 
     if additional_context:
@@ -1113,58 +978,6 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
     )
 
 
-async def view_summaries(
-    request: HttpRequest, pk: int, slug: str
-) -> HttpResponse:
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
-    parenthetical_groups_qs = await get_or_create_parenthetical_groups(cluster)
-    parenthetical_groups = [
-        parenthetical_group
-        async for parenthetical_group in parenthetical_groups_qs.prefetch_related(
-            Prefetch(
-                "parentheticals",
-                queryset=Parenthetical.objects.order_by("-score"),
-            ),
-            "parentheticals__describing_opinion__cluster__citations",
-            "parentheticals__describing_opinion__cluster__docket__court",
-            "representative__describing_opinion__cluster__citations",
-            "representative__describing_opinion__cluster__docket__court",
-        )
-    ]
-
-    return TemplateResponse(
-        request,
-        "opinion_summaries.html",
-        {
-            "title": await get_case_title(cluster),
-            "caption": await cluster.acaption(),
-            "cluster": cluster,
-            "private": cluster.blocked,
-            "parenthetical_groups": parenthetical_groups,
-            "summaries_count": await cluster.parentheticals.acount(),
-        },
-    )
-
-
-async def view_authorities(
-    request: HttpRequest, pk: int, slug: str, doc_type=0
-) -> HttpResponse:
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
-
-    return TemplateResponse(
-        request,
-        "opinion_authorities.html",
-        {
-            "title": await get_case_title(cluster),
-            "caption": await cluster.acaption(),
-            "cluster": cluster,
-            "private": cluster.blocked
-            or await cluster.ahas_private_authority(),
-            "authorities_with_data": await cluster.aauthorities_with_data(),
-        },
-    )
-
-
 @never_cache
 async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """View Opinions
@@ -1174,12 +987,6 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     :param _: url slug
     :return: The old or new opinion HTML
     """
-    ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
-        request, "ui_flag_for_o"
-    )
-    if not ui_flag_for_o:
-        return await view_opinion_old(request, pk, "str")
-
     cluster: OpinionCluster = await aget_object_or_404(
         await get_opinions_base_queryset(), pk=pk
     )
@@ -1212,15 +1019,6 @@ async def view_opinion_authorities(
     :param _: url slug
     :return: Table of Authorities tab
     """
-    ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
-        request, "ui_flag_for_o"
-    )
-    if not ui_flag_for_o:
-        # Old page to load for people outside the flag
-        return await view_authorities(
-            request=request, pk=pk, slug="authorities"
-        )
-
     cluster: OpinionCluster = await aget_object_or_404(
         await get_opinions_base_queryset(), pk=pk
     )
@@ -1266,13 +1064,6 @@ async def view_opinion_summaries(
     :param _: url slug
     :return: Summaries tab
     """
-    ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
-        request, "ui_flag_for_o"
-    )
-    if not ui_flag_for_o:
-        # Old page to load for people outside the flag
-        return await view_summaries(request=request, pk=pk, slug="summaries")
-
     cluster: OpinionCluster = await aget_object_or_404(
         await get_opinions_base_queryset(), pk=pk
     )
@@ -1290,18 +1081,10 @@ async def view_opinion_summaries(
             "representative__describing_opinion__cluster__docket__court",
         )
     ]
-    ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
-        request, "ui_flag_for_o"
-    )
-    if not ui_flag_for_o:
-        # Old page to load for people outside the flag
-        return await view_summaries(request=request, pk=pk, slug="summaries")
-
     summaries_count = await cluster.parentheticals.acount()
 
     additional_context = {
         "parenthetical_groups": parenthetical_groups,
-        "ui_flag_for_o": ui_flag_for_o,
         "summaries_count": summaries_count,
     }
     return await render_opinion_view(
@@ -1337,24 +1120,7 @@ async def view_opinion_related_cases(
     )
 
 
-async def cluster_visualizations(
-    request: HttpRequest, pk: int, slug: str
-) -> HttpResponse:
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
-    return TemplateResponse(
-        request,
-        "opinion_visualizations.html",
-        {
-            "title": await get_case_title(cluster),
-            "caption": await cluster.acaption(),
-            "cluster": cluster,
-            "private": cluster.blocked
-            or await cluster.ahas_private_authority(),
-        },
-    )
-
-
-async def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
+async def throw_404(request: HttpRequest, context: dict) -> HttpResponse:
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",
@@ -1495,7 +1261,7 @@ async def reporter_or_volume_handler(
     )
 
 
-async def make_reporter_dict() -> Dict:
+async def make_reporter_dict() -> dict:
     """Make a dict of reporter names and abbreviations
 
     The format here is something like:
@@ -1511,7 +1277,7 @@ async def make_reporter_dict() -> Dict:
         .distinct()
     ]
 
-    reporters: Union[defaultdict, OrderedDict] = defaultdict(list)
+    reporters: defaultdict | OrderedDict = defaultdict(list)
     for name, abbrev_list in NAMES_TO_EDITIONS.items():
         for abbrev in abbrev_list:
             if abbrev in reporters_in_db:
@@ -1655,7 +1421,7 @@ async def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
-    reporter_slug = slugify(reporter)
+    reporter_slug = slugify_reporter(reporter)
 
     if reporter != reporter_slug:
         # Reporter provided in non-slugified form. Redirect to slugified
@@ -1767,7 +1533,9 @@ async def block_item(request: HttpRequest) -> HttpResponse:
         docket_pk = (
             pk
             if obj_type == "docket"
-            else cluster.docket_id if cluster is not None else None
+            else cluster.docket_id
+            if cluster is not None
+            else None
         )
         if not docket_pk:
             return HttpResponse("It worked")

@@ -1,0 +1,53 @@
+{% load extras %}
+
+<c-vars columns rows footer caption="Data table" safe></c-vars>
+
+<div class="w-full overflow-auto">
+  <table>
+    <caption class="sr-only">{{ caption }}</caption>
+    <thead>
+    <tr class="border-none">
+      {% for column in columns %}
+        <th
+          class="text-nowrap text-start text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal {% if forloop.first %}rounded-l-lg{% elif forloop.last  %}rounded-r-lg{% endif %}"
+        >
+          {{ column.label }}
+        </th>
+      {% endfor %}
+    </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr class="border-b-greyscale-200 border-b">
+        {% for column in columns %}
+          <td class="text-start align-top text-sm font-normal p-2">
+            {% if safe %}
+              {{ row|get:column.field|safe }}
+            {% else %}
+              {{ row|get:column.field }}
+            {% endif %}
+          </td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+    {% if footer %}
+      <tfoot>
+      {% for item in footer %}
+        <tr>
+          {% for column in columns %}
+            <td class="text-start align-top text-sm p-2">
+              <strong>
+                {% if safe %}
+                  {{ item|get:column.field|safe }}
+                {% else %}
+                  {{ item|get:column.field }}
+                {% endif %}
+              </strong>
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      </tfoot>
+    {% endif %}
+  </table>
+</div>

@@ -14,21 +14,35 @@ module.exports = {
        * Adjust the following line to match your project structure.
        */
       '../../**/templates/**/*.html',
+
+      /*  Alpine components that could contain Tailwind CSS classes. */
+      '../static-global/js/alpine/components/*.js',
+
+      /*  SVG files that could contain Tailwind CSS classes. */
+      '../static-global/svg/*.svg',
     ],
   },
   theme: {
     extend: {
       screens: {
-        xs: '380px',
+        xs: '392px',
       },
       spacing: {
-        13: '52px',
-        15: '60px',
-        35: '140px',
+        4.5: '1.125rem', // 18px
+        7.5: '1.875rem', // 30px
+        13: '3.25rem', // 52px
+        15: '3.75rem', // 60px
+        18: '4.5rem', // 72px
+        35: '8.75rem', // 140px
+        41: '10.25rem', // 164px
+        42: '10.5rem', // 168px
+        53: '13.25rem', // 212px
+        70: '17.5rem', // 280px
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
         cooper: ['Cooper Hewitt', 'sans-serif'],
+        mono: ['DM Mono', 'mono'],
       },
       colors: {
         greyscale: {
@@ -60,7 +74,9 @@ module.exports = {
           950: '#4E1713',
         },
         brand: {
+          100: '#F4EBFF',
           300: '#D6BBFB',
+          600: '#7F56D9',
           700: '#6941C6',
         },
         yellow: {

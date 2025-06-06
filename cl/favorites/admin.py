@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from cl.favorites.models import DocketTag, Note, Prayer, UserTag
+from cl.favorites.models import (
+    DocketTag,
+    Note,
+    Prayer,
+    PrayerAvailability,
+    UserTag,
+)
 
 
 class NoteInline(admin.TabularInline):
@@ -59,4 +65,14 @@ class PrayerAdmin(admin.ModelAdmin):
         "id",
         "user",
         "recap_document",
+    )
+
+
+@admin.register(PrayerAvailability)
+class PrayerAvailabilityAdmin(admin.ModelAdmin):
+    raw_id_fields = ("recap_document",)
+    list_display = (
+        "id",
+        "recap_document",
+        "last_checked",
     )
