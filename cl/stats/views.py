@@ -66,7 +66,7 @@ def redis_writes(request: HttpRequest) -> HttpResponse:
     if v > 100:
         r.set(key, 0)
 
-    return HttpResponse("Successful Redis write.", content_type="text/plain" )
+    return HttpResponse("Successful Redis write.", content_type="text/plain")
 
 
 def sentry_fail(request: HttpRequest) -> HttpResponse:
