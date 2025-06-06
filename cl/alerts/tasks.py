@@ -45,7 +45,7 @@ from cl.lib.redis_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
+from cl.search.models import SEARCH_TYPES, Docket, DocketEntry, RECAPDocument
 from cl.search.types import (
     ESDocumentNameType,
     SaveESDocumentReturn,
@@ -742,9 +742,18 @@ def send_or_schedule_search_alerts(
     document_content = response.document_content
 
     # Perform an initial percolator query and process its response.
-    percolator_index, es_document_index, documents_to_percolate = (
-        prepare_percolator_content(app_label, document_id)
-    )
+    try:
+        percolator_index, es_document_index, documents_to_percolate = (
+            prepare_percolator_content(app_label, document_id)
+        )
+    except RECAPDocument.DoesNotExist as exc:
+        if (
+            self.request.retries
+            >= settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES
+        ):
+            raise exc
+        raise self.retry(exc=exc, countdown=0.5)
+
     if documents_to_percolate:
         # If documents_to_percolate is returned by prepare_percolator_content,
         # use the main document as the content to render in alerts.
@@ -798,6 +807,7 @@ def es_save_alert_document(
     self: Task,
     alert_id: int,
     es_document_name: ESDocumentNameType,
+    custom_index_name: str | None = None,
 ) -> None:
     """Helper method to prepare and index an Alert object into Elasticsearch.
 
@@ -806,6 +816,7 @@ def es_save_alert_document(
     :param es_document_name: The Elasticsearch document percolator name used
     for indexing.
     the Alert instance.
+    :param custom_index_name: Optional custom index name to use.
     :return: Bool, True if document was properly indexed, otherwise None.
     """
 
@@ -820,9 +831,14 @@ def es_save_alert_document(
         "percolator_query": document.prepare_percolator_query(alert),
     }
     if not alert_doc["percolator_query"]:
+        logger.warning("Skipping invalid query for Alert ID: %s", alert.pk)
         return None
-    doc_indexed = es_document(meta={"id": alert.pk}, **alert_doc).save(
+
+    meta: dict[str, int | str] = {"id": alert.pk}
+    if custom_index_name:
+        meta["index"] = custom_index_name
+    doc_indexed = es_document(meta=meta, **alert_doc).save(
         skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
     )
     if doc_indexed not in ["created", "updated"]:
-        logger.warning(f"Error indexing Alert ID: {alert.pk}")
+        logger.warning("Error indexing Alert ID %s:", alert.pk)
