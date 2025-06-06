@@ -45,7 +45,7 @@ from cl.lib.redis_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
+from cl.search.models import SEARCH_TYPES, Docket, DocketEntry, RECAPDocument
 from cl.search.types import (
     ESDocumentNameType,
     SaveESDocumentReturn,
@@ -742,9 +742,18 @@ def send_or_schedule_search_alerts(
     document_content = response.document_content
 
     # Perform an initial percolator query and process its response.
-    percolator_index, es_document_index, documents_to_percolate = (
-        prepare_percolator_content(app_label, document_id)
-    )
+    try:
+        percolator_index, es_document_index, documents_to_percolate = (
+            prepare_percolator_content(app_label, document_id)
+        )
+    except RECAPDocument.DoesNotExist as exc:
+        if (
+            self.request.retries
+            >= settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES
+        ):
+            raise exc
+        raise self.retry(exc=exc, countdown=0.5)
+
     if documents_to_percolate:
         # If documents_to_percolate is returned by prepare_percolator_content,
         # use the main document as the content to render in alerts.
