@@ -6,7 +6,7 @@ from cache_memoize import cache_memoize
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.template.response import TemplateResponse
@@ -16,6 +16,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from waffle.decorators import waffle_flag
 
+from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
@@ -125,54 +126,76 @@ def show_results(request: HttpRequest) -> HttpResponse:
         "get_string_sans_alert": get_string_sans_alert,
     }
 
+    edit_alert = "edit_alert" in request.GET
+    # Build the context for the limitations of RECAP alerts.
+    user = request.user
+    alerts_context = None
+    if user.is_authenticated and hasattr(user, "profile"):
+        level = user.membership.level if user.profile.is_member else "free"
+        # Get the rate counts.
+        counts = Alert.objects.filter(
+            user=user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        ).aggregate(
+            rt=Count("pk", filter=Q(rate=Alert.REAL_TIME)),
+            other_rates=Count(
+                "pk",
+                filter=Q(rate__in=[Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY]),
+            ),
+        )
+        alerts_context = {
+            "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
+            "level": level,
+            "counts": counts,
+            "limits": RECAP_ALERT_QUOTAS,
+            "editAlert": edit_alert,
+        }
+
     if request.method == "POST":
-        # The user is trying to save an alert.
-        alert_form = CreateAlertForm(
-            request.POST,
-            user=request.user,
-            initial={
+        alert_form_context = {
+            "data": request.POST,
+            "user": request.user,
+            "initial": {
                 "original_alert_type": request.GET.get(
                     "type", SEARCH_TYPES.OPINION
                 ),
             },
-        )
-        if alert_form.is_valid():
-            cd = alert_form.cleaned_data
-
-            # save the alert
-            if request.POST.get("edit_alert"):
-                # check if the user can edit this, or if they are url hacking
-                alert = get_object_or_404(
-                    Alert,
-                    pk=request.POST.get("edit_alert"),
-                    user=request.user,
-                )
-                alert_form = CreateAlertForm(
-                    cd, instance=alert, user=request.user
-                )
-                alert_form.save()
-                action = "edited"
-            else:
-                alert_form = CreateAlertForm(cd, user=request.user)
-                alert = alert_form.save(commit=False)
-                alert.user = request.user
-                alert.save()
-
-                action = "created"
-            messages.add_message(
-                request,
-                messages.SUCCESS,
-                f"Your alert was {action} successfully.",
+        }
+        # Handle alert editing or creation
+        if request.POST.get("edit_alert"):
+            # check if the user can edit this, or if they are url hacking
+            alert = get_object_or_404(
+                Alert,
+                pk=request.POST.get("edit_alert"),
+                user=request.user,
             )
-
-            # and redirect to the alerts page
-            return HttpResponseRedirect(reverse("profile_alerts"))
+            alert_form_context["instance"] = alert
+            action = "edited"
         else:
+            action = "created"
+
+        alert_form = CreateAlertForm(**alert_form_context)
+        if not alert_form.is_valid():
             # Invalid form. Do the search again and show them the alert form
             # with the errors
             render_dict.update(do_es_search(request.GET.copy()))
-            render_dict.update({"alert_form": alert_form})
+            render_dict.update(
+                {"alert_form": alert_form, "alerts_context": alerts_context}
+            )
             return TemplateResponse(request, "search.html", render_dict)
+
+        alert = alert_form.save(commit=(action == "edited"))
+        if action == "created":
+            alert.user = request.user
+            alert_form.save()
+
+        messages.add_message(
+            request,
+            messages.SUCCESS,
+            f"Your alert was {action} successfully.",
+        )
+        # and redirect to the alerts page
+        return HttpResponseRedirect(reverse("profile_alerts"))
 
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
@@ -233,7 +256,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     # This is a GET with parameters
     # User placed a search or is trying to edit an alert
-    if request.GET.get("edit_alert"):
+    if edit_alert:
         # They're editing an alert
         if request.user.is_anonymous:
             return HttpResponseRedirect(
@@ -280,8 +303,9 @@ def show_results(request: HttpRequest) -> HttpResponse:
     alert_form.fields["name"].widget.attrs["value"] = render_dict[
         "search_summary_str"
     ]
-    render_dict.update({"alert_form": alert_form})
-
+    render_dict.update(
+        {"alert_form": alert_form, "alerts_context": alerts_context}
+    )
     return TemplateResponse(request, "search.html", render_dict)
 
 

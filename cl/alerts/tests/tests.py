@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
+from typing import cast
 from unittest import mock
 from urllib.parse import urlencode
 
@@ -17,6 +18,8 @@ from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
+from lxml import html
+from lxml.html import HtmlElement
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -104,7 +107,47 @@ from cl.users.models import EmailSent
 
 
 class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
-    fixtures = ["test_court.json"]
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user_no_member = UserProfileWithParentsFactory()
+        cls.user_no_member.user.password = make_password("password")
+        cls.user_no_member.user.save()
+
+        cls.user_member = UserProfileWithParentsFactory()
+        cls.user_member.user.password = make_password("password")
+        cls.user_member.user.save()
+
+        cls.membership_termination_date = now() + timedelta(days=1)
+        NeonMembership.objects.create(
+            level=NeonMembership.LEGACY,
+            user=cls.user_member.user,
+            termination_date=cls.membership_termination_date,
+        )
+
+        cls.user_member_tier_1 = UserProfileWithParentsFactory()
+        cls.user_member_tier_1.user.password = make_password("password")
+        cls.user_member_tier_1.user.save()
+        NeonMembership.objects.create(
+            level=NeonMembership.TIER_1,
+            user=cls.user_member_tier_1.user,
+            termination_date=cls.membership_termination_date,
+        )
+
+    def assert_form_validation_error(self, expected: str, html_content: str):
+        html_doc = html.fromstring(html_content)
+        validation_error = cast(
+            list[HtmlElement],
+            html_doc.xpath('//p[contains(@class, "help-block")]'),
+        )
+        assert validation_error, "No validation error found"
+
+        error_text = validation_error[0].text_content().strip()
+        self.assertIn(
+            expected,
+            error_text,
+            f"Expected {expected!r} not found in validation error:\n{error_text}",
+        )
 
     def setUp(self) -> None:
         # Set up some handy variables
@@ -112,7 +155,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             "query": "q=asdf",
             "name": "dummy alert",
             "rate": "dly",
-            "alert_type": SEARCH_TYPES.RECAP,
+            "alert_type": SEARCH_TYPES.OPINION,
         }
         self.alert = Alert.objects.create(user_id=1001, **self.alert_params)
 
@@ -132,12 +175,423 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         r = await self.async_client.post(
             reverse("show_results"), self.alert_params, follow=True
         )
+
         self.assertEqual(r.redirect_chain[0][1], 302)
         self.assertIn("successfully", r.content.decode())
         self.assertEqual(await alert_user.acount(), 1)
         alert_created = await alert_user.afirst()
         if alert_created:
+            self.assertEqual(alert_created.alert_type, SEARCH_TYPES.OPINION)
+        await self.async_client.alogout()
+
+    async def test_non_recap_rt_alert_succeeds_for_member(self) -> None:
+        """Confirm that RT alert creation for non-RECAP alerts succeeds for
+        members.
+        """
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.user_member.user.username, password="password"
+            )
+        )
+        rt_alert_params = self.alert_params.copy()
+        rt_alert_params["rate"] = Alert.REAL_TIME
+        r = await self.async_client.post(
+            reverse("show_results"), rt_alert_params, follow=True
+        )
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", r.content.decode())
+
+        alert_user = Alert.objects.filter(user=self.user_member.user)
+        self.assertEqual(await alert_user.acount(), 1)
+        alert_created = await alert_user.afirst()
+        if alert_created:
+            self.assertEqual(alert_created.alert_type, SEARCH_TYPES.OPINION)
+            self.assertEqual(alert_created.rate, Alert.REAL_TIME)
+        await self.async_client.alogout()
+
+    async def test_fail_non_recap_rt_alert_for_no_member(self) -> None:
+        """Confirm that RT alert creation for non-RECAP alerts displays the
+        regular limitation message for non-members.
+        """
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.user_no_member.user.username, password="password"
+            )
+        )
+        rt_alert_params = self.alert_params.copy()
+        rt_alert_params["rate"] = Alert.REAL_TIME
+        r = await self.async_client.post(
+            reverse("show_results"), rt_alert_params, follow=True
+        )
+        self.assertIn("only supported for members", r.content.decode())
+        self.assertIn(
+            "Please select another rate or become a member to create this alert.",
+            r.content.decode(),
+        )
+
+        alert_user = Alert.objects.filter(user=self.user_no_member.user)
+        self.assertEqual(await alert_user.acount(), 0)
+        await self.async_client.alogout()
+
+    async def test_fail_non_recap_rt_alert_for_expired_membership(
+        self,
+    ) -> None:
+        """Confirm that RT alert creation for non-RECAP alerts displays the
+        regular limitation message for expired memberships.
+        """
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.user_member.user.username, password="password"
+            )
+        )
+        rt_alert_params = self.alert_params.copy()
+        rt_alert_params["rate"] = Alert.REAL_TIME
+        with time_machine.travel(
+            self.membership_termination_date + timedelta(days=2), tick=False
+        ):
+            r = await self.async_client.post(
+                reverse("show_results"), rt_alert_params, follow=True
+            )
+
+        self.assertIn("only supported for members", r.content.decode())
+        self.assertIn(
+            "Please select another rate or become a member to create this alert.",
+            r.content.decode(),
+        )
+
+        alert_user = Alert.objects.filter(user=self.user_no_member.user)
+        self.assertEqual(await alert_user.acount(), 0)
+        await self.async_client.alogout()
+
+    async def test_non_member_recap_rt_alert_fails(self):
+        """RECAP RT alerts should be rejected for free users."""
+        assert await self.async_client.alogin(
+            username=self.user_no_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.REAL_TIME
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assert_form_validation_error(
+            "to create Real Time alerts.", content
+        )
+        alerts = Alert.objects.filter(user=self.user_no_member.user)
+        self.assertEqual(await alerts.acount(), 0)
+        await self.async_client.alogout()
+
+    async def test_recap_rt_alert_for_member(self) -> None:
+        """Confirm that RT alert creation for RECAP alerts succeeds for
+        members within their quota.
+        """
+        # Non-RECAP alerts do not count toward the RECAP alerts quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_member_tier_1.user,
+            rate=Alert.MONTHLY,
+            alert_type=SEARCH_TYPES.OPINION,
+        )
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.user_member_tier_1.user.username,
+                password="password",
+            )
+        )
+        rt_alert_params = self.alert_params.copy()
+        rt_alert_params["rate"] = Alert.REAL_TIME
+        rt_alert_params["alert_type"] = SEARCH_TYPES.RECAP
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, rt_alert_params, follow=True)
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", r.content.decode())
+
+        alert_user = Alert.objects.filter(
+            user=self.user_member_tier_1.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        self.assertEqual(await alert_user.acount(), 1)
+        alert_created = await alert_user.afirst()
+        if alert_created:
             self.assertEqual(alert_created.alert_type, SEARCH_TYPES.RECAP)
+            self.assertEqual(alert_created.rate, Alert.REAL_TIME)
+
+        # Add 4 more rt alerts.
+        await sync_to_async(AlertFactory.create_batch)(
+            4,
+            user=self.user_member_tier_1.user,
+            rate=Alert.REAL_TIME,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.REAL_TIME
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assert_form_validation_error(
+            "You've used all of the alerts included with your membership.",
+            content,
+        )
+
+        # no new alert should be created
+        self.assertEqual(await alert_user.acount(), 5)
+        await self.async_client.alogout()
+
+    async def test_legacy_member_recap_rt_alert_fails_when_over_quota(self):
+        """RECAP + REAL_TIME should be rejected once the legacy member hits
+        their quota (0).
+        """
+        assert await self.async_client.alogin(
+            username=self.user_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.REAL_TIME
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assert_form_validation_error(
+            "You've used all of the alerts included with your membership.",
+            content,
+        )
+        alerts = Alert.objects.filter(user=self.user_member.user)
+        self.assertEqual(await alerts.acount(), 0)
+
+        await self.async_client.alogout()
+
+    async def test_non_member_recap_other_rate_alert(self):
+        """Non-RT RECAP alerts should be rejected once a free user exceeds the
+        quota.
+        """
+
+        # Non-RECAP alerts do not count toward the RECAP alerts quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_no_member.user,
+            rate=Alert.MONTHLY,
+            alert_type=SEARCH_TYPES.OPINION,
+        )
+
+        # Non-member inside the quota.
+        assert await self.async_client.alogin(
+            username=self.user_no_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.DOCKETS
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", content)
+
+        # 1 new alert should be created
+        alerts = Alert.objects.filter(
+            user=self.user_no_member.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        self.assertEqual(await alerts.acount(), 1)
+
+        # Add 4 more other rate alerts.
+        await sync_to_async(AlertFactory.create_batch)(
+            4,
+            user=self.user_no_member.user,
+            rate=Alert.WEEKLY,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.RECAP
+
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assert_form_validation_error(
+            "To create more than 5 alerts", content
+        )
+
+        # no new alert should be created
+        self.assertEqual(await alerts.acount(), 5)
+        await self.async_client.alogout()
+
+    async def test_member_recap_other_rate_alert(self):
+        """Non-RT RECAP alerts should be rejected once the member exceeds
+        the allowed quota.
+        """
+
+        # Non-RECAP alerts do not count toward the RECAP alerts quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_member_tier_1.user,
+            rate=Alert.MONTHLY,
+            alert_type=SEARCH_TYPES.OPINION,
+        )
+
+        # Member inside the quota.
+        assert await self.async_client.alogin(
+            username=self.user_member_tier_1.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", content)
+
+        # 1 new alert should be created
+        alerts = Alert.objects.filter(
+            user=self.user_member_tier_1.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        self.assertEqual(await alerts.acount(), 1)
+
+        # Create 10 additional alerts to reach the allowed quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            4,
+            user=self.user_member_tier_1.user,
+            rate=Alert.DAILY,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_member_tier_1.user,
+            rate=Alert.MONTHLY,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assert_form_validation_error(
+            "You've used all of the alerts included with your membership.",
+            content,
+        )
+
+        # no new alert should be created
+        self.assertEqual(await alerts.acount(), 10)
+        await self.async_client.alogout()
+
+    async def test_edit_alert_constraints(self):
+        """Confirm that alerts can be edited even if the user is over their
+        quota. Also confirm that they can’t change an off alert to an active
+        alert if doing so would exceed the quota.
+        """
+
+        # Create 5 RECAP alerts that would hit the user quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            10,
+            user=self.user_member_tier_1.user,
+            rate=Alert.WEEKLY,
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        alerts = Alert.objects.filter(
+            user=self.user_member_tier_1.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        alert_to_edit = await alerts.afirst()
+
+        # Member is over quota but can still edit alerts.
+        # User is turning off the alert.
+        assert await self.async_client.alogin(
+            username=self.user_member_tier_1.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.OFF
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        params["edit_alert"] = alert_to_edit.pk
+        url = (
+            reverse("show_results")
+            + f"?type={SEARCH_TYPES.RECAP}&edit_alert={alert_to_edit.pk}"
+        )
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", content)
+
+        # User now has one alert available. Creation succeeds.
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", content)
+        alerts = Alert.objects.filter(
+            user=self.user_member_tier_1.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        self.assertEqual(await alerts.acount(), 11)
+
+        # Attempting to toggle an alert from “off” to an active state that
+        # exceeds the quota should fail.
+        params = self.alert_params.copy()
+        params["rate"] = Alert.MONTHLY
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        params["edit_alert"] = alert_to_edit.pk
+        url = (
+            reverse("show_results")
+            + f"?type={SEARCH_TYPES.RECAP}&edit_alert={alert_to_edit.pk}"
+        )
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assert_form_validation_error(
+            "You've used all of the alerts included with your membership.",
+            content,
+        )
+        await self.async_client.alogout()
+
+    async def test_edit_alert_constraints_non_member(self):
+        """Confirm that alerts can be edited even if a non-member user is over
+        their quota. But they can't create additional alerts once the limit
+        is reached.
+        """
+
+        # Create 5 RECAP alerts that would hit the user quota.
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_no_member.user,
+            rate=Alert.DAILY,
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        alerts = Alert.objects.filter(
+            user=self.user_no_member.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        alert_to_edit = await alerts.afirst()
+        # Member is over quota but can still edit alerts.
+        assert await self.async_client.alogin(
+            username=self.user_no_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        params["edit_alert"] = alert_to_edit.pk
+        url = (
+            reverse("show_results")
+            + f"?type={SEARCH_TYPES.RECAP}&edit_alert={alert_to_edit.pk}"
+        )
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", content)
+
+        # The user has now reached the alert limit for non-members.
+        # Any further attempt to create an alert should fail.
+        params = self.alert_params.copy()
+        params["rate"] = Alert.DAILY
+        params["alert_type"] = SEARCH_TYPES.RECAP
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assert_form_validation_error(
+            "To create more than 5 alerts and to gain access to real time alerts",
+            content,
+        )
         await self.async_client.alogout()
 
     async def test_fail_gracefully(self) -> None:
@@ -170,7 +624,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, 200)
         self.assertIn("error creating your alert", r.content.decode())
-        self.assertIn(
+        self.assert_form_validation_error(
             f"{SEARCH_TYPES.PEOPLE} is not one of the available choices.",
             r.content.decode(),
         )
@@ -203,7 +657,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         self.assertIn(
             "Please confirm your unsubscription", response.content.decode()
         )
-        self.assertIn("Your daily RECAP alert", response.content.decode())
+        self.assertIn("Your daily opinion alert", response.content.decode())
         self.assertIn("Unsubscribe", response.content.decode())
 
     async def test_can_we_disable_alert_using_the_one_click_link(
@@ -227,6 +681,60 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.get(f"{path}?rate={new_rate}")
         await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, new_rate)
+
+    async def test_disallows_alert_type_change_for_non_recap_alerts(self):
+        """Confirm that a frontend request that changes the alert_type in a
+        non-recap alert fails.
+        """
+        alert_to_edit = await sync_to_async(AlertFactory)(
+            user=self.user_member.user,
+            rate=Alert.REAL_TIME,
+            query=f"q=test&type={SEARCH_TYPES.OPINION}",
+        )
+        assert await self.async_client.alogin(
+            username=self.user_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.OFF
+        params["query"] = f"q=test&type={SEARCH_TYPES.ORAL_ARGUMENT}"
+        params["edit_alert"] = alert_to_edit.pk
+        url = (
+            reverse("show_results")
+            + f"?type={SEARCH_TYPES.OPINION}&edit_alert={alert_to_edit.pk}"
+        )
+        r = await self.async_client.post(url, params, follow=True)
+        content = r.content.decode()
+        self.assertIn("You cannot change alert_type once set", content)
+        await self.async_client.alogout()
+
+    async def test_alert_type_change_for_recap_alerts(self):
+        """Confirm that a frontend request that changes the alert_type in a
+        recap alert succeeds."""
+        alert_to_edit = await sync_to_async(AlertFactory)(
+            user=self.user_member.user,
+            rate=Alert.REAL_TIME,
+            query=f"q=test&type={SEARCH_TYPES.RECAP}",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        assert await self.async_client.alogin(
+            username=self.user_member.user.username, password="password"
+        )
+        params = self.alert_params.copy()
+        params["rate"] = Alert.OFF
+        params["query"] = f"q=test&type={SEARCH_TYPES.RECAP}"
+        params["alert_type"] = SEARCH_TYPES.DOCKETS
+        params["edit_alert"] = alert_to_edit.pk
+        url = (
+            reverse("show_results")
+            + f"?type={SEARCH_TYPES.RECAP}&edit_alert={alert_to_edit.pk}"
+        )
+        r = await self.async_client.post(url, params, follow=True)
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn("successfully", r.content.decode())
+
+        await alert_to_edit.arefresh_from_db()
+        self.assertEqual(alert_to_edit.alert_type, SEARCH_TYPES.DOCKETS)
+        await self.async_client.alogout()
 
 
 class DocketAlertTest(TestCase):
@@ -494,12 +1002,15 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
         alert_name="testing_name",
         alert_query="q=testing_query&",
         alert_rate="dly",
+        alert_type=None,
     ):
         data = {
             "name": alert_name,
             "query": alert_query,
             "rate": alert_rate,
         }
+        if alert_type:
+            data["alert_type"] = alert_type
         return await client.post(self.alert_path, data, format="json")
 
     async def test_make_an_alert(self) -> None:
@@ -757,6 +1268,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
             self.client,
             alert_name="alert_1",
             alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+            alert_type=SEARCH_TYPES.RECAP,
         )
 
         alert_1_data = alert_1.json()
@@ -780,6 +1292,182 @@ class AlertAPITests(APITestCase, ESIndexTestCase):
             "You can't create a match-all alert. Please try narrowing your query.",
             response.json()["query"],
         )
+
+    async def test_saving_case_only_and_recap_alert(self) -> None:
+        """Confirm a case only and both cases and filings alert can be
+        created/updated from the API."""
+
+        test_cases = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+
+        for search_type in test_cases:
+            with self.subTest(search_type=search_type):
+                alert_created = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=case only &type={SEARCH_TYPES.RECAP}",
+                    alert_type=search_type,
+                )
+                self.assertEqual(alert_created.status_code, HTTPStatus.CREATED)
+                alert_created_data = alert_created.json()
+                self.assertEqual(alert_created_data["alert_type"], search_type)
+
+        # Try validation on update. Create a RECAP alert first.
+        recap_alert = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=RECAP alert &type={SEARCH_TYPES.RECAP}",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        alert_alert_data = recap_alert.json()
+        # Try to update the alert to a case only alert.
+        alert_alert_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_alert_data["id"], "version": "v4"},
+        )
+        data_updated = {
+            "name": "alert_alert_updated",
+            "query": "q=recap&type=r&order_by=score+desc&",
+            "rate": Alert.DAILY,
+            "alert_type": SEARCH_TYPES.DOCKETS,
+        }
+        response = await self.client.put(
+            alert_alert_path_detail, data_updated, format="json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        alert_data = response.json()
+        self.assertEqual(alert_data["alert_type"], SEARCH_TYPES.DOCKETS)
+
+    async def test_invalid_recap_alert_type_fails(self) -> None:
+        """Confirm that an error is raised if an invalid alert_type is
+        provided for a RECAP search query.
+        """
+
+        # Set a non-RECAP search type for a RECAP alert query.
+        test_cases = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+        for search_type in test_cases:
+            with self.subTest(search_type=search_type):
+                alert_created = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=RECAP query &type={search_type}",
+                    alert_type=SEARCH_TYPES.OPINION,
+                )
+                self.assertEqual(
+                    alert_created.status_code, HTTPStatus.BAD_REQUEST
+                )
+                self.assertIn(
+                    "The specified alert type is not valid for the given RECAP search query.",
+                    alert_created.json()["alert_type"],
+                )
+
+    async def test_alert_type_not_provided_for_recap_alert(self) -> None:
+        """Confirm that if alert_type is not provided in a RECAP search query,
+        an error is raised.
+        """
+
+        test_cases = [SEARCH_TYPES.DOCKETS, SEARCH_TYPES.RECAP]
+        for search_type in test_cases:
+            with self.subTest(search_type=search_type):
+                alert_created = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=RECAP query &type={search_type}",
+                )
+                self.assertEqual(
+                    alert_created.status_code, HTTPStatus.BAD_REQUEST
+                )
+                self.assertIn(
+                    "Please provide an alert type for your RECAP search query.",
+                    alert_created.json()["alert_type"][0],
+                )
+
+    async def test_alert_type_is_ignored_in_non_recap_alerts(self) -> None:
+        """Confirm that if alert_type is provided in the request, it is ignored.
+        The alert type is instead determined from the alert’s search query.
+        """
+
+        test_cases = [SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT]
+        for search_type in test_cases:
+            with self.subTest(search_type=search_type):
+                alert_created = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=RECAP query &type={search_type}",
+                    alert_type=SEARCH_TYPES.DOCKETS,
+                )
+                self.assertEqual(alert_created.status_code, HTTPStatus.CREATED)
+                alert_created_data = alert_created.json()
+                self.assertEqual(alert_created_data["alert_type"], search_type)
+
+    async def test_disallows_alert_type_change_for_non_recap_alerts(
+        self,
+    ) -> None:
+        """Confirm that an API request that changes the alert_type in a
+        non-recap alert fails.
+        """
+        # Create an initial alert for testing:
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+        )
+        alert_1_data = alert_1.json()
+        # Construct the detail URL for the alert:
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1_data["id"], "version": "v4"},
+        )
+
+        # Update the alert's search type:
+        data_updated = {
+            "query": f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}"
+        }
+        response = await self.client.patch(alert_1_path_detail, data_updated)
+
+        # Check that the alert_type change request fails.
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "You cannot change alert_type once set",
+            response.json()["alert_type"][0],
+        )
+
+    async def test_alert_type_change_for_recap_alerts(self) -> None:
+        """Confirm that an API request that changes the alert_type in a recap
+        alert succeeds."""
+        test_cases = {
+            SEARCH_TYPES.DOCKETS: SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.RECAP: SEARCH_TYPES.DOCKETS,
+        }
+        for search_type, search_type_target in test_cases.items():
+            with self.subTest(search_type=search_type):
+                # Create an initial alert for testing:
+                alert_1 = await self.make_an_alert(
+                    self.client,
+                    alert_name="alert_1",
+                    alert_query=f"q=testing_query&type={search_type}",
+                    alert_type=search_type,
+                )
+                alert_1_data = alert_1.json()
+                # Construct the detail URL for the alert:
+                alert_1_path_detail = reverse(
+                    "alert-detail",
+                    kwargs={"pk": alert_1_data["id"], "version": "v4"},
+                )
+
+                # Update the alert's search type:
+                data_updated = {
+                    "query": f"q=testing_query&type={search_type_target}",
+                    "alert_type": search_type_target,
+                }
+                response = await self.client.patch(
+                    alert_1_path_detail, data_updated
+                )
+
+                # Check that the alert_type change succeeds.
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                self.assertEqual(
+                    response.json()["alert_type"], search_type_target
+                )
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])

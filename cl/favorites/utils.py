@@ -254,7 +254,7 @@ async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
         .aaggregate(Sum("price", default=0.0))
     )
 
-    return cost["price__sum"]
+    return round(cost["price__sum"], 1)
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
