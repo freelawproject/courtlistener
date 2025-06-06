@@ -36,6 +36,8 @@ MULTIPLE_MATCHES_RESOURCE = Resource(
         source_text="MULTIPLE_MATCHES", page="999999", volume="999999"
     )
 )
+# to be used when storing unmatched citations
+MULTIPLE_MATCHES_FLAG = "is_ambiguous"
 
 
 def filter_by_matching_antecedent(
@@ -96,10 +98,14 @@ def resolve_fullcase_citation(
                     # return the first item by ordering key
                     return clusters[0].ordered_opinions.first()
                 elif _count >= 2:
+                    # set an attribute to differentiate 0-match and
+                    # more-than-one-match citations
+                    setattr(full_citation, MULTIPLE_MATCHES_FLAG, True)
                     # if two or more remain return multiple matches
                     return MULTIPLE_MATCHES_RESOURCE
 
         if len(db_search_results) > 1:
+            setattr(full_citation, MULTIPLE_MATCHES_FLAG, True)
             return MULTIPLE_MATCHES_RESOURCE
 
         # If there is one search result, try to return it

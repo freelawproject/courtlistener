@@ -142,6 +142,9 @@ REST_FRAMEWORK = {
         "manu.jose": "10/hour",
         "shishir": "10/hour",
         "shishir.kumar": "10/hour",
+        # hitting '/api/rest/v4/opinions/' causes counts and high CPU usage
+        "arivdc": "10/hour",
+        "Mpits003": "1/hour",
         # Throttling up.
         "JonasHappel": "10000/hour",
         "YFIN": "430000/day",

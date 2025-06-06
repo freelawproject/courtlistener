@@ -64,7 +64,7 @@
   <p>Search Alerts update you when there is new information in our search engine.</p>
   <p>This system scales to support thousands or even millions of alerts, allowing organizations to stay updated about numerous topics. This is a powerful system when used with <a href="{% url "webhooks_docs" %}">webhooks</a>.
   </p>
-  <p>Search alerts have three required fields:</p>
+  <p>Search alerts have three required fields and one optional field:</p>
   <ul>
     <li><strong><code>name</code></strong> &mdash; A human-friendly name for the alert.</li>
     <li><strong><code>query</code></strong> &mdash; Search parameters you get from the front end, as a string.
@@ -77,6 +77,10 @@
       <li><code>wly</code> — Weekly</li>
       <li><code>mly</code> — Monthly</li>
     </ul>
+    <li><strong><code>alert_type</code></strong> &mdash; This is a required field for RECAP Search Alerts, but it is ignored for other types. When used with RECAP Search alerts, this field specifies whether you want alerts for each new case matching the query or for both new cases and new filings.
+      For notifications on cases only, use the <code>d</code> type (short for "dockets").
+      For notifications on both cases and filings, use the <code>r</code> type (meaning all of RECAP).
+    </li>
   </ul>
   <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
   <pre class="pre-scrollable">curl -X OPTIONS \
