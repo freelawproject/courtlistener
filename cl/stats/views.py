@@ -13,6 +13,10 @@ from cl.stats.utils import (
 )
 
 
+def heartbeat(request: HttpRequest) -> HttpResponse:
+    return HttpResponse("OK")
+
+
 def health_check(request: HttpRequest) -> JsonResponse:
     """Check if we can connect to various services."""
     is_redis_up = check_redis()
