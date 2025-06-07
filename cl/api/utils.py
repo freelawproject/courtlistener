@@ -475,8 +475,11 @@ class NoFilterCacheListMixin:
             request.query_params.get("count") == "on"
             and request.version == "v4"
         )
+        has_pagination = request.query_params.get(
+            "cursor"
+        ) or request.query_params.get("page")
 
-        # Determine the cache key prefix. Use a custom key if provided,
+        # Determine the cache key prefix. Uses a custom key if provided,
         # otherwise default to the class name.
         prefix = getattr(self, "no_filters_cache_key", self.__class__.__name__)
         # Get the ordering key from the request, defaulting to the view's
@@ -490,8 +493,15 @@ class NoFilterCacheListMixin:
             else f"{prefix}_{ordering_key}"
         )
 
-        # Check if the queryset has no active filters applied
-        if not has_filters or is_count_request:
+        # Attempt to retrieve the response from cache only if eligible.
+        # Caching is applied when there's no pagination and either a count is
+        # requested or no filters are active, ensuring we cache full,
+        # unfiltered/unpaginated datasets or counts, which are likely to be
+        # reused frequently.
+        should_cache_response = not has_pagination and (
+            is_count_request or not has_filters
+        )
+        if should_cache_response:
             response = cache.get(cache_key) or None
             if response:
                 return response
@@ -518,8 +528,9 @@ class NoFilterCacheListMixin:
             serializer = self.get_serializer(page, many=True)
             response = self.get_paginated_response(serializer.data)
 
-            # If no filters were applied, add a callback to cache the response
-            if not has_filters:
+            # If the conditions for a cachable response are met, add a callback
+            # to cache the response
+            if should_cache_response:
                 response.add_post_render_callback(
                     partial(_save_page_in_cache, cache, cache_key)
                 )
@@ -527,8 +538,9 @@ class NoFilterCacheListMixin:
 
         serializer = self.get_serializer(queryset, many=True)
         response = Response(serializer.data)
-        # If no filters were applied, add a callback to cache the response
-        if not has_filters:
+        # If the conditions for a cachable response are met, add a callback to
+        # cache the response
+        if should_cache_response:
             response.add_post_render_callback(
                 partial(_save_page_in_cache, cache, cache_key)
             )
