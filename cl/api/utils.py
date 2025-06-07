@@ -534,8 +534,8 @@ class NoFilterCacheListMixin:
                 key (str): The cache key under which to store the response.
                 response_obj (Response): The DRF Response object to be cached.
             """
-            # Cache the response for 1 hour
-            cache_connection.set(key, response, 60 * 60)
+            # Cache the response for 10 minutes
+            cache_connection.set(key, response, 10 * 60)
 
         page = self.paginate_queryset(queryset)
         if page is not None:
