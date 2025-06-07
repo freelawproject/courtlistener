@@ -456,12 +456,12 @@ class CacheListMixin:
 
 class NoFilterCacheListMixin:
     """
-    A mixin that caches list of results when no filters are applied to the
-    queryset.
+    A mixin that caches list of results when there's no pagination and either a
+    count is requested or no filters are applied to the queryset.
 
-    It leverages Django's caching mechanism to store responses for unfiltered
-    list requests, improving performance by avoiding repeated database queries
-    for frequently accessed data.
+    It leverages Django's caching mechanism to store responses when no filters
+    or pagination are applied to the queryset, improving performance by
+    avoiding repeated database queries for frequently accessed data.
 
     Attributes:
         no_filters_cache_key (str, optional): A custom prefix for the cache key.
@@ -519,7 +519,7 @@ class NoFilterCacheListMixin:
                 key (str): The cache key under which to store the response.
                 response_obj (Response): The DRF Response object to be cached.
             """
-            # Cache the response for 1 hour (60 minutes * 60 seconds)
+            # Cache the response for 1 hour
             cache_connection.set(key, response, 60 * 60)
 
         page = self.paginate_queryset(queryset)
