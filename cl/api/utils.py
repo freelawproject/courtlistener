@@ -478,6 +478,7 @@ class NoFilterCacheListMixin:
         has_pagination = request.query_params.get(
             "cursor"
         ) or request.query_params.get("page")
+        is_v3_request = request.version == "v3"
 
         # Determine the cache key prefix. Uses a custom key if provided,
         # otherwise default to the class name.
@@ -498,8 +499,10 @@ class NoFilterCacheListMixin:
         # requested or no filters are active, ensuring we cache full,
         # unfiltered/unpaginated datasets or counts, which are likely to be
         # reused frequently.
-        should_cache_response = not has_pagination and (
-            is_count_request or not has_filters
+        should_cache_response = (
+            not is_v3_request
+            and not has_pagination
+            and (is_count_request or not has_filters)
         )
         if should_cache_response:
             response = cache.get(cache_key) or None
