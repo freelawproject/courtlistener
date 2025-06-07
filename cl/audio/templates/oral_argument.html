@@ -317,15 +317,15 @@
                 {% endif %}
             </p>
         {% endif %}
-    </article>
 
-    {% if transcript_feature_active %}
-    <div id="transcript-container" class="transcript">
-        <h3>Transcript</h3>
-        <div id="transcript-text">
-            <p>Transcript data is not available.</p>
+        {% if transcript_feature_active %}
+        <div id="transcript-container" class="transcript">
+            <h3>Transcript</h3>
+            <div id="transcript-text">
+                <p>Transcript data is not available.</p>
+            </div>
         </div>
-    </div>
-    {% endif %}
+        {% endif %}
+    </article>
 
 {% endblock %}
