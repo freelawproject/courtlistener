@@ -322,14 +322,6 @@
     {% if transcript_feature_active %}
     <div id="transcript-container" class="transcript">
         <h3>Transcript</h3>
-        {% if transcript_segments_data %}
-        <div class="search-controls">
-          <input type="text" id="transcript-search" class="form-control" placeholder="Search transcript...">
-          <span id="search-count"></span>
-          <button id="search-prev" class="btn btn-default btn-sm" disabled>&lt; Prev</button>
-          <button id="search-next" class="btn btn-default btn-sm" disabled>Next &gt;</button>
-        </div>
-        {% endif %}
         <div id="transcript-text">
             <p>Transcript data is not available.</p>
         </div>

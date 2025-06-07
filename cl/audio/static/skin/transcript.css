@@ -41,37 +41,4 @@
     border: 1px solid #ccc;
     padding: 10px;
     line-height: 1.6;
-    margin-top: 10px; /* Add some space below search controls */
-}
-.transcript-segment.transcript-search-match { /* Target segments */
-   background-color: #add8e6; /* Light blue */
-   border: 1px solid #87ceeb;
-}
-.transcript-segment.transcript-search-match:hover {
-   background-color: #add8e6; /* preserve on hover */
-}
-.transcript-segment.transcript-search-current-match {
-   background-color: #90ee90; /* Light green */
-   border: 1px solid #3cb371;
-   box-shadow: 0 0 5px rgba(60, 179, 113, 0.7);
-}
-.transcript-segment.transcript-search-current-match:hover {
-   background-color: #90ee90; /* preserve on hover */
-}
-.search-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px; /* Space between elements */
-  margin-bottom: 10px; /* Space below the controls */
-  padding: 0 15px; /* Add horizontal padding */
-}
-.search-controls input {
-  flex-grow: 1; /* Allow input to take available space */
-}
-.search-controls button {
-  padding: 5px 10px;
-}
-.search-controls span { /* Style for the count */
-    font-size: 0.9em;
-    color: #333;
 }
