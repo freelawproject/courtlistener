@@ -1,6 +1,7 @@
 import logging
 from collections import OrderedDict, defaultdict
 from datetime import UTC, date, datetime, timedelta
+from functools import partial
 from itertools import batched, chain
 from typing import Any, TypedDict
 
@@ -10,8 +11,11 @@ from dateutil.rrule import DAILY, rrule
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
+from django.core.cache import caches
+from django.core.cache.backends.base import BaseCache
 from django.db.models import F
 from django.db.models.constants import LOOKUP_SEP
+from django.template.response import SimpleTemplateResponse
 from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
@@ -448,6 +452,80 @@ class CacheListMixin:
     @method_decorator(vary_on_headers("Cookie", "Authorization"))
     def list(self, *args, **kwargs):
         return super().list(*args, **kwargs)
+
+
+class NoFilterCacheListMixin:
+    """
+    A mixin that caches list of results when no filters are applied to the
+    queryset.
+
+    It leverages Django's caching mechanism to store responses for unfiltered
+    list requests, improving performance by avoiding repeated database queries
+    for frequently accessed data.
+
+    Attributes:
+        no_filters_cache_key (str, optional): A custom prefix for the cache key.
+            If not provided, the class name will be used as the prefix.
+    """
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        has_filters = queryset.query.has_filters()
+
+        # Determine the cache key prefix. Use a custom key if provided,
+        # otherwise default to the class name.
+        prefix = getattr(self, "no_filters_cache_key", self.__class__.__name__)
+        # Get the ordering key from the request, defaulting to the view's
+        # ordering
+        ordering_key = request.GET.get("order_by", self.ordering)
+
+        cache = caches["db_cache"]
+        cache_key = f"{prefix}_{ordering_key}"
+
+        # Check if the queryset has no active filters applied
+        if not has_filters:
+            response = cache.get(cache_key) or None
+            if response:
+                return response
+
+        def _save_page_in_cache(
+            cache_connection: BaseCache,
+            key: str,
+            response: SimpleTemplateResponse,
+        ):
+            """
+            Helper function to save the response in the cache.
+
+            Args:
+                cache_connection: The cache instance (e.g., Django's `caches["db_cache"]`).
+                key (str): The cache key under which to store the response.
+                response_obj (Response): The DRF Response object to be cached.
+            """
+            # Cache the response for 1 hour (60 minutes * 60 seconds)
+            cache_connection.set(key, response, 60 * 60)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            # If pagination is applied, serialize the paginated data
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+
+            # If no filters were applied, add a callback to cache the response
+            if not has_filters:
+                response.add_post_render_callback(
+                    partial(_save_page_in_cache, cache, cache_key)
+                )
+            return response
+
+        serializer = self.get_serializer(queryset, many=True)
+        response = Response(serializer.data)
+        # If no filters were applied, add a callback to cache the response
+        if not has_filters:
+            response.add_post_render_callback(
+                partial(_save_page_in_cache, cache, cache_key)
+            )
+
+        return response
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):
