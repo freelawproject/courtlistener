@@ -471,6 +471,10 @@ class NoFilterCacheListMixin:
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         has_filters = queryset.query.has_filters()
+        is_count_request = (
+            request.query_params.get("count") == "on"
+            and request.version == "v4"
+        )
 
         # Determine the cache key prefix. Use a custom key if provided,
         # otherwise default to the class name.
@@ -480,10 +484,14 @@ class NoFilterCacheListMixin:
         ordering_key = request.GET.get("order_by", self.ordering)
 
         cache = caches["db_cache"]
-        cache_key = f"{prefix}_{ordering_key}"
+        cache_key = (
+            f"{prefix}_count"
+            if is_count_request
+            else f"{prefix}_{ordering_key}"
+        )
 
         # Check if the queryset has no active filters applied
-        if not has_filters:
+        if not has_filters or is_count_request:
             response = cache.get(cache_key) or None
             if response:
                 return response
