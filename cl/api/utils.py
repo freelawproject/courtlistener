@@ -454,6 +454,20 @@ class CacheListMixin:
         return super().list(*args, **kwargs)
 
 
+def get_cache_key_for_no_filter_mixin(
+    prefix: str, ordering_key: str, is_count_request: bool
+) -> str:
+    """
+    Generates a cache key for the `NoFilterCacheListMixin`.
+
+    The key varies based on whether a count or ordered is requested. Useful
+    for mocking the logger.
+    """
+    return (
+        f"{prefix}_count" if is_count_request else f"{prefix}_{ordering_key}"
+    )
+
+
 class NoFilterCacheListMixin:
     """
     A mixin that caches list of results when there's no pagination and either a
@@ -485,13 +499,11 @@ class NoFilterCacheListMixin:
         prefix = getattr(self, "no_filters_cache_key", self.__class__.__name__)
         # Get the ordering key from the request, defaulting to the view's
         # ordering
-        ordering_key = request.GET.get("order_by", self.ordering)
+        ordering_key = request.query_params.get("order_by", self.ordering)
 
         cache = caches["db_cache"]
-        cache_key = (
-            f"{prefix}_count"
-            if is_count_request
-            else f"{prefix}_{ordering_key}"
+        cache_key = get_cache_key_for_no_filter_mixin(
+            prefix, ordering_key, is_count_request
         )
 
         # Attempt to retrieve the response from cache only if eligible.
