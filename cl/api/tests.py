@@ -3465,7 +3465,7 @@ class TestApiUsage(SimpleTestCase):
         self.assertEqual(dates, ["2023-01-01", "2023-01-02"])
 
 
-@patch("cl.api.utils.get_cache_key_for_no_filter_mixin")
+@patch("cl.api.utils.make_cache_key_for_no_filter_mixin")
 class CacheListApiResponseTest(TestCase):
     def setUp(self):
         self.cache = caches["db_cache"]

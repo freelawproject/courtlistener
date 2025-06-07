@@ -454,7 +454,7 @@ class CacheListMixin:
         return super().list(*args, **kwargs)
 
 
-def get_cache_key_for_no_filter_mixin(
+def make_cache_key_for_no_filter_mixin(
     prefix: str, ordering_key: str, is_count_request: bool
 ) -> str:
     """
@@ -502,7 +502,7 @@ class NoFilterCacheListMixin:
         ordering_key = request.query_params.get("order_by", self.ordering)
 
         cache = caches["db_cache"]
-        cache_key = get_cache_key_for_no_filter_mixin(
+        cache_key = make_cache_key_for_no_filter_mixin(
             prefix, ordering_key, is_count_request
         )
 
