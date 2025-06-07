@@ -462,7 +462,7 @@ class ApiQueryCountTests(TransactionTestCase):
         and another to select the count.
         """
         with CaptureQueriesContext(connection) as ctx:
-            path = reverse("docket-list", kwargs={"version": "v4"})
+            path = reverse("audio-list", kwargs={"version": "v4"})
             params = {"count": "on"}
             self.client.get(path, params)
 
