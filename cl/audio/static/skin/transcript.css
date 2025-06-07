@@ -42,3 +42,11 @@
     padding: 10px;
     line-height: 1.6;
 }
+
+.transcript-disclaimer {
+  text-align: right;
+  margin-top: 10px;
+  font-style: italic;
+  color: #555;
+  font-size: 0.9em;
+}
