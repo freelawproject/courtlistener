@@ -237,7 +237,9 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     ).order_by("-id")
 
 
-class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
+class OpinionViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
     permission_classes = [
