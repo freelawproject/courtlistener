@@ -1,7 +1,6 @@
 import logging
 from collections import OrderedDict, defaultdict
 from datetime import UTC, date, datetime, timedelta
-from functools import partial
 from itertools import batched, chain
 from typing import Any, TypedDict
 
@@ -15,7 +14,6 @@ from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
 from django.db.models import F
 from django.db.models.constants import LOOKUP_SEP
-from django.template.response import SimpleTemplateResponse
 from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
@@ -30,6 +28,7 @@ from rest_framework.exceptions import Throttled
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
+from rest_framework.response import Response as DRFResponse
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
@@ -517,14 +516,17 @@ class NoFilterCacheListMixin:
             and (is_count_request or not has_filters)
         )
         if should_cache_response:
-            response = cache.get(cache_key) or None
-            if response:
-                return response
+            cached_data = cache.get(cache_key) or None
+            if cached_data:
+                # For backward compatibility, Handle legacy Response objects
+                # still in cache. This branch can be removed once all cached
+                # responses are migrated away from DRFResponse instances.
+                if isinstance(cached_data, DRFResponse):
+                    return cached_data
+                return DRFResponse(cached_data)
 
         def _save_page_in_cache(
-            cache_connection: BaseCache,
-            key: str,
-            response: SimpleTemplateResponse,
+            cache_connection: BaseCache, key: str, data: dict[str, Any]
         ):
             """
             Helper function to save the response in the cache.
@@ -532,34 +534,24 @@ class NoFilterCacheListMixin:
             Args:
                 cache_connection: The cache instance (e.g., Django's `caches["db_cache"]`).
                 key (str): The cache key under which to store the response.
-                response_obj (Response): The DRF Response object to be cached.
+                data (dict): Dictionary containing the data to be cached.
             """
             # Cache the response for 10 minutes
-            cache_connection.set(key, response, 10 * 60)
+            cache_connection.set(key, data, 10 * 60)
 
         page = self.paginate_queryset(queryset)
         if page is not None:
             # If pagination is applied, serialize the paginated data
             serializer = self.get_serializer(page, many=True)
             response = self.get_paginated_response(serializer.data)
-
-            # If the conditions for a cachable response are met, add a callback
-            # to cache the response
             if should_cache_response:
-                response.add_post_render_callback(
-                    partial(_save_page_in_cache, cache, cache_key)
-                )
+                _save_page_in_cache(cache, cache_key, response.data)
             return response
 
         serializer = self.get_serializer(queryset, many=True)
-        response = Response(serializer.data)
-        # If the conditions for a cachable response are met, add a callback to
-        # cache the response
+        response = DRFResponse(serializer.data)
         if should_cache_response:
-            response.add_post_render_callback(
-                partial(_save_page_in_cache, cache, cache_key)
-            )
-
+            _save_page_in_cache(cache, cache_key, response.data)
         return response
 
 
