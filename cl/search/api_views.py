@@ -8,7 +8,12 @@ from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
-from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
+from cl.api.utils import (
+    CacheListMixin,
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    RECAPUsersReadOnly,
+)
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_serializers import (
@@ -80,7 +85,9 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
     queryset = OriginatingCourtInformation.objects.all().order_by("-id")
 
 
-class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
+class DocketViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
     permission_classes = [
@@ -230,7 +237,9 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     ).order_by("-id")
 
 
-class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
+class OpinionViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
     permission_classes = [
