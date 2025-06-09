@@ -64,6 +64,9 @@ class TestRunner(DiscoverRunner):
         )
         parallel_action.default = parallel_action.const
 
+        # Default buffering on, to hide output
+        parser.set_defaults(buffer=True)
+
     def setup_databases(self, **kwargs):
         # Force to always delete the database if it exists
         interactive = self.interactive

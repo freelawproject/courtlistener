@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import boto3
 import pytz
@@ -111,7 +111,7 @@ class Command(CommandUtils, BaseCommand):
 
         self.print_statistics()
 
-    def setup_s3_client(self, mock_client: Optional[Any] = None) -> None:
+    def setup_s3_client(self, mock_client: Any | None = None) -> None:
         """Set up S3 client for accessing CAP data in R2.
 
         :param mock_client: Optional mock client for testing.
@@ -152,7 +152,7 @@ class Command(CommandUtils, BaseCommand):
             )
             if reporter_item_index:
                 logger.info(
-                    f"Starting from reporter: {self.start_from_reporter}"
+                    "Starting from reporter: %s", self.start_from_reporter
                 )
                 reporters = reporters[reporter_item_index:]
                 self.start_from_reporter = None
@@ -168,7 +168,7 @@ class Command(CommandUtils, BaseCommand):
             self.generate_crosswalk_for_reporter(reporter, i)
 
     def generate_crosswalk_for_reporter(
-        self, reporter: Dict[str, Any], index: int
+        self, reporter: dict[str, Any], index: int
     ) -> None:
         """Generate crosswalk for a specific reporter.
 
@@ -191,12 +191,17 @@ class Command(CommandUtils, BaseCommand):
         for volume in volumes:
             cases_metadata = self.fetch_cases_metadata(reporter_slug, volume)
             logger.info(
-                f"Processing {len(cases_metadata)} cases for {reporter_name} volume {volume}"
+                "Processing %s cases for %s volume %s",
+                len(cases_metadata),
+                reporter_name,
+                volume,
             )
 
             for case_meta in cases_metadata:
                 logger.debug(
-                    f"Processing case: {case_meta['id']} - {case_meta['name_abbreviation']}"
+                    "Processing case: %s - %s",
+                    case_meta["id"],
+                    case_meta["name_abbreviation"],
                 )
                 if self.is_valid_case_metadata(case_meta):
                     # Only increment the counter for valid cases that meet our date criteria
@@ -214,25 +219,33 @@ class Command(CommandUtils, BaseCommand):
                             }
                         )
                         logger.info(
-                            f"Match found: CAP ID {case_meta['id']} -> CL ID {cl_case.id}"
+                            "Match found: CAP ID %s -> CL ID %s",
+                            case_meta["id"],
+                            cl_case.id,
                         )
                 else:
                     logger.warning(
-                        f"Invalid case metadata for CAP ID {case_meta['id']}"
+                        "Invalid case metadata for CAP ID %s", case_meta["id"]
                     )
 
             if not self.dry_run:
                 self.save_crosswalk(crosswalk, reporter_name, index)
             else:
                 logger.info(
-                    f"Dry run: Would save {len(crosswalk)} matches for {reporter_name}"
+                    "Dry run: Would save %s matches for %s",
+                    len(crosswalk),
+                    reporter_name,
                 )
 
             logger.info(
-                f"Processed {self.total_cases_processed} cases for {reporter_name}({reporter_slug}), found {self.total_matches_found} matches"
+                "Processed %s cases for %s(%s), found %s matches",
+                self.total_cases_processed,
+                reporter_name,
+                reporter_slug,
+                self.total_matches_found,
             )
 
-    def fetch_volumes_for_reporter(self, reporter_slug: str) -> List[str]:
+    def fetch_volumes_for_reporter(self, reporter_slug: str) -> list[str]:
         """Fetch volume directories for a given reporter from R2 using a paginator.
 
         :param reporter_slug: The slug of the reporter.
@@ -259,19 +272,23 @@ class Command(CommandUtils, BaseCommand):
                 )
 
             logger.info(
-                f"Found {len(volume_directories)} volumes for reporter {reporter_slug}"
+                "Found %s volumes for reporter %s",
+                len(volume_directories),
+                reporter_slug,
             )
 
         except ClientError as e:
             logger.error(
-                f"Error fetching volume directories for {reporter_slug}: {str(e)}"
+                "Error fetching volume directories for %s: %s",
+                reporter_slug,
+                str(e),
             )
 
         return sorted(volume_directories)
 
     def find_matching_case(
-        self, case_meta: Dict[str, Any], reporter_slug: str, volume: str
-    ) -> Optional[OpinionCluster]:
+        self, case_meta: dict[str, Any], reporter_slug: str, volume: str
+    ) -> OpinionCluster | None:
         """Find a matching case in CourtListener database using the filepath_json_harvard field.
 
         :param case_meta: Case metadata dictionary from CAP.
@@ -284,7 +301,7 @@ class Command(CommandUtils, BaseCommand):
             page = str(case_meta["first_page"])
 
             query = f"law.free.cap.{reporter_slug}.{volume}/{page}.{cap_case_id}.json"
-            logger.debug(f"Searching for: {query}")
+            logger.debug("Searching for: %s", query)
 
             # Exact match of the file path in this format, e.g.:
             # law.free.cap.wis-2d.369/658.6776082.json
@@ -297,20 +314,23 @@ class Command(CommandUtils, BaseCommand):
                 return matching_cluster
             else:
                 logger.info(
-                    f"No match found for CAP ID {cap_case_id} (reporter: {reporter_slug}, volume: {volume}, page: {page})"
+                    "No match found for CAP ID %s (reporter: %s, volume: %s, page: %s)",
+                    cap_case_id,
+                    reporter_slug,
+                    volume,
+                    page,
                 )
 
         except Exception as e:
-            logger.error(
-                f"Error processing case {str(case_meta["id"])}: {str(e)}",
-                exc_info=True,
+            logger.exception(
+                "Error processing case %s: %s", str(case_meta["id"]), str(e)
             )
 
         return None
 
     def fetch_cases_metadata(
         self, reporter_slug: str, volume: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Fetch CasesMetadata.json for a specific reporter and volume from R2.
 
         :param reporter_slug: The slug of the reporter.
@@ -334,17 +354,22 @@ class Command(CommandUtils, BaseCommand):
                     > self.updated_after
                 ]
                 logger.debug(
-                    f"Filtered to {len(cases)} cases after {self.updated_after}"
+                    "Filtered to %s cases after %s",
+                    len(cases),
+                    self.updated_after,
                 )
 
             return cases
         except Exception as e:
             logger.error(
-                f"Error fetching CasesMetadata.json for {reporter_slug} volume {volume}: {str(e)}"
+                "Error fetching CasesMetadata.json for %s volume %s: %s",
+                reporter_slug,
+                volume,
+                str(e),
             )
             return []
 
-    def fetch_reporters_metadata(self) -> List[Dict[str, Any]]:
+    def fetch_reporters_metadata(self) -> list[dict[str, Any]]:
         """Fetch ReportersMetadata.json from R2.
 
         :return: A list of reporter metadata dictionaries.
@@ -355,10 +380,10 @@ class Command(CommandUtils, BaseCommand):
             )
             return json.loads(response["Body"].read().decode("utf-8"))
         except Exception as e:
-            logger.error(f"Error fetching ReportersMetadata.json: {str(e)}")
+            logger.error("Error fetching ReportersMetadata.json: %s", str(e))
             return []
 
-    def is_valid_case_metadata(self, case_meta: Dict[str, Any]) -> bool:
+    def is_valid_case_metadata(self, case_meta: dict[str, Any]) -> bool:
         """Check if case metadata contains all required fields.
 
         :param case_meta: Case metadata dictionary.
@@ -402,7 +427,7 @@ class Command(CommandUtils, BaseCommand):
             self.stdout.write(self.style.WARNING("No cases processed"))
 
     def save_crosswalk(
-        self, crosswalk: List[Dict[str, Any]], reporter_name: str, index: int
+        self, crosswalk: list[dict[str, Any]], reporter_name: str, index: int
     ) -> None:
         """Save the generated crosswalk to a JSON file.
 

@@ -1,6 +1,5 @@
 # fields that are used for highlighting or other output in the search results
 import re
-from typing import Dict
 
 from cl.search.models import SEARCH_TYPES, Opinion
 
@@ -212,7 +211,7 @@ opinion_boosts_es = {
     "caseName.exact": 4.0,
     "docketNumber": 2.0,
 }
-BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
+BOOSTS: dict[str, dict[str, dict[str, float]]] = {
     "qf": {
         SEARCH_TYPES.OPINION: {
             "text": 1.0,

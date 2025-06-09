@@ -13,10 +13,19 @@
 
 {% block content %}
 
-  <div class="col-xs-12">
+  <div class="col-xs-12 hidden-sm hidden-md hidden-lg flex justify-content-around v-offset-below-2">
+    <a href={% if user.is_authenticated %}"{% url 'user_prayers' user.username %}"{% else %}"{% url 'sign-in' %}?next={% url 'top_prayers' %}"{% endif %}><div class="fa gray fa-fw">
+      {% include "includes/hand-holding-heart.svg" %}
+    </div> Your Prayers</a>
+    <a href="{% url "pray_and_pay_help" %}">
+      <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
+    </a>
+  </div>
+
+  <div class="col-xs-12 hidden-xs">
     <ul class="prayer-top-buttons nav navbar-nav navbar-right">
       {% include 'includes/remind_me_modal.html' %}
-      <li class="hidden-xs">
+      <li>
         <a href="#" class="donate" data-toggle="modal" data-target="#remindMeModal">
           <i class="fa fa-heart-o"></i>&nbsp;Remind Me to Help
         </a>
@@ -26,7 +35,11 @@
           {% include "includes/hand-holding-heart.svg" %}
         </div> Your Prayers</a>
       </li>
-      <li><a href="{% url "pray_and_pay_help" %}">Learn More</a></li>
+      <li>
+        <a href="{% url "pray_and_pay_help" %}">
+          <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
+        </a>
+      </li>
     </ul>
   </div>
 
@@ -46,6 +59,7 @@
               <th>Case Name</th>
               <th>Document Number</th>
               <th>Document Description</th>
+              <th></th>
               <th>Buy on Pacer</th>
             {% if perms.favorites.change_prayer %}
               <th>Action</th>
@@ -73,15 +87,30 @@
               </td>
               {% endwith %}
               <td>{{ prayer.description }}</td>
-              <td><a href="{{ prayer.pacer_url }}"
-                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                  class="open_buy_pacer_modal btn btn-default btn-xs"
-                  data-toggle="modal" data-target="#modal-buy-pacer"
-                {% else%}
-                  class="btn btn-default btn-xs"
+              <td>
+                <div class="prayer-button">
+                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=prayer.prayer_exists document_id=prayer.id count=prayer.prayer_count regular_size=False%}
+                </div>
+              </td>
+              <td>
+                {% if prayer.doc_unavailable %}
+                  <span class="btn btn-default btn-xs disabled">
+                    Unavailable as of {{ prayer.last_checked|date:"M j, Y" }}
+                  </span>
+                {% else %}
+                  <a href="{{ prayer.pacer_url }}"
+                     {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                       class="open_buy_pacer_modal btn btn-default btn-xs"
+                       data-toggle="modal" data-target="#modal-buy-pacer"
+                     {% else %}
+                       class="btn btn-default btn-xs"
+                     {% endif %}
+                     target="_blank"
+                     rel="nofollow">
+                    Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}
+                  </a>
                 {% endif %}
-                  target="_blank"
-                  rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
+              </td>
               {% if perms.favorites.change_prayer %}
                 <td>
                   <div class="flex">
@@ -110,7 +139,15 @@
 {% endblock %}
 
 {% block footer-scripts %}
+  <script src="{% static "js/pray_and_pay.js" %}"></script>
+  {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
   <script defer type="text/javascript"
             src="{% static "js/buy_pacer_modal.js" %}"></script>
   {% include "includes/buy_pacer_modal.html" %}
+  {% include "includes/logged_out_modal.html" %}
 {% endblock %}

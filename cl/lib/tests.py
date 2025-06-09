@@ -1,13 +1,20 @@
 import datetime
 import pickle
-from typing import Tuple, TypedDict, cast
+from typing import TypedDict, cast
+from unittest import mock
 from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
+from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.test import override_settings
 from requests.cookies import RequestsCookieJar
 
+from cl.lib.courts import (
+    get_active_court_from_cache,
+    get_minimal_list_of_courts,
+    lookup_child_courts_cache,
+)
 from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
@@ -76,8 +83,7 @@ class TestPacerUtils(TestCase):
         )
         self.assertFalse(
             blocked,
-            msg="Bankruptcy dockets with many entries "
-            "should not be blocked",
+            msg="Bankruptcy dockets with many entries should not be blocked",
         )
         # This should stay blocked even though it's a big bankruptcy docket.
         d.blocked = True
@@ -86,16 +92,106 @@ class TestPacerUtils(TestCase):
         )
         self.assertTrue(
             blocked,
-            msg="Bankruptcy dockets that start blocked "
-            "should stay blocked.",
+            msg="Bankruptcy dockets that start blocked should stay blocked.",
         )
+
+
+@mock.patch(
+    "cl.lib.courts.get_cache_key_for_court_list",
+    return_value="lib_test:minimal-court-list",
+)
+class TestCachedCourtUtils(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent_court = CourtFactory(id="parent_court")
+        cls.child_court_1 = CourtFactory(
+            id="child_1", jurisdiction="FB", parent_court=cls.parent_court
+        )
+        cls.child_court_2 = CourtFactory(
+            id="child_2",
+            jurisdiction="FB",
+            parent_court=cls.parent_court,
+        )
+        cls.court_not_in_use = CourtFactory(in_use=False)
+
+        cls.self_referencing_court = CourtFactory(
+            id="self_ref", parent_court_id="self_ref"
+        )
+        cls.self_referencing_child_1 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+        cls.self_referencing_child_1_1 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+        cls.self_referencing_child_2 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+
+    def setUp(self):
+        # Pre-populate the cache with the court list
+        with patch(
+            "cl.lib.courts.get_cache_key_for_court_list",
+            return_value="lib_test:minimal-court-list",
+        ):
+            get_minimal_list_of_courts()
+
+    def test_can_get_active_courts_from_cache(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            in_use_courts = get_active_court_from_cache()
+
+        court_count = Court.objects.filter(in_use=True).count()
+        self.assertEqual(len(in_use_courts), court_count)
+
+    def test_can_handle_empty_inputs(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([])
+
+        self.assertEqual(child_ids, set())
+
+    def test_can_return_empty_set_for_court_w_no_child(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([self.court_not_in_use.pk])
+
+        self.assertEqual(child_ids, set())
+
+    def test_can_return_set_with_child_court_ids(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([self.parent_court.pk])
+
+        self.assertSetEqual(
+            {
+                self.parent_court.pk,
+                self.child_court_1.pk,
+                self.child_court_2.pk,
+            },
+            child_ids,
+        )
+
+    def test_can_handle_self_referencing_courts(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache(
+                [self.self_referencing_court.pk]
+            )
+
+        self.assertSetEqual(
+            {
+                self.self_referencing_court.pk,
+                self.self_referencing_child_1.pk,
+                self.self_referencing_child_1_1.pk,
+                self.self_referencing_child_2.pk,
+            },
+            child_ids,
+        )
+
+    def tearDown(self):
+        cache.delete("lib_test:minimal-court-list")
+        return super().tearDown()
 
 
 @override_settings(
     EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
 )
 class TestPacerSessionUtils(TestCase):
-
     def setUp(self) -> None:
         r = get_redis_interface("CACHE", decode_responses=False)
         # Clear cached session keys to prevent data inconsistencies.
@@ -182,7 +278,7 @@ class TestStringUtils(SimpleTestCase):
             ellipsis: str
 
         s = "Henry wants apple."
-        tests: Tuple[TestType, ...] = (
+        tests: tuple[TestType, ...] = (
             # Simple case
             {"length": 13, "result": "Henry wants"},
             # Off by one cases
@@ -209,14 +305,15 @@ class TestStringUtils(SimpleTestCase):
             self.assertEqual(
                 result,
                 test_dict["result"],
-                msg="Failed with dict: %s.\n"
-                "%s != %s" % (test_dict, result, test_dict["result"]),
+                msg="Failed with dict: {}.\n{} != {}".format(
+                    test_dict, result, test_dict["result"]
+                ),
             )
             self.assertTrue(
                 len(result) <= test_dict["length"],
-                msg="Failed with dict: %s.\n"
-                "%s is longer than %s"
-                % (test_dict, result, test_dict["length"]),
+                msg="Failed with dict: {}.\n{} is longer than {}".format(
+                    test_dict, result, test_dict["length"]
+                ),
             )
 
     def test_anonymize(self) -> None:
@@ -1101,9 +1198,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_for_proximity_tokens(
-                test["input_str"]  # type: ignore
-            )
+            output = check_for_proximity_tokens(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         # Check for Unbalanced parentheses.
@@ -1140,15 +1235,11 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = check_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
 
         # Check for Unbalanced quotes.
@@ -1199,9 +1290,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_quotes(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_quotes(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
 
     def test_can_get_parties_from_bankruptcy_case_name(self) -> None:

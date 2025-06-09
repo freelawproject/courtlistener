@@ -1,7 +1,7 @@
 # Functions to parse court data in XML format into a list of dictionaries.
 import os
 import re
-import xml.etree.cElementTree as ET
+import xml.etree.ElementTree as ET
 
 import dateutil.parser as dparser
 from juriscraper.lib.string_utils import (
@@ -66,7 +66,7 @@ def parse_file(file_path):
     )
     if not info["court_id"]:
         raise Exception(
-            f"Failed to find a court ID for \"{''.join(raw_info.get('court', []))}\"."
+            f'Failed to find a court ID for "{"".join(raw_info.get("court", []))}".'
         )
 
     # get the full panel text and extract judges from it
@@ -152,8 +152,8 @@ def parse_file(file_path):
                 o for o in info["opinions"] if o["type"] == current_type
             ]
             if relevant_opinions:
-                relevant_opinions[-1]["opinion"] += "\n%s" % "\n".join(
-                    last_texts
+                relevant_opinions[-1]["opinion"] += "\n{}".format(
+                    "\n".join(last_texts)
                 )
                 relevant_opinions[-1]["opinion_texts"].extend(last_texts)
             else:
@@ -205,7 +205,7 @@ def get_text(file_path):
 
     :param file_path: A path the file to be parsed.
     """
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         file_string = f.read()
     raw_info = {}
 

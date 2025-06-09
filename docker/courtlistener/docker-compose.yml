@@ -1,6 +1,4 @@
 # Run using `docker compose up`
-version: "3.7"
-
 networks:
   cl_net_overlay:
     driver: bridge
@@ -160,7 +158,7 @@ services:
 
   cl-es:
     container_name: cl-es
-    image: elasticsearch:8.17.0
+    image: elastic/elasticsearch:9.0.1
     environment:
       - discovery.type=single-node
       - cluster.name=courtlistener-cluster

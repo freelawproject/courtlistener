@@ -22,7 +22,7 @@ PROJECT_TAG_NAME = "cmSyHgaaCIFnUOop"
 
 def download_dockets(options):
     """Download dockets listed in the spreadsheet."""
-    f = open(options["input_file"], "r")
+    f = open(options["input_file"])
     dialect = csv.Sniffer().sniff(f.read(2048))
     f.seek(0)
     reader = csv.DictReader(f, dialect=dialect)

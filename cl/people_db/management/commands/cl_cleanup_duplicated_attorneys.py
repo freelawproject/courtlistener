@@ -2,9 +2,8 @@ from django.db import transaction
 from django.db.models import Count
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.people_db.models import Attorney
+from cl.people_db.models import Attorney, Role
 from cl.people_db.models import AttorneyOrganizationAssociation as AttyOrgAss
-from cl.people_db.models import Role
 from cl.search.models import Docket
 
 
@@ -21,8 +20,9 @@ def clone_attorney(orig_atty_id, atty, docket):
         attorney_id=orig_atty_id, docket=docket
     )
     logger.info(
-        "Got %s roles for this attorney on docket %s. Remapping "
-        "them all." % (roles_for_docket.count(), docket)
+        "Got %s roles for this attorney on docket %s. Remapping them all.",
+        roles_for_docket.count(),
+        docket,
     )
     roles_for_docket.update(attorney=atty)
 
@@ -32,8 +32,8 @@ def clone_attorney(orig_atty_id, atty, docket):
         docket=docket, attorney_id=orig_atty_id
     )
     logger.info(
-        "Got %s organization associations on this docket for this "
-        "attorney." % atty_orgs_for_docket.count()
+        "Got %s organization associations on this docket for this attorney.",
+        atty_orgs_for_docket.count(),
     )
     atty_orgs_for_docket.update(attorney=atty)
 

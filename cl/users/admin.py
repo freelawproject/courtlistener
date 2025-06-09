@@ -34,14 +34,13 @@ class UserProfileInline(admin.StackedInline):
 
 
 class CustomUserChangeForm(UserChangeForm):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Ensure user_permissions field uses an optimized queryset
         if "user_permissions" in self.fields:
-            self.fields["user_permissions"].queryset = (
-                Permission.objects.select_related("content_type")
-            )
+            self.fields[
+                "user_permissions"
+            ].queryset = Permission.objects.select_related("content_type")
 
 
 # Replace the normal User admin with our better one.

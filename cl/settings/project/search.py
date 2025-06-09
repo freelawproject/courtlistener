@@ -1,5 +1,3 @@
-import os
-
 import environ
 
 env = environ.FileAwareEnv()
@@ -39,10 +37,22 @@ SEARCH_API_PAGE_SIZE = 20
 # matching fragments to highlight.
 NO_MATCH_HL_SIZE = 500
 
+
 ###################
 # SEMANTIC SEARCH #
 ###################
+MIN_OPINION_SIZE = env("MIN_OPINION_SIZE", default=100)
 NLP_EMBEDDING_MODEL = env(
     "NLP_EMBEDDING_MODEL_NAME",
     default="freelawproject/modernbert-embed-base_finetune_512",
+)
+
+#################
+# SEARCH ALERTS #
+#################
+REAL_TIME_ALERTS_SENDING_RATE = env(
+    "REAL_TIME_ALERTS_SENDING_RATE", default=300
+)
+PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES = env(
+    "PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES", default=4
 )
