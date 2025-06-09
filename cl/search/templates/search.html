@@ -181,6 +181,7 @@
                   <div class="flex ml-auto gap-1">
                     <form action="/alert/delete/{{request.GET.edit_alert}}/" method="post" class="float-right">
                       {% csrf_token %}
+                      <input type="hidden" name="redirect_to_search_page" value="on">
                       <button type="submit" class="btn btn-danger btn-sm">Delete alert</button>
                     </form>
                     <div>
