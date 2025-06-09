@@ -150,7 +150,6 @@
 {% block content %}
 {% with type=search_form.type.value %}
     <div id="search-results" class="col-lg-7 col-sm-9 search-page">
-      {% include "includes/messages.html" %}
       {% if type != SEARCH_TYPES.PEOPLE %}
         {% if query_citation or alert_form.errors or request.GET.edit_alert  %}
           <div class="alert {% if query_citation %}alert-info{% elif alert_form.errors %}alert-danger{% elif request.GET.edit_alert %}alert-info{% endif %}" role="alert">
