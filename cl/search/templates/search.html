@@ -173,21 +173,22 @@
                      data-target="#modal-save-alert">Update Alert</a>
                 </div>
               {% elif request.GET.edit_alert %}
-                <div class="col-sm-6">
-                  <p class="bottom">You are editing your alert,
-                    "<strong>{{ alert_form.name.value }}</strong>".</p>
+                <div class="col-xs-12 flex gap-2">
+                  <div class="flex justify-content-left">
+                    <p class="bottom">You are editing your alert,
+                      "<strong>{{ alert_form.name.value }}</strong>".</p>
+                  </div>
+                  <div class="flex ml-auto gap-1">
+                    <form action="/alert/delete/{{request.GET.edit_alert}}/" method="post" class="float-right">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-danger btn-sm">Delete alert</button>
+                    </form>
+                    <div>
+                      <a class="btn btn-default btn-sm" data-toggle="modal" data-target="#modal-save-alert">Save Alert</a>
+                    </div>
+                  </div>
                 </div>
-                <div class="col-sm-6 text-right">
-                  <a class="btn btn-default btn-sm"
-                     data-toggle="modal"
-                     data-target="#modal-save-alert">
-                    Save Alert
-                  </a>
-                  <a class="btn btn-danger btn-sm"
-                     href="?{{ get_string_sans_alert }}">
-                    Cancel
-                  </a>
-                </div>
+                <a id="close-alert-in-line-banner" type="button" class="close alert-banner-close" href="/?{{alert_form.query.value}}">&times;</a>
               {% endif %}
             </div>
           </div>

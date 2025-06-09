@@ -1934,3 +1934,9 @@ rect.series-segment {
   color: #8a1f11;
   text-decoration: underline;
 }
+
+.alert-banner-close{
+  position: absolute;
+  top: 0px;
+  right: 16px;
+}
