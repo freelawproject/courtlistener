@@ -1,5 +1,5 @@
-import concurrent.futures
 import asyncio
+import concurrent.futures
 import csv
 import io
 import json
@@ -1676,6 +1676,7 @@ def remove_documents_by_query(
         es_document._index.refresh()
 
     return response
+
 
 def inception_batch_request(batch: dict) -> list[dict]:
     """Get embeddings from the inception batch microservice.

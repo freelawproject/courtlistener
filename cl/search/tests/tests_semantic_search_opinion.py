@@ -15,7 +15,7 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Docket
+from cl.search.models import PRECEDENTIAL_STATUS, Docket
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
@@ -122,7 +122,6 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
             "cl.search.tasks.AWSMediaStorage.open",
             side_effect=mock_read_from_s3,
         ):
-
             call_command(
                 "cl_index_embeddings",
                 batch_size=2,
