@@ -5,7 +5,10 @@
 
 <c-vars variant class=""></c-vars>
 
-<header x-data="header" class="relative w-full h-18 md:h-[102px] flex justify-between items-center gap-4 px-4 md:px-10 py-3 md:py-2.5 {{ class }}">
+<header
+  x-data="header"
+  class="relative w-full h-18 {% if variant != "homepage" %}md:h-[102px] {% endif %}flex justify-between items-center gap-4 px-4 md:px-10 py-3 md:py-2.5 {{ class }}"
+>
   <a href="#main" class="skip-link">Skip to main content</a>
   <a href="#footer" class="skip-link">Skip to footer</a>
 
