@@ -9,6 +9,7 @@ from cl.citations.match_citations import (
     do_resolve_citations,
 )
 from cl.citations.types import MatchedResourceType, SupportedCitationType
+from cl.citations.unmatched_citations_utils import handle_unmatched_citations
 from cl.citations.utils import make_get_citations_kwargs
 from cl.search.models import OpinionsCitedByRECAPDocument, RECAPDocument
 from cl.search.tasks import index_related_cites_fields
@@ -40,12 +41,20 @@ def store_recap_citations(document: RECAPDocument) -> None:
     ] = do_resolve_citations(citations, document)
 
     # Delete the unmatched citations
-    citation_resolutions.pop(NO_MATCH_RESOURCE, None)
+    unmatched_citations = citation_resolutions.pop(NO_MATCH_RESOURCE, [])
 
     # Delete multiple matches citations
-    citation_resolutions.pop(MULTIPLE_MATCHES_RESOURCE, None)
+    ambiguous_citations = citation_resolutions.pop(
+        MULTIPLE_MATCHES_RESOURCE, []
+    )
 
     with transaction.atomic():
+        handle_unmatched_citations(
+            document,
+            unmatched_citations + ambiguous_citations,
+            citation_resolutions,
+        )
+
         # delete existing citation entries
         OpinionsCitedByRECAPDocument.objects.filter(
             citing_document=document.pk

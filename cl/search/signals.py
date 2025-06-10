@@ -4,7 +4,10 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from cl.audio.models import Audio
-from cl.citations.models import UnmatchedCitation
+from cl.citations.models import (
+    UnmatchedCitation,
+    UnmatchedCitationFromRECAPDocument,
+)
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
@@ -587,14 +590,20 @@ def handle_recap_doc_change(
 def update_unmatched_citation(
     sender, instance: Citation, created: bool, **kwargs
 ):
-    """Updates UnmatchedCitation.status to MATCHED, if found"""
+    """Updates UnmatchedCitation.status status to MATCHED, if found"""
     if not created:
         return
-    UnmatchedCitation.objects.filter(
-        volume=instance.volume,
-        reporter=instance.reporter,
-        page=instance.page,
-    ).update(status=UnmatchedCitation.FOUND)
+    query = {
+        "volume": instance.volume,
+        "reporter": instance.reporter,
+        "page": instance.page,
+    }
+    UnmatchedCitation.objects.filter(**query).update(
+        status=UnmatchedCitation.FOUND
+    )
+    UnmatchedCitationFromRECAPDocument.objects.filter(**query).update(
+        status=UnmatchedCitationFromRECAPDocument.FOUND
+    )
 
 
 @receiver(
