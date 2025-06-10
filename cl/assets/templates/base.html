@@ -86,8 +86,10 @@
     {% if FUNDRAISING_MODE %}
       {% include 'includes/dismissible_nav_banner.html' with link="https://donate.free.law/forms/supportflp" cookie_name="eoy_banner" button_text="Make your DONATION TODAY" button_emoji='<i class="fa fa-heart-o"></i>' text="Your support has grown CourtListener to over 10 million opinions, with improved search and API functionality. Help us continue expanding and enhancing access to the law. Donate before the end of 2024 to power free and open legal information for everyone" %}
     {% endif %}
-    {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2025/06/18/recap-search-alerts-for-pacer/" cookie_name="eoy_banner" button_text="Learn more here!" button_emoji='' text="📣 The Wait is Over! You can now get alerts for keywords in the RECAP Archive. Set daily or real-time email alerts when PACER cases or filings match your saved search. Follow topics, people, organizations, and more." %}
-
+    <!-- RECAP Alerts Banner -->
+    {% flag "recap-alerts-home-banner" %}
+      {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2025/06/18/recap-search-alerts-for-pacer/" cookie_name="recap_alerts_banner" button_text="Learn more here!" button_emoji='' text="📣 The Wait is Over! You can now get alerts for keywords in the RECAP Archive. Set daily or real-time email alerts when PACER cases or filings match your saved search. Follow topics, people, organizations, and more." %}
+    {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
