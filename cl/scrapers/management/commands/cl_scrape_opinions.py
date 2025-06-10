@@ -1,11 +1,14 @@
+import json
+import os
 import signal
 import sys
 import time
 import traceback
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
@@ -15,7 +18,7 @@ from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
-from cl.alerts.models import RealTimeQueue
+from cl.alerts.models import DateJSONEncoder, RealTimeQueue
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
@@ -49,6 +52,7 @@ from cl.search.models import (
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
 cnt = CaseNameTweaker()
+collected_metadata = []
 
 
 @transaction.atomic
@@ -277,6 +281,28 @@ class Command(ScraperCommand):
             len(site),
             self.scrape_target_descr,
         )
+        if settings.DEVELOPMENT:
+            # Save metadata locally when running in development
+            now = datetime.now()
+            date_str = now.strftime("%Y%m%d")
+            time_str = now.strftime("%H%M%S")
+            court_str = site.court_id.split(".")[-1].split("_")[0]
+            filename = f"{court_str}_{date_str}_{time_str}.json"
+            relative_path = os.path.join("json_data", filename)
+            full_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+            # Create directory if needed (/opt/courtlistener/cl/assets/media/json_data/)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+
+            with open(full_path, "w", encoding="utf-8") as f:
+                json.dump(
+                    collected_metadata,
+                    f,
+                    cls=DateJSONEncoder,
+                    ensure_ascii=False,
+                    indent=4,
+                )
+                logger.debug("Metadata saved to %s.", full_path)
+
         if not full_crawl:
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)
@@ -344,6 +370,16 @@ class Command(ScraperCommand):
                 "citations": citations,
             }
         )
+
+        if settings.DEVELOPMENT:
+            # Update download_urls to s3 path
+            # TODO should we keep the original url?
+            item["court_pk"] = court.pk
+            item["juriscraper_module"] = site.court_id
+            item["original_url"] = item["download_urls"]
+            item["download_urls"] = opinion.local_path.url
+            collected_metadata.append(item)
+
         extract_doc_content.delay(
             opinion.pk,
             ocr_available=ocr_available,
