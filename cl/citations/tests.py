@@ -69,8 +69,10 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionClusterFactory,
     OpinionClusterFactoryMultipleOpinions,
     OpinionClusterFactoryWithChildrenAndParents,
+    OpinionFactory,
     OpinionWithChildrenFactory,
     RECAPDocumentFactory,
 )
@@ -3164,3 +3166,68 @@ class UnmatchedCitationTest(TransactionTestCase):
         self.assertEqual(
             count, 0, "Self-cite has been stored as UnmatchedCitation"
         )
+
+
+class CountCitationsTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        court = CourtFactory(id="illappct")
+        docket = DocketFactory.create(court=court)
+
+        # 1 cluster with 0 citations to it
+        cls.cluster1 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cluster1_opinion = OpinionFactory(cluster=cls.cluster1)
+
+        # 1 cluster with 2 subopinions, each with one citation to it
+        cls.cluster2 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cluster2_opinion1 = OpinionFactory(cluster=cls.cluster2)
+        cluster2_opinion2 = OpinionFactory(cluster=cls.cluster2)
+
+        OpinionsCited.objects.create(
+            citing_opinion=cluster1_opinion,
+            cited_opinion=cluster2_opinion1,
+            depth=1,
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=cluster1_opinion,
+            cited_opinion=cluster2_opinion2,
+            depth=1,
+        )
+
+        # 1 cluster with 1 sub opinion, and 3 citations to it
+        cls.cluster3 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cluster3_opinion = OpinionFactory(cluster=cls.cluster3)
+
+        OpinionsCited.objects.create(
+            citing_opinion=cluster1_opinion,
+            cited_opinion=cluster3_opinion,
+            depth=1,
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=cluster2_opinion1,
+            cited_opinion=cluster3_opinion,
+            depth=1,
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=cluster2_opinion2,
+            cited_opinion=cluster3_opinion,
+            depth=1,
+        )
+
+    def test_count_citations_from_opinions_cited(self):
+        """Can we compute OpinionCluster.citation_count using OpinionsCited?"""
+        call_command(
+            "count_citations",
+            count_from_opinions_cited=True,
+        )
+        self.cluster1.refresh_from_db()
+        self.cluster2.refresh_from_db()
+        self.cluster3.refresh_from_db()
+        self.assertEqual(self.cluster1.citation_count, 0, "Count should be 0")
+        self.assertEqual(
+            self.cluster2.citation_count,
+            2,
+            "Count should be 2, 1 per each subopinion",
+        )
+        self.assertEqual(self.cluster3.citation_count, 3, "Count should be 3")
