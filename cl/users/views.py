@@ -24,7 +24,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import urlencode
-from django.template.response import TemplateResponse
+from django.template.response import SimpleTemplateResponse, TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
@@ -101,6 +101,7 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
         order_by = order_by.lstrip("-")
     else:
         direction = ""
+    order_name = order_by
     name_map = {
         "name": "docket__case_name",
         "court": "docket__court__short_name",
@@ -112,6 +113,7 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
         # Set default order
         direction = "-"
         order_by = name_map["hit"]
+        order_name = "hit"
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
     )
@@ -127,14 +129,14 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
     else:
         docket_alerts = docket_alerts.order_by(f"{direction}{order_by}")
 
-    return TemplateResponse(
-        request,
+    return SimpleTemplateResponse(
         "profile/alerts.html",
         {
             "docket_alerts": docket_alerts,
             "page": "docket_alerts",
             "private": True,
             "page_title": "Docket Alerts",
+            "sort_desc": {order_name: "" if direction else "-"},
         },
     )
 
