@@ -38,6 +38,7 @@
           id="header-support-menu"
           x-data="focus"
           x-show="supportMenuExpanded"
+          x-cloak
           x-on:click.outside="closeSupportMenu"
           x-on:keyup.esc="closeProfileMenu"
           x-on:keyup.right="focusNext"
@@ -104,6 +105,7 @@
         id="header-scope-menu"
         x-data="focus"
         x-show="scopeMenuExpanded"
+        x-cloak
         x-on:click.outside="closeScopeMenu"
         x-on:keyup.esc="closeProfileMenu"
         x-on:keyup.right="focusNext"
@@ -179,6 +181,7 @@
             id="header-profile-menu"
             x-data="focus"
             x-show="profileMenuExpanded"
+            x-cloak
             x-on:click.outside="closeProfileMenu"
             x-on:keyup.esc="closeProfileMenu"
             x-on:keyup.right="focusNext"
