@@ -48,6 +48,9 @@
   td {
     @apply p-2;
   }
+  [x-cloak] {
+    display: none !important;
+  }
 }
 
 @tailwind components;
