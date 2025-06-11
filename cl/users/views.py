@@ -108,7 +108,7 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_docket_alerts(request: HttpRequest) -> HttpResponse:
-    order_by = request.GET.get("order_by", "-hit")
+    order_by = request.GET.get("order_by", "")
     if order_by.startswith("-"):
         direction = "-"
         order_by = order_by.lstrip("-")
@@ -121,9 +121,8 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
         "date_filed": "docket__date_filed",
         "docket_number": "docket__docket_number",
     }
-    if order_by in name_map:
-        order_by = name_map[order_by]
-    else:
+    if not (order_by := name_map.get(order_by)):
+        # Set default order
         direction = "-"
         order_by = name_map["hit"]
     docket_alerts = request.user.docket_alerts.filter(
