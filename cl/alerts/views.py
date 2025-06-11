@@ -53,7 +53,10 @@ def delete_alert(request, pk):
         messages.SUCCESS,
         f"Your alert <strong>{alert.name}</strong> was deleted successfully.",
     )
-    return HttpResponseRedirect(reverse("profile_alerts"))
+    if request.POST.get("redirect_to_search_page", None):
+        return HttpResponseRedirect(f"{reverse('show_results')}?{alert.query}")
+    else:
+        return HttpResponseRedirect(reverse("profile_alerts"))
 
 
 @login_required
