@@ -182,11 +182,9 @@
                     <div>
                       <a class="btn btn-default btn-sm" data-toggle="modal" data-target="#modal-save-alert">Save Alert</a>
                     </div>
-                    <form action="/alert/delete/{{request.GET.edit_alert}}/" method="post" class="float-right">
-                      {% csrf_token %}
-                      <input type="hidden" name="redirect_to_search_page" value="on">
-                      <button type="submit" class="btn btn-danger btn-sm">Delete Alert</button>
-                    </form>
+                    <div>
+                      <a class="btn btn-danger btn-sm" href="{% url "delete_alert_confirm" request.GET.edit_alert %}">Delete Alert</a>
+                    </div>
                     <div>
                       <a class="btn btn-default btn-sm" href="/?{{ get_string_sans_alert }}">
                         <i class="fa fa-close"></i>
