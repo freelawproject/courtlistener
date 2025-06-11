@@ -106,7 +106,7 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
         "court": "docket__court__short_name",
         "hit": "date_last_hit",
         "date_filed": "docket__date_filed",
-        "docket_number": "docket__docket_number"
+        "docket_number": "docket__docket_number",
     }
     if order_by in name_map:
         order_by = name_map[order_by]

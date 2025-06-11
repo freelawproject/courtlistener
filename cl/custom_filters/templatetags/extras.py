@@ -178,7 +178,9 @@ def url_replace(request, value):
 
 @register.simple_tag
 def sort_caret(request, value, default_asc=True) -> SafeString:
-    current = request.GET.get("order_by", "*UP*" if default_asc else f"-{value}")
+    current = request.GET.get(
+        "order_by", "*UP*" if default_asc else f"-{value}"
+    )
     caret = '&nbsp;<i class="gray fa fa-angle-up"></i>'
     if current == f"-{value}":
         caret = '&nbsp;<i class="gray fa fa-angle-down"></i>'
