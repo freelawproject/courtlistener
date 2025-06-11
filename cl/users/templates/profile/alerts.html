@@ -70,11 +70,11 @@
         <table id="dockets-table" class="table settings-table">
           <thead>
           <tr>
-              <th data-label="Case Name"><a class="no-underline black-link" href="?{% url_replace request 'name' %}">Case Name{% sort_caret request 'name' %}</a></th>
-              <th data-label="Court"><a class="no-underline black-link" href="?{% url_replace request 'court' %}">Court{% sort_caret request 'court' %}</a></th>
-              <th data-label="Docket Number"><a class="no-underline black-link" href="?{% url_replace request 'docket_number' %}">Docket Number{% sort_caret request 'docket_number' %}</a></th>
-              <th data-label="Date Filed"><a class="no-underline black-link" href="?{% url_replace request 'date_filed' %}">Date Filed{% sort_caret request 'date_filed' %}</a></th>
-              <th data-label="Last&nbsp;Hit" colspan="2"><a class="no-underline black-link" href="?{% url_replace request 'hit' %}"> Last&nbsp;Hit{% sort_caret request 'hit' False %}</a></th>
+              <th data-label="Case Name"><a class="no-underline black-link" href="?order_by={{ sort_desc.name }}name">Case Name <i class="gray fa fa-angle-{% if sort_desc.name == '' %}down{% else %}up{% endif %}"></i></a></th>
+              <th data-label="Court"><a class="no-underline black-link" href="?order_by={{ sort_desc.court }}court">Court <i class="gray fa fa-angle-{% if sort_desc.court == '' %}down{% else %}up{% endif %}"></i></a></th>
+              <th data-label="Docket Number"><a class="no-underline black-link" href="?order_by={{ sort_desc.docket_number }}docket_number">Docket Number <i class="gray fa fa-angle-{% if sort_desc.docket_number == '' %}down{% else %}up{% endif%}"></i></a></th>
+              <th data-label="Date Filed"><a class="no-underline black-link" href="?order_by={{ sort_desc.date_filed }}date_filed">Date Filed <i class="gray fa fa-angle-{% if sort_desc.date_filed == '' %}down{% else %}up{% endif %}"></i></a></th>
+              <th data-label="Last Hit" colspan="2"><a class="no-underline black-link" href="?order_by={{ sort_desc.hit }}hit"> Last Hit <i class="gray fa fa-angle-{% if sort_desc.hit == '' %}down{% else %}up{% endif %}"></i></a></th>
           </tr>
           </thead>
           <tbody>
