@@ -118,6 +118,8 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
         "name": "docket__case_name",
         "court": "docket__court__short_name",
         "hit": "date_last_hit",
+        "date_filed": "docket__date_filed",
+        "docket_number": "docket__docket_number"
     }
     order_by = name_map.get(order_by, "date_created")
     docket_alerts = request.user.docket_alerts.filter(
