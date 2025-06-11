@@ -112,8 +112,8 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
     if not (order_by := name_map.get(order_by)):
         # Set default order
         direction = "-"
-        order_by = name_map["hit"]
         order_name = "hit"
+        order_by = name_map[order_name]
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
     )
