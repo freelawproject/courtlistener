@@ -241,6 +241,8 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "view_settings"},
             {"viewname": "profile_notes"},
             {"viewname": "profile_alerts"},
+            {"viewname": "profile_search_alerts"},
+            {"viewname": "profile_docket_alerts"},
             {"viewname": "view_visualizations"},
             {"viewname": "view_deleted_visualizations"},
             {"viewname": "password_change"},
