@@ -354,6 +354,10 @@ a.button:active {
     font-size: 12px;
   }
 
+  .flex-sm-column {
+    flex-direction: column;
+  }
+
 }
 
 @media (min-width: 992px) {
@@ -377,6 +381,10 @@ a.button:active {
 @media (min-width: 1200px) {
   #main-query-box #id_q, #main-query-box #id_full_citation {
     width: 800px;
+  }
+
+  .flex-lg-row {
+    flex-direction: row;
   }
 }
 

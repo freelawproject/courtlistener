@@ -1,19 +1,23 @@
 {% load extras %}
 
 <div class="form-group date-filter-mode" data-field-prefix="{{ field_prefix }}">
-  <div>
-    <label>{{ label|default:"Docket Date" }}</label>
-    <label class="radio-inline">
-      <input type="radio" name="{{ field_prefix }}-date-mode" value="calendar"
-        {% get_request_value request.GET after_field as after_value %}
-        {% if not after_value or "/" in after_value %} checked {% endif %}>
-      Calendar
-    </label>
-    <label class="radio-inline">
-      <input type="radio" name="{{ field_prefix }}-date-mode" value="relative"
-        {% if after_value and not "/" in after_value %} checked {% endif %}>
-      Relative
-    </label>
+  <div class="flex{% if sidebar %} flex-sm-column flex-lg-row{% endif %}">
+    <div class="flex justify-content-start">
+      <label>{{ label|default:"Docket Date" }}</label>
+    </div>
+    <div style="margin-bottom: 5px;">
+      <label class="radio-inline">
+        <input type="radio" name="{{ field_prefix }}-date-mode" value="calendar"
+          {% get_request_value request.GET after_field as after_value %}
+          {% if not after_value or "/" in after_value %} checked {% endif %}>
+        Calendar
+      </label>
+      <label class="radio-inline">
+        <input type="radio" name="{{ field_prefix }}-date-mode" value="relative"
+          {% if after_value and not "/" in after_value %} checked {% endif %}>
+        Relative
+      </label>
+    </div>
   </div>
 
   <div class="date-calendar-fields {% if after_value and not "/" in after_value %} hidden {% endif %}">
