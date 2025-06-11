@@ -281,16 +281,16 @@ class Command(ScraperCommand):
             len(site),
             self.scrape_target_descr,
         )
-        if settings.DEVELOPMENT:
+        if settings.DEVELOPMENT and collected_metadata:
             # Save metadata locally when running in development
             now = datetime.now()
             date_str = now.strftime("%Y%m%d")
             time_str = now.strftime("%H%M%S")
             court_str = site.court_id.split(".")[-1].split("_")[0]
             filename = f"{court_str}_{date_str}_{time_str}.json"
-            relative_path = os.path.join("json_data", filename)
+            relative_path = os.path.join("juriscraper_json_data", filename)
             full_path = os.path.join(settings.MEDIA_ROOT, relative_path)
-            # Create directory if needed (/opt/courtlistener/cl/assets/media/json_data/)
+            # Create directory if needed (/opt/courtlistener/cl/assets/media/juriscraper_json_data/)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
             with open(full_path, "w", encoding="utf-8") as f:
@@ -372,12 +372,10 @@ class Command(ScraperCommand):
         )
 
         if settings.DEVELOPMENT:
-            # Update download_urls to s3 path
-            # TODO should we keep the original url?
+            # Add extra data to item
             item["court_pk"] = court.pk
             item["juriscraper_module"] = site.court_id
-            item["original_url"] = item["download_urls"]
-            item["download_urls"] = opinion.local_path.url
+            item["s3_url"] = opinion.local_path.url
             collected_metadata.append(item)
 
         extract_doc_content.delay(
