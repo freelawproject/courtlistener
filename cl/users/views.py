@@ -75,14 +75,14 @@ logger = logging.getLogger(__name__)
 @login_required
 @never_cache
 def view_alerts(request: HttpRequest) -> HttpResponse:
-    if request.user.alerts.exists():
-        return view_search_alerts(request)
-    elif request.user.docket_alerts.filter(
-        alert_type=DocketAlert.SUBSCRIPTION
-    ).exists():
+    if (
+        not request.user.alerts.exists()
+        and request.user.docket_alerts.filter(
+            alert_type=DocketAlert.SUBSCRIPTION
+        ).exists()
+    ):
         return view_docket_alerts(request)
-    else:
-        return view_search_alerts(request)
+    return view_search_alerts(request)
 
 
 @login_required
