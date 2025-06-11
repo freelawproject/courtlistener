@@ -1,6 +1,7 @@
 from collections.abc import Awaitable, Callable
 
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction
+from django.conf import settings
 from django.http import HttpRequest, HttpResponseBase
 from django.template.response import TemplateResponse
 from waffle import flag_is_active
@@ -80,6 +81,8 @@ class IncrementalNewTemplateMiddleware:
         return response
 
     def process_template_response(self, request, response):
+        if settings.TESTING:
+            return response
         use_new_design = flag_is_active(request, "use_new_design")
 
         if (
