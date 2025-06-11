@@ -1,0 +1,19 @@
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="clip-avatar">
+      <rect x="0.5" y="0.5" width="19" height="19" rx="9.5" />
+    </clipPath>
+  </defs>
+  <rect x="0.5" y="0.5" width="19" height="19" rx="9.5" fill="#F5F3EF"/>
+  <g clip-path="url(#clip-avatar)">
+    <path
+      d="M10.0003 4C7.91032 4 6.21602 5.69661 6.21602 7.78947C6.21602 9.88234 7.91032 11.5789 10.0003 11.5789C12.0904 11.5789 13.7847 9.88234 13.7847 7.78947C13.7847 5.69661 12.0904 4 10.0003 4Z"
+      fill="#D6D0C6"
+    />
+    <path
+      d="M10 12.8421C6.11822 12.8421 3.40243 15.7134 3.06485 19.3093L3 20H17L16.9352 19.3093C16.5976 15.7134 13.8818 12.8421 10 12.8421Z"
+      fill="#D6D0C6"
+    />
+  </g>
+  <rect x="0.5" y="0.5" width="19" height="19" rx="9.5" stroke="#F5F3EF"/>
+</svg>

@@ -82,7 +82,7 @@
             <tr>
               <td>
                 <p class="bottom">
-                  <a href="{{ alert.docket.get_absolute_url }}">
+                  <a href="{{ alert.docket.get_absolute_url }}?order_by=desc">
                     {{ alert.docket|best_case_name|safe|v_wrapper }}
                   </a>
                 </p>

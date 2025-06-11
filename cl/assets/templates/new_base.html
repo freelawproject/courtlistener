@@ -75,12 +75,10 @@
 
 <body class="{% block body-classes %}{% endblock %}">
   {% block header %}
-  <header class="border border-greyscale-200">
-  New design MVP
-  </header>
+    <c-header></c-header>
   {% endblock %}
 
-  <main>
+  <main id="main">
     {% block content_wrapper %}
     <div class="max-w-content mx-auto pt-4 md:pt-20 pb-35 max-lg:px-[--mobile-main-padding]">
       {% block content %}

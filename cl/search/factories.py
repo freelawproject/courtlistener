@@ -3,9 +3,12 @@ import string
 
 from django.db.utils import IntegrityError
 from factory import (
+    DictFactory,
     Faker,
     Iterator,
     LazyAttribute,
+    LazyFunction,
+    List,
     RelatedFactory,
     SelfAttribute,
     SubFactory,
@@ -373,3 +376,16 @@ class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
     cited_opinion = SubFactory(
         "cl.search.factories.OpinionFactory",
     )
+
+
+class EmbeddingDataFactory(DictFactory):
+    chunk_number = Faker("pyint", min_value=0, max_value=100)
+    chunk = Faker("text", max_nb_chars=500)
+    embedding = LazyFunction(
+        lambda: [0.036101438105106354 for _ in range(768)]
+    )
+
+
+class EmbeddingsDataFactory(DictFactory):
+    id = Faker("pyint", min_value=1, max_value=100)
+    embeddings = List([SubFactory(EmbeddingDataFactory)])
