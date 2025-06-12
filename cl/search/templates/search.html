@@ -148,7 +148,6 @@
 {% block content %}
 {% with type=search_form.type.value %}
     <div id="search-results" class="col-lg-7 col-sm-9 search-page">
-      {% include "includes/messages.html" %}
       {% if type != SEARCH_TYPES.PEOPLE %}
         {% if query_citation or alert_form.errors or request.GET.edit_alert  %}
           <div class="alert {% if query_citation %}alert-info{% elif alert_form.errors %}alert-danger{% elif request.GET.edit_alert %}alert-info{% endif %}" role="alert">
@@ -172,20 +171,24 @@
                      data-target="#modal-save-alert">Update Alert</a>
                 </div>
               {% elif request.GET.edit_alert %}
-                <div class="col-sm-6">
-                  <p class="bottom">You are editing your alert,
-                    "<strong>{{ alert_form.name.value }}</strong>".</p>
-                </div>
-                <div class="col-sm-6 text-right">
-                  <a class="btn btn-default btn-sm"
-                     data-toggle="modal"
-                     data-target="#modal-save-alert">
-                    Save Alert
-                  </a>
-                  <a class="btn btn-danger btn-sm"
-                     href="?{{ get_string_sans_alert }}">
-                    Cancel
-                  </a>
+                <div class="col-xs-12 flex gap-2">
+                  <div class="flex justify-content-left">
+                    <p class="bottom">You are editing your alert,
+                      "<strong>{{ alert_form.name.value }}</strong>".</p>
+                  </div>
+                  <div class="flex ml-auto gap-1">
+                    <div>
+                      <a class="btn btn-default btn-sm" data-toggle="modal" data-target="#modal-save-alert">Save Alert</a>
+                    </div>
+                    <div>
+                      <a class="btn btn-danger btn-sm" href="{% url "delete_alert_confirm" request.GET.edit_alert %}">Delete Alert</a>
+                    </div>
+                    <div>
+                      <a class="btn btn-default btn-sm" href="/?{{ get_string_sans_alert }}">
+                        <i class="fa fa-close"></i>
+                      </a>
+                    </div>
+                  </div>
                 </div>
               {% endif %}
             </div>
