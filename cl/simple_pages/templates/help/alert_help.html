@@ -60,6 +60,7 @@
           <li><a href="#creating-alerts">Creating Alerts</a></li>
           <li><a href="#enabling-real-time-alerts">Enabling Real Time Alerts</a></li>
           <li><a href="#recap-search-alerts-limitations">Limitations of Real-Time RECAP Search Alerts</a></li>
+          <li><a href="#recap-cases-or-filings">RECAP Cases or Filings</a></li>
           <li><a href="#editing-search-alerts">Editing an Alert</a></li>
           <li><a href="#editing-search-alerts">Deleting an Alert</a></li>
           <li><a href="#disabling-search-alerts">Disabling an Alert</a></li>
@@ -67,7 +68,6 @@
         </ul>
       </li>
       <li><a href="#citation-alerts">Citation Alerts</a></li>
-      <li><a href="#coming-soon">Coming Soon</a></li>
     </ul>
   </div>
 </div>
@@ -238,7 +238,7 @@
   <p>Search alerts are triggered by our search engine and are a powerful way to get fine-tuned alerts on cases or topics that you are following.
   </p>
   <h3>Creating Alerts</h3>
-  <p>To create a Search Alert, begin with a search in CourtListener's Case Law, RECAP or Oral Argument database. In the results page, click the bell icon in the search bar (<i class="fa fa-bell-o gray"></i>) or click the <a class="btn btn-success btn-xs"><i class="fa fa-bell-o"></i> Get Alerts</a> button in the sidebar on the left.
+  <p>To create a Search Alert, begin with a search in CourtListener's Case Law, RECAP or Oral Argument database. You can set static calendar dates, or rolling <a href="{% url "relative_dates" %}">relative dates</a> for your alerts. In the results page, click the bell icon in the search bar (<i class="fa fa-bell-o gray"></i>) or click the <a class="btn btn-success btn-xs"><i class="fa fa-bell-o"></i> Get Alerts</a> button in the sidebar on the left.
   </p>
   <p>
     <img src="{% static "png/search-bar.png" %}"
@@ -290,6 +290,15 @@
   <p><code>party:"Michael Jordan" AND attorney:"LeBron James" AND description:goat</code></p>
   <p>This is because <code>party</code> and <code>attorney</code> values are only associated with dockets, not with individual filings, unlike other docket fields.</p>
   <p>As a workaround to build alerts that involve party and attorney conditions along with a filing description, use the sidebar filters instead of the main query box.</p>
+    <h3 id="recap-cases-or-filings">RECAP Search Alerts for Cases or Filings</h3>
+  <p>For RECAP Search Alerts, you can choose whether you’d like alerts for new cases only, or for both new cases and new filings:</p>
+    <p>
+    <img src="{% static "png/recap-alert-cases-or-filings.png" %}"
+         alt="screenshot of alert selection for cases or filings"
+         class="img-responsive img-rounded shadow center-block"
+         height="136"
+         width="835">
+  </p>
   <h3 id="editing-search-alerts">Editing or Deleting a Search Alert</h3>
   <p>Existing alerts can be edited or deleted from <a href="{% url "profile_alerts" %}">your user profile</a>. By clicking the <a class="btn btn-xs btn-primary"><i class="fa fa-pencil"></i>Edit</a> button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
   </p>

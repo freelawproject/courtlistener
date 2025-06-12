@@ -22,12 +22,12 @@
       {'href': '#creating-search-alerts', 'text': 'Creating Alerts'},
       {'href': '#enabling-real-time-alerts', 'text': 'Enabling Real Time Alerts'},
       {'href': '#recap-search-alerts-limitations', 'text': 'Limitations of Real-Time RECAP Search Alerts'},
+      {'href': '#recap-cases-or-filings', 'text': 'RECAP Cases or Filings'},
       {'href': '#editing-search-alerts', 'text': 'Editing/Deleting an Alert'},
       {'href': '#disabling-search-alerts', 'text': 'Disabling an Alert'},
       {'href': '#courts', 'text': 'Supported Courts'},
     ]},
     {'href': '#citation-alerts', 'text': 'Citation Alerts'},
-    {'href': '#coming-soon', 'text': 'Coming Soon'},
   ]"
 >
   <c-layout-with-navigation.section id="about">
@@ -184,7 +184,7 @@
   {# Creating Search Alerts #}
   <section x-intersect.margin.-20%.0.-70%.0="show" id="creating-search-alerts">
     <h3>Creating Alerts</h3>
-    <p>To create a Search Alert, begin with a search in CourtListener's Case Law, RECAP or Oral Argument database. In the results page, click the bell icon in the search bar or click the Get Alerts button in the sidebar on the left.
+    <p>To create a Search Alert, begin with a search in CourtListener's Case Law, RECAP or Oral Argument database. You can set static calendar dates, or rolling <a class="underline" href="{% url "relative_dates" %}">relative dates</a> for your alerts. In the results page, click the bell icon in the search bar or click the Get Alerts button in the sidebar on the left.
     </p>
     <figure class="bg-greyscale-50 p-2 rounded-2xl">
       <img
@@ -249,6 +249,20 @@
     <p>As a workaround to build alerts that involve party and attorney conditions along with a filing description, use the sidebar filters instead of the main query box.</p>
   </c-layout-with-navigation.section>
 
+  {# RECAP Search Alerts for Cases or Filings #}
+  <c-layout-with-navigation.section id="recap-cases-or-filings">
+    <h3>RECAP Search Alerts for Cases or Filings</h3>
+  <p>For RECAP Search Alerts, you can choose whether you’d like alerts for new cases only, or for both new cases and new filings:</p>
+  <figure class="bg-greyscale-50 p-2 rounded-2xl">
+      <img
+        src="{% static "png/logo.png" %}"
+        alt="screenshot of alert selection for cases or filings"
+        class="max-w-full"
+        height="388"
+        width="">
+    </figure>
+  </c-layout-with-navigation.section>
+
   {# Editing or Deleting a Search Alert #}
   <c-layout-with-navigation.section id="editing-search-alerts">
     <h3>Editing or Deleting a Search Alert</h3>
@@ -302,12 +316,5 @@
     </p>
   </section>
 
-  {# Coming Soon #}
-  <section x-intersect.full="show" id="coming-soon">
-    <h2>Coming Soon</h2>
-    <p>We do not currently support search alerts or citation alerts for PACER filings, but we plan to do so soon.
-    </p>
-    <p>Please stay tuned!</p>
-  </section>
 </c-layout-with-navigation>
 {% endblock %}
