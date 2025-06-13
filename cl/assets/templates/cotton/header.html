@@ -3,11 +3,11 @@
 {% require_script "js/alpine/composables/focus.js" %}
 {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 
-<c-vars variant class=""></c-vars>
+<c-vars variant request class=""></c-vars>
 
 <header
   x-data="header"
-  class="relative w-full h-18 {% if variant != "homepage" %}md:h-[102px] {% endif %}flex justify-between items-center gap-4 px-4 md:px-10 py-3 md:py-2.5 {{ class }}"
+  class="relative w-full h-18 {% if variant != "homepage" %}md:h-[102px] {% endif %}flex justify-between items-center gap-4 px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
 >
   <a href="#main" class="skip-link">Skip to main content</a>
   <a href="#footer" class="skip-link">Skip to footer</a>
@@ -74,92 +74,54 @@
   {# DEFAULT VARIANT #}
   {% else %}
     {# COURTLISTENER LOGO #}
-    <div class="w-[226px] md:min-w-[226px] flex justify-start" aria-label="Go to homepage">
+    <div class="w-[226px] lg:min-w-[226px] flex justify-start" aria-label="Go to homepage">
       <div class="md:h-21 md:w-45 h-12 w-[106px]">
         {% svg "logos/courtlistener" %}
       </div>
     </div>
 
-    {# SEARCH BAR #}
-    <form class="w-full relative hidden lg:flex flex-row flex-nowrap h-12">
-      {#  scope selector  #}
-      <button
-        type="button"
-        aria-controls="header-scope-menu"
-        aria-haspopup="menu"
-        x-on:click="toggleScopeMenu"
-        class="btn-outline !rounded-r-none rounded-l-xl border-greyscale-200 my-[1px]"
-        aria-label="Select search scope"
-      >
-        <span class="text-sm text-greyscale-600" x-text="selected"></span>
-        <span
-          x-bind:class="scopeCaretClass"
-          class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
-          aria-hidden="true"
-        >{% svg 'chevron' class="w-full h-full text-greyscale-400" aria_hidden="true" %}
-        </span>
-      </button>
-
-      {#  scope menu  #}
-      <menu
-        id="header-scope-menu"
-        x-data="focus"
-        x-show="scopeMenuExpanded"
-        x-cloak
-        x-on:click.outside="closeScopeMenu"
-        x-on:keyup.esc="closeProfileMenu"
-        x-on:keyup.right="focusNext"
-        x-on:keyup.left="focusPrevious"
-        x-transition:enter="transition ease-out duration-300"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="transition ease-in duration-100"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        class="z-20 absolute left-0 top-14 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
-        role="menu"
-      >
-        <template x-for="scope in searchScopes">
-          <li
-            x-bind:key="scope.label"
-            x-on:click="selectScope"
-            x-bind:data-scope="scope.label"
-            class="px-4 py-1.5 text-md font-cooper text-greyscale-800 flex hover:bg-greyscale-50"
-            role="menuitem"
-            x-bind:id="scope.label"
-          >
-            <button type="button" class="flex justify-between w-full">
-              <span x-text="scope.label"></span>
-              {% svg "check" x_show="isActiveScope" x_bind__data_scope="scope.label" class="text-primary-600" aria_hidden="true" %}
-            </button>
-          </li>
-        </template>
-      </menu>
-
-      {#  input  #}
-      <div class="[&:has(input:focus)]:ring-2 bg-greyscale-200 flex flex-row gap-2 items-center pl-4 pr-2 flex-grow">
-        {% svg "magnifier" class="text-greyscale-400 flex-grow-0" %}
-        <div class="bg-greyscale-200 flex-grow">
-          <label for="header-search-bar" class="sr-only" type="text">Search <span x-text="selected"></span></label>
-          <input id="header-search-bar" type="search" class="bg-greyscale-200 placeholder:text-sm placeholder:text-greyscale-500 focus-visible:ring-0 focus-visible:outline-none bg-none" placeholder="Enter keyword(s)">
-        </div>
-        <button type="button" class="p-2 rounded-[10px] border border-greyscale-200 bg-white">
-          {% svg "brackets" class="text-greyscale-500" %}
-        </button>
-      </div>
-      <a href="" class="btn-primary rounded-l-none rounded-r-xl">{% svg "magnifier" class="text-white" %}</a>
-    </form>
+    {# DESKTOP SEARCH BAR #}
+    <c-corpus-search class="w-full h-12 hidden md:flex" only>
+      <c-corpus-search.scope
+        class="!rounded-r-none"
+        menu_class="left-0 top-14 w-55 text-md font-cooper text-greyscale-800"
+        item_class="py-1.5"
+        only
+      />
+      <c-corpus-search.input only/>
+      <c-corpus-search.button class="rounded-l-none rounded-r-xl" only/>
+    </c-corpus-search>
   {% endif %}
 
-  {# ALL VARIANTS #}
-  {# ACCOUNT BUTTON(S) #}
-  <div class="w-[--profile-menu-width] flex justify-end items-center relative">
+  {# RIGHT-SIDE BUTTON(S) #}
+  <div class="lg:w-[--profile-menu-width] flex justify-end items-center relative">
+    {# MOBILE SEARCH TRIGGER + DIALOG #}
+    {% if variant != "homepage" %}
+      <c-corpus-search only>
+        <c-corpus-search.mobile :request="request" only>
+          <c-corpus-search.input rounded only/>
+          <c-corpus-search.scope
+            class="w-full"
+            menu_class="w-full text-sm text-greyscale-600"
+            item_class="py-[10px]"
+            :request="request"
+            only
+          />
+          <button
+            type="button"
+            class="btn w-full text-primary-600 text-sm font-medium my-4 hover:bg-greyscale-100 flex justify-center"
+          >Advanced Search</button>
+          <c-corpus-search.button class="w-full flex items-center justify-center">Search</c-corpus-search.button>
+        </c-corpus-search.mobile>
+      </c-corpus-search>
+    {% endif %}
+
     {% if request.user.is_authenticated %}
       <div>
         {#   Signed-in button   #}
         <button
           x-on:click="toggleProfileMenu"
-          class="bg-white btn-outline text-greyscale-800 outline-greyscale-400 rounded-[10px] px-2.5 py-2 text-sm items-center"
+          class="bg-white btn-outline text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
           type="button"
           aria-haspopup="menu"
           aria-controls="header-profile-menu"
@@ -221,7 +183,7 @@
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
               <a
-                href="{% url "tag_list" username=user.username %}"
+                href="{% url "tag_list" username=request.user.username %}"
                 role="menuitem"
                 aria-label="Go to Tags page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
@@ -254,7 +216,7 @@
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
               <a
-                href="{% url 'user_prayers' user.username %}"
+                href="{% url 'user_prayers' request.user.username %}"
                 role="menuitem"
                 aria-label="Go to Prayers page"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
@@ -310,7 +272,7 @@
         <a
           href="{% url "register" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}"
           class="btn-grey md:h-9 {% if variant == 'homepage' %}bg-white{% endif %} "
-        >Sign Up</a>
+        >Sign&nbsp;Up</a>
       </div>
     {% endif %}
   </div>
