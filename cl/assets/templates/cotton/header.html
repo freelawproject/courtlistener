@@ -7,7 +7,7 @@
 
 <header
   x-data="header"
-  class="relative w-full h-18 {% if variant != "homepage" %}md:h-[102px] {% endif %}flex justify-between items-center gap-4 px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
+  class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:h-[102px] max-md:h-18 {% endif %}flex justify-between items-center gap-4 px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
 >
   <a href="#main" class="skip-link">Skip to main content</a>
   <a href="#footer" class="skip-link">Skip to footer</a>
@@ -76,14 +76,14 @@
     {# COURTLISTENER LOGO #}
     <div class="w-[226px] lg:min-w-[226px] flex justify-start" aria-label="Go to homepage">
       <div class="md:h-21 md:w-45 h-12 w-[106px]">
-        {% svg "logos/courtlistener" %}
+        {% svg "logos/courtlistener" class="md:h-21 h-12" %}
       </div>
     </div>
 
     {# DESKTOP SEARCH BAR #}
     <c-corpus-search class="w-full h-12 hidden md:flex" only>
       <c-corpus-search.scope
-        class="!rounded-r-none"
+        class="!rounded-r-none text-greyscale-600"
         menu_class="left-0 top-14 w-55 text-md font-cooper text-greyscale-800"
         item_class="py-1.5"
         only
@@ -101,7 +101,7 @@
         <c-corpus-search.mobile :request="request" only>
           <c-corpus-search.input rounded only/>
           <c-corpus-search.scope
-            class="w-full"
+            class="w-full text-greyscale-500"
             menu_class="w-full text-sm text-greyscale-600"
             item_class="py-[10px]"
             :request="request"
@@ -109,7 +109,7 @@
           />
           <button
             type="button"
-            class="btn w-full text-primary-600 text-sm font-medium my-4 hover:bg-greyscale-100 flex justify-center"
+            class="btn w-full text-primary-600 text-sm font-medium my-2 hover:bg-greyscale-100 flex justify-center"
           >Advanced Search</button>
           <c-corpus-search.button class="w-full flex items-center justify-center">Search</c-corpus-search.button>
         </c-corpus-search.mobile>
