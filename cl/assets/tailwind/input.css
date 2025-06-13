@@ -8,6 +8,7 @@
     --profile-menu-width: 228px;
     --mobile-main-padding: theme(spacing.4);
     --padded-full-width: calc(100vw - (2 * var(--mobile-main-padding)));
+    --corpus-search-height: theme(spacing.12);
   }
   code {
     @apply font-sans text-sm bg-brand-100 text-brand-600 border border-brand-300 rounded-[2px] px-1;
@@ -63,7 +64,7 @@
     @apply btn text-white bg-primary-600 hover:bg-primary-700 outline-none focus-visible:ring-4 focus-visible:ring-primary-300 disabled:bg-primary-100 disabled:text-primary-400;
   }
   .btn-outline {
-    @apply btn text-greyscale-700 hover:bg-greyscale-100 outline outline-1 outline-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:outline-greyscale-200 disabled:text-greyscale-400;
+    @apply btn text-greyscale-700 hover:bg-greyscale-100 border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:border-greyscale-200 disabled:text-greyscale-400;
   }
   .btn-dark {
     @apply btn text-white bg-greyscale-900 hover:bg-greyscale-800 outline-none focus-visible:ring-4 focus-visible:ring-greyscale-400 disabled:bg-greyscale-400 disabled:text-greyscale-200;
