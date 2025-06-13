@@ -92,7 +92,12 @@ urlpatterns = [
         "profile/favorites/",
         RedirectView.as_view(pattern_name="profile_notes", permanent=True),
     ),
-    path("profile/alerts/", views.view_search_alerts, name="profile_alerts"),
+    path("profile/alerts/", views.view_alerts, name="profile_alerts"),
+    path(
+        "profile/search-alerts/",
+        views.view_search_alerts,
+        name="profile_search_alerts",
+    ),
     path(
         "profile/docket-alerts/",
         views.view_docket_alerts,

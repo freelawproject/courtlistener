@@ -195,7 +195,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             f"Your alert was {action} successfully.",
         )
         # and redirect to the alerts page
-        return HttpResponseRedirect(reverse("profile_alerts"))
+        return HttpResponseRedirect(reverse("profile_search_alerts"))
 
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
