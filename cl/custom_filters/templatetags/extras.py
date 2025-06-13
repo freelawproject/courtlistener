@@ -444,3 +444,9 @@ def has_attr(obj, attr_name):
 def get_attr(obj, attr_name):
     """Return the value of the attribute attr_name."""
     return getattr(obj, attr_name, "")
+
+
+@register.simple_tag
+def get_request_value(request_get, field_name):
+    """Simple tag to get value from request.GET given a field name"""
+    return request_get.get(field_name, "")

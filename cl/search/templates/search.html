@@ -52,9 +52,7 @@
 
 {% block footer-scripts %}
   <script src="{% static "js/progress-bar.js" %}"></script>
-  {% flag "recap_relative_date_filter" %}
-    <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
-  {% endflag %}
+  <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
   {% if alerts_context %}
     {{ alerts_context|json_script:"alerts-data" }}
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">
