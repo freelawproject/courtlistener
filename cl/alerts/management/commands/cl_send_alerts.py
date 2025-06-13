@@ -14,6 +14,7 @@ from django.utils.timezone import now
 from elasticsearch_dsl import MultiSearch
 from elasticsearch_dsl import Q as ES_Q
 from elasticsearch_dsl.response import Response
+from waffle import switch_is_active
 
 from cl.alerts.models import Alert, RealTimeQueue
 from cl.alerts.utils import InvalidDateError, build_alert_email_subject
@@ -109,6 +110,7 @@ def send_alert(user_profile, hits):
     context = {
         "hits": hits,
         "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
+        "recap_alerts_banner": switch_is_active("recap-alerts-email-banner"),
     }
 
     headers = {}

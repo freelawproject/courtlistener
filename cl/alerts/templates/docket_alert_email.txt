@@ -43,6 +43,13 @@ This alert was sent because you subscribed to this docket with your account on C
 To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'unsubscribe' docket_alert_secret_key %}
 {% endif %}
 ************************
+{% if recap_alerts_banner %}
+📣 The Wait is Over! You can now get alerts for keywords in the RECAP Archive.
+Set daily or real-time email alerts when PACER cases or filings match your saved search.
+Follow topics, people, organizations, and more.
+Learn more: https://free.law/2025/06/18/recap-search-alerts-for-pacer/
+{% endif %}
+
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
 
  - Blog: https://free.law
