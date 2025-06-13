@@ -1928,3 +1928,9 @@ rect.series-segment {
 .relative-options-list li:hover {
   background-color: #f5f5f5;
 }
+
+/* Search alerts validation links */
+.link-red a {
+  color: #8a1f11;
+  text-decoration: underline;
+}

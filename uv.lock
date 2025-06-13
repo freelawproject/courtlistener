@@ -56,15 +56,6 @@ wheels = [
 ]
 
 [[package]]
-name = "argparse"
-version = "1.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/18/dd/e617cfc3f6210ae183374cd9f6a26b20514bbb5a792af97949c5aacddf0f/argparse-1.4.0.tar.gz", hash = "sha256:62b089a55be1d8949cd2bc7e0df0bddb9e028faefc8c32038cc84862aefdd6e4", size = 70508, upload-time = "2015-09-12T20:22:16.217Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f2/94/3af39d34be01a24a6e65433d19e107099374224905f1e0cc6bbe1fd22a2f/argparse-1.4.0-py2.py3-none-any.whl", hash = "sha256:c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314", size = 23000, upload-time = "2015-09-14T16:03:16.137Z" },
-]
-
-[[package]]
 name = "asgiref"
 version = "3.8.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1605,10 +1596,9 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.70"
+version = "2.6.76"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "argparse" },
     { name = "certifi" },
     { name = "chardet" },
     { name = "charset-normalizer" },
@@ -1624,7 +1614,10 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/30/55/9e77303038a49d10e047a9ce5d1a8a4b39e6847355940b288d29154e6e39/juriscraper-2.6.70.tar.gz", hash = "sha256:59d280f5d2f33c1fae97ead09d09af6369e7f279441a6d1210d61f325cfa4960", size = 302881, upload-time = "2025-05-23T17:24:33.843Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/f6/6b05c321f4f3ba5ecbbc1df52331dc074acf5e59205958d640cabeeb07f4/juriscraper-2.6.76.tar.gz", hash = "sha256:915e33436d54ba082e27cea22b71e33a7562ade9cbbfd233274a2b155fdd466f", size = 304084, upload-time = "2025-06-12T22:14:54.75Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/23/7f700b62fdbd95bcf6b2d893c03a81def4e55124f125c3f3a8212ba28d60/juriscraper-2.6.76-py3-none-any.whl", hash = "sha256:b327ed9d1e9841ab68db870014fad1360f2afe9bbe5df5bb911964f730754a1a", size = 499661, upload-time = "2025-06-12T22:14:52.641Z" },
+]
 
 [[package]]
 name = "kdtree"
