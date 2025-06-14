@@ -88,7 +88,7 @@
         item_class="py-1.5"
         only
       />
-      <c-corpus-search.input only/>
+      <c-corpus-search.input :request="request" only/>
       <c-corpus-search.button class="rounded-l-none rounded-r-xl" only/>
     </c-corpus-search>
   {% endif %}
@@ -99,7 +99,7 @@
     {% if variant != "homepage" %}
       <c-corpus-search only>
         <c-corpus-search.mobile :request="request" only>
-          <c-corpus-search.input rounded only/>
+          <c-corpus-search.input :request="request" rounded only/>
           <c-corpus-search.scope
             class="w-full text-greyscale-500"
             menu_class="w-full text-sm text-greyscale-600"
