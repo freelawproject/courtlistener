@@ -29,18 +29,19 @@
     id="header-scope-menu"
     x-data="focus"
     x-show="scopeMenuExpanded"
+    x-trap="scopeMenuExpanded"
     x-cloak
     x-on:click.outside="closeScopeMenu"
-    x-on:keyup.esc="closeProfileMenu"
-    x-on:keyup.right="focusNext"
-    x-on:keyup.left="focusPrevious"
+    x-on:keyup.esc.window="closeScopeMenu"
+    x-on:keyup.right.window="focusNext"
+    x-on:keyup.left.window="focusPrevious"
     x-transition:enter="transition ease-out duration-300"
     x-transition:enter-start="opacity-0"
     x-transition:enter-end="opacity-100"
     x-transition:leave="transition ease-in duration-100"
     x-transition:leave-start="opacity-100"
     x-transition:leave-end="opacity-0"
-    class="z-20 absolute mt-2 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2 {{ menu_class }}"
+    class="z-10 absolute mt-2 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2 {{ menu_class }}"
     role="menu"
   >
     <template x-for="scope in searchScopes">
