@@ -424,7 +424,7 @@ def scheduled_alert_hits_limit_reached(
     :return: True if the limit has been reached, otherwise False.
     """
 
-    if child_document:
+    if child_document and content_type:
         # To limit child hits in case, count ScheduledAlertHits related to the
         # alert, user and parent document.
         hits_count = ScheduledAlertHit.objects.filter(
