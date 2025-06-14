@@ -2396,3 +2396,59 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
         cd = search_form.cleaned_data
         query = build_plain_percolator_query(cd)
         return query.to_dict() if query else None
+
+
+class OpinionPercolator(OpinionClusterDocument, OpinionDocument):
+    """Opinions Percolator index"""
+
+    rate = fields.KeywordField(attr="rate")
+    percolator_query = PercolatorField()
+
+    class Index:
+        name = "opinions_percolator_index"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_OPINIONS_ALERTS_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_OPINIONS_ALERTS_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+    def prepare_percolator_query(self, instance):
+        from cl.alerts.utils import build_plain_percolator_query
+
+        qd = QueryDict(instance.query.encode(), mutable=True)
+        # For Opinions percolator queries, we use build_plain_percolator_query to
+        # build the query. It does not add a custom function_score, so there is
+        # no need to remove the order_by sorting key as it is ignored.
+        search_form = SearchForm(qd)
+        if not search_form.is_valid():
+            logger.warning(
+                f"The query {qd} associated with Alert ID {instance.pk} is "
+                "invalid and was not indexed."
+            )
+            return None
+
+        cd = search_form.cleaned_data
+        query = build_plain_percolator_query(cd)
+        return query.to_dict() if query else None
+
+
+class ESOpinionDocumentPlain(OpinionClusterDocument, OpinionDocument):
+    """Document class for preparing Opinions to be percolated into the
+    OpinionPercolator index.
+    """
+
+    def prepare_non_participating_judge_ids(self, instance):
+        return list(
+            instance.cluster.non_participating_judges.all().values_list(
+                "id", flat=True
+            )
+        )
+
+    def prepare_source(self, instance):
+        return instance.cluster.source
+
+    def prepare_court_exact(self, instance):
+        return instance.cluster.docket.court_id

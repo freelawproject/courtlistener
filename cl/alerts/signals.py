@@ -7,7 +7,11 @@ from django.dispatch import receiver
 
 from cl.alerts.models import Alert
 from cl.alerts.tasks import es_save_alert_document
-from cl.search.documents import AudioPercolator, RECAPPercolator
+from cl.search.documents import (
+    AudioPercolator,
+    OpinionPercolator,
+    RECAPPercolator,
+)
 from cl.search.models import SEARCH_TYPES
 from cl.search.tasks import remove_document_from_es_index
 
@@ -45,6 +49,17 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
                 )
             )
 
+        case SEARCH_TYPES.OPINION if (
+            settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        ):
+            transaction.on_commit(
+                partial(
+                    es_save_alert_document.delay,
+                    instance.pk,
+                    OpinionPercolator.__name__,
+                )
+            )
+
 
 @receiver(
     post_delete,
@@ -67,4 +82,8 @@ def remove_alert_from_es_index(sender, instance=None, **kwargs):
         case SEARCH_TYPES.RECAP:
             remove_document_from_es_index.delay(
                 RECAPPercolator.__name__, instance.pk, None
+            )
+        case SEARCH_TYPES.OPINION:
+            remove_document_from_es_index.delay(
+                OpinionPercolator.__name__, instance.pk, None
             )

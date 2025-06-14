@@ -5,15 +5,22 @@ from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.api_serializers import SearchAlertSerializerModel
 from cl.alerts.models import Alert
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import (
+    Webhook,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookVersions,
+)
 from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.lib.elasticsearch_utils import set_child_docs_and_score
 from cl.search.api_serializers import (
+    OpinionClusterWebhookResultSerializer,
     RECAPESWebhookResultSerializer,
     V3OAESResultSerializer,
+    V3OpinionESResultSerializer,
 )
 from cl.search.api_utils import ResultObject
 from cl.search.models import SEARCH_TYPES, DocketEntry
@@ -113,6 +120,14 @@ def send_search_alert_webhook_es(
             serialized_results = RECAPESWebhookResultSerializer(
                 results, many=True
             ).data
+        case SEARCH_TYPES.OPINION:
+            set_child_docs_and_score(results, merge_highlights=True)
+            serializer_class = (
+                V3OpinionESResultSerializer
+                if webhook.version == WebhookVersions.v1
+                else OpinionClusterWebhookResultSerializer
+            )
+            serialized_results = serializer_class(results, many=True).data
         case _:
             # No implemented alert type.
             return None

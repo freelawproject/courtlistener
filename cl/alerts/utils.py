@@ -34,17 +34,23 @@ from cl.lib.types import CleanData
 from cl.recap.constants import bankruptcy_data_fields
 from cl.search.constants import (
     ALERTS_HL_TAG,
+    SEARCH_OPINION_CHILD_HL_FIELDS,
+    SEARCH_OPINION_HL_FIELDS,
+    SEARCH_OPINION_QUERY_FIELDS,
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
+    opinion_boosts_es,
     recap_boosts_es,
 )
 from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
     DocketDocument,
+    ESOpinionDocumentPlain,
     ESRECAPBaseDocument,
     ESRECAPDocumentPlain,
+    OpinionPercolator,
     RECAPPercolator,
 )
 from cl.search.models import SEARCH_TYPES, Docket
@@ -128,7 +134,8 @@ def percolate_es_document(
     percolator_index: str,
     document_index: str | None = None,
     documents_to_percolate: (
-        tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None
+        tuple[ESDictDocument, ESDictDocument | None, ESDictDocument | None]
+        | None
     ) = None,
     app_label: str | None = None,
     main_search_after: int | None = None,
@@ -156,6 +163,7 @@ def percolate_es_document(
     Docket percolator response (if applicable).
     """
 
+    percolate_query_child = percolate_query_parent = None
     if document_index:
         # If document_index is provided, use it along with the document_id to refer
         # to the document to percolate.
@@ -175,15 +183,23 @@ def percolate_es_document(
             field="percolator_query",
             document=main_document_content_plain,
         )
-        percolate_query_child = Q(
-            "percolate",
-            field="percolator_query",
-            document=child_document,
+        percolate_query_child = (
+            Q(
+                "percolate",
+                field="percolator_query",
+                document=child_document,
+            )
+            if child_document
+            else None
         )
-        percolate_query_parent = Q(
-            "percolate",
-            field="percolator_query",
-            document=parent_document,
+        percolate_query_parent = (
+            Q(
+                "percolate",
+                field="percolator_query",
+                document=parent_document,
+            )
+            if parent_document
+            else None
         )
     else:
         raise NotImplementedError(
@@ -235,6 +251,18 @@ def percolate_es_document(
             s = add_es_highlighting(
                 s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
             )
+        case "search.Opinion":
+            child_highlight_options, _ = build_highlights_dict(
+                SEARCH_OPINION_CHILD_HL_FIELDS, ALERTS_HL_TAG
+            )
+            parent_highlight_options, _ = build_highlights_dict(
+                SEARCH_OPINION_HL_FIELDS, ALERTS_HL_TAG
+            )
+            child_highlight_options["fields"].update(
+                parent_highlight_options["fields"]
+            )
+            extra_options = {"highlight": child_highlight_options}
+            s = s.extra(**extra_options)
         case _:
             raise NotImplementedError(
                 "Percolator search alerts not supported for %s", app_label
@@ -406,7 +434,12 @@ def scheduled_alert_hits_limit_reached(
             content_type=content_type,
             object_id=object_id,
         ).count()
-        hits_limit = settings.RECAP_CHILD_HITS_PER_RESULT + 1
+        hits_per_result = (
+            settings.OPINION_HITS_PER_RESULT
+            if content_type.model == "opinion"
+            else settings.RECAP_CHILD_HITS_PER_RESULT
+        )
+        hits_limit = hits_per_result + 1
     else:
         # To limit hits in an alert count ScheduledAlertHits related to the
         # alert and user.
@@ -499,14 +532,24 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
             SEARCH_TYPES.RECAP
             | SEARCH_TYPES.DOCKETS
             | SEARCH_TYPES.RECAP_DOCUMENT
+            | SEARCH_TYPES.OPINION
         ):
-            text_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
-            text_fields.extend(
-                add_fields_boosting(
-                    cd,
-                    list(recap_boosts_es.keys()),
+            if cd["type"] == SEARCH_TYPES.OPINION:
+                text_fields = SEARCH_OPINION_QUERY_FIELDS.copy()
+                text_fields.extend(
+                    add_fields_boosting(
+                        cd,
+                        list(opinion_boosts_es.keys()),
+                    )
                 )
-            )
+            else:
+                text_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
+                text_fields.extend(
+                    add_fields_boosting(
+                        cd,
+                        list(recap_boosts_es.keys()),
+                    )
+                )
             child_filters = build_has_child_filters(cd)
             parent_filters = build_join_es_filters(cd)
             parent_filters.extend(child_filters)
@@ -517,7 +560,7 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
 
             match parent_filters, string_query:
                 case [[], []]:
-                    NotImplementedError(
+                    raise NotImplementedError(
                         "Indexing match-all queries is not supported."
                     )
                 case [[], _]:
@@ -688,6 +731,19 @@ def prepare_percolator_content(
                 parent_document_content,
             )
 
+        case "search.Opinion":
+            percolator_index = OpinionPercolator._index._name
+            model = apps.get_model(app_label)
+            rd = model.objects.get(pk=document_id)
+            document_content_plain = ESOpinionDocumentPlain().prepare(rd)
+            # Remove docket_child to avoid document parsing errors.
+            del document_content_plain["cluster_child"]
+
+            documents_to_percolate = (
+                document_content_plain,
+                None,
+                None,
+            )
         case _:
             raise NotImplementedError(
                 "Percolator search alerts not supported for %s", app_label
