@@ -2,25 +2,24 @@ import datetime
 from unittest import mock
 
 import time_machine
+from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.test import override_settings
 from django.utils.timezone import now
-from django.conf import settings
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
 from cl.api.factories import WebhookFactory
-from cl.api.models import WebhookEventType, WebhookEvent
+from cl.api.models import WebhookEvent, WebhookEventType
 from cl.donate.models import NeonMembership
 from cl.lib.date_time import midnight_pt
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import SearchTestCase, CourtTestCase, PeopleTestCase
+from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
 from cl.search.documents import OpinionPercolator
 from cl.search.factories import OpinionClusterFactory, OpinionFactory
 from cl.search.models import SEARCH_TYPES
-from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions
-from cl.tests.cases import TestCase
+from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -32,7 +31,12 @@ from cl.users.factories import UserProfileWithParentsFactory
 )
 @override_settings(NO_MATCH_HL_SIZE=100)
 class OpinionAlertsPercolatorTest(
-    CourtTestCase, PeopleTestCase, SearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions,
+    CourtTestCase,
+    PeopleTestCase,
+    SearchTestCase,
+    ESIndexTestCase,
+    TestCase,
+    SearchAlertsAssertions,
 ):
     """
     Opinion Alerts Percolator Tests
@@ -152,7 +156,8 @@ class OpinionAlertsPercolatorTest(
         expected_queries = 1
         self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses.main_response, query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
 
         # Test Percolate an OpinionCluster it's not supported.
@@ -218,11 +223,12 @@ class OpinionAlertsPercolatorTest(
             msg=f"Alert id: {opinion_alert_filter_id} was not indexed.",
         )
 
-
     def test_percolate_document_on_ingestion(self, mock_prefix) -> None:
         """Confirm an Opinion is percolated upon ingestion."""
 
-        opinion_cluster_indexing_time = self.mock_date - datetime.timedelta(seconds=15)
+        opinion_cluster_indexing_time = self.mock_date - datetime.timedelta(
+            seconds=15
+        )
         with self.captureOnCommitCallbacks(execute=True):
             opinion_cluster_alert = AlertFactory(
                 user=self.user_profile.user,
@@ -379,7 +385,9 @@ class OpinionAlertsPercolatorTest(
             time_machine.travel(opinion_cluster_indexing_time, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            opinion_3.plain_text = "Curabitur id lorem vel orci aliquam commodo"
+            opinion_3.plain_text = (
+                "Curabitur id lorem vel orci aliquam commodo"
+            )
             opinion_3.save()
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
@@ -402,7 +410,6 @@ class OpinionAlertsPercolatorTest(
         )
         snippet = self._extract_snippet_content(html_content)
         self.assertIn(opinion_3.plain_text, snippet)
-
 
     def test_opinion_alerts_highlighting(self, mock_prefix) -> None:
         """Confirm Opinion Search alerts are properly highlighted."""
@@ -443,13 +450,9 @@ class OpinionAlertsPercolatorTest(
         self.assertIn(opinion_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 1)
         self.assertIn("<strong>cluster</strong>", html_content)
-        self.assertIn("<strong>elementum</strong>",
-                      html_content)
+        self.assertIn("<strong>elementum</strong>", html_content)
 
-
-    @override_settings(
-        SCHEDULED_ALERT_HITS_LIMIT=3, OPINION_HITS_PER_RESULT=5
-    )
+    @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3, OPINION_HITS_PER_RESULT=5)
     def test_group_percolator_alerts(self, mock_prefix) -> None:
         """Test group Percolator Opinion Alerts in an email and hits."""
         with self.captureOnCommitCallbacks(execute=True):
@@ -465,7 +468,7 @@ class OpinionAlertsPercolatorTest(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert Opinion Text",
-                query=f'q="elementum"&type=o',
+                query='q="elementum"&type=o',
                 alert_type=SEARCH_TYPES.OPINION,
             )
 
@@ -478,8 +481,12 @@ class OpinionAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-
-            clusters = [self.opinion_cluster_1, self.opinion_cluster_2, self.opinion_cluster_3, self.opinion_cluster_4]
+            clusters = [
+                self.opinion_cluster_1,
+                self.opinion_cluster_2,
+                self.opinion_cluster_3,
+                self.opinion_cluster_4,
+            ]
             alert_1_ids = []
             alert_2_ids = []
             for i, cluster in enumerate(clusters):
@@ -576,7 +583,7 @@ class OpinionAlertsPercolatorTest(
         cluster_case_names = [cluster.case_name for cluster in clusters]
         for case_name in cluster_case_names:
             with self.subTest(
-                    alert=case_name, msg="Assert case_name in email."
+                alert=case_name, msg="Assert case_name in email."
             ):
                 self.assertIn(case_name, txt_email)
 
