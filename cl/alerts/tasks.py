@@ -631,6 +631,21 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
             case "audio.Audio":
                 object_id = document_content_copy["id"]
                 child_document = False
+            case "search.Opinion":
+                # Filter out Opinions and set the document id to the
+                # Redis Opinion alert hits set.
+                if has_document_alert_hit_been_triggered(
+                    r, alert_triggered_id, "o", document_content_copy["id"]
+                ):
+                    continue
+                transform_percolator_child_document(
+                    document_content_copy, hit.meta
+                )
+                add_document_hit_to_alert_set(
+                    r, alert_triggered_id, "o", document_content_copy["id"]
+                )
+                object_id = document_content_copy["cluster_id"]
+                child_document = True
             case _:
                 raise NotImplementedError(
                     "Percolator response processing not supported for: %s",
@@ -731,9 +746,13 @@ def send_or_schedule_search_alerts(
     if (
         not settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
         and response.app_label in ["search.RECAPDocument", "search.Docket"]
+    ) or (
+        not settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        and response.app_label in ["search.Opinion"]
     ):
-        # Disable percolation for RECAP search alerts until
-        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED is set to True.
+        # Disable percolation for RECAP Or Opinions search alerts until
+        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED or PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        # is set to True.
         self.request.chain = None
         return None
 

@@ -97,7 +97,7 @@ from cl.search.types import (
     SaveESDocumentReturn,
 )
 
-percolator_alerts_models_supported = [Audio, RECAPDocument, Docket]
+percolator_alerts_models_supported = [Audio, RECAPDocument, Docket, Opinion]
 
 logger = logging.getLogger(__name__)
 
@@ -552,7 +552,8 @@ def update_es_document(
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
     if (
-        main_app_label in ["search.RECAPDocument", "search.Docket"]
+        main_app_label
+        in ["search.RECAPDocument", "search.Docket", "search.Opinion"]
         and not related_instance_app_label == "search.DocketEntry"
         or related_instance_app_label in ["search.BankruptcyInformation"]
     ) and not skip_percolator_request:
