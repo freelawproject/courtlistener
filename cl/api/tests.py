@@ -13,6 +13,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
+from django.core.cache import caches
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
@@ -462,7 +463,7 @@ class ApiQueryCountTests(TransactionTestCase):
         and another to select the count.
         """
         with CaptureQueriesContext(connection) as ctx:
-            path = reverse("docket-list", kwargs={"version": "v4"})
+            path = reverse("audio-list", kwargs={"version": "v4"})
             params = {"count": "on"}
             self.client.get(path, params)
 
@@ -1948,6 +1949,21 @@ class V4DRFPaginationTest(TestCase):
         if method == "post":
             return await api_client.post(url, params)
 
+    @classmethod
+    def generate_test_cursor(cls, paginator, ordering_key: str) -> str | None:
+        """Generates a valid cursor for testing according to the ordering
+        key type.
+        :param paginator: paginator object to encode cursor.
+        :param ordering_key: The ordering key of the cursor.
+        :return: A valid cursor for testing.
+        """
+        position = 10 if "id" in ordering_key else now()
+        cursor = Cursor(offset=1, reverse=False, position=position)  # type: ignore
+        encoded_cursor = paginator.encode_cursor(cursor)
+        parsed_url = urlparse(encoded_cursor)
+        query_params = parse_qs(parsed_url.query)
+        return query_params.get("cursor", [None])[0]
+
     async def _base_test_for_v4_endpoints(
         self,
         endpoint,
@@ -1961,19 +1977,6 @@ class V4DRFPaginationTest(TestCase):
         cursor_paginator = CursorPagination()
         cursor_paginator.base_url = "/"
 
-        def generate_test_cursor(ordering_key: str) -> str | None:
-            """Generates a valid cursor for testing according to the ordering
-            key type.
-            :param ordering_key: The ordering key of the cursor.
-            :return: A valid cursor for testing.
-            """
-            position = 10 if "id" in ordering_key else now()
-            cursor = Cursor(offset=1, reverse=False, position=position)  # type: ignore
-            encoded_cursor = cursor_paginator.encode_cursor(cursor)
-            parsed_url = urlparse(encoded_cursor)
-            query_params = parse_qs(parsed_url.query)
-            return query_params.get("cursor", [None])[0]
-
         # Mock handle_database_cursor_pagination
         # Initialize call count and call arguments tracking
         handle_database_cursor_pagination_wrapper.call_count = 0
@@ -1983,7 +1986,9 @@ class V4DRFPaginationTest(TestCase):
             "handle_database_cursor_pagination",
             new=handle_database_cursor_pagination_wrapper,
         ) as mock_cursor_pagination:
-            cursor_value = generate_test_cursor(default_ordering)
+            cursor_value = V4DRFPaginationTest.generate_test_cursor(
+                cursor_paginator, default_ordering
+            )
             # Confirm the default sorting key works with cursor pagination
             response = await self._api_v4_request(
                 endpoint, {"cursor": cursor_value}
@@ -2005,7 +2010,9 @@ class V4DRFPaginationTest(TestCase):
         )
 
         # Try a different cursor sorting key.
-        cursor_value = generate_test_cursor(secondary_cursor_key)
+        cursor_value = V4DRFPaginationTest.generate_test_cursor(
+            cursor_paginator, secondary_cursor_key
+        )
         params = {"order_by": secondary_cursor_key, "cursor": cursor_value}
         handle_database_cursor_pagination_wrapper.call_count = 0
         handle_database_cursor_pagination_wrapper.call_args = None
@@ -3456,3 +3463,158 @@ class TestApiUsage(SimpleTestCase):
         dates = list(anonymous_data.keys())
         dates.remove("total")
         self.assertEqual(dates, ["2023-01-01", "2023-01-02"])
+
+
+@patch("cl.api.utils.make_cache_key_for_no_filter_mixin")
+class CacheListApiResponseTest(TestCase):
+    def setUp(self):
+        self.cache = caches["db_cache"]
+        return super().setUp()
+
+    def _check_cached_request(self, path, params, cache_key):
+        """
+        Helper method to verify caching behavior for a given request.
+
+        Args:
+            path (str): The URL path to make the request to.
+            params (dict): Dictionary of query parameters for the request.
+            cache_key (str): The expected cache key for the response.
+        """
+        # Checks the cache key does not exist before the first request
+        self.assertFalse(self.cache.has_key(cache_key))
+
+        # Make the first request and capture the number of database queries
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.get(path, params)
+
+        # After the first request, the cache key should exist
+        self.assertTrue(self.cache.has_key(cache_key))
+        # Verify that more than one query was executed for the initial request
+        self.assertGreater(len(ctx.captured_queries), 1)
+
+        # Repeat the same query to verify it's served from the cache
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.get(path, params)
+
+        # For the cached request, at most 2 queries should be executed: one to
+        # check the authenticated user, and another to get the cached data.
+        self.assertLessEqual(
+            len(ctx.captured_queries),
+            2,
+            msg=f"{len(ctx.captured_queries)} queries executed, at most 2 expected",
+        )
+
+    def test_no_filters_no_pagination_cached(self, mock_cache_key_method):
+        """
+        Test that a response is cached when there are no filters and no pagination.
+        """
+        fake_cache_key = "cache_no_filter_no_pagination"
+        # Mock the method that generates the cache key to return a predictable value
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Call the helper method to check caching behavior with no parameters
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        self._check_cached_request(
+            path=path, params={}, cache_key=fake_cache_key
+        )
+
+        # Delete the fake key after the test
+        self.cache.delete(fake_cache_key)
+
+    def test_can_ignore_invalid_filters(self, mock_cache_key_method):
+        """
+        Test that a response is cached when there are invalid filters.
+        """
+        fake_cache_key = "cache_no_filter_no_pagination"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Call the helper method to check caching behavior with invalid filters
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"evil_filter": "1"}
+        self._check_cached_request(path, params, cache_key=fake_cache_key)
+
+        # Delete the fake key after the test
+        self.cache.delete(fake_cache_key)
+
+    def test_no_filters_count_request_cached(self, mock_cache_key_method):
+        """
+        Test that a v4 count request is cached when no filters are applied.
+        """
+        fake_cache_key = "cache_no_filter_count_request"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Resolve the URL for the 'docket-list' endpoint and add the count
+        # parameter
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"count": "on"}
+
+        # Call the helper method to check caching behavior with parameters
+        self._check_cached_request(path, params, fake_cache_key)
+
+        # Delete the fake key after the test
+        self.cache.delete(fake_cache_key)
+
+    def test_no_filters_ordering_request_cached(self, mock_cache_key_method):
+        """
+        Test that a ordered response is cached when no filters are requested.
+        """
+        fake_cache_key = "cache_no_filter_count_request"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Resolve the URL for the 'docket-list' endpoint and add a custom order
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"order_by": "-id"}
+
+        # Call the helper method to check caching behavior with parameters
+        self._check_cached_request(path, params, fake_cache_key)
+
+        # Delete the fake key after the test
+        self.cache.delete(fake_cache_key)
+
+    def test_filters_applied_not_cached(self, mock_cache_key_method):
+        """
+        Test that a response is NOT cached when filters are applied.
+        """
+        fake_cache_key = "cache_filters_key"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Resolve the URL for the 'docket-list' endpoint and add a filter
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"court": "ca1"}
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Make the request with filters
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Delete the fake key after the test
+        self.cache.delete(fake_cache_key)
+
+    def test_pagination_applied_not_cached(self, mock_cache_key_method):
+        """
+        Test that a response is NOT cached when pagination (cursor or page) is applied.
+        """
+        fake_cache_key = "cache_page_or_cursor"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Resolve the URL for the 'docket-list' endpoint and add a cursor
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        cursor_paginator = CursorPagination()
+        cursor_paginator.base_url = "/"
+        cursor = V4DRFPaginationTest.generate_test_cursor(
+            cursor_paginator, "id"
+        )
+        params = {"cursor": cursor}
+
+        # Make the request with cursor pagination
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
