@@ -57,10 +57,15 @@ from cl.search.factories import (
     BankruptcyInformationFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionClusterFactory,
+    OpinionFactory,
     RECAPDocumentFactory,
 )
-from cl.search.models import Docket
-from cl.search.tasks import index_docket_parties_in_es
+from cl.search.models import Docket, OpinionsCitedByRECAPDocument
+from cl.search.tasks import (
+    index_docket_parties_in_es,
+    index_related_cites_fields,
+)
 from cl.stats.models import Stat
 from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
@@ -4757,3 +4762,70 @@ class RECAPAlertsPercolatorTest(
         docket_only_alert.delete()
         docket.delete()
         docket_2.delete()
+
+    def test_percolate_rd_upon_cites_fields_update(self, mock_prefix) -> None:
+        """Test RECAPDocument percolation to match queries that involve the
+        cites field.
+        """
+
+        opinion_cluster_indexing_time = self.mock_date - datetime.timedelta(
+            seconds=15
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion = OpinionFactory(
+                cluster=OpinionClusterFactory(docket=self.de.docket)
+            )
+            rd_cites_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Opinion cites",
+                query=f"q=cites:{opinion.pk}&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(opinion_cluster_indexing_time, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # Add OpinionsCitedByRECAPDocument using bulk_create as in
+            # store_opinion_citations_and_update_parentheticals
+            OpinionsCitedByRECAPDocument.objects.bulk_create(
+                [
+                    OpinionsCitedByRECAPDocument(
+                        citing_document=self.rd,
+                        cited_opinion=opinion,
+                        depth=1,
+                    )
+                ]
+            )
+
+            # Update changes in ES using index_related_cites_fields and
+            # percolate the RECAPDocument.
+            index_related_cites_fields.delay(
+                OpinionsCitedByRECAPDocument.__name__, self.rd.pk
+            )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        txt_content = mail.outbox[0].body
+
+        self.assertIn(rd_cites_alert.name, html_content)
+        self.assertIn(rd_cites_alert.name, txt_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            rd_cites_alert.name,
+            1,
+            self.rd.docket_entry.docket.case_name,
+            1,
+        )
