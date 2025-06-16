@@ -10,7 +10,70 @@
     <label for="header-search-bar" class="sr-only" type="text">Search <span x-text="selectedScope"></span></label>
     <input id="header-search-bar" type="search" class="w-full bg-greyscale-100 placeholder:text-sm placeholder:text-greyscale-500 focus-visible:ring-0 focus-visible:outline-none bg-none placeholder:text-ellipsis" placeholder="Enter keyword(s)">
   </div>
-  <button type="button" class="p-2 rounded-[10px] border border-greyscale-200 bg-white">
-    {% svg "brackets" class="text-greyscale-500" %}
-  </button>
+
+  {# OPERATORS MODAL #}
+  <c-dialog
+    panel_class="p-6 rounded-2xl max-w-[706px] gap-6 max-md:absolute max-md:bottom-0 max-md:rounded-b-none max-md:max-w-full"
+    dialog_class="items-center z-20"
+  >
+    {#  trigger button  #}
+    <c-slot name="button_content">
+      {% svg "brackets" class="text-greyscale-500" %}
+    </c-slot>
+
+    {#  modal content  #}
+    <c-slot name="panel">
+      <div class="flex flex-col gap-2">
+        <h2 class="">Operators</h2>
+        <p class="text-sm">CourtListener supports highly advanced Boolean queries. These allow you to build a complex search that can be run across our entire corpus.</p>
+      </div>
+      <div class="flex sm:flex-row flex-col gap-x-2 text-greyscale-950 text-sm py-6 border-y border-greyscale-100">
+        <div class=" md:w-1/2 w-full flex flex-col">
+          <div class="border-l-2 border-greyscale-200 w-full py-1 pl-6">
+            <span class="font-semibold">AND </span>
+            - Intersection
+          </div>
+          <div class="border-l-2 border-greyscale-200 w-full py-1 pl-6">
+            <span class="font-semibold">OR </span>
+            - Union
+          </div>
+          <div class="border-l-2 border-greyscale-200 w-full py-1 pl-6">
+            <span class="font-semibold">- </span>
+            - Negation
+          </div>
+          <div class="border-l-2 border-greyscale-200 w-full py-1 pl-6">
+            <span class="font-semibold">" " </span>
+            - Phrase search
+          </div>
+          <div class="border-l-2 border-greyscale-200 w-full py-1 pl-6">
+            <span class="font-semibold">( ) </span>
+            - Grouped queries
+          </div>
+        </div>
+        <div class="md:w-1/2 w-full flex flex-col">
+          <div class="border-l-2 border-greyscale-200 w-full py-1 pl-6">
+            <span class="font-semibold">fieldname:term </span>
+            - Fielded search
+          </div>
+          <div class="border-l-2 border-greyscale-200 w-full py-1 pl-6">
+            <span class="font-semibold">*, ?, ! </span>
+            - Wildcard
+          </div>
+          <div class="border-l-2 border-greyscale-200 w-full py-1 pl-6">
+            <span class="font-semibold">~ </span>
+            - Fuzzy and proximity
+          </div>
+          <div class="border-l-2 border-greyscale-200 w-full py-1 pl-6">
+            <span class="font-semibold">[x TO y] </span>
+            - Ranges
+          </div>
+        </div>
+      </div>
+      <p class="text-sm">If you would like assistance crafting a query, let us know. We can sometimes help.</p>
+      <div class="flex flex-col md:flex-row justify-end gap-2">
+        <button x-on:click="close" type="button" class="btn-outline max-md:w-full justify-center max-md:order-2" aria-label="Close modal">Close</button>
+        <a href="{% url 'advanced_search' %}" class="btn-primary max-md:w-full justify-center max-md:order-1">Learn More</a>
+      </div>
+    </c-slot>
+  </c-dialog>
 </div>
