@@ -2,52 +2,49 @@ from django.db import models
 from eyecite.models import FullCaseCitation
 
 from cl.citations.utils import map_reporter_db_cite_type
-from cl.search.models import BaseCitation, Citation, Opinion
+from cl.search.models import BaseCitation, Citation, Opinion, RECAPDocument
 
 
-class UnmatchedCitation(BaseCitation):
-    """Keep track of citations that could not be resolved to a cluster on the
-    batch citator run
+class BaseUnmatchedCitation(BaseCitation):
+    """
+    Track citations that couldn't be resolved to a RecapDocument or
+    OpinionCluster
     """
 
-    UNMATCHED = 1
+    NO_CITATION = 1
     FOUND = 2
     RESOLVED = 3
     FAILED_AMBIGUOUS = 4
     FAILED = 5
     STATUS = (
         (
-            UNMATCHED,
-            "The citation may be unmatched if: 1. it does not exist in the "
-            "search_citation table. 2. It exists on the search_citation table,"
-            " but we couldn't match the citation to a cluster on the previous"
-            " citation extractor run",
+            NO_CITATION,
+            "The citation does not exist in the search_citation table.",
         ),
         (
             FOUND,
-            "The citation exists on the search_citation table. We "
-            " haven't updated the citing Opinion.html_with_citations yet",
+            "The citation now exists on the search_citation table. "
+            "In the case of opinions, we haven't tried to update the citing "
+            "Opinion.html_with_citations yet",
         ),
         (
             RESOLVED,
-            "The citing Opinion.html_with_citations was updated successfully",
+            "The citation resolution task was run successfully and this "
+            "citation is now matched. In the case of opinions, citing "
+            "Opinion.html_with_citations was updated successfully",
         ),
         (
             FAILED_AMBIGUOUS,
-            "The citing Opinion.html_with_citations update "
-            "failed because the citation is ambiguous",
+            "The citation resolution failed because this citation resolved to "
+            "more than 1 cluster. In the case of opinions, the citing opinion "
+            "Opinion.html_with_citations update failed for this citation.",
         ),
         (
             FAILED,
-            "We couldn't resolve the citation, and the citing "
-            "Opinion.html_with_citations update failed",
+            "We couldn't resolve the citation. In the case of opinions, the "
+            "citing Opinion.html_with_citations update failed for this "
+            "citation",
         ),
-    )
-    citing_opinion: models.ForeignKey = models.ForeignKey(
-        Opinion,
-        help_text="The opinion citing this citation",
-        on_delete=models.CASCADE,
-        related_name="unmatched_citations",
     )
     status: models.SmallIntegerField = models.SmallIntegerField(
         help_text="Status of resolution of the initially unmatched citation",
@@ -67,19 +64,12 @@ class UnmatchedCitation(BaseCitation):
     )
 
     class Meta:
-        indexes = [
-            models.Index(
-                fields=["volume", "reporter", "page"],
-            )
-        ]
-        #
-        unique_together = (("citing_opinion", "volume", "reporter", "page"),)
+        abstract = True
 
     @classmethod
-    def create_from_eyecite(
+    def create_from_eyecite_base(
         cls,
         eyecite_citation: FullCaseCitation,
-        citing_opinion: Opinion,
         has_multiple_matches: bool,
     ):
         """
@@ -89,16 +79,15 @@ class UnmatchedCitation(BaseCitation):
 
         :param eyecite_citation: a FullCaseCitation as returned by
             eyecite.get_citations
-        :param citing_opinion: the opinion which uses the citation
         :param has_multiple_matches: if the citation was resolved to
             MULTIPLE_MATCHES_RESOURCE
-        :return: a UnmatchedCitation object
+        :return: a UnmatchedCitation object, without a `citing_opinion` or
+            `citing_recapdocument`
         """
         cite_type_str = eyecite_citation.all_editions[0].reporter.cite_type
         year = eyecite_citation.metadata.year
         unmatched_citation = cls(
-            citing_opinion=citing_opinion,
-            status=cls.UNMATCHED,
+            status=cls.NO_CITATION,
             citation_string=eyecite_citation.matched_text(),
             court_id=eyecite_citation.metadata.court or "",
             year=int(year) if year else None,
@@ -120,4 +109,76 @@ class UnmatchedCitation(BaseCitation):
         ).exists():
             unmatched_citation.status = cls.FAILED
 
+        return unmatched_citation
+
+
+class UnmatchedCitation(BaseUnmatchedCitation):
+    citing_opinion: models.ForeignKey = models.ForeignKey(
+        Opinion,
+        help_text="The opinion citing this citation",
+        on_delete=models.CASCADE,
+        related_name="unmatched_citations",
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["volume", "reporter", "page"],
+            )
+        ]
+        #
+        unique_together = (("citing_opinion", "volume", "reporter", "page"),)
+
+    @classmethod
+    def create_from_eyecite(
+        cls,
+        eyecite_citation: FullCaseCitation,
+        citing_opinion: Opinion,
+        has_multiple_matches: bool,
+    ):
+        """
+        :param citing_document: the opinion that cited this unresolved citation
+
+        """
+        unmatched_citation = cls.create_from_eyecite_base(
+            eyecite_citation, has_multiple_matches
+        )
+        unmatched_citation.citing_opinion = citing_opinion
+        return unmatched_citation
+
+
+class UnmatchedCitationFromRECAPDocument(BaseUnmatchedCitation):
+    citing_recapdocument: models.ForeignKey = models.ForeignKey(
+        RECAPDocument,
+        help_text="The RECAPDocument citing this unmatched citation",
+        on_delete=models.CASCADE,
+        related_name="unmatched_citations",
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["volume", "reporter", "page"],
+            )
+        ]
+        #
+        unique_together = (
+            ("citing_recapdocument", "volume", "reporter", "page"),
+        )
+
+    @classmethod
+    def create_from_eyecite(
+        cls,
+        eyecite_citation: FullCaseCitation,
+        citing_recapdocument: RECAPDocument,
+        has_multiple_matches: bool,
+    ):
+        """
+        :param citing_document: the opinion that cited this unresolved citation
+
+        """
+        unmatched_citation = cls.create_from_eyecite_base(
+            eyecite_citation, has_multiple_matches
+        )
+        unmatched_citation.citing_recapdocument = citing_recapdocument
         return unmatched_citation
