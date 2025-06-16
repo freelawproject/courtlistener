@@ -9,11 +9,21 @@
     <div class="col-sm-6">
         <h1 class="text-center">You are about to delete this alert</h1>
         <h2 class="v-offset-below-3 text-center">Are you sure you want to do this?</h2>
-
-        <a href="{% url "profile_alerts" %}" class="btn btn-primary btn-lg"><i class="fa fa-arrow-circle-left"></i>&nbsp;Cancel and Go
-            Back</a>&nbsp;&nbsp;
-        <form action="/alert/delete/{{alert_id}}/" method="post" class="float-right">{% csrf_token %}
-            <button type="submit" class="btn btn-danger btn-lg"><i class="fa fa-trash-o"></i>&nbsp;Delete this Alert</button>
+        {% url "profile_alerts" as profile_alerts_url %}
+        <a class="btn btn-primary btn-lg"
+          href={% if profile_alerts_url in request.META.HTTP_REFERER %}{{ profile_alerts_url }}{%else%}"/alert/edit/{{alert_id}}/"{% endif %}>
+          <i class="fa fa-arrow-circle-left"></i>
+          &nbsp;Cancel and Go Back
+        </a>
+        &nbsp;&nbsp;
+        <form action="/alert/delete/{{alert_id}}/" method="post" class="float-right">
+          {% csrf_token %}
+          {% if profile_alerts_url not in request.META.HTTP_REFERER %}
+          <input type="hidden" name="redirect_to_search_page" value="on">
+          {% endif %}
+          <button type="submit" class="btn btn-danger btn-lg">
+            <i class="fa fa-trash-o"></i>&nbsp;Delete this Alert
+          </button>
         </form>
 
     </div>
