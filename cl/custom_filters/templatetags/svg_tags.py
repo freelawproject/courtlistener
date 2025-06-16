@@ -18,8 +18,12 @@ def svg(name, **kwargs):
     ```
 
     Note HTML attributes are passed directly with minor adjustments:
+
     - Use snake case instead of kebab, as template tags don't support kebab.
     - To include Alpine bindings, use "__" instead of ":" (e.g. `x_bind__class="w-full"`)
+    - Passing class= here will inject it into every element that already has a class, so
+      only use the class argument when no nested tags include their own class attributes,
+      otherwise style the SVG’s parent container.
     """
     relative_path = f"svg/{name}.svg"
     absolute_path = find(relative_path)
