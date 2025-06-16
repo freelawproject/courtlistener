@@ -545,6 +545,10 @@ class SearchAlertsAssertions:
                         f"Expected: {expected_child_hits} - Got: {child_hit_count}\n\n",
                     )
                     break
+            else:
+                self.fail(
+                    f"Case title '{case_title}' was not found in the alert."
+                )
 
     def _assert_child_hits_content(
         self,

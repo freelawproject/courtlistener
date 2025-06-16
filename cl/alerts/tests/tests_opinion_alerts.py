@@ -18,7 +18,8 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
 from cl.search.documents import OpinionPercolator
 from cl.search.factories import OpinionClusterFactory, OpinionFactory
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, OpinionsCited
+from cl.search.tasks import index_related_cites_fields
 from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
@@ -410,6 +411,85 @@ class OpinionAlertsPercolatorTest(
         )
         snippet = self._extract_snippet_content(html_content)
         self.assertIn(opinion_3.plain_text, snippet)
+
+    def test_percolate_opinion_upon_cites_fields_update(
+        self, mock_prefix
+    ) -> None:
+        """Test Opinion percolation to match queries that involve the
+        cites field.
+        """
+
+        opinion_cluster_indexing_time = self.mock_date - datetime.timedelta(
+            seconds=15
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Opinion cites",
+                query=f"q=cites:{self.opinion_6.pk}&type=o",
+                alert_type=SEARCH_TYPES.OPINION,
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(opinion_cluster_indexing_time, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            opinion_4 = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person_2,
+                plain_text="",
+                cluster=self.opinion_cluster_3,
+                local_path="test/search/opinion_doc.doc",
+                per_curiam=False,
+                type="020lead",
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(opinion_cluster_indexing_time, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # Add OpinionsCited using bulk_create as in store_opinion_citations_and_update_parentheticals
+            cite = OpinionsCited(
+                citing_opinion_id=opinion_4.pk,
+                cited_opinion_id=self.opinion_6.pk,
+            )
+            OpinionsCited.objects.bulk_create([cite])
+
+        index_related_cites_fields.delay(
+            OpinionsCited.__name__, opinion_4.pk, []
+        )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        txt_content = mail.outbox[0].body
+
+        self.assertIn(opinion_cluster_alert.name, html_content)
+        self.assertIn(opinion_cluster_alert.name, txt_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            opinion_cluster_alert.name,
+            1,
+            opinion_4.cluster.case_name,
+            1,
+        )
 
     def test_opinion_alerts_highlighting(self, mock_prefix) -> None:
         """Confirm Opinion Search alerts are properly highlighted."""

@@ -56,6 +56,7 @@ from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.lib.db_tools import log_db_connection_info
 from cl.lib.elasticsearch_utils import build_daterange_query
+from cl.lib.indexing_utils import compose_app_label
 from cl.lib.microservice_utils import microservice
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
@@ -1349,19 +1350,20 @@ def build_bulk_cites_doc(
     es_child_doc_class: ESDocumentClassType,
     child_id: int,
     child_doc_model: ESModelClassType,
-) -> ESDictDocument:
+) -> tuple[ESDictDocument, ESModelType | None]:
     """Builds a bulk document for updating cites field in an ES document.
 
     :param es_child_doc_class: The ES child document class to update.
     :param child_id: The child document ID to update.
     :param child_doc_model: The child document to update model class.
-    :return: A dictionary representing the ES update operation if the document
-    exists, otherwise, it returns an empty dictionary.
+    :return: A two-tuple: a dictionary representing the ES update operation if
+    the document exists; otherwise an empty dictionary and the related
+    document’s instance if available.
     """
 
     child_instance = get_instance_from_db(child_id, child_doc_model)
     if not child_instance:
-        return {}
+        return {}, None
 
     match child_doc_model.__name__:
         case "RECAPDocument":
@@ -1371,7 +1373,7 @@ def build_bulk_cites_doc(
             parent_document_id = child_instance.cluster.pk
             child_id_property = "OPINION"
         case _:
-            return {}
+            return {}, None
 
     cites_prepared = es_child_doc_class().prepare_cites(child_instance)
     doc_id = getattr(ES_CHILD_ID(child_id), child_id_property)
@@ -1390,7 +1392,7 @@ def build_bulk_cites_doc(
         "_routing": parent_document_id,
         "doc": {"cites": cites_prepared},
     }
-    return doc_to_update
+    return doc_to_update, child_instance
 
 
 def check_bulk_indexing_exception(
@@ -1443,6 +1445,8 @@ def index_related_cites_fields(
     documents_to_update = []
     cites_doc_to_update = {}
     base_doc = {}
+    citing_doc = None
+    es_child_doc_class = None
     match model_name:
         case OpinionsCited.__name__:
             # Query all clusters to update and retrieve only their sub_opinions
@@ -1504,7 +1508,7 @@ def index_related_cites_fields(
             # Finally build the Opinion dict for updating the cites.
             child_doc_model = Opinion
             es_child_doc_class = OpinionDocument
-            cites_doc_to_update = build_bulk_cites_doc(
+            cites_doc_to_update, citing_doc = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
 
@@ -1517,7 +1521,7 @@ def index_related_cites_fields(
 
             child_doc_model = RECAPDocument
             es_child_doc_class = ESRECAPDocument
-            cites_doc_to_update = build_bulk_cites_doc(
+            cites_doc_to_update, citing_doc = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
 
@@ -1552,6 +1556,21 @@ def index_related_cites_fields(
         # Set auto-refresh, used for testing.
         OpinionClusterDocument._index.refresh()
         DocketDocument._index.refresh()
+
+    if citing_doc and es_child_doc_class:
+        # Percolate the related RECAPDocument to match queries that involve the
+        # cites field.
+        doc = es_child_doc_class().prepare(citing_doc)
+        chain(
+            send_or_schedule_search_alerts.s(
+                SaveESDocumentReturn(
+                    document_id=str(child_id),
+                    document_content=doc,
+                    app_label=compose_app_label(citing_doc),
+                )
+            ),
+            percolator_response_processing.s(),
+        ).apply_async()
 
 
 @app.task(
