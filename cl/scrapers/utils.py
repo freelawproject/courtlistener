@@ -572,14 +572,16 @@ def check_duplicate_ingestion(local_path_name: str) -> None:
     date and extension combination
     'pdf/2025/06/05/state_v._walsh_1.pdf'
 
+    Need to consider an acceptable repetition threshold, since we may get the
+    same file path for:
+    - a cluster of opinions, which are actually different documents for the
+        same date and case
+    - a common case name in the same date, for example, "State v. Doe"
+    - opinion versions
+
     :param local_path_name: filepath of the file in S3
     :return None
     """
-    # we may get the same file path for:
-    # - a cluster of opinions, which are actually different documents for the
-    #     same date and case
-    # - a common case name in the same date, for example, "State v. Doe"
-    # - opinion versions
     # Trigger error log for repetitions beyond this count
     SUSPECT_DUPLICATES_THRESHOLD = 4
 
