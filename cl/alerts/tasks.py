@@ -751,8 +751,16 @@ def send_or_schedule_search_alerts(
             self.request.retries
             >= settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES
         ):
-            raise exc
-        raise self.retry(exc=exc, countdown=0.5)
+            logger.warning(
+                "RECAPDocument %s missing during alert trigger.", document_id
+            )
+            self.request.chain = None
+            return None
+        raise self.retry(
+            exc=exc,
+            countdown=0.5,
+            max_retries=settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES,
+        )
 
     if documents_to_percolate:
         # If documents_to_percolate is returned by prepare_percolator_content,
