@@ -552,10 +552,17 @@ def update_es_document(
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
     if (
-        main_app_label in ["search.RECAPDocument", "search.Docket"]
-        and not related_instance_app_label == "search.DocketEntry"
-        or related_instance_app_label in ["search.BankruptcyInformation"]
-    ) and not skip_percolator_request:
+        (
+            related_instance_app_label == "search.BankruptcyInformation"
+            or (
+                main_app_label in ("search.RECAPDocument", "search.Docket")
+                and related_instance_app_label != "search.DocketEntry"
+                and "plain_text"
+                not in fields_to_update  # Percolation upon plain_text extraction will be delayed until citation matching completes.
+            )
+        )
+        and not skip_percolator_request
+    ):
         doc = es_doc.prepare(main_model_instance)
         return SaveESDocumentReturn(
             document_id=str(main_instance_id),
@@ -1390,6 +1397,29 @@ def build_bulk_cites_doc(
     return doc_to_update, child_instance
 
 
+def percolate_document(
+    es_doc_class: ESDocumentClassType, document_id: int, instance: ESModelType
+) -> None:
+    """Percolate a document by preparing it and sending it for alert matching.
+
+    :param es_doc_class: The ES document class used to prepare the document.
+    :param document_id: The ID of the document in DB.
+    :param instance: The model instance to be prepared and percolated.
+    :return: None
+    """
+    doc = es_doc_class().prepare(instance)
+    chain(
+        send_or_schedule_search_alerts.s(
+            SaveESDocumentReturn(
+                document_id=str(document_id),
+                document_content=doc,
+                app_label=f"{instance._meta.app_label}.{instance.__class__.__name__}",
+            )
+        ),
+        percolator_response_processing.s(),
+    ).apply_async()
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -1526,17 +1556,7 @@ def index_related_cites_fields(
     ):
         # Percolate the related RECAPDocument to match queries that involve the
         # cites field.
-        doc = es_child_doc_class().prepare(recap_document)
-        chain(
-            send_or_schedule_search_alerts.s(
-                SaveESDocumentReturn(
-                    document_id=str(child_id),
-                    document_content=doc,
-                    app_label="search.RECAPDocument",
-                )
-            ),
-            percolator_response_processing.s(),
-        ).apply_async()
+        percolate_document(es_child_doc_class, child_id, recap_document)
 
 
 @app.task(
