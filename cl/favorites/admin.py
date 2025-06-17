@@ -21,6 +21,12 @@ class NoteInline(admin.TabularInline):
     )
 
 
+class PrayerInline(admin.TabularInline):
+    model = Prayer
+    readonly_fields = ("date_created", "recap_document", "status")
+    extra = 0
+
+
 @admin.register(Note)
 class NoteAdmin(admin.ModelAdmin):
     list_display = (

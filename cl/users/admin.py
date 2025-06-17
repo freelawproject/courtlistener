@@ -11,7 +11,7 @@ from cl.donate.admin import (
     MonthlyDonationInline,
     NeonMembershipInline,
 )
-from cl.favorites.admin import NoteInline, UserTagInline
+from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
 from cl.lib.admin import AdminTweaksMixin, build_admin_url
 from cl.users.models import (
     BarMembership,
@@ -56,6 +56,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         UserProfileInline,
         DonationInline,
         MonthlyDonationInline,
+        PrayerInline,
         AlertInline,
         DocketAlertInline,
         NoteInline,
