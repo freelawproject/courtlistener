@@ -2,6 +2,7 @@ import importlib.machinery
 import sys
 import types
 from pathlib import Path
+from cl.tests.cases import TestCase
 
 import django
 from django.conf import settings
@@ -56,7 +57,7 @@ loader.exec_module(pagination)
 LargePagePagination = pagination.LargePagePagination
 
 
-class LargePagePaginationTest(SimpleTestCase):
+class LargePagePaginationTest(TestCase):
     def setUp(self):
         self.paginator = LargePagePagination()
 
