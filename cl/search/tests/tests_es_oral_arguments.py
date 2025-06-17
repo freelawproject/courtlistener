@@ -2362,6 +2362,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 1
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2382,6 +2383,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 2
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2401,6 +2403,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_1.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 1
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2422,6 +2425,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_5.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 1
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2444,6 +2448,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_1.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 2
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2465,6 +2470,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 3
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2486,6 +2492,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_4.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 2
         self.assertEqual(len(responses.main_response), expected_queries)
