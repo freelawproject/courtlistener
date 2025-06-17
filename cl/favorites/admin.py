@@ -23,8 +23,8 @@ class NoteInline(admin.TabularInline):
 
 class PrayerInline(admin.TabularInline):
     model = Prayer
-    readonly_fields = ("date_created", "recap_document", "status")
-    extra = 0
+    raw_id_fields = ("recap_document",)
+    extra = 1
 
 
 @admin.register(Note)
