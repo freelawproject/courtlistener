@@ -89,7 +89,9 @@
         only
       />
       <c-corpus-search.input :request="request" only/>
-      <c-corpus-search.button class="rounded-l-none rounded-r-xl" only/>
+      <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
+        {% svg "magnifier" class="text-white" %}
+      </c-corpus-search.button>
     </c-corpus-search>
   {% endif %}
 
@@ -109,9 +111,12 @@
           />
           <button
             type="button"
-            class="btn w-full text-primary-600 text-sm font-medium my-2 hover:bg-greyscale-100 flex justify-center"
+            class="btn w-full text-primary-600 text-sm font-medium py-2 hover:bg-greyscale-100 flex justify-center"
           >Advanced Search</button>
-          <c-corpus-search.button class="w-full flex items-center justify-center">Search</c-corpus-search.button>
+          <c-corpus-search.button class="w-full max-md:btn-xl flex items-center justify-center">
+            {% svg "magnifier" class="text-white w-5 h-5 mr-1.5" %}
+            Search
+          </c-corpus-search.button>
         </c-corpus-search.mobile>
       </c-corpus-search>
     {% endif %}
