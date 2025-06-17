@@ -26,7 +26,7 @@
 }
 #transcript-container {
   width: 100%; /* Ensure it fills parent column */
-  margin-top: 20px;
+  margin-top: 32px;
 }
 
 #transcript-container h3 {
