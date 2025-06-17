@@ -557,8 +557,10 @@ def update_es_document(
             or (
                 main_app_label in ("search.RECAPDocument", "search.Docket")
                 and related_instance_app_label != "search.DocketEntry"
-                and "plain_text"
-                not in fields_to_update  # Percolation upon plain_text extraction will be delayed until citation matching completes.
+                and not {"plain_text", "filepath_local"}
+                & set(
+                    fields_to_update
+                )  # Percolation upon plain_text extraction will be delayed until citation matching completes.
             )
         )
         and not skip_percolator_request
