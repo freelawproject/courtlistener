@@ -1,0 +1,16 @@
+{% load svg_tags %}
+
+<c-vars rounded></c-vars>
+
+<div
+  class="[&:has(input:focus)]:ring-2 bg-greyscale-100 flex flex-row gap-2 items-center pl-4 pr-2 flex-grow h-[--corpus-search-height] border-t border-b border-greyscale-200{% if rounded %} rounded-lg border-l border-r{% endif %}"
+>
+  {% svg "magnifier" class="text-greyscale-400 flex-grow-0 h-5 w-5" %}
+  <div class="bg-greyscale-200 flex-grow">
+    <label for="header-search-bar" class="sr-only" type="text">Search <span x-text="selectedScope"></span></label>
+    <input id="header-search-bar" type="search" class="w-full bg-greyscale-100 placeholder:text-sm placeholder:text-greyscale-500 focus-visible:ring-0 focus-visible:outline-none bg-none placeholder:text-ellipsis" placeholder="Enter keyword(s)">
+  </div>
+  <button type="button" class="p-2 rounded-[10px] border border-greyscale-200 bg-white">
+    {% svg "brackets" class="text-greyscale-500" %}
+  </button>
+</div>
