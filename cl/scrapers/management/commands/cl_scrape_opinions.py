@@ -28,6 +28,7 @@ from cl.scrapers.exceptions import (
 )
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
+    check_duplicate_ingestion,
     get_binary_content,
     get_child_court,
     get_extension,
@@ -141,6 +142,7 @@ def make_objects(
     file_name = trunc(item["case_names"].lower(), 75) + extension
     opinion.file_with_date = cluster.date_filed
     opinion.local_path.save(file_name, cf, save=False)
+    check_duplicate_ingestion(opinion.local_path.name)
 
     return docket, opinion, cluster, citations
 

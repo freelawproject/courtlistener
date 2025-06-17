@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import date, datetime
 from urllib.parse import urljoin
 
@@ -555,3 +556,44 @@ def save_response(site: AbstractSite) -> None:
 
     content_name = f"{base_name}.{extension}"
     storage.save(content_name, ContentFile(content))
+
+
+def check_duplicate_ingestion(local_path_name: str) -> None:
+    """
+    Send an error log to Sentry if a filename has a high repetition count
+
+    S3 filenames / filepaths for opinions and oral arguments are created using
+    created via `cl.lib.storage.get_name_by_incrementing`. The name is composed
+    of the document's filed date or argued date, the case name and the file
+    extension. `get_name_by_incrementing` adds a counter if the name already
+    existed
+
+    For example, this file name means there are 2 documents for that case name,
+    date and extension combination
+    'pdf/2025/06/05/state_v._walsh_1.pdf'
+
+    Need to consider an acceptable repetition threshold, since we may get the
+    same file path for:
+    - a cluster of opinions, which are actually different documents for the
+        same date and case
+    - a common case name in the same date, for example, "State v. Doe"
+    - opinion versions
+
+    :param local_path_name: filepath of the file in S3
+    :return None
+    """
+    # Trigger error log for repetitions beyond this count
+    SUSPECT_DUPLICATES_THRESHOLD = 4
+
+    match = re.search(r"_(?P<repeated_count>\d+)\.\w+$", local_path_name or "")
+    if not match:
+        return
+
+    repeated_count = int(match.group("repeated_count"))
+    if repeated_count > SUSPECT_DUPLICATES_THRESHOLD:
+        base_file_name = f"{local_path_name[: match.start()]}.{local_path_name.split('.')[-1]}"
+        logger.error(
+            "Probable ongoing duplicate ingestion: %s files with name '%s'",
+            repeated_count,
+            base_file_name,
+        )
