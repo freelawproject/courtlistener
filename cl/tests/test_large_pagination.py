@@ -2,10 +2,11 @@ import importlib.machinery
 import sys
 import types
 from pathlib import Path
-from cl.tests.cases import TestCase
 
 import django
 from django.conf import settings
+
+from cl.tests.cases import TestCase
 
 # Minimal Django configuration
 if not settings.configured:
@@ -24,7 +25,6 @@ if not settings.configured:
     )
     django.setup()
 
-from django.test import SimpleTestCase
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
