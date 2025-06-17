@@ -20,6 +20,7 @@
         {'href': '#nav-layout', 'text': 'Layout with navigation'},
         {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
         {'href': '#data-table', 'text': 'Data table'},
+        {'href': '#dialog', 'text': 'Dialog'},
       ]},
       {'href': '#misc', 'text': 'Other components', 'children': [
         {'href': '#support-banner', 'text': 'Support plea banner'},
@@ -622,6 +623,58 @@ Sample code here.
       </c-code>
     </c-expansion-panel>
   </section>
+
+  {# DIALOG #}
+  <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="dialog">
+    <h2 class="mt-6 mb-3">Dialog</h2>
+    <p>Renders a button that opens a dialog with an overlay. This component uses named slots.</p>
+    <h4 class="mt-3">Demo</h4>
+    <c-dialog panel_class="p-5 banner max-w-70" dialog_class="items-center z-20">
+      <c-slot name="button_content">Click me!</c-slot>
+      <c-slot name="panel">
+        Place any content you want here.
+        <div class="flex flex-row justify-end gap-2">
+          <button x-on:click="close" type="button" class="btn-outline" aria-label="Close modal">Close</button>
+        </div>
+      </c-slot>
+    </c-dialog>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>dialog_class</code></c-slot>
+        <c-slot name="description">CSS classes added to the container for the overlay and the panel.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>panel_class</code></c-slot>
+        <c-slot name="description">CSS classes added to the panel itself.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label"><code>button_content</code></c-slot>
+        <c-slot name="description">Content added inside the trigger button slot.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>panel</code></c-slot>
+        <c-slot name="description">Content displayed in the dialog panel when opened.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-dialog panel_class="p-5 banner max-w-70" dialog_class="items-center z-20"&gt;
+  &lt;c-slot name="button_content"&gt;Click me!&lt;/c-slot&gt;
+  &lt;c-slot name="panel"&gt;
+    Place any content you want here.
+    &lt;div class="flex flex-row justify-end gap-2"&gt;
+      &lt;button x-on:click="close" type="button" class="btn-outline" aria-label="Close modal"&gt;Close&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/c-slot&gt;
+&lt;/c-dialog&gt;
+      </c-code>
+    </c-expansion-panel>
+  </c-layout-with-navigation.section>
 
   {# SUPPORT PLEA BANNER #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="support-banner">
