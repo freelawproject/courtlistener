@@ -58,11 +58,11 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         MonthlyDonationInline,
         AlertInline,
         DocketAlertInline,
-        WebhookInline,
         NoteInline,
         UserTagInline,
-        TokenInline,
         NeonMembershipInline,
+        TokenInline,
+        WebhookInline,
     )
     list_display = (
         "username",
