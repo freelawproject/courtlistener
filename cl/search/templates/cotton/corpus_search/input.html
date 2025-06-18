@@ -18,7 +18,8 @@
   >
     {#  trigger button  #}
     <c-slot name="button_content">
-      {% svg "brackets" class="text-greyscale-500" %}
+      <label class="sr-only">Open operators modal</label>
+      {% svg "brackets" class="text-greyscale-500" aria_hidden="true" %}
     </c-slot>
 
     {#  modal content  #}
