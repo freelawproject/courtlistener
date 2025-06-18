@@ -122,7 +122,7 @@ def create_percolator_search_query(
     s = Search(index=index_name)
     s = s.query(final_query)
     s = s.source(includes=["id"])
-    s = s.sort("date_created")
+    s = s.sort("id")
     s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
     if search_after:
         s = s.extra(search_after=search_after)

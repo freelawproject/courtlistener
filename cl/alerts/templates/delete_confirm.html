@@ -9,7 +9,7 @@
     <div class="col-sm-6">
         <h1 class="text-center">You are about to delete this alert</h1>
         <h2 class="v-offset-below-3 text-center">Are you sure you want to do this?</h2>
-        {% url "profile_alerts" as profile_alerts_url %}
+        {% url "profile_search_alerts" as profile_alerts_url %}
         <a class="btn btn-primary btn-lg"
           href={% if profile_alerts_url in request.META.HTTP_REFERER %}{{ profile_alerts_url }}{%else%}"/alert/edit/{{alert_id}}/"{% endif %}>
           <i class="fa fa-arrow-circle-left"></i>
