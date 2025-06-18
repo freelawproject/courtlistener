@@ -9,11 +9,13 @@
   {#  scope selector  #}
   <button
     type="button"
-    aria-controls="header-scope-menu"
+    x-bind:id="triggerButtonId"
+    x-on:click="openScopeMenu"
+    x-bind:aria-controls="menuId"
     aria-haspopup="menu"
-    x-on:click="toggleScopeMenu"
+    x-bind:aria-expanded="scopeMenuExpanded"
     class="h-[--corpus-search-height] btn-outline justify-between rounded-xl border-greyscale-200 {{ class }}"
-    aria-label="Select search scope"
+    aria-label="Open menu to select the scope of your search"
   >
     <span class="text-sm" x-text="selectedScope"></span>
     <span
@@ -26,15 +28,15 @@
 
   {#  scope menu  #}
   <menu
-    id="header-scope-menu"
+    x-bind:id="menuId"
     x-data="focus"
     x-show="scopeMenuExpanded"
-    x-trap="scopeMenuExpanded"
+    tabindex="-1"
     x-cloak
     x-on:click.outside="closeScopeMenu"
-    x-on:keyup.esc.window="closeScopeMenu"
-    x-on:keyup.right.window="focusNext"
-    x-on:keyup.left.window="focusPrevious"
+    x-on:keyup.esc.stop.prevent="closeScopeMenu"
+    x-on:keyup.right.window.prevent="focusNext"
+    x-on:keyup.left.window.prevent="focusPrevious"
     x-transition:enter="transition ease-out duration-300"
     x-transition:enter-start="opacity-0"
     x-transition:enter-end="opacity-100"
@@ -43,17 +45,25 @@
     x-transition:leave-end="opacity-0"
     class="z-10 absolute mt-2 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2 {{ menu_class }}"
     role="menu"
+    aria-label="Select the scope of your search"
   >
     <template x-for="scope in searchScopes">
       <li
         x-bind:key="scope.label"
-        x-on:click="selectScope"
-        x-bind:data-scope="scope.label"
         class="{{ item_class }} px-4 flex hover:bg-greyscale-50"
-        role="menuitem"
-        x-bind:id="scope.label"
+        role="none"
+        x-on:keydown.tab="closeScopeMenu"
       >
-        <button type="button" class="flex justify-between w-full">
+        <button
+          type="button"
+          class="flex justify-between w-full"
+          x-on:click="selectScope"
+          x-bind:data-scope="scope.label"
+          x-bind:id="scope.label"
+          x-on:keydown.shift.tab.stop.prevent="closeScopeMenuBack"
+          x-bind:aria-selected="isActiveScope"
+          role="menuitem"
+        >
           <span x-text="scope.label"></span>
           {% svg "check" x_show="isActiveScope" x_bind__data_scope="scope.label" class="text-primary-600" aria_hidden="true" %}
         </button>
