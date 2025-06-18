@@ -52,7 +52,6 @@ from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.lib.db_tools import log_db_connection_info
 from cl.lib.elasticsearch_utils import build_daterange_query
-from cl.lib.indexing_utils import compose_app_label
 from cl.lib.microservice_utils import microservice
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
@@ -552,13 +551,24 @@ def update_es_document(
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
+    fields_to_omit_percolation = {
+        "plain_text",
+        "filepath_local",
+        "local_path",
+        "html_columbia",
+        "html_lawbox",
+        "xml_harvard",
+        "html_anon_2020",
+        "html",
+    }
     if (
         (
             related_instance_app_label == "search.BankruptcyInformation"
             or (
-                main_app_label in ("search.RECAPDocument", "search.Docket")
+                main_app_label
+                in ("search.RECAPDocument", "search.Docket", "search.Opinion")
                 and related_instance_app_label != "search.DocketEntry"
-                and not {"plain_text", "filepath_local"}
+                and not fields_to_omit_percolation
                 & set(
                     fields_to_update
                 )  # Percolation upon plain_text extraction will be delayed until citation matching completes.

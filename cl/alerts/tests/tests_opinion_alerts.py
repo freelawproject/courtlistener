@@ -7,6 +7,7 @@ from django.core import mail
 from django.core.management import call_command
 from django.test import override_settings
 from django.utils.timezone import now
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
@@ -31,6 +32,7 @@ from cl.users.factories import UserProfileWithParentsFactory
     return_value="alert_hits_percolator_opinions",
 )
 @override_settings(NO_MATCH_HL_SIZE=100)
+@override_switch("opinions-percolator-alerts", active=True)
 class OpinionAlertsPercolatorTest(
     CourtTestCase,
     PeopleTestCase,
@@ -112,7 +114,7 @@ class OpinionAlertsPercolatorTest(
 
         self.percolator_call_count = 0
 
-    def test_opinions_cross_object_percolator_queries(
+    def test_opinions_percolator_queries(
         self, mock_prefix
     ) -> None:
         """Test if a variety of Opinions and OpinionClusters can trigger
@@ -390,7 +392,10 @@ class OpinionAlertsPercolatorTest(
                 "Curabitur id lorem vel orci aliquam commodo"
             )
             opinion_3.save()
-
+            # Percolation of plain_text is delayed until index_related_cites_fields runs.
+            index_related_cites_fields.delay(
+                OpinionsCited.__name__, opinion_3.pk, []
+            )
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(

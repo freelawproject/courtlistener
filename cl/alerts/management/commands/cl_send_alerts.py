@@ -218,6 +218,11 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super().handle(*args, **options)
         self.options = options
+
+        if switch_is_active("opinions-percolator-alerts"):
+            logger.info("cl_send_alerts is disabled.")
+            return
+
         if options["rate"] == Alert.REAL_TIME:
             self.remove_stale_rt_items()
             self.valid_ids = self.get_new_ids()

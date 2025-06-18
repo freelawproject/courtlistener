@@ -1,7 +1,7 @@
 from cl.alerts.models import Alert
 from cl.alerts.tasks import es_save_alert_document
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.documents import AudioPercolator, RECAPPercolator
+from cl.search.documents import AudioPercolator, RECAPPercolator, OpinionPercolator
 from cl.search.models import SEARCH_TYPES
 
 
@@ -47,15 +47,18 @@ class Command(VerboseCommand):
             .order_by("pk")
         )
 
-        if alert_type == SEARCH_TYPES.ORAL_ARGUMENT:
-            es_document = AudioPercolator
-        elif alert_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-            es_document = RECAPPercolator
-        else:
-            logger.info(
-                f"'{alert_type}' Alert type indexing is not supported yet."
-            )
-            return
+        match alert_type:
+            case SEARCH_TYPES.ORAL_ARGUMENT:
+                es_document = AudioPercolator
+            case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+                es_document = RECAPPercolator
+            case SEARCH_TYPES.OPINION:
+                es_document = OpinionPercolator
+            case _:
+                logger.info(
+                    f"'{alert_type}' Alert type indexing is not supported yet."
+                )
+                return
 
         indexing_counter = 0
         # Indexing the Alert objects

@@ -25,6 +25,7 @@ from cl.alerts.models import (
 from cl.alerts.utils import (
     has_document_alert_hit_been_triggered,
     percolate_es_document,
+    prepare_percolator_content,
     set_skip_percolation_if_bankruptcy_data,
     set_skip_percolation_if_parties_data,
 )
