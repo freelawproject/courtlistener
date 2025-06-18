@@ -56,7 +56,7 @@ def delete_alert(request, pk):
     if request.POST.get("redirect_to_search_page", None):
         return HttpResponseRedirect(f"{reverse('show_results')}?{alert.query}")
     else:
-        return HttpResponseRedirect(reverse("profile_alerts"))
+        return HttpResponseRedirect(reverse("profile_search_alerts"))
 
 
 @login_required

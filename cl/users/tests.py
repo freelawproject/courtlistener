@@ -27,7 +27,7 @@ from django_ses import signals
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.alerts.factories import DocketAlertFactory
+from cl.alerts.factories import AlertFactory, DocketAlertFactory
 from cl.alerts.models import DocketAlert, DocketAlertEvent
 from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import (
@@ -558,6 +558,83 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(user_tag_events_first.name, "tag_1_user_2")
         docket_tag_events_first = await docket_tag_events.afirst()
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
+
+    async def test_redirect_to_search_alerts_if_no_alerts(self):
+        """Tests redirection to search alerts when a user has no alerts"""
+        # Create a user profile with no associated alerts
+        user_with_no_alert = await sync_to_async(
+            UserProfileWithParentsFactory
+        )()
+        # Log in the created user
+        await self.async_client.alogin(
+            username=user_with_no_alert.user.username, password="password"
+        )
+        # Load the 'profile_alerts' URL and follow redirects
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert that the request was redirected to 'profile_search_alerts'.
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_search_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+    async def test_redirect_to_docket_alerts_if_no_search_alerts(self):
+        """Tests redirection to docket alerts page when a user has no search alerts."""
+        # Create a user profile
+        user_with_docket_alert = await sync_to_async(
+            UserProfileWithParentsFactory
+        )()
+        # Create a docket and a docket alert associated with the user
+        docket = await sync_to_async(DocketFactory)()
+        await sync_to_async(DocketAlertFactory)(
+            docket=docket, user=user_with_docket_alert.user
+        )
+        # Log in the created user
+        await self.async_client.alogin(
+            username=user_with_docket_alert.user, password="password"
+        )
+        # Load the 'profile_alerts' URL and follow redirects
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert that the request was redirected to 'profile_docket_alerts'
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_docket_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+    async def test_redirect_to_search_alerts_if_has_search_alerts(self):
+        """Tests redirection to search alerts page when a user has search alerts, regardless of docket alerts."""
+        # Create a user profile
+        user_with_search_alert = await sync_to_async(
+            UserProfileWithParentsFactory
+        )()
+        await self.async_client.alogin(
+            username=user_with_search_alert.user.username, password="password"
+        )
+        # Create a search alert for the user.
+        await sync_to_async(AlertFactory)(user=user_with_search_alert.user)
+        # Loads the 'profile_alerts' page and follow redirects.
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert redirection to the 'profile_search_alerts' page.
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_search_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+        # Create a docket and a docket alert for the same user.
+        docket = await sync_to_async(DocketFactory)()
+        await sync_to_async(DocketAlertFactory)(
+            docket=docket, user=user_with_search_alert.user
+        )
+        # Loads the 'profile_alerts' page and follow redirects.
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert that it still redirects to 'profile_search_alerts' because a
+        # search alert exists
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_search_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
