@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import csv
 import io
 import json
@@ -32,12 +33,7 @@ from elasticsearch.exceptions import (
     NotFoundError,
     RequestError,
 )
-from elasticsearch.helpers import (
-    BulkIndexError,
-    bulk,
-    parallel_bulk,
-    streaming_bulk,
-)
+from elasticsearch.helpers import parallel_bulk, streaming_bulk
 from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
 from httpx import (
     HTTPStatusError,
@@ -61,12 +57,13 @@ from cl.lib.microservice_utils import microservice
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
+    index_documents_in_bulk,
 )
 from cl.lib.search_utils import (
     fetch_es_results_for_csv,
     get_headers_and_transformations_for_search_export,
 )
-from cl.lib.storage import S3IntelligentTieringStorage
+from cl.lib.storage import AWSMediaStorage, S3IntelligentTieringStorage
 from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
@@ -556,11 +553,19 @@ def update_es_document(
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
     if (
-        main_app_label
-        in ["search.RECAPDocument", "search.Docket", "search.Opinion"]
-        and not related_instance_app_label == "search.DocketEntry"
-        or related_instance_app_label in ["search.BankruptcyInformation"]
-    ) and not skip_percolator_request:
+        (
+            related_instance_app_label == "search.BankruptcyInformation"
+            or (
+                main_app_label in ("search.RECAPDocument", "search.Docket")
+                and related_instance_app_label != "search.DocketEntry"
+                and not {"plain_text", "filepath_local"}
+                & set(
+                    fields_to_update
+                )  # Percolation upon plain_text extraction will be delayed until citation matching completes.
+            )
+        )
+        and not skip_percolator_request
+    ):
         doc = es_doc.prepare(main_model_instance)
         return SaveESDocumentReturn(
             document_id=str(main_instance_id),
@@ -1395,21 +1400,27 @@ def build_bulk_cites_doc(
     return doc_to_update, child_instance
 
 
-def check_bulk_indexing_exception(
-    errors: list[dict[str, Any]], exception: str
-) -> bool:
-    """Check for a specific exception type in bulk indexing errors.
-    :param errors: A list of dictionaries representing errors from a bulk
-    indexing operation.
-    :param exception: The exception type string to check for in the error
-    details.
-    :return: True if the specified exception is found in any of the error
-    dictionaries; otherwise, returns False.
+def percolate_document(
+    es_doc_class: ESDocumentClassType, document_id: int, instance: ESModelType
+) -> None:
+    """Percolate a document by preparing it and sending it for alert matching.
+
+    :param es_doc_class: The ES document class used to prepare the document.
+    :param document_id: The ID of the document in DB.
+    :param instance: The model instance to be prepared and percolated.
+    :return: None
     """
-    for error in errors:
-        if error.get("update", {}).get("error", {}).get("type") == exception:
-            return True
-    return False
+    doc = es_doc_class().prepare(instance)
+    chain(
+        send_or_schedule_search_alerts.s(
+            SaveESDocumentReturn(
+                document_id=str(document_id),
+                document_content=doc,
+                app_label=f"{instance._meta.app_label}.{instance.__class__.__name__}",
+            )
+        ),
+        percolator_response_processing.s(),
+    ).apply_async()
 
 
 @app.task(
@@ -1532,25 +1543,7 @@ def index_related_cites_fields(
     if not documents_to_update:
         return
 
-    client = connections.get_connection(alias="no_retry_connection")
-    # Execute the bulk update
-    try:
-        bulk(client, documents_to_update)
-    except BulkIndexError as exc:
-        # Catch any BulkIndexError exceptions to handle specific error message.
-        # If the error is a version conflict, raise a ConflictError for retrying it.
-        if check_bulk_indexing_exception(
-            exc.errors, "version_conflict_engine_exception"
-        ):
-            raise ConflictError(
-                "ConflictError indexing cites.",
-                "",
-                {"id": child_id},
-            )
-        else:
-            # If the error is of any other type, raises the original
-            # BulkIndexError for debugging.
-            raise exc
+    index_documents_in_bulk(documents_to_update)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -1558,19 +1551,9 @@ def index_related_cites_fields(
         DocketDocument._index.refresh()
 
     if citing_doc and es_child_doc_class:
-        # Percolate the related RECAPDocument to match queries that involve the
+        # Percolate the related document to match queries that involve the
         # cites field.
-        doc = es_child_doc_class().prepare(citing_doc)
-        chain(
-            send_or_schedule_search_alerts.s(
-                SaveESDocumentReturn(
-                    document_id=str(child_id),
-                    document_content=doc,
-                    app_label=compose_app_label(citing_doc),
-                )
-            ),
-            percolator_response_processing.s(),
-        ).apply_async()
+        percolate_document(es_child_doc_class, child_id, citing_doc)
 
 
 @app.task(
@@ -1906,3 +1889,115 @@ def save_embeddings(
 
     # Delete the cache key after the saving process is complete.
     cache.delete(cache_key)
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
+def retrieve_embeddings(
+    self,
+    opinion_ids: list[int],
+    directory: str = "opinions",
+) -> list[dict] | None:
+    """Download opinion embeddings from S3 for the given opinion IDs.
+
+    :param self: The Celery task instance.
+    :param opinion_ids: A list of opinion IDs for which to retrieve embeddings.
+    :param directory: The directory where the embeddings are stored.
+    :return: A list of dictionaries containing the embeddings.
+    """
+
+    storage = AWSMediaStorage()
+
+    def download_embedding(opinion_id: int) -> dict | None:
+        file_path = str(
+            PurePosixPath(
+                "embeddings",
+                directory,
+                settings.NLP_EMBEDDING_MODEL,
+                f"{opinion_id}.json",
+            )
+        )
+        logger.info("Attempting to retrieve embedding from: %s", file_path)
+        try:
+            with storage.open(file_path, "rb") as f:
+                file_contents = f.read().decode("utf-8")
+            embedding_data = json.loads(file_contents)
+            return embedding_data
+        except FileNotFoundError:
+            logger.error(
+                "Embeddings for opinion ID:%s doesn't exist.", opinion_id
+            )
+            return None
+
+    embeddings: list[dict] = []
+    # Download embeddings concurrently.
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [
+            executor.submit(download_embedding, opinion_id)
+            for opinion_id in opinion_ids
+        ]
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result:
+                embeddings.append(result)
+    return embeddings
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError, ConflictError, ConnectionTimeout),
+    max_retries=5,
+    retry_backoff=1 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
+    ignore_result=True,
+)
+def index_embeddings(
+    self: Task,
+    embeddings: list[dict],
+) -> SaveESDocumentReturn | None:
+    """Update opinion documents in bulk with embeddings.
+
+    :param self: The Celery task instance.
+    :param embeddings: A list of dictionaries, each containing the opinion ID
+    and its corresponding embeddings to update.
+    :return: None if there are no documents to update.
+    """
+
+    base_doc = {
+        "_op_type": "update",
+        "_index": OpinionClusterDocument._index._name,
+    }
+    documents_to_update = []
+    for embeddings in embeddings:
+        opinion_id = embeddings["id"]
+        opinion_instance = (
+            Opinion.objects.filter(id=opinion_id).only("pk", "cluster").first()
+        )
+        if not opinion_instance:
+            # The opinion has been removed from the DB
+            continue
+
+        doc_to_update = {
+            "_id": ES_CHILD_ID(opinion_id).OPINION,
+            "_routing": opinion_instance.cluster_id,
+            "doc": {"embeddings": embeddings["embeddings"]},
+        }
+        doc_to_update.update(base_doc)
+        documents_to_update.append(doc_to_update)
+
+    if not documents_to_update:
+        return
+
+    index_documents_in_bulk(documents_to_update)
+
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        OpinionClusterDocument._index.refresh()

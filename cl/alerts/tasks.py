@@ -15,6 +15,7 @@ from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
+from waffle import switch_is_active
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
@@ -225,6 +226,7 @@ def make_alert_messages(
         "docket": d,
         "docket_alert_secret_key": None,
         "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
+        "recap_alerts_banner": switch_is_active("recap-alerts-email-banner"),
     }
     messages = []
     for recipient in da_recipients:
@@ -498,6 +500,9 @@ def send_search_alert_emails(
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
             "scheduled_alert": scheduled_alert,
+            "recap_alerts_banner": switch_is_active(
+                "recap-alerts-email-banner"
+            ),
         }
         headers = {}
         query_string = ""
@@ -770,8 +775,16 @@ def send_or_schedule_search_alerts(
             self.request.retries
             >= settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES
         ):
-            raise exc
-        raise self.retry(exc=exc, countdown=0.5)
+            logger.warning(
+                "RECAPDocument %s missing during alert trigger.", document_id
+            )
+            self.request.chain = None
+            return None
+        raise self.retry(
+            exc=exc,
+            countdown=0.5,
+            max_retries=settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES,
+        )
 
     if documents_to_percolate:
         # If documents_to_percolate is returned by prepare_percolator_content,

@@ -1,0 +1,284 @@
+{% load static svg_tags component_tags %}
+{% require_script "js/alpine/components/header.js" %}
+{% require_script "js/alpine/composables/focus.js" %}
+{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+
+<c-vars variant request class=""></c-vars>
+
+<header
+  x-data="header"
+  class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:h-[102px] max-md:h-18 {% endif %}flex justify-between items-center gap-4 px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
+>
+  <a href="#main" class="skip-link">Skip to main content</a>
+  <a href="#footer" class="skip-link">Skip to footer</a>
+
+  {# HOMEPAGE VARIANT #}
+  {% if variant == "homepage" %}
+      <div class="relative">
+        <button
+          type="button"
+          x-on:click="toggleSupportMenu"
+          class="btn-primary z-10"
+          aria-controls="header-support-menu"
+          aria-haspopup="menu"
+          x-bind:aria-expanded="supportMenuExpanded"
+          aria-label="Toggle menu to support Free Law Project"
+        >
+          Support&nbsp;FLP
+          <span
+            x-bind:class="supportCaretClass"
+            class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+            aria-hidden="true"
+          >{% svg 'chevron' class="w-full h-full text-white" %}
+          </span>
+        </button>
+
+        {#  support menu  #}
+        <menu
+          id="header-support-menu"
+          x-data="focus"
+          x-show="supportMenuExpanded"
+          x-cloak
+          x-on:click.outside="closeSupportMenu"
+          x-on:keyup.esc="closeProfileMenu"
+          x-on:keyup.right="focusNext"
+          x-on:keyup.left="focusPrevious"
+          x-transition:enter="transition ease-out duration-300"
+          x-transition:enter-start="opacity-0"
+          x-transition:enter-end="opacity-100"
+          x-transition:leave="transition ease-in duration-100"
+          x-transition:leave-start="opacity-100"
+          x-transition:leave-end="opacity-0"
+          class="z-20 absolute left-0 top-14 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+          role="menu"
+        >
+          <li
+            class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
+          >
+            <a href="https://donate.free.law/forms/supportflp" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
+              {% svg "money_hand" class="text-greyscale-500" aria_hidden="true" %}
+              Make a Donation
+            </a>
+          </li>
+          <li
+            class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
+          >
+            <a href="https://donate.free.law/forms/membership" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
+              {% svg "group" class="text-greyscale-500" aria_hidden="true" %}
+              Become a Member
+            </a>
+          </li>
+        </menu>
+      </div>
+
+  {# DEFAULT VARIANT #}
+  {% else %}
+    {# COURTLISTENER LOGO #}
+    <div class="w-[226px] lg:min-w-[226px] flex justify-start" aria-label="Go to homepage">
+      <div class="md:h-21 md:w-45 h-12 w-[106px]">
+        {% svg "logos/courtlistener" class="md:h-21 h-12" %}
+      </div>
+    </div>
+
+    {# DESKTOP SEARCH BAR #}
+    <c-corpus-search class="w-full h-12 hidden md:flex" only>
+      <c-corpus-search.scope
+        class="!rounded-r-none text-greyscale-600"
+        menu_class="left-0 top-14 w-55 text-md font-cooper text-greyscale-800"
+        item_class="py-1.5"
+        only
+      />
+      <c-corpus-search.input only/>
+      <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
+        {% svg "magnifier" class="text-white" %}
+      </c-corpus-search.button>
+    </c-corpus-search>
+  {% endif %}
+
+  {# RIGHT-SIDE BUTTON(S) #}
+  <div class="lg:w-[--profile-menu-width] flex justify-end items-center relative">
+    {# MOBILE SEARCH TRIGGER + DIALOG #}
+    {% if variant != "homepage" %}
+      <c-corpus-search only>
+        <c-corpus-search.mobile :request="request" only>
+          <c-corpus-search.input rounded only/>
+          <c-corpus-search.scope
+            class="w-full text-greyscale-500"
+            menu_class="w-full text-sm text-greyscale-600"
+            item_class="py-[10px]"
+            :request="request"
+            only
+          />
+          <button
+            type="button"
+            class="btn w-full text-primary-600 text-sm font-medium py-2 hover:bg-greyscale-100 flex justify-center"
+          >Advanced Search</button>
+          <c-corpus-search.button class="w-full max-md:btn-xl flex items-center justify-center">
+            {% svg "magnifier" class="text-white w-5 h-5 mr-1.5" %}
+            Search
+          </c-corpus-search.button>
+        </c-corpus-search.mobile>
+      </c-corpus-search>
+    {% endif %}
+
+    {% if request.user.is_authenticated %}
+      <div>
+        {#   Signed-in button   #}
+        <button
+          x-on:click="toggleProfileMenu"
+          class="bg-white btn-outline text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
+          type="button"
+          aria-haspopup="menu"
+          aria-controls="header-profile-menu"
+          x-bind:aria-expanded="profileMenuExpanded"
+        >
+          {% svg "avatar" class="border-greyscale-300 border rounded-full" %}
+          Profile
+          <span
+            x-bind:class="profileCaretClass"
+            class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+            aria-hidden="true"
+          >{% svg "chevron" class="w-full h-full text-greyscale-400" %}
+          </span>
+        </button>
+
+        {#   Signed-in menu   #}
+        <nav>
+          <ul
+            id="header-profile-menu"
+            x-data="focus"
+            x-show="profileMenuExpanded"
+            x-cloak
+            x-on:click.outside="closeProfileMenu"
+            x-on:keyup.esc="closeProfileMenu"
+            x-on:keyup.right="focusNext"
+            x-on:keyup.left="focusPrevious"
+            class="absolute right-0 z-10 mt-2 w-[--profile-menu-width] rounded-lg bg-white py-2 shadow-lg border border-greyscale-200 focus-visible:outline-hidden list-none pl-0"
+            tabindex="-1"
+            role="menu"
+            aria-label="Account navigation"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-100"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+          >
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <a
+                href="{% url "profile_alerts" %}"
+                role="menuitem"
+                aria-label="Go to Alerts page"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+              >
+                {% svg "bell" aria_hidden="true" class="text-greyscale-400" %}
+                Alerts
+              </a>
+            </li>
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <a
+                href="{% url "profile_notes" %}"
+                role="menuitem"
+                aria-label="Go to Notes page"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+              >
+                {% svg "bookmark" aria_hidden="true" class="text-greyscale-400" %}
+                Notes
+              </a>
+            </li>
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <a
+                href="{% url "tag_list" username=request.user.username %}"
+                role="menuitem"
+                aria-label="Go to Tags page"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+              >
+                {% svg "tag" aria_hidden="true" class="text-greyscale-400" %}
+                Tags
+              </a>
+            </li>
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <a
+                href="{% url "view_visualizations" %}"
+                role="menuitem"
+                aria-label="Go to Visualizations page"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+              >
+                {% svg "graph_up" aria_hidden="true" class="text-greyscale-400" %}
+                Visualizations
+              </a>
+            </li>
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <a
+                href="{% url "view_api" %}"
+                role="menuitem"
+                aria-label="Go to Developer Tools page"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+              >
+                {% svg "code" aria_hidden="true" class="text-greyscale-400" %}
+                Developer Tools
+              </a>
+            </li>
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <a
+                href="{% url 'user_prayers' request.user.username %}"
+                role="menuitem"
+                aria-label="Go to Prayers page"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+              >
+                {% svg "donate" aria_hidden="true" class="text-greyscale-400" %}
+                Prayers
+              </a>
+            </li>
+            <div aria-hidden="true" class="h-1 bg-greyscale-100 my-1 w-full"></div>
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <a
+                href="{% url "profile_your_support" %}"
+                role="menuitem"
+                aria-label="Go to Your Support page"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+              >
+                {% svg "donate" aria_hidden="true" class="text-greyscale-400" %}
+                Your Support
+              </a>
+            </li>
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <a
+                href="{% url "view_settings" %}"
+                role="menuitem"
+                aria-label="Go to Account page"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+              >
+                {% svg "avatar_outline" aria_hidden="true" class="text-greyscale-400" %}
+                Account
+              </a>
+            </li>
+            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
+              <form id="logout-form" method="post" action="/sign-out/">
+                {% csrf_token %}
+                <button type="submit" class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2 w-full">
+                  {% svg "sign_out" aria_hidden="true" class="text-greyscale-400" %}
+                  Sign out
+                </button>
+              </form>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    {% else %}
+
+      {#   Signed-out button   #}
+      <div class="flex flex-row flex-nowrap items-center">
+        {% if request.path != "/sign-out/" %}
+          <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" class="btn-ghost md:h-9">Login</a>
+        {% else %}
+          <a href="{% url "sign-in" %}" class="btn-ghost md:h-9">Login</a>
+        {% endif %}
+        <a
+          href="{% url "register" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}"
+          class="btn-grey md:h-9 {% if variant == 'homepage' %}bg-white{% endif %} "
+        >Sign&nbsp;Up</a>
+      </div>
+    {% endif %}
+  </div>
+</header>
