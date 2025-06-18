@@ -22,7 +22,7 @@ from django.http import (
     HttpResponseRedirect,
     QueryDict,
 )
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -81,8 +81,8 @@ def view_alerts(request: HttpRequest) -> HttpResponse:
             alert_type=DocketAlert.SUBSCRIPTION
         ).exists()
     ):
-        return view_docket_alerts(request)
-    return view_search_alerts(request)
+        return redirect("profile_docket_alerts")
+    return redirect("profile_search_alerts")
 
 
 @login_required
