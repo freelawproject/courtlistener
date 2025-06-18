@@ -6,9 +6,16 @@
 
 <c-vars request dialog_class="" panel_class=""></c-vars>
 
-<div x-data="dialog" class="flex justify-center">
+<div x-data="dialog" x-id="dialogIdGroup" class="flex justify-center">
   <!-- Trigger -->
-  <button x-on:click="open" type="button" class="min-h-13 h-fit min-w-13 w-fit flex justify-center items-center focus-visible:outline-none group">
+  <button
+    x-on:click="open"
+    x-bind:aria-controls="dialogId"
+    x-bind:aria-expanded="isOpen"
+    aria-haspopup="dialog"
+    type="button"
+    class="min-h-13 h-fit min-w-13 w-fit flex justify-center items-center focus-visible:outline-none group"
+  >
     {# We use a span to style the button, but keep the button element larger to increase the click/touch area #}
     <span class="bg-white relative flex items-center justify-center btn-outline text-greyscale-800 rounded-[10px] p-2  group-focus-visible:ring-4 group-focus-visible:ring-greyscale-200 group-hover:bg-greyscale-100">
       {{ button_content }}
@@ -19,6 +26,10 @@
   <div
     x-dialog
     x-bind:open="isOpen"
+    x-on:keyup.esc.stop.prevent="close"
+    x-bind:id="dialogId"
+    role="dialog"
+    aria-modal="true"
     x-cloak
     class="fixed z-40 inset-0 overflow-hidden flex justify-center {{ dialog_class }}"
   >
