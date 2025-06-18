@@ -3,7 +3,6 @@ from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from typing import cast
 from unittest import mock
-from urllib.parse import urlencode
 
 import pytz
 import time_machine
@@ -41,7 +40,6 @@ from cl.alerts.models import (
     SEARCH_TYPES,
     Alert,
     DocketAlert,
-    RealTimeQueue,
     ScheduledAlertHit,
 )
 from cl.alerts.tasks import (
@@ -60,36 +58,28 @@ from cl.api.models import (
     Webhook,
     WebhookEvent,
     WebhookEventType,
-    WebhookVersions,
 )
 from cl.api.utils import get_webhook_deprecation_date
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
-from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
-    ES_CHILD_ID,
     AudioDocument,
     AudioPercolator,
-    OpinionDocument,
 )
 from cl.search.factories import (
-    CitationWithParentsFactory,
     CourtFactory,
     DocketFactory,
-    OpinionFactory,
-    OpinionsCitedWithParentsFactory,
     OpinionWithParentsFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    Citation,
     Court,
     Docket,
     DocketEntry,
-    Opinion,
     RECAPDocument,
 )
 from cl.stats.models import Stat
@@ -1510,27 +1500,6 @@ class SearchAlertsWebhooksTest(
         )
         unpublished_status = PRECEDENTIAL_STATUS.UNPUBLISHED
         with cls.captureOnCommitCallbacks(execute=True):
-            cls.search_alert = AlertFactory(
-                user=cls.user_profile.user,
-                rate=Alert.DAILY,
-                name="Test Alert O",
-                query=f"q=California&type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
-            cls.search_alert_rt = AlertFactory(
-                user=cls.user_profile.user,
-                rate=Alert.REAL_TIME,
-                name="Test Alert O rt",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
-            cls.search_alert_rt_1 = AlertFactory(
-                user=cls.user_profile_1.user,
-                rate=Alert.REAL_TIME,
-                name="Test Alert O rt",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
             cls.search_alert_oa = AlertFactory(
                 user=cls.user_profile.user,
                 rate=Alert.DAILY,
@@ -1538,41 +1507,12 @@ class SearchAlertsWebhooksTest(
                 query="type=oa",
                 alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
             )
-            cls.search_alert_o_wly = AlertFactory(
-                user=cls.user_profile.user,
-                rate=Alert.WEEKLY,
-                name="Test Alert O wly",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
-            cls.search_alert_o_mly = AlertFactory(
-                user=cls.user_profile.user,
-                rate=Alert.MONTHLY,
-                name="Test Alert O mly",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
-
             cls.user_profile_2 = UserProfileWithParentsFactory()
             cls.webhook_disabled = WebhookFactory(
                 user=cls.user_profile_2.user,
                 event_type=WebhookEventType.SEARCH_ALERT,
                 url="https://example.com/",
                 enabled=False,
-            )
-            cls.search_alert_2 = AlertFactory(
-                user=cls.user_profile_2.user,
-                rate=Alert.DAILY,
-                name="Test Alert O Disabled",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
-            cls.search_alert_2_1 = AlertFactory(
-                user=cls.user_profile_2.user,
-                rate=Alert.DAILY,
-                name="Test Alert O Copy",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
             )
             cls.user_profile_3 = UserProfileWithParentsFactory(
                 user__email="test_3@email.com"
@@ -1584,13 +1524,7 @@ class SearchAlertsWebhooksTest(
                 enabled=True,
                 version=1,
             )
-            cls.search_alert_3 = AlertFactory(
-                user=cls.user_profile_3.user,
-                rate=Alert.DAILY,
-                name="Test Alert 2 O Enabled",
-                query=f"q=California hearing&type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
+
         cls.c1 = CourtFactory(
             id="canb", jurisdiction="I", citation_string="Bankr. C.D. Cal."
         )
@@ -1618,114 +1552,18 @@ class SearchAlertsWebhooksTest(
             ),
             time_machine.travel(cls.mock_date, tick=False),
             cls.captureOnCommitCallbacks(execute=True),
+            mock.patch(
+                "cl.scrapers.tasks.microservice",
+                side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
+            ),
+            mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ),
         ):
-            cls.dly_opinion = OpinionWithParentsFactory.create(
-                cluster__case_name="California vs Lorem",
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__date_filed=cls.day_before_date_filed.date(),
-                cluster__attorneys="Attorney General of North Carolina",
-                cluster__judges="Lorem Judge",
-                cluster__citation_count=1,
-                cluster__docket=DocketFactory(
-                    court=cls.c1,
-                    date_reargued=cls.day_before_date_filed.date(),
-                    date_reargument_denied=cls.day_before_date_filed.date(),
-                ),
-                plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
-                type=Opinion.LEAD,
-            )
-
-            cls.dly_opinion.joined_by.add(cls.person_1)
-            cls.dly_opinion.cluster.panel.add(cls.person_1)
-            cls.lexis_citation = CitationWithParentsFactory.create(
-                volume=10,
-                reporter="Yeates",
-                page="4",
-                type=Citation.LEXIS,
-                cluster=cls.dly_opinion.cluster,
-            )
-            cls.neutra_citation = CitationWithParentsFactory.create(
-                volume=10,
-                reporter="Neutral",
-                page="4",
-                type=Citation.NEUTRAL,
-                cluster=cls.dly_opinion.cluster,
-            )
-            cls.citation_1 = CitationWithParentsFactory.create(
-                volume=33,
-                reporter="state",
-                page="1",
-                type=Citation.FEDERAL,
-                cluster=cls.dly_opinion.cluster,
-            )
-            cls.dly_opinion_2 = OpinionFactory(
-                cluster=cls.dly_opinion.cluster,
-                type=Opinion.COMBINED,
-                plain_text="Lorem dolor california sit amet, consectetur adipiscing elit.",
-                download_url="https://ca.flcourts.gov/",
-                local_path="test/search/opinion_html.html",
-            )
-            cls.opinion_cited_1 = OpinionsCitedWithParentsFactory.create(
-                cited_opinion=cls.dly_opinion,
-                citing_opinion=cls.dly_opinion_2,
-            )
-
-            cls.dly_opinion_current_day = OpinionWithParentsFactory.create(
-                cluster__case_name="California vs Lorem Current Day",
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__date_filed=cls.current_day_date_filed.date(),
-                cluster__attorneys="Attorney General of North Carolina",
-                cluster__judges="Lorem Judge",
-                cluster__citation_count=1,
-                cluster__docket=DocketFactory(
-                    court=cls.c1,
-                    date_reargued=cls.current_day_date_filed.date(),
-                    date_reargument_denied=cls.current_day_date_filed.date(),
-                ),
-                plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
-                type=Opinion.LEAD,
-            )
-
-            with (
-                mock.patch(
-                    "cl.scrapers.tasks.microservice",
-                    side_effect=lambda *args, **kwargs: MockResponse(
-                        200, b"10"
-                    ),
-                ),
-                mock.patch(
-                    "cl.lib.es_signal_processor.allow_es_audio_indexing",
-                    side_effect=lambda x, y: True,
-                ),
-            ):
-                cls.dly_oral_argument = AudioWithParentsFactory.create(
-                    case_name="Dly Test OA",
-                    docket__date_argued=now() - timedelta(hours=5),
-                )
-
-            cls.wly_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__case_name="California vs Week",
-                cluster__date_filed=now() - timedelta(days=2),
-                plain_text="Lorem dolor Ipsum",
-            )
-            cls.wly_opinion_current_date = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__case_name="California vs Week Current Day",
-                cluster__date_filed=cls.current_day_date_filed.date(),
-                plain_text="Lorem dolor Ipsum",
-            )
-            cls.mly_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__case_name="California vs Month",
-                cluster__date_filed=now() - timedelta(days=25),
-                plain_text="Lorem dolor Ipsum",
-            )
-            cls.mly_opinion_current_date = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__case_name="California vs Month Current Day",
-                cluster__date_filed=cls.current_day_date_filed.date(),
-                plain_text="Lorem dolor Ipsum",
+            cls.dly_oral_argument = AudioWithParentsFactory.create(
+                case_name="Dly Test OA",
+                docket__date_argued=now() - timedelta(hours=5),
             )
 
     def test_send_search_alert_webhooks(self):
@@ -1738,7 +1576,7 @@ class SearchAlertsWebhooksTest(
             len(webhooks_enabled), 3, msg="Webhooks enabled doesn't match."
         )
         search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 9, msg="Alerts doesn't match.")
+        self.assertEqual(len(search_alerts), 1, msg="Alerts doesn't match.")
 
         with (
             mock.patch(
@@ -1749,155 +1587,19 @@ class SearchAlertsWebhooksTest(
             ),
             time_machine.travel(self.mock_date, tick=False),
         ):
-            # Send Opinion Alerts
-            call_command("cl_send_alerts", rate="dly")
             # Send ES Alerts (Only OA for now)
             call_command("cl_send_scheduled_alerts", rate="dly")
 
-        # 4 search alerts should be sent:
-        # Two opinion alerts to user_profile, one to user_profile_2, and one to
-        # user_profile_3
-        # One oral argument alert to user_profile (ES)
+        # One oral argument alert to user_profile
         self.assertEqual(
-            len(mail.outbox), 4, msg="Outgoing emails don't match."
-        )
-
-        # First Opinion email alert assertions search_alert
-        self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
-        self.assertEqual(
-            mail.outbox[0].subject,
-            f"1 Alert has hits: {self.search_alert.name}",
-        )
-
-        # Plain text assertions
-        opinion_alert_content = mail.outbox[0].body
-        self.assertIn("daily opinion alert", opinion_alert_content)
-
-        self.assertIn("had 1 hit", opinion_alert_content)
-        self.assertIn(
-            self.dly_opinion_2.cluster.docket.court.citation_string,
-            opinion_alert_content,
-        )
-        self.assertIn("California vs Lorem", opinion_alert_content)
-        self.assertIn(
-            "california sit amet",
-            opinion_alert_content,
-            msg="Alert content didn't match",
-        )
-        self.assertIn(self.dly_opinion_2.download_url, opinion_alert_content)
-        self.assertIn(
-            str(self.dly_opinion_2.local_path), opinion_alert_content
-        )
-
-        html_content = self.get_html_content_from_email(mail.outbox[0])
-        # HTML assertions
-        self._count_alert_hits_and_child_hits(
-            html_content,
-            self.search_alert.name,
-            1,
-            self.dly_opinion.cluster.case_name,
-            2,
-        )
-
-        self._assert_child_hits_content(
-            html_content,
-            self.search_alert.name,
-            self.dly_opinion.cluster.case_name,
-            [
-                self.dly_opinion.get_type_display(),
-                self.dly_opinion_2.get_type_display(),
-            ],
-        )
-
-        self.assertIn("had 1 hit", html_content)
-        self.assertIn(
-            self.dly_opinion_2.cluster.docket.court.citation_string.replace(
-                " ", "&nbsp;"
-            ),
-            html_content,
-        )
-        self.assertIn(self.dly_opinion_2.download_url, html_content)
-        self.assertIn(str(self.dly_opinion_2.local_path), html_content)
-        self.assertIn("<strong>California</strong> vs Lorem", html_content)
-        self.assertIn("<strong>california</strong> sit amet", html_content)
-
-        # Unsubscribe headers assertions.
-        self.assertEqual(
-            mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
-            "List-Unsubscribe=One-Click",
-        )
-        unsubscribe_url = reverse(
-            "one_click_disable_alert", args=[self.search_alert.secret_key]
-        )
-        self.assertIn(
-            unsubscribe_url,
-            mail.outbox[0].extra_headers["List-Unsubscribe"],
-        )
-
-        # Second Opinion alert search_alert_2
-        html_content = self.get_html_content_from_email(mail.outbox[1])
-        # HTML assertions
-        self._count_alert_hits_and_child_hits(
-            html_content,
-            self.search_alert.name,
-            1,
-            self.dly_opinion.cluster.case_name,
-            2,
-        )
-
-        self._assert_child_hits_content(
-            html_content,
-            self.search_alert.name,
-            self.dly_opinion.cluster.case_name,
-            [
-                self.dly_opinion.get_type_display(),
-                self.dly_opinion_2.get_type_display(),
-            ],
-        )
-
-        self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
-        subject = mail.outbox[1].subject
-        self.assertIn("2 Alerts have hits:", subject)
-        self.assertIn(self.search_alert_2.name, subject)
-        self.assertIn(self.search_alert_2_1.name, subject)
-        self.assertIn("daily opinion alert", mail.outbox[1].body)
-
-        params = {
-            "keys": [
-                self.search_alert_2.secret_key,
-                self.search_alert_2_1.secret_key,
-            ]
-        }
-        query_string = urlencode(params, doseq=True)
-        unsubscribe_path = reverse("disable_alert_list")
-        self.assertIn(
-            f"{unsubscribe_path}{'?' if query_string else ''}{query_string}",
-            mail.outbox[1].extra_headers["List-Unsubscribe"],
-        )
-
-        # Third Opinion alert search_alert_3
-        html_content = self.get_html_content_from_email(mail.outbox[2])
-        # HTML assertions
-        self._count_alert_hits_and_child_hits(
-            html_content,
-            self.search_alert_3.name,
-            1,
-            self.dly_opinion.cluster.case_name,
-            1,
-        )
-
-        self._assert_child_hits_content(
-            html_content,
-            self.search_alert_3.name,
-            self.dly_opinion.cluster.case_name,
-            [self.dly_opinion.get_type_display()],
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
 
         # Oral Argument Alert
-        self.assertEqual(mail.outbox[3].to[0], self.user_profile.user.email)
-        self.assertIn("daily oral argument alert ", mail.outbox[3].body)
+        self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
+        self.assertIn("daily oral argument alert ", mail.outbox[0].body)
         self.assertEqual(
-            mail.outbox[3].extra_headers["List-Unsubscribe-Post"],
+            mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
             "List-Unsubscribe=One-Click",
         )
         unsubscribe_url = reverse(
@@ -1905,73 +1607,25 @@ class SearchAlertsWebhooksTest(
         )
         self.assertIn(
             unsubscribe_url,
-            mail.outbox[3].extra_headers["List-Unsubscribe"],
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
         )
 
-        # 3 webhook events should be sent, 2 user_profile user and 1 user_profile_3
+        # 1 webhook events should be sent to user_profile_3
         webhook_events = WebhookEvent.objects.filter().values_list(
             "content", flat=True
         )
 
         self.assertEqual(
-            len(webhook_events), 3, msg="Webhook events don't match."
+            len(webhook_events), 1, msg="Webhook events don't match."
         )
 
         alert_data = {
-            self.search_alert.pk: {
-                "alert": self.search_alert,
-                "result": self.dly_opinion_2,
-                "snippet": "Lorem dolor <strong>california</strong> sit amet, consectetur adipiscing elit.",
-            },
             self.search_alert_oa.pk: {
                 "alert": self.search_alert_oa,
                 "result": self.dly_oral_argument,
                 "snippet": "",
             },
-            self.search_alert_3.pk: {
-                "alert": self.search_alert_3,
-                "result": self.dly_opinion,
-                "snippet": "Lorem dolor sit amet, consectetur adipiscing elit <strong>hearing</strong>.",
-            },
         }
-
-        # Assert V2 Opinion Search Alerts Webhook
-        self._count_webhook_hits_and_child_hits(
-            list(webhook_events),
-            self.search_alert.name,
-            1,
-            self.dly_opinion.cluster.case_name,
-            2,
-            "opinions",
-        )
-
-        # Assert HL content in V2 webhooks.
-        self._assert_webhook_hit_hl(
-            webhook_events,
-            self.search_alert.name,
-            "caseName",
-            "<strong>California</strong> vs Lorem",
-            child_field=False,
-            nested_field="opinions",
-        )
-        self._assert_webhook_hit_hl(
-            webhook_events,
-            self.search_alert.name,
-            "snippet",
-            "Lorem dolor <strong>california</strong> sit amet, consectetur adipiscing elit.",
-            child_field=True,
-            nested_field="opinions",
-        )
-
-        # Assert V1 Opinion Search Alerts Webhook
-        self._count_webhook_hits_and_child_hits(
-            list(webhook_events),
-            self.search_alert_3.name,
-            1,
-            self.dly_opinion.cluster.case_name,
-            0,
-            None,
-        )
 
         webhook_events_instances = WebhookEvent.objects.all()
         for webhook_sent in webhook_events_instances:
@@ -2015,33 +1669,6 @@ class SearchAlertsWebhooksTest(
                 )
                 if (
                     content["payload"]["alert"]["alert_type"]
-                    == SEARCH_TYPES.OPINION
-                ) and webhook_sent.webhook.version == WebhookVersions.v1:
-                    # Assert the number of keys in the Opinions Search Webhook
-                    # payload
-                    keys_count = len(content["payload"]["results"][0])
-                    self.assertEqual(
-                        keys_count, len(opinion_v3_search_api_keys)
-                    )
-                    # Iterate through all the opinion fields and compare them.
-                    for (
-                        field,
-                        get_expected_value,
-                    ) in opinion_v3_search_api_keys.items():
-                        with self.subTest(field=field):
-                            expected_value = get_expected_value(
-                                alert_data_compare
-                            )
-                            actual_value = content["payload"]["results"][
-                                0
-                            ].get(field)
-                            self.assertEqual(
-                                actual_value,
-                                expected_value,
-                                f"Field '{field}' does not match.",
-                            )
-                elif (
-                    content["payload"]["alert"]["alert_type"]
                     == SEARCH_TYPES.ORAL_ARGUMENT
                 ):
                     # Assertions for OA webhook payload.
@@ -2053,48 +1680,20 @@ class SearchAlertsWebhooksTest(
     def test_send_search_alert_webhooks_rates(self):
         """Can we send search alert webhooks for different alert rates?"""
 
-        self.assertTrue(
-            OpinionDocument.exists(
-                id=ES_CHILD_ID(self.wly_opinion.pk).OPINION
-            ),
-            msg="wly error",
-        )
-        self.assertTrue(
-            OpinionDocument.exists(
-                id=ES_CHILD_ID(self.mly_opinion.pk).OPINION
-            ),
-            msg="mly error",
-        )
-
-        with (
-            time_machine.travel(self.mock_date, tick=False),
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            # Get ready the RT opinion for the test.
-            rt_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__case_name="California vs RT",
-                cluster__date_filed=self.day_before_date_filed.date(),
-                plain_text="Lorem dolor hearing Ipsum",
-            )
-            RealTimeQueue.objects.create(
-                item_type=SEARCH_TYPES.OPINION, item_pk=rt_opinion.pk
-            )
-
         webhooks_enabled = Webhook.objects.filter(enabled=True)
         self.assertEqual(len(webhooks_enabled), 3)
         search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 9)
+        self.assertEqual(len(search_alerts), 1)
         # (rate, events expected, number of search results expected per event)
         # The number of expected results increases with every iteration since
         # daily events include results created for the RT test, weekly results
         # include results from RT and Daily tests, and so on...
         rates = [
-            (Alert.REAL_TIME, 2, 1),  # 2 expected webhook events, 1 Opinion RT
-            # Alert (search_alert_rt) + 1 OA Daily Alert, triggered by ES.
-            (Alert.DAILY, 2, 2),
-            (Alert.WEEKLY, 1, 3),
-            (Alert.MONTHLY, 1, 4),
+            (
+                Alert.REAL_TIME,
+                1,
+                1,
+            ),  # 1 expected webhook events 1 OA Daily Alert, triggered by ES.
         ]
         for rate, events, results in rates:
             with mock.patch(
@@ -2105,9 +1704,7 @@ class SearchAlertsWebhooksTest(
             ):
                 # Monthly alerts cannot be run on the 29th, 30th or 31st.
                 with time_machine.travel(self.mock_date, tick=False):
-                    # Send Alerts (Except OA)
-                    call_command("cl_send_alerts", rate=rate)
-                    # Send ES Alerts (Only OA for now)
+                    # Send ES Alerts OA
                     call_command("cl_send_scheduled_alerts", rate=rate)
 
             with self.subTest(rate=rate):
@@ -2146,29 +1743,17 @@ class SearchAlertsWebhooksTest(
 
                     # The oral argument webhook is sent independently not grouped
                     # with opinions webhooks results.
-                    if content["payload"]["alert"]["query"] == "type=oa":
-                        self.assertEqual(
-                            len(content["payload"]["results"]),
-                            1,
-                            msg="Wrong number of results OA.",
-                        )
-                        self.assertEqual(
-                            content["payload"]["alert"]["rate"],
-                            Alert.DAILY,
-                        )
-                    else:
-                        self.assertEqual(
-                            len(content["payload"]["results"]),
-                            results,
-                            msg="Wrong number of results O.",
-                        )
-                        self.assertEqual(
-                            content["payload"]["alert"]["rate"],
-                            rate,
-                        )
-            webhook_events.delete()
+                    self.assertEqual(
+                        len(content["payload"]["results"]),
+                        1,
+                        msg="Wrong number of results OA.",
+                    )
+                    self.assertEqual(
+                        content["payload"]["alert"]["rate"],
+                        Alert.DAILY,
+                    )
 
-        rt_opinion.cluster.delete()
+            webhook_events.delete()
 
     def test_alert_frequency_estimation(self):
         """Test alert frequency ES API endpoint for Opinion Alerts."""

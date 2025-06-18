@@ -1,22 +1,34 @@
 import datetime
 from unittest import mock
+from urllib.parse import urlencode
 
 import time_machine
 from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.test import override_settings
+from django.urls import reverse
 from django.utils.timezone import now
 from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
 from cl.api.factories import WebhookFactory
-from cl.api.models import WebhookEvent, WebhookEventType
+from cl.api.models import (
+    WEBHOOK_EVENT_STATUS,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookVersions,
+)
 from cl.donate.models import NeonMembership
 from cl.lib.date_time import midnight_pt
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
+from cl.lib.test_helpers import (
+    CourtTestCase,
+    PeopleTestCase,
+    SearchTestCase,
+    opinion_v3_search_api_keys,
+)
 from cl.search.documents import OpinionPercolator
 from cl.search.factories import OpinionClusterFactory, OpinionFactory
 from cl.search.models import SEARCH_TYPES, OpinionsCited
@@ -59,6 +71,14 @@ class OpinionAlertsPercolatorTest(
             url="https://example.com/",
             enabled=True,
             version=2,
+        )
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.webhook_enabled_v1 = WebhookFactory(
+            user=cls.user_profile_2.user,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=True,
+            version=1,
         )
 
         date_now = midnight_pt(now().date())
@@ -114,9 +134,7 @@ class OpinionAlertsPercolatorTest(
 
         self.percolator_call_count = 0
 
-    def test_opinions_percolator_queries(
-        self, mock_prefix
-    ) -> None:
+    def test_opinions_percolator_queries(self, mock_prefix) -> None:
         """Test if a variety of Opinions and OpinionClusters can trigger
         percolator queries
         """
@@ -229,13 +247,18 @@ class OpinionAlertsPercolatorTest(
     def test_percolate_document_on_ingestion(self, mock_prefix) -> None:
         """Confirm an Opinion is percolated upon ingestion."""
 
-        opinion_cluster_indexing_time = self.mock_date - datetime.timedelta(
-            seconds=15
-        )
+        opinion_cluster_indexing_time = self.mock_date
         with self.captureOnCommitCallbacks(execute=True):
             opinion_cluster_alert = AlertFactory(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
+                name="Test Alert OpinionCluster Only 1",
+                query='q="Howard v. Honda"&type=o',
+                alert_type=SEARCH_TYPES.OPINION,
+            )
+            u2_opinion_cluster_alert = AlertFactory(
+                user=self.user_profile_2.user,
+                rate=Alert.DAILY,
                 name="Test Alert OpinionCluster Only 1",
                 query='q="Howard v. Honda"&type=o',
                 alert_type=SEARCH_TYPES.OPINION,
@@ -262,9 +285,10 @@ class OpinionAlertsPercolatorTest(
             )
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
-
+        call_command("cl_send_scheduled_alerts", rate=Alert.DAILY)
+        # One alert for user_profile and one for user_profile_2
         self.assertEqual(
-            len(mail.outbox), 1, msg="Outgoing emails don't match."
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
         html_content = self.get_html_content_from_email(mail.outbox[0])
         txt_content = mail.outbox[0].body
@@ -279,6 +303,109 @@ class OpinionAlertsPercolatorTest(
             self.opinion_cluster_2.case_name,
             1,
         )
+        self.assertIn("1 Alert has hits:", mail.outbox[0].subject)
+
+        # Unsubscribe headers assertions.
+        self.assertEqual(
+            mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
+            "List-Unsubscribe=One-Click",
+        )
+        unsubscribe_url = reverse(
+            "one_click_disable_alert", args=[opinion_cluster_alert.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
+
+        # Assert webhooks content.
+        webhook_events = WebhookEvent.objects.filter().values_list(
+            "content", flat=True
+        )
+        self.assertEqual(
+            len(webhook_events), 2, msg="Webhook events don't match."
+        )
+
+        alert_data = {
+            opinion_cluster_alert.pk: {
+                "alert": opinion_cluster_alert,
+                "result": opinion,
+                "snippet": "Lorem ipsum text",
+            },
+            u2_opinion_cluster_alert.pk: {
+                "alert": u2_opinion_cluster_alert,
+                "result": opinion,
+                "snippet": "Lorem ipsum text",
+            },
+        }
+
+        webhook_events_instances = WebhookEvent.objects.all()
+        for webhook_sent in webhook_events_instances:
+            with self.subTest(webhook_sent=webhook_sent):
+                self.assertEqual(
+                    webhook_sent.event_status,
+                    WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+                    msg="The event status doesn't match.",
+                )
+                content = webhook_sent.content
+
+                alert_data_compare = alert_data[
+                    content["payload"]["alert"]["id"]
+                ]
+                self.assertEqual(
+                    webhook_sent.webhook.user,
+                    alert_data_compare["alert"].user,
+                    msg="The user doesn't match.",
+                )
+
+                # Check if the webhook event payload is correct.
+                self.assertEqual(
+                    content["webhook"]["event_type"],
+                    WebhookEventType.SEARCH_ALERT,
+                    msg="The event type doesn't match.",
+                )
+                self.assertEqual(
+                    content["payload"]["alert"]["name"],
+                    alert_data_compare["alert"].name,
+                    msg="The alert name doesn't match.",
+                )
+                self.assertEqual(
+                    content["payload"]["alert"]["query"],
+                    alert_data_compare["alert"].query,
+                    msg="The alert query doesn't match.",
+                )
+                self.assertEqual(
+                    content["payload"]["alert"]["rate"],
+                    alert_data_compare["alert"].rate,
+                    msg="The alert rate doesn't match.",
+                )
+                if (
+                    content["payload"]["alert"]["alert_type"]
+                    == SEARCH_TYPES.OPINION
+                ) and webhook_sent.webhook.version == WebhookVersions.v1:
+                    # Assert the number of keys in the Opinions Search Webhook
+                    # payload
+                    keys_count = len(content["payload"]["results"][0])
+                    self.assertEqual(
+                        keys_count, len(opinion_v3_search_api_keys)
+                    )
+                    # Iterate through all the opinion fields and compare them.
+                    for (
+                        field,
+                        get_expected_value,
+                    ) in opinion_v3_search_api_keys.items():
+                        with self.subTest(field=field):
+                            expected_value = get_expected_value(
+                                alert_data_compare
+                            )
+                            actual_value = content["payload"]["results"][
+                                0
+                            ].get(field)
+                            self.assertEqual(
+                                actual_value,
+                                expected_value,
+                                f"Field '{field}' does not match.",
+                            )
 
         # Trigger an update for the same opinion. The alert shouldn't be trigger
         # again.
@@ -291,7 +418,7 @@ class OpinionAlertsPercolatorTest(
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
-            len(mail.outbox), 1, msg="Outgoing emails don't match."
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
 
         # Alert for Opinion only fields.
@@ -330,10 +457,10 @@ class OpinionAlertsPercolatorTest(
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(
-            len(mail.outbox), 2, msg="Outgoing emails don't match."
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
         )
-        html_content = self.get_html_content_from_email(mail.outbox[1])
-        txt_content = mail.outbox[1].body
+        html_content = self.get_html_content_from_email(mail.outbox[2])
+        txt_content = mail.outbox[2].body
 
         self.assertIn(opinion_alert.name, html_content)
         self.assertIn(opinion_alert.name, txt_content)
@@ -374,7 +501,7 @@ class OpinionAlertsPercolatorTest(
 
         # No alert should be triggered.
         self.assertEqual(
-            len(mail.outbox), 2, msg="Outgoing emails don't match."
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
         )
 
         # The alert should be triggered upon the opinion update.
@@ -399,10 +526,10 @@ class OpinionAlertsPercolatorTest(
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(
-            len(mail.outbox), 3, msg="Outgoing emails don't match."
+            len(mail.outbox), 4, msg="Outgoing emails don't match."
         )
-        html_content = self.get_html_content_from_email(mail.outbox[2])
-        txt_content = mail.outbox[2].body
+        html_content = self.get_html_content_from_email(mail.outbox[3])
+        txt_content = mail.outbox[3].body
 
         self.assertIn(opinion_alert.name, html_content)
         self.assertIn(opinion_alert.name, txt_content)
@@ -556,6 +683,20 @@ class OpinionAlertsPercolatorTest(
                 query='q="elementum"&type=o',
                 alert_type=SEARCH_TYPES.OPINION,
             )
+            AlertFactory(
+                user=self.user_profile_2.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Opinion",
+                query='case_name="Howard" OR "cluster" OR "Debbas" OR "America"&type=o&stat_Published=on&stat_Errata=on',
+                alert_type=SEARCH_TYPES.OPINION,
+            )
+            AlertFactory(
+                user=self.user_profile_2.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Opinion Text",
+                query='q="elementum"&type=o',
+                alert_type=SEARCH_TYPES.OPINION,
+            )
 
         with (
             mock.patch(
@@ -603,23 +744,33 @@ class OpinionAlertsPercolatorTest(
         )
 
         # Assert webhooks.
-        webhook_events = WebhookEvent.objects.filter(
+        webhook_events_v2 = WebhookEvent.objects.filter(
             webhook__user=self.user_profile.user
         ).values_list("content", flat=True)
 
-        # 9 webhooks for user_profile should be triggered one for each
+        # 9 V2 webhooks for user_profile should be triggered one for each
         # document ingested that matched each alert.
         self.assertEqual(
-            len(webhook_events), 9, msg="Webhook events didn't match."
+            len(webhook_events_v2), 9, msg="Webhook events didn't match."
         )
 
         # 4 Webhooks for alert_1.
         self._count_percolator_webhook_hits_and_child_hits(
-            webhook_events, alert_1.name, 4, 4, alert_1_ids, "opinions"
+            webhook_events_v2, alert_1.name, 4, 4, alert_1_ids, "opinions"
         )
         # 5 Webhooks for alert_2 each one with 1 Opinion nested.
         self._count_percolator_webhook_hits_and_child_hits(
-            webhook_events, alert_2.name, 5, 5, alert_2_ids, "opinions"
+            webhook_events_v2, alert_2.name, 5, 5, alert_2_ids, "opinions"
+        )
+
+        webhook_events_v1 = WebhookEvent.objects.filter(
+            webhook__user=self.user_profile_2.user
+        ).values_list("content", flat=True)
+
+        # 9 V1 webhooks for user_profile_2 should be triggered one for each
+        # document ingested that matched each alert.
+        self.assertEqual(
+            len(webhook_events_v1), 9, msg="Webhook events didn't match."
         )
 
         rt_mock_date_sent = self.mock_date + datetime.timedelta(
@@ -655,6 +806,7 @@ class OpinionAlertsPercolatorTest(
         txt_email = mail.outbox[0].body
         self.assertIn(alert_1.name, html_content)
         self._confirm_number_of_alerts(html_content, 2)
+        self.assertIn("2 Alerts have hits:", mail.outbox[0].subject)
 
         self._count_alert_hits_and_child_hits(
             html_content,
@@ -696,6 +848,20 @@ class OpinionAlertsPercolatorTest(
         # Assert email text version.
         self.assertIn(alert_2.name, txt_email)
         self.assertIn(self.opinion_cluster_5.case_name, txt_email)
+
+        # Assert the disable_alert_list link.
+        params = {
+            "keys": [
+                alert_1.secret_key,
+                alert_2.secret_key,
+            ]
+        }
+        query_string = urlencode(params, doseq=True)
+        unsubscribe_path = reverse("disable_alert_list")
+        self.assertIn(
+            f"{unsubscribe_path}{'?' if query_string else ''}{query_string}",
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=3)
     def test_retrieve_all_the_matched_alerts_in_batches(self, mock_prefix):

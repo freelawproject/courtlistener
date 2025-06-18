@@ -1,7 +1,11 @@
 from cl.alerts.models import Alert
 from cl.alerts.tasks import es_save_alert_document
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.documents import AudioPercolator, RECAPPercolator, OpinionPercolator
+from cl.search.documents import (
+    AudioPercolator,
+    OpinionPercolator,
+    RECAPPercolator,
+)
 from cl.search.models import SEARCH_TYPES
 
 
