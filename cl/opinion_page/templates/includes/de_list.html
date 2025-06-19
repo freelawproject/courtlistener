@@ -158,9 +158,37 @@
                   {% else %}
                     {# We don't have it #}
                     {% if rd.is_sealed %}
-                      <span class="btn btn-primary btn-xs disabled">Unavailable on PACER</span>
+                      <div class="btn-group btn-group-xs">
+                        <button type="button" class="btn btn-primary btn-xs" disabled>
+                          Unavailable on PACER
+                        </button>
+                        {% if rd.pacer_url %}
+                          <button type="button"
+                                  class="btn btn-primary btn-xs dropdown-toggle dropdown-toggle-split"
+                                  data-toggle="dropdown"
+                                  aria-haspopup="true"
+                                  aria-expanded="false">
+                            <span class="caret"></span>
+                            <span class="sr-only">Toggle Dropdown</span>
+                          </button>
+                          <ul class="dropdown-menu">
+                            <li>
+                              <a href="{{ rd.pacer_url }}"
+                                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                                  data-toggle="modal"
+                                  data-target="#modal-buy-pacer"
+                                  class="open_buy_pacer_modal"
+                                {% endif %}
+                                target="_blank"
+                                rel="nofollow">
+                                <i class="fa fa-external-link"></i> Check Availability on PACER
+                              </a>
+                            </li>
+                          </ul>
+                        {% endif %}
+                      </div>
                       <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
-                        {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
+                        {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count %}
                       </div>
                     {% else %}
                       {% if rd.pacer_url %}
@@ -175,7 +203,7 @@
                             rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
                         </a>
                           <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
-                            {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
+                            {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count %}
                           </div>
                       {% endif %}
                     {% endif %}
