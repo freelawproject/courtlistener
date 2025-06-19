@@ -9,7 +9,6 @@ from django.core.management import call_command
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
@@ -38,13 +37,15 @@ from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
 
-@override_settings(PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED=True)
+@override_settings(
+    INDEXING_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED=True,
+    PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED=True,
+)
 @mock.patch(
     "cl.alerts.utils.get_alerts_set_prefix",
     return_value="alert_hits_percolator_opinions",
 )
 @override_settings(NO_MATCH_HL_SIZE=100)
-@override_switch("opinions-percolator-alerts", active=True)
 class OpinionAlertsPercolatorTest(
     CourtTestCase,
     PeopleTestCase,

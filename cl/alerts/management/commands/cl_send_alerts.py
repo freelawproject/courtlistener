@@ -219,7 +219,7 @@ class Command(VerboseCommand):
         super().handle(*args, **options)
         self.options = options
 
-        if switch_is_active("opinions-percolator-alerts"):
+        if settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED:
             logger.info("cl_send_alerts is disabled.")
             return
 

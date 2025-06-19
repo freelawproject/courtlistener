@@ -50,7 +50,7 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
             )
 
         case SEARCH_TYPES.OPINION if (
-            settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+            settings.INDEXING_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
         ):
             transaction.on_commit(
                 partial(

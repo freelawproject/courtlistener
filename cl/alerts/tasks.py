@@ -752,11 +752,11 @@ def send_or_schedule_search_alerts(
         not settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
         and response.app_label in ["search.RECAPDocument", "search.Docket"]
     ) or (
-        not switch_is_active("opinions-percolator-alerts")
+        not settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
         and response.app_label in ["search.Opinion"]
     ):
         # Disable percolation for RECAP Or Opinions search alerts until
-        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED or PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED or INDEXING_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
         # is set to True.
         self.request.chain = None
         return None
