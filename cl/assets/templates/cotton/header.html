@@ -125,7 +125,8 @@
       <div>
         {#   Signed-in button   #}
         <button
-          x-on:click="toggleProfileMenu"
+          id="header-profile-trigger"
+          x-on:click="openProfileMenu"
           class="bg-white btn-outline text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
           type="button"
           aria-haspopup="menu"
@@ -153,6 +154,9 @@
             x-on:keyup.esc="closeProfileMenu"
             x-on:keyup.right="focusNext"
             x-on:keyup.left="focusPrevious"
+            x-on:keydown.down.prevent.stop="focusNext"
+            x-on:keydown.up.prevent.stop="focusPrevious"
+            x-on:keydown.tab.prevent.stop="closeProfileMenu"
             class="absolute right-0 z-10 mt-2 w-[--profile-menu-width] rounded-lg bg-white py-2 shadow-lg border border-greyscale-200 focus-visible:outline-hidden list-none pl-0"
             tabindex="-1"
             role="menu"

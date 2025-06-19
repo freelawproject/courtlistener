@@ -14,11 +14,15 @@ document.addEventListener('alpine:init', () => {
     closeSupportMenu() {
       this.supportMenuExpanded = false;
     },
-    toggleProfileMenu() {
-      this.profileMenuExpanded = !this.profileMenuExpanded;
+    openProfileMenu() {
+      this.profileMenuExpanded = true;
+      const profileMenu = document.getElementById('header-profile-menu');
+      this.$focus.within(profileMenu).first();
     },
     closeProfileMenu() {
       this.profileMenuExpanded = false;
+      const triggerButton = document.getElementById('header-profile-trigger');
+      this.$focus.focus(triggerButton);
     },
   }));
 });

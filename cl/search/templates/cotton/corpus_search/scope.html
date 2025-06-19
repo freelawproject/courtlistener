@@ -37,6 +37,8 @@
     x-on:keyup.esc.stop.prevent="closeScopeMenu"
     x-on:keyup.right.window.prevent="focusNext"
     x-on:keyup.left.window.prevent="focusPrevious"
+    x-on:keydown.down.prevent.stop="focusNext"
+    x-on:keydown.up.prevent="focusPrevious"
     x-transition:enter="transition ease-out duration-300"
     x-transition:enter-start="opacity-0"
     x-transition:enter-end="opacity-100"
