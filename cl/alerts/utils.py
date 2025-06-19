@@ -457,14 +457,19 @@ def scheduled_alert_hits_limit_reached(
 
     if hits_count >= hits_limit:
         if child_document:
-            logger.info(
-                f"Skipping child hit for Alert ID: {alert_pk} and object_id "
-                f"{object_id}, there are {hits_count} child hits stored for this alert-instance."
+            logger.error(
+                "Skipping child hit for Alert ID: %s and object_id %s, there "
+                "are %s child hits stored for this alert-instance.",
+                alert_pk,
+                object_id,
+                hits_count,
             )
         else:
             logger.info(
-                f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} "
-                f"hits stored for this alert."
+                "Skipping hit for Alert ID: %s, there are %s hits stored for "
+                "this alert.",
+                alert_pk,
+                hits_count,
             )
         return True
     return False
@@ -734,9 +739,9 @@ def prepare_percolator_content(
         case "search.Opinion":
             percolator_index = OpinionPercolator._index._name
             model = apps.get_model(app_label)
-            rd = model.objects.get(pk=document_id)
-            document_content_plain = ESOpinionDocumentPlain().prepare(rd)
-            # Remove docket_child to avoid document parsing errors.
+            opinion = model.objects.get(pk=document_id)
+            document_content_plain = ESOpinionDocumentPlain().prepare(opinion)
+            # Remove cluster_child to avoid document parsing errors.
             del document_content_plain["cluster_child"]
 
             documents_to_percolate = (

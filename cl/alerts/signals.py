@@ -83,7 +83,9 @@ def remove_alert_from_es_index(sender, instance=None, **kwargs):
             remove_document_from_es_index.delay(
                 RECAPPercolator.__name__, instance.pk, None
             )
-        case SEARCH_TYPES.OPINION:
+        case SEARCH_TYPES.OPINION if (
+            settings.INDEXING_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        ):
             remove_document_from_es_index.delay(
                 OpinionPercolator.__name__, instance.pk, None
             )

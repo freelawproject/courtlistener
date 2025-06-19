@@ -60,7 +60,8 @@ class Command(VerboseCommand):
                 es_document = OpinionPercolator
             case _:
                 logger.info(
-                    f"'{alert_type}' Alert type indexing is not supported yet."
+                    "'%s' Alert type indexing is not supported yet.",
+                    alert_type,
                 )
                 return
 

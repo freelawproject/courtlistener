@@ -4414,7 +4414,8 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         )
 
         mock_logger.info.assert_called_with(
-            f"'{SEARCH_TYPES.PEOPLE}' Alert type indexing is not supported yet."
+            "'%s' Alert type indexing is not supported yet.",
+            SEARCH_TYPES.PEOPLE,
         )
 
     @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
