@@ -3749,3 +3749,4 @@ class SearchQuery(models.Model):
         indexes = [
             models.Index(fields=["date_created"]),
         ]
+        verbose_name_plural = "Search Queries"
