@@ -107,7 +107,7 @@ urlpatterns = [
         name="docket_authorities",
     ),
     path(
-        "docket/<int:docket_id>/<str:doc_num>/<blank-slug:slug>/",
+        "docket/<int:docket_id>/<int:doc_num>/<blank-slug:slug>/",
         view_recap_document,  # type: ignore[arg-type]
         name="view_recap_document",
     ),
@@ -117,7 +117,7 @@ urlpatterns = [
         name="view_document_authorities",
     ),
     path(
-        "docket/<int:docket_id>/<str:doc_num>/<int:att_num>/<blank-slug:slug>/",
+        "docket/<int:docket_id>/<int:doc_num>/<int:att_num>/<blank-slug:slug>/",
         view_recap_document,  # type: ignore[arg-type]
         name="view_recap_attachment",
     ),
