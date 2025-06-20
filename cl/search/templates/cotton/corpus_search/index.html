@@ -5,6 +5,11 @@
 
 <c-vars class=""></c-vars>
 
-<form x-data="search" class="relative flex flex-row flex-nowrap {{ class }}">
+<form
+  x-data="search"
+  x-id="corpusSearchIdGroup"
+  role="search"
+  class="relative flex flex-row flex-nowrap {{ class }}"
+>
   {{ slot }}
 </form>

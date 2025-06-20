@@ -1,40 +1,14 @@
-{# This component is based on Alpine UI Components Dialog Flyout #}
-{% load component_tags svg_tags %}
-{% require_script "js/alpine/composables/dialog.js" %}
-{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
-{% require_script "js/alpine/plugins/ui@3.14.8" defer=True %}
+{% load svg_tags %}
 
 <c-vars request></c-vars>
 
-<div x-data="dialog" class="md:hidden flex justify-center">
-  <!-- Trigger -->
-  <button x-on:click="open" type="button" class="h-13 w-13 flex justify-center items-center focus-visible:outline-none group">
-    <span class="bg-white relative flex items-center justify-center btn-outline text-greyscale-800 rounded-[10px] p-2  group-focus-visible:ring-4 group-focus-visible:ring-greyscale-200">
+<div class="md:hidden">
+  <c-dialog panel_class="absolute pt-0 pb-4 px-3" only>
+    <c-slot name="button_content">
       {% svg "magnifier" class="text-greyscale-400 w-5 h-5" %}
-    </span>
-  </button>
+    </c-slot>
 
-  <!-- Dialog -->
-  <div
-    x-dialog
-    x-bind:open="isOpen"
-    x-on:close="close"
-    x-cloak
-    class="fixed inset-0 overflow-hidden z-10"
-  >
-    <!-- Overlay -->
-    <div
-      x-dialog:overlay
-      class="fixed z-9 inset-0 bg-greyscale-600/40"
-    ></div>
-
-    <!-- Panel -->
-    <div
-      class="w-full absolute flex flex-col bg-white shadow-md pt-0 pb-4 px-3 z-10"
-      x-dialog:panel
-      x-show="isOpen"
-      x-on:click.outside="close"
-    >
+    <c-slot name="panel">
       <div x-dialog:title class="font-medium text-gray-800 py-3 flex flex-row justify-between">
         <div class="w-[226px] lg:min-w-[226px] flex justify-start" aria-label="Go to homepage">
           <div class="md:h-21 md:w-45 h-12 ml-1 w-[106px]">
@@ -44,7 +18,7 @@
         <div class="pt-1.5">
           <button
             type="button"
-            x-on:click="close"
+            x-on:click.stop="close"
             class="btn-outline p-2 rounded-[10px]"
             aria-label="Close modal"
           >
@@ -56,6 +30,6 @@
       <div class="flex flex-col gap-2">
         {{ slot }}
       </div>
-    </div>
-  </div>
+    </c-slot>
+  </c-dialog>
 </div>
