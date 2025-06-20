@@ -627,8 +627,8 @@ async def view_recap_document(
         .order_by("pk")
         .select_related("docket_entry__docket__court")
     ]
-    if rd := list(filter(lambda x: x.attachment_number == att_num, rds)):
-        rd = rd[0]
+    if rds_tmp := list(filter(lambda x: x.attachment_number == att_num, rds)):
+        rd: RECAPDocument = rds_tmp[0]
     else:
         # Unable to find the docket entry the normal way. In appellate courts, this
         # can be because the main document was converted to an attachment, leaving no
