@@ -888,7 +888,7 @@ async def setup_opinion_context(
 
 
 async def get_opinions_queryset(
-    sub_opinions_prefetch: str,
+    sub_opinions_prefetch: str | Prefetch,
 ) -> QuerySet:
     """Prepare a cluster queryset with common prefetchs to prevent extra
     queries
@@ -977,7 +977,6 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
             str(opinion.pk)
             async for opinion in cluster.sub_opinions.all().only("pk")
         ]
-        # sub_opinion_pks = [str(opinion.pk) async for opinion in cluster.sub_opinions.all()]
         cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
         related_cases_count = await es_related_case_count(
             cluster.id, sub_opinion_pks
@@ -1047,7 +1046,7 @@ async def view_opinion_authorities(
     :return: Table of Authorities tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_queryset("no_text_fields"),
+        await get_opinions_queryset("sub_opinions__opinions_cited"),
         pk=pk,
     )
 
