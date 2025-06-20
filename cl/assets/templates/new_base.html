@@ -75,7 +75,7 @@
 
 <body class="{% block body-classes %}{% endblock %}">
   {% block header %}
-    <c-header></c-header>
+    <c-header :request="request" only></c-header>
   {% endblock %}
 
   <main id="main">

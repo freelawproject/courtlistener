@@ -103,11 +103,13 @@ class CreateAlertForm(ModelForm):
 
             if used + 1 > allowed:
                 if is_member:
+                    neon_id = self.user.membership.neon_id
+                    upgrade_flp_membership = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
                     msg = format_html(
                         "You've used all of the alerts included with your membership. "
                         "To create this alert, <a href='{}' target='_blank'>upgrade your membership</a> or "
                         "<a href='{}'>disable a RECAP Alert</a>.",
-                        flp_membership,
+                        upgrade_flp_membership,
                         profile_url,
                     )
                 else:
