@@ -296,6 +296,36 @@ class SearchForm(forms.Form):
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.PARENTHETICAL,
     ]
+    # RECAP specific fields
+    entry_date_filed_after = FloorDateOrRelativeField(
+        required=False,
+        label="Entry Filed After",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    entry_date_filed_after.as_str_types = [
+        SEARCH_TYPES.RECAP,
+    ]
+    entry_date_filed_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Entry Filed Before",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    entry_date_filed_before.as_str_types = [
+        SEARCH_TYPES.RECAP,
+    ]
+
     citation = forms.CharField(
         required=False,
         label="Citation",

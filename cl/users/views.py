@@ -22,7 +22,7 @@ from django.http import (
     HttpResponseRedirect,
     QueryDict,
 )
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -70,6 +70,19 @@ from cl.users.utils import (
 from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
+
+
+@login_required
+@never_cache
+def view_alerts(request: HttpRequest) -> HttpResponse:
+    if (
+        not request.user.alerts.exists()
+        and request.user.docket_alerts.filter(
+            alert_type=DocketAlert.SUBSCRIPTION
+        ).exists()
+    ):
+        return redirect("profile_docket_alerts")
+    return redirect("profile_search_alerts")
 
 
 @login_required
