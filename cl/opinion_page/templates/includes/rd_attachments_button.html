@@ -1,0 +1,43 @@
+<div class="btn-group">
+  <a href="{{ next_doc.get_absolute_url }}"
+     role="button"
+     class="btn btn-warning">
+     {% if next_doc.description %}
+      {{ next_doc.description|truncatechars:30 }}
+    {% else %}
+      {% if next_doc.document_type == next_doc.ATTACHMENT %}
+        Attachment {{ next_doc.attachment_number }}
+      {% else %}
+        Document {{ next_doc.docket_entry.entry_number }}
+      {% endif %}
+    {% endif %}
+    &nbsp;<i class="fa fa-file-text-o"></i>
+  </a>
+  <button type="button"
+          class="btn btn-warning dropdown-toggle"
+          data-toggle="dropdown"
+          aria-haspopup="true"
+          aria-expanded="false">
+    <span class="caret"></span>
+    <span class="sr-only">Toggle Dropdown</span>
+  </button>
+  <ul class="dropdown-menu">
+    {% for doc in attachments %}
+      <li>
+        <a href="{{ doc.get_absolute_url }}">
+        {% if doc == rd %}«{%else%}&nbsp;&nbsp;{% endif %}
+        {% if doc.description %}
+          {{ doc.description|truncatechars:30 }}
+        {% else %}
+          {% if doc.document_type == doc.ATTACHMENT %}
+            Attachment {{ doc.attachment_number }}
+          {% else %}
+            Document {{ doc.docket_entry.entry_number }}
+          {% endif %}
+        {% endif %}
+       {% if doc == rd %}»{% endif %}
+       </a>
+      </li>
+    {% endfor %}
+  </ul>
+</div>

@@ -618,17 +618,17 @@ async def view_recap_document(
     depending on the URL pattern that is matched.
     """
     redirect_to_pacer_modal = False
-    rd_qs = (
-        RECAPDocument.objects.filter(
+    rds = [
+        x
+        async for x in RECAPDocument.objects.filter(
             docket_entry__docket__id=docket_id,
             document_number=doc_num,
-            attachment_number=att_num,
         )
         .order_by("pk")
         .select_related("docket_entry__docket__court")
-    )
-    if await rd_qs.aexists():
-        rd = await rd_qs.afirst()
+    ]
+    if rd := list(filter(lambda x: x.attachment_number == att_num, rds)):
+        rd = rd[0]
     else:
         # Unable to find the docket entry the normal way. In appellate courts, this
         # can be because the main document was converted to an attachment, leaving no
@@ -641,14 +641,7 @@ async def view_recap_document(
         if att_num:
             raise Http404("No RECAPDocument matches the given query.")
 
-        # check if the main document was converted to an attachment and
-        # if it was, redirect the user to the attachment page
-        rd = await RECAPDocument.objects.filter(
-            docket_entry__docket__id=docket_id,
-            document_number=doc_num,
-            attachment_number=1,
-        ).afirst()
-        if rd:
+        if list(filter(lambda x: x.attachment_number == 1, rds)):
             # Get the URL to the attachment page and use the querystring
             # if the request included one
             attachment_page = reverse(
@@ -719,6 +712,17 @@ async def view_recap_document(
     rd.prayer_count = prayer_counts.get(rd.id, 0)
     rd.prayer_exists = existing_prayers.get(rd.id, False)
 
+    # Add context for attachments
+    attachments = None
+    next_doc = None
+    if len(rds) > 1:
+        attachments = rds
+        next_doc_index = rds.index(rd) + 1
+        if next_doc_index == len(rds):
+            # Wrap to first doc
+            next_doc_index = 0
+        next_doc = rds[next_doc_index]
+
     return TemplateResponse(
         request,
         "recap_document.html",
@@ -731,6 +735,8 @@ async def view_recap_document(
             "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
             "authorities": await rd.cited_opinions.aexists(),
+            "next_doc": next_doc,
+            "attachments": attachments,
         },
     )
 
