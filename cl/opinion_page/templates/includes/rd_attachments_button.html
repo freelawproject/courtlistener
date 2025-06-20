@@ -2,11 +2,16 @@
   <a href="{{ next_doc.get_absolute_url }}"
      role="button"
      class="btn btn-warning">
-     {% if next_doc.description %}
-      {{ next_doc.description|truncatechars:30 }}
+    {% if next_doc.document_type == next_doc.ATTACHMENT %}
+      #{{ next_doc.attachment_number }}
+      {% if next_doc.description %}
+        {{ next_doc.description|truncatechars:30 }}
+      {% else %}
+        Attachment
+      {% endif %}
     {% else %}
-      {% if next_doc.document_type == next_doc.ATTACHMENT %}
-        Attachment {{ next_doc.attachment_number }}
+      {% if next_doc.description %}
+        {{ next_doc.description|truncatechars:30 }}
       {% else %}
         Document {{ next_doc.docket_entry.entry_number }}
       {% endif %}
@@ -26,11 +31,16 @@
       <li>
         <a href="{{ doc.get_absolute_url }}">
         {% if doc == rd %}«{%else%}&nbsp;&nbsp;{% endif %}
-        {% if doc.description %}
-          {{ doc.description|truncatechars:30 }}
+        {% if doc.document_type == doc.ATTACHMENT %}
+          #{{ doc.attachment_number }}
+          {% if doc.description %}
+            {{ doc.description|truncatechars:30 }}
+          {% else %}
+            Attachment
+          {% endif %}
         {% else %}
-          {% if doc.document_type == doc.ATTACHMENT %}
-            Attachment {{ doc.attachment_number }}
+          {% if doc.description %}
+            {{ doc.description|truncatechars:30 }}
           {% else %}
             Document {{ doc.docket_entry.entry_number }}
           {% endif %}
