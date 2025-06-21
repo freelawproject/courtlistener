@@ -44,4 +44,8 @@
   </div>
   {% include "includes/rd_doc_search_button.html" %}
   {% include "includes/rd_download_button.html" %}
+  {% if next_doc %}
+    {% include "includes/rd_attachments_button.html" %}
+  {% endif %}
+
 </div>
