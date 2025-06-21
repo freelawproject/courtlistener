@@ -1904,6 +1904,7 @@ def save_embeddings(
     ),
     max_retries=5,
     retry_backoff=10,
+    ignore_result=True,
 )
 def retrieve_embeddings(
     self,
@@ -1967,7 +1968,7 @@ def retrieve_embeddings(
 def index_embeddings(
     self: Task,
     embeddings: list[dict],
-) -> SaveESDocumentReturn | None:
+) -> None:
     """Update opinion documents in bulk with embeddings.
 
     :param self: The Celery task instance.
@@ -1999,7 +2000,7 @@ def index_embeddings(
         documents_to_update.append(doc_to_update)
 
     if not documents_to_update:
-        return
+        return None
 
     index_documents_in_bulk(documents_to_update)
 
