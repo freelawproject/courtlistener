@@ -158,13 +158,13 @@
                   {% else %}
                     {# We don't have it #}
                     {% if rd.is_sealed %}
-                      <div class="btn-group btn-group-xs">
-                        <button type="button" class="btn btn-primary btn-xs" disabled>
-                          Unavailable on PACER
+                      <div class="btn-group btn-group-xs flex">
+                        <button type="button" class="btn btn-primary btn-xs btn-sealed" disabled>
+                          Unavailable
                         </button>
                         {% if rd.pacer_url %}
                           <button type="button"
-                                  class="btn btn-primary btn-xs dropdown-toggle dropdown-toggle-split"
+                                  class="btn btn-primary toggle-disable btn-xs dropdown-toggle dropdown-toggle-split"
                                   data-toggle="dropdown"
                                   aria-haspopup="true"
                                   aria-expanded="false">
@@ -187,7 +187,7 @@
                           </ul>
                         {% endif %}
                       </div>
-                      <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
+                      <div class="prayer-button" data-gap-size="{% if rd.pacer_url %}small{% else %}large{% endif %}">
                         {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count %}
                       </div>
                     {% else %}
