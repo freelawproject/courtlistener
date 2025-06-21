@@ -247,6 +247,26 @@ class MediumAdjustablePagination(VersionBasedPagination):
     page_size_query_param = "page_size"
 
 
+class LargePagePagination(VersionBasedPagination):
+    """Pagination that allows larger page sizes when plain text is excluded."""
+
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 250
+
+    def get_page_size(self, request: Request) -> int | None:  # type: ignore[override]
+        size = super().get_page_size(request)
+        if not size:
+            return size
+        include_plain = (
+            request.query_params.get("include_plain_text", "true").lower()
+            == "true"
+        )
+        if include_plain and size > 20:
+            return 20
+        return size
+
+
 class BigPagination(VersionBasedPagination):
     page_size = 300
 

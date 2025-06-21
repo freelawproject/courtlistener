@@ -134,6 +134,13 @@ class RECAPDocumentSerializer(
         exclude = ("docket_entry",)
 
 
+class RECAPDocumentLiteSerializer(RECAPDocumentSerializer):
+    """Serializer that omits the ``plain_text`` field."""
+
+    class Meta(RECAPDocumentSerializer.Meta):
+        exclude = RECAPDocumentSerializer.Meta.exclude + ("plain_text",)
+
+
 class DocketEntrySerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
@@ -148,6 +155,12 @@ class DocketEntrySerializer(
     class Meta:
         model = DocketEntry
         fields = "__all__"
+
+
+class DocketEntryLiteSerializer(DocketEntrySerializer):
+    """Serializer that uses :class:`RECAPDocumentLiteSerializer`."""
+
+    recap_documents = RECAPDocumentLiteSerializer(many=True, read_only=True)
 
 
 class FullDocketSerializer(DocketSerializer):
