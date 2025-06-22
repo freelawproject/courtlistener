@@ -99,15 +99,17 @@ class CreateAlertForm(ModelForm):
                 # exclude the alert being edited from the count
                 alerts_count = alerts_count.exclude(pk=self.instance.pk)
             used = alerts_count.count()
-            profile_url = reverse("profile_alerts")
+            profile_url = reverse("profile_search_alerts")
 
             if used + 1 > allowed:
                 if is_member:
+                    neon_id = self.user.membership.neon_id
+                    upgrade_flp_membership = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
                     msg = format_html(
                         "You've used all of the alerts included with your membership. "
                         "To create this alert, <a href='{}' target='_blank'>upgrade your membership</a> or "
                         "<a href='{}'>disable a RECAP Alert</a>.",
-                        flp_membership,
+                        upgrade_flp_membership,
                         profile_url,
                     )
                 else:

@@ -87,7 +87,7 @@ class Command(VerboseCommand):
                 f"Auto-resume enabled starting embeddings indexing from ID: {start_id}."
             )
 
-        opinions = Opinion.objects.filter(id__gte=start_id)
+        opinions = Opinion.objects.filter(id__gte=start_id).order_by("pk")
         # Limit opinions to retrieve if count was provided.
         opinions_to_process = (
             opinions[:count] if count is not None else opinions

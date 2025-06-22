@@ -491,6 +491,9 @@ class NoFilterCacheListMixin:
         has_pagination = request.query_params.get(
             "cursor"
         ) or request.query_params.get("page")
+        has_dynamic_fields = request.query_params.get(
+            "fields"
+        ) or request.query_params.get("omit")
         is_v3_request = request.version == "v3"
 
         # Determine the cache key prefix. Uses a custom key if provided,
@@ -513,6 +516,7 @@ class NoFilterCacheListMixin:
         should_cache_response = (
             not is_v3_request
             and not has_pagination
+            and not has_dynamic_fields
             and (is_count_request or not has_filters)
         )
         if should_cache_response:

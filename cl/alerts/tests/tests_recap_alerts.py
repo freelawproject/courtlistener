@@ -55,12 +55,17 @@ from cl.search.documents import (
 )
 from cl.search.factories import (
     BankruptcyInformationFactory,
+    CitationWithParentsFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionClusterFactory,
+    OpinionFactory,
     RECAPDocumentFactory,
 )
-from cl.search.models import Docket
-from cl.search.tasks import index_docket_parties_in_es
+from cl.search.models import Docket, RECAPDocument
+from cl.search.tasks import (
+    index_docket_parties_in_es,
+)
 from cl.stats.models import Stat
 from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
@@ -4757,3 +4762,152 @@ class RECAPAlertsPercolatorTest(
         docket_only_alert.delete()
         docket.delete()
         docket_2.delete()
+
+    def test_percolate_rd_upon_cites_fields_update(self, mock_prefix) -> None:
+        """Test RECAPDocument percolation to match queries that involve the
+        cites field.
+        """
+
+        rd_indexing_time = self.mock_date - datetime.timedelta(seconds=15)
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion = OpinionFactory(
+                cluster=OpinionClusterFactory(docket=self.de.docket)
+            )
+            rd_cites_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Opinion cites",
+                query=f"q=cites:{opinion.pk}&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=self.de,
+                description="Motion to File",
+                document_number="5",
+                pacer_doc_id=3243434,
+                is_available=True,
+            )
+            CitationWithParentsFactory.create(
+                volume="948",
+                reporter="F.3d",
+                page="593",
+                cluster=opinion.cluster,
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            mock.patch(
+                "cl.alerts.tasks.prepare_percolator_content",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    prepare_percolator_content, *args, **kwargs
+                ),
+            ),
+            time_machine.travel(rd_indexing_time, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd.plain_text = (
+                "In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020)"
+            )
+            rd.ocr_status = RECAPDocument.OCR_COMPLETE
+            rd.save(
+                update_fields=["ocr_status", "plain_text"],
+            )
+
+        # A single percolator call upon plain_text extraction and citation matching.
+        self.reset_and_assert_percolator_count(expected=1)
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        txt_content = mail.outbox[0].body
+
+        self.assertIn(rd_cites_alert.name, html_content)
+        self.assertIn(rd_cites_alert.name, txt_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            rd_cites_alert.name,
+            1,
+            self.rd.docket_entry.docket.case_name,
+            1,
+        )
+
+    def test_percolates_rd_upon_plain_text_extraction_if_no_citations(
+        self, mock_prefix
+    ) -> None:
+        """The RECAPDocument percolation upon the plain_text extraction is delayed
+        in order to avoid two percolation requests if the plain_text contains
+        citations. But in case no citations are found the document should still
+        be percolated to match other types of alerts with no citations.
+        """
+
+        rd_indexing_time = self.mock_date - datetime.timedelta(seconds=15)
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_no_cites = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Opinion cites",
+                query="q=Plain text extracted&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=self.de,
+                description="Motion to File",
+                document_number="6",
+                pacer_doc_id=3243478,
+                is_available=True,
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            mock.patch(
+                "cl.alerts.tasks.prepare_percolator_content",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    prepare_percolator_content, *args, **kwargs
+                ),
+            ),
+            time_machine.travel(rd_indexing_time, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd.plain_text = "Plain text extracted no citations."
+            rd.ocr_status = RECAPDocument.OCR_COMPLETE
+            rd.save(
+                update_fields=["ocr_status", "plain_text"],
+            )
+
+        # A single percolator call upon plain_text extraction and citation matching.
+        self.reset_and_assert_percolator_count(expected=1)
+
+        # The plain_text alert should be triggered.
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        txt_content = mail.outbox[0].body
+
+        self.assertIn(rd_no_cites.name, html_content)
+        self.assertIn(rd_no_cites.name, txt_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            rd_no_cites.name,
+            1,
+            self.rd.docket_entry.docket.case_name,
+            1,
+        )

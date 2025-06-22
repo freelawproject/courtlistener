@@ -378,9 +378,7 @@
   "date_modified": "2023-03-31T07:15:28.409594-07:00"
 },
 ...</pre>
-    <p>You can also exclude fields using <code>fields!=educations,date_modified</code>.
-    </p>
-    <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/wimglenn/djangorestframework-queryfields/issues/8" target="_blank">there is an open issue tracking this</a>.
+    <p>You can also exclude fields using <code>omit=educations,date_modified</code>. Unfortunately, this cannot currently be used for nested resources.
     </p>
 
     <h3 id="pagination">Pagination</h3>

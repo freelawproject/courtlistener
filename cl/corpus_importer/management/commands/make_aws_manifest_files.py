@@ -726,6 +726,10 @@ def compute_monthly_export(
     upload_list_of_records_for_users(
         record_type, options["bucket_name"], record_ids
     )
+    # If no records are found, there's no need to schedule a batch job.
+    if not record_ids:
+        return
+
     create_and_execute_batch_job(
         record_type,
         options["bucket_name"],

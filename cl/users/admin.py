@@ -11,7 +11,7 @@ from cl.donate.admin import (
     MonthlyDonationInline,
     NeonMembershipInline,
 )
-from cl.favorites.admin import NoteInline, UserTagInline
+from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
 from cl.lib.admin import AdminTweaksMixin, build_admin_url
 from cl.users.models import (
     BarMembership,
@@ -23,6 +23,7 @@ from cl.users.models import (
 
 UserProxyEvent = apps.get_model("users", "UserProxyEvent")
 UserProfileEvent = apps.get_model("users", "UserProfileEvent")
+UserSearchQuery = apps.get_model("search", "SearchQuery")
 
 
 class TokenInline(admin.StackedInline):
@@ -55,13 +56,14 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         UserProfileInline,
         DonationInline,
         MonthlyDonationInline,
+        PrayerInline,
         AlertInline,
         DocketAlertInline,
-        WebhookInline,
         NoteInline,
         UserTagInline,
-        TokenInline,
         NeonMembershipInline,
+        TokenInline,
+        WebhookInline,
     )
     list_display = (
         "username",
@@ -98,6 +100,12 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
             extra_context["profile_events_url"] = build_admin_url(
                 UserProfileEvent,
                 {"pgh_obj": profile_id},
+            )
+
+        if user and hasattr(user, "search_queries"):
+            extra_context["search_queries_url"] = build_admin_url(
+                UserSearchQuery,
+                {"user": object_id},
             )
 
         return super().change_view(

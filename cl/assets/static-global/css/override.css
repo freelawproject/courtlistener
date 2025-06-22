@@ -354,6 +354,10 @@ a.button:active {
     font-size: 12px;
   }
 
+  .flex-sm-column {
+    flex-direction: column;
+  }
+
 }
 
 @media (min-width: 992px) {
@@ -377,6 +381,10 @@ a.button:active {
 @media (min-width: 1200px) {
   #main-query-box #id_q, #main-query-box #id_full_citation {
     width: 800px;
+  }
+
+  .flex-lg-row {
+    flex-direction: row;
   }
 }
 
@@ -907,8 +915,18 @@ input.court-checkbox, input.status-checkbox {
   width: 60px;
 }
 
-#id_filed_after, #id_filed_before {
+#id_filed_after,
+#id_filed_before,
+#id_entry_date_filed_after,
+#id_entry_date_filed_before {
   width: 95px;
+}
+
+#advanced-page #id_filed_after,
+#advanced-page #id_filed_before,
+#advanced-page #id_entry_date_filed_after,
+#advanced-page #id_entry_date_filed_before {
+  width: auto;
 }
 
 #docket-entry-table .row {
@@ -1933,4 +1951,12 @@ rect.series-segment {
 .link-red a {
   color: #8a1f11;
   text-decoration: underline;
+}
+
+.btn-sealed{
+  min-width: 96px;
+}
+
+.toggle-disable{
+  opacity: 0.65;
 }

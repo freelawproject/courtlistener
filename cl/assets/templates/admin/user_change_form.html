@@ -4,14 +4,21 @@
   {% if proxy_events_url %}
     <li>
       <a class="historylink" href="{{ proxy_events_url }}">
-        View UserProxy Events
+        UserProxy Events
       </a>
     </li>
   {% endif %}
   {% if profile_events_url %}
     <li>
       <a class="historylink" href="{{ profile_events_url }}">
-        View UserProfile Events
+        UserProfile Events
+      </a>
+    </li>
+  {% endif %}
+  {% if search_queries_url %}
+    <li>
+      <a class="historylink" href="{{ search_queries_url }}">
+        Search Queries
       </a>
     </li>
   {% endif %}

@@ -26,6 +26,7 @@ class WebhookAdmin(admin.ModelAdmin):
 
 class WebhookInline(admin.TabularInline):
     model = Webhook
+    extra = 1
 
 
 @admin.register(WebhookEvent)

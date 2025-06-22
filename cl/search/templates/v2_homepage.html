@@ -4,7 +4,12 @@
 {% block title %}Non-Profit Free Legal Search Engine and Alert System – CourtListener.com{% endblock %}
 
 {% block header %}
-  <c-header variant="homepage" class="bg-greyscale-100"></c-header>
+  <c-header
+    :request="request"
+    variant="homepage"
+    class="bg-greyscale-100"
+    only
+  ></c-header>
 {% endblock %}
 
 {% block content_wrapper %}

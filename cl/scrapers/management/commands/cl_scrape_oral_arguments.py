@@ -20,6 +20,7 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.tasks import process_audio_file
 from cl.scrapers.utils import (
+    check_duplicate_ingestion,
     get_binary_content,
     get_extension,
     update_or_create_docket,
@@ -102,7 +103,7 @@ def make_objects(
     file_name = trunc(item["case_names"].lower(), 75) + extension
     audio_file.file_with_date = docket.date_argued
     audio_file.local_path_original_file.save(file_name, cf, save=False)
-
+    check_duplicate_ingestion(audio_file.local_path_original_file.name)
     return docket, audio_file
 
 

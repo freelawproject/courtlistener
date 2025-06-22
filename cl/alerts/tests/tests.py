@@ -332,6 +332,9 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             "You've used all of the alerts included with your membership.",
             content,
         )
+        neon_id = self.user_member_tier_1.user.membership.neon_id
+        expected_upgrade_url = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
+        self.assertIn(expected_upgrade_url, content)
 
         # no new alert should be created
         self.assertEqual(await alert_user.acount(), 5)
@@ -353,6 +356,10 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             "You've used all of the alerts included with your membership.",
             content,
         )
+        neon_id = self.user_member.user.membership.neon_id
+        expected_upgrade_url = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
+        self.assertIn(expected_upgrade_url, content)
+
         alerts = Alert.objects.filter(user=self.user_member.user)
         self.assertEqual(await alerts.acount(), 0)
 
@@ -468,6 +475,9 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             "You've used all of the alerts included with your membership.",
             content,
         )
+        neon_id = self.user_member_tier_1.user.membership.neon_id
+        expected_upgrade_url = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
+        self.assertIn(expected_upgrade_url, content)
 
         # no new alert should be created
         self.assertEqual(await alerts.acount(), 10)

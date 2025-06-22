@@ -224,3 +224,4 @@ class PrayerAvailability(models.Model):
                 include=["last_checked"],
             ),
         ]
+        verbose_name_plural = "Prayer Availabilities"
