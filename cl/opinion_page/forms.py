@@ -494,7 +494,7 @@ class BaseCourtUploadForm(forms.Form):
             self.cleaned_data.get("pdf_upload"),
         )
 
-        if not citations:
+        if not citations and "citations" in self.fields:
             logger.warning(
                 f"Citation not found for court id: {self.cleaned_data.get('court_str')} form"
             )
