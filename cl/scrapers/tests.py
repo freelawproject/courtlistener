@@ -37,6 +37,7 @@ from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
     case_names_are_too_different,
+    check_duplicate_ingestion,
     get_binary_content,
     get_existing_docket,
     get_extension,
@@ -352,6 +353,16 @@ class IngestionTest(TestCase):
         extract_doc_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("ideal", txt_opinion.plain_text.lower())
+
+    def test_duplicate_ingestion_warnings(self) -> None:
+        """Can we detect duplicate ingestion"""
+        with mock.patch.object(logger, "error") as error_mock:
+            check_duplicate_ingestion("pdf/2025/06/05/state_v._walsh_1.pdf")
+            error_mock.assert_not_called()
+            check_duplicate_ingestion(
+                "html/2025/04/25/zelka_h.v.a.c._maintenance_solutions_inc._v._g.m._crisalli__assoc._inc._12.html"
+            )
+            error_mock.assert_called()
 
 
 class ExtensionIdentificationTest(SimpleTestCase):

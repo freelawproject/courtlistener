@@ -3554,6 +3554,29 @@ class CacheListApiResponseTest(TestCase):
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
 
+    def test_count_request_with_filters_not_cached(
+        self, mock_cache_key_method
+    ):
+        """
+        Test that a v4 count request is not cached when filters are applied.
+        """
+        fake_cache_key = "count_request_w_filters_no_cache"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Resolve the URL for the 'docket-list' endpoint and add the count
+        # parameter
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"count": "on", "pacer_case_id": 533886}
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Make the request with filters
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
     def test_no_filters_ordering_request_cached(self, mock_cache_key_method):
         """
         Test that a ordered response is cached when no filters are requested.
@@ -3614,6 +3637,39 @@ class CacheListApiResponseTest(TestCase):
         params = {"cursor": cursor}
 
         # Make the request with cursor pagination
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+    def test_dynamic_fields_applied_not_cached(self, mock_cache_key_method):
+        """
+        Test that responses with dynamic 'fields' or 'omit' parameters are not cached.
+        """
+        fake_cache_key = "cache_dynamic_fields"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Resolve the URL for the 'docket-list' endpoint
+        path = reverse("docket-list", kwargs={"version": "v4"})
+
+        # --- Test with 'fields' parameter ---
+        # Define parameters to request specific fields.
+        params = {"fields": "id"}
+
+        # Make the request with the fields param
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # --- Test with 'omit' parameter ---
+        # Define parameters to omit specific fields.
+        params = {"omit": "id"}
+
+        # Make the request with the omit param
         self.client.get(path, params)
 
         # Confirm the cache key still does not exist after the request
