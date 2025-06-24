@@ -1,6 +1,7 @@
 from math import ceil
 
 import nh3
+from django.conf import settings
 from django.contrib.humanize.templatetags.humanize import intword
 from django.db.models import QuerySet
 
@@ -10,7 +11,7 @@ from cl.search.models import Opinion, RECAPDocument
 
 
 def get_recap_random_dataset(
-    percentage: float = 0.1,
+    percentage: float = 0.1, db_connection: str = "default"
 ) -> QuerySet[RECAPDocument]:
     """
     Creates a queryset that retrieves a random sample of RECAPDocuments from
@@ -23,18 +24,20 @@ def get_recap_random_dataset(
     Args:
         percentage (float): A floating-point value between 0 and 100(inclusive)
          representing the percentage of documents to sample. Defaults to 0.1.
+        db_connection (str): The database connection alias to use for the
+            query. Defaults to "default".
 
     Returns:
         A Django QuerySet containing a random sample of RECAPDocument objects.
     """
-    return RECAPDocument.objects.raw(
+    return RECAPDocument.objects.using(db_connection).raw(
         f"SELECT * FROM search_recapdocument TABLESAMPLE SYSTEM ({percentage}) "
         "where is_available= True and plain_text <> '' and page_count > 0"
     )
 
 
 def get_opinions_random_dataset(
-    percentage: float = 0.1,
+    percentage: float = 0.1, db_connection: str = "default"
 ) -> QuerySet[Opinion]:
     """
     Creates a queryset that retrieves a random sample of Opinions from the
@@ -43,11 +46,13 @@ def get_opinions_random_dataset(
     Args:
         percentage (float): A floating-point value between 0 and 100(inclusive)
          representing the percentage of documents to sample. Defaults to 0.1.
+        db_connection (str): The database connection alias to use for the
+            query. Defaults to "default".
 
     Returns:
         A Django QuerySet containing a random sample of Opinion objects.
     """
-    return Opinion.objects.raw(
+    return Opinion.objects.using(db_connection).raw(
         f"SELECT * FROM search_opinion TABLESAMPLE SYSTEM ({percentage}) "
     )
 
@@ -125,10 +130,21 @@ class Command(VerboseCommand):
                 "100.0 percent). Defaults to 1.0."
             ),
         )
+        parser.add_argument(
+            "--use-replica",
+            action="store_true",
+            default=False,
+            help="Use this flag to run the queries in the replica db",
+        )
 
     def handle(self, *args, **options):
         percentage = options["percentage"]
-        rd_queryset = get_recap_random_dataset(percentage)
+        db_connection = (
+            "replica"
+            if options["use_replica"] and "replica" in settings.DATABASES
+            else "default"
+        )
+        rd_queryset = get_recap_random_dataset(percentage, db_connection)
 
         token_count = []
         tokens_per_page = []
@@ -151,7 +167,8 @@ class Command(VerboseCommand):
             "Counting the total number of documents in the Archive."
         )
         total_recap_documents = (
-            RECAPDocument.objects.filter(is_available=True)
+            RECAPDocument.objects.using(db_connection)
+            .filter(is_available=True)
             .exclude(plain_text__exact="")
             .all()
             .count()
@@ -173,7 +190,9 @@ class Command(VerboseCommand):
             f"Total number of tokens in the recap archive: {intword(total_token_in_recap)}"
         )
 
-        opinion_queryset = get_opinions_random_dataset(percentage)
+        opinion_queryset = get_opinions_random_dataset(
+            percentage, db_connection
+        )
         self.stdout.write("Starting to retrieve the random Opinion dataset.")
         token_count = []
         words_per_opinion = []
@@ -191,7 +210,7 @@ class Command(VerboseCommand):
         self.stdout.write(
             "Counting the total number of Opinions in the Archive."
         )
-        total_opinions = Opinion.objects.all().count()
+        total_opinions = Opinion.objects.using(db_connection).all().count()
         total_token_in_caselaw = avg_tokens_per_opinion * total_opinions
 
         self.stdout.write(f"Size of the dataset: {len(token_count)}")
