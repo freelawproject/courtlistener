@@ -122,6 +122,14 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "--type",
+            type=str,
+            choices=["recap", "caselaw"],
+            required=True,
+            help="Specify which dataset to compute token count for: 'recap' "
+            "or 'caselaw'.",
+        )
+        parser.add_argument(
             "--percentage",
             type=float,
             default=1.0,
@@ -137,13 +145,57 @@ class Command(VerboseCommand):
             help="Use this flag to run the queries in the replica db",
         )
 
-    def handle(self, *args, **options):
-        percentage = options["percentage"]
-        db_connection = (
-            "replica"
-            if options["use_replica"] and "replica" in settings.DATABASES
-            else "default"
+    def _compute_case_law_token_count(
+        self, percentage: float, db_connection: str
+    ):
+        """
+        Computes and reports token counts for Caselaw dataset.
+        """
+        opinion_queryset = get_opinions_random_dataset(
+            percentage, db_connection
         )
+        self.stdout.write("Starting to retrieve the random Opinion dataset.")
+        token_count = []
+        words_per_opinion = []
+        for opinion in opinion_queryset.iterator():
+            text = get_clean_opinion_text(opinion)
+            count = get_token_count_from_string(text)
+            words_per_opinion.append(len(text.split()))
+            token_count.append(count)
+
+        self.stdout.write("Computing averages.")
+        sample_size = len(token_count)
+        avg_tokens_per_opinion = compute_avg_from_list(token_count)
+        avg_words_per_opinion = compute_avg_from_list(words_per_opinion)
+
+        self.stdout.write(
+            "Counting the total number of Opinions in the Archive."
+        )
+        total_opinions = Opinion.objects.using(db_connection).all().count()
+        total_token_in_caselaw = avg_tokens_per_opinion * total_opinions
+
+        self.stdout.write(f"Size of the dataset: {len(token_count)}")
+        self.stdout.write(
+            f"Average tokens per opinion: {avg_tokens_per_opinion}"
+        )
+        self.stdout.write(
+            f"Average words per opinion: {avg_words_per_opinion}"
+        )
+        self.stdout.write("-" * 20)
+        self.stdout.write(f"Total number of opinions: {total_opinions}")
+        self.stdout.write(
+            f"The sample represents {sample_size / total_opinions:.3%} of the Caselaw"
+        )
+        self.stdout.write(
+            f"Total number of tokens in caselaw: {intword(total_token_in_caselaw)}"
+        )
+
+    def _compute_recap_token_count(
+        self, percentage: float, db_connection: str
+    ):
+        """
+        Computes and reports token counts for RECAP Documents.
+        """
         rd_queryset = get_recap_random_dataset(percentage, db_connection)
 
         token_count = []
@@ -190,41 +242,16 @@ class Command(VerboseCommand):
             f"Total number of tokens in the recap archive: {intword(total_token_in_recap)}"
         )
 
-        opinion_queryset = get_opinions_random_dataset(
-            percentage, db_connection
+    def handle(self, *args, **options):
+        percentage = options["percentage"]
+        db_connection = (
+            "replica"
+            if options["use_replica"] and "replica" in settings.DATABASES
+            else "default"
         )
-        self.stdout.write("Starting to retrieve the random Opinion dataset.")
-        token_count = []
-        words_per_opinion = []
-        for opinion in opinion_queryset.iterator():
-            text = get_clean_opinion_text(opinion)
-            count = get_token_count_from_string(text)
-            words_per_opinion.append(len(text.split()))
-            token_count.append(count)
+        dataset_type = options["type"]
 
-        self.stdout.write("Computing averages.")
-        sample_size = len(token_count)
-        avg_tokens_per_opinion = compute_avg_from_list(token_count)
-        avg_words_per_opinion = compute_avg_from_list(words_per_opinion)
-
-        self.stdout.write(
-            "Counting the total number of Opinions in the Archive."
-        )
-        total_opinions = Opinion.objects.using(db_connection).all().count()
-        total_token_in_caselaw = avg_tokens_per_opinion * total_opinions
-
-        self.stdout.write(f"Size of the dataset: {len(token_count)}")
-        self.stdout.write(
-            f"Average tokens per opinion: {avg_tokens_per_opinion}"
-        )
-        self.stdout.write(
-            f"Average words per opinion: {avg_words_per_opinion}"
-        )
-        self.stdout.write("-" * 20)
-        self.stdout.write(f"Total number of opinions: {total_opinions}")
-        self.stdout.write(
-            f"The sample represents {sample_size / total_opinions:.3%} of the Caselaw"
-        )
-        self.stdout.write(
-            f"Total number of tokens in caselaw: {intword(total_token_in_caselaw)}"
-        )
+        if dataset_type == "recap":
+            self._compute_recap_token_count(percentage, db_connection)
+        else:
+            self._compute_case_law_token_count(percentage, db_connection)
