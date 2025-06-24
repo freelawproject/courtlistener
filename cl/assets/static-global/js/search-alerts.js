@@ -6,6 +6,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const FreeRTMsg = document.getElementById('msg-rt-free');
   const FreeQuotaMsg = document.getElementById('msg-quota-free');
   const MemberQuotaMsg = document.getElementById('msg-quota-member');
+  const NoMemberButton = document.getElementById('no-member-button');
+  const MemberButton = document.getElementById('member-button');
 
   // Opinions and OA alerts limits logic
   function otherAlerts() {
@@ -35,12 +37,15 @@ document.addEventListener('DOMContentLoaded', function () {
     quotaWarning.classList.add('hidden');
     FreeQuotaMsg.classList.add('hidden');
     MemberQuotaMsg.classList.add('hidden');
+    NoMemberButton.classList.add('hidden');
+    MemberButton.classList.add('hidden');
     FreeRTMsg.classList.add('hidden');
     saveBtn.disabled = false;
     if (rateValue === 'rt' && !isMember) {
       // Display the custom RT alert message for free users.
       quotaWarning.classList.remove('hidden');
       FreeRTMsg.classList.remove('hidden');
+      NoMemberButton.classList.remove('hidden');
       saveBtn.disabled = true;
       return;
     }
@@ -49,9 +54,11 @@ document.addEventListener('DOMContentLoaded', function () {
       if (isMember) {
         // Member has reached the quota for this rate group.
         MemberQuotaMsg.classList.remove('hidden');
+        MemberButton.classList.remove('hidden');
       } else {
         // Free user has reached their quota for other rates.
         FreeQuotaMsg.classList.remove('hidden');
+        NoMemberButton.classList.remove('hidden');
       }
       // Show the limit warning if the quota has been reached and the user is not editing their alerts.
       quotaWarning.classList.remove('hidden');

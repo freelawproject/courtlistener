@@ -21,6 +21,12 @@ class NoteInline(admin.TabularInline):
     )
 
 
+class PrayerInline(admin.TabularInline):
+    model = Prayer
+    raw_id_fields = ("recap_document",)
+    extra = 1
+
+
 @admin.register(Note)
 class NoteAdmin(admin.ModelAdmin):
     list_display = (

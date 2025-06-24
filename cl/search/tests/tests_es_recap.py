@@ -657,6 +657,28 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "filed_before")
 
+    async def test_entry_filed_after_filter(self) -> None:
+        """Confirm entry_filed_after filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_after": "2015-08-19",
+        }
+
+        # Frontend
+        r = await self._test_article_count(params, 1, "filed_after")
+        self.assertIn(self.de.description, r.content.decode())
+
+    async def test_entry_filed_before_filter(self) -> None:
+        """Confirm entry_filed_before filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_before": "2014-07-05",
+        }
+
+        # Frontend, 1 result expected since RECAPDocuments are grouped by case
+        r = await self._test_article_count(params, 1, "filed_before")
+        self.assertIn(self.de_1.description, r.content.decode())
+
     async def test_document_number_filter(self) -> None:
         """Confirm document number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "document_number": "3"}
@@ -3098,6 +3120,90 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         d_2.delete()
         d_3.delete()
 
+    def test_relative_dates_entry_filed_filtering(self):
+        """Confirm that the relative date filter works properly for the
+        entry_date_filed  field by returning the expected documents within
+        the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            de_1 = DocketEntryWithParentsFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="SUBPOENAS SERVED 9 days ago",
+            )
+
+            # 40 days ago
+            de_2 = DocketEntryWithParentsFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=de_2,
+                description="SUBPOENAS SERVED 40 days ago",
+            )
+
+            # 400 days ago
+            de_3 = DocketEntryWithParentsFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+            )
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=de_3,
+                description="SUBPOENAS SERVED 400 days ago",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No document within the range.
+            ("9d ago", [rd_1]),  # Only the 9-day old
+            ("past 10 days", [rd_1]),  # Only the 9-day old
+            ("30d ago", [rd_1]),  # only the 9-day old
+            ("60d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1m ago", [rd_1]),  # only the 9-day old
+            ("2m ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("365d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1y ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("2y ago", [rd_1, rd_2, rd_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                cd = {**params, "entry_date_filed_after": relative_date}
+                r = async_to_sync(self._test_article_count)(
+                    cd,
+                    len(expected_cases),
+                    f"entry_date_filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for rd in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(rd.description, r.content.decode())
+
+        de_1.docket.delete()
+        de_2.docket.delete()
+        de_3.docket.delete()
+
     def test_invalid_relative_date_syntax(self):
         """Confirm that a custom error is displayed to users when they enter an
         invalid relative date syntax.
@@ -3660,6 +3766,32 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         await self._test_api_results_count(
             params, expected_results, "filed_before"
         )
+
+    @skip_if_common_tests_skipped
+    async def test_entry_filed_after_filter(self) -> None:
+        """Confirm entry_filed_after filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_after": "2020-08-19",
+        }
+        # API
+        r = await self._test_api_results_count(
+            params, 1, "entry_date_filed_after"
+        )
+        self.assertIn(self.de_api.description, r.content.decode())
+
+    @skip_if_common_tests_skipped
+    async def test_entry_filed_before_filter(self) -> None:
+        """Confirm entry_filed_before filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_before": "2014-07-05",
+        }
+        # API, 1 result expected since RECAPDocuments are grouped by case
+        r = await self._test_api_results_count(
+            params, 1, "entry_date_filed_before"
+        )
+        self.assertIn(self.de_1.description, r.content.decode())
 
     @skip_if_common_tests_skipped
     async def test_document_number_filter(self) -> None:
@@ -5811,6 +5943,97 @@ class RECAPSearchAPIV4Test(
         d_1.delete()
         d_2.delete()
         d_3.delete()
+
+    def test_relative_dates_entry_filed_filtering(self):
+        """Confirm that the relative date filter works properly for the
+        entry_date_filed  field by returning the expected documents within
+        the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            de_1 = DocketEntryWithParentsFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="SUBPOENAS SERVED 9 days ago",
+            )
+
+            # 40 days ago
+            de_2 = DocketEntryWithParentsFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=de_2,
+                description="SUBPOENAS SERVED 40 days ago",
+            )
+
+            # 400 days ago
+            de_3 = DocketEntryWithParentsFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+            )
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=de_3,
+                description="SUBPOENAS SERVED 400 days ago",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No document within the range.
+            ("9d ago", [rd_1]),  # Only the 9-day old
+            ("past 10 days", [rd_1]),  # Only the 9-day old
+            ("30d ago", [rd_1]),  # only the 9-day old
+            ("60d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1m ago", [rd_1]),  # only the 9-day old
+            ("2m ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("365d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1y ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("2y ago", [rd_1, rd_2, rd_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                search_params = {
+                    **params,
+                    "entry_date_filed_after": relative_date,
+                }
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertEqual(
+                    len(r.data["results"]),
+                    len(expected_cases),
+                    f"entry_date_filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for rd in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(rd.description, r.content.decode())
+
+        de_1.docket.delete()
+        de_2.docket.delete()
+        de_3.docket.delete()
 
     def test_invalid_relative_date_syntax(self):
         """Confirm that a custom error is displayed to users when they enter an
