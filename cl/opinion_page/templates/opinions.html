@@ -236,7 +236,7 @@
                             None known
                           {% endif %}
                         </li>
-                        {% if cluster.case_name_full != cluster|best_case_name %}
+                        {% if cluster.case_name_full != cluster|best_case_name  and cluster.case_name_full%}
                         <li><strong>Full Case Name:</strong>
                           <span class="select-all">{{ cluster.case_name_full }}</span>
                         </li>
@@ -286,7 +286,7 @@
                             <li><strong>Nature of Suit:</strong> {{ cluster.nature_of_suit }}</li>
                         {% endif %}
 
-                        {% if cluster.nature_of_suit %}
+                        {% if cluster.posture %}
                             <li><strong>Posture:</strong> {{ cluster.posture }}</li>
                         {% endif %}
 
