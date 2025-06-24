@@ -119,8 +119,11 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--percentage",
             type=float,
-            default=0.1,
-            help="specifies the proportion of the table to be sampled",
+            default=1.0,
+            help=(
+                "Specifies the proportion of the table to be sampled (0.0 to "
+                "100.0 percent). Defaults to 1.0."
+            ),
         )
 
     def handle(self, *args, **options):
