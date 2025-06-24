@@ -40,7 +40,6 @@
         <li><a href="#docket-examples">Example Usage</a></li>
       </ul>
       <li><a href="#relative-dates-help">Help with Relative Date Queries</a></li>
-      <li><a href="#coming-soon">Coming Soon</a></li>
     </ul>
   </div>
 </div>
@@ -77,10 +76,9 @@
       <li><code>wly</code> — Weekly</li>
       <li><code>mly</code> — Monthly</li>
     </ul>
-    <li><strong><code>alert_type</code></strong> &mdash; This is an optional field. It is specifically useful for RECAP Search alerts, where you can specify whether you want alerts for cases only or for both cases and filings.
+    <li><strong><code>alert_type</code></strong> &mdash; This is a required field for RECAP Search Alerts, but it is ignored for other types. When used with RECAP Search alerts, this field specifies whether you want alerts for each new case matching the query or for both new cases and new filings.
       For notifications on cases only, use the <code>d</code> type (short for "dockets").
       For notifications on both cases and filings, use the <code>r</code> type (meaning all of RECAP).
-      For other alert types, this field is ignored.
     </li>
   </ul>
   <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
@@ -187,10 +185,6 @@
   </p>
   <p>
     <a href="{% url "relative_dates" %}" class="btn btn-default btn-lg">Learn More</a>
-  </p>
-
-  <h2 id="coming-soon">Coming Soon</h2>
-  <p>We are currently developing a scalable alert system that will update you when keywords appear in PACER documents or cases. To join the beta test for this system, please <a href="{% url "contact" %}">get in touch</a>.
   </p>
 
   {% include "includes/donate_footer_plea.html" %}

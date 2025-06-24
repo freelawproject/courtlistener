@@ -116,7 +116,7 @@ def create_percolator_search_query(
     s = Search(index=index_name)
     s = s.query(final_query)
     s = s.source(includes=["id"])
-    s = s.sort("date_created")
+    s = s.sort("id")
     s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
     if search_after:
         s = s.extra(search_after=search_after)
@@ -227,9 +227,17 @@ def percolate_es_document(
                     percolate_query_parent,
                     search_after=d_search_after,
                 )
-        case _:
+        case "search.Docket":
             s = add_es_highlighting(
                 s, {"type": SEARCH_TYPES.RECAP}, alerts=True
+            )
+        case "audio.Audio":
+            s = add_es_highlighting(
+                s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
+            )
+        case _:
+            raise NotImplementedError(
+                "Percolator search alerts not supported for %s", app_label
             )
 
     s = s.source(excludes=["percolator_query"])

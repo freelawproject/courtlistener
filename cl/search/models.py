@@ -3712,6 +3712,10 @@ class SEARCH_TYPES:
         (DOCKETS, "RECAP Dockets"),
         (ORAL_ARGUMENT, "Oral Arguments"),
     )
+    RECAP_ALERT_TYPES = (
+        (RECAP, "RECAP"),
+        (DOCKETS, "RECAP Dockets"),
+    )
 
 
 class SearchQuery(models.Model):
@@ -3764,3 +3768,4 @@ class SearchQuery(models.Model):
         indexes = [
             models.Index(fields=["date_created"]),
         ]
+        verbose_name_plural = "Search Queries"

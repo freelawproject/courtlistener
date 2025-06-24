@@ -8,7 +8,11 @@ from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
-from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
+from cl.api.utils import (
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    RECAPUsersReadOnly,
+)
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_serializers import (
@@ -80,7 +84,9 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
     queryset = OriginatingCourtInformation.objects.all().order_by("-id")
 
 
-class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
+class DocketViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
     permission_classes = [
@@ -117,7 +123,9 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
 
 
-class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
+class DocketEntryViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = DocketEntrySerializer
     filterset_class = DocketEntryFilter
@@ -151,7 +159,7 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class RECAPDocumentViewSet(
-    LoggingMixin, CacheListMixin, viewsets.ModelViewSet
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
 ):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = RECAPDocumentSerializer
@@ -197,7 +205,9 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     pagination_class = PageNumberPagination
 
 
-class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
+class OpinionClusterViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     serializer_class = OpinionClusterSerializer
     filterset_class = OpinionClusterFilter
     permission_classes = [
@@ -230,7 +240,9 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     ).order_by("-id")
 
 
-class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
+class OpinionViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
     permission_classes = [
@@ -260,7 +272,9 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
 
 
-class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
+class OpinionsCitedViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     serializer_class = OpinionsCitedSerializer
     filterset_class = OpinionsCitedFilter
     permission_classes = [

@@ -1,0 +1,52 @@
+{# This component is based on Alpine UI Components Dialog Flyout #}
+{% load component_tags svg_tags %}
+{% require_script "js/alpine/composables/dialog.js" %}
+{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/ui@3.14.8" defer=True %}
+
+<c-vars request dialog_class="" panel_class=""></c-vars>
+
+<div x-data="dialog" x-id="dialogIdGroup" class="flex justify-center">
+  <!-- Trigger -->
+  <button
+    x-on:click="open"
+    x-bind:aria-controls="dialogId"
+    x-bind:aria-expanded="isOpen"
+    aria-haspopup="dialog"
+    type="button"
+    class="min-h-13 h-fit min-w-13 w-fit flex justify-center items-center focus-visible:outline-none group"
+  >
+    {# We use a span to style the button, but keep the button element larger to increase the click/touch area #}
+    <span class="bg-white relative flex items-center justify-center btn-outline text-greyscale-800 rounded-[10px] p-2  group-focus-visible:ring-4 group-focus-visible:ring-greyscale-200 group-hover:bg-greyscale-100">
+      {{ button_content }}
+    </span>
+  </button>
+
+  <!-- Dialog -->
+  <div
+    x-dialog
+    x-bind:open="isOpen"
+    x-on:keyup.esc.stop.prevent="close"
+    x-bind:id="dialogId"
+    role="dialog"
+    aria-modal="true"
+    x-cloak
+    class="fixed z-40 inset-0 overflow-hidden flex justify-center {{ dialog_class }}"
+  >
+    <!-- Overlay -->
+    <div
+      x-dialog:overlay
+      x-on:click.stop.prevent="close"
+      class="fixed z-40 inset-0 bg-greyscale-600/40"
+    ></div>
+
+    <!-- Panel -->
+    <div
+      class="w-full flex flex-col bg-white shadow-md z-50 {{ panel_class }}"
+      x-dialog:panel
+      x-show="isOpen"
+    >
+      {{ panel }}
+    </div>
+  </div>
+</div>
