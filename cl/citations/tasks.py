@@ -5,9 +5,6 @@ from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
 from django.db.utils import OperationalError
-from eyecite import get_citations
-from eyecite.models import CitationBase
-from eyecite.tokenizers import HyperscanTokenizer
 from sentry_sdk import capture_exception
 
 from cl.celery_init import app
@@ -42,6 +39,9 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.tasks import index_related_cites_fields
+from eyecite import get_citations
+from eyecite.models import CitationBase
+from eyecite.tokenizers import HyperscanTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +204,19 @@ def store_opinion_citations_and_update_parentheticals(
     # If the source has marked up text, pass it so it can be used to find
     # ReferenceCitations. This is handled by `make_get_citations_kwargs`
     get_citations_kwargs = make_get_citations_kwargs(opinion)
+
+    # Failed extractions should be skipped and logged
+    if not get_citations_kwargs.get("plain_text", "markup_text"):
+        logger.error(
+            "Opinion has no content id: '%s'",
+            opinion.id,
+            extra=dict(
+                opinion=opinion,
+                fingerprint=[f"{opinion.id}-no-opinion-content"],
+            ),
+        )
+        return
+
     citations: list[CitationBase] = get_citations(
         tokenizer=HYPERSCAN_TOKENIZER,
         **get_citations_kwargs,
