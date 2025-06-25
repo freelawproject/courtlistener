@@ -194,20 +194,28 @@ class MockACMSDocketReport:
             ],
             docket_entries=[
                 DocketEntryDataFactory(
-                    date_filed=datetime(2023, 10, 2, 11, 17, 0),
-                    date_entered=datetime(2023, 10, 2, 11, 17, 0),
-                    description="<p>NOTICE OF CRIMINAL APPEAL, with district court docket, on behalf of Appellant Mustapha Raji, FILED. [Entered: 10/02/2023 11:17 AM]</p>",
-                    pacer_doc_id="46de54cd-3561-ee11-be6e-001dd804e087",
-                    document_number=1,
-                    page_count=18,
-                ),
-                DocketEntryDataFactory(
                     date_filed=datetime(2023, 10, 2, 11, 20, 0),
                     date_entered=datetime(2023, 10, 2, 11, 20, 0),
                     description="<p>DISTRICT COURT JUDGMENT, dated 09/19/2023, RECEIVED. [Entered: 10/02/2023 11:20 AM]</p>",
                     pacer_doc_id="0d24550b-3761-ee11-be6e-001dd804e087",
                     document_number=2,
                     page_count=8,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(2023, 10, 2, 11, 21, 0),
+                    date_entered=datetime(2023, 10, 2, 11, 21, 0),
+                    description="<p><strong>Emergency MOTION</strong> Circuit Rule 27-3 Certificate [Entered: 10/02/2023 11:21 PM]</p>",
+                    pacer_doc_id="69e338d7-f947-f011-877a-001dd803d7d3",
+                    document_number=3,
+                    page_count=5,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(2023, 10, 2, 11, 17, 0),
+                    date_entered=datetime(2023, 10, 2, 11, 17, 0),
+                    description="<p>NOTICE OF CRIMINAL APPEAL, with district court docket, on behalf of Appellant Mustapha Raji, FILED. [Entered: 10/02/2023 11:17 AM]</p>",
+                    pacer_doc_id="46de54cd-3561-ee11-be6e-001dd804e087",
+                    document_number=1,
+                    page_count=18,
                 ),
             ],
         )
