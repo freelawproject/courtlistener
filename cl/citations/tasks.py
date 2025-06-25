@@ -5,10 +5,6 @@ from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
 from django.db.utils import OperationalError
-from eyecite import get_citations
-from eyecite.models import CitationBase
-from eyecite.tokenizers import HyperscanTokenizer
-from sentry_sdk import capture_exception
 
 from cl.celery_init import app
 from cl.citations.annotate_citations import create_cited_html
@@ -42,6 +38,9 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.tasks import index_related_cites_fields
+from eyecite import get_citations
+from eyecite.models import CitationBase
+from eyecite.tokenizers import HyperscanTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +164,10 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 )
             except Exception as e:
                 # Send this opinion failure to sentry and continue onward
-                capture_exception(e, fingerprint=[opinion.id])
+                logger.error(
+                    "Opinion failed: '%s'",
+                    opinion.id,
+                )
 
                 # do not retry the whole loop on an unknown exception
                 ids = [o.id for o in opinions[index + 1 :]]
@@ -212,7 +214,6 @@ def store_opinion_citations_and_update_parentheticals(
             opinion.id,
             extra=dict(
                 opinion=opinion,
-                fingerprint=[f"{opinion.id}-no-opinion-content"],
             ),
         )
         return
