@@ -168,17 +168,16 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 capture_exception(e, fingerprint=[opinion.id])
 
                 # do not retry the whole loop on an unknown exception
-                end_index = min(len(opinions) - 1, index + 1)
-                ids = [o.id for o in opinions[end_index:]]
+                ids = [o.id for o in opinions[index + 1 :]]
                 if ids:
                     raise self.retry(
                         exc=e,
                         countdown=60,
-                        kwargs={
-                            "opinion_pks": ids,
-                            "disconnect_pg_signals": disconnect_pg_signals,
-                            "disable_citation_count_update": disable_citation_count_update,
-                        },
+                        args=(
+                            ids,
+                            disconnect_pg_signals,
+                            disable_citation_count_update,
+                        ),
                     )
     finally:
         if disconnect_pg_signals:
