@@ -5,6 +5,9 @@ from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
 from django.db.utils import OperationalError
+from eyecite import get_citations
+from eyecite.models import CitationBase
+from eyecite.tokenizers import HyperscanTokenizer
 from sentry_sdk import capture_exception
 
 from cl.celery_init import app
@@ -39,9 +42,6 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.tasks import index_related_cites_fields
-from eyecite import get_citations
-from eyecite.models import CitationBase
-from eyecite.tokenizers import HyperscanTokenizer
 
 logger = logging.getLogger(__name__)
 
