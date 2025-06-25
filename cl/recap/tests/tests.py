@@ -1151,9 +1151,9 @@ class RecapUploadsTest(TestCase):
         )
 
         # Confirm Docket entry and RECAPDocument is properly created.
-        self.assertEqual(docket_entries.count(), 2)
+        self.assertEqual(docket_entries.count(), 3)
         recap_documents = RECAPDocument.objects.all().order_by("date_created")
-        self.assertEqual(recap_documents.count(), 2)
+        self.assertEqual(recap_documents.count(), 3)
         self.assertEqual(
             recap_documents[0].pacer_doc_id,
             "46de54cd-3561-ee11-be6e-001dd804e087",
@@ -1171,6 +1171,17 @@ class RecapUploadsTest(TestCase):
         de_2 = DocketEntry.objects.get(docket__court=self.ca2, entry_number=2)
         self.assertEqual(de_2.date_filed, date(2023, 10, 2))
         self.assertEqual(de_2.time_filed, time(11, 20, 0))
+
+        de_3 = DocketEntry.objects.get(docket__court=self.ca2, entry_number=3)
+
+        # Assert that the RECAP sequence numbers correctly reflect the order
+        # of docket entries.
+        self.assertGreater(
+            de_3.recap_sequence_number, de_2.recap_sequence_number
+        )
+        self.assertGreater(
+            de_2.recap_sequence_number, de_1.recap_sequence_number
+        )
 
     def test_processing_an_acms_attachment_page(self, mock_upload):
         d = DocketFactory(
