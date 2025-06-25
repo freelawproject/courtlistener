@@ -1,8 +1,8 @@
 from math import ceil
 
 import nh3
-from django.conf import settings
 from django.contrib.humanize.templatetags.humanize import intword
+from django.db import DEFAULT_DB_ALIAS
 from django.db.models import QuerySet
 
 from cl.lib.command_utils import VerboseCommand
@@ -141,10 +141,10 @@ class Command(VerboseCommand):
             ),
         )
         parser.add_argument(
-            "--use-replica",
-            action="store_true",
-            default=False,
-            help="Use this flag to run the queries in the replica db",
+            "--database",
+            type=str,
+            default=DEFAULT_DB_ALIAS,
+            help="Let the user decide which DB name to use",
         )
 
     def _compute_case_law_token_count(
@@ -246,11 +246,7 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         percentage = options["percentage"]
-        db_connection = (
-            "replica"
-            if options["use_replica"] and "replica" in settings.DATABASES
-            else "default"
-        )
+        db_connection = options["database"]
         dataset_type = options["type"]
 
         match dataset_type:
