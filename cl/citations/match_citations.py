@@ -4,6 +4,16 @@ from typing import no_type_check
 
 from asgiref.sync import async_to_sync
 from elasticsearch_dsl.response import Hit
+
+from cl.citations.match_citations_queries import es_search_db_for_full_citation
+from cl.citations.types import (
+    MatchedResourceType,
+    ResolvedFullCites,
+    SupportedCitationType,
+)
+from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.search.models import Opinion, RECAPDocument
+from cl.search.selectors import get_clusters_from_citation_str
 from eyecite import resolve_citations
 from eyecite.models import (
     CitationBase,
@@ -16,16 +26,6 @@ from eyecite.models import (
 )
 from eyecite.test_factories import case_citation
 from eyecite.utils import strip_punct
-
-from cl.citations.match_citations_queries import es_search_db_for_full_citation
-from cl.citations.types import (
-    MatchedResourceType,
-    ResolvedFullCites,
-    SupportedCitationType,
-)
-from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.search.models import Opinion, RECAPDocument
-from cl.search.selectors import get_clusters_from_citation_str
 
 DEBUG = True
 
@@ -83,6 +83,9 @@ def resolve_fullcase_citation(
                 clusters, _count = async_to_sync(
                     get_clusters_from_citation_str
                 )(volume=volume, reporter=reporter, page=page)
+
+                if _count == 0:
+                    return NO_MATCH_RESOURCE
 
                 # exclude self links
                 if getattr(full_citation, "citing_opinion", False):
