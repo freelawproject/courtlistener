@@ -1491,6 +1491,13 @@ async def process_recap_acms_docket(pk):
     # Merge parties before adding docket entries, so they can access parties'
     # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
+
+    # Sort docket entries by their 'document_number'.
+    # We noticed raw ACMS data is not consistently sorted, so we sort by
+    # 'document_number' to match the display order on the docket report.
+    data["docket_entries"] = sorted(
+        data["docket_entries"], key=lambda d: d["document_number"]
+    )
     des_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
