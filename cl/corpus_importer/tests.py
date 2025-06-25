@@ -1,5 +1,8 @@
+import hashlib
 import json
+import tempfile
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from unittest.mock import call, patch
 
 import eyecite
@@ -15,7 +18,8 @@ from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
-from juriscraper.lib.string_utils import harmonize, titlecase
+from faker import Faker
+from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
@@ -30,6 +34,9 @@ from cl.corpus_importer.factories import (
 from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
+)
+from cl.corpus_importer.management.commands.cl_import_dataset_opinions import (
+    VALID_EXTENSIONS,
 )
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
@@ -112,6 +119,7 @@ from cl.recap.management.commands.nightly_pacer_updates import (
     get_recap_documents_pray_and_pay,
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
+from cl.scrapers.exceptions import SingleDuplicateError
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.factories import (
@@ -139,6 +147,7 @@ from cl.search.models import (
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
+from cl.tests.providers import LegalProvider
 from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -1583,7 +1592,8 @@ class HarvardMergerTests(TestCase):
             # CL item #1301211
             (
                 "Mikell",
-                "MlKELL",  # there is a typo in the name, but it is very similar, we shouldn't be throwing an exception
+                "MlKELL",
+                # there is a typo in the name, but it is very similar, we shouldn't be throwing an exception
                 "Mikell",
             ),
         ]:
@@ -3820,3 +3830,150 @@ class AWSManifestTest(TestCase):
         self.assertIn(old_audio_2.id, record_ids)
         # Verify that the old record that was not updated is NOT included
         self.assertNotIn(old_audio_3.id, record_ids)
+
+
+class ImportDatasetOpinionsTests(TestCase):
+    def setUp(self):
+        self.court = CourtFactory.create(id="ca1")
+        self.faker = Faker()
+        self.faker.add_provider(LegalProvider)
+        self.cnt = CaseNameTweaker()
+        self.juriscraper_module = (
+            "juriscraper.opinions.united_states.federal_appellate.ca1"
+        )
+
+    def _sha1(self, content: bytes) -> str:
+        return hashlib.sha1(content).hexdigest()
+
+    def _create_json_and_file(
+        self, directory: Path, content: bytes, ext: str = ".pdf"
+    ):
+        """Generate all required data for tests"""
+        sha1_hash = self._sha1(content)
+        case_name = self.faker.case_name()
+        json_data = {
+            "citations": self.faker.citation(),
+            "docket_numbers": f"{self.faker.federal_district_docket_number()}",
+            "case_names": f"{case_name}",
+            "case_dates": f"{self.faker.date()}",
+            "download_urls": f"https://example.com/{sha1_hash}{ext}",
+            "precedential_statuses": "Published",
+            "blocked_statuses": False,
+            "date_filed_is_approximate": False,
+            "case_name_shorts": f"{self.cnt.make_case_name_short(case_name)}",
+            "url_hash": sha1_hash,
+        }
+
+        json_path = directory / f"{sha1_hash}.json"
+        file_path = directory / f"{sha1_hash}{ext}"
+        json_path.write_text(json.dumps(json_data), encoding="utf-8")
+        file_path.write_bytes(content)
+
+        return json_data
+
+    def test_import_opinion_other_extensions(self):
+        """Test importing opinions with all possible extensions."""
+        with tempfile.TemporaryDirectory() as tmpdir_str:
+            tmpdir = Path(tmpdir_str)
+
+            for ext in VALID_EXTENSIONS:
+                content = f"{ext} opinion content".encode()
+                self._create_json_and_file(tmpdir, content, ext=ext)
+
+            call_command(
+                "cl_import_dataset_opinions",
+                "--files-dir",
+                str(tmpdir),
+                "--court-id",
+                self.juriscraper_module,
+            )
+
+            self.assertEqual(Opinion.objects.count(), len(VALID_EXTENSIONS))
+
+    def test_import_opinion_from_txt(self):
+        """Can we import an opinion with a txt file?"""
+        with tempfile.TemporaryDirectory() as tmpdir_str:
+            tmpdir = Path(tmpdir_str)
+
+            content = b"Plain text opinion content"
+            json_data = self._create_json_and_file(tmpdir, content, ext=".txt")
+
+            call_command(
+                "cl_import_dataset_opinions",
+                "--files-dir",
+                str(tmpdir),
+                "--court-id",
+                self.juriscraper_module,
+            )
+
+            self.assertEqual(Opinion.objects.count(), 1)
+            opinion = Opinion.objects.first()
+            self.assertEqual(opinion.sha1, json_data["url_hash"])
+
+    def test_import_multiple_opinions_and_handle_duplicates(self):
+        """Can we import multiple opinions?"""
+        with tempfile.TemporaryDirectory() as tmpdir_str:
+            tmpdir = Path(tmpdir_str)
+
+            # Opinion 1
+            content1 = b"First opinion content."
+            json_data1 = self._create_json_and_file(tmpdir, content1)
+
+            # Opinion 2
+            content2 = b"Second opinion content."
+            json_data2 = self._create_json_and_file(
+                tmpdir, content2, ext=".txt"
+            )
+
+            # Import both
+            call_command(
+                "cl_import_dataset_opinions",
+                "--files-dir",
+                str(tmpdir),
+                "--court-id",
+                self.juriscraper_module,
+            )
+
+            self.assertEqual(Opinion.objects.count(), 2)
+
+            # Validate both opinions were created
+            sha1s = {opinion.sha1 for opinion in Opinion.objects.all()}
+            self.assertIn(json_data1["url_hash"], sha1s)
+            self.assertIn(json_data2["url_hash"], sha1s)
+
+            # Re-import (should skip both due to duplicates)
+            with patch(
+                "cl.scrapers.DupChecker.DupChecker.press_on",
+                side_effect=SingleDuplicateError("Duplicate"),
+            ) as mock_dup:
+                call_command(
+                    "cl_import_dataset_opinions",
+                    "--files-dir",
+                    str(tmpdir),
+                    "--court-id",
+                    self.juriscraper_module,
+                )
+                self.assertEqual(mock_dup.call_count, 2)
+
+            # Still only 2 opinions
+            self.assertEqual(Opinion.objects.count(), 2)
+
+    def test_missing_opinion_file(self):
+        """Test that if opinion file is missing, import skips that file."""
+        with tempfile.TemporaryDirectory() as tmpdir_str:
+            tmpdir = Path(tmpdir_str)
+            content = b"Opinion content"
+            json_data = self._create_json_and_file(tmpdir, content)
+            # Delete the opinion file to simulate missing file
+            opinion_file = tmpdir / f"{json_data['url_hash']}.pdf"
+            opinion_file.unlink()
+
+            call_command(
+                "cl_import_dataset_opinions",
+                "--files-dir",
+                str(tmpdir),
+                "--court-id",
+                self.juriscraper_module,
+            )
+
+            self.assertEqual(Opinion.objects.count(), 0)
