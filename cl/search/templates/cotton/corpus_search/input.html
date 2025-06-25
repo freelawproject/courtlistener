@@ -6,9 +6,17 @@
   class="[&:has(input:focus)]:ring-2 bg-greyscale-100 flex flex-row gap-2 items-center pl-4 pr-2 flex-grow h-[--corpus-search-height] border-t border-b border-greyscale-200{% if rounded %} rounded-lg border-l border-r{% endif %}"
 >
   {% svg "magnifier" class="text-greyscale-400 flex-grow-0 h-5 w-5" aria_hidden="true" %}
+  <input type="hidden" name="type" x-bind:value="selectedScopeType">
   <div class="bg-greyscale-200 flex-grow">
     <label x-bind:for="inputId" class="sr-only" type="text">Search <span x-text="selectedScope"></span></label>
-    <input x-bind:id="inputId" type="search" class="w-full bg-greyscale-100 placeholder:text-sm placeholder:text-greyscale-500 focus-visible:ring-0 focus-visible:outline-none bg-none placeholder:text-ellipsis" placeholder="Enter keyword(s)">
+    <input
+      x-bind:id="inputId"
+      type="search"
+      name="q"
+      autocomplete="off"
+      class="w-full bg-greyscale-100 placeholder:text-sm placeholder:text-greyscale-500 focus-visible:ring-0 focus-visible:outline-none bg-none placeholder:text-ellipsis"
+      placeholder="Enter keyword(s)"
+    >
   </div>
 
   {# OPERATORS MODAL #}

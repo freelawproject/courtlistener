@@ -163,18 +163,23 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                     countdown=60,
                 )
             except Exception as e:
+                # Send this opinion failure to sentry and continue onward
+                logger.error(
+                    "Opinion failed: '%s'",
+                    opinion.id,
+                )
+
                 # do not retry the whole loop on an unknown exception
-                end_index = min(len(opinions) - 1, index + 1)
-                ids = [o.id for o in opinions[end_index:]]
+                ids = [o.id for o in opinions[index + 1 :]]
                 if ids:
                     raise self.retry(
                         exc=e,
                         countdown=60,
-                        kwargs={
-                            "opinion_pks": ids,
-                            "disconnect_pg_signals": disconnect_pg_signals,
-                            "disable_citation_count_update": disable_citation_count_update,
-                        },
+                        args=(
+                            ids,
+                            disconnect_pg_signals,
+                            disable_citation_count_update,
+                        ),
                     )
     finally:
         if disconnect_pg_signals:
@@ -201,6 +206,18 @@ def store_opinion_citations_and_update_parentheticals(
     # If the source has marked up text, pass it so it can be used to find
     # ReferenceCitations. This is handled by `make_get_citations_kwargs`
     get_citations_kwargs = make_get_citations_kwargs(opinion)
+
+    # Failed extractions should be skipped and logged
+    if not get_citations_kwargs.get("plain_text", "markup_text"):
+        logger.error(
+            "Opinion has no content id: '%s'",
+            opinion.id,
+            extra=dict(
+                opinion=opinion,
+            ),
+        )
+        return
+
     citations: list[CitationBase] = get_citations(
         tokenizer=HYPERSCAN_TOKENIZER,
         **get_citations_kwargs,
