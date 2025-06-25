@@ -7,7 +7,7 @@ from django.db.models import QuerySet
 
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.string_utils import get_token_count_from_string
-from cl.search.models import Opinion, RECAPDocument
+from cl.search.models import SEARCH_TYPES, Opinion, RECAPDocument
 
 
 def get_recap_random_dataset(
@@ -124,10 +124,12 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--type",
             type=str,
-            choices=["recap", "caselaw"],
+            choices=[SEARCH_TYPES.RECAP_DOCUMENT, SEARCH_TYPES.OPINION],
             required=True,
-            help="Specify which dataset to compute token count for: 'recap' "
-            "or 'caselaw'.",
+            help=(
+                "Specify which dataset to compute token count for: "
+                f"({', '.join([SEARCH_TYPES.RECAP_DOCUMENT, SEARCH_TYPES.OPINION])})"
+            ),
         )
         parser.add_argument(
             "--percentage",
@@ -251,7 +253,12 @@ class Command(VerboseCommand):
         )
         dataset_type = options["type"]
 
-        if dataset_type == "recap":
-            self._compute_recap_token_count(percentage, db_connection)
-        else:
-            self._compute_case_law_token_count(percentage, db_connection)
+        match dataset_type:
+            case SEARCH_TYPES.RECAP_DOCUMENT:
+                self._compute_recap_token_count(percentage, db_connection)
+            case SEARCH_TYPES.OPINION:
+                self._compute_case_law_token_count(percentage, db_connection)
+            case _:
+                raise NotImplementedError(
+                    f"Type '{dataset_type}' is not supported."
+                )
