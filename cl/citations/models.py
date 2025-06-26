@@ -1,10 +1,10 @@
 import re
 
 from django.db import models
+from eyecite.models import FullCaseCitation
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.search.models import BaseCitation, Citation, Opinion
-from eyecite.models import FullCaseCitation
 
 
 class UnmatchedCitation(BaseCitation):

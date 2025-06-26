@@ -16,6 +16,16 @@ from django.db.models.signals import post_delete, post_save
 from django.test import override_settings
 from django.urls import reverse
 from elasticsearch import NotFoundError
+from eyecite import get_citations
+from eyecite.test_factories import (
+    case_citation,
+    id_citation,
+    journal_citation,
+    law_citation,
+    supra_citation,
+    unknown_citation,
+)
+from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from lxml import etree
 
@@ -82,16 +92,6 @@ from cl.tests.cases import (
     TransactionTestCase,
 )
 from cl.users.factories import UserProfileWithParentsFactory
-from eyecite import get_citations
-from eyecite.test_factories import (
-    case_citation,
-    id_citation,
-    journal_citation,
-    law_citation,
-    supra_citation,
-    unknown_citation,
-)
-from eyecite.tokenizers import HyperscanTokenizer
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
