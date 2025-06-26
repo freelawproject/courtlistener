@@ -175,7 +175,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 if ids:
                     raise self.retry(
                         exc=e,
-                        countdown=60,
+                        countdown=2,
                         args=(
                             ids,
                             disconnect_pg_signals,
