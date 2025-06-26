@@ -84,6 +84,9 @@ def resolve_fullcase_citation(
                     get_clusters_from_citation_str
                 )(volume=volume, reporter=reporter, page=page)
 
+                if _count == 0:
+                    return NO_MATCH_RESOURCE
+
                 # exclude self links
                 if getattr(full_citation, "citing_opinion", False):
                     clusters = [
