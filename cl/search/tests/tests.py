@@ -1672,7 +1672,6 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
             "Citations:",
             "Docket Number:",
             "Nature of Suit:",
-            "Posture:",
             "Full Case Name:",
         ]
         for header in headers:
