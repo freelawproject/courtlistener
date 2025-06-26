@@ -3835,6 +3835,7 @@ class AWSManifestTest(TestCase):
 class ImportDatasetOpinionsTests(TestCase):
     def setUp(self):
         self.court = CourtFactory.create(id="ca1")
+        self.court_2 = CourtFactory.create(id="nhd")
         self.faker = Faker()
         self.faker.add_provider(LegalProvider)
         self.cnt = CaseNameTweaker()
@@ -3871,6 +3872,46 @@ class ImportDatasetOpinionsTests(TestCase):
 
         return json_data
 
+    def test_import_opinion_using_juriscraper_module(self):
+        """Can we import an opinion using --juriscraper-module argument?"""
+        with tempfile.TemporaryDirectory() as tmpdir_str:
+            tmpdir = Path(tmpdir_str)
+
+            content = b"Plain text opinion content"
+            json_data = self._create_json_and_file(tmpdir, content, ext=".pdf")
+
+            call_command(
+                "cl_import_dataset_opinions",
+                "--files-dir",
+                str(tmpdir),
+                "--juriscraper-module",
+                self.juriscraper_module,
+            )
+
+            self.assertEqual(Opinion.objects.count(), 1)
+            opinion = Opinion.objects.first()
+            self.assertEqual(opinion.sha1, json_data["url_hash"])
+
+    def test_import_opinion_using_court_id(self):
+        """Can we import an opinion using --court-id argument?"""
+        with tempfile.TemporaryDirectory() as tmpdir_str:
+            tmpdir = Path(tmpdir_str)
+
+            content = b"Plain text opinion content"
+            json_data = self._create_json_and_file(tmpdir, content, ext=".pdf")
+
+            call_command(
+                "cl_import_dataset_opinions",
+                "--files-dir",
+                str(tmpdir),
+                "--court-id",
+                self.court_2.pk,
+            )
+
+            self.assertEqual(Opinion.objects.count(), 1)
+            opinion = Opinion.objects.first()
+            self.assertEqual(opinion.sha1, json_data["url_hash"])
+
     def test_import_opinion_other_extensions(self):
         """Test importing opinions with all possible extensions."""
         with tempfile.TemporaryDirectory() as tmpdir_str:
@@ -3884,31 +3925,11 @@ class ImportDatasetOpinionsTests(TestCase):
                 "cl_import_dataset_opinions",
                 "--files-dir",
                 str(tmpdir),
-                "--court-id",
+                "--juriscraper-module",
                 self.juriscraper_module,
             )
 
             self.assertEqual(Opinion.objects.count(), len(VALID_EXTENSIONS))
-
-    def test_import_opinion_from_txt(self):
-        """Can we import an opinion with a txt file?"""
-        with tempfile.TemporaryDirectory() as tmpdir_str:
-            tmpdir = Path(tmpdir_str)
-
-            content = b"Plain text opinion content"
-            json_data = self._create_json_and_file(tmpdir, content, ext=".txt")
-
-            call_command(
-                "cl_import_dataset_opinions",
-                "--files-dir",
-                str(tmpdir),
-                "--court-id",
-                self.juriscraper_module,
-            )
-
-            self.assertEqual(Opinion.objects.count(), 1)
-            opinion = Opinion.objects.first()
-            self.assertEqual(opinion.sha1, json_data["url_hash"])
 
     def test_import_multiple_opinions_and_handle_duplicates(self):
         """Can we import multiple opinions?"""
@@ -3930,7 +3951,7 @@ class ImportDatasetOpinionsTests(TestCase):
                 "cl_import_dataset_opinions",
                 "--files-dir",
                 str(tmpdir),
-                "--court-id",
+                "--juriscraper-module",
                 self.juriscraper_module,
             )
 
@@ -3950,7 +3971,7 @@ class ImportDatasetOpinionsTests(TestCase):
                     "cl_import_dataset_opinions",
                     "--files-dir",
                     str(tmpdir),
-                    "--court-id",
+                    "--juriscraper-module",
                     self.juriscraper_module,
                 )
                 self.assertEqual(mock_dup.call_count, 2)
@@ -3972,7 +3993,7 @@ class ImportDatasetOpinionsTests(TestCase):
                 "cl_import_dataset_opinions",
                 "--files-dir",
                 str(tmpdir),
-                "--court-id",
+                "--juriscraper-module",
                 self.juriscraper_module,
             )
 

@@ -75,17 +75,22 @@ class Command(BaseCommand):
         return None
 
     def add_arguments(self, parser):
+        group = parser.add_mutually_exclusive_group(required=True)
         parser.add_argument(
             "--files-dir",
             type=self.validate_files_dir,
             required=True,
             help="Directory containing JSON files and opinion files.",
         )
-        parser.add_argument(
+        group.add_argument(
+            "--juriscraper-module",
+            type=str,
+            help="CourtListener juriscraper module, e.g. juriscraper.opinions.united_states.federal_appellate.ca1",
+        )
+        group.add_argument(
             "--court-id",
             type=str,
-            required=True,
-            help="CourtListener juriscraper module, e.g. juriscraper.opinions.united_states.federal_appellate.ca1",
+            help="CourtListener court id, e.g. nhd",
         )
         parser.add_argument(
             "--dry",
@@ -106,16 +111,24 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         files_dir = Path(options["files_dir"])
+        juriscraper_module = options["juriscraper_module"]
         court_id = options["court_id"]
         dry_run = options["dry"]
         limit = options["limit"]
 
-        module_strings = build_module_list(court_id)
-        package, module = module_strings[0].rsplit(".", 1)
-
-        mod = __import__(f"{package}.{module}", globals(), locals(), [module])
-        module_string = mod.Site().court_id
-        court_id = module_string.split(".")[-1].split("_")[0]
+        if juriscraper_module:
+            # We need a juriscraper module when we run a scraper locally to collect files and metadata and want to
+            # extract additional data from document. e.g. call extract_from_text method in scraper
+            module_strings = build_module_list(juriscraper_module)
+            package, module = module_strings[0].rsplit(".", 1)
+            mod = __import__(
+                f"{package}.{module}", globals(), locals(), [module]
+            )
+            module_string = mod.Site().court_id
+            court_id = module_string.split(".")[-1].split("_")[0]
+        else:
+            # There is no juriscraper module when we collect data from a set of files, like nhd pdf files.
+            module_string = ""
 
         try:
             court = Court.objects.get(pk=court_id)
