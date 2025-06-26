@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from itertools import product
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock, patch
@@ -27,7 +28,11 @@ from django_ses import signals
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.alerts.factories import AlertFactory, DocketAlertFactory
+from cl.alerts.factories import (
+    AlertFactory,
+    DocketAlertFactory,
+    DocketAlertWithParentsFactory,
+)
 from cl.alerts.models import DocketAlert, DocketAlertEvent
 from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import (
@@ -635,6 +640,73 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             expected_url=reverse("profile_search_alerts"),
             target_status_code=HTTPStatus.OK,
         )
+
+    async def test_docket_alerts_sorting(self):
+        """Tests docket ordering on the docket alerts page."""
+        # Create a user profile
+        up = await sync_to_async(UserProfileWithParentsFactory)()
+        user_with_docket_alerts = up.user
+        # Create some dockets and docket alerts associated with the user
+        das = []
+        das.append(
+            await sync_to_async(DocketAlertWithParentsFactory)(
+                user=user_with_docket_alerts,
+                date_last_hit=now() - timedelta(days=2),
+                docket__date_filed=now().date() - timedelta(days=2),
+            )
+        )
+        das.append(
+            await sync_to_async(DocketAlertWithParentsFactory)(
+                user=user_with_docket_alerts,
+                date_last_hit=now() - timedelta(days=1),
+                docket__date_filed=now().date() - timedelta(days=1),
+            )
+        )
+        das.append(
+            await sync_to_async(DocketAlertWithParentsFactory)(
+                user=user_with_docket_alerts,
+                date_last_hit=now(),
+                docket__date_filed=now().date(),
+            )
+        )
+        # Log in the created user
+        await self.async_client.alogin(
+            username=user_with_docket_alerts, password="password"
+        )
+
+        tests = (
+            ("", lambda x: x.date_last_hit),
+            ("invalid", lambda x: x.date_last_hit),
+            ("hit", lambda x: x.date_last_hit),
+            ("name", lambda x: x.docket.case_name),
+            ("court", lambda x: x.docket.court.short_name),
+            ("date_filed", lambda x: x.docket.date_filed),
+            ("docket_number", lambda x: x.docket.docket_number),
+        )
+
+        # Create ascending/descending tests for each test case in the form:
+        # ("hit", lambda, "-"), etc.
+        tests = ((*x, y) for x, y in product(tests, ["", "-"]))
+
+        for order_name, sorter, direction in tests:
+            with self.subTest(
+                "Checking docket alert sorting",
+                order_by=f"{direction}{order_name}",
+            ):
+                r = await self.async_client.get(
+                    reverse("profile_docket_alerts"),
+                    query_params={"order_by": f"{direction}{order_name}"},
+                )
+                c = r.context
+                if order_name in ("", "invalid"):
+                    direction = "-"
+                    order_name = "hit"
+                das.sort(key=sorter, reverse=True if direction else False)
+                self.assertEqual(list(c["docket_alerts"]), das)
+                if direction:
+                    self.assertEqual(
+                        c["sort_desc"][order_name], "" if direction else "-"
+                    )
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
