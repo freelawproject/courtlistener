@@ -5,9 +5,6 @@ from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
 from django.db.utils import OperationalError
-from eyecite import get_citations
-from eyecite.models import CitationBase
-from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.celery_init import app
 from cl.citations.annotate_citations import create_cited_html
@@ -41,6 +38,9 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.tasks import index_related_cites_fields
+from eyecite import get_citations
+from eyecite.models import CitationBase
+from eyecite.tokenizers import HyperscanTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +174,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 if ids:
                     raise self.retry(
                         exc=e,
-                        countdown=60,
+                        countdown=2,
                         args=(
                             ids,
                             disconnect_pg_signals,
