@@ -1162,7 +1162,7 @@ wheels = [
 
 [[package]]
 name = "eyecite"
-version = "2.7.5"
+version = "2.7.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "courts-db" },
@@ -1172,9 +1172,9 @@ dependencies = [
     { name = "regex" },
     { name = "reporters-db" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/16/0e/b81758485648883d865edaefbd0be57550c920e6f613c5f7c06485860a2e/eyecite-2.7.5.tar.gz", hash = "sha256:3208f4bbea4d060d87b5d3750ae8662fc5bd05dfec04b40510839ced05b93e15", size = 56826, upload-time = "2025-05-22T20:28:50.737Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/c0/c2fd431c81e9843768f880608f965c0fbd58244856ec18a920ae4f213228/eyecite-2.7.6.tar.gz", hash = "sha256:2afa8e8a4106c6a074fbf1216686c3df97f006359faccb0dd27d29fd4614a1c0", size = 86960, upload-time = "2025-06-25T14:07:41.275Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/09/94/50318599d2951a60ad76a756e16bc5986d66b51b1613d87127cab330b5c2/eyecite-2.7.5-py3-none-any.whl", hash = "sha256:117d407c988e347c4fadee411254152afd0a2318f61a24d92f7da41c2b4b3c5e", size = 55670, upload-time = "2025-05-22T20:28:49.559Z" },
+    { url = "https://files.pythonhosted.org/packages/26/0a/77649b9261129534543c3bd66cc94c30f07446967d760a44c6f50508dc39/eyecite-2.7.6-py3-none-any.whl", hash = "sha256:cf7b6e1fe852a244aa613cea6004dc435b90b86807a1588061f562b62c0ec918", size = 55630, upload-time = "2025-06-25T14:07:40.152Z" },
 ]
 
 [[package]]
@@ -1596,7 +1596,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.74"
+version = "2.6.77"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1614,9 +1614,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/f5/7a7febed2d9b17bc28808f04940f1cb5c4e7278019310f392480f1c37f9a/juriscraper-2.6.74.tar.gz", hash = "sha256:04ebb853daa631605dec470c2a0d207e247c127e6c100b673052b4adb4ea521e", size = 303424, upload-time = "2025-06-04T22:16:02.37Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b1/1c/051f6687c11ab5ed92e58de34b56c886c7912336cac26c9bf917ea31d67c/juriscraper-2.6.77.tar.gz", hash = "sha256:67680a9f81d01de64eca6d0818446cc9b7ab6566659ff32006130dd8315956aa", size = 306138, upload-time = "2025-06-17T20:47:11.636Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/29/67/91b54a73c60aaf206f2720383124c705bc0d1520b13cb39d3f3b05db151f/juriscraper-2.6.74-py3-none-any.whl", hash = "sha256:839df91d873cc9f6b5bf7a14fc80f2008e6779189a20e6eb6004e38e9fb2ff19", size = 498324, upload-time = "2025-06-04T22:16:00.019Z" },
+    { url = "https://files.pythonhosted.org/packages/b1/99/4a3411ac60df13dc7ab89bc50dbe15ca680d6b02463786753dfdb43cc4e8/juriscraper-2.6.77-py3-none-any.whl", hash = "sha256:934b67fca548466fafee280596c7b4ceebf177b8d1cd95983feb70720abe94af", size = 502945, upload-time = "2025-06-17T20:47:09.539Z" },
 ]
 
 [[package]]

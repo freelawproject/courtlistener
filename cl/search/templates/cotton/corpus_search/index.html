@@ -1,0 +1,17 @@
+{% load svg_tags component_tags %}
+{% require_script "js/alpine/components/corpus_search.js" %}
+{% require_script "js/alpine/composables/focus.js" %}
+{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+
+<c-vars class=""></c-vars>
+
+<form
+  x-data="search"
+  x-id="corpusSearchIdGroup"
+  role="search"
+  action="/"
+  method="get"
+  class="relative flex flex-row flex-nowrap {{ class }}"
+>
+  {{ slot }}
+</form>
