@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 import time_machine
 from django.conf import settings
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import override_settings
 from django.urls import reverse
@@ -28,10 +29,15 @@ from cl.lib.test_helpers import (
     SearchTestCase,
     opinion_v3_search_api_keys,
 )
-from cl.search.documents import OpinionPercolator
-from cl.search.factories import OpinionClusterFactory, OpinionFactory
-from cl.search.models import SEARCH_TYPES, OpinionsCited
-from cl.search.tasks import index_related_cites_fields
+from cl.scrapers.tasks import extract_opinion_content
+from cl.search.documents import OpinionDocument, OpinionPercolator
+from cl.search.factories import (
+    CitationWithParentsFactory,
+    OpinionClusterFactory,
+    OpinionFactory,
+)
+from cl.search.models import SEARCH_TYPES
+from cl.search.tasks import percolate_document
 from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
@@ -123,6 +129,10 @@ class OpinionAlertsPercolatorTest(
                 pk_offset=0,
                 testing_mode=True,
             )
+
+    @staticmethod
+    def _percolate_opinion_doc(opinion):
+        percolate_document(OpinionDocument, opinion.pk, opinion)
 
     def setUp(self):
         OpinionPercolator._index.delete(ignore=404)
@@ -245,7 +255,7 @@ class OpinionAlertsPercolatorTest(
             msg=f"Alert id: {opinion_alert_filter_id} was not indexed.",
         )
 
-    def test_percolate_document_on_ingestion(self, mock_prefix) -> None:
+    def test_percolate_document_for_different_rates(self, mock_prefix) -> None:
         """Confirm an Opinion is percolated upon ingestion."""
 
         opinion_cluster_indexing_time = self.mock_date
@@ -284,6 +294,7 @@ class OpinionAlertsPercolatorTest(
                 per_curiam=False,
                 type="020lead",
             )
+            self._percolate_opinion_doc(opinion)
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         call_command("cl_send_scheduled_alerts", rate=Alert.DAILY)
@@ -454,6 +465,7 @@ class OpinionAlertsPercolatorTest(
                 per_curiam=False,
                 type="020lead",
             )
+            self._percolate_opinion_doc(opinion_2)
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
@@ -497,6 +509,7 @@ class OpinionAlertsPercolatorTest(
                 per_curiam=False,
                 type="020lead",
             )
+            self._percolate_opinion_doc(opinion_3)
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
@@ -520,10 +533,8 @@ class OpinionAlertsPercolatorTest(
                 "Curabitur id lorem vel orci aliquam commodo"
             )
             opinion_3.save()
-            # Percolation of plain_text is delayed until index_related_cites_fields runs.
-            index_related_cites_fields.delay(
-                OpinionsCited.__name__, opinion_3.pk, []
-            )
+            self._percolate_opinion_doc(opinion_3)
+
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -545,7 +556,7 @@ class OpinionAlertsPercolatorTest(
         snippet = self._extract_snippet_content(html_content)
         self.assertIn(opinion_3.plain_text, snippet)
 
-    def test_percolate_opinion_upon_cites_fields_update(
+    def test_percolate_opinion_upon_initial_extraction_citations_found(
         self, mock_prefix
     ) -> None:
         """Test Opinion percolation to match queries that involve the
@@ -556,11 +567,14 @@ class OpinionAlertsPercolatorTest(
             seconds=15
         )
         with self.captureOnCommitCallbacks(execute=True):
+            opinion = OpinionFactory(
+                cluster=OpinionClusterFactory(docket=self.docket_1)
+            )
             opinion_cluster_alert = AlertFactory(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert Opinion cites",
-                query=f"q=cites:{self.opinion_6.pk}&type=o",
+                query=f"q=cites:{opinion.pk}&type=o",
                 alert_type=SEARCH_TYPES.OPINION,
             )
 
@@ -574,14 +588,63 @@ class OpinionAlertsPercolatorTest(
             time_machine.travel(opinion_cluster_indexing_time, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
+            file = SimpleUploadedFile(
+                "file.txt", b"Debbas v. Franklin., 948 F.3d 593 (2d Cir. 2015)"
+            )
             opinion_4 = OpinionFactory.create(
                 extracted_by_ocr=False,
                 author=self.person_2,
                 plain_text="",
                 cluster=self.opinion_cluster_3,
-                local_path="test/search/opinion_doc.doc",
+                local_path=file,
                 per_curiam=False,
                 type="020lead",
+            )
+            CitationWithParentsFactory.create(
+                volume="948",
+                reporter="F.3d",
+                page="593",
+                cluster=opinion.cluster,
+            )
+
+        extract_opinion_content.delay(opinion_4.pk, False, False, True)
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        txt_content = mail.outbox[0].body
+
+        self.assertIn(opinion_cluster_alert.name, html_content)
+        self.assertIn(opinion_cluster_alert.name, txt_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            opinion_cluster_alert.name,
+            1,
+            opinion_4.cluster.case_name,
+            1,
+        )
+
+    def test_percolate_opinion_upon_initial_extraction_no_citations_found(
+        self, mock_prefix
+    ) -> None:
+        """Test Opinion percolation for queries that don’t involve the cites
+        fields and where no citations are matched within the document content.
+        """
+
+        opinion_cluster_indexing_time = self.mock_date - datetime.timedelta(
+            seconds=15
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Opinion cites",
+                query="q=Plain text with no citations&type=o",
+                alert_type=SEARCH_TYPES.OPINION,
             )
 
         with (
@@ -594,16 +657,20 @@ class OpinionAlertsPercolatorTest(
             time_machine.travel(opinion_cluster_indexing_time, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            # Add OpinionsCited using bulk_create as in store_opinion_citations_and_update_parentheticals
-            cite = OpinionsCited(
-                citing_opinion_id=opinion_4.pk,
-                cited_opinion_id=self.opinion_6.pk,
+            file = SimpleUploadedFile(
+                "file.txt", b"Plain text with no citations"
             )
-            OpinionsCited.objects.bulk_create([cite])
+            opinion_4 = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person_2,
+                plain_text="",
+                cluster=self.opinion_cluster_3,
+                local_path=file,
+                per_curiam=False,
+                type="020lead",
+            )
 
-        index_related_cites_fields.delay(
-            OpinionsCited.__name__, opinion_4.pk, []
-        )
+        extract_opinion_content.delay(opinion_4.pk, False, False, True)
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
@@ -644,7 +711,7 @@ class OpinionAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            OpinionFactory.create(
+            opinion = OpinionFactory.create(
                 extracted_by_ocr=False,
                 author=self.person_2,
                 plain_text="Fusce elementum felis",
@@ -653,6 +720,7 @@ class OpinionAlertsPercolatorTest(
                 per_curiam=False,
                 type="020lead",
             )
+            self._percolate_opinion_doc(opinion)
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
@@ -726,6 +794,7 @@ class OpinionAlertsPercolatorTest(
                     per_curiam=False,
                     type="020lead",
                 )
+                self._percolate_opinion_doc(alert_1_o)
                 alert_1_ids.append(alert_1_o.id)
 
             for i in range(5):
@@ -738,6 +807,7 @@ class OpinionAlertsPercolatorTest(
                     per_curiam=False,
                     type="020lead",
                 )
+                self._percolate_opinion_doc(alert_2_o)
                 alert_2_ids.append(alert_2_o.id)
 
         self.assertEqual(
@@ -902,6 +972,7 @@ class OpinionAlertsPercolatorTest(
                 per_curiam=False,
                 type="020lead",
             )
+            self._percolate_opinion_doc(opinion)
 
         webhook_events = WebhookEvent.objects.all().values_list(
             "content", flat=True

@@ -19,7 +19,7 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
     make_objects,
     save_everything,
 )
-from cl.scrapers.tasks import extract_doc_content
+from cl.scrapers.tasks import extract_opinion_content
 from cl.search.fields import CeilingDateField, FloorDateField
 from cl.search.models import (
     SOURCES,
@@ -517,9 +517,7 @@ class BaseCourtUploadForm(forms.Form):
             docket.originating_court_information = originating_court
             docket.save()
 
-        extract_doc_content.delay(
-            opinion.pk, ocr_available=True, citation_jitter=True
-        )
+        extract_opinion_content.delay(opinion.pk, ocr_available=True)
 
         logging.info(
             "Successfully added object cluster: %s for %s",

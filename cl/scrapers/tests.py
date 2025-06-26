@@ -33,7 +33,7 @@ from cl.scrapers.management.commands import (
     update_from_text,
 )
 from cl.scrapers.models import UrlHash
-from cl.scrapers.tasks import extract_doc_content, process_audio_file
+from cl.scrapers.tasks import extract_opinion_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
     case_names_are_too_different,
@@ -315,42 +315,42 @@ class IngestionTest(TestCase):
     def test_doc_content_extraction(self) -> None:
         """Can we ingest a doc file?"""
         doc_opinion = Opinion.objects.get(pk=1)
-        extract_doc_content(doc_opinion.pk, ocr_available=False)
+        extract_opinion_content(doc_opinion.pk, ocr_available=False)
         doc_opinion.refresh_from_db()
         self.assertIn("indiana", doc_opinion.plain_text.lower())
 
     def test_image_based_pdf(self) -> None:
         """Can we ingest an image based pdf file?"""
         image_opinion = Opinion.objects.get(pk=2)
-        extract_doc_content(image_opinion.pk, ocr_available=True)
+        extract_opinion_content(image_opinion.pk, ocr_available=True)
         image_opinion.refresh_from_db()
         self.assertIn("intelligence", image_opinion.plain_text.lower())
 
     def test_text_based_pdf(self) -> None:
         """Can we ingest a text based pdf file?"""
         txt_opinion = Opinion.objects.get(pk=3)
-        extract_doc_content(txt_opinion.pk, ocr_available=False)
+        extract_opinion_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("tarrant", txt_opinion.plain_text.lower())
 
     def test_html_content_extraction(self) -> None:
         """Can we ingest an html file?"""
         html_opinion = Opinion.objects.get(pk=4)
-        extract_doc_content(html_opinion.pk, ocr_available=False)
+        extract_opinion_content(html_opinion.pk, ocr_available=False)
         html_opinion.refresh_from_db()
         self.assertIn("reagan", html_opinion.html.lower())
 
     def test_wpd_content_extraction(self) -> None:
         """Can we ingest a wpd file?"""
         wpd_opinion = Opinion.objects.get(pk=5)
-        extract_doc_content(wpd_opinion.pk, ocr_available=False)
+        extract_opinion_content(wpd_opinion.pk, ocr_available=False)
         wpd_opinion.refresh_from_db()
         self.assertIn("greene", wpd_opinion.html.lower())
 
     def test_txt_content_extraction(self) -> None:
         """Can we ingest a txt file?"""
         txt_opinion = Opinion.objects.get(pk=6)
-        extract_doc_content(txt_opinion.pk, ocr_available=False)
+        extract_opinion_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("ideal", txt_opinion.plain_text.lower())
 

@@ -97,7 +97,7 @@ from cl.search.types import (
     SaveESDocumentReturn,
 )
 
-percolator_alerts_models_supported = [Audio, RECAPDocument, Docket, Opinion]
+percolator_alerts_models_supported = [Audio, RECAPDocument, Docket]
 
 logger = logging.getLogger(__name__)
 
@@ -554,19 +554,12 @@ def update_es_document(
     fields_to_omit_percolation = {
         "plain_text",
         "filepath_local",
-        "local_path",
-        "html_columbia",
-        "html_lawbox",
-        "xml_harvard",
-        "html_anon_2020",
-        "html",
     }
     if (
         (
             related_instance_app_label == "search.BankruptcyInformation"
             or (
-                main_app_label
-                in ("search.RECAPDocument", "search.Docket", "search.Opinion")
+                main_app_label in ("search.RECAPDocument", "search.Docket")
                 and related_instance_app_label != "search.DocketEntry"
                 and not fields_to_omit_percolation
                 & set(
@@ -1453,6 +1446,7 @@ def index_related_cites_fields(
     model_name: str,
     child_id: int,
     cluster_ids_to_update: list[int] | None = None,
+    percolate_opinion: bool = False,
 ) -> None:
     """Index 'cites' and 'citeCount' fields in ES documents in a one request.
     :param self: The Celery task instance.
@@ -1460,6 +1454,8 @@ def index_related_cites_fields(
     :param child_id: The child document ID to update with the cites.
     :param cluster_ids_to_update: Optional; the cluster IDs where 'citeCount'
     should be updated.
+    :param percolate_opinion: Whether to percolate the related opinion document in
+    order to trigger search alerts.
     :return: None.
     """
 
@@ -1560,9 +1556,16 @@ def index_related_cites_fields(
         OpinionClusterDocument._index.refresh()
         DocketDocument._index.refresh()
 
-    if citing_doc and es_child_doc_class:
-        # Percolate the related document to match queries that involve the
-        # cites field.
+    if (
+        citing_doc
+        and es_child_doc_class
+        and (
+            model_name == OpinionsCitedByRECAPDocument.__name__
+            or percolate_opinion
+        )
+    ):
+        # Percolate if it’s the RECAP‐cited‐by document or if percolation is
+        # enabled for opinions.
         percolate_document(es_child_doc_class, child_id, citing_doc)
 
 

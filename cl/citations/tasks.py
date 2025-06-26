@@ -33,6 +33,7 @@ from cl.citations.utils import (
     get_cited_clusters_ids_to_update,
     make_get_citations_kwargs,
 )
+from cl.search.documents import OpinionDocument
 from cl.search.models import (
     Opinion,
     OpinionCluster,
@@ -40,7 +41,7 @@ from cl.search.models import (
     Parenthetical,
     RECAPDocument,
 )
-from cl.search.tasks import index_related_cites_fields
+from cl.search.tasks import index_related_cites_fields, percolate_document
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     opinion_pks: list[int],
     disconnect_pg_signals: bool = False,
     disable_citation_count_update: bool = False,
+    percolate_opinion: bool = False,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
@@ -132,7 +134,8 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     :param disable_citation_count_update: if True,
         OpinionCluster.citation_count and related ElasticSearch fields will not
         be updated. Useful to prevent database overloading during bulk work
-
+    :param percolate_opinion: Whether to percolate the related opinion document in
+    order to trigger search alerts.
     :return: None
     """
     opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
@@ -147,7 +150,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         for index, opinion in enumerate(opinions):
             try:
                 store_opinion_citations_and_update_parentheticals(
-                    opinion, update_citation_count
+                    opinion, update_citation_count, percolate_opinion
                 )
             except ResponseNotReady as e:
                 # Threading problem in httplib.
@@ -184,6 +187,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
 def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion,
     update_citation_count: bool = True,
+    percolate_opinion: bool = False,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion,
@@ -195,6 +199,8 @@ def store_opinion_citations_and_update_parentheticals(
         - `index_related_cites_fields` that updates OpinionDocument and
             OpinionClusterDocument
         this is useful to prevent database overloading during bulk work
+    :param percolate_opinion: Whether to percolate the related opinion document in
+    order to trigger search alerts.
     :return: None
     """
     # Extract the citations from the opinion's text
@@ -219,6 +225,8 @@ def store_opinion_citations_and_update_parentheticals(
     if not citation_resolutions:
         # there was nothing to annotate, just save the `html_with_citations`
         opinion.save()
+        if percolate_opinion:
+            percolate_document(OpinionDocument, opinion.pk, opinion)
         return
 
     # Put apart the unmatched citations and ambiguous citations
@@ -308,4 +316,5 @@ def store_opinion_citations_and_update_parentheticals(
             OpinionsCited.__name__,
             opinion.pk,
             cluster_ids_to_update,
+            percolate_opinion,
         )
