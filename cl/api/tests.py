@@ -3554,6 +3554,29 @@ class CacheListApiResponseTest(TestCase):
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
 
+    def test_count_request_with_filters_not_cached(
+        self, mock_cache_key_method
+    ):
+        """
+        Test that a v4 count request is not cached when filters are applied.
+        """
+        fake_cache_key = "count_request_w_filters_no_cache"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Resolve the URL for the 'docket-list' endpoint and add the count
+        # parameter
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"count": "on", "pacer_case_id": 533886}
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Make the request with filters
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
     def test_no_filters_ordering_request_cached(self, mock_cache_key_method):
         """
         Test that a ordered response is cached when no filters are requested.

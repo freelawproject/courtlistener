@@ -4,8 +4,8 @@
 {% block title %}Components Library - CourtListener.com{% endblock %}
 
 {% block content %}
-<div>
 <c-layout-with-navigation
+  data-first-active="main-title"
   :nav_items="[
       {'href': '#main-title', 'text': 'Component Library'},
       {'href': '#text-components', 'text': 'Text components', 'children': [
@@ -20,6 +20,7 @@
         {'href': '#nav-layout', 'text': 'Layout with navigation'},
         {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
         {'href': '#data-table', 'text': 'Data table'},
+        {'href': '#dialog', 'text': 'Dialog'},
       ]},
       {'href': '#misc', 'text': 'Other components', 'children': [
         {'href': '#support-banner', 'text': 'Support plea banner'},
@@ -51,30 +52,30 @@
 Sample code here.
     </c-code>
 
-    <h4 class="mt-8">Props</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>disable_copy</code><br><span class="font-normal text-xs">(optional)</span></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+    <c-library.list title="Props">
+      <c-library.item optional only>
+        <c-slot name="label"><code>disable_copy</code></c-slot>
+        <c-slot name="description">
           Adding this attribute hides the copy-to-clipboard button in the top-right corner of the code block.
           <br>Defaults to false.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>class</code><br><span class="font-normal text-xs">(optional)</span></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+        </c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">
           CSS classes applied to the <code>&lt;pre&gt;</code> element.
-        </span>
-      </div>
-    </div>
+        </c-slot>
+      </c-library.item>
+    </c-library.list>
 
-    <h4 class="mt-3">Slot</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Text that will be displayed in the code block.</span>
-      </div>
-    </div>
+    <c-library.list title="Slot">
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">
+          Text that will be displayed in the code block.
+        </c-slot>
+      </c-library.item>
+    </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
@@ -102,43 +103,43 @@ Sample code here.
       ]"
     ></c-two-column-list>
 
-    <h4>Props</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>list</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>list</code></c-slot>
+        <c-slot name="description">
           List of items that can either be strings or dicts. In case of dicts, including both <code>href</code> and <code>label</code> will render a link.
           Otherwise, if a key is specified, the value of that key is rendered.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>link_class</code><br><span class="font-normal text-xs">(optional)</span></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+        </c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>link_class</code></c-slot>
+        <c-slot name="description">
           CSS classes to add to links. For accessibility, <a class="underline" href="https://accessibleweb.com/question-answer/do-links-need-to-be-underlined/" target="_blank" rel="noopener noreferrer">it's recommended all links are always underlined</a>.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>key</code><br><span class="font-normal text-xs">(optional)</span></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+        </c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>key</code></c-slot>
+        <c-slot name="description">
           Custom key to pick the value from a dict.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>responsive</code><br><span class="font-normal text-xs">(optional)</span></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+        </c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>responsive</code></c-slot>
+        <c-slot name="description">
           Collapses both columns into one stacked on top of the other in small screens.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>class</code><br><span class="font-normal text-xs">(optional)</span></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+        </c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">
           CSS classes for the list container, appended after the built-in <code>w-full flex flex-row justify-between</code>.
-        </span>
-      </div>
-    </div>
+        </c-slot>
+      </c-library.item>
+    </c-library.list>
 
-    <h4 class="mt-3">Slot</h4>
-    <p class="mb-3">No slot</p>
+    <c-library.list title="Slot" only>
+      <p>No slots</p>
+    </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
@@ -163,15 +164,17 @@ Sample code here.
     <h4 class="mt-3">Demo</h4>
     <c-eyebrow class="my-4">CourtListener</c-eyebrow>
 
-    <h4 class="mt-3">Props</h4>
-    <p>No props</p>
-    <h4 class="mt-3">Slot</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Eyebrow's content.</span>
-      </div>
-    </div>
+    <c-library.list title="Props" only>
+      <p>No props</p>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <!-- list slots: -->
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Eyebrow's content.</c-slot>
+      </c-library.item>
+    </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
@@ -194,26 +197,24 @@ Sample code here.
       Click to copy
     </c-copy-to-clipboard>
 
-    <h4 class="mt-8">Props</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>text_to_copy</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>text_to_copy</code></c-slot>
+        <c-slot name="description">
           Text to be copied to clipboard when clicking the button, or when pressing either the <kbd>Enter</kbd> or <kbd>Space</kbd> keys on focus.
           <br><strong>Important:</strong> Some characters, like double quotation marks, could break syntax. To pass a string that includes any of these characters, escape them with
           <a class="underline" href="https://www.w3schools.com/html/html_entities.asp" target="_blank" rel="noopener noreferrer">HTML entities</a>, or use
           <a class="underline" href="https://docs.djangoproject.com/en/5.1/ref/templates/builtins/#escapejs" target="_blank" rel="noopener noreferrer">Django's built-in <code>escapejs</code> filter</a> to do it for you.
-        </span>
-      </div>
-    </div>
+        </c-slot>
+      </c-library.item>
+    </c-library.list>
 
-    <h4 class="mt-3">Slot</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Button content.</span>
-      </div>
-    </div>
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Button content.</c-slot>
+      </c-library.item>
+    </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
@@ -235,23 +236,19 @@ Sample code here.
       Hello!
     </c-expansion-panel>
 
-    <h4 class="mt-3">Props</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>title</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
-          Title displayed.
-        </span>
-      </div>
-    </div>
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>title</code></c-slot>
+        <c-slot name="description">Title displayed.</c-slot>
+      </c-library.item>
+    </c-library.list>
 
-    <h4 class="mt-3">Slot</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">Default</span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">Collapsible content.</span>
-      </div>
-    </div>
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Collapsible content.</c-slot>
+      </c-library.item>
+    </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
@@ -275,17 +272,18 @@ Sample code here.
     <h4 class="mt-3">Demo</h4>
     <p>See this page's navigation menu.</p>
 
-    <h4 class="mt-3">Props</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>nav_items</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+    <c-library.list title="Props" only>
+      <c-library.item optional only>
+        <c-slot name="label"><code>nav_items</code></c-slot>
+        <c-slot name="description">
           List of navigation items, where each item is a dictionary with <code>href</code> and <code>text</code>.
-        </span>
-      </div>
-    </div>
-    <h4 class="mt-3">Slot</h4>
-    <p class="mb-3">No slot</p>
+        </c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
@@ -315,30 +313,28 @@ Sample code here.
     <h4 class="mt-3">Demo</h4>
     <p>See this page's layout: responsive navigation menu with a main content divided by sections.</p>
 
-    <h4 class="mt-3">Props</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation</code>: <code>nav_items</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>c-layout-with-navigation</code>: <code>nav_items</code></c-slot>
+        <c-slot name="description">
           Same as the navigation menu: a list of navigation items, where each item is a dictionary with <code>href</code> and <code>text</code>.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation.section</code>: <code>id</code></span>
-        <div class="p-2.5 flex flex-col gap-2 max-md:max-w-full [overflow-wrap:anywhere]">
+        </c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-layout-with-navigation.section</code>: <code>id</code></c-slot>
+        <c-slot name="description">
           <div>
             Used to identify the active section for navigation menu highlighting.
           </div>
           <div>Make sure the id is for the entire section that needs to be highlighted, not just a heading or a child element, otherwise the highlighting could misbehave.</div>
-        </div>
-      </div>
-    </div>
+        </c-slot>
+      </c-library.item>
+    </c-library.list>
 
-    <h4 class="mt-3">Slot</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation</code> default</span>
-        <div class="p-2.5 flex flex-col gap-2 max-md:max-w-full [overflow-wrap:anywhere]">
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label"><code>c-layout-with-navigation</code> default</c-slot>
+        <c-slot name="description">
           <div>
             To preserve proper spacing and ensure correct highlighting, nest all content in sections using the <code>c-layout-with-navigation.section</code> sub-component.
           </div>
@@ -346,17 +342,18 @@ Sample code here.
             However, if you need to tweak or remove the section's intersect behavior, you can swap the sub-component for a native <code>&lt;section&gt;</code> element and it will preserve proper spacing and layout.
           </div>
           <div>
-            For further reference, check Alpine's docs on <a class="underline" href="https://alpinejs.dev/plugins/intersect#modifiers" target="_blank" rel="noopener noreferrer">intersect modifiers</a>.</div>
-        </div>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-layout-with-navigation.section</code> default</span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+            For further reference, check Alpine's docs on <a class="underline" href="https://alpinejs.dev/plugins/intersect#modifiers" target="_blank" rel="noopener noreferrer">intersect modifiers</a>.
+          </div>
+        </c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-layout-with-navigation.section</code> default</c-slot>
+        <c-slot name="description">
           A section's content which should probably have a heading.
           <br>For further reference check the <a class="underline" href="https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/section" target="_blank" rel="noopener noreferrer">mdn web docs</a> on the <code>&lt;section&gt;</code> element.
-        </span>
-      </div>
-    </div>
+        </c-slot>
+      </c-library.item>
+    </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
@@ -415,37 +412,33 @@ Sample code here.
       </c-tabs.tab>
     </c-tabs>
 
-    <h4 class="mt-3">Props</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs</code>: <code>title</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs</code>: <code>title</code></c-slot>
+        <c-slot name="description">
           Component title used for accessibility.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs.tab</code>: <code>name</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+        </c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs.tab</code>: <code>name</code></c-slot>
+        <c-slot name="description">
           Tab label displayed in selector.
-        </span>
-      </div>
-    </div>
+        </c-slot>
+      </c-library.item>
+    </c-library.list>
 
-    <h4 class="mt-3">Slot</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs</code> default</span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs</code> default</c-slot>
+        <c-slot name="description">
           Add as many <code>c-tabs.tab</code> elements as needed.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>c-tabs.tab</code> default</span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
-          Content displayed when this tab is active.
-        </span>
-      </div>
-    </div>
+        </c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs.tab</code> default</c-slot>
+        <c-slot name="description">Content displayed when this tab is active.</c-slot>
+      </c-library.item>
+    </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
@@ -526,46 +519,50 @@ Sample code here.
       ]"
     ></c-data-table>
 
-    <h4 class="mt-8">Props</h4>
-    <div class="bg-greyscale-100 rounded-xl p-4 my-3">
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>columns</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>columns</code></c-slot>
+        <c-slot name="description">
           List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the col value for each row).
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>rows</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item only>
+        <c-slot name="label"><code>rows</code></c-slot>
+        <c-slot name="description">
           List of rows in the <code>&lt;tbody&gt;</code>.
           <br>Each element in the list is a dictionary where the keys correspond to the column fields.
           <br>If a given field isn't present, the cell will be empty.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>footer</code><br><span class="font-normal text-xs">(optional)</span></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
-          List of rows in the <code>&lt;tfoot&gt;</code>.<br>Same structure as <code>rows</code>.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>caption</code></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item only>
+        <c-slot name="label"><code>caption</code></c-slot>
+        <c-slot name="description">
           Table caption for accessibility.<br>Not displayed visually, but it's important to provide context for screen readers.
-        </span>
-      </div>
-      <div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
-        <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium"><code>safe</code><br><span class="font-normal text-xs">(optional)</span></span>
-        <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
+        <c-slot name="label"><code>footer</code></c-slot>
+        <c-slot name="description">
+          List of rows in the <code>&lt;tfoot&gt;</code>.<br>Same structure as <code>rows</code>.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
+        <c-slot name="label"><code>safe</code></c-slot>
+        <c-slot name="description">
           Marks the contents as safe, so it can render HTML inside the table.
           <br>Defaults to false.
           <br><strong>Warning:</strong> May allow XSS vulnerabilities if enabled on user-provided HTML, so use only with trusted content.
-        </span>
-      </div>
-    </div>
+        </c-slot>
+      </c-library.item>
+    </c-library.list>
 
-    <h4 class="mt-3">Slot</h4>
-    <p class="mb-3">No slot</p>
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
@@ -627,6 +624,58 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+  {# DIALOG #}
+  <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="dialog">
+    <h2 class="mt-6 mb-3">Dialog</h2>
+    <p>Renders a button that opens a dialog with an overlay. This component uses named slots.</p>
+    <h4 class="mt-3">Demo</h4>
+    <c-dialog panel_class="p-5 banner max-w-70" dialog_class="items-center z-20">
+      <c-slot name="button_content">Click me!</c-slot>
+      <c-slot name="panel">
+        Place any content you want here.
+        <div class="flex flex-row justify-end gap-2">
+          <button x-on:click="close" type="button" class="btn-outline" aria-label="Close modal">Close</button>
+        </div>
+      </c-slot>
+    </c-dialog>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>dialog_class</code></c-slot>
+        <c-slot name="description">CSS classes added to the container for the overlay and the panel.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>panel_class</code></c-slot>
+        <c-slot name="description">CSS classes added to the panel itself.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label"><code>button_content</code></c-slot>
+        <c-slot name="description">Content added inside the trigger button slot.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>panel</code></c-slot>
+        <c-slot name="description">Content displayed in the dialog panel when opened.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-dialog panel_class="p-5 banner max-w-70" dialog_class="items-center z-20"&gt;
+  &lt;c-slot name="button_content"&gt;Click me!&lt;/c-slot&gt;
+  &lt;c-slot name="panel"&gt;
+    Place any content you want here.
+    &lt;div class="flex flex-row justify-end gap-2"&gt;
+      &lt;button x-on:click="close" type="button" class="btn-outline" aria-label="Close modal"&gt;Close&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/c-slot&gt;
+&lt;/c-dialog&gt;
+      </c-code>
+    </c-expansion-panel>
+  </c-layout-with-navigation.section>
+
   {# SUPPORT PLEA BANNER #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="support-banner">
     <h2 class="mt-6 mb-3">Support plea banner</h2>
@@ -634,11 +683,13 @@ Sample code here.
     <h4 class="mt-3">Demo</h4>
     <c-support-plea-banner></c-support-plea-banner>
 
-    <h4 class="mt-3">Props</h4>
-    <p>No props</p>
+    <c-library.list title="Props" only>
+      <p>No props</p>
+    </c-library.list>
 
-    <h4 class="mt-3">Slot</h4>
-    <p>No slots</p>
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
@@ -648,5 +699,4 @@ Sample code here.
   </c-layout-with-navigation.section>
 
 </c-layout-with-navigation>
-</div>
 {% endblock %}

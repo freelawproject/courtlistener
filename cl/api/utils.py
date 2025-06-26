@@ -517,7 +517,7 @@ class NoFilterCacheListMixin:
             not is_v3_request
             and not has_pagination
             and not has_dynamic_fields
-            and (is_count_request or not has_filters)
+            and not has_filters
         )
         if should_cache_response:
             cached_data = cache.get(cache_key) or None

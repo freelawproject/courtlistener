@@ -88,9 +88,9 @@
         item_class="py-1.5"
         only
       />
-      <c-corpus-search.input only/>
+      <c-corpus-search.input :request="request" only/>
       <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
-        {% svg "magnifier" class="text-white" %}
+        {% svg "magnifier" class="text-white" aria_hidden="true" %}
       </c-corpus-search.button>
     </c-corpus-search>
   {% endif %}
@@ -99,9 +99,9 @@
   <div class="lg:w-[--profile-menu-width] flex justify-end items-center relative">
     {# MOBILE SEARCH TRIGGER + DIALOG #}
     {% if variant != "homepage" %}
-      <c-corpus-search only>
+      <c-corpus-search class="md:hidden" only>
         <c-corpus-search.mobile :request="request" only>
-          <c-corpus-search.input rounded only/>
+          <c-corpus-search.input :request="request" rounded only/>
           <c-corpus-search.scope
             class="w-full text-greyscale-500"
             menu_class="w-full text-sm text-greyscale-600"
@@ -114,7 +114,7 @@
             class="btn w-full text-primary-600 text-sm font-medium py-2 hover:bg-greyscale-100 flex justify-center"
           >Advanced Search</button>
           <c-corpus-search.button class="w-full max-md:btn-xl flex items-center justify-center">
-            {% svg "magnifier" class="text-white w-5 h-5 mr-1.5" %}
+            {% svg "magnifier" class="text-white w-5 h-5 mr-1.5" aria_hidden="true" %}
             Search
           </c-corpus-search.button>
         </c-corpus-search.mobile>
@@ -125,14 +125,15 @@
       <div>
         {#   Signed-in button   #}
         <button
-          x-on:click="toggleProfileMenu"
+          id="header-profile-trigger"
+          x-on:click="openProfileMenu"
           class="bg-white btn-outline text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
           type="button"
           aria-haspopup="menu"
           aria-controls="header-profile-menu"
           x-bind:aria-expanded="profileMenuExpanded"
         >
-          {% svg "avatar" class="border-greyscale-300 border rounded-full" %}
+          {% svg "avatar" class="border-greyscale-300 border rounded-full" aria_hidden="true" %}
           Profile
           <span
             x-bind:class="profileCaretClass"
@@ -153,6 +154,9 @@
             x-on:keyup.esc="closeProfileMenu"
             x-on:keyup.right="focusNext"
             x-on:keyup.left="focusPrevious"
+            x-on:keydown.down.prevent.stop="focusNext"
+            x-on:keydown.up.prevent.stop="focusPrevious"
+            x-on:keydown.tab.prevent.stop="closeProfileMenu"
             class="absolute right-0 z-10 mt-2 w-[--profile-menu-width] rounded-lg bg-white py-2 shadow-lg border border-greyscale-200 focus-visible:outline-hidden list-none pl-0"
             tabindex="-1"
             role="menu"

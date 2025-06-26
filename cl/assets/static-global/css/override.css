@@ -1952,3 +1952,11 @@ rect.series-segment {
   color: #8a1f11;
   text-decoration: underline;
 }
+
+.btn-sealed{
+  min-width: 96px;
+}
+
+.toggle-disable{
+  opacity: 0.65;
+}
