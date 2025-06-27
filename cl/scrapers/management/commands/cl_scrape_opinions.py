@@ -26,7 +26,7 @@ from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
     SingleDuplicateError,
 )
-from cl.scrapers.tasks import extract_doc_content
+from cl.scrapers.tasks import extract_opinion_content
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
     get_binary_content,
@@ -346,11 +346,11 @@ class Command(ScraperCommand):
                 "citations": citations,
             }
         )
-        extract_doc_content.delay(
+        extract_opinion_content.delay(
             opinion.pk,
             ocr_available=ocr_available,
-            citation_jitter=True,
             juriscraper_module=site.court_id,
+            percolate_opinion=True,
         )
 
         logger.info(

@@ -12,6 +12,7 @@ from cl.alerts.tasks import (
 )
 from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
+from cl.lib.indexing_utils import compose_app_label
 from cl.people_db.models import (
     ABARating,
     Education,
@@ -47,15 +48,6 @@ from cl.search.tasks import (
     update_es_document,
 )
 from cl.search.types import ESDocumentClassType, ESModelType
-
-
-def compose_app_label(instance: ESModelType) -> str:
-    """Compose the app label and model class name for an ES model instance.
-
-    :param instance: The ES Model instance.
-    :return: A string combining the app label and the Model class name.
-    """
-    return f"{instance._meta.app_label}.{instance.__class__.__name__}"
 
 
 def check_fields_that_changed(

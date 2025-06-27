@@ -94,6 +94,140 @@ def update_document_from_text(
     max_retries=5,
     retry_backoff=10,
 )
+def extract_opinion_content(
+    self,
+    pk: int,
+    juriscraper_module: str = "",
+    ocr_available: bool = False,
+    percolate_opinion: bool = False,
+) -> None:
+    """
+    Given an opinion PK, we extract it, sniffing its extension, then store its
+    contents in the database.  Finally, we asynchronously find citations in
+    the document content and match them to other documents.
+
+    This implementation uses local paths.
+
+    After reviewing some related errors on Sentry we realized that some
+    opinions that didn't need OCR were being extracted using OCR.
+
+    Doctor has a method to decide if a document should be extracted using OCR
+    that works by checking if the document contains images. The problem with
+    that is if a PDF that its content is mostly text contains an image (like a
+    stamp or a signature) it'll be fully converted to images to then be
+    extracted using OCR. That's not good in large documents due to the
+    unnecessary use of resources.
+
+    That's why it's better to first try to extract the content without OCR,
+    then if the extraction doesn't return any content try to extract it using
+    OCR.
+    That means that we'll only use OCR for those PDF documents that are fully
+    composed of images.
+
+    Note that this approach won't work well for those documents with mixed
+    content (text pages + images pages) in these cases we'll only extract the
+    text content. Fortunately seems that documents like those are not too
+    common.
+
+    :param self: The Celery task
+    :param pk: The opinion primary key to work on
+    :param juriscraper_module: the full module string to re-import a Site object
+    :param ocr_available: Whether the PDF converting function should use OCR
+    :param percolate_opinion: Whether to percolate the related opinion document in
+    order to trigger search alerts.
+    larger scrape.
+    """
+
+    opinion = Opinion.objects.get(pk=pk)
+
+    # Try to extract opinion content without using OCR.
+    response = async_to_sync(microservice)(
+        service="document-extract",
+        item=opinion,
+    )
+    if not response.is_success:
+        logger.error(
+            "Error from document-extract microservice: %s",
+            response.status_code,
+            extra=dict(
+                opinion_id=opinion.id,
+                url=opinion.download_url,
+                local_path=opinion.local_path.name,
+                fingerprint=[
+                    f"{opinion.cluster.docket.court_id}-document-extract-failure"
+                ],
+            ),
+        )
+        return
+
+    content = response.json()["content"]
+    extracted_by_ocr = response.json()["extracted_by_ocr"]
+    # For PDF documents, if there's no content after the extraction without OCR
+    # Let's try to extract using OCR.
+    if (
+        ocr_available
+        and needs_ocr(content)
+        and ".pdf" in str(opinion.local_path)
+    ):
+        response = async_to_sync(microservice)(
+            service="document-extract-ocr",
+            item=opinion,
+            params={"ocr_available": ocr_available},
+        )
+        if response.is_success:
+            content = response.json()["content"]
+            extracted_by_ocr = True
+
+    data = response.json()
+    extension = opinion.local_path.name.split(".")[-1]
+    opinion.extracted_by_ocr = extracted_by_ocr
+
+    if data["page_count"]:
+        opinion.page_count = data["page_count"]
+
+    assert isinstance(content, str), (
+        f"content must be of type str, not {type(content)}"
+    )
+
+    set_blocked_status(opinion, content, extension)
+    update_document_from_text(opinion, juriscraper_module)
+
+    if data["err"]:
+        logger.error(
+            "****Error: %s, extracting text from %s: %s****",
+            data["err"],
+            extension,
+            opinion,
+        )
+        return
+
+    # Save item
+    # noinspection PyBroadException
+    try:
+        opinion.cluster.docket.save()
+        opinion.cluster.save()
+        opinion.save()
+    except Exception:
+        logger.error(
+            "****Error saving text to the db for: %s****\n%s",
+            opinion,
+            traceback.format_exc(),
+        )
+        return
+
+    # Identify and link citations within the document content
+    find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
+        ([opinion.pk], False, False, percolate_opinion),
+        countdown=random.randint(0, 3600),
+    )
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    max_retries=5,
+    retry_backoff=10,
+)
 def extract_doc_content(
     self,
     pk: int,
