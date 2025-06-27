@@ -712,17 +712,6 @@ async def view_recap_document(
     rd.prayer_count = prayer_counts.get(rd.id, 0)
     rd.prayer_exists = existing_prayers.get(rd.id, False)
 
-    # Add context for attachments
-    attachments = None
-    next_doc = None
-    if len(rds) > 1:
-        attachments = rds
-        next_doc_index = rds.index(rd) + 1
-        if next_doc_index == len(rds):
-            # Wrap to first doc
-            next_doc_index = 0
-        next_doc = rds[next_doc_index]
-
     return TemplateResponse(
         request,
         "recap_document.html",
@@ -735,8 +724,7 @@ async def view_recap_document(
             "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
             "authorities": await rd.cited_opinions.aexists(),
-            "next_doc": next_doc,
-            "attachments": attachments,
+            "attachments": rds if len(rds) > 1 else None,
         },
     )
 

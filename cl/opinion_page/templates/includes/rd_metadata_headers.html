@@ -1,12 +1,42 @@
 {% load tz %}
-<h3>
-  {% if rd.description %}{{ rd.description }}
-    <span class="gray">&mdash;</span>
-  {% endif %}
-    Document <a href="{{ rd.docket_entry.docket.get_absolute_url }}#entry-{{ rd.document_number }}">#{{ rd.document_number }}
-  </a>
-  {% if rd.document_type == rd.ATTACHMENT %}, Attachment #{{ rd.attachment_number }}{% endif %}
-</h3>
+<div class="btn-group" style="display:block;">
+  <h3 style="margin-top: 10px;">
+    {% if rd.description %}{{ rd.description }}
+      <span class="gray">&mdash;</span>
+    {% endif %}
+    Document
+    <a href="{{ rd.docket_entry.docket.get_absolute_url }}#entry-{{ rd.document_number }}">
+      #{{ rd.document_number }}</a>{% if rd.document_type == rd.ATTACHMENT %},
+      Attachment #{{ rd.attachment_number }}{% endif %}
+    {% if attachments %}
+    <button
+      class="btn btn-default btn-lg dropdown-toggle"
+      type="button"
+      data-toggle="dropdown"
+      aria-expanded="false"
+      style="vertical-align:bottom; padding:1px 10px; border-radius:3px;"
+    >
+      <span class="caret"></span>
+    </button>
+    <ul class="dropdown-menu">
+      {% for doc in attachments %}
+        <li {% if doc == rd %}class="disabled"{% endif %}>
+          <a
+            href="{% if doc != rd %}{{ doc.get_absolute_url }}{% else %}#{% endif %}"
+            style="font-size:21px; font-weight:500; padding:3px 18px;"
+          >
+            {% if doc.description %}{{ doc.description }}
+              <span class="gray">&mdash;</span>
+            {% endif %}
+            Document #{{ doc.document_number }}{% if doc.document_type == doc.ATTACHMENT %},
+            Attachment #{{ doc.attachment_number }}{% endif %}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </h3>
+</div>
 <h4>{{ rd.docket_entry.docket.court }}</h4>
 <p class="bottom">
   <span class="meta-data-header">Docket Number:</span>
@@ -44,8 +74,4 @@
   </div>
   {% include "includes/rd_doc_search_button.html" %}
   {% include "includes/rd_download_button.html" %}
-  {% if next_doc %}
-    {% include "includes/rd_attachments_button.html" %}
-  {% endif %}
-
 </div>
