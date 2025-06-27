@@ -24,6 +24,7 @@
           <a
             href="{% if doc != rd %}{{ doc.get_absolute_url }}{% else %}#{% endif %}"
             style="font-size:21px; font-weight:500; padding:3px 18px;"
+            title="Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}"
           >
             {% if doc.description %}{{ doc.description }}
               <span class="gray">&mdash;</span>
