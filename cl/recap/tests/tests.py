@@ -1151,36 +1151,69 @@ class RecapUploadsTest(TestCase):
         )
 
         # Confirm Docket entry and RECAPDocument is properly created.
-        self.assertEqual(docket_entries.count(), 3)
+        self.assertEqual(docket_entries.count(), 6)
         recap_documents = RECAPDocument.objects.all().order_by("date_created")
-        self.assertEqual(recap_documents.count(), 3)
-        self.assertEqual(
-            recap_documents[0].pacer_doc_id,
-            "46de54cd-3561-ee11-be6e-001dd804e087",
-        )
-        self.assertEqual(
-            recap_documents[1].pacer_doc_id,
-            "0d24550b-3761-ee11-be6e-001dd804e087",
-        )
+        self.assertEqual(recap_documents.count(), 6)
 
         # Confirm the naive date_filed is not converted.
         de_1 = DocketEntry.objects.get(docket__court=self.ca2, entry_number=1)
         self.assertEqual(de_1.date_filed, date(2023, 10, 2))
-        self.assertEqual(de_1.time_filed, time(11, 17, 0))
+        self.assertEqual(de_1.time_filed, time(0, 0, 0))
 
         de_2 = DocketEntry.objects.get(docket__court=self.ca2, entry_number=2)
         self.assertEqual(de_2.date_filed, date(2023, 10, 2))
-        self.assertEqual(de_2.time_filed, time(11, 20, 0))
+        self.assertEqual(de_2.time_filed, time(0, 0, 0))
 
         de_3 = DocketEntry.objects.get(docket__court=self.ca2, entry_number=3)
 
         # Assert that the RECAP sequence numbers correctly reflect the order
-        # of docket entries.
+        # of docket entries with numbers. The mock data includes three such
+        # entries (de_1, de_2, de_3) that should be ordered sequentially by
+        # their document numbers.
         self.assertGreater(
             de_3.recap_sequence_number, de_2.recap_sequence_number
         )
         self.assertGreater(
             de_2.recap_sequence_number, de_1.recap_sequence_number
+        )
+
+        # Assert RECAP sequence numbers are correctly computed for minute
+        # entries. The mock data also includes three minute entries with
+        # specific relationships to existing numbered entries and to each other,
+        # covering various scenarios:
+        # 1. 'minute_entry_first': An older minute entry, expected to precede
+        #    de_1.
+        #
+        # 2. 'minute_entry_same_date': A minute entry filed on the same day as
+        #    de_2, expected to be ordered after de_2 but before de_3.
+        #
+        # 3. 'minute_entry_last': The newest entry in the case, expected to get
+        #    the highest sequence number.
+        minute_entry_first = RECAPDocument.objects.get(
+            pacer_doc_id="b7607114-058e-ee11-8179-001dd804e4bd"
+        ).docket_entry
+        self.assertGreater(
+            de_1.recap_sequence_number,
+            minute_entry_first.recap_sequence_number,
+        )
+
+        minute_entry_same_date = RECAPDocument.objects.get(
+            pacer_doc_id="c5f76179-dd92-ee11-8179-001dd804e087"
+        ).docket_entry
+        self.assertGreater(
+            minute_entry_same_date.recap_sequence_number,
+            de_2.recap_sequence_number,
+        )
+        self.assertGreater(
+            de_3.recap_sequence_number,
+            minute_entry_same_date.recap_sequence_number,
+        )
+
+        minute_entry_last = RECAPDocument.objects.get(
+            pacer_doc_id="f50a3a31-dc92-ee11-8179-001dd804ed2e"
+        ).docket_entry
+        self.assertGreater(
+            minute_entry_last.recap_sequence_number, de_3.recap_sequence_number
         )
 
     def test_processing_an_acms_attachment_page(self, mock_upload):
