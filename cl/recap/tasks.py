@@ -1492,11 +1492,17 @@ async def process_recap_acms_docket(pk):
     # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
 
-    # Sort docket entries by their 'document_number'.
-    # We noticed raw ACMS data is not consistently sorted, so we sort by
-    # 'document_number' to match the display order on the docket report.
+    # Sort docket entries to ensure consistent ordering
+    # The primary sort is by 'date_filed', followed by 'document_number' (nulls
+    # last for a given date). This approach aligns the order with how docket
+    # reports are typically displayed.
     data["docket_entries"] = sorted(
-        data["docket_entries"], key=lambda d: d["document_number"]
+        data["docket_entries"],
+        key=lambda d: (
+            d["date_filed"],
+            d["document_number"] is None,
+            d["document_number"],
+        ),
     )
     des_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
