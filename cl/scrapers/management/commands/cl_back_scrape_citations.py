@@ -19,7 +19,7 @@ from cl.scrapers.exceptions import BadContentError
 from cl.scrapers.management.commands import cl_back_scrape_opinions
 from cl.scrapers.management.commands.cl_scrape_opinions import make_citation
 from cl.scrapers.utils import citation_is_duplicated, get_binary_content
-from cl.search.models import Court, Opinion, OpinionCluster
+from cl.search.models import Court, Opinion
 
 
 class Command(cl_back_scrape_opinions.Command):
@@ -52,47 +52,52 @@ class Command(cl_back_scrape_opinions.Command):
 
         for case in site:
             citation = case.get("citations")
-            docket_number = case.get("docket_numbers") if citation else None
             parallel_citation = case.get("parallel_citations")
-            content = None
             if not citation and not parallel_citation:
                 logger.debug(
                     "No citation, skipping row for case %s",
                     case.get("case_names"),
                 )
                 continue
+
             try:
-                if court_str == "scotus":
-                    # In SCOTUS, docket numbers are unique, so we can use them to match citations.
-                    # We use filter (not get) because the system has duplicates: the court site sometimes
-                    # do minor updates to their opinion files, and we end up with multiple clusters. But we only want the most recent one.
-                    cluster = (
-                        OpinionCluster.objects.filter(
-                            docket__court=court,
-                            docket__docket_number=docket_number,
-                            case_name=case.get("case_names"),
-                            date_filed=case.get("case_dates"),
-                            judges=case.get("judges"),
-                        )
-                        .order_by("-date_created")
-                        .first()
-                    )
-                else:
-                    content = get_binary_content(case["download_urls"], site)
-                    sha1_hash = sha1(force_bytes(content))
-                    cluster = Opinion.objects.get(sha1=sha1_hash).cluster
+                content = get_binary_content(case["download_urls"], site)
             except BadContentError:
                 continue
-            except (OpinionCluster.DoesNotExist, Opinion.DoesNotExist) as e:
+
+            sha1_hash = sha1(force_bytes(content))
+
+            try:
+                if court.id == "scotus":
+                    # Ensure all criteria matches for scotus opinion and add the citation
+                    scotus_opinions = Opinion.objects.filter(
+                        cluster__docket__docket_number=case.get("docket_numbers"),
+                        cluster__case_name=case.get("case_names"),
+                        cluster__date_filed=case.get("case_dates"),
+                        cluster__judges=case.get("judges"),
+                        cluster__docket__court__id="scotus",
+                    )
+                    if len(scotus_opinions) > 1:
+                        # duplicates detected, check if we have the exact copy
+                        cluster = Opinion.objects.get(sha1=sha1_hash).cluster
+                    elif len(scotus_opinions) == 1:
+                        cluster = scotus_opinions.first().cluster
+                    else:
+                        raise Opinion.DoesNotExist
+                else:
+                    cluster = Opinion.objects.get(sha1=sha1_hash).cluster
+            except Opinion.DoesNotExist:
+                # populate special key to avoid downloading the file again
+                case["content"] = content
+
                 logger.info(
-                    "Case '%s', opinion '%s' has no match in the DB. "
+                    "Case '%s', opinion '%s' has no matching hash in the DB. "
                     "Has a citation '%s'. Will try to ingest all objects",
                     case["case_names"],
                     case["download_urls"],
                     citation or parallel_citation,
                 )
-                if isinstance(e, Opinion.DoesNotExist):
-                    case["content"] = content
+
                 self.ingest_a_case(case, None, True, site, dup_checker, court)
                 continue
 
