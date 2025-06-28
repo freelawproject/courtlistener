@@ -1,0 +1,230 @@
+{% extends "new_base.html" %}
+{% load extras %}
+
+{% block title %}Legal Search API – CourtListener.com{% endblock %}
+{% block og_title %}Legal Search API – CourtListener.com{% endblock %}
+
+{% block description %}Use this API to search case law, federal filings and cases, judges, and oral argument audio files.{% endblock %}
+{% block og_description %}Use this API to search case law, federal filings and cases, judges, and oral argument audio files.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#usage', 'text': 'Basic Usage'},
+    {'href': '#understanding', 'text': 'Understanding', 'children': [
+      {'href': '#type', 'text': 'Result Types'},
+      {'href': '#ordering', 'text': 'Ordering'},
+      {'href': '#filtering', 'text': 'Filtering'},
+      {'href': '#fields', 'text': 'Fields'},
+      {'href': '#highlighting', 'text': 'Highlighting'},
+      {'href': '#counts', 'text': 'Result Counts'},
+      {'href': '#notes', 'text': 'Special Notes'}
+    ]},
+    {'href': '#monitoring', 'text': 'Monitoring'}
+  ]"
+>
+  <c-layout-with-navigation.section id="about">
+    <h1>Legal Search&nbsp;API</h1>
+    <h2><code>{% url "search-list" version=version %}</code></h2>
+    <p>Use this API to search case law, PACER data, judges, and oral argument audio recordings.</p>
+    <p>To get the most out of this API, see our <a class="underline" href="{% url "coverage" %}">coverage</a> and <a class="underline" href="{% url "advanced_search" %}">advanced operators</a>, and <a class="underline" href="{% url "relative_dates" %}">relative date queries</a> documentation.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="usage">
+    <h2>Basic Usage</h2>
+    <p>This API uses the same GET parameters as the front end of the website. To use this API, place a search query on the front end of the website. That will give you a URL like:</p>
+    <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">{% get_full_host %}/q=foo</pre>
+    <p>To make this into an API request, copy the GET parameters from this URL to the API endpoint, creating a request like:</p>
+    <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  '{% get_full_host %}{% url "search-list" version=version %}?q=foo'</pre>
+    <p>That returns:</p>
+    <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">{
+  "count": 2343,
+    "next": "https://www.courtlistener.com/api/rest/v4/search/?cursor=cz0yMzUuODcxMjUmcz04MDUzNTUzJnQ9byZkPTIwMjQtMDktMTY%3D&q=foo",
+    "previous": null,
+    "results": [
+        {
+            "absolute_url": "/opinion/6613686/foo-v-foo/",
+            "attorney": "",
+            "caseName": "Foo v. Foo",
+            "caseNameFull": "Foo v. Foo",
+            "citation": [
+                "101 Haw. 235",
+                "65 P.3d 182"
+            ],
+            "citeCount": 0,
+            "cluster_id": 6613686,
+            "court": "Hawaii Intermediate Court of Appeals",
+            "court_citation_string": "Haw. App.",
+            "court_id": "hawapp",
+            "dateArgued": null,
+            "dateFiled": "2003-01-10",
+            "dateReargued": null,
+            "dateReargumentDenied": null,
+            "docketNumber": "24158",
+            "docket_id": 63544014,
+            "judge": "",
+            "lexisCite": "",
+            "meta": {
+                "timestamp": "2024-06-22T10:26:35.320787Z",
+                "date_created": "2022-06-26T23:24:18.926040Z",
+                "score": {
+                    "bm25": 2.1369965
+                }
+            },
+            "neutralCite": "",
+            "non_participating_judge_ids": [],
+            "opinions": [
+                {
+                    "author_id": null,
+                    "cites": [],
+                    "download_url": null,
+                    "id": 6489975,
+                    "joined_by_ids": [],
+                    "local_path": null,
+                    "meta": {
+                        "timestamp": "2024-06-24T21:14:41.408206Z",
+                        "date_created": "2022-06-26T23:24:18.931912Z"
+                    },
+                    "per_curiam": false,
+                    "sha1": "",
+                    "snippet": "\nAffirmed in part, reversed in part, vacated and remanded\n",
+                    "type": "lead-opinion"
+                }
+            ],
+            "panel_ids": [],
+            "panel_names": [],
+            "posture": "",
+            "procedural_history": "",
+            "scdb_id": "",
+            "sibling_ids": [
+                6489975
+            ],
+            "source": "U",
+            "status": "Published",
+            "suitNature": "",
+            "syllabus": ""
+        },
+    ...</pre>
+    <p>That's the simple version. Read on to learn the rest.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="understanding">
+    <h2>Understanding the API</h2>
+    <p>Unlike most APIs on CourtListener, this API is powered by our search engine, not our database.</p>
+    <p>This means that it does not use the same approach to ordering, filtering, or field definitions as our other APIs, and sending an HTTP <code>OPTIONS</code> request won't be useful.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="type">
+    <h4>Setting the Result <code>type</code></h4>
+    <p>The most important parameter in this API is <code>type</code>. This parameter sets the type of object you are querying:</p>
+    <table class="w-full text-sm text-left text-greyscale-700 my-4">
+      <thead class="text-xs text-greyscale-900 uppercase bg-greyscale-50">
+        <tr>
+          <th scope="col" class="px-6 py-3">Type</th>
+          <th scope="col" class="px-6 py-3">Definition</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="bg-white border-b">
+          <td class="px-6 py-4"><code>o</code></td>
+          <td class="px-6 py-4">Case law opinion clusters with nested Opinion documents.</td>
+        </tr>
+        <tr class="bg-white border-b">
+          <td class="px-6 py-4"><code>r</code></td>
+          <td class="px-6 py-4">List of Federal cases (dockets) with up to three nested documents. If there are more than three matching documents, the <code>more_docs</code> field for the docket result will be </code>true</code>.</td>
+        </tr>
+        <tr class="bg-white border-b">
+          <td class="px-6 py-4"><code>rd</code></td>
+          <td class="px-6 py-4">Federal filing documents from PACER</td>
+        </tr>
+        <tr class="bg-white border-b">
+          <td class="px-6 py-4"><code>d</code></td>
+          <td class="px-6 py-4">Federal cases (dockets) from PACER</td>
+        </tr>
+        <tr class="bg-white border-b">
+          <td class="px-6 py-4"><code>p</code></td>
+          <td class="px-6 py-4">Judges</td>
+        </tr>
+        <tr class="bg-white">
+          <td class="px-6 py-4"><code>oa</code></td>
+          <td class="px-6 py-4">Oral argument audio files</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>For example, this query searches case law:</p>
+    <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">{% get_full_host %}/q=foo&type=o</pre>
+    <p>And this query searches federal filings in the PACER system:</p>
+    <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">{% get_full_host %}/q=foo&type=r</pre>
+    <p>If the <code>type</code> parameter is not provided, the default is to search case law.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="ordering">
+    <h4>Ordering Results</h4>
+    <p>Each search <code>type</code> can be sorted by certain fields. These are available on the front end in the ordering drop down, which sets the <code>order_by</code> parameter.</p>
+    <p>If your sorting field has null values, those results will be sorted at the end of the query, regardless of whether you sort in ascending or descending order. For example if you sort by a date that is null for an opinion, that opinion will go at the end of the result set.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="filtering">
+    <h4>Filtering Results</h4>
+    <p>Results can be filtered with the input boxes provided on the front end or by <a class="underline" href="{% url "advanced_search" %}">advanced query operators</a> provided to the <code>q</code> parameter.</p>
+    <p>The best way to refine your query is to do so on the front end, and then copy the GET parameters to the API.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="fields">
+    <h4>Fields</h4>
+    <p>Unlike most of the fields on CourtListener, many fields on this API are provided in camelCase instead of snake_case. This is to make it easier for users to place queries like:</p>
+    <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">caseName:foo</pre>
+    <p>Instead of:</p>
+    <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">case_name:foo</pre>
+    <p>All available fields are listed on the <a class="underline" href="{% url "advanced_search" %}">advanced operators help page</a>.</p>
+    <p>To understand the meaning of a field, find the object in our regular APIs that it corresponds to, and send an HTTP <code>OPTIONS</code> request to the API.</p>
+    <p>For example, the <code>docketNumber</code> field in the search engine corresponds to the <code>docket_number</code> field in the <code>docket</code> API, so an HTTP <code>OPTIONS</code> request to that API returns its definition:</p>
+    <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version=version %}" \
+  | jq '.actions.POST.docket_number'</pre>
+    <p>After filtering through <a class="underline" href="https://github.com/jqlang/jq"><code>jq</code></a>, that returns:</p>
+    <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">{
+  "type": "string",
+  "required": false,
+  "read_only": false,
+  "label": "Docket number",
+  "help_text": "The docket numbers of a case, can be consolidated and quite long. In some instances they are too long to be indexed by postgres and we store the full docket in the correction field on the Opinion Cluster."
+}</pre>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="highlighting">
+    <h4>Highlighting Results</h4>
+    <p>To enhance performance, results are not highlighted by default. To enable highlighting, include <code>highlight=on</code> in your request.</p>
+    <p>When highlighting is disabled, the first 500 characters of snippet fields are returned for fields <code>o</code>, <code>r</code>, and <code>rd</code>.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="counts">
+    <h4>Result Counts</h4>
+    <p><code>type=d</code> and <code>type=r</code> use cardinality aggregation to compute the result count. This enhances performance, but has an error of ±6% if results are over 2000. We recommend noting this in your interface by saying something like, "About 10,000 results."</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="notes">
+    <h4>Special Notes</h4>
+    <p>A few fields deserve special consideration:</p>
+    <ol class="list-decimal list-inside space-y-4">
+      <li>As in the front end, when the <code>type</code> is set to return case law, only published results are returned by default. To include unpublished and other statuses, you need to explicitly request them.</li>
+      <li>The <code>snippet</code> field contains the same values as are found on the front end. This uses the HTML5 <code>&lt;mark&gt;</code> element to identify up to five matches in a document.
+        <p class="mt-2">This field only responds to arguments provided to the <code>q</code> parameter. If the <code>q</code> parameter is not used, the <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.</p>
+        <p class="mt-2">This field only displays Opinion text content.</p>
+      </li>
+      <li>The <code>meta</code> field in main documents contains the <code>score</code> field, which is currently a JSON object that includes the <code>bm25</code> score used by Elasticsearch to rank results. Additional scores may be introduced in the future.</li>
+    </ol>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="monitoring">
+    <h2>Monitoring a Query for New&nbsp;Results</h2>
+    <p>To monitor queries for new results, use the <a class="underline" href="{% url "search_api_help" %}">Alert API</a>, which will send emails or webhook events when there are new results.</p>
+  </c-layout-with-navigation.section>
+
+</c-layout-with-navigation>
+{% endblock %}
