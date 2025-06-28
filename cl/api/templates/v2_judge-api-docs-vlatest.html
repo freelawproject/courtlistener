@@ -1,0 +1,127 @@
+{% extends "new_base.html" %}
+{% load extras %}
+
+{% block title %}Judge APIs for Federal and State Judges and Justices – CourtListener.com{% endblock %}
+{% block og_title %}Judge APIs for Federal and State Judges and Justices – CourtListener.com{% endblock %}
+
+{% block description %}Use these APIs to query and analyze thousands of federal and state judges, including their biographical information, political affiliations, education and employment histories, judgeships, and more.{% endblock %}
+{% block og_description %}Use these APIs to query and analyze thousands of federal and state judges, including their biographical information, political affiliations, education and employment histories, judgeships, and more.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#apis', 'text': 'The APIs', 'children': [
+      {'href': '#people-endpoint', 'text': 'Judges & Appointers'},
+      {'href': '#positions-endpoint', 'text': 'Positions Held'},
+      {'href': '#affiliations-endpoint', 'text': 'Political Affiliations'},
+      {'href': '#education-history', 'text': 'Educational Histories'},
+      {'href': '#aba-ratings', 'text': 'ABA Ratings'},
+      {'href': '#retention-events', 'text': 'Retention Events'},
+      {'href': '#sources-endpoint', 'text': 'Sources'}
+    ]}
+  ]"
+>
+  <c-layout-with-navigation.section id="about">
+    {% if version == "v3" %}
+      {% include "v2_includes/v3-deprecated-warning.html" %}
+    {% endif %}
+    <h1>Judge and Justice&nbsp;API</h1>
+    <p>Use these APIs to query and analyze thousands of federal and state court judges.</p>
+    <p>This data set is person-centric. All data links back to a particular person.</p>
+    <p>To learn more about this data, see <a class="underline" href="https://free.law/projects/judge-db">our page about it on Free.law</a>.</p>
+    <p>The available APIs include:</p>
+    <ul class="list-disc list-inside">
+      <li>Judges and Appointers</li>
+      <li>Positions Held</li>
+      <li>Political Affiliations</li>
+      <li>Educational Histories</li>
+      <li>ABA Ratings</li>
+      <li>Retention Events</li>
+      <li>Sources</li>
+    </ul>
+    <p>Other types of data are linked to this API and have their own documentation, including:</p>
+    <ul class="list-disc list-inside">
+      <li><a class="text-primary-600 underline" href="{% url "financial_disclosures_api_help" %}">Financial Disclosures</a></li>
+      <li><a class="text-primary-600 underline" href="{% url "pacer_api_help" %}">PACER Filings</a></li>
+      <li><a class="text-primary-600 underline" href="{% url "case_law_api_help" %}">Case Law</a></li>
+      <li><a class="text-primary-600 underline" href="{% url "oral_argument_api_help" %}">Oral Argument Audio</a></li>
+    </ul>
+    <p>In life, people can serve various roles in the justice system. Therefore, this is not strictly a database of judges, but rather a database of <em>people</em> and the positions they hold.</p>
+    <p>For example, <a class="underline" href="{% url "view_person" pk="26" slug="william-howard-taft" %}">William Taft</a> served as president, where he appointed justices, but he was also a Supreme Court justice himself. Therefore, he has a single "person" record in the API, he has one position record for his role as president, and another position record for his role as a justice.</p>
+    <p>There are a number of "granularity" fields for dates. These are used to indicate how granular a corresponding date is. For example, if we know the year somebody died but not the month or day, we would put <code>2010-01-01</code> as the date of death, and set the date of death granularity field to <code>%Y</code>.</p>
+    <p>This approach means that you can still — mostly — filter and sort by these date fields, but with an awareness that the data may be incomplete.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="apis">
+    <h2>The APIs</h2>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="people-endpoint">
+    <h2>People (Judges and Appointers)</h2>
+    <p><code>{% url "person-list" version=version %}</code></p>
+    <p>This API contains the central "person" object. As explained above, people can be judges, appointers, or both.</p>
+    <p>This object holds the core metadata about the person, including their biographical data, positions held, educational history, ABA ratings, and political affiliations.</p>
+    <p>A few notes:</p>
+    <ul class="list-disc list-inside space-y-4">
+      <li>Position objects can be quite large, so they are linked in the person object instead of nested within it.</li>
+      <li>If the <code>is_alias_of</code> field has a value, that means the record represents a nickname for the person referenced in the alias field. Alias records make it possible to find a judge by name, even if they sometimes go by Bob instead of Robert. In our database, this field is a <a class="underline" href="https://en.wikipedia.org/wiki/Join_(SQL)#Self-join">self-join</a>.
+        <p class="mt-2">In general, you will only want to work with judges where this field is null, indicating a record that represents a person, not an alias to a person.</p>
+      </li>
+      <li>The <code>race</code> and <code>gender</code> fields are not self-reported and should therefore be considered best guesses. We have done our best to gather these fields from reputable sources, but have also supplied values ourselves when it felt appropriate to do so. Some values may be incorrect.
+        <p class="mt-2">To create choices for race, we used the U.S. census and added <a class="underline" href="https://en.wikipedia.org/wiki/Middle_East_and_North_Africa">MENA (it has since been added to the census)</a>.</p>
+      </li>
+      <li>The <code>has_photo</code> field indicates whether we have a photo for the judge in <a class="underline" href="https://free.law/projects/judge-pics">our database of judge portraits</a>.</li>
+      <li>The <code>ftm_*</code> fields relate to state court judges, who raise money for elections. Use these fields to link judges to their IDs on <a class="underline" href="https://www.followthemoney.org/">Follow The Money</a>, where you can gather and analyze the details.
+        <p class="mt-2">These fields have not been updated in many years, but we can do so as a service.</p>
+      </li>
+    </ul>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="positions-endpoint">
+    <h2>Positions — <code>{% url "position-list" version=version %}</code></h2>
+    <p>Use this API to learn the positions held by a person, including their time as president, in private practice, as a judge, or in any number of other roles in society or the judiciary.</p>
+    <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
+    <p>To filter to positions for a particular person:</p>
+    <c-code>curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "position-list" version=version %}?person=20"</c-code>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="affiliations-endpoint">
+    <h2>Political Affiliations — <code>{% url "politicalaffiliation-list" version=version %}</code></h2>
+    <p>Use this API to learn the political affiliations of a person. Political affiliations are gathered from a number of sources such as ballots or appointments, and have start and end dates.</p>
+    <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="education-history">
+    <h2>Educations and Schools — <code>{% url "education-list" version=version %}</code></h2>
+    <p>Use this API to learn about the educational history of a person, including which schools they went to, when, and what degrees they received. Each education object can include a school object based on data from the Department of Education.</p>
+    <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
+    <p>To filter for judges educated at a particular school:</p>
+    <c-code>curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "person-list" version=version %}?educations__school__name__contains=Rochester"</c-code>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="aba-ratings">
+    <h2>ABA Ratings — <code>{% url "abarating-list" version=version %}</code></h2>
+    <p>These are the American Bar Association ratings that are given to many judges, particularly those that are nominated to federal positions.</p>
+    <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="retention-events">
+    <h2>Retention Events — <code>{% url "retentionevent-list" version=version %}</code></h2>
+    <p>These are the events that keep a judge in a position, such as a retention vote, or reappointment.</p>
+    <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="sources-endpoint">
+    <h2>Sources — <code>{% url "source-list" version=version %}</code></h2>
+    <p>This API keeps a list of sources that explain how we built this database.</p>
+    <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
+  </c-layout-with-navigation.section>
+
+</c-layout-with-navigation>
+{% endblock %}
