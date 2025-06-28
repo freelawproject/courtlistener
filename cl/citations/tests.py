@@ -1,5 +1,6 @@
 import itertools
 import json
+import sys
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
@@ -9,9 +10,11 @@ from unittest.mock import Mock, patch
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from bs4 import BeautifulSoup
+from celery.exceptions import Retry
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
 from django.core.management import call_command
+from django.db import OperationalError
 from django.db.models.signals import post_delete, post_save
 from django.test import override_settings
 from django.urls import reverse
@@ -3183,3 +3186,177 @@ class UnmatchedCitationTest(TransactionTestCase):
             1,
             "Incorrect number of citations saved",
         )
+
+
+class TasksTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
+
+    @patch(
+        "cl.citations.tasks.store_opinion_citations_and_update_parentheticals"
+    )
+    def test_operational_error_does_not_cause_recursion(self, mock_store):
+        """Can we avoid getting RecursionError when calling store_opinion_citations_and_update_parentheticals task?"""
+
+        # Set small recursion limit to trigger RecursionError after many OperationalError exceptions
+        old_limit = sys.getrecursionlimit()
+        sys.setrecursionlimit(100)
+
+        opinion = OpinionWithChildrenFactory(
+            plain_text="Sample text",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="ca")),
+                case_name="Some placeholder",
+                date_filed=date(2025, 4, 25),
+            ),
+        )
+
+        mock_store.side_effect = OperationalError()
+
+        try:
+            call_count = 0
+            args = ([opinion.id], False, False)
+
+            while True:
+                call_count += 1
+                try:
+                    find_citations_and_parentheticals_for_opinion_by_pks.apply(
+                        args=args,
+                        throw=True,
+                    )
+                    # Success
+                    break
+                except Retry as retry_exc:
+                    # Task retried as expectd
+                    if (
+                        call_count
+                        > find_citations_and_parentheticals_for_opinion_by_pks.max_retries
+                    ):
+                        # Simulate the end of retry loop
+                        break
+                except RecursionError:
+                    self.fail("RecursionError occurred")
+                except Exception as e:
+                    self.fail(
+                        f"Unexpected exception: {e.__class__.__name__} - {e}"
+                    )
+
+            self.assertEqual(
+                call_count,
+                find_citations_and_parentheticals_for_opinion_by_pks.max_retries
+                + 1,
+                "Retry attempts did not match expected max retries",
+            )
+
+        finally:
+            # Restore the original limit no matter what
+            sys.setrecursionlimit(old_limit)
+
+    @patch(
+        "cl.citations.tasks.find_citations_and_parentheticals_for_opinion_by_pks.apply_async"
+    )
+    @patch("celery.app.task.Task.retry", side_effect=Retry())
+    @patch(
+        "cl.citations.tasks.store_opinion_citations_and_update_parentheticals"
+    )
+    def test_operational_error_retries_failed_and_schedules_remaining(
+        self, mock_task, mock_retry, mock_apply_async
+    ):
+        """If OperationalError is raised, can we retry only the failed opinion and schedule the rest?"""
+
+        opinion_1 = OpinionWithChildrenFactory(
+            plain_text="Sample text 1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="ca")),
+                case_name="Opinion 1",
+                date_filed=date(2025, 4, 25),
+            ),
+        )
+        opinion_2 = OpinionWithChildrenFactory(
+            plain_text="Sample text 2",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="ca")),
+                case_name="Opinion 2",
+                date_filed=date(2025, 4, 26),
+            ),
+        )
+        opinion_3 = OpinionWithChildrenFactory(
+            plain_text="Sample text 3",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="ca")),
+                case_name="Opinion 3",
+                date_filed=date(2025, 4, 27),
+            ),
+        )
+
+        def fail_only_opinion_2(opinion, *_):
+            """Mocks store_opinion_citations_and_update_parentheticals call
+            Simulates a failure only for opinion2
+
+            :param opinion: The opinion object being processed
+            :param *_: Ignored positional arguments passed by the task
+            :return: None for all other opinions to simulate success
+            """
+            if opinion.id == opinion_2.id:
+                raise OperationalError("Simulated DB error")
+            return None
+
+        mock_task.side_effect = fail_only_opinion_2
+
+        # Set small recursion limit to trigger RecursionError after many OperationalError exceptions
+        old_limit = sys.getrecursionlimit()
+        sys.setrecursionlimit(100)
+
+        try:
+            with self.assertRaises(Retry):
+                find_citations_and_parentheticals_for_opinion_by_pks.apply(
+                    args=(
+                        [opinion_1.id, opinion_2.id, opinion_3.id],
+                        False,
+                        False,
+                    ),
+                    throw=True,
+                )
+
+            # Verify retry only triggered for opinion_2
+            called_args = mock_retry.call_args.kwargs
+            self.assertIsInstance(called_args["exc"], OperationalError)
+            self.assertEqual(
+                called_args["args"], ([opinion_2.id], False, False)
+            )
+            self.assertEqual(called_args["countdown"], 60)
+
+            # Remaining opinions (after the failed one) should be scheduled in a new task
+            mock_apply_async.assert_called_once_with(
+                args=([opinion_3.id], False, False),
+                countdown=5,
+            )
+
+            # Ensure that only the first two opinions were processed
+            self.assertEqual(mock_task.call_count, 2)
+            attempted_ids = sorted(
+                [c[0][0].id for c in mock_task.call_args_list]
+            )
+            self.assertEqual(attempted_ids, [opinion_1.id, opinion_2.id])
+
+            # Verify opinion_3 was not processed yet
+            self.assertNotIn(opinion_3.id, attempted_ids)
+
+            # Simulate running the rescheduled opinion_3
+            scheduled_args = mock_apply_async.call_args.kwargs["args"]
+            find_citations_and_parentheticals_for_opinion_by_pks.apply(
+                args=scheduled_args, throw=True
+            )
+
+            # Verify that three opinions have been procesed
+            attempted_ids = sorted(
+                [c[0][0].id for c in mock_task.call_args_list]
+            )
+            self.assertEqual(
+                attempted_ids, [opinion_1.id, opinion_2.id, opinion_3.id]
+            )
+
+        finally:
+            # Restore the original limit no matter what
+            sys.setrecursionlimit(old_limit)
