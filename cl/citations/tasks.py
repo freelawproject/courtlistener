@@ -165,8 +165,9 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
             except Exception as e:
                 # Send this opinion failure to sentry and continue onward
                 logger.error(
-                    "Opinion failed: '%s'",
+                    "Opinion failed: '%s' with %s",
                     opinion.id,
+                    str(e),
                 )
 
                 # do not retry the whole loop on an unknown exception
@@ -174,7 +175,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 if ids:
                     raise self.retry(
                         exc=e,
-                        countdown=60,
+                        countdown=2,
                         args=(
                             ids,
                             disconnect_pg_signals,
