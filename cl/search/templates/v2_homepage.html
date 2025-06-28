@@ -1,7 +1,11 @@
 {% extends "new_base.html" %}
 {% load svg_tags component_tags %}
-{% require_script "js/alpine/composables/focus.js" %}
-{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+
+{% block head %}
+  {% require_script "js/alpine/components/homepage.js" %}
+  {% require_script "js/alpine/composables/focus.js" %}
+  {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+{% endblock %}
 
 {% block title %}Non-Profit Free Legal Search Engine and Alert System – CourtListener.com{% endblock %}
 
@@ -15,101 +19,131 @@
 {% endblock %}
 
 {% block content_wrapper %}
-<div class="w-full flex flex-col bg-greyscale-100">
-  <div class="flex flex-col justify-center items-center gap-6 p-5">
-    {# CourtListener logo #}
-    <div class="md:w-[310px] md:h-35 h-20 w-44">
-      {% svg "logos/courtlistener" class="bg-greyscale-800" %}
+<div x-data="homepage">
+  <div class="w-full flex flex-col bg-greyscale-100">
+    <div class="flex flex-col justify-center items-center gap-6 p-5">
+      {# CourtListener logo #}
+      <div class="md:w-[310px] md:h-35 h-20 w-44">
+        {% svg "logos/courtlistener" class="bg-greyscale-800" %}
+      </div>
+      <h1 class="w-full text-center lg:text-display-sm-cooper text-xl">Search millions of opinions across hundreds of jurisdictions</h1>
     </div>
-    <h1 class="w-full text-center lg:text-display-sm-cooper text-xl">Search millions of opinions across hundreds of jurisdictions</h1>
   </div>
-</div>
 
-{# ACTION BUTTONS #}
-<div
-  x-data="focus"
-  x-on:keydown.right.stop.prevent="focusNext"
-  x-on:keydown.left.stop.prevent="focusPrevious"
-  x-on:keydown.home.stop.prevent="focusFirst"
-  x-on:keydown.end.stop.prevent="focusLast"
-  role="toolbar"
-  aria-label="Homepage actions"
-  class="flex flex-row gap-2 max-w-[1400px] mx-auto overflow-auto justify-between p-10"
->
-  <a
-    href="https://free.law/about"
-    target="_blank"
-    class="w-28 flex flex-col justify-center items-center gap-4 group"
-    aria-label="Learn about Free Law Project (opens in new tab)"
-  >
-    <div aria-hidden="true" class="group-hover:bg-greyscale-200 w-15 h-15 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400">
-      {% svg "logos/flp_tiny" class="w-8 h-8" %}
+  {# ACTION BUTTONS #}
+  <div class="relative w-full flex flex-row max-w-[1400px] mx-auto">
+    <button
+      type="button"
+      x-on:click="scrollPrev"
+      x-bind:disabled="atStart"
+      aria-label="Scroll actions left"
+      class="z-10 absolute flex justify-center items-center w-11 h-11 left-4 top-1/2 -translate-y-1/2 rounded-full bg-white hover:bg-greyscale-50 border border-greyscale-200 shadow disabled:hidden"
+    >
+      {% svg "chevron" class="w-6 h-6 text-greyscale-500 transform rotate-90" %}
+    </button>
+
+    <div
+      x-ref="container"
+      x-on:keydown.home.stop.prevent="focusFirst"
+      x-on:keydown.end.stop.prevent="focusLast"
+      role="toolbar"
+      aria-label="Homepage actions"
+      tabindex="-1"
+      class="relative w-full flex flex-row gap-2 max-w-[1400px] mx-auto overflow-auto justify-between md:p-10 px-4 py-11"
+    >
+      <a
+        x-on:focus="scrollIntoView"
+        href="https://free.law/about"
+        target="_blank"
+        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
+        aria-label="Learn about Free Law Project (opens in new tab)"
+      >
+        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
+          {% svg "logos/flp_tiny" class="md:w-8 md:h-8 w-6 h-6" %}
+        </div>
+        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">About Free<br>Law Project</span>
+      </a>
+      <a
+        x-on:focus="scrollIntoView"
+        href="https://donate.free.law/forms/membership"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
+        aria-label="Become a member and donate to Free Law Project (opens in new tab)"
+      >
+        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
+          {% svg "money_hand" class="md:w-8 md:h-8 w-6 h-6" %}
+        </div>
+        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Become a Member</span>
+      </a>
+      <a
+        x-on:focus="scrollIntoView"
+        href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
+        aria-label="Subscribe to the Free Law Project newsletter (opens in new tab)"
+      >
+        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
+          {% svg "bell_plus" class="md:w-8 md:h-8 w-6 h-6" %}
+        </div>
+        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Subscribe to Updates</span>
+      </a>
+      <a
+        x-on:focus="scrollIntoView"
+        href="{% url "alert_help" %}"
+        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
+        aria-label="Learn about creating alerts in CourtListener"
+      >
+        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
+          {% svg "bell" class="md:w-8 md:h-8 w-6 h-6" %}
+        </div>
+        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Create an Alert</span>
+      </a>
+      <a
+        x-on:focus="scrollIntoView"
+        href="{% url "citation_homepage" %}"
+        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
+        aria-label="Use our Citation Lookup Tool"
+      >
+        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
+          {% svg "court" class="md:w-8 md:h-8 w-6 h-6" %}
+        </div>
+        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Find a Case</span>
+      </a>
+      <a
+        x-on:focus="scrollIntoView"
+        href="https://free.law/recap"
+        target="_blank"
+        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
+        aria-label="Learn how to contribute documents using RECAP (opens in new tab)"
+      >
+        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
+          {% svg "file_text" class="md:w-8 md:h-8 w-6 h-6" %}
+        </div>
+        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Contribute a Document</span>
+      </a>
+      <a
+        x-on:focus="scrollIntoView"
+        href="{% url "podcasts" %}"
+        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
+      >
+        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
+          {% svg "microphone" class="md:w-8 md:h-8 w-6 h-6" %}
+        </div>
+        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Create a Podcast</span>
+      </a>
     </div>
-    <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">About Free<br>Law Project</span>
-  </a>
-  <a
-    href="https://donate.free.law/forms/membership"
-    target="_blank"
-    rel="noopener noreferrer"
-    class="w-28 flex flex-col justify-center items-center gap-4 group"
-    aria-label="Become a member and donate to Free Law Project (opens in new tab)"
-  >
-    <div aria-hidden="true" class="w-15 h-15 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-      {% svg "money_hand" class="w-8 h-8" %}
-    </div>
-    <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Become a Member</span>
-  </a>
-  <a
-    href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp"
-    target="_blank"
-    rel="noopener noreferrer"
-    class="w-28 flex flex-col justify-center items-center gap-4 group"
-    aria-label="Subscribe to the Free Law Project newsletter (opens in new tab)"
-  >
-    <div aria-hidden="true" class="w-15 h-15 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-      {% svg "bell_plus" class="w-8 h-8" %}
-    </div>
-    <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Subscribe to Updates</span>
-  </a>
-  <a
-    href="{% url "alert_help" %}"
-    class="w-28 flex flex-col justify-center items-center gap-4 group"
-    aria-label="Learn about creating alerts in CourtListener"
-  >
-    <div aria-hidden="true" class="w-15 h-15 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-      {% svg "bell" class="w-8 h-8" %}
-    </div>
-    <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Create an Alert</span>
-  </a>
-  <a
-    href="{% url "citation_homepage" %}"
-    class="w-28 flex flex-col justify-center items-center gap-4 group"
-    aria-label="Use our Citation Lookup Tool"
-  >
-    <div aria-hidden="true" class="w-15 h-15 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-      {% svg "court" class="w-8 h-8" %}
-    </div>
-    <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Find a Case</span>
-  </a>
-  <a
-    href="https://free.law/recap"
-    target="_blank"
-    class="w-28 flex flex-col justify-center items-center gap-4 group"
-    aria-label="Learn how to contribute documents using RECAP (opens in new tab)"
-  >
-    <div aria-hidden="true" class="w-15 h-15 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-      {% svg "file_text" class="w-8 h-8" %}
-    </div>
-    <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Contribute a Document</span>
-  </a>
-  <a
-    href="{% url "podcasts" %}"
-    class="w-28 flex flex-col justify-center items-center gap-4 group"
-  >
-    <div aria-hidden="true" class="w-15 h-15 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-      {% svg "microphone" class="w-8 h-8" %}
-    </div>
-    <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Create a Podcast</span>
-  </a>
+
+    <button
+      type="button"
+      x-on:click="scrollNext"
+      x-bind:disabled="atEnd"
+      aria-label="Scroll actions right"
+      class="absolute flex justify-center items-center w-11 h-11 right-4 top-1/2 -translate-y-1/2 rounded-full bg-white hover:bg-greyscale-50 border border-greyscale-200 shadow disabled:hidden"
+    >
+      {% svg "chevron" class="w-6 h-6 text-greyscale-500 -rotate-90" %}
+    </button>
+  </div>
 </div>
 {% endblock %}
