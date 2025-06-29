@@ -119,7 +119,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="type">
-    <h4>Setting the Result <code>type</code></h4>
+    <h3>Setting the Result <code>type</code></h3>
     <p>The most important parameter in this API is <code>type</code>. This parameter sets the type of object you are querying:</p>
     <table class="w-full text-sm text-left text-greyscale-700 my-4">
       <thead class="text-xs text-greyscale-900 uppercase bg-greyscale-50">
@@ -163,19 +163,19 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="ordering">
-    <h4>Ordering Results</h4>
+    <h3>Ordering Results</h3>
     <p>Each search <code>type</code> can be sorted by certain fields. These are available on the front end in the ordering drop down, which sets the <code>order_by</code> parameter.</p>
     <p>If your sorting field has null values, those results will be sorted at the end of the query, regardless of whether you sort in ascending or descending order. For example if you sort by a date that is null for an opinion, that opinion will go at the end of the result set.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="filtering">
-    <h4>Filtering Results</h4>
+    <h3>Filtering Results</h3>
     <p>Results can be filtered with the input boxes provided on the front end or by <a class="underline" href="{% url "advanced_search" %}">advanced query operators</a> provided to the <code>q</code> parameter.</p>
     <p>The best way to refine your query is to do so on the front end, and then copy the GET parameters to the API.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="fields">
-    <h4>Fields</h4>
+    <h3>Fields</h3>
     <p>Unlike most of the fields on CourtListener, many fields on this API are provided in camelCase instead of snake_case. This is to make it easier for users to place queries like:</p>
     <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">caseName:foo</pre>
     <p>Instead of:</p>
@@ -198,20 +198,20 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="highlighting">
-    <h4>Highlighting Results</h4>
+    <h3>Highlighting Results</h3>
     <p>To enhance performance, results are not highlighted by default. To enable highlighting, include <code>highlight=on</code> in your request.</p>
     <p>When highlighting is disabled, the first 500 characters of snippet fields are returned for fields <code>o</code>, <code>r</code>, and <code>rd</code>.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="counts">
-    <h4>Result Counts</h4>
+    <h3>Result Counts</h3>
     <p><code>type=d</code> and <code>type=r</code> use cardinality aggregation to compute the result count. This enhances performance, but has an error of ±6% if results are over 2000. We recommend noting this in your interface by saying something like, "About 10,000 results."</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="notes">
-    <h4>Special Notes</h4>
+    <h3>Special Notes</h3>
     <p>A few fields deserve special consideration:</p>
-    <ol class="list-decimal list-inside space-y-4">
+    <ol class="list-decimal list-inside space-y-6">
       <li>As in the front end, when the <code>type</code> is set to return case law, only published results are returned by default. To include unpublished and other statuses, you need to explicitly request them.</li>
       <li>The <code>snippet</code> field contains the same values as are found on the front end. This uses the HTML5 <code>&lt;mark&gt;</code> element to identify up to five matches in a document.
         <p class="mt-2">This field only responds to arguments provided to the <code>q</code> parameter. If the <code>q</code> parameter is not used, the <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.</p>
