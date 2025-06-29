@@ -11,7 +11,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import IntegerField, Prefetch, QuerySet
+from django.db.models import Exists, IntegerField, OuterRef, Prefetch, QuerySet
 from django.db.models.functions import Cast
 from django.http import (
     HttpRequest,
@@ -92,8 +92,8 @@ from cl.search.models import (
     Citation,
     Court,
     Docket,
-    DocketEntry,
     OpinionCluster,
+    OpinionsCitedByRECAPDocument,
     Parenthetical,
     RECAPDocument,
     sort_cites,
@@ -545,10 +545,10 @@ async def docket_authorities(
     return TemplateResponse(request, "docket_authorities.html", context)
 
 
-async def make_rd_title(rd: RECAPDocument) -> str:
-    de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
-    d = await Docket.objects.aget(id=de.docket_id)
-    court = await Court.objects.aget(id=d.court_id)
+def make_rd_title(rd: RECAPDocument) -> str:
+    de = rd.docket_entry
+    d = de.docket
+    court = d.court
     return "{desc}#{doc_num}{att_num} in {case_name} ({court}{docket_number})".format(
         desc=f"{rd.description} &ndash; " if rd.description else "",
         doc_num=rd.document_number,
@@ -626,6 +626,13 @@ async def view_recap_document(
         )
         .order_by("pk")
         .select_related("docket_entry__docket__court")
+        .annotate(
+            authorities=Exists(
+                OpinionsCitedByRECAPDocument.objects.filter(
+                    citing_document=OuterRef("pk")
+                )
+            )
+        )
     ]
     if rds_tmp := list(filter(lambda x: x.attachment_number == att_num, rds)):
         rd: RECAPDocument = rds_tmp[0]
@@ -676,7 +683,7 @@ async def view_recap_document(
             if rd.pacer_url and redirect_or_modal:
                 redirect_to_pacer_modal = True
 
-    title = await make_rd_title(rd)
+    title = make_rd_title(rd)
     rd = await make_thumb_if_needed(request, rd)
     try:
         note = await Note.objects.aget(
@@ -697,9 +704,6 @@ async def view_recap_document(
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
 
-    de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
-    d = await Docket.objects.aget(id=de.docket_id)
-
     prayer_counts = await get_prayer_counts_in_bulk([rd])
     existing_prayers = {}
 
@@ -712,6 +716,8 @@ async def view_recap_document(
     rd.prayer_count = prayer_counts.get(rd.id, 0)
     rd.prayer_exists = existing_prayers.get(rd.id, False)
 
+    court_id = rd.docket_entry.docket.court.id
+
     return TemplateResponse(
         request,
         "recap_document.html",
@@ -721,9 +727,9 @@ async def view_recap_document(
             "og_file_path": og_file_path_override,
             "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
-            "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
+            "timezone": COURT_TIMEZONES.get(court_id, "US/Eastern"),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
-            "authorities": await rd.cited_opinions.aexists(),
+            "authorities": rd.authorities,
             "attachments": rds if len(rds) > 1 else None,
         },
     )
@@ -747,9 +753,10 @@ async def view_recap_authorities(
             attachment_number=att_num,
         )
         .order_by("pk")
+        .select_related("docket_entry__docket__court")
         .afirst()
     )
-    title = await make_rd_title(rd)
+    title = make_rd_title(rd)
     rd = await make_thumb_if_needed(request, rd)
 
     try:
@@ -770,8 +777,7 @@ async def view_recap_authorities(
 
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
-    de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
-    d = await Docket.objects.aget(id=de.docket_id)
+    court_id = rd.docket_entry.docket.court.id
     return TemplateResponse(
         request,
         "recap_authorities.html",
@@ -781,7 +787,7 @@ async def view_recap_authorities(
             "og_file_path": og_file_path_override,
             "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
-            "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
+            "timezone": COURT_TIMEZONES.get(court_id, "US/Eastern"),
             "authorities": rd.authorities_with_data,
         },
     )
