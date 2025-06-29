@@ -43,10 +43,10 @@
     </ul>
     <p>Other types of data are linked to this API and have their own documentation, including:</p>
     <ul class="list-disc list-inside">
-      <li><a class="text-primary-600 underline" href="{% url "financial_disclosures_api_help" %}">Financial Disclosures</a></li>
-      <li><a class="text-primary-600 underline" href="{% url "pacer_api_help" %}">PACER Filings</a></li>
-      <li><a class="text-primary-600 underline" href="{% url "case_law_api_help" %}">Case Law</a></li>
-      <li><a class="text-primary-600 underline" href="{% url "oral_argument_api_help" %}">Oral Argument Audio</a></li>
+      <li class="text-primary-600 underline"><a href="{% url "financial_disclosures_api_help" %}">Financial Disclosures</a></li>
+      <li class="text-primary-600 underline"><a href="{% url "pacer_api_help" %}">PACER Filings</a></li>
+      <li class="text-primary-600 underline"><a href="{% url "case_law_api_help" %}">Case Law</a></li>
+      <li class="text-primary-600 underline"><a href="{% url "oral_argument_api_help" %}">Oral Argument Audio</a></li>
     </ul>
     <p>In life, people can serve various roles in the justice system. Therefore, this is not strictly a database of judges, but rather a database of <em>people</em> and the positions they hold.</p>
     <p>For example, <a class="underline" href="{% url "view_person" pk="26" slug="william-howard-taft" %}">William Taft</a> served as president, where he appointed justices, but he was also a Supreme Court justice himself. Therefore, he has a single "person" record in the API, he has one position record for his role as president, and another position record for his role as a justice.</p>
