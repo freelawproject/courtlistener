@@ -53,55 +53,55 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="disclosure-api">
-    <h2>Disclosures</h2>
+    <h3>Disclosures</h3>
     <p><code>{% url "financialdisclosure-list" version=version %}</code></p>
     <p>This API contains information about the main document itself and is the link between the other financial disclosure endpoints and the judges in our system.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="investment-api">
-    <h2>Investments</h2>
+    <h3>Investments</h3>
     <p><code>{% url "investment-list" version=version %}</code></p>
     <p>This API lists the source and type of investment income held by a judge, including dividends, rents, interest, capital gains, or income from qualified or excepted trusts.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="position-api">
-    <h2>Positions</h2>
+    <h3>Positions</h3>
     <p><code>{% url "disclosureposition-list" version=version %}</code></p>
     <p>This API lists the positions held as an officer, director, trustee, general partner, proprietor, representative, executor, employee, or consultant of any corporation, company, firm, partnership, trust, or other business enterprise, any nonprofit organization, any labor organization, or any educational or other institution other than the United States.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="agreement-api">
-    <h2>Agreements</h2>
+    <h3>Agreements</h3>
     <p><code>{% url "agreement-list" version=version %}</code></p>
     <p>This API lists any agreements or arrangements of the filer in existence at any time during the reporting period.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="non-investment-api">
-    <h2>Non-Investment Income</h2>
+    <h3>Non-Investment Income</h3>
     <p><code>{% url "noninvestmentincome-list" version=version %}</code></p>
     <p>This API lists the source, type, and the amount or value of earned or other non-investment income aggregating $200 or more from any one source that is received during the reporting period.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="spouse-non-investment-income-api">
-    <h2>Non-Investment Income (Spouse)</h2>
+    <h3>Non-Investment Income (Spouse)</h3>
     <p><code>{% url "spouseincome-list" version=version %}</code></p>
     <p>This API lists the source and type earned of non-investment income from the spouse of the filer.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="reimbursement-api">
-    <h2>Reimbursements</h2>
+    <h2>Reimbursements</h3>
     <p><code>{% url "reimbursement-list" version=version %}</code></p>
     <p>This API lists the source identity and description (including travel locations, dates, and nature of expenses provided) of any travel-related reimbursements aggregating more than $415 in value that are received by the filer from one source during the reporting period.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="gift-api">
-    <h2>Gifts</h2>
+    <h3>Gifts</h3>
     <p><code>{% url "gift-list" version=version %}</code></p>
     <p>This API lists the source, a brief description, and the value of all gifts aggregating more than $415 in value that are received by the filer during the reporting period from any one source.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="debt-api">
-    <h2>Debts</h2>
+    <h3>Debts</h3>
     <p><code>{% url "debt-list" version=version %}</code></p>
     <p>All liabilities specified by that section that are owed during the period beginning on January 1 of the preceding calendar year and ending fewer than 31 days before the date on which the report is filed.</p>
   </c-layout-with-navigation.section>
@@ -111,7 +111,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="understanding">
-    <h4>Understanding the Fields</h4>
+    <h3>Understanding the Fields</h3>
     <p>Like most of our APIs, field definitions can be obtained by sending an HTTP <code>OPTIONS</code> request to any of the APIs. For example, this request, piped through <a class="underline" href="https://github.com/jqlang/jq"><code>jq</code></a>, shows you the fields of the Gifts API:</p>
     <c-code>curl -X OPTIONS "{% get_full_host %}{% url "gift-list" version=version %}" \
     | jq '.actions.POST'
@@ -190,7 +190,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="redactions">
-    <h4>Redactions</h4>
+    <h3>Redactions</h3>
     <p>For security reasons, filers can redact information on their disclosure forms. When a line in a disclosure contains a redaction, we will attempt to set the <code>redacted</code> field on that row to <code>True</code>. This is your hint that you may want to investigate that row more carefully.</p>
     <p>This field can be used as a filter. For example, here are all the investments with redacted information:</p>
     <c-code>curl "{% get_full_host %}{% url "investment-list" version=version %}?redacted=True" \
@@ -224,14 +224,14 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="value-codes">
-    <h4>Value Codes</h4>
+    <h3>Value Codes</h3>
     <p>Several APIs, including <code>Investments</code>, <code>Debts</code>,and <code>Gifts</code> use form-based value codes to indicate monetary ranges instead of exact values. For example, the letter "J" indicates a value of $1–15,000.</p>
     <p>Place an <code>OPTIONS</code> request to these endpoints to learn the values of those fields or look in a PDF filing to see the key.</p>
     <p>Regrettably, these fields have not been updated by the judiciary in many years, so the highest value code only goes up to $50,000,000. For some judges, this may not be enough to accurately reflect their wealth.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="inferred-values">
-    <h4>Inferred Values</h4>
+    <h3>Inferred Values</h3>
     <p><code>Investment</code> objects contain the field <code>has_inferred_values</code>. This field indicates that we inferred information about an investment based on the layout of the data in the disclosure form.</p>
     <p>For example, an investment could have been bought in Q1, while a dividend was paid out in Q2 before being sold in Q4. Often, after the first entry of the investment, later rows in the table are mostly blank. In this instance, we infer the values.</p>
     <p>The table below gives a brief example where we would infer that the blank cell below the cell for <code>AAPL</code> also refers to <code>AAPL</code>:</p>
@@ -271,7 +271,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="more">
-    <h2>Learn More</h2>
+    <h3>Learn More</h3>
     <p>The following references may help you learn more about these forms:</p>
     <ol class="list-decimal list-inside">
       <li><a class="underline" href="https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf">The official policies guiding financial disclosures</a></li>
@@ -282,7 +282,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="security">
-    <h2>Security</h2>
+    <h3>Security</h3>
     <p>Please report any security or privacy concerns to <a class="underline" href="mailto:security@free.law">security@free.law</a>.</p>
   </c-layout-with-navigation.section>
 
