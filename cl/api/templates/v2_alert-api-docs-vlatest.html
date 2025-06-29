@@ -1,0 +1,158 @@
+{% extends "new_base.html" %}
+{% load extras %}
+
+{% block title %}Legal Alert APIs – CourtListener.com{% endblock %}
+{% block og_title %}Legal Alert APIs – CourtListener.com{% endblock %}
+
+{% block description %}Use these APIs to automatically track search queries and cases. Alerts can be sent to your inbox or server.{% endblock %}
+{% block og_description %}Use these APIs to automatically track search queries and cases. Alerts can be sent to your inbox or server.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#search', 'text': 'Search Alerts', 'children': [
+      {'href': '#example', 'text': 'Example Usage'}
+    ]},
+    {'href': '#dockets', 'text': 'Docket Alerts', 'children': [
+      {'href': '#docket-examples', 'text': 'Example Usage'}
+    ]},
+    {'href': '#relative-dates-help', 'text': 'Relative Date Queries'}
+  ]"
+>
+  <c-layout-with-navigation.section id="about">
+    {% if version == "v3" %}
+      {% include "v2_includes/v3-deprecated-warning.html" %}
+    {% endif %}
+    <h1>Legal Alert&nbsp;APIs</h1>
+    <p>Use these APIs to create, modify, list, and delete search and docket alerts in our system.</p>
+    <p>Once configured, alerts can notify you by email or with a <a class="underline" href="{% url "webhooks_docs" %}">webhook event sent to your server</a>.</p>
+    <p>This page focuses on the alerts API itself. To learn more about alerts generally, read the alert documentation.</p>
+    <p><a href="{% url "alert_help" %}" class="btn-primary">Learn About Alerts</a></p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="search">
+    <h2>Search Alerts</h2>
+    <p><code>{% url "alert-list" version=version %}</code></p>
+    <p>Search Alerts update you when there is new information in our search engine.</p>
+    <p>This system scales to support thousands or even millions of alerts, allowing organizations to stay updated about numerous topics. This is a powerful system when used with <a class="underline" href="{% url "webhooks_docs" %}">webhooks</a>.</p>
+    <p>Search alerts have three required fields and one optional field:</p>
+    <ul class="list-disc list-inside space-y-4">
+      <li><strong><code>name</code></strong> &mdash; A human-friendly name for the alert.</li>
+      <li><strong><code>query</code></strong> &mdash; Search parameters you get from the front end, as a string.</li>
+      <li><strong><code>rate</code></strong> &mdash; How frequently you want to receive email updates. Webhook events are always sent in real time. This field accepts the following values:
+        <ul class="list-disc list-inside ml-8 mt-2">
+          <li><code>rt</code> — Real time</li>
+          <li><code>dly</code> — Daily</li>
+          <li><code>wly</code> — Weekly</li>
+          <li><code>mly</code> — Monthly</li>
+        </ul>
+      </li>
+      <li><strong><code>alert_type</code></strong> &mdash; This is a required field for RECAP Search Alerts, but it is ignored for other types. When used with RECAP Search alerts, this field specifies whether you want alerts for each new case matching the query or for both new cases and new filings. For notifications on cases only, use the <code>d</code> type (short for "dockets"). For notifications on both cases and filings, use the <code>r</code> type (meaning all of RECAP).</li>
+    </ul>
+    <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
+    <c-code>curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-list" version=version %}"</c-code>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="example">
+    <h3>Example Usage</h3>
+    <p>Let's say we want to know about case law involving Apple Inc. On the front end, we search for "Apple Inc" (in quotes) and <a class="underline" href="/?q=%22Apple%20Inc%22&type=o">get query parameters</a> like:</p>
+    <c-code>q=%22Apple%20Inc%22&type=o</c-code>
+    <p>We can create that as an alert with an HTTP <code>POST</code> request:</p>
+    <c-code>curl -X POST \
+  --data 'name=Apple' \
+  --data 'query=q=%22Apple%20Inc%22&type=o' \
+  --data 'rate=rt' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-list" version=version %}"</c-code>
+    <p>The response:</p>
+    <c-code>{
+  "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/alerts/4839/",
+  "id": 4839,
+  "date_created": "2024-05-02T15:29:32.048912-07:00",
+  "date_modified": "2024-05-02T15:29:32.048929-07:00",
+  "date_last_hit": null,
+  "name": "Apple",
+  "query": "q=\"Apple Inc\"",
+  "rate": "rt",
+  "alert_type": "o",
+  "secret_key": "ybSBXwtDcMKI2SxPZDCEx02DSSUF7EEvx1CjOk4f"
+}</c-code>
+    <p>Search Alerts can be modified with HTTP <code>PATCH</code> requests. For example, to change the rate to <code>dly</code>:</p>
+    <c-code>curl -X PATCH \
+  --data 'rate=dly' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-detail" version=version pk="4839" %}"</c-code>
+    <p>Search Alerts can be deleted with HTTP <code>DELETE</code> requests:</p>
+    <c-code>curl -X DELETE \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-detail" version=version pk="4839" %}"</c-code>
+    <p>To list your alerts, send an HTTP <code>GET</code> request with no filters:</p>
+    <c-code>curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-list" version=version %}"</c-code>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="dockets">
+    <h2>Docket Alerts</h2>
+    <p><code>{% url "docket-alert-list" version=version %}</code></p>
+    <p>Docket Alerts keep you updated about cases by sending notifications by email or webhook whenever there is new information in our system. Use this API to create, modify, list, and delete Docket Alerts.</p>
+    <p>Docket Alerts are always sent as soon as an update is available. See <a class="underline" href="{% url "alert_help" %}">the help page on Docket Alerts</a> to learn more about how we get updates.</p>
+    <p>Docket Alerts have two fields you can set:</p>
+    <ul class="list-disc list-inside space-y-4">
+      <li><strong><code>docket</code></strong> — Required: The docket you want to subscribe to or unsubscribe from.</li>
+      <li><strong><code>alert_type</code></strong> — Whether to subscribe or unsubscribe from the docket.
+        <p class="mt-2">This field is part of <a class="underline" href="{% url 'recap_email_help' %}">@recap.email</a>'s auto-subscribe feature. If you are not using @recap.email or have auto-subscribe disabled, you can ignore this field.</p>
+        <p class="mt-2">If you are using @recap.email and have auto-subscribe enabled <a class="underline" href="{% url "view_recap_email" %}">in your profile</a>, Docket Alerts will be automatically created for you as CourtListener receives notifications about cases. To permanently unsubscribe from a case for which you are receiving notifications from PACER, create an "Unsubscription" for the case.</p>
+      </li>
+    </ul>
+    <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
+    <c-code>curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
+  "{% get_full_host %}{% url "docket-alert-list" version=version %}"</c-code>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="docket-examples">
+    <h3>Example Usage</h3>
+    <p>To create a Docket Alert, send a POST request with the <code>docket</code> ID you wish to subscribe to.</p>
+    <p>This example subscribes to docket number 1:</p>
+    <c-code>curl -X POST \
+  --data 'docket=1' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version=version %}"</c-code>
+    <p>The response:</p>
+    <c-code>{
+  "id": 133013,
+  "date_created": "2024-05-02T16:35:58.562617-07:00",
+  "date_modified": "2024-05-02T16:35:58.562629-07:00",
+  "date_last_hit": null,
+  "secret_key": "Xv6sg4xkarzyWdzABi84AyjzV3CslJs9Ldippq3s",
+  "alert_type": 1,
+  "docket": 1
+}</c-code>
+    <p>To unsubscribe from a docket, you can either delete the alert with an HTTP <code>DELETE</code> request:</p>
+    <c-code>curl -X DELETE \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-detail" version=version pk="133013" %}"</c-code>
+    <p>Or, if you are using @recap.email and have auto-subscribe enabled, you can send an HTTP <code>PATCH</code> request to change it from a subscription (<code>alert_type=1</code>) to an unsubscription (<code>alert_type=0</code>):</p>
+    <c-code>curl -X PATCH \
+  --data 'alert_type=0' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-detail" version=version pk="133013" %}"</c-code>
+    <p>To list your Docket Alerts, send an HTTP <code>GET</code> request with no filters:</p>
+    <c-code>curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version=version %}"</c-code>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="relative-dates-help">
+    <h3>Help with Relative Dates Queries</h3>
+    <p>Use relative dates in your queries to keep your searches and alerts dynamically up to date.</p>
+    <p><a href="{% url "relative_dates" %}" class="btn btn-outline max-md:btn-xl"">Learn More</a></p>
+  </c-layout-with-navigation.section>
+
+</c-layout-with-navigation>
+{% endblock %}
