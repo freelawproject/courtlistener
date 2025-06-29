@@ -44,7 +44,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="docket-endpoint">
-    <h2>Dockets</h2>
+    <h3>Dockets</h3>
     <p><code>{% url "docket-list" version=version %}</code></p>
     {% include "v2_includes/docket-endpoint.html" %}
     <p>Ideally, docket entries, parties, and attorneys would be nested within the docket object you request, but this is not possible because some dockets have a vast number of these objects. Listing so many values in a single response from the server is impractical. To access docket entries, parties, or attorneys for a specific docket, use the docket entry, party, or attorney endpoints and filter by docket ID.</p>
@@ -52,13 +52,13 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="court-endpoint">
-      <h2>Courts</h2>
+      <h3>Courts</h3>
       <p><code>{% url "court-list" version=version %}</code></p>
       {% include "v2_includes/court-endpoint.html" %}
       </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="docket-entry-endpoint">
-    <h2>Docket Entries</h2>
+    <h3>Docket Entries</h3>
     <p><code>{% url "docketentry-list" version=version %}</code></p>
     <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain one or more nested documents. This follows the design on PACER, in which a single row on a docket represents a document with its associated attachments.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
@@ -118,7 +118,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="recap-document-endpoint">
-    <h2>Documents</h2>
+    <h3>Documents</h3>
     <p><code>{% url "recapdocument-list" version=version %}</code></p>
     <p>Each docket entry contains several documents, which we call <code>RECAP Document</code> objects.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
@@ -154,7 +154,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="party-endpoint">
-    <h2>Parties</h2>
+    <h3>Parties</h3>
     <p><code>{% url "party-list" version=version %}</code></p>
     <p>The <code>Party</code> endpoint provides details about parties that have been involved in federal cases in PACER, and contains nested attorney information.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
@@ -162,19 +162,22 @@
 
 
     <div class="px-4 py-3 text-sm text-yellow-700 bg-yellow-100 border border-yellow-500 rounded-[10px]">
-      <p class="font-semibold inline-flex items-center gap-1 mb-1">
-        <i class="fa fa-warning"></i>
-        <span>Listen Up:</span>
-        <span class="font-normal text-yellow-700">
+      <div class="flex flex-wrap items-baseline">
+        <div class="inline-flex items-center gap-1 whitespace-nowrap">
+          <i class="fa fa-warning"></i>
+          <p class="font-semibold">Listen Up!</p>
+        </div>
+        <p class="ml-1">
           Filters applied to this endpoint only affect the top-level data, not the nested records within it. Therefore, each party returned by this API will list all the attorneys that have represented them in any case, even if the parties themselves are filtered to a particular case.
-        </span>
-      </p>
-      <p class="mt-2">
+        </p>
+        <p class="mt-2">
         To filter the nested attorney data for each party, include the
         <code>filter_nested_results=True</code>
         parameter in your API request.
       </p>
+      </div>
     </div>
+
     <p>For example, this query returns the parties for docket number <code>123</code>:</p>
     <c-code>curl -X GET \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
@@ -239,7 +242,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="attorney-endpoint">
-    <h2>Attorneys</h2>
+    <h3>Attorneys</h3>
     <p><code>{% url "attorney-list" version=version %}</code></p>
     <p>Use this API to look up an attorney in our system.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
@@ -282,7 +285,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="og-court-info-endpoint">
-    <h2>Originating Court</h2>
+    <h3>Originating Court</h3>
     <p><code>{% url 'originatingcourtinformation-list' version=version %}</code></p>
     <p><code>Originating Court Information</code> represents the information gathered at an appellate court about a case when it was in a lower court or administrative body.</p>
     <p>The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, this table is only completed for appellate cases that we acquire from PACER.</p>
@@ -290,7 +293,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="idb-data-endpoint">
-    <h2>Integrated Database</h2>
+    <h3>Integrated Database</h3>
     <p><code>{% url 'fjcintegrateddatabase-list' version=version %}</code></p>
     <p><code>FJC Integrated Database</code> objects represent the information available in the <a class="underline" href="https://www.fjc.gov/research/idb">Federal Judicial Center's Integrated Database</a>, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:</p>
     <ul class="list-disc list-inside space-y-2">
@@ -303,7 +306,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="recap-query">
-    <h2>Fast Document Lookup</h2>
+    <h3>Fast Document Lookup</h3>
     <p><code>{% url "fast-recapdocument-list" version=version %}</code></p>
     <p>This API is used to check if documents with known IDs are available in our system.</p>
     <p>To use it, provide a court ID and a comma-separated list of <code>pacer_doc_id</code>'s:</p>
