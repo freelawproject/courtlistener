@@ -1,0 +1,72 @@
+{% extends "new_base.html" %}
+{% load extras %}
+
+{% block title %}Database Replication for Organizations and Researchers – CourtListener.com{% endblock %}
+{% block og_title %}Database Replication for Organizations and Researchers – CourtListener.com{% endblock %}
+{% block description %}The CourtListener Database Replication service is for researchers and organizations that need high-speed, granular access to the CourtListener database on an ongoing basis.{% endblock %}
+{% block og_description %}The CourtListener Database Replication service is for researchers and organizations that need high-speed, granular access to the CourtListener database on an ongoing basis.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="overview"
+  :nav_items="[
+    {'href': '#overview', 'text': 'Overview'},
+    {'href': '#how', 'text': 'How it Works'},
+    {'href': '#setup', 'text': 'Our Process'},
+    {'href': '#faqs', 'text': 'FAQs'}
+  ]"
+>
+  <c-layout-with-navigation.section id="overview">
+    <h1>CourtListener Database Replication</h1>
+    <p class="lead">The CourtListener Database Replication service is for researchers and organizations that need high-speed, granular access to the CourtListener database on an ongoing basis.</p>
+    <p>This service works by using PostgreSQL to create and maintain a table-based <a class="underline" href="https://www.postgresql.org/docs/current/logical-replication.html">logical replica</a> of our database allocated specifically for you. Once the replica has completed its first sync, you can query your replica of the CourtListener database using standard SQL commands. This provides an incredibly powerful way to access one of the largest open collections of American legal data.</p>
+    <p>The following types of data are currently available as part of this service:</p>
+    <ul class="list-disc list-inside space-y-2">
+      <li class="text-primary-600 underline"><a href="{% url "advanced_o" %}">Case Law</a></li>
+      <li class="text-primary-600 underline"><a href="{% url "advanced_r" %}">RECAP Archive of PACER data</a></li>
+      <li class="text-primary-600 underline">The <a href="https://www.fjc.gov/research/idb">FJC Integrated Database</a> civil data</li>
+      <li class="text-primary-600 underline"><a href="{% url "advanced_oa" %}">Oral Arguments</a></li>
+      <li class="text-primary-600 underline"><a href="{% url "financial_disclosures_home" %}">Financial Disclosures</a></li>
+      <li class="text-primary-600 underline"><a href="{% url "advanced_p" %}">Judge and Appointer data</a></li>
+    </ul>
+    <p>User data will never be shared as part of this service.</p>
+    <p>If you are interested in this service, please get in touch to learn more. We will be happy to discuss the technical details.</p>
+    <div class="text-right">
+        <a href="{% url "contact" %}" class="btn-primary">Get Started</a>
+    </div>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="how">
+    <h2>How Logical Replication Works</h2>
+    <p><a class="underline" href="https://www.postgresql.org/docs/current/logical-replication.html">Logical replication</a> is a system supported by recent versions of PostgreSQL. Unlike older methods of database replication, which worked by shipping the database binary files across the network (so-called physical replication), logical replication works by streaming SQL commands from a "publisher" server to a "subscriber" server.</p>
+    <p>This form of replication provides a number of benefits over physical replication including the ability to have slightly different versions of the database installed, and the ability to only replicate certain tables from the publisher to the subscriber.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="setup">
+    <h2>Our Process</h2>
+    <p>When we engage with you to set up logical replication, we will set up a new server for you in our cloud, and we will provide access to you from a specific IP address in your network.</p>
+    <p>Once it's set up, your server will always be in sync and we can work together to scale the server however you need.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="faqs">
+    <h2>Frequently Asked Questions</h2>
+    <h3>What about schema changes?</h3>
+    <p>Logical replication allows for some schema differences between the publisher and the subscriber, but in general, the less you change your schema, the better. Best is if you don't change your schema at all.</p>
+    <p>On our end, when we make schema changes, we will give you advance notice and we will complete the work according to a pre-determined maintenance schedule.</p>
+
+    <h3 class="mt-6">What if my server goes down?</h3>
+    <p>Whenever your server goes down, ours will keep track of changes until yours comes back online. As soon as your server is back and the subscription is re-established, all changes from your downtime will be synced to your server.</p>
+    <p>If your server goes offline for an extended period of time, we need to know so that we can make a decision together whether to keep a log of all changes that occurred during your planned downtime.</p>
+    <p>Keeping these changes takes up space on our hard drive. If your server is down for too long, eventually we have to stop saving the information for you and a complete re-synchronization will be needed. We charge a fee for re-synchronization work.</p>
+
+    <h3 class="mt-6">Is there monitoring?</h3>
+    <p>Yes, we monitor replication around the clock using our own tools and those from our provider, AWS. Some of our internal monitoring is <a class="underline" href="{% url "replication_status" %}">available here</a>.</p>
+
+    <h3 class="mt-6">More questions?</h3>
+    <p>If you have more questions, please send us an email. This service is a complicated one and we look forward to working with organizations and researchers to make it a success.</p>
+    <div class="text-right">
+        <a href="{% url "contact" %}" class="btn-primary">Contact Us</a>
+    </div>
+  </c-layout-with-navigation.section>
+</c-layout-with-navigation>
+{% endblock %}
