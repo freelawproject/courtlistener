@@ -31,8 +31,13 @@
   ul {
     @apply list-disc pl-6;
   }
-  ol {
-    @apply list-decimal pl-6;
+
+  ul ul {
+    list-style-type: circle;
+  }
+
+  ul ul ul {
+    list-style-type: square;
   }
   blockquote {
     @apply border-l-4 border-l-greyscale-200 pl-6 py-2 text-xl font-normal first-of-type:mt-2 [&_blockquote:last-of-type]:-mb-2;
@@ -55,6 +60,20 @@
 }
 
 @tailwind components;
+
+@layer components {
+  .alert {
+    @apply px-4 py-3 text-sm rounded-[10px] border;
+  }
+
+  .alert-warning {
+    @apply alert text-yellow-700 bg-yellow-100 border-yellow-500;
+  }
+
+   .alert-danger {
+    @apply bg-red-100 text-red-700 border-red-500;
+  } 
+}
 
 @layer components {
   .btn {
