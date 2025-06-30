@@ -1,0 +1,482 @@
+[
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 2002,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1980-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 2135,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1983-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 327,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1984-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 1836,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1985-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 2453,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1987-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 799,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1988-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 2008,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1989-04-08",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 782,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1989-11-20",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 2420,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1990-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": "1988-05-19",
+      "date_granularity_termination": "%Y-%m-%d",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 863,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1992-03-02",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 131,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "1992-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 498,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2000-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 1844,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2002-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": "1995-05-19",
+      "date_granularity_termination": "%Y-%m-%d",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 413,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2004-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 1251,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2008-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 411,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2009-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 2892,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2011-01-08",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 662,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2013-01-08",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 3590,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2015-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 957,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2019-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 841,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2019-07-01",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 687,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2020-03-07",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": "2016-05-19",
+      "date_granularity_termination": "%Y-%m-%d",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 2332,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2020-05-03",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 6762,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2021-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": "2020-01-20",
+      "date_granularity_termination": "%Y-%m-%d",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 3260,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2026-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": "2023-05-19",
+      "date_granularity_termination": "%Y-%m-%d",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 2978,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2026-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 2209,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2028-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 1002,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2029-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 1703,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2029-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 845,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2030-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 1943,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2030-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  },
+  {
+    "model": "people_db.Position",
+    "pk": null,
+    "fields": {
+      "person_id": 14440,
+      "position_type": "jud",
+      "court_id": "fisc",
+      "date_start": "2031-05-18",
+      "date_granularity_start": "%Y-%m-%d",
+      "date_termination": null,
+      "date_granularity_termination": "",
+      "how_selected": "a_judge",
+      "has_inferred_values": false
+    }
+  }
+]
