@@ -72,7 +72,7 @@
 
    .alert-danger {
     @apply bg-red-100 text-red-700 border-red-500;
-  } 
+  }
 }
 
 @layer components {
