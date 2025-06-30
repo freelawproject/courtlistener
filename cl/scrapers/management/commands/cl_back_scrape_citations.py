@@ -71,7 +71,9 @@ class Command(cl_back_scrape_opinions.Command):
                 if court.id == "scotus":
                     # Ensure all criteria matches for scotus opinion and add the citation
                     scotus_opinions = Opinion.objects.filter(
-                        cluster__docket__docket_number=case.get("docket_numbers"),
+                        cluster__docket__docket_number=case.get(
+                            "docket_numbers"
+                        ),
                         cluster__case_name=case.get("case_names"),
                         cluster__date_filed=case.get("case_dates"),
                         cluster__judges=case.get("judges"),
