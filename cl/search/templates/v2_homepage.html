@@ -45,8 +45,10 @@
 
     <div
       x-ref="container"
+      x-on:scroll="updateButtons"
       x-on:keydown.home.stop.prevent="focusFirst"
       x-on:keydown.end.stop.prevent="focusLast"
+      x-on:resize.window="updateButtons"
       role="toolbar"
       aria-label="Homepage actions"
       tabindex="-1"
