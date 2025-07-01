@@ -87,7 +87,9 @@ async def rest_docs(request, version=None):
 
     Latest version is shown when not specified in args.
     """
-    court_count = await Court.objects.acount()
+    court_count = await Court.objects.exclude(
+        jurisdiction=Court.TESTING_COURT
+    ).acount()
     latest = version is None
     context = {"court_count": court_count, "private": not latest}
     return TemplateResponse(
