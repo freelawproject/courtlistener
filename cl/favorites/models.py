@@ -234,8 +234,8 @@ class GenericCount(models.Model):
         unique=True,
         help_text=(
             "A namespaced identifier for the object and action being tracked. "
-            "Use a consistent format like 'd.view:1234' for a views on docket "
-            "with ID 1234, or 'o.view:456' for views on opinion with ID 456."
+            "Use a consistent format like 'd.1234:view' for views on docket "
+            "with ID 1234, or 'o.456:view' for views on opinion with ID 456."
         ),
     )
     value = models.BigIntegerField(

@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='GenericCount',
             fields=[
-                ('label', models.CharField(help_text="A namespaced identifier for the object and action being tracked. Use a consistent format like 'd.view:1234' for a views on docket with ID 1234, or 'o.view:456' for views on opinion with ID 456.", max_length=255, primary_key=True, serialize=False, unique=True)),
+                ('label', models.CharField(help_text="A namespaced identifier for the object and action being tracked. Use a consistent format like 'd.1234:view' for views on docket with ID 1234, or 'o.456:view' for views on opinion with ID 456.", max_length=255, primary_key=True, serialize=False, unique=True)),
                 ('value', models.BigIntegerField(default=0, help_text='The number of times the action (e.g., view) has occurred for the object identified by the key.')),
             ],
             options={
