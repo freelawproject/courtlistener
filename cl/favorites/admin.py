@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from cl.favorites.models import (
     DocketTag,
+    GenericCount,
     Note,
     Prayer,
     PrayerAvailability,
@@ -82,3 +83,8 @@ class PrayerAvailabilityAdmin(admin.ModelAdmin):
         "recap_document",
         "last_checked",
     )
+
+
+@admin.register(GenericCount)
+class GenericCountAdmin(admin.ModelAdmin):
+    search_fields = ("label__startswith",)
