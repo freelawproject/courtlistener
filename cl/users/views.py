@@ -108,12 +108,13 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_docket_alerts(request: HttpRequest) -> HttpResponse:
-    order_name = request.GET.get("order_by", "")
-    if order_name.startswith("-"):
+    order_by_param = request.GET.get("order_by", "")
+    if order_by_param.startswith("-"):
         direction = "-"
-        order_name = order_name.lstrip("-")
+        order_name = order_by_param.lstrip("-")
     else:
         direction = ""
+        order_name = order_by_param
     name_map = {
         "name": "docket__case_name",
         "court": "docket__court__short_name",
@@ -141,6 +142,16 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
     else:
         docket_alerts = docket_alerts.order_by(f"{direction}{order_by}")
 
+    sorting_fields = {
+        col: {
+            "url_param": f"{'-' if order_name == col and direction == '' else ''}{col}",
+            "direction": "down"
+            if (order_name == col and direction == "-")
+            else "up",
+        }
+        for col in name_map
+    }
+
     return SimpleTemplateResponse(
         "profile/alerts.html",
         {
@@ -148,7 +159,7 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
             "page": "docket_alerts",
             "private": True,
             "page_title": "Docket Alerts",
-            "sort_desc": {order_name: "" if direction else "-"},
+            "sorting_fields": sorting_fields,
         },
     )
 

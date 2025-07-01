@@ -703,10 +703,19 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                     order_name = "hit"
                 das.sort(key=sorter, reverse=True if direction else False)
                 self.assertEqual(list(c["docket_alerts"]), das)
-                if direction:
-                    self.assertEqual(
-                        c["sort_desc"][order_name], "" if direction else "-"
-                    )
+
+                sorting_fields = c["sorting_fields"]
+                for col, vals in sorting_fields.items():
+                    # Test url_param
+                    if order_name == col and direction == "":
+                        self.assertEqual(vals["url_param"], f"-{order_name}")
+                    else:
+                        self.assertEqual(vals["url_param"], col)
+                    # Test direction
+                    if order_name == col and direction == "-":
+                        self.assertEqual(vals["direction"], "down")
+                    else:
+                        self.assertEqual(vals["direction"], "up")
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
