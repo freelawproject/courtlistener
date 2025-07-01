@@ -3164,3 +3164,22 @@ class UnmatchedCitationTest(TransactionTestCase):
         self.assertEqual(
             count, 0, "Self-cite has been stored as UnmatchedCitation"
         )
+
+    def test_saving_non_standard_year_format(self) -> None:
+        """Can we prevent crash with atypical year format?"""
+
+        cluster = OpinionClusterFactoryWithChildrenAndParents()
+        eyecite_citations = get_citations(
+            """2018 WL 1915078, at *2 (Mass. 1993-94).""",
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
+        opinion = cluster.sub_opinions.first()
+        handle_unmatched_citations(opinion, eyecite_citations, {})
+        unmatched_citations = list(
+            UnmatchedCitation.objects.filter(citing_opinion=opinion).all()
+        )
+        self.assertEqual(
+            len(unmatched_citations),
+            1,
+            "Incorrect number of citations saved",
+        )
