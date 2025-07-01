@@ -34,6 +34,7 @@
   <div class="relative w-full flex flex-row max-w-[1400px] mx-auto">
     <button
       type="button"
+      tabindex="-1"
       x-on:click="scrollPrev"
       x-bind:disabled="atStart"
       aria-label="Scroll actions left"
@@ -51,6 +52,9 @@
       tabindex="-1"
       class="relative w-full flex flex-row gap-2 max-w-[1400px] mx-auto overflow-auto justify-between md:p-10 px-4 py-11"
     >
+      <p class="sr-only">
+        Use left and right arrow keys to scroll through the actions.
+      </p>
       <a
         x-on:focus="scrollIntoView"
         href="https://free.law/about"
@@ -137,6 +141,7 @@
 
     <button
       type="button"
+      tabindex="-1"
       x-on:click="scrollNext"
       x-bind:disabled="atEnd"
       aria-label="Scroll actions right"
