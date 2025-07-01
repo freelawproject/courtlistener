@@ -1,0 +1,102 @@
+{% extends "new_base.html" %}
+{% load extras %}
+
+{% block title %}APIs and Bulk Data – CourtListener.com{% endblock %}
+{% block og_title %}APIs and Bulk Data – CourtListener.com{% endblock %}
+{% block description %}Legal APIs and Bulk Data from Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
+{% block og_description %}Legal APIs and Bulk Data from Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
+
+{% block content %}
+<c-layout-without-navigation>
+  <c-layout-without-navigation.section id="about">
+    <h1>CourtListener APIs, Webhooks, and Bulk Legal&nbsp;Data</h1>
+    <p>We currently have five major services available on CourtListener:</p>
+    <ul class="list-decimal space-y-2 ml-4">
+      <li>If you need the fastest and most granular form of our data, we <a class="underline" href="{% url "replication_docs" %}">recommend our database replication service</a>. This unique service provides an isolated logical replica of our PostgreSQL database that you can query with SQL.</li>
+      <li>If you are interested in obtaining large quantities of our data, we <a class="underline" href="{% url "bulk_data_index" %}">recommend using bulk data files</a>. These provide CSV files of our case law, people, and financial disclosures databases.</li>
+      <li>If you require less data or if you want to crawl PACER, we <a class="underline" href="{% url "rest_docs" %}">recommend using our REST APIs</a>.</li>
+      <li>If you want to subscribe to events on CourtListener, we recommend our <a class="underline" href="{% url "webhooks_docs" %}">webhooks service</a>, which works as a bi-directional API &mdash; It can push data to you.</li>
+      <li>Finally, we also <a class="underline" href="https://free.law/data-consulting/">offer custom data services</a> and custom bulk file creation, with hourly and project-based rates.</li>
+    </ul>
+  </c-layout-without-navigation.section>
+
+  <c-layout-without-navigation.section id="comparison">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col" style="min-width: 10em !important;" >Learn More About&hellip;</th>
+            <th scope="col">Update<br>Speed</th>
+            <th scope="col">Data<br>Fidelity</th>
+            <th scope="col">Query<br>Flexibility</th>
+            <th scope="col">Learning<br>Curve</th>
+            <th scope="col">Setup</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a href="{% url "replication_docs" %}" class="btn btn-primary">Replication</a></td>
+            <td>Instant</td>
+            <td>Complete</td>
+            <td>Unlimited<br>SQL Queries</td>
+            <td>Short</td>
+            <td>Complex</td>
+          </tr>
+          <tr>
+            <td><a href="{% url "bulk_data_index" %}" class="btn btn-primary">Bulk Data</a></td>
+            <td>Slow</td>
+            <td>Great</td>
+            <td>None</td>
+            <td>Short</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td><a href="{% url "rest_docs" %}" class="btn btn-primary">REST APIs</a></td>
+            <td>Fast</td>
+            <td>Good</td>
+            <td>Filters &amp;<br> Joins</td>
+            <td>Longer</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td><a href="{% url "webhooks_docs" %}" class="btn btn-primary">Webhooks</a></td>
+            <td>Instant</td>
+            <td>Good</td>
+            <td>Subscribe to Events</td>
+            <td>Medium</td>
+            <td>Complex</td>
+          </tr>
+          <tr>
+            <td><a href="https://free.law/data-consulting/" class="btn btn-outline whitespace-nowrap">Data Services</a></td>
+            <td colspan="5" class="py-3 px-2 text-left">Engage with Free Law Project, the non-profit behind CourtListener and RECAP, for the most flexibility.</td>
+          </tr>
+        </tbody>
+      </table>
+  </c-layout-without-navigation.section>
+
+  <c-layout-without-navigation.section id="pricing">
+    <h2>Pricing</h2>
+    <p>We make these services available according to means-based pricing. This allows a variety of researchers, journalists, and organizations to access this information.</p>
+    <p>The goal of these charges is to provide ongoing support for these APIs and for <a href="https://free.law" target="_blank" class="underline">Free Law Project</a>, the 501(c)(3) non-profit supporting CourtListener and RECAP. We hope you'll agree that that is an important cause.</p>
+    <p>Depending on what makes sense for the organization and the project, support for Free Law Project can take the form of monthly subscriptions, one time fees for service, or revenue share agreements.</p>
+  </c-layout-without-navigation.section>
+
+  <c-layout-without-navigation.section id="pride">
+    <h2 class="text-2xl font-bold">We're Proud of our Data</h2>
+    <p>For over a decade, we have worked to make the data in CourtListener the best on the open Web.</p>
+    <p>Among the minor enhancements we make on a regular basis, we've made significant improvements to our data that you won't find in other sources:</p>
+    <ul class="list-decimal space-y-2 ml-4">
+      <li>When we import other data sources, we clean them up. For example, we <a class="underline" href="https://free.law/2011/08/25/second-series-of-federal-reporter-from-1950-to-1993-now-on-courtlistener/">manually corrected</a> more than ten thousand items from Public.Resource.Org, and we have cleaned up or fixed more than one-million items in <a class="underline" href="https://case.law/">Harvard's Caselaw Access Project</a>.</li>
+      <li>We've <a class="underline" href="https://free.law/2011/05/25/updated-scotus-dates/">added exact dates from the library of congress</a> to our collection of older Supreme Court cases, enhancing thousands of cases beyond what's available anywhere else.</li>
+      <li>We use open records requests and manual data entry to build our datasets of judges and financial disclosures.</li>
+    </ul>
+    <p>You can learn more about the data that we have on our coverage pages.</p>
+    <p><a href="{% url "coverage" %}" class="btn btn-primary">Coverage Details</a></p>
+  </c-layout-without-navigation.section>
+
+  <c-layout-without-navigation.section id="privacy">
+    <h2 class="text-2xl font-bold">Privacy of Court Materials</h2>
+    <p>As is <a class="underline" href="{% url "terms" %}#removal">explained in our removal policy</a>, we block public search engines from indexing many of the cases available on our website. We do this to protect vulnerable people.</p>
+    <p>If you plan to use this data on the Internet, carefully consider how you will protect these people and their privacy wishes. The simplest way to do that is to use the <code>blocked</code> flag that's available on most objects.</p>
+  </c-layout-without-navigation.section>
+</c-layout-without-navigation>
+{% endblock %}
