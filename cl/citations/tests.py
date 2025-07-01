@@ -3189,9 +3189,39 @@ class UnmatchedCitationTest(TransactionTestCase):
 
 
 class TasksTest(TestCase):
+    """Test citations tasks"""
+
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
+
+        cls.ca_court = CourtFactory(id="ca")
+
+        cls.opinion_1 = OpinionWithChildrenFactory(
+            plain_text="Sample text 1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.ca_court),
+                case_name="Opinion 1",
+                date_filed=date(2025, 4, 25),
+            ),
+        )
+
+        cls.opinion_2 = OpinionWithChildrenFactory(
+            plain_text="Sample text 2",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.ca_court),
+                case_name="Opinion 2",
+                date_filed=date(2025, 4, 26),
+            ),
+        )
+        cls.opinion_3 = OpinionWithChildrenFactory(
+            plain_text="Sample text 3",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.ca_court),
+                case_name="Opinion 3",
+                date_filed=date(2025, 4, 27),
+            ),
+        )
 
     @patch(
         "cl.citations.tasks.store_opinion_citations_and_update_parentheticals"
@@ -3203,20 +3233,11 @@ class TasksTest(TestCase):
         old_limit = sys.getrecursionlimit()
         sys.setrecursionlimit(100)
 
-        opinion = OpinionWithChildrenFactory(
-            plain_text="Sample text",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="ca")),
-                case_name="Some placeholder",
-                date_filed=date(2025, 4, 25),
-            ),
-        )
-
         mock_store.side_effect = OperationalError()
 
         try:
             call_count = 0
-            args = ([opinion.id], False, False)
+            args = ([self.opinion_1.id], False, False)
 
             while True:
                 call_count += 1
@@ -3265,31 +3286,6 @@ class TasksTest(TestCase):
     ):
         """If OperationalError is raised, can we retry only the failed opinion and schedule the rest?"""
 
-        opinion_1 = OpinionWithChildrenFactory(
-            plain_text="Sample text 1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="ca")),
-                case_name="Opinion 1",
-                date_filed=date(2025, 4, 25),
-            ),
-        )
-        opinion_2 = OpinionWithChildrenFactory(
-            plain_text="Sample text 2",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="ca")),
-                case_name="Opinion 2",
-                date_filed=date(2025, 4, 26),
-            ),
-        )
-        opinion_3 = OpinionWithChildrenFactory(
-            plain_text="Sample text 3",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="ca")),
-                case_name="Opinion 3",
-                date_filed=date(2025, 4, 27),
-            ),
-        )
-
         def fail_only_opinion_2(opinion, *_):
             """Mocks store_opinion_citations_and_update_parentheticals call
             Simulates a failure only for opinion2
@@ -3298,8 +3294,8 @@ class TasksTest(TestCase):
             :param *_: Ignored positional arguments passed by the task
             :return: None for all other opinions to simulate success
             """
-            if opinion.id == opinion_2.id:
-                raise OperationalError("Simulated DB error")
+            if opinion.id == self.opinion_2.id:
+                raise OperationalError()
             return None
 
         mock_task.side_effect = fail_only_opinion_2
@@ -3312,7 +3308,11 @@ class TasksTest(TestCase):
             with self.assertRaises(Retry):
                 find_citations_and_parentheticals_for_opinion_by_pks.apply(
                     args=(
-                        [opinion_1.id, opinion_2.id, opinion_3.id],
+                        [
+                            self.opinion_1.id,
+                            self.opinion_2.id,
+                            self.opinion_3.id,
+                        ],
                         False,
                         False,
                     ),
@@ -3323,13 +3323,13 @@ class TasksTest(TestCase):
             called_args = mock_retry.call_args.kwargs
             self.assertIsInstance(called_args["exc"], OperationalError)
             self.assertEqual(
-                called_args["args"], ([opinion_2.id], False, False)
+                called_args["args"], ([self.opinion_2.id], False, False)
             )
             self.assertEqual(called_args["countdown"], 60)
 
             # Remaining opinions (after the failed one) should be scheduled in a new task
             mock_apply_async.assert_called_once_with(
-                args=([opinion_3.id], False, False),
+                args=([self.opinion_3.id], False, False),
                 countdown=5,
             )
 
@@ -3338,10 +3338,12 @@ class TasksTest(TestCase):
             attempted_ids = sorted(
                 [c[0][0].id for c in mock_task.call_args_list]
             )
-            self.assertEqual(attempted_ids, [opinion_1.id, opinion_2.id])
+            self.assertEqual(
+                attempted_ids, [self.opinion_1.id, self.opinion_2.id]
+            )
 
             # Verify opinion_3 was not processed yet
-            self.assertNotIn(opinion_3.id, attempted_ids)
+            self.assertNotIn(self.opinion_3.id, attempted_ids)
 
             # Simulate running the rescheduled opinion_3
             scheduled_args = mock_apply_async.call_args.kwargs["args"]
@@ -3354,7 +3356,8 @@ class TasksTest(TestCase):
                 [c[0][0].id for c in mock_task.call_args_list]
             )
             self.assertEqual(
-                attempted_ids, [opinion_1.id, opinion_2.id, opinion_3.id]
+                attempted_ids,
+                [self.opinion_1.id, self.opinion_2.id, self.opinion_3.id],
             )
 
         finally:
