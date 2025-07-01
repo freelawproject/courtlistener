@@ -9,6 +9,7 @@ document.addEventListener('alpine:init', () => {
     init() {
       this.updateButtons();
       this.$refs.container.addEventListener('scroll', () => this.updateButtons());
+      window.addEventListener('resize', () => this.updateButtons());
     },
     scrollIntoView() {
       const rect = this.$el.getBoundingClientRect();
