@@ -37,6 +37,15 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
             id="canb",
             jurisdiction="FB",
         )
+        with cls.captureOnCommitCallbacks(execute=True) as callbacks:
+            cls.opinion_cluster_2 = OpinionClusterFactory(
+                docket=DocketFactory(
+                    court=cls.court,
+                    docket_number="1:21-cv-1235",
+                    source=Docket.HARVARD,
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            )
 
     def test_opinion_embeddings_field(self) -> None:
         """Test index embeddings into an opinion document."""
@@ -89,34 +98,23 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 
     def test_cl_index_embeddings(self) -> None:
         """Test cl_index_embeddings command"""
-
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            opinion_cluster_2 = OpinionClusterFactory(
-                docket=DocketFactory(
-                    court=self.court,
-                    docket_number="1:21-cv-1235",
-                    source=Docket.HARVARD,
-                ),
-                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            )
+        with self.captureOnCommitCallbacks(execute=True):
             opinion_2 = OpinionFactory(
-                cluster=opinion_cluster_2,
+                cluster=self.opinion_cluster_2,
                 html_columbia=("<p>Sed ut perspiciatis</p>"),
             )
             opinion_3 = OpinionFactory(
-                cluster=opinion_cluster_2,
+                cluster=self.opinion_cluster_2,
                 html_columbia=("<p>Sed ut perspiciatis</p>"),
             )
 
-        es_opinion_2 = OpinionDocument.get(
-            id=ES_CHILD_ID(opinion_2.pk).OPINION
-        )
-        self.assertEqual(es_opinion_2.embeddings, [])
-
-        es_opinion_3 = OpinionDocument.get(
-            id=ES_CHILD_ID(opinion_3.pk).OPINION
-        )
-        self.assertEqual(es_opinion_3.embeddings, [])
+        for opinion in (opinion_2, opinion_3):
+            self.assertEqual(
+                OpinionDocument.get(
+                    id=ES_CHILD_ID(opinion.pk).OPINION
+                ).embeddings,
+                [],
+            )
 
         with mock.patch(
             "cl.search.tasks.AWSMediaStorage.open",
@@ -129,13 +127,60 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
                 start_id=0,
             )
 
-        es_opinion_2 = OpinionDocument.get(
-            id=ES_CHILD_ID(opinion_2.pk).OPINION
-        )
-        # Opinion embedding should be now indexed into the document.
-        self.assertTrue(es_opinion_2.embeddings)
-        es_opinion_3 = OpinionDocument.get(
-            id=ES_CHILD_ID(opinion_3.pk).OPINION
-        )
-        # Opinion embedding should be now indexed into the document.
-        self.assertTrue(es_opinion_3.embeddings)
+        for opinion in (opinion_2, opinion_3):
+            self.assertTrue(
+                OpinionDocument.get(
+                    id=ES_CHILD_ID(opinion.pk).OPINION
+                ).embeddings
+            )
+
+    def test_cl_index_embeddings_from_inventory(self):
+        """Test cl_index_embeddings command using an S3 inventory file."""
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_4 = OpinionFactory(
+                cluster=self.opinion_cluster_2,
+                html_columbia=("<p>Sed ut perspiciatis</p>"),
+            )
+            opinion_5 = OpinionFactory(
+                cluster=self.opinion_cluster_2,
+                html_columbia=("<p>Sed ut perspiciatis</p>"),
+            )
+        for opinion in (opinion_4, opinion_5):
+            self.assertEqual(
+                OpinionDocument.get(
+                    id=ES_CHILD_ID(opinion.pk).OPINION
+                ).embeddings,
+                [],
+            )
+
+        csv_lines = [
+            f'"com-courtlistener-storage","embeddings/opinions/freelawproject/'
+            f'modernbert-embed-base_finetune_512/{opinion_4.pk}.json","2025-06-24T00:00:00.000Z"',
+            f'"com-courtlistener-storage","embeddings/opinions/freelawproject/'
+            f'modernbert-embed-base_finetune_512/{opinion_5.pk}.json","2025-06-24T00:00:00.000Z"',
+        ]
+        mock_csv_content = "\n".join(csv_lines) + "\n"
+        with (
+            mock.patch(
+                "cl.search.tasks.AWSMediaStorage.open",
+                side_effect=mock_read_from_s3,
+            ),
+            mock.patch("pathlib.Path.exists", return_value=True),
+            mock.patch(
+                "pathlib.Path.open", mock.mock_open(read_data=mock_csv_content)
+            ),
+        ):
+            call_command(
+                "cl_index_embeddings",
+                batch_size=2,
+                inventory_file="test_inventory.csv",
+                inventory_rows=len(csv_lines),
+            )
+
+        # Confirm embeddings are indexed.
+        for opinion in (opinion_4, opinion_5):
+            self.assertTrue(
+                OpinionDocument.get(
+                    id=ES_CHILD_ID(opinion.pk).OPINION
+                ).embeddings
+            )
