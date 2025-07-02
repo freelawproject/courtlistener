@@ -1,0 +1,317 @@
+{% extends "new_base.html" %}
+{% load static %}
+{% load extras %}
+{% load waffle_tags %}
+
+{% block title %}Webhook API – CourtListener.com{% endblock %}
+{% block og_title %}Webhook API – CourtListener.com{% endblock %}
+{% block description %}CourtListener’s webhook system allows us to push information to you, enabling bi-directional APIs without polling.{% endblock %}
+{% block og_description %}CourtListener’s webhook system allows us to push information to you, enabling bi-directional APIs without polling.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#getting-started', 'text': 'Getting Started'},
+    {'href': '#pricing', 'text': 'Pricing'},
+    {'href': '#overview-of-events', 'text': 'Overview of Events', 'children': [
+      {'href': '#headers', 'text': 'Headers'},
+      {'href': '#fields', 'text': 'Fields'},
+      {'href': '#security', 'text': 'Security'},
+      {'href': '#retries', 'text': 'Retries and Disablement'}
+    ]},
+    {'href': '#event-types', 'text': 'Event Types', 'children': [
+      {'href': '#docket-alerts', 'text': 'Docket Alerts'},
+      {'href': '#search-alerts', 'text': 'Search Alerts'},
+      {'href': '#old-da-alerts-report', 'text': 'Old Docket Alerts'},
+      {'href': '#recap-fetch', 'text': 'RECAP Fetch'}
+    ]},
+    {'href': '#maintenance', 'text': 'Maintenance Schedule'},
+    {'href': '#change-log', 'text': 'Change Log'}
+  ]"
+>
+  <c-layout-with-navigation.section id="about">
+    <h1>Webhook API</h1>
+    <p class="lead">CourtListener’s webhook system allows us to push information to you, enabling bi-directional APIs without polling.</p>
+    <p>To set this up, you create a URL on your server where CourtListener can send data. Then, whenever something important happens in CourtListener, we will POST an “event” to that URL as JSON data. When you receive the event, you can process it and perform whatever actions your system needs in response.</p>
+    <p>Currently, CourtListener can send webhook events whenever dockets are updated, search alerts are triggered, docket alerts expire, or when RECAP Fetch tasks complete. If you have other events of interest, please get in touch.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="getting-started">
+      <h2>Getting Started With Webhooks</h2>
+      <p>Creating your first webhook working can be complicated. To get an overview of the process, please read our documentation on getting started.</p>
+      <p><a href="{% url 'webhooks_getting_started' %}" class="btn btn-primary">Get Started</a></p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="pricing">
+    <h2>Pricing</h2>
+    <p>CourtListener is hosted by <a class="underline" href="https://free.law">Free Law Project</a>, a non-profit that has "Free" in its name, but we do charge reasonable fees to organizations using advanced features like Webhooks and APIs. We use these fees to maintain our paid and free services.</p>
+    <p>When we see an organization starting a new project using Webhooks, we will get in touch to discuss the project and set up an agreement that works for everybody.</p>
+    <p>Questions? Get in touch to start the conversation.</p>
+    <p><a href="{% url "contact" %}" class="btn btn-outline">Contact Us</a></p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="overview-of-events">
+    <h2>Overview of Events</h2>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="headers">
+    <h3>Standard Headers</h3>
+    <p>Each webhook event contains two HTTP headers with additional context for the event:</p>
+    <ul class="space-y-2">
+      <li><strong>Content-Type</strong>: Indicates the content type of the payload request. For now, our events only support <code>"application/json"</code>.</li>
+      <li><strong>Idempotency-Key</strong>: This is a unique 128 bit UUID that corresponds to each event. This value should be used by your application to ensure that you do not process events more than once.
+        <p>If you do not take advantage of this feature, we may resend an event that appeared to fail, and you may receive and process it multiple times. More details about this are available in <a class="underline" href="#retries">the section on retries below</a>.</p>
+      </li>
+    </ul>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="fields">
+    <h3>Standard Fields</h3>
+    <p>Each webhook event is a JSON hash with two keys, <code>payload</code> and <code>webhook</code>. The <code>payload</code> key contains the specific data for the event that occurred. Its values are described in the <a class="underline" href="#event-types">event-specific descriptions below</a>.</p>
+    <p>The <code>webhook</code> key helps with maintenance and compatibility. It contains information about the webhook itself. This key should be monitored by administrators and used to track the deprecation schedule for the webhook events.</p>
+    <p>It has the following structure:</p>
+    <div class="mt-2 p-4 border rounded-md bg-greyscale-50">
+        <p><strong>webhook</strong> <span class="text-greyscale-700">JSON hash</span></p>
+        <p class="text-sm">Information related to the webhook endpoint to which the event belongs.</p>
+        <div class="pl-4 mt-2 pt-2 border-t">
+          <p><strong>version</strong> <span class="text-greyscale-700">integer</span></p>
+          <p class="text-sm">The specific version of the webhook event.</p>
+          <hr class="my-2">
+          <p><strong>event_type</strong> <span class="text-greyscale-700">integer</span></p>
+          <p class="text-sm">The webhook event type.</p>
+          <ul class="list-disc list-inside text-sm pl-4">
+            <li>DOCKET_ALERT = 1</li>
+            <li>SEARCH_ALERT = 2</li>
+            <li>RECAP_FETCH = 3</li>
+          </ul>
+          <hr class="my-2">
+          <p><strong>date_created</strong> <span class="text-greyscale-700">ISO 8601 string</span></p>
+          <p class="text-sm">The date time the webhook endpoint was created.</p>
+          <hr class="my-2">
+          <p><strong>deprecation_date</strong> <span class="text-greyscale-700">ISO 8601 string or null </span></p>
+          <p class="text-sm">The next deprecation date if scheduled, otherwise null.</p>
+        </div>
+    </div>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="security">
+    <h3>Webhook Security</h3>
+    <p>Our webhook events will be sent from one of two IP addresses:</p>
+    <ol>
+      <li><code>34.210.230.218</code></li>
+      <li><code>54.189.59.91</code></li>
+    </ol>
+    <p>We recommend adding these IP addresses to your network allow list and/or verifying that the webhook events you receive come from these addresses.</p>
+    <p>We also recommend you protect your webhook endpoints by giving them long, random, secret URLs instead of short preditable ones.</p>
+    <p>Beyond this, our webhook system does not have an authentication mechanism to verify that a POST to your endpoint came from CourtListener. The <a class="underline" href="https://github.com/freelawproject/courtlistener/issues/1650" rel="nofollow" target="_blank">decision not to support an authentication mechanism</a> was made after analyzing the risk of lacking authentication and after completing a review of the Stripe payments platform (which defaults to not using authentication despite being a high-risk environment).</p>
+    <p>If the need for webhook authentication is a blocker for your organization, <a class="underline" href="{% url 'contact' %}">please let us know</a> and we can revisit this decision.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="retries">
+    <h3>Retries and Automatic Endpoint Disablement</h3>
+    <p>Errors across distributed systems are inevitable. To make our webhook system resilient, we automatically retry events POSTed to your application that do not receive a 2xx status code response within one second.</p>
+    <p>Events are retried up to seven times after the first failure. The retry logic uses an exponential backoff starting at roughly three minutes with a 3× multiplier. As shown in the table below, this gives you around 54 hours to fix any issues in your system.</p>
+    <p>The next attempt date and time for a specific event can be found <a class="underline" href="{% url 'view_webhook_logs' 'logs' %}">in your webhook logs</a>.</p>
+    <p>As webhooks fail to be delivered, we will send emails to your account to inform you of the issue. Email notifications are sent per webhook endpoint based on the first failing event for that endpoint — Notifications are not sent for every failing event, since that would flood your inbox.</p>
+    <p>This table explains the retry and notification schedule for failing events (in minutes):</p>
+    <table class = "table">
+      <thead>
+        <tr>
+          <th scope="col">Retry Count</th>
+          <th scope="col">New Delay</th>
+          <th scope="col">Elapsed</th>
+          <th scope="col">Send Failure<br>Notification Email?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Initial Event</td><td>N/A</td><td>0:00</td><td>No</td></tr>
+        <tr><td>1</td><td>0:03</td><td>0:03</td><td>Yes</td></tr>
+        <tr><td>2</td><td>0:09</td><td>0:12</td><td>No</td></tr>
+        <tr><td>3</td><td>0:27</td><td>0:39</td><td>No</td></tr>
+        <tr><td>4</td><td>1:21</td><td>2:00</td><td>No</td></tr>
+        <tr><td>5</td><td>4:03</td><td>6:03</td><td>Yes</td></tr>
+        <tr><td>6</td><td>12:09</td><td>18:12</td><td>No</td></tr>
+        <tr><td>7</td><td>36:27</td><td>54:39</td><td>Yes</td></tr>
+      </tbody>
+    </table>
+    <p>After a webhook fails eight times, it is disabled in our system and we immediately stop sending it new or undelivered events.</p>
+    <p>At that point, you will have received two warning emails about the issue, and a third informing you that the endpoint is disabled. Webhooks can be re-enabled at any time, but will get disabled again if errors continue.</p>
+    <p>Fixed webhook endpoints can be re-enabled in the webhooks panel.</p>
+    <p><img src="{% static "png/re-enable-webhook-v2.png" %}" alt="screenshot of how to re-enable a webhook endpoint" class="w-full rounded-lg shadow-md my-4"></p>
+    <p>Once your webhook endpoint is re-enabled, we will continue attempting to deliver failed webhook events that we stopped retrying when the endpoint was disabled, if those events occurred within the last two days.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="event-types">
+    <h2>Event Types</h2>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="docket-alerts">
+    <h3>Docket Alert Events</h3>
+    <p>If you wish to receive events when particular dockets are updated in CourtListener, you must first “subscribe” to dockets.</p>
+    <p>A docket subscription can be created in one of three ways:</p>
+    <ol class="space-y-4">
+      <li><strong>For normal users</strong>, the best way is <a class="underline" href="{% url 'alert_help' %}#recap-alerts">via the CourtListener website itself</a>.</li>
+      <li><strong>For servers</strong>, the best way is to use the <a class="underline" href="{% url 'alert_api_help' %}#dockets">Docket Alert API</a>.
+        <p>For example, this shell code searches for the <a class="underline" href="{% url 'view_docket' '64911367' 'trump-v-united-states' %}">Trump Mar-A-Lago</a> case and then subscribes your account to it:</p>
+        <c-code>curl --silent \
+  --url '{% get_full_host %}{% url "search-list" version="v3" %}?type=d&docket_number=22-cv-81294&case_name=trump' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' | \
+jq '.results[0].docket_id' | \
+xargs -I % curl -X POST \
+  --url 'https://www.courtlistener.com/api/rest/v3/docket-alerts/' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'docket=%'</c-code>
+      </li>
+      <li><strong>For users</strong> of <a class="underline" href="{% url 'recap_email_help' %}">@recap.email</a>, the best way to subscribe to a case is to have <a class="underline" href="{% url 'view_recap_email' %}">auto-subscribe turned on in your settings</a>.
+        <p>When auto-subscribe is on, you will automatically be subscribed to cases when we receive your PACER notifications for them. For users that wish to subscribe to all the cases for which they get PACER notifications, this is usually the best way to do so.</p>
+      </li>
+    </ol>
+    <p>Once subscribed to a case, we will begin POSTing events to your Docket Alert webhook endpoint whenever that case gets new filings.</p>
+    <p>The docket alert event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>. <code>payload</code> has a key for new filings that is called <code>results</code>.</p>
+    <p>The shape of the data is thus:</p>
+    <c-code>
+{
+  "payload": {
+    "results": [...]
+  },
+  "webhook": {...}
+}
+    </c-code>
+    <p>The <code>results</code> key is based on the <a class="underline" href="{% url 'pacer_api_help' %}#docket-entry-endpoint">Docket Entry API</a>. It has all the same fields except for the <code>resource_uri</code> and <code>tags</code> fields, which are omitted, and the <code>docket</code> field is an <code>ID</code> instead of a URL. If you already have access to that API, you can <a class="underline" href="{% url "docketentry-detail" version="v3" pk=20615503 %}">see an example object here</a>, and do an HTTP OPTIONS request to get a description of the fields:</p>
+    <c-code>curl -X OPTIONS \
+  --url '{% get_full_host %}{% url "docketentry-list" version="v3" %}' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</c-code>
+    <p>If you do not yet have access to the Docket Entry API, please <a class="underline" href="{% url "contact" %}">let us know</a>. In the meantime, another way to see an example event is via <a class="underline" href="{% url "webhooks_getting_started" %}#testing">the webhook testing tool</a>.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="search-alerts">
+      <h3>Search Alert Events</h3>
+      <p><a class="underline" href="{% url "alert_help" %}#search-alerts">Search alerts in CourtListener</a> allow you to subscribe to a particular query so that you are sent a webhook event whenever it has new results. For example, you can use search alerts to get a notification whenever a case is cited or whenever a particular keyword appears in a legal decision.</p>
+      <p>To get search alert events, begin by subscribing to particular queries in CourtListener. This can be done in one of two ways:</p>
+      <ol class="space-y-2">
+          <li><strong>For normal users</strong>, subscribe to a query <a class="underline" href="{% url 'alert_help' %}#search-alerts">via the CourtListener website itself</a>.</li>
+          <li>
+              <p><strong>For servers</strong>, the best way is to use the <a class="underline" href="{% url 'alert_api_help' %}#search">Search Alert API</a>.</p>
+              <p>For example, this shell code creates a Search Alert for new legal decisions mentioning the <a class="underline" href="{% url "view_case" 2812209 "obergefell-v-hodges" %}">Obergefell v. Hodges case</a>:</p>
+              <c-code>curl -X POST \
+  --url {% get_full_host %}{% url "alert-list" version="v3" %} \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'name=My Obergefell Alert' \
+  --data 'query=q=Obergefell+v.+Hodges&type=o&order_by=score+desc&stat_Precedential=on&docket_number=14-556' \
+  --data 'rate=wly'</c-code>
+          </li>
+      </ol>
+      <p>After you’ve created a Search Alert, we’ll send webhook events to your endpoint each time new results are available for your query.</p>
+      <p>The Search Alert event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>. <code>payload</code> has two keys, <code>results</code> that contains the search results and <code>alert</code> for the Search Alert details.</p>
+      <p>The shape of the data is thus:</p>
+      <c-code>
+{
+  "payload": {
+    "results": [...],
+    "alert": {...}
+  },
+  "webhook": {...}
+}
+      </c-code>
+      <p>The <code>results</code> key is based on the Search API endpoint and has all the same fields. Review <a class="underline" href="{% url 'search_api_help' %}">the Search API documentation</a> for details on how it works; it is slightly different than all of our other API endpoints.</p>
+      <p>The <code>alert</code> key is based on the <a class="underline" href="{% url 'alert_api_help' %}#search">Search Alert endpoint</a> and has all the same fields except for the <code>resource_uri</code> field, which is omitted.</p>
+      <p>To get a description of the Search Alert object, do an HTTP <code>OPTIONS</code> request to the API endpoint:</p>
+      <c-code>curl -X OPTIONS \
+  --url '{% get_full_host %}{% url "alert-list" version="v3" %}' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</c-code>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="old-da-alerts-report">
+      <h3>Old Docket Alert Events</h3>
+      <p>If a case stops receiving updates due to being terminated or otherwise dormant, we automatically disable any <a class="underline" href="{% url 'alert_help' %}#recap-alerts">docket alerts</a> that may be configured for it. This helps ease the load on our servers, and helps users in our free tier identify cases that they may wish to stop following.</p>
+      <p>To help our users manage this, we send a weekly email telling our users about any docket alerts they have that will soon be automatically disabled. This allows them to take one of three actions on the alert:</p>
+      <ol class="space-y-2">
+          <li><strong>Do nothing</strong> &mdash; If the user does this, the alert will soon be deleted during the next week's automatic process.</li>
+          <li><strong>Delete the alert</strong> &mdash; The user will immediately stop getting alerts for the case.</li>
+          <li><strong>Re-up the alert</strong> &mdash; This tells us that the user wishes to continue getting alerts for the case and pushes out the automatic disablement by about six months.</li>
+      </ol>
+      <p>By subscribing to this webhook your server will get a notification similar to the weekly email we send to users. At that time, your server can decide whether to continue monitoring stagnant cases (by re-upping them; see below) or let the automatic disablement occur.</p>
+      <p>As with our other events, this webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>. <code>payload</code> has two keys:</p>
+      <ul class="space-y-2">
+          <li><p><code>disabled_alerts</code> (Automatically Disabled Alerts):</p>
+              <p>Contains a list of docket alerts that have been automatically disabled by our system on terminated cases that haven’t had updates for over 180 days. You can re-enable these alerts if they were disabled by mistake.</p>
+          </li>
+          <li><p><code>old_alerts</code> (Old Terminated Cases):</p>
+              <p>Contains a list of docket alerts on terminated cases that were last updated about 180 days ago. These alerts will be disabled during the next week's process if you do not re-up them for another six months.</p>
+          </li>
+      </ul>
+      <p>The shape of the data is thus:</p>
+      <c-code>
+{
+  "payload":{
+    "old_alerts":[
+      {
+        "id":1,
+        "date_created":"2022-09-23T19:53:36.903277-07:00",
+        "date_last_hit":null,
+        "secret_key":"ehT7V9rmnBNIOV6rTMmMH0x6EvxeA0nYXfpN3Ks3",
+        "alert_type":1,
+        "docket":1
+      }
+    ],
+    "disabled_alerts":[...]
+  },
+  "webhook":{...}
+}
+      </c-code>
+      <p><code>old_alerts</code> and <code>disabled_alerts</code> contain a list of docket alert objects based on the <a class="underline" href="{% url 'alert_api_help' %}#dockets">Docket Alerts API</a> and have all the same fields.</p>
+      <h4>Re-upping a docket alert</h4>
+      <p>If a case has been dormant for a long time, and you wish to continue monitoring it, you must re-up the alert. To do this, send an HTTP PATCH request to the <a class="underline" href="{% url 'alert_api_help' %}#dockets">Docket Alerts API</a>:</p>
+      <c-code>curl -X PATCH \
+  --data 'alert_type=1' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}{id}/"</c-code>
+      <p>Doing the above will tell our system that the alert was recently modified and thus should not be disabled for another six months.</p>
+      <p>A similar request can be used to disable any docket alert:</p>
+      <c-code>curl -X PATCH \
+  --data 'alert_type=0' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}{id}/"</c-code>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="recap-fetch">
+    <h3>RECAP Fetch Events</h3>
+    <p>The <a class="underline" href="{% url 'rest_docs' %}#pacer-fetch">RECAP Fetch API</a> lets you use our servers and infrastructure to purchase items on PACER. Your server simply places a <code>POST</code> request to the API. In response, the API provides an ID for your request and your download is enqueued for processing.</p>
+    <p>By listening to this webhook endpoint, your server can monitor your requests and take action when they are complete. This avoids the need to poll the API to check when your request has completed.</p>
+    <p>As with our other events, this webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>.</p>
+    <p>The shape of the data is thus:</p>
+    <c-code>
+{
+  "payload":{...},
+  "webhook":{...}
+}
+    </c-code>
+    <p>The <code>payload</code> key is based on the <a class="underline" href="{% url 'rest_docs' %}#pacer-fetch">RECAP Fetch API</a> endpoint and has all the same fields.</p>
+    <p>To get a description of the <code>payload</code> object, do an HTTP <code>OPTIONS</code> request to the API endpoint:</p>
+    <c-code>curl -X OPTIONS \
+  --url '{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</c-code>
+    <p>After you set up this endpoint, you will be notified whenever one of your fetch requests terminates in success or failure.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="maintenance">
+    <h2>Maintenance Schedule</h2>
+    <p>Major server maintenance is scheduled on Thursday nights from 21:00PT to 23:59PT. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.</p>
+    <p>Bulk processing tasks on our servers can create delays while running. We maintain <a class="underline" href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking these tasks.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="change-log">
+    <h2>Change Log</h2>
+    <ul class="space-y-2">
+      <li><strong>v1</strong> First release</li>
+      <li><strong>v2</strong> - This release introduces support for Case Law Search Alerts results with nested documents.
+        <p>You can now select the webhook version when configuring an endpoint. For most webhook event types, there are no differences between <code>v1</code> and <code>v2</code>, as the payload remains unchanged.</p>
+        <p>In the Search Alert webhook event type, the Oral Arguments search response remains identical between <code>v1</code> and <code>v2</code>.</p>
+        <p>For Case Law {% flag "recap-alerts-active" %}and RECAP{% endflag %} <code>v2</code> now includes nested results, which are based on the new changes introduced in <code>v4</code> of the <a class="underline" href="{% url "search_api_help" version="v4" %}">Search API.</a></p>
+      </li>
+    </ul>
+  </c-layout-with-navigation.section>
+</c-layout-with-navigation>
+{% endblock %}
