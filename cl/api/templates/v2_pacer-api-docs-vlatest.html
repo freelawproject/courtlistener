@@ -62,7 +62,7 @@
     <p><code>{% url "docketentry-list" version=version %}</code></p>
     <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain one or more nested documents. This follows the design on PACER, in which a single row on a docket represents a document with its associated attachments.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
-    <p>To filter to the docket entries for a particular docket use the <code>docket</code> filter:</p>
+    <p>To filter the docket entries for a particular docket use the <code>docket</code> filter:</p>
     <c-code>curl -X GET \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "docketentry-list" version=version %}?docket=4214664"</c-code>
