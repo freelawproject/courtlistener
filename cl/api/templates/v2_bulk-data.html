@@ -1,0 +1,132 @@
+{% extends "new_base.html" %}
+{% load extras static humanize %}
+
+{% block title %}Bulk Legal Data – CourtListener.com{% endblock %}
+{% block og_title %}Bulk Legal Data – CourtListener.com{% endblock %}
+{% block description %}Free legal bulk data for federal and state case law, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
+{% block og_description %}Free legal bulk data for federal and state case law, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#Browse', 'text': 'Browse the Files'},
+    {'href': '#formats', 'text': 'Data Definitions'},
+    {'href': '#schemas', 'text': 'Schema Diagrams', 'children': [
+        {'href': '#opinions-db', 'text': 'Case Law Data'},
+        {'href': '#disclosures', 'text': 'Disclosures Data'},
+        {'href': '#people-db', 'text': 'Judge Data'},
+        {'href': '#audio-db', 'text': 'Oral Argument Data'}
+    ]},
+    {'href': '#odds-and-ends', 'text': 'Odds and Ends', 'children': [
+        {'href': '#schedule', 'text': 'Data Generation Schedule'},
+        {'href': '#contributing', 'text': 'Contributions'},
+        {'href': '#old', 'text': 'Release Notes'},
+        {'href': '#copyright', 'text': 'Copyright'}
+    ]}
+  ]"
+>
+  <c-layout-with-navigation.section id="about">
+    <h1>Bulk Legal Data</h1>
+    <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general the files that are available correspond to the major types of data we have in our database, such as case law, oral arguments, dockets, and judges.</p>
+    <p><a class="underline" href="{% url "contact" %}">Get in touch</a> if you're interested in types of data not provided here.</p>
+    <p>If you have questions about the data, <a class="underline" href="https://github.com/freelawproject/courtlistener/discussions">please use our forum</a> and we'll get back to you as soon as possible.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="Browse">
+    <h2>Browse the Data Files</h2>
+    <p>As they are generated, files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type. Files are snapshots, not deltas.</p>
+    <p><a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/" class="btn-primary">Browse Bulk Data</a></p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="formats">
+    <h2>Data Format and Field Definitions</h2>
+    <p>Files are generated using the PostgreSQL <a class="underline" href="https://www.postgresql.org/docs/current/sql-copy.html"><code>COPY TO</code></a> command. This generates CSV files that correspond with the tables in our database. Files are provided using the CSV output format, in the UTF-8 encoding, with a header row on the top. If you are using PostgreSQL, the easiest way to import these files is to use the <code>COPY FROM</code> command. Details about the CSVs we generate can be found in the <a class="underline" href="https://www.postgresql.org/docs/current/sql-copy.html">COPY documentation</a> or by reading <a class="underline" href="https://github.com/freelawproject/courtlistener/blob/main/scripts/make_bulk_data.sh">the code we use to generate these files</a>. You can import the data using <code>COPY FROM</code> by executing a sql statement like this:</p>
+    <c-code>COPY public.search_opinionscited (id, depth, cited_opinion_id, citing_opinion_id) FROM 'path_to_csv_file.csv' WITH (FORMAT csv, ENCODING utf8, ESCAPE '\', HEADER);</c-code>
+    <p>The SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:</p>
+    <c-code>psql [various connection parameters] < schema.sql</c-code>
+    <p>Field definitions can be found in one of two ways. First, you can <a class="underline" href="https://github.com/freelawproject/courtlistener">browse the CourtListener code base</a>, where all the fields and tables are defined in <code>models.py</code> files. Second, if you send an <code>HTTP OPTIONS</code> request to our <a class="underline" href="{% url "rest_docs" %}">REST API</a>, it will give you field definitions (though the API does not always correspond to the CSV files on a 1-to-1 basis).</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="schemas">
+    <h3>Schema Diagrams</h3>
+    <p>Click for more detail.</p>
+    <div class="flex gap-4 mt-4">
+        <div class="flex-1">
+            <a href="{% static "png/people-model-v3.13.png" %}" target="_blank" title="Click to see details.">
+                <img src="{% static "png/people-model-v3.13-small.png" %}" alt="People model schema diagram" class="rounded-lg shadow-md w-full">
+            </a>
+        </div>
+        <div class="flex-1">
+            <a href="{% static "png/search-model-v3.13.png" %}" target="_blank" title="Click to see details.">
+                <img src="{% static "png/search-model-v3.13-small.png" %}" alt="Search model schema diagram" class="rounded-lg shadow-md w-full">
+            </a>
+        </div>
+    </div>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="opinions-db">
+    <h3>Case Law Data</h3>
+    <p>The following bulk data files are available for our Case Law database. Use <a class="underline" href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/">the browsable interface</a> to get their most recent links:</p>
+    <ul class="space-y-4">
+      <li><strong>Courts</strong> &mdash; This is a dump of court table and contains metadata about the courts we have in our system. Because nearly every data type <em>happens</em> in a court, you'll probably need this table to import any other data type below. We suggest importing it first.</li>
+      <li><strong>Dockets</strong> &mdash; Dockets contain high-level case information like the docket number, case name, etc. This table contains many millions of rows and should be imported before the opinions data below. A docket can have multiple opinion clusters within it, just like a real life case can have multiple opinions and orders.</li>
+      <li><strong>Opinion Clusters and Opinions</strong> &mdash; Clusters serve the purpose of grouping dissenting and concurring opinions together. Each cluster tends to have a lot of metadata about the opinion(s) that it groups together. Opinions hold the text of the opinion as well as a few other bits of metadata. Because of the text, the opinions bulk data file is our largest.</li>
+      <li><strong>Citations Map</strong> &mdash; This is a narrow table that indicates which opinion cited which and how deeply.</li>
+      <li><strong>Parentheticals</strong> &mdash; Parentheticals are short summaries of opinions written by the Court. <a class="underline" href="https://free.law/2022/03/17/summarizing-important-cases">Learn more about them from our blog</a>.</li>
+      <li><strong>Integrated DB</strong> — We regularly import the <a class="underline" href="https://www.fjc.gov/research/idb">FJC Integrated Database</a> into our database, merging it with the data we have.</li>
+    </ul>
+    <p>We have also partnered with the Library Innovation Lab at Harvard Law Library to create <a class="underline" href="https://huggingface.co/datasets/harvard-lil/cold-cases">a dataset on Hugging Face</a> with similar data.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="disclosures">
+    <h3>Financial Disclosure Data</h3>
+    <p>We have built a database of {{ disclosures|intcomma }} financial disclosure documents containing {{ investments|intcomma }} investments. To learn more about this data, please read the <a class="underline" href="{% url "financial_disclosures_api_help" %}">REST API documentation</a> or the <a class="underline" href="{% url "coverage_fds" %}">disclosures coverage page</a>.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="people-db">
+    <h3>Judge Data</h3>
+    <p>Our judge database is described in detail in our <a class="underline" href="{% url "rest_docs" %}">REST API documentation</a>. To learn more about that data, we suggest you read that documentation. Before you can import this data, you will need to import the court data.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="audio-db">
+    <h3>Oral Argument Data</h3>
+    <p>Our database of oral arguments is the largest in the world, but has a very simple structure consisting of only a single table that we export. That said, it relies on our court, judge, and docket data, so before you can import the oral argument data, you will likely want to import those other sources.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="odds-and-ends">
+    <h2>Odds and Ends</h2>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="schedule">
+    <h3>Generation Schedule</h3>
+    <p>As can be seen on the public <a class="underline" href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">CourtListener maintenance calendar</a>, bulk data files are regenerated on the last day of every month beginning at 3AM PST. Generation can take many hours, but in general is expected to conclude before the 1st of each month. Check the date in the filename to be sure you have the most recent data.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="contributing">
+    <h3>Adding Features and Fixing Bugs</h3>
+    <p>Like all Free Law Project initiatives, CourtListener is an open source project. If you are a developer and you notice bugs or missing features, we enthusiastically welcome your contributions <a class="underline" href="https://github.com/freelawproject/courtlistener">on GitHub</a>.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="old">
+    <h3>Release Notes</h3>
+    <p><strong>2025-01-24</strong>: Improved PostgreSQL bulk data export by defaulting to double quotes for quoting instead of backticks, resolving parsing errors. Added the <code>ESCAPE</code> option to handle embedded double quotes, ensuring reliable exports and data integrity. Updated the generated import shell script to include this option.</p>
+    <p><strong>2024-08-07</strong>: Added <code>filepath_pdf_harvard</code> field to OpinionCluster data in bulk exports. This field contains the path to the PDF file from the Harvard Caselaw Access Project for the given case.</p>
+    <p><strong>2024-08-02</strong>: Add new fields to the bulk data files for the Docket object: federal_dn_case_type, federal_dn_office_code, federal_dn_judge_initials_assigned, federal_dn_judge_initials_referred, federal_defendant_number, parent_docket_id.</p>
+    <p><strong>2023-09-26</strong>: Bulk script refactored to make it easier to maintain. Courthouse table added to bulk script. Court appeals_to through table added to bulk script. Bulk script now automatically generates a shell script to load bulk data and stream the script to S3.</p>
+    <p><strong>2023-07-07</strong>: We added the <code>FORCE_QUOTE *</code> option to our export script so that null can be distinguished from blank values. In the past, both appeared in the CSVs as commas with nothing between them (<code>,,</code>). With this change, blanks will use quotes: (<code>,"",</code>), while nulls will remain as before. This should make the <code>COPY TO</code> commands work better. In addition, several missing columns are added to the bulk data to align our exports more closely with our database.</p>
+    <p>This is the third version of our bulk data system. Previous versions were available by jurisdiction, by day, month, or year, and in JSON format corresponding to our REST API. We also previously provided our CiteGeist data file. Each of these features has been removed in an effort to simply the feature. For more information, see <a class="underline" href="https://github.com/freelawproject/courtlistener/issues/285">here (removing day/month/year files)</a> and <a class="underline" href="https://github.com/freelawproject/courtlistener/issues/1983">here (removing the JSON format and switching to PostgreSQL dumps)</a>.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="copyright">
+    <h3>Copyright</h3>
+    <p>Our bulk data files are free of known copyright restrictions.<br/>
+      <a rel="license" href="https://creativecommons.org/publicdomain/mark/1.0/">
+        <img src="{% static "png/cc-pd.png" %}" alt="Public Domain Mark" height="31" width="88"/>
+      </a>
+    </p>
+  </c-layout-with-navigation.section>
+
+</c-layout-with-navigation>
+{% endblock %}
