@@ -817,55 +817,20 @@ def clone_position(
             del position_data[f]
 
         # Prepare values
-        if position_data["date_nominated"]:
-            position_data["date_nominated"] = parse_date(
-                position_data["date_nominated"]
-            )
-
-        if position_data["date_elected"]:
-            position_data["date_elected"] = parse_date(
-                position_data["date_elected"]
-            )
-
-        if position_data["date_recess_appointment"]:
-            position_data["date_recess_appointment"] = parse_date(
-                position_data["date_recess_appointment"]
-            )
-
-        if position_data["date_referred_to_judicial_committee"]:
-            position_data["date_referred_to_judicial_committee"] = parse_date(
-                position_data["date_referred_to_judicial_committee"]
-            )
-
-        if position_data["date_judicial_committee_action"]:
-            position_data["date_judicial_committee_action"] = parse_date(
-                position_data["date_judicial_committee_action"]
-            )
-
-        if position_data["date_hearing"]:
-            position_data["date_hearing"] = parse_date(
-                position_data["date_hearing"]
-            )
-
-        if position_data["date_confirmation"]:
-            position_data["date_confirmation"] = parse_date(
-                position_data["date_confirmation"]
-            )
-
-        if position_data["date_start"]:
-            position_data["date_start"] = parse_date(
-                position_data["date_start"]
-            )
-
-        if position_data["date_termination"]:
-            position_data["date_termination"] = parse_date(
-                position_data["date_termination"]
-            )
-
-        if position_data["date_retirement"]:
-            position_data["date_retirement"] = parse_date(
-                position_data["date_retirement"]
-            )
+        for field in [
+            "date_nominated",
+            "date_elected",
+            "date_recess_appointment",
+            "date_referred_to_judicial_committee",
+            "date_judicial_committee_action",
+            "date_hearing",
+            "date_confirmation",
+            "date_start",
+            "date_termination",
+            "date_retirement",
+        ]:
+            if position_data[field]:
+                position_data[field] = parse_date(position_data[field])
 
         position_data["court"] = (
             clone_court(session, [position_data["court"].get("id")])[0]
