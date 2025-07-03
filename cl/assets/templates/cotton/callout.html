@@ -1,0 +1,10 @@
+{# callout.html #}
+
+<c-vars title="Listen Up!" type="warning" />
+
+<div class="alert alert-{{ type }}">
+    <div>
+        <strong class="font-semibold">{{ title }}</strong>
+        {{ slot }}
+    </div>
+</div>
