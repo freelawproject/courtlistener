@@ -83,35 +83,32 @@
     </ul>
     <p>To order using multiple fields simultaneously, separate the field names with commas. For example, <code>?order_by=recap_sequence_number,entry_number</code> will use the default website order for Docket Entries.</p>
     <p>A few field-level notes:</p>
-    <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">Field</th>
-          <th scope="col">Notes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>entry_number</code></td>
-          <td>
-            <p>In district courts, this field is usually a number between zero and the low thousands (depending on the length of the case).</p>
-            <p class="mt-2">Some appellate courts do not provide this number, in which case we use the internal PACER document ID to populate this field.</p>
-          </td>
-        </tr>
-        <tr>
-          <td><code>description</code></td>
-          <td>This field contains the description of the docket entry, if we have it. A second, shorter description is also available on the document itself.</td>
-        </tr>
-        <tr>
-          <td><code>recap_documents</code></td>
-          <td>This field contains all the documents associated with the docket entry. In general, this is only one or two items, but it can be more in complex litigation. See below for details.</td>
-        </tr>
-        <tr>
-          <td><code>recap_sequence_number</code><br><code>pacer_sequence_number</code></td>
-          <td>Use the RECAP sequence number to sort dockets in your system. It is based on the PACER sequence number when we have it, plus some heuristics to order content as accurately as possible. In rare cases, docket entry numbers are not sequential, and these fields are preferred.</td>
-        </tr>
-      </tbody>
-    </table>
+    <c-data-table
+      safe
+      caption="Field-level notes for Docket Entry object"
+      :columns="[
+        {'label': 'Field', 'field': 'field'},
+        {'label': 'Notes', 'field': 'notes'},
+      ]"
+      :rows="[
+        {
+          'field': '<code>entry_number</code>',
+          'notes': '<p>In district courts, this field is usually a number between zero and the low thousands (depending on the length of the case).</p><p class=mt-2>Some appellate courts do not provide this number, in which case we use the internal PACER document ID to populate this field.</p>'
+        },
+        {
+          'field': '<code>description</code>',
+          'notes': 'This field contains the description of the docket entry, if we have it. A second, shorter description is also available on the document itself.'
+        },
+        {
+          'field': '<code>recap_documents</code>',
+          'notes': 'This field contains all the documents associated with the docket entry. In general, this is only one or two items, but it can be more in complex litigation. See below for details.'
+        },
+        {
+          'field': '<code>recap_sequence_number</code><br><code>pacer_sequence_number</code>',
+          'notes': 'Use the RECAP sequence number to sort dockets in your system. It is based on the PACER sequence number when we have it, plus some heuristics to order content as accurately as possible. In rare cases, docket entry numbers are not sequential, and these fields are preferred.'
+        },
+      ]"
+    ></c-data-table>
     {% if not perms.search.has_recap_api_access %}
       <p class="mt-4">This endpoint is only available to select users. Please <a class="underline" href="{% url "contact" %}">get in touch</a> to access this API.</p>
     {% endif %}
@@ -123,31 +120,17 @@
     <p>Each docket entry contains several documents, which we call <code>RECAP Document</code> objects.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
     <p>A few field-level notes:</p>
-    <table>
-      <thead>
-        <tr>
-          <th scope="col">Field</th>
-          <th scope="col">Notes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>plain_text</code></td>
-          <td>
-            <p>This field contains the extracted text of the document.</p>
-            <p>We use <a class="underline" href="https://free.law/projects/doctor">Doctor</a> to complete this task. If needed, Doctor uses an optimized version of Tesseract to complete OCR.</p>
-            <p>To see whether OCR was used, check the <code>ocr_status</code> field.</p>
-          </td>
-        </tr>
-        <tr>
-          <td><code>filepath_local</code></td>
-          <td>
-            <p>This field contains the path to the binary file if we have it (<code>is_available=True</code>). To use this field, see the <a class="underline" href="{% url "field_api_help" %}#downloads">help article on this topic</a>.</p>
-            <p>The name of this field dates back to when all our files were locally stored on a single server.</p>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    {% with document_table_data='[{"field":"<code>plain_text</code>","notes":"<p>This field contains the extracted text of the document.</p><p>We use <a class=\"underline\" href=\"https://free.law/projects/doctor\">Doctor</a> to complete this task. If needed, Doctor uses an optimized version of Tesseract to complete OCR.</p><p>To see whether OCR was used, check the <code>ocr_status</code> field.</p>"},{"field":"<code>filepath_local</code>","notes":"<p>This field contains the path to the binary file if we have it (<code>is_available=True</code>). To use this field, see the <a class=\"underline\" href=\"/help/api/rest/fields/#downloads\">help article on this topic</a>.</p><p>The name of this field dates back to when all our files were locally stored on a single server.</p>"}]' %}
+    <c-data-table
+      safe
+      caption="Field-level notes for Document object"
+      :columns="[
+        {'label': 'Field', 'field': 'field'},
+        {'label': 'Notes', 'field': 'notes'},
+      ]"
+      :rows="{{ document_table_data|safe }}"
+    ></c-data-table>
+    {% endwith %}
     {% if not perms.search.has_recap_api_access %}
       <p>This endpoint is only available to select users. Please <a class="underline" href="{% url "contact" %}">get in touch</a> to access this API.</p>
     {% endif %}
