@@ -35,7 +35,7 @@
     <p>To learn more about this collection, including the cases it has and how we get new data each day, see <a class="underline" href="{% url "coverage_opinions" %}">our coverage page on the topic</a>.</p>
     <p>This data is organized into a number of objects. An overview of these objects is described in this section, and greater detail is provided for each, below.</p>
     <p>The four most important objects in this data set are courts, dockets, clusters, and opinions. Together, these hold most of the information from a single case:</p>
-    <ul class="list-disc list-inside space-y-4">
+    <ul class="space-y-2">
       <li><code>Court</code> objects hold information about thousands of courts in this country, including their name, abbreviation, founding date, and more. Every docket is joined to a court to indicate where the case was filed.</li>
       <li><code>Docket</code> objects hold metadata about the case like the date it was initiated or terminated, the docket number, and more. Every cluster is joined to a docket.</li>
       <li><code>Cluster</code> objects group together opinions when a panel hears a case and there is more than one decision, such as a dissent, concurrence, etc. Clusters are an abstraction we created. Every opinion is joined to a cluster.</li>
@@ -46,7 +46,7 @@
     <p>For example, you <em>could</em> make the docket number a field of the opinion object. This would be fine until you had more than one opinion in a cluster, or more than one cluster joined to a docket. When that happened, you would wind up repeating the docket number value in each opinion object. Instead, if you make it a field of the docket object, you only have to save it to one place: The docket that binds together the clusters and opinions.</p>
     <p>Another example is the opinion text. You <em>could</em> make it a field of the cluster, say, but, again, that wouldn't work, since it wouldn't be clear which opinion the text was a part of in a case with a dissent, concurrence, and majority opinion.</p>
     <p>There are two other objects in the case law database:</p>
-    <ul class="list-disc list-inside space-y-4">
+    <ul class="space-y-2">
       <li><strong>Citation</strong> objects link together which opinion objects cite each other. For more information, see <a class="underline" href="{% url "citation_api_help" %}">their help page</a>.</li>
       <li><strong>Parenthetical</strong> objects are extracted from the opinion text when a decision explains a citation it relies on as authority. These are not <a class="underline" href="https://github.com/freelawproject/courtlistener/issues/4082">yet</a> available in an API, but are available as bulk data.</li>
     </ul>
@@ -75,7 +75,7 @@
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "opinioncluster-list" version=version %}"</c-code>
     <p>A few notes:</p>
-    <ul class="list-disc list-inside space-y-4">
+    <ul class="space-y-2">
       <li>The <code>id</code> field of the cluster is used in case law URLs on CourtListener.</li>
       <li>The <code>sub_opinions</code> field provides a list of the opinions that are linked to each cluster.</li>
       <li>The <code>citations</code> field will contain a list of parallel citations for the cluster. See the <a class="underline" href="{% url "citation_api_help" %}">citation API</a> for details.</li>
@@ -93,14 +93,14 @@
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "opinion-list" version=version %}"</c-code>
     <p>A few notes:</p>
-    <ul class="list-disc list-inside space-y-4">
+    <ul class="space-y-2">
       <li>The <code>type</code> field indicates whether the item is a concurrence, lead opinion, dissent, etc. The values provided for this field are proceeded by numbers so that if they are sorted, they will also be sorted from highest priority to lowest. The most common type of opinion is a "Combined Opinion" this is what we label any opinion that either cannot be identified as a specific type, or that contains more than one type.</li>
       <li>The <code>download_url</code> field contains the original location where we scraped the decision. Many courts do not maintain <a class="underline" href="https://www.w3.org/Provider/Style/URI.html">Cool URIs</a>, so this field is often unreliable.</li>
       <li>The <code>local_path</code> field contains the path to the binary file for the decision, if we have one. To use it, see the <a class="underline" href="{% url "field_api_help" %}#downloads">help article on this topic</a>.</li>
       <li>The <code>opinions_cited</code> field has a list of other opinions cited by the one you are reviewing.</li>
       <li>The <code>ordering_key</code> field indicates the order of opinions within a cluster. This field is only populated for opinions ingested from Harvard or Columbia sources.</li>
       <li>Each opinion has several text fields that will be populated depending on the cluster's <code>source</code> field. For example, scraped opinions tend not to have great text while those from the Harvard corpus do. The best way to get the text for an opinion is to choose the first populated fields from the list below (from best to worst):
-        <ul class="list-disc list-inside space-y-4 ml-4">
+        <ul class="space-y-2">
           <li><code>html_with_citations</code> is generated by finding citations in the text of the other fields. All items should eventually have this field, though it can be empty initially or if our citation lookup utility fails. In general, this field is used to generate pages on CourtListener.</li>
           <li><code>html_columbia</code> will be populated if we got the content from the Columbia collaboration.</li>
           <li><code>html_lawbox</code> will be populated if we got the content from the Lawbox donation.</li>
@@ -179,7 +179,7 @@
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "opinion-list" version=version %}?cluster__docket__docket_number=23A994"</c-code>
     <p>Docket numbers are not unique, so you'll want to add a court filter too:</p>
-    <ul class="list-disc list-inside space-y-4">
+    <ul class="space-y-2">
       <li>For dockets, add: <code>&amp;court=scotus</code></li>
       <li>For clusters, add: <code>&amp;docket__court=scotus</code></li>
       <li>For opinions, add: <code>&amp;cluster__docket__court=scotus</code></li>
