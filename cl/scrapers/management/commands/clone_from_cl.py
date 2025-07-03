@@ -598,7 +598,9 @@ def clone_docket_entries(
 
         with transaction.atomic():
             # Create docket entry
-            docket_entry = model.objects.create(**docket_entry_data)
+            docket_entry, _ = model.objects.update_or_create(
+                docket_entry_data, id=docket_entry_data.get("id")
+            )
             print(f"Docket entry id: {docket_entry.pk} cloned")
 
             # Clone recap documents
@@ -643,7 +645,9 @@ def clone_recap_documents(
 
         recap_document_data["docket_entry_id"] = docket_entry_id
 
-        recap_document = RECAPDocument.objects.create(**recap_document_data)
+        recap_document, _ = RECAPDocument.objects.update_or_create(
+            recap_document_data, id=recap_document_data.get("id")
+        )
 
         # Create and add tags
         cloned_tags = clone_tag(
