@@ -121,40 +121,40 @@
   <c-layout-with-navigation.section id="type">
     <h3>Setting the Result <code>type</code></h3>
     <p>The most important parameter in this API is <code>type</code>. This parameter sets the type of object you are querying:</p>
-    <table class="w-full text-sm text-left text-greyscale-700 my-4">
-      <thead class="text-xs text-greyscale-900 uppercase bg-greyscale-50">
-        <tr>
-          <th scope="col" class="px-6 py-3">Type</th>
-          <th scope="col" class="px-6 py-3">Definition</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="bg-white border-b">
-          <td class="px-6 py-4"><code>o</code></td>
-          <td class="px-6 py-4">Case law opinion clusters with nested Opinion documents.</td>
-        </tr>
-        <tr class="bg-white border-b">
-          <td class="px-6 py-4"><code>r</code></td>
-          <td class="px-6 py-4">List of Federal cases (dockets) with up to three nested documents. If there are more than three matching documents, the <code>more_docs</code> field for the docket result will be </code>true</code>.</td>
-        </tr>
-        <tr class="bg-white border-b">
-          <td class="px-6 py-4"><code>rd</code></td>
-          <td class="px-6 py-4">Federal filing documents from PACER</td>
-        </tr>
-        <tr class="bg-white border-b">
-          <td class="px-6 py-4"><code>d</code></td>
-          <td class="px-6 py-4">Federal cases (dockets) from PACER</td>
-        </tr>
-        <tr class="bg-white border-b">
-          <td class="px-6 py-4"><code>p</code></td>
-          <td class="px-6 py-4">Judges</td>
-        </tr>
-        <tr class="bg-white">
-          <td class="px-6 py-4"><code>oa</code></td>
-          <td class="px-6 py-4">Oral argument audio files</td>
-        </tr>
-      </tbody>
-    </table>
+      <c-data-table
+      safe
+      caption="Type definitions"
+      :columns="[
+        {'label': 'Type', 'field': 'type'},
+        {'label': 'Definition', 'field': 'definition'},
+      ]"
+      :rows="[
+        {
+          'type': '<code>o</code>',
+          'definition': 'Case law opinion clusters with nested Opinion documents.'
+        },
+        {
+          'type': '<code>r</code>',
+          'definition': 'List of Federal cases (dockets) with up to three nested documents. If there are more than three matching documents, the <code>more_docs</code> field for the docket result will be <code>true</code>.'
+        },
+        {
+          'type': '<code>rd</code>',
+          'definition': 'Federal filing documents from PACER'
+        },
+        {
+          'type': '<code>d</code>',
+          'definition': 'Federal cases (dockets) from PACER'
+        },
+        {
+          'type': '<code>p</code>',
+          'definition': 'Judges'
+        },
+        {
+          'type': '<code>oa</code>',
+          'definition': 'Oral argument audio files'
+        }
+      ]"
+    />
     <p>For example, this query searches case law:</p>
     <pre class="bg-greyscale-50 border border-greyscale-200 rounded-lg p-4 text-sm max-h-[400px] overflow-auto font-mono">{% get_full_host %}/q=foo&type=o</pre>
     <p>And this query searches federal filings in the PACER system:</p>
