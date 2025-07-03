@@ -49,44 +49,44 @@
     <p>Use this API to buy PACER content and add it to CourtListener so that it is available via our website, APIs, <a class="underline" href="{% url "webhooks_docs" %}">webhooks</a>, and <a class="underline" href="{% url "replication_docs" %}">replicated database</a>. This is <a class="underline" href="https://free.law/2019/11/05/pacer-fetch-api">a free API</a>, but it uses your PACER credentials to purchase and download PACER content. You'll still have to pay your PACER bill when it comes.</p>
     <p>Because downloading content from PACER takes time, this API is asynchronous. After you send an HTTP <code>POST</code>, it immediately responds with an ID for the request and places the request in a queue to be downloaded by our scrapers. Most requests are completed within seconds.</p>
     <p>As the request is processed, it will have a status code:</p>
-    <table class = "table">
-      <thead>
-        <tr>
-          <th scope="col">Code</th>
-          <th scope="col">Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>1</code></td>
-          <td>Awaiting processing in queue</td>
-        </tr>
-        <tr">
-          <td><code>2</code></td>
-          <td>Item processed successfully</td>
-        </tr>
-        <tr>
-          <td><code>3</code></td>
-          <td>Item encountered an error while processing</td>
-        </tr>
-        <tr>
-          <td><code>4</code></td>
-          <td>Item is currently being processed</td>
-        </tr>
-        <tr>
-          <td><code>5</code></td>
-          <td>Item failed processing, but will be retried</td>
-        </tr>
-        <tr>
-          <td><code>6</code></td>
-          <td>Item failed validity tests during your POST</td>
-        </tr>
-        <tr>
-          <td><code>7</code></td>
-          <td>There was insufficient metadata to complete the task</td>
-        </tr>
-      </tbody>
-    </table>
+    <c-data-table
+    safe
+    caption="Processing status codes"
+    :columns="[
+      {'label': 'Code', 'field': 'code'},
+      {'label': 'Description', 'field': 'description'},
+    ]"
+    :rows="[
+      {
+        'code': '<code>1</code>',
+        'description': 'Awaiting processing in queue'
+      },
+      {
+        'code': '<code>2</code>',
+        'description': 'Item processed successfully'
+      },
+      {
+        'code': '<code>3</code>',
+        'description': 'Item encountered an error while processing'
+      },
+      {
+        'code': '<code>4</code>',
+        'description': 'Item is currently being processed'
+      },
+      {
+        'code': '<code>5</code>',
+        'description': 'Item failed processing, but will be retried'
+      },
+      {
+        'code': '<code>6</code>',
+        'description': 'Item failed validity tests during your POST'
+      },
+      {
+        'code': '<code>7</code>',
+        'description': 'There was insufficient metadata to complete the task'
+      }
+    ]"
+  />
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="monitoring">
@@ -200,32 +200,28 @@
     <p>This API is used by the RECAP extension and a handful of special partners to upload PACER content to the RECAP Archive. This API is not available to the public. If you have a collection of PACER data you wish to donate to the RECAP Archive so it is permanently available to the public, please <a class="underline" href="{% url "contact" %}">get in touch</a>.</p>
     <p>We describe the process for completing these uploads below, and you can see examples of them in <a class="underline" href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.</p>
     <p>When you make an upload, you create a <code>Processing Queue</code> object in the CourtListener system. This object will be returned in the HTTP response to your upload, so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:</p>
-    <table class = "table">
-      <thead>
-        <tr>
-          <th scope="col">Field</th>
-          <th scope="col">Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>status</code></td>
-          <td>When you upload an item, it is placed into a queue until processing resources are available to merge it into the RECAP Archive. Use this field to determine where in that process your item is. To see the possible values, place an <code>OPTIONS</code> request to this endpoint.</td>
-        </tr>
-        <tr>
-          <td><code>error_message</code></td>
-          <td>This field will provide you information about whether your upload was processed successfully or will explain any errors that occurred. (It's not strictly errors.)</td>
-        </tr>
-        <tr>
-          <td>
-            <code>docket</code><br>
-            <code>docket_entry</code><br>
-            <code>recap_document</code>
-          </td>
-          <td>After an item is successfully processed, these fields will be populated with the IDs of the items that were created or updated. The <code>docket</code> field will be populated for dockets that were created or updated, and all three fields will be populated for uploaded PDFs.</td>
-        </tr>
-      </tbody>
-    </table>
+    <c-data-table
+    safe
+    caption="Upload response fields"
+    :columns="[
+      {'label': 'Field', 'field': 'field'},
+      {'label': 'Description', 'field': 'description'},
+    ]"
+    :rows="[
+      {
+        'field': '<code>status</code>',
+        'description': 'When you upload an item, it is placed into a queue until processing resources are available to merge it into the RECAP Archive. Use this field to determine where in that process your item is. To see the possible values, place an <code>OPTIONS</code> request to this endpoint.'
+      },
+      {
+        'field': '<code>error_message</code>',
+        'description': 'This field will provide you information about whether your upload was processed successfully or will explain any errors that occurred. (It\'s not strictly errors.)'
+      },
+      {
+        'field': '<code>docket</code><br><code>docket_entry</code><br><code>recap_document</code>',
+        'description': 'After an item is successfully processed, these fields will be populated with the IDs of the items that were created or updated. The <code>docket</code> field will be populated for dockets that were created or updated, and all three fields will be populated for uploaded PDFs.'
+      }
+    ]"
+  />
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="global-params">
