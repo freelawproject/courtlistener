@@ -412,6 +412,7 @@ def clone_docket(
         )
         docket_url = f"{domain}{docket_path}"
 
+        docket = None
         try:
             docket = Docket.objects.get(pk=docket_id)
             print(
@@ -419,28 +420,16 @@ def clone_docket(
                 reverse("view_docket", args=[docket.pk, docket.slug]),
             )
             dockets.append(docket)
-
+            # This is duplicated with the new docket case, but it gives us
+            # a chance to not hit the API to get the docket info.
             if add_docket_entries:
                 clone_docket_entries(session, docket.pk)
-
-            if add_audio_files:
-                docket_data = get_json_data(docket_url, session)
-                clone_audio_files(
-                    session, docket_data.get("audio_files", []), docket
-                )
-
-            if add_clusters:
-                docket_data = get_json_data(docket_url, session)
-                cluster_ids = [
-                    c.split("/")[-2] for c in docket_data.get("clusters", [])
-                ]
-                clone_opinion_cluster(session, cluster_ids, True, False)
-
-            continue
+            if not any([add_audio_files, add_clusters]):
+                continue
         except Docket.DoesNotExist:
             pass
 
-        # Create new Docket
+        # Get and clean docket data
         docket_data = get_json_data(docket_url, session)
 
         # Remove unneeded fields
@@ -454,47 +443,47 @@ def clone_docket(
         ]:
             del docket_data[f]
 
+        audio_files = docket_data.pop("audio_files", [])
+        clusters = docket_data.pop("clusters", [])
+
         with transaction.atomic():
-            for field, cloner in (
-                ("court", lambda x: clone_court(session, [x])[0]),
-                ("appeal_from", lambda x: clone_court(session, [x])[0]),
-                (
-                    "assigned_to",
-                    lambda x: clone_person(session, [x], person_positions)[0],
-                ),
-                (
-                    "referred_to",
-                    lambda x: clone_person(session, [x], person_positions)[0],
-                ),
-            ):
-                if docket_data[field]:
-                    docket_data[field] = cloner(
-                        get_id_from_url(docket_data[field])
-                    )
+            if not docket:
+                # Create linked objects and then new docket
+                for field, cloner in (
+                    ("court", lambda x: clone_court(session, [x])[0]),
+                    ("appeal_from", lambda x: clone_court(session, [x])[0]),
+                    (
+                        "assigned_to",
+                        lambda x: clone_person(session, [x], person_positions)[0],
+                    ),
+                    (
+                        "referred_to",
+                        lambda x: clone_person(session, [x], person_positions)[0],
+                    ),
+                ):
+                    if docket_data[field]:
+                        docket_data[field] = cloner(
+                            get_id_from_url(docket_data[field])
+                        )
+                docket = Docket.objects.create(**docket_data)
+                dockets.append(docket)
+                if add_docket_entries:
+                    clone_docket_entries(session, docket.pk)
 
-            audio_files = docket_data.pop("audio_files", [])
-            clusters = docket_data.pop("clusters", [])
+        if add_audio_files:
+            clone_audio_files(session, audio_files, docket)
 
-            docket = Docket.objects.create(**docket_data)
+        if add_clusters:
+            cluster_ids = [c.split("/")[-2] for c in clusters]
+            clone_opinion_cluster(session, cluster_ids, True, False)
 
-            dockets.append(docket)
-
-            if add_audio_files:
-                clone_audio_files(session, audio_files, docket)
-            if add_clusters:
-                cluster_ids = [c.split("/")[-2] for c in clusters]
-                clone_opinion_cluster(session, cluster_ids, True, False)
-
-            if add_docket_entries:
-                clone_docket_entries(session, docket.pk)
-
-            print(
-                "View cloned docket here:",
-                reverse(
-                    "view_docket",
-                    args=[docket_data["id"], docket_data["slug"]],
-                ),
-            )
+        print(
+            "View cloned docket here:",
+            reverse(
+                "view_docket",
+                args=[docket_data["id"], docket_data["slug"]],
+            ),
+        )
 
     return dockets
 
