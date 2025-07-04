@@ -99,6 +99,13 @@ router.register(
 # Prayers
 router.register(r"prayers", favorite_views.PrayerViewSet, basename="prayer")
 
+# Increment events
+router.register(
+    r"increment-event",
+    favorite_views.EventCounterViewset,
+    basename="increment-event",
+)
+
 # Visualizations
 router.register(
     r"visualizations/json", viz_views.JSONViewSet, basename="jsonversion"
