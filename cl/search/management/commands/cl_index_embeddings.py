@@ -1,5 +1,6 @@
 import csv
 import re
+import time
 from pathlib import Path
 
 from celery import chain
@@ -32,6 +33,7 @@ class Command(VerboseCommand):
         self.retrieval_queue = None
         self.indexing_queue = None
         self.batch_size = None
+        self.delay = None
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -86,6 +88,12 @@ class Command(VerboseCommand):
             type=int,
             help="The number of rows in the inventory file.",
         )
+        parser.add_argument(
+            "--delay",
+            type=float,
+            default=1.0,
+            help="How long to wait between scheduled tasks.",
+        )
 
     def maybe_schedule_chunk(
         self,
@@ -109,6 +117,7 @@ class Command(VerboseCommand):
                 index_embeddings.s().set(queue=self.indexing_queue),
             ).apply_async()
             chunk.clear()
+            time.sleep(self.delay)
 
     @staticmethod
     def maybe_log_progress(processed_count: int, opinion_id: int, total: int):
@@ -134,6 +143,7 @@ class Command(VerboseCommand):
         self.retrieval_queue = options["retrieval_queue"]
         self.indexing_queue = options["indexing_queue"]
         self.batch_size = options["batch_size"]
+        self.delay = options["delay"]
         count = options["count"]
         auto_resume = options["auto_resume"]
         start_id = options["start_id"]
