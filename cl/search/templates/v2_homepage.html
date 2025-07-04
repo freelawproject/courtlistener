@@ -32,6 +32,7 @@
 
   {# ACTION BUTTONS #}
   <div class="relative w-full flex flex-row max-w-[1400px] mx-auto">
+    {#  Left arrow button  #}
     <button
       type="button"
       tabindex="-1"
@@ -43,6 +44,7 @@
       {% svg "chevron" class="w-6 h-6 text-greyscale-500 transform rotate-90" %}
     </button>
 
+    {#  Scrollable area  #}
     <div
       x-ref="container"
       x-on:scroll="updateButtons"
@@ -57,90 +59,78 @@
       <p class="sr-only">
         Use left and right arrow keys to scroll through the actions.
       </p>
-      <a
+
+      <c-icon-link
         x-on:focus="scrollIntoView"
         href="https://free.law/about"
         target="_blank"
-        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
         aria-label="Learn about Free Law Project (opens in new tab)"
+        icon="logos/flp_tiny"
       >
-        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-          {% svg "logos/flp_tiny" class="md:w-8 md:h-8 w-6 h-6" %}
-        </div>
-        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">About Free<br>Law Project</span>
-      </a>
-      <a
+        About Free<br>Law Project
+      </c-icon-link>
+
+      <c-icon-link
         x-on:focus="scrollIntoView"
         href="https://donate.free.law/forms/membership"
         target="_blank"
         rel="noopener noreferrer"
-        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
         aria-label="Become a member and donate to Free Law Project (opens in new tab)"
+        icon="money_hand"
       >
-        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-          {% svg "money_hand" class="md:w-8 md:h-8 w-6 h-6" %}
-        </div>
-        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Become a Member</span>
-      </a>
-      <a
+        Become a Member
+      </c-icon-link>
+
+      <c-icon-link
         x-on:focus="scrollIntoView"
         href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp"
         target="_blank"
         rel="noopener noreferrer"
-        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
         aria-label="Subscribe to the Free Law Project newsletter (opens in new tab)"
+        icon="bell_plus"
       >
-        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-          {% svg "bell_plus" class="md:w-8 md:h-8 w-6 h-6" %}
-        </div>
-        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Subscribe to Updates</span>
-      </a>
-      <a
+        Get Our Newsletter
+      </c-icon-link>
+
+      <c-icon-link
         x-on:focus="scrollIntoView"
         href="{% url "alert_help" %}"
-        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
         aria-label="Learn about creating alerts in CourtListener"
+        icon="bell"
       >
-        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-          {% svg "bell" class="md:w-8 md:h-8 w-6 h-6" %}
-        </div>
-        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Create an Alert</span>
-      </a>
-      <a
+        Create an Alert
+      </c-icon-link>
+
+      <c-icon-link
         x-on:focus="scrollIntoView"
         href="{% url "citation_homepage" %}"
-        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
         aria-label="Use our Citation Lookup Tool"
+        icon="court"
       >
-        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-          {% svg "court" class="md:w-8 md:h-8 w-6 h-6" %}
-        </div>
-        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Find a Case</span>
-      </a>
-      <a
+        Find a Citation
+      </c-icon-link>
+
+      <c-icon-link
         x-on:focus="scrollIntoView"
         href="https://free.law/recap"
         target="_blank"
-        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
+        rel="noopener noreferrer"
         aria-label="Learn how to contribute documents using RECAP (opens in new tab)"
+        icon="file_text"
       >
-        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-          {% svg "file_text" class="md:w-8 md:h-8 w-6 h-6" %}
-        </div>
-        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Contribute a Document</span>
-      </a>
-      <a
+        Send&nbsp;us PACER&nbsp;Docs
+      </c-icon-link>
+
+      <c-icon-link
         x-on:focus="scrollIntoView"
         href="{% url "podcasts" %}"
-        class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-10"
+        icon="microphone"
       >
-        <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
-          {% svg "microphone" class="md:w-8 md:h-8 w-6 h-6" %}
-        </div>
-        <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">Create a Podcast</span>
-      </a>
+        Create Custom Podcast
+      </c-icon-link>
     </div>
 
+    {#  Right arrow button  #}
     <button
       type="button"
       tabindex="-1"
