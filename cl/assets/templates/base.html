@@ -497,6 +497,12 @@
 
 </script>
 
+{% if track_events %}
+<input id="event_label" type="hidden" value="{{ event_label }}">
+<script type="text/javascript" src="{% static "js/event-utils.js" %}"></script>
+{% endif %}
+
+
 {# Allows your own scripts in the footer. #}
 {% block footer-scripts %}{% endblock %}
 
