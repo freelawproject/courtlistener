@@ -1,3 +1,5 @@
+import re
+
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from drf_dynamic_fields import DynamicFieldsMixin
@@ -72,3 +74,26 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
                 f"You have reached the maximum number of prayers ({settings.ALLOWED_PRAYER_COUNT}) allowed in the last 24 hours."
             )
         return data
+
+
+class EventCountSerializer(serializers.Serializer):
+    label = serializers.CharField(required=True)
+
+    def validate(self, attrs):
+        label = attrs.get("label")
+        # Define a list of allowed regex patterns for valid labels
+        # Currently supports:
+        # - 'd.<id>:view' format, e.g., 'd.123:view' for docket views
+        valid_pattern = [
+            r"^d\.(\d+):view$",
+        ]
+        # Check if the label matches any of the allowed patterns
+        pattern_checks = [
+            re.match(pattern, label) for pattern in valid_pattern
+        ]
+        # If no pattern matches, raise a validation error
+        if not any(pattern_checks):
+            raise serializers.ValidationError(
+                {"label": "Invalid label format provided."}
+            )
+        return super().validate(attrs)

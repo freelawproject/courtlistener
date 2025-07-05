@@ -49,6 +49,7 @@ from cl.citations.utils import (
     slugify_reporter,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.favorites.decorators import track_view_counter
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
 from cl.favorites.utils import (
@@ -336,6 +337,7 @@ async def fetch_docket_entries(docket):
     return de_list
 
 
+@track_view_counter(tracks="docket", label_format="d.%s:view")
 async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
