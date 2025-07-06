@@ -1,6 +1,5 @@
 import re
 from datetime import datetime
-from pathlib import Path
 from typing import cast
 from urllib.parse import parse_qs, urlparse
 
@@ -124,8 +123,7 @@ class APITestCase(
     ELASTICSEARCH_DISABLED=False,
 )
 class ESIndexTestCase(SerializeMixin, SimpleTestCase):
-    lockfile = __file__ + "-ESIndexTestCase"
-    Path.touch(lockfile, exist_ok=True)
+    lockfile = __file__
 
     @classmethod
     def setUpClass(cls):
