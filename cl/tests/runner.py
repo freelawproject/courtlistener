@@ -67,7 +67,7 @@ class TestRunner(DiscoverRunner):
         # Default buffering on, to hide output
         # This is disabled due to Django bug #36491.
         # See PR #5888 for more details.
-        #parser.set_defaults(buffer=True)
+        # parser.set_defaults(buffer=True)
 
     def setup_databases(self, **kwargs):
         # Force to always delete the database if it exists
