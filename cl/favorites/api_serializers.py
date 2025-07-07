@@ -77,7 +77,7 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
 
 
 class EventCountSerializer(serializers.Serializer):
-    label = serializers.CharField(required=True)
+    label = serializers.CharField(required=True, max_length=255)
 
     def validate(self, attrs):
         label = attrs.get("label")
