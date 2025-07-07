@@ -1,6 +1,4 @@
 document.addEventListener('DOMContentLoaded', async () => {
-  // get the csrf token
-  const token = getCookie('csrftoken');
   const url = '/api/rest/v4/increment-event/';
 
   // Get the event label element
@@ -15,7 +13,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-CSRFToken': token,
     },
     body: JSON.stringify(payload),
   });

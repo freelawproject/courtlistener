@@ -97,6 +97,7 @@ class PrayerViewSet(LoggingMixin, ModelViewSet):
 class EventCounterViewset(CreateModelMixin, GenericViewSet):
     serializer_class = EventCountSerializer
     permission_classes = (permissions.AllowAny,)
+    authentication_classes = []
 
     def create(self, request, *args, **kwargs):
         """
