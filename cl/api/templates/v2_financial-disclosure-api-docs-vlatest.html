@@ -235,27 +235,27 @@
     <p><code>Investment</code> objects contain the field <code>has_inferred_values</code>. This field indicates that we inferred information about an investment based on the layout of the data in the disclosure form.</p>
     <p>For example, an investment could have been bought in Q1, while a dividend was paid out in Q2 before being sold in Q4. Often, after the first entry of the investment, later rows in the table are mostly blank. In this instance, we infer the values.</p>
     <p>The table below gives a brief example where we would infer that the blank cell below the cell for <code>AAPL</code> also refers to <code>AAPL</code>:</p>
-    <table>
-      <thead>
-        <tr>
-          <th scope="col">Description</th>
-          <th scope="col">Date</th>
-          <th scope="col">Type</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>AAPL</td>
-          <td>2020-01-01</td>
-          <td>Bought</td>
-        </tr>
-        <tr>
-          <td>&mdash;</td>
-          <td>2020-02-01</td>
-          <td>Sold</td>
-        </tr>
-      </tbody>
-    </table>
+    <c-data-table
+      safe
+      caption="Example of inferred values in investment data"
+      :columns="[
+        {'label': 'Description', 'field': 'description'},
+        {'label': 'Date', 'field': 'date'},
+        {'label': 'Type', 'field': 'type'},
+      ]"
+      :rows="[
+        {
+          'description': 'AAPL',
+          'date': '2020-01-01',
+          'type': 'Bought',
+        },
+        {
+          'description': '&mdash;',
+          'date': '2020-02-01',
+          'type': 'Sold',
+        },
+      ]"
+    ></c-data-table>
     <p>In this (slightly contrived) example our database would have two rows in the <code>Investment</code> table. The first would be for the purchase of the <code>AAPL</code> stock, and the second would be for the sale of it.</p>
   </c-layout-with-navigation.section>
 
