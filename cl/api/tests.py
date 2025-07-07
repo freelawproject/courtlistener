@@ -49,6 +49,7 @@ from cl.disclosures.api_views import (
     SpouseIncomeViewSet,
 )
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
+from cl.favorites.models import GenericCount
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
@@ -3674,3 +3675,58 @@ class CacheListApiResponseTest(TestCase):
 
         # Confirm the cache key still does not exist after the request
         self.assertFalse(self.cache.has_key(fake_cache_key))
+
+
+class EventCountApiTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Get the versioned URL for the increment-event endpoint
+        cls.increment_event_v4 = reverse(
+            "increment-event-list", kwargs={"version": "v4"}
+        )
+
+    def test_can_validate_label_format(self):
+        """Verify invalid event labels are rejected with a 400 response."""
+        invalid_label = "invalid-label-format"
+        response = self.client.post(
+            self.increment_event_v4, {"label": invalid_label}
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+        data = response.data
+        self.assertEqual(data["label"][0], "Invalid label format provided.")
+
+    def test_can_create_new_events(self):
+        """Verify new events can be created through the API."""
+        label = "d.123:view"
+
+        # Ensure no existing record
+        event_record = GenericCount.objects.filter(label=label)
+        self.assertFalse(event_record.exists())
+
+        # First request — should create the counter with value 0, return it
+        response = self.client.post(self.increment_event_v4, {"label": label})
+        self.assertEqual(response.status_code, HTTPStatus.ACCEPTED)
+
+        data = response.data
+        self.assertEqual(data["label"], label)
+        self.assertEqual(data["value"], 0)
+
+        # Counter should now exist and be 1
+        view_counter = event_record.first()
+        self.assertIsNotNone(view_counter)
+        self.assertEqual(view_counter.value, 1)
+
+    def test_can_increment_exiting_events(self):
+        """Verify existing events can be incremented through the API."""
+        # Create an initial event record
+        label = "d.345:view"
+        event_record = GenericCount.objects.create(label=label, value=3)
+
+        response = self.client.post(self.increment_event_v4, {"label": label})
+        self.assertEqual(response.status_code, HTTPStatus.ACCEPTED)
+
+        # Refresh the event_record object from the database
+        event_record.refresh_from_db()
+        # Assert that the value of the event record has been incremented by 1
+        self.assertEqual(event_record.value, 4)
