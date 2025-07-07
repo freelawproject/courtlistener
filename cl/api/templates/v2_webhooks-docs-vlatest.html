@@ -116,26 +116,66 @@
     <p>The next attempt date and time for a specific event can be found <a class="underline" href="{% url 'view_webhook_logs' 'logs' %}">in your webhook logs</a>.</p>
     <p>As webhooks fail to be delivered, we will send emails to your account to inform you of the issue. Email notifications are sent per webhook endpoint based on the first failing event for that endpoint — Notifications are not sent for every failing event, since that would flood your inbox.</p>
     <p>This table explains the retry and notification schedule for failing events (in minutes):</p>
-    <table class = "table">
-      <thead>
-        <tr>
-          <th scope="col">Retry Count</th>
-          <th scope="col">New Delay</th>
-          <th scope="col">Elapsed</th>
-          <th scope="col">Send Failure<br>Notification Email?</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>Initial Event</td><td>N/A</td><td>0:00</td><td>No</td></tr>
-        <tr><td>1</td><td>0:03</td><td>0:03</td><td>Yes</td></tr>
-        <tr><td>2</td><td>0:09</td><td>0:12</td><td>No</td></tr>
-        <tr><td>3</td><td>0:27</td><td>0:39</td><td>No</td></tr>
-        <tr><td>4</td><td>1:21</td><td>2:00</td><td>No</td></tr>
-        <tr><td>5</td><td>4:03</td><td>6:03</td><td>Yes</td></tr>
-        <tr><td>6</td><td>12:09</td><td>18:12</td><td>No</td></tr>
-        <tr><td>7</td><td>36:27</td><td>54:39</td><td>Yes</td></tr>
-      </tbody>
-    </table>
+    <c-data-table
+      safe
+      caption="Retry and notification schedule for failing webhook events"
+      :columns="[
+        {'label': 'Retry Count', 'field': 'retry_count'},
+        {'label': 'New Delay', 'field': 'new_delay'},
+        {'label': 'Elapsed', 'field': 'elapsed'},
+        {'label': 'Send Failure<br>Notification Email?', 'field': 'notification'},
+      ]"
+      :rows="[
+        {
+          'retry_count': 'Initial Event',
+          'new_delay': 'N/A',
+          'elapsed': '0:00',
+          'notification': 'No',
+        },
+        {
+          'retry_count': '1',
+          'new_delay': '0:03',
+          'elapsed': '0:03',
+          'notification': 'Yes',
+        },
+        {
+          'retry_count': '2',
+          'new_delay': '0:09',
+          'elapsed': '0:12',
+          'notification': 'No',
+        },
+        {
+          'retry_count': '3',
+          'new_delay': '0:27',
+          'elapsed': '0:39',
+          'notification': 'No',
+        },
+        {
+          'retry_count': '4',
+          'new_delay': '1:21',
+          'elapsed': '2:00',
+          'notification': 'No',
+        },
+        {
+          'retry_count': '5',
+          'new_delay': '4:03',
+          'elapsed': '6:03',
+          'notification': 'Yes',
+        },
+        {
+          'retry_count': '6',
+          'new_delay': '12:09',
+          'elapsed': '18:12',
+          'notification': 'No',
+        },
+        {
+          'retry_count': '7',
+          'new_delay': '36:27',
+          'elapsed': '54:39',
+          'notification': 'Yes',
+        },
+      ]"
+    ></c-data-table>
     <p>After a webhook fails eight times, it is disabled in our system and we immediately stop sending it new or undelivered events.</p>
     <p>At that point, you will have received two warning emails about the issue, and a third informing you that the endpoint is disabled. Webhooks can be re-enabled at any time, but will get disabled again if errors continue.</p>
     <p>Fixed webhook endpoints can be re-enabled in the webhooks panel.</p>
