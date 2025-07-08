@@ -273,7 +273,9 @@ class OpinionSearchAPICommonTests(
 
         search_params = {"q": "*", "cited_lt": 100, "cited_gt": 80}
 
-        r = self._test_api_results_count(search_params, 0, "citation_count")
+        r = await self._test_api_results_count(
+            search_params, 0, "citation_count"
+        )
 
     @skip_if_common_tests_skipped
     async def test_citation_ordering_by_citation_count(self) -> None:

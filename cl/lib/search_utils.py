@@ -9,10 +9,11 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
-from django.core.paginator import EmptyPage, Page, PageNotAnInteger
+from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
+from elasticsearch_dsl.response import Response
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 
@@ -355,6 +356,40 @@ def retrieve_cached_search_results(
     return None, cache_key
 
 
+def get_results_from_paginator(
+    paginator: ESPaginator, page_num: int = 1
+) -> Page:
+    """Get results Page from ESPaginator
+
+    :param paginator: The paginator to get results from
+    :param page_num: Page number to request
+    :return: Page object
+    """
+    try:
+        results = paginator.page(page_num)
+    except PageNotAnInteger:
+        results = paginator.page(1)
+    except EmptyPage:
+        results = paginator.page(paginator.num_pages)
+
+    return results
+
+
+def enrich_search_results(results: Page, search_type: str, get_params: dict):
+    """Enrich dataset before returning to user
+
+    :param results: A ESPaginator page object
+    :param search_type: The search type
+    :param get_params: A dictionary of parameters sent in request
+    :return: None
+    """
+    convert_str_date_fields_to_date_objects(results, search_type)
+    merge_courts_from_db(results, search_type)
+    limit_inner_hits(get_params, results, search_type)
+    set_results_highlights(results, search_type)
+    merge_unavailable_fields_on_parent_document(results, search_type)
+
+
 def fetch_and_paginate_results(
     get_params: QueryDict,
     search_query: Search,
@@ -375,29 +410,56 @@ def fetch_and_paginate_results(
     the total number of hits for the child document.
     """
 
-    # Run the query and set up pagination
+    # Get or set default params
+    try:
+        page = int(get_params.get("page", 1))
+    except ValueError:
+        page = 1
+    search_type = get_params.get("type", SEARCH_TYPES.OPINION)
+
+    # Check cache for displaying insights on the Home Page.
     if cache_key is not None:
-        # Check cache for displaying insights on the Home Page.
-        results = cache.get(cache_key)
-        if results is not None:
+        cache_data = cache.get(cache_key)
+        if cache_data is not None:
+            if type(cache_data) is Page:
+                # Handle existing cache entries that still contain the Page object
+                results = cache_data
+
+            elif type(cache_data) is Response:
+                # Create Django paginator for insights as ES metadata is not stored
+                paginator = Paginator(cache_data, page)
+                results = get_results_from_paginator(paginator, page)
+                enrich_search_results(results, search_type, get_params)
+
             return results, 0, False, None, None
 
     # Check micro-cache for all other search requests.
     results_dict, micro_cache_key = retrieve_cached_search_results(get_params)
     if results_dict:
+        if "hits" in results_dict:
+            # Create paginator from ES hits
+            paginator = ESPaginator(
+                results_dict["main_total"], results_dict["hits"], rows_per_page
+            )
+
+            # Get appropriate page
+            results = get_results_from_paginator(paginator, page)
+
+            # Enrich results
+            enrich_search_results(results, search_type, get_params)
+
+        # Handle existing cache entries that still contain the Page object
+        elif "results" in results_dict:
+            results = results_dict["results"]
+
         # Return results and counts. Set query time to 1ms.
         return (
-            results_dict["results"],
+            results,
             1,
             False,
             results_dict["main_total"],
             results_dict["child_total"],
         )
-
-    try:
-        page = int(get_params.get("page", 1))
-    except ValueError:
-        page = 1
 
     # Check pagination depth
     check_pagination_depth(page)
@@ -406,32 +468,25 @@ def fetch_and_paginate_results(
     hits, query_time, error, main_total, child_total = fetch_es_results(
         get_params, search_query, child_docs_count_query, page, rows_per_page
     )
-
     if error:
         return [], query_time, error, main_total, child_total
-    paginator = ESPaginator(main_total, hits, rows_per_page)
-    try:
-        results = paginator.page(page)
-    except PageNotAnInteger:
-        results = paginator.page(1)
-    except EmptyPage:
-        results = paginator.page(paginator.num_pages)
 
-    search_type = get_params.get("type", SEARCH_TYPES.OPINION)
-    # Set highlights in results.
-    convert_str_date_fields_to_date_objects(results, search_type)
-    merge_courts_from_db(results, search_type)
-    limit_inner_hits(get_params, results, search_type)
-    set_results_highlights(results, search_type)
-    merge_unavailable_fields_on_parent_document(results, search_type)
+    # Create paginator from ES hits
+    paginator = ESPaginator(main_total, hits, rows_per_page)
+
+    # Get appropriate page
+    results = get_results_from_paginator(paginator, page)
+
+    # Enrich results
+    enrich_search_results(results, search_type, get_params)
 
     if cache_key is not None:
-        # Cache only Page results for displaying insights on the Home Page.
-        cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
+        # Cache only ES hits for displaying insights on the Home Page.
+        cache.set(cache_key, hits, settings.QUERY_RESULTS_CACHE)
     elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
-        # Cache Page results and counts for all other search requests.
+        # Cache ES hits and counts for all other search requests.
         results_dict = {
-            "results": results,
+            "hits": hits,
             "main_total": main_total,
             "child_total": child_total,
         }
