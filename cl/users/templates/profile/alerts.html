@@ -70,11 +70,11 @@
         <table id="dockets-table" class="table settings-table">
           <thead>
           <tr>
-              <th data-label="Case Name"><a class="no-underline black-link" href="?{% url_replace request 'name' %}">Case Name{% sort_caret request 'name' %}</a></th>
-              <th data-label="Court"><a class="no-underline black-link" href="?{% url_replace request 'court' %}">Court{% sort_caret request 'court' %}</a></th>
-              <th data-label="Docket Number"><a class="no-underline black-link" href="?{% url_replace request 'docket_number' %}">Docket Number{% sort_caret request 'docket_number' %}</a></th>
-              <th data-label="Date Filed"><a class="no-underline black-link" href="?{% url_replace request 'date_filed' %}">Date Filed{% sort_caret request 'date_filed' %}</a></th>
-              <th data-label="Last&nbsp;Hit" colspan="2"><a class="no-underline black-link" href="?{% url_replace request 'hit' %}"> Last&nbsp;Hit{% sort_caret request 'hit' %}</a></th>
+            <th data-label="Case Name"><a class="no-underline black-link" href="?order_by={{ sorting_fields.name.url_param }}">Case Name <i class="gray fa fa-angle-{{ sorting_fields.name.direction }}"></i></a></th>
+            <th data-label="Court"><a class="no-underline black-link" href="?order_by={{ sorting_fields.court.url_param }}">Court <i class="gray fa fa-angle-{{ sorting_fields.court.direction }}"></i></a></th>
+            <th data-label="Docket Number"><a class="no-underline black-link" href="?order_by={{ sorting_fields.docket_number.url_param }}">Docket Number <i class="gray fa fa-angle-{{ sorting_fields.docket_number.direction }}"></i></a></th>
+            <th data-label="Date Filed"><a class="no-underline black-link" href="?order_by={{ sorting_fields.date_filed.url_param }}">Date Filed <i class="gray fa fa-angle-{{ sorting_fields.date_filed.direction }}"></i></a></th>
+            <th data-label="Last Hit"><a class="no-underline black-link" href="?order_by={{ sorting_fields.hit.url_param }}">Last Hit <i class="gray fa fa-angle-{{ sorting_fields.hit.direction }}"></i></a></th>
           </tr>
           </thead>
           <tbody>
