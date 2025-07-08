@@ -85,7 +85,7 @@ class EventCountSerializer(serializers.Serializer):
         # Currently supports:
         # - 'd.<id>:view' format, e.g., 'd.123:view' for docket views
         valid_pattern = [
-            r"^d\.(\d+):view$",
+            r"^d\.(\d{1,10}):view$",
         ]
         # Check if the label matches any of the allowed patterns
         pattern_checks = [
