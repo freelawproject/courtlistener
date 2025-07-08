@@ -3696,6 +3696,15 @@ class EventCountApiTest(TestCase):
         data = response.data
         self.assertEqual(data["label"][0], "Invalid label format provided.")
 
+        more_than_10_digit_label = "d.12345678910:view"
+        response = self.client.post(
+            self.increment_event_v4, {"label": more_than_10_digit_label}
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+        data = response.data
+        self.assertEqual(data["label"][0], "Invalid label format provided.")
+
     def test_can_create_new_events(self):
         """Verify new events can be created through the API."""
         label = "d.123:view"
