@@ -323,7 +323,7 @@ def store_search_api_query(
 
 
 class CachedESSearchResults(TypedDict):
-    results: Page | list # Deprecated. See #5562
+    results: Page | list  # Deprecated. See #5562
     hits: Response | list
     main_total: int | None
     child_total: int | None
