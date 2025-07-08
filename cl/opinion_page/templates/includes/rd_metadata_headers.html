@@ -3,7 +3,7 @@
   {% if rd.description %}{{ rd.description }}
     <span class="gray">&mdash;</span>
   {% endif %}
-    Document <a href="{{ rd.docket_entry.docket.get_absolute_url }}#entry-{{ rd.document_number }}">#{{ rd.document_number }}
+    Document <a href="{{ rd.docket_entry.docket.get_absolute_url }}?de={{ rd.document_number }}#entry-{{ rd.document_number }}">#{{ rd.document_number }}
   </a>
   {% if rd.document_type == rd.ATTACHMENT %}, Attachment #{{ rd.attachment_number }}{% endif %}
 </h3>
