@@ -54,7 +54,7 @@
   <script src="{% static "js/progress-bar.js" %}"></script>
   <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
   {% flag "recap_alert_tooltip_enabled" %}
-  {% if search_form.type.value == SEARCH_TYPES.RECAP and user.is_authenticated %}
+  {% if search_form.type.value == SEARCH_TYPES.RECAP %}
     <script type="text/javascript" src="{% static "js/recap_dismissible_tooltip.js" %}"></script>
   {% endif %}
   {% endflag %}
@@ -230,7 +230,7 @@
                                    title="{% if request.GET.edit_alert %}Edit this alert{% else %}Create new alert{% endif %}"></i>
                                 </span>
                                 {% flag "recap_alert_tooltip_enabled" %}
-                                {% if search_form.type.value == SEARCH_TYPES.RECAP and user.is_authenticated %}
+                                {% if search_form.type.value == SEARCH_TYPES.RECAP %}
                                   <div id="recap-tooltip" class="recap-tooltip">
                                     <div class="flex flex-column align-items-center">
                                       <div class="tooltip-arrow"></div>
