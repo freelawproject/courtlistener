@@ -13,10 +13,7 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import IntegerField, Prefetch, QuerySet
 from django.db.models.functions import Cast
-from django.http import (
-    HttpRequest,
-    HttpResponseRedirect,
-)
+from django.http import HttpRequest, HttpResponseRedirect, QueryDict
 from django.http.response import (
     Http404,
     HttpResponse,
@@ -363,7 +360,7 @@ async def view_docket(
         # Remove de param so it won't continue to clobber other ones
         qd = request.GET.copy()
         del qd["de"]
-        request.GET = qd
+        request.GET = QueryDict(qd.urlencode())
     else:
         form = DocketEntryFilterForm(request.GET, request=request)
         if await sync_to_async(form.is_valid)():
