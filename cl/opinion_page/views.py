@@ -358,7 +358,7 @@ async def view_docket(
                 entry_number_idx = 0
         except ValueError:
             entry_number_idx = 0
-        page = entry_number_idx // entries_per_page + 1
+        page = str(entry_number_idx // entries_per_page + 1)
         form = DocketEntryFilterForm()
         # Remove de param so it won't continue to clobber other ones
         qd = request.GET.copy()
@@ -383,7 +383,7 @@ async def view_docket(
                     "-recap_sequence_number", "-entry_number"
                 )
 
-        page = request.GET.get("page", 1)
+        page = request.GET.get("page", "1")
 
     @sync_to_async
     def paginate_docket_entries(docket_entries, docket_page):
