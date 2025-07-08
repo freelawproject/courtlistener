@@ -340,34 +340,55 @@ async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     sort_order_asc = True
-    form = DocketEntryFilterForm(request.GET, request=request)
+    entries_per_page = 200
     docket, context = await core_docket_data(request, pk)
-
     de_list = await fetch_docket_entries(docket)
 
-    if await sync_to_async(form.is_valid)():
-        cd = form.cleaned_data
+    if de_value := request.GET.get("de"):
+        # Figure out which page the entry is in
+        # This overrides all other parameters
+        entry_number_idx = 0
+        try:
+            entry_number = int(de_value)
+            async for de in de_list:
+                if entry_number == de.entry_number:
+                    break
+                entry_number_idx += 1
+            else:
+                entry_number_idx = 0
+        except ValueError:
+            entry_number_idx = 0
+        page = entry_number_idx // entries_per_page + 1
+        form = DocketEntryFilterForm()
+        # Remove de param so it won't continue to clobber other ones
+        qd = request.GET.copy()
+        del qd["de"]
+        request.GET = qd
+    else:
+        form = DocketEntryFilterForm(request.GET, request=request)
+        if await sync_to_async(form.is_valid)():
+            cd = form.cleaned_data
 
-        if cd.get("entry_gte"):
-            de_list = de_list.filter(entry_number__gte=cd["entry_gte"])
-        if cd.get("entry_lte"):
-            de_list = de_list.filter(entry_number__lte=cd["entry_lte"])
-        if cd.get("filed_after"):
-            de_list = de_list.filter(date_filed__gte=cd["filed_after"])
-        if cd.get("filed_before"):
-            de_list = de_list.filter(date_filed__lte=cd["filed_before"])
-        if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
-            sort_order_asc = False
-            de_list = de_list.order_by(
-                "-recap_sequence_number", "-entry_number"
-            )
+            if cd.get("entry_gte"):
+                de_list = de_list.filter(entry_number__gte=cd["entry_gte"])
+            if cd.get("entry_lte"):
+                de_list = de_list.filter(entry_number__lte=cd["entry_lte"])
+            if cd.get("filed_after"):
+                de_list = de_list.filter(date_filed__gte=cd["filed_after"])
+            if cd.get("filed_before"):
+                de_list = de_list.filter(date_filed__lte=cd["filed_before"])
+            if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
+                sort_order_asc = False
+                de_list = de_list.order_by(
+                    "-recap_sequence_number", "-entry_number"
+                )
 
-    page = request.GET.get("page", 1)
+        page = request.GET.get("page", 1)
 
     @sync_to_async
     def paginate_docket_entries(docket_entries, docket_page):
         return Paginator(
-            docket_entries, 200, orphans=10
+            docket_entries, entries_per_page, orphans=10
         ).get_page(docket_page)
 
     paginated_entries = await paginate_docket_entries(de_list, page)
