@@ -323,7 +323,8 @@ def store_search_api_query(
 
 
 class CachedESSearchResults(TypedDict):
-    results: Page | list
+    results: Page | list # Deprecated. See #5562
+    hits: Response | list
     main_total: int | None
     child_total: int | None
 
@@ -336,7 +337,7 @@ def retrieve_cached_search_results(
 
     :param get_params: The GET parameters provided by the user.
     :return: A two-tuple containing either the cached search results and the
-    cache key based ona prefix and the get parameters, or None and the cache key
+    cache key based on a prefix and the get parameters, or None and the cache key
     if no cached results were found.
     """
 
@@ -357,9 +358,9 @@ def retrieve_cached_search_results(
 
 
 def get_results_from_paginator(
-    paginator: ESPaginator, page_num: int = 1
+    paginator: Paginator, page_num: int = 1
 ) -> Page:
-    """Get results Page from ESPaginator
+    """Get results Page from Paginator
 
     :param paginator: The paginator to get results from
     :param page_num: Page number to request
@@ -486,6 +487,7 @@ def fetch_and_paginate_results(
     elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
         # Cache ES hits and counts for all other search requests.
         results_dict = {
+            "results": [],
             "hits": hits,
             "main_total": main_total,
             "child_total": child_total,
