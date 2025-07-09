@@ -1,4 +1,4 @@
-{% load tz %}
+{% load tz %}{% load waffle_tags %}
 <div class="btn-group" style="display:block;">
   <h3 style="margin-top: 10px;">
     {% if rd.description %}{{ rd.description }}
@@ -9,32 +9,46 @@
       #{{ rd.document_number }}</a>{% if rd.document_type == rd.ATTACHMENT %},
       Attachment #{{ rd.attachment_number }}{% endif %}
     {% if attachments %}
-    <button
-      class="btn btn-default btn-lg dropdown-toggle"
-      type="button"
-      data-toggle="dropdown"
-      aria-expanded="false"
-      style="vertical-align:bottom; padding:1px 10px; border-radius:3px;"
-    >
-      <span class="caret"></span>
-    </button>
-    <ul class="dropdown-menu">
-      {% for doc in attachments %}
-        <li {% if doc == rd %}class="disabled"{% endif %}>
-          <a
-            href="{% if doc != rd %}{{ doc.get_absolute_url }}{% else %}#{% endif %}"
-            style="font-size:21px; font-weight:500; padding:3px 18px;"
-            title="Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}"
-          >
-            {% if doc.description %}{{ doc.description }}
-              <span class="gray">&mdash;</span>
-            {% endif %}
-            Document #{{ doc.document_number }}{% if doc.document_type == doc.ATTACHMENT %},
-            Attachment #{{ doc.attachment_number }}{% endif %}
-          </a>
-        </li>
-      {% endfor %}
-    </ul>
+      <button
+        class="btn btn-default btn-lg dropdown-toggle"
+        type="button"
+        data-toggle="dropdown"
+        aria-expanded="false"
+        style="vertical-align:bottom; padding:1px 10px; border-radius:3px;"
+      >
+        <span class="caret"></span>
+      </button>
+
+      <ul class="dropdown-menu">
+        {% for doc in attachments %}
+          <li {% if doc == rd %}class="disabled"{% endif %}>
+            {% flag "alt-attachment-button" %}
+              <a
+                href="{% if doc != rd %}{{ doc.get_absolute_url }}{% else %}#{% endif %}"
+                style="font-size:21px; font-weight:500; padding:3px 18px;"
+                title="{% if doc.description %}{{ doc.description }}{% elif doc.attachment_number%}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ doc.document_number }}{% endif %}"
+              >
+                {% if doc.attachment_number %}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ doc.document_number }}{% endif %}
+                {% if doc.description %}
+                  <span class="gray">&mdash;</span>
+                  {{ doc.description }}
+                {% endif %}
+              </a>
+            {% else %}
+              <a
+                href="{% if doc != rd %}{{ doc.get_absolute_url }}{% else %}#{% endif %}"
+                style="font-size:21px; font-weight:500; padding:3px 18px;"
+                title="{% if doc.attachment_number %}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ doc.document_number }}{% endif %}"
+              >
+                {% if doc.description %}{{ doc.description }}
+                  <span class="gray">&mdash;</span>
+                {% endif %}
+                {% if doc.attachment_number %}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ doc.document_number }}{% endif %}
+              </a>
+            {% endflag %}
+          </li>
+        {% endfor %}
+      </ul>
     {% endif %}
   </h3>
 </div>
