@@ -702,7 +702,11 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                     direction = "-"
                     order_name = "hit"
                 das.sort(key=sorter, reverse=True if direction else False)
-                self.assertEqual(list(c["docket_alerts"]), das)
+                self.assertEqual(
+                    list(c["docket_alerts"]),
+                    das,
+                    f"docket_alerts {order_name}: {[sorter(x) for x in c['docket_alerts']]}",
+                )
 
                 sorting_fields = c["sorting_fields"]
                 for col, vals in sorting_fields.items():
