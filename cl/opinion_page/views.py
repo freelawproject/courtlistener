@@ -344,18 +344,17 @@ async def view_docket(
     if de_value := request.GET.get("de"):
         # Figure out which page the entry is in
         # This overrides all other parameters
-        entry_number_idx = 0
-        try:
-            entry_number = int(de_value)
-            async for de in de_list:
-                if entry_number == de.entry_number:
-                    break
-                entry_number_idx += 1
-            else:
-                entry_number_idx = 0
-        except ValueError:
-            entry_number_idx = 0
-        page = str(entry_number_idx // entries_per_page + 1)
+        de_entries = [x async for x in de_list.filter(entry_number=de_value)]
+        if de_entries:
+            de_entry = de_entries[0]
+            de_entry_idx = await sync_to_async(
+                de_list.filter(
+                    recap_sequence_number__lt=de_entry.recap_sequence_number
+                ).count
+            )()
+            page = str(de_entry_idx // entries_per_page + 1)
+        else:
+            page = "1"
         form = DocketEntryFilterForm()
         # Remove de param so it won't continue to clobber other ones
         qd = request.GET.copy()
