@@ -1,4 +1,4 @@
-{% load extras %}
+{% load extras svg_tags %}
 <div class="sidebar-section">
     <h3><span>Share</span></h3>
 
@@ -12,11 +12,12 @@
            title="Share on Facebook">
             <i class="fa fa-facebook-square fa-lg gray"></i>
         </a>&nbsp;
-        <a href="https://x.com/home?status={% get_full_host %}{{ request.path }}"
-           target="_blank"
-           title="Share on X">
-            <i class="fa fa-twitter-square fa-lg gray"></i>
-        </a>&nbsp;
+        <a
+          target="_blank"
+          title="Share on Bluesky"
+          class="gray"
+          href="https://bsky.app/intent/compose?text={% get_full_host %}{{ request.path }}"
+        >{% svg "logos/bluesky" width="12" height="12" aria_hidden="true" style="vertical-align: -15%;"%}</a>
 
         <div class="form-group">
             <input type="text"

@@ -6,7 +6,7 @@ import json
 import logging
 import uuid
 from collections.abc import Generator
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
@@ -2002,7 +2002,10 @@ def index_embeddings(
         doc_to_update = {
             "_id": ES_CHILD_ID(opinion_id).OPINION,
             "_routing": opinion_instance.cluster_id,
-            "doc": {"embeddings": embeddings["embeddings"]},
+            "doc": {
+                "embeddings": embeddings["embeddings"],
+                "timestamp": datetime.now(UTC),
+            },
         }
         doc_to_update.update(base_doc)
         documents_to_update.append(doc_to_update)

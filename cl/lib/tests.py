@@ -404,6 +404,11 @@ class TestModelHelpers(TestCase):
         # Do we automatically zero-pad short docket numbers?
         self.assertEqual(make_docket_number_core("12-cv-1032"), expected)
 
+        # Case type up to 5 letters.
+        self.assertEqual(
+            make_docket_number_core("4:25-crcor-00029"), "2500029"
+        )
+
         # bankruptcy numbers
         self.assertEqual(make_docket_number_core("12-33112"), "12033112")
         self.assertEqual(make_docket_number_core("12-00001"), "12000001")
