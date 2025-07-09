@@ -362,7 +362,7 @@ async def view_docket(
                 "-recap_sequence_number", "-entry_number"
             )
 
-    page = request.GET.get("page", 1)
+    page = request.GET.get("page", "1")
 
     @sync_to_async
     def paginate_docket_entries(docket_entries, docket_page):
