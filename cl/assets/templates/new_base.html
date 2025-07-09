@@ -1,7 +1,7 @@
 {% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
 {% load tailwind_tags %}{% load component_tags %}
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en" class="motion-safe:scroll-smooth">
 <head>
   <meta charset="utf-8"/>
   <meta http-equiv="Content-Language" content="en"/>
@@ -56,8 +56,6 @@
   <link rel="manifest" href="{% static "json/manifest.json" %}">
   {% endblock %}
 
-  <link href="{% static "css/font-awesome.css" %}" rel="stylesheet">
-
   {% block privacy %}
     {% if private %}
       <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
@@ -95,25 +93,10 @@
   {% render_required_scripts %}
 
   {% if DEBUG %}
-  <script type="text/javascript"
-          src="{% static "js/jquery/jquery-3.4.1.js" %}"></script>
   <script src="{% static 'js/alpine/alpinejscsp@3.14.8.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% else %}
-  <script type="text/javascript"
-          src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
   <script src="{% static 'js/alpine/alpinejscsp@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% endif %}
-
-  <script type="text/javascript" src="{% static "js/base.js" %}"></script>
-  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
-    {# Default values are to ensure JS parsing even if 500 error thrown #}
-    var isMember = {{ user.profile.is_member|yesno:"true,false" }},
-        userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},
-        priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }}),
-        maxFreeDocketAlerts = {{ MAX_FREE_DOCKET_ALERTS|default:0 }},
-        recapBonusAlerts = {{ DOCKET_ALERT_RECAP_BONUS|default:0 }};
-
-  </script>
 
   {# Allows your own scripts in the footer. #}
   {% block footer-scripts %}{% endblock %}
