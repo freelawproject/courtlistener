@@ -69,6 +69,31 @@ from cl.search.models import (
 )
 
 
+class PreparePercolatorQueryMixin:
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+    def prepare_percolator_query(self, instance):
+        from cl.alerts.utils import build_plain_percolator_query
+
+        qd = QueryDict(instance.query.encode(), mutable=True)
+        # For RECAP/Opinions percolator queries, we use
+        # build_plain_percolator_query to build the query. It does not add a
+        # custom function_score, so there is no need to remove the
+        # order_by sorting key as it is ignored.
+        search_form = SearchForm(qd)
+        if not search_form.is_valid():
+            logger.warning(
+                f"The query {qd} associated with Alert ID {instance.pk} is "
+                "invalid and was not indexed."
+            )
+            return None
+
+        cd = search_form.cleaned_data
+        query = build_plain_percolator_query(cd)
+        return query.to_dict() if query else None
+
+
 @parenthetical_group_index.document
 class ParentheticalGroupDocument(CSVSerializableDocumentMixin, Document):
     author_id = fields.IntegerField(attr="opinion.author_id")
@@ -2386,7 +2411,9 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
         return data
 
 
-class RECAPPercolator(DocketDocument, ESRECAPDocument):
+class RECAPPercolator(
+    DocketDocument, ESRECAPDocument, PreparePercolatorQueryMixin
+):
     rate = fields.KeywordField(attr="rate")
     percolator_query = PercolatorField()
 
@@ -2398,30 +2425,10 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
             "analysis": settings.ELASTICSEARCH_DSL["analysis"],
         }
 
-    def prepare_timestamp(self, instance):
-        return datetime.utcnow()
 
-    def prepare_percolator_query(self, instance):
-        from cl.alerts.utils import build_plain_percolator_query
-
-        qd = QueryDict(instance.query.encode(), mutable=True)
-        # For RECAP percolator queries, we use build_plain_percolator_query to
-        # build the query. It does not add a custom function_score, so there is
-        # no need to remove the order_by sorting key as it is ignored.
-        search_form = SearchForm(qd)
-        if not search_form.is_valid():
-            logger.warning(
-                f"The query {qd} associated with Alert ID {instance.pk} is "
-                "invalid and was not indexed."
-            )
-            return None
-
-        cd = search_form.cleaned_data
-        query = build_plain_percolator_query(cd)
-        return query.to_dict() if query else None
-
-
-class OpinionPercolator(OpinionClusterDocument, OpinionDocument):
+class OpinionPercolator(
+    OpinionClusterDocument, OpinionDocument, PreparePercolatorQueryMixin
+):
     """Opinions Percolator index"""
 
     rate = fields.KeywordField(attr="rate")
@@ -2434,28 +2441,6 @@ class OpinionPercolator(OpinionClusterDocument, OpinionDocument):
             "number_of_replicas": settings.ELASTICSEARCH_OPINIONS_ALERTS_NUMBER_OF_REPLICAS,
             "analysis": settings.ELASTICSEARCH_DSL["analysis"],
         }
-
-    def prepare_timestamp(self, instance):
-        return datetime.utcnow()
-
-    def prepare_percolator_query(self, instance):
-        from cl.alerts.utils import build_plain_percolator_query
-
-        qd = QueryDict(instance.query.encode(), mutable=True)
-        # For Opinions percolator queries, we use build_plain_percolator_query to
-        # build the query. It does not add a custom function_score, so there is
-        # no need to remove the order_by sorting key as it is ignored.
-        search_form = SearchForm(qd)
-        if not search_form.is_valid():
-            logger.warning(
-                f"The query {qd} associated with Alert ID {instance.pk} is "
-                "invalid and was not indexed."
-            )
-            return None
-
-        cd = search_form.cleaned_data
-        query = build_plain_percolator_query(cd)
-        return query.to_dict() if query else None
 
 
 class ESOpinionDocumentPlain(OpinionClusterDocument, OpinionDocument):

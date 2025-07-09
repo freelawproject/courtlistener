@@ -37,7 +37,11 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_versions_by_download_url,
 )
 from cl.scrapers.models import UrlHash
-from cl.scrapers.tasks import extract_opinion_content, find_and_merge_versions, process_audio_file
+from cl.scrapers.tasks import (
+    extract_opinion_content,
+    find_and_merge_versions,
+    process_audio_file,
+)
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
     case_names_are_too_different,
