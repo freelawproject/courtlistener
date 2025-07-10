@@ -3,7 +3,7 @@ import io
 import re
 from http import HTTPStatus
 from unittest import mock
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote_plus
 
 import pytz
 import time_machine
@@ -1832,7 +1832,8 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         # Dora remembers this Lissner guy and wonders if he's been involved
         # in any litigation. She types his name into the search box and hits
         # Enter
-        search_box.send_keys("lissner")
+        test_query_box = 'lissner OR "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce rutrumd"'
+        search_box.send_keys(test_query_box)
         search_box.submit()
 
         # The browser brings her to a search engine result page with some
@@ -1842,7 +1843,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
 
         self.assertIn("1 Opinion", result_count.text)
         search_box = get_with_wait(wait, (By.ID, "id_q"))
-        self.assertEqual("lissner", search_box.get_attribute("value"))
+        self.assertEqual(test_query_box, search_box.get_attribute("value"))
 
         facet_sidebar = get_with_wait(wait, (By.ID, "extra-search-fields"))
         self.assertIn("Precedential Status", facet_sidebar.text)
@@ -1870,14 +1871,16 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         btn.click()
 
         # After logging in, she goes to the homepage. From there, she goes back
-        # to where she was, which still has "lissner" in the search box.
+        # to where she was, which still has
+        # 'lissner OR "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce rutrumd"'
+        # in the search box.
         self.browser.get(results_url)
         page_text = get_with_wait(wait, (By.TAG_NAME, "body")).text
         self.assertNotIn(
             "Please enter a correct username and password.", page_text
         )
         search_box = get_with_wait(wait, (By.ID, "id_q"))
-        self.assertEqual("lissner", search_box.get_attribute("value"))
+        self.assertEqual(test_query_box, search_box.get_attribute("value"))
 
         # She now opens the modal for the form for creating an alert
         alert_bell = get_with_wait(
@@ -1894,7 +1897,14 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
         self.assertIn("How often should we notify you?", page_text)
-        get_with_wait(wait, (By.ID, "id_name"))
+        alert_name = get_with_wait(wait, (By.ID, "id_name"))
+        # Confirm the Alert name is truncated to 75 chars.
+        self.assertEqual(
+            len(alert_name.get_attribute("value")),
+            75,
+            "The Alert name doesn't match its size.",
+        )
+
         get_with_wait(wait, (By.ID, "id_rate"))
         btn = get_with_wait(wait, (By.ID, "alertSave"))
         self.assertEqual("Create Alert", btn.text)
@@ -1938,7 +1948,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         # We are taking advantage of the queries done with authenticated and
         # anonymous user to see if SearchQuery collection is working
         lookup = {
-            "get_params": "q=lissner",
+            "get_params": f"q={quote_plus(test_query_box)}",
             "user": None,
             "query_time_ms__gte": 0,
         }
