@@ -1,0 +1,498 @@
+{% extends "new_base.html" %}
+{% load static extras humanize %}
+
+{% block title %}REST API, v4 – CourtListener.com{% endblock %}
+{% block og_title %}REST API, v4 – CourtListener.com{% endblock %}
+
+{% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit.{% endblock %}
+{% block og_description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Introduction'},
+    {'href': '#support', 'text': 'Support'},
+    {'href': '#data-modeling', 'text': 'Data Models'},
+    {'href': '#overview', 'text': 'API Overview', 'children': [
+      {'href': '#permissions', 'text': 'Permissions'},
+      {'href': '#authentication', 'text': 'Authentication'},
+      {'href': '#formats', 'text': 'Serialization Formats'},
+      {'href': '#parsing', 'text': 'Parsing Uploaded Content'},
+      {'href': '#filtering', 'text': 'Filtering'},
+      {'href': '#ordering', 'text': 'Ordering'},
+      {'href': '#counting', 'text': 'Counting'},
+      {'href': '#field-selection', 'text': 'Field Selection'},
+      {'href': '#pagination', 'text': 'Pagination'},
+      {'href': '#rates', 'text': 'Rate Limits'},
+      {'href': '#performance-tips', 'text': 'Performance Tips'},
+      {'href': '#field-details', 'text': 'Advanced Field Details'}
+    ]},
+    {'href': '#apis', 'text': 'The APIs', 'children': [
+      {'href': '#case-law-apis', 'text': 'Case Law'},
+      {'href': '#pacer-apis', 'text': 'PACER Data'},
+      {'href': '#recap-apis', 'text': 'RECAP'},
+      {'href': '#search-api', 'text': 'Search'},
+      {'href': '#judge-apis', 'text': 'Judges'},
+      {'href': '#disclosure-apis', 'text': 'Financial Disclosures'},
+      {'href': '#oral-argument-apis', 'text': 'Oral Arguments'},
+      {'href': '#citation-lookup', 'text': 'Citation Lookup'},
+      {'href': '#citation-network-apis', 'text': 'Citation Network'},
+      {'href': '#alerts', 'text': 'Alerts'},
+      {'href': '#visualizations', 'text': 'Visualizations'}
+    ]},
+    {'href': '#available-jurisdictions', 'text': 'Jurisdictions'},
+    {'href': '#upgrades', 'text': 'Upgrades & Fixes'},
+    {'href': '#maintenance-schedule', 'text': 'Maintenance'},
+    {'href': '#api-change-log', 'text': 'Change Log'},
+    {'href': '#copyright', 'text': 'Copyright'}
+  ]"
+>
+<c-layout-with-navigation.section id="about">
+    <h1>REST API &ndash; v4</h1>
+    <p class="text-xl text-greyscale-700">APIs for developers and researchers that need granular legal data.</p>
+    <p>After more than a decade of development, these APIs are powerful. Our <a class="underline" href="{% url "case_law_api_help" %}">case law API</a> was the first. Our <a class="underline" href="{% url "pacer_api_help" %}">PACER</a> and <a class="underline" href="{% url "oral_argument_api_help" %}">oral argument</a> APIs are the biggest. Our <a class="underline" href="{% url "webhooks_getting_started" %}">webhooks</a> push data to you. Our <a class="underline" href="{% url "citation_lookup_api" %}">citation lookup tool</a> can fight hallucinations in AI tools.</p>
+    <p>Let's get started. To see and browse all the API URLs, click the button below:</p>
+    <p><a href="{% url "api-root" version="v4" %}"
+        target="_blank"
+        class="btn btn-lg btn-primary">Show the APIs</a>
+    </p>
+    <p>We could have also pulled up that same information using curl, with a command like:</p>
+    <c-code disable_copy>curl "{% get_full_host %}{% url "api-root" version="v4" %}"</c-code>
+    <p>Note that when you press the button in your browser, you get an HTML result, but when you run <code>curl</code> you get a JSON object. This is <a class="underline" href="#formats">discussed in more depth below</a>.</p>
+    <div class="alert-warning alert">
+        <strong >Listen Up!</strong> Something else that's curious just happened. You didn't authenticate to the API. To encourage experimentation, many of our APIs are open by default. The biggest gotcha people have is that they forget to enable authentication before deploying their code. Don't make this mistake! Remember to add <a href="#authentication" class="underline">authentication</a>.
+    </div>    
+    <p>The APIs listed in this response can be used to make queries against our database or search engine.</p>
+    <p>To learn more about an API, you can send an <a class="underline" href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/OPTIONS">HTTP OPTIONS</a> request, like so:</p>
+    <c-code disable_copy>curl -X OPTIONS "{% get_full_host %}{% url "api-root" version="v4" %}"</c-code>
+    <p>An <code>OPTIONS</code> request is one of the best ways to understand the API.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="support">
+    <h2>Support</h2>
+    <p>Questions about the APIs can be sent <a class="underline" href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our GitHub Discussions forum</a> or via our <a class="underline" href="{% url "contact" %}">contact form</a>.</p>
+    <p>We prefer that questions be posted in the forum so they can help others. If you are a private organization posting to that forum, we will avoid sharing details about your organization.</p>
+    <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank" class="btn btn-outline">Ask in GitHub Discussions</a>
+    <a href="{% url "contact" %}" target="_blank" class="btn btn-outline">Send us a Private Message</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="data-modeling">
+    <h2>Data Models</h2>
+    <p>The two images below show how the APIs work together. The first image shows the models we use for people, and the second shows the models we use for documents and metadata about them. You can see that these models currently link together on the Docket, Person, and Court tables. (<a class="underline" href="{% static "png/complete-model-v3.13.png" %}" target="_blank">Here's a version of this diagram that shows everything all at once</a>.)</p>
+    <p><a href="{% static "png/people-model-v3.13.png" %}" target="_blank" title="Click to see details.">
+      <img src="{% static "png/people-model-v3.13-small.png" %}" alt="Data model for people" class=" border">
+    </a></p>
+    <p><a href="{% static "png/search-model-v3.13.png" %}" target="_blank" title="Click to see details.">
+      <img src="{% static "png/search-model-v3.13-small.png" %}" alt="Data model for legal documents" class="max-w-full h-auto rounded-lg border">
+    </a></p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="overview">
+    <h2>API Overview</h2>
+    <p>This section explains the general principles of the API. These principals are driven by the features supported by the <a class="underline" href="https://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>. To go deep on any of these sections, we encourage you to check out the documentation there.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="permissions">
+    <h3>Permissions</h3>
+    <p>Some of our APIs are only available to select users. If you need greater access to these APIs, <a class="underline" href="{% url "contact" %}">please get in touch</a>.</p>
+    <p>All other endpoints are available according to the <a class="underline" href="#rates">throttling</a> and <a class="underline" href="#authentication">authentication</a> limitations listed below.</p>
+  </c-layout-with-navigation.section>
+  
+  <div class="p-6 border rounded-lg banner w-full">
+    <h4>Your Authorization Token</h4>
+    {% if user.is_authenticated %}
+      <p>Your permanent token for use with this API is:</p>
+      <p><code>{{ user.auth_token }}</code></p>
+      <p>Do not share your API token. Keep it private like a password.</p>
+      <a href="{% url "view_api_usage" %}">See Your Usage</a>
+    {% else %}
+      <a href="{% url "sign-in" %}?next={{ request.path }}" class="btn btn-lg btn-primary">Sign In To See Your Token</a>
+    {% endif %}
+  </div>
+
+  <c-layout-with-navigation.section id="authentication">
+    
+    <h3>Authentication</h3>
+    
+    <p>Authentication is necessary to monitor and throttle the system, and so we can assist with any errors that may occur.</p>
+    <p>Per our <a class="underline" href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your queries in the API, though we do collect statistical information for system monitoring.</p>
+    <p>There are currently three types of authentication available on the API:</p>
+    <ol class="list-inside space-y-2">
+      <li><a class="underline" href="https://www.django-rest-framework.org/api-guide/authentication/#tokenauthentication">HTTP Token Authentication</a></li>
+      <li><a class="underline" href="https://docs.djangoproject.com/en/dev/topics/auth/" target="_blank">Cookie/Session Authentication</a></li>
+      <li><a class="underline" href="https://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a></li>
+    </ol>
+
+    <p>All of these methods are secure, so the choice of which to use is generally a question of what's most convenient for the context of your work. Our recommendations are:</p>
+    <ul class="list-inside space-y-2">
+        <li>Use Token Authentication for programmatic API access.</li>
+        <li>Use Cookie/Session Authentication if you already have a user's cookie or are developing a system where you can ask the user to log into CourtListener.</li>
+        <li>Use Basic Authentication if that's all your client supports.</li>
+    </ul>
+
+
+    <h4>Token Authentication</h4>
+    <p>To use token authentication, use the <code>Authorization</code> HTTP Header. The key should prefix the <code>Token</code>, with whitespace separating the two strings. For example:</p>
+    <c-code disable_copy>Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</c-code>
+    <div class="alert-warning alert">
+    <p><strong>Careful!</strong> A common mistake is to forget the word "Token" in the header.</p>
+    </div>
+
+    {% if user.is_authenticated %}
+        <p>Your permanent token for use with this API is being used in the examples above and is:</p>
+        <c-code disable_copy>{{ user.auth_token }}</c-code>
+        <p>Do not share this value publicly via code check ins, emails, etc. Treat this value as you would a password. Do not email it to us.</p>
+    {% else %}
+        <p><a href="{% url "sign-in" %}?next={{ request.path }}#token-auth" class="underline">Sign in</a> to see your authorization token in this documentation.</p>
+    {% endif %}
+
+    <h4>Cookie Authentication</h4>
+    <p>To use Cookie Authentication <a class="underline" href="{% url 'sign-in' %}">log into Courtlistener</a> and pass the cookie value using the standard cookie headers.</p>
+    <h4>HTTP Basic Authentication</h4>
+    <p>To do HTTP Basic Authentication using curl, you might do something like this:</p>
+    <c-code disable_copy>curl --user "harvey:your-password" "{% get_full_host %}{% url "opinioncluster-list" version="v4" %}"</c-code>
+
+    <p>You can also do it in your browser with a url like:</p>
+    <c-code disable_copy>{% get_full_host username='harvey' password='your-password' %}{% url "opinioncluster-list" version="v4" %}</c-code>
+
+    <p>But if you're using your browser, <a href="{% url 'sign-in' %}" class="underline">you might as well just log in</a>.</p>
+
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="formats">
+    <h3>Serialization Formats</h3>
+    <p>Requests may be serialized as HTML, JSON, or XML. JSON is the default if no format is specified. The format you wish to receive is requested via the HTTP <code>Accept</code> header.</p>
+    <p>The following media types and parameters can be used:</p>
+    <ul class="list-inside space-y-2">
+      <li><strong>HTML</strong>: The media type for HTML is <code>text/html</code>.</li>
+      <li><strong>JSON</strong>: The media type for JSON is <code>application/json</code>. Providing the <code>indent</code> media type parameter allows clients to set the indenting for the response, for example: <code>Accept: application/json; indent=2</code>.</li>
+      <li><strong>XML</strong>: The media type for XML is <code>application/xml</code>.</li>
+    </ul>
+    <p>By default, browsers send an <code>Accept</code> header similar to:</p>
+    <c-code disable_copy>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</c-code>
+    <p>This states that <code>text/html</code> is the preferred serialization format. The API respects that, returning HTML when requested by a browser and returning JSON when no <code>Accept</code> header is provided, because JSON is the default.</p>
+    <p>If you wish to set the <code>Accept</code> header using a tool like cURL, you can do so using the <code>--header</code> flag:</p>
+    <c-code disable_copy>curl --header "Accept: application/xml" \
+    "{% get_full_host %}{% url "opinioncluster-list" version="v4" %}"</c-code>
+    <p>All data is serialized using the utf-8 charset.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="parsing">
+    <h3>Parsing Uploaded Content</h3>
+    <p>If you are a user that has write access to these APIs (most users do not), you will need to use the <code>Content-Type</code> HTTP header to explicitly set the format of the content you are uploading. The header can be set to any of the values that are available for serialization or to <code>application/x-www-form-urlencoded</code> or <code>multipart/form-data</code>, if you are sending form data.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="filtering">
+    <h3>Filtering</h3>
+    <p>With the exception of the search API, these APIs can be filtered using a technique similar to <a class="underline" href="https://docs.djangoproject.com/en/dev/ref/models/querysets/#field-lookups">Django's field lookups</a>.</p>
+    <p>To see how an endpoint can be filtered, do an <code>OPTIONS</code> request on the API and inspect the <code>filters</code> key in the response.</p>
+    <c-code disable_copy>curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v4" %}" | jq '.filters'</c-code>
+    <p>That returns something like:</p>
+    <c-code disable_copy>{
+  "id": {
+    "type": "NumberRangeFilter",
+    "lookup_types": [
+      "exact",
+      "gte",
+      "gt",
+      "lte",
+      "lt",
+      "range"
+    ]
+  },
+...}</c-code>
+    <p>This means that you can filter dockets using the ID field, and that you can do exact, greater than or equal, greater than, less than or equal, less than, or range filtering.</p>
+    <p>You can use these filters with a double underscore. For example, this gets IDs greater than 500 and less than 1,000:</p>
+    <c-code disable_copy>curl \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v4" %}?id__gt=500&id__lt=1000" | jq '.count'
+499</c-code>
+    <p>It also allows ranges (inclusive):</p>
+    <c-code disable_copy>curl \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v4" %}?id__range=500,1000" | jq '.count'
+501</c-code>
+    <p>Filters can be combined using multiple <code>GET</code> parameters.</p>
+    <p>There are a few special types of filters. The first are <code>Related Filters</code>, which allow you to join filters across APIs. For example, when you are using the docket API, you'll see that it has a filter for the court API:</p>
+    <c-code disable_copy>
+"court": {
+    "type": "RelatedFilter",
+    "lookup_types": "See available filters for 'Courts'"
+}</c-code>
+    <p>This means that you can use any of the court filters on the docket API. If you do an <code>OPTIONS</code> request on the court API, you'll see its filters:</p>
+    <c-code disable_copy>curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "court-list" version="v4" %}" | jq '.filters'</c-code>
+    <p>Again, one of the filters is the ID field, but it only allows exact values on this API:</p>
+    <c-code disable_copy>
+"id": {
+    "type": "CharFilter",
+    "lookup_types": [
+        "exact"
+    ]
+}</c-code>
+    <p>Putting this together, here's how you look up dockets for a particular court:</p>
+    <c-code disable_copy>curl \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v4" %}?court=scotus&id__range=500,1000" | jq '.count'
+36</c-code>
+    <p>This opens up many possibilities. For example, another filter on the <code>Court</code> endpoint is for <code>jurisdictions</code>. To use it, you would use a GET parameter like <code>court__jurisdictions=FD</code>. In this case, the double underscore allows you to join the filter from the other court API to the docket API.</p>
+    <p>If you want to join a filter, you could do something like <code>court__full_name__startswith=district</code>. That would return dockets in courts where the court's name starts with "district".</p>
+    <p><code>RelatedFilters</code> can span many objects. For example, if you want to get all the Supreme Court <code>Opinion</code> objects, you will need to do that with a query such as:</p>
+    <c-code disable_copy>curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cluster__docket__court=scotus"</c-code>
+    <p>This uses the <code>Opinion</code> API to get <code>Opinions</code> that are part of <code>Opinion Clusters</code> that are on <code>Dockets</code> in the <code>Court</code> with the ID of <code>scotus</code>. To understand this data model better, see the <a href="{% url "case_law_api_help" %}" class="underline">case law API documentation</a>.</p>
+    <p>To use date filters, supply dates in <a href="https://en.wikipedia.org/wiki/ISO_8601" target="_blank" class="underline">ISO-8601 format</a>.</p>
+    <p>A final trick that can be used with the filters is the exclusion parameter. Any filter can be converted into an exclusion filter by prepending it with an exclamation mark. For example, this returns <code>Dockets</code> from non-Federal Appellate jurisdictions:</p>
+    <c-code disable_copy>curl "{% get_full_host %}{% url "docket-list" version="v4" %}?court__jurisdiction!=F"</c-code>
+    <p>You can see more examples of filters in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/api/tests.py" target="_blank" class="underline">our automated tests</a>.</p>
+  </c-layout-with-navigation.section>
+  
+  <c-layout-with-navigation.section id="ordering">
+    <h3>Ordering</h3>
+    <p>With the exception of the search API, you can see which fields can be used for ordering, by looking at the <code>ordering</code> key in an <code>OPTIONS</code> request. For example, the <code>Position</code> endpoint contains this:
+    </p>
+    <c-code disable_copy>
+  "ordering": [
+      "id",
+      "date_created",
+      "date_modified",
+      "date_nominated",
+      "date_elected",
+      "date_recess_appointment",
+      "date_referred_to_judicial_committee",
+      "date_judicial_committee_action",
+      "date_hearing",
+      "date_confirmation",
+      "date_start",
+      "date_retirement",
+      "date_termination"
+  ]</c-code>
+    <p>Thus, you can order using any of these fields in conjunction with the <code>order_by</code> parameter.
+    </p>
+    <p>Descending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Positions</code> ordered by the most recently modified, then by the most recently elected:
+    </p>
+    <c-code disable_copy>curl "{% get_full_host %}{% url "position-list" version="v4" %}?order_by=-date_modified,-date_elected"</c-code>
+    <p>Ordering by fields with duplicate values is non-deterministic. If you wish to order by such a field, you should provide a second field as a tie-breaker to consistently order results. For example, ordering by <code>date_filed</code> will not return consistent ordering for items that have the same date, but this can be fixed by ordering by <code>date_filed,id</code>. In that case, if two items have the same <code>date_filed</code> value, the tie will be broken by the <code>id</code> field.
+    </p>
+  </c-layout-with-navigation.section>
+  
+  <c-layout-with-navigation.section id="counting">
+    <h3>Counting</h3>
+    <p>To retrieve the total number of items matching your query without fetching all the data, you can use the <code>count=on</code> parameter. This is useful for verifying filters and understanding the scope of your query results without incurring the overhead of retrieving full datasets.</p>
+    <c-code disable_copy>
+  curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cited_opinion=32239&count=on"
+  
+  {"count": 3302}
+    </c-code>
+    <p>When <code>count=on</code> is specified:</p>
+    <ul class="list-inside space-y-2">
+      <li>The API returns only the <code>count</code> key with the total number of matching items.</li>
+      <li>Pagination parameters like <code>cursor</code> are ignored.</li>
+      <li>The response does not include any result data, which can improve performance for large datasets.</li>
+    </ul>
+    <p>In standard paginated responses, a <code>count</code> key is included with the URL to obtain the total count for your query:</p>
+    <c-code disable_copy>
+  curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cited_opinion=32239"
+  
+  {
+    "count": "https://www.courtlistener.com/api/rest/v4/opinions/?cited_opinion=32239&count=on",
+    "next": "https://www.courtlistener.com/api/rest/v4/opinions/?cited_opinion=32239&cursor=2",
+    "previous": null,
+    "results": [
+      // paginated results
+    ]
+  }
+    </c-code>
+    <p>You can follow this URL to get the total count of items matching your query.</p>
+  </c-layout-with-navigation.section>
+  
+  <c-layout-with-navigation.section id="field-selection">
+    <h3>Field Selection</h3>
+    <p>To save bandwidth and increase serialization performance, fields can be limited by using the <code>fields</code> parameter with a comma-separated list of fields.</p>
+    <p>For example, to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:</p>
+    <c-code disable_copy>
+  curl "{% get_full_host %}{% url "person-list" version="v4" %}?fields=educations,date_modified"
+  {
+    "educations": [
+      {
+        "resource_uri": "https://www.courtlistener.com/api/rest/v4/educations/12856/",
+        "id": 12856,
+        "school": {
+          "resource_uri": "https://www.courtlistener.com/api/rest/v4/schools/4240/",
+          "id": 4240,
+          "is_alias_of": null,
+          "date_created": "2010-06-07T17:00:00-07:00",
+          "date_modified": "2010-06-07T17:00:00-07:00",
+          "name": "University of Maine",
+          "ein": 16000769
+        },
+        "person": "https://www.courtlistener.com/api/rest/v4/people/16214/",
+        "date_created": "2023-03-31T07:15:28.556198-07:00",
+        "date_modified": "2023-03-31T07:15:28.556222-07:00",
+        "degree_level": "jd",
+        "degree_detail": "",
+        "degree_year": 1979
+      }
+    ],
+    "date_modified": "2023-03-31T07:15:28.409594-07:00"
+  },
+  ...
+    </c-code>
+    <p>You can also exclude fields using <code>omit=educations,date_modified</code>. Unfortunately, this cannot currently be used for nested resources.</p>
+  </c-layout-with-navigation.section>
+  
+  <c-layout-with-navigation.section id="pagination">
+    <h3>Pagination</h3>
+    <p>Most APIs can be paginated by using the <code>page</code> GET parameter, but that will be limited to 100 pages of results.</p>
+    <p>As of API v4, deep pagination is generally enabled for requests that are ordered by the <code>id</code>, <code>date_modified</code>, or <code>date_created</code> field. When sorting by these fields, the <code>next</code> and <code>previous</code> keys of the response are how you must paginate results, and the <code>page</code> parameter will not work.
+    </p>
+    <p>Some API endpoints support slightly different fields for deep pagination:</p>
+    <ol class="list-inside space-y-2">
+      <li><code>{% url "pacerfetchqueue-list" version="v4" %}</code> also supports the <code>date_completed</code> field.</li>
+      <li><code>{% url "alert-list" version="v4" %}</code> and <code>{% url "docket-alert-list" version="v4" %}</code> only support the <code>date_created</code> field.</li>
+    </ol>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="rates">
+    <h3>Rate Limits</h3>
+    <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation. Creating more than one account per project, person, or organization is forbidden. If you are in doubt, please contact us before creating multiple accounts.</p>
+    <p>To debug throttling issues:</p>
+    <ol class="list-inside space-y-2">
+      <li>Try Browse the API while logged into the website. If this works and your code fails, it usually means that your token authentication is not configured properly, and your code is getting throttled as an anonymous user, not according to your token.</li>
+      <li>Review your recent API usage by looking in your <a href="{% url "view_api" %}#usage" class="underline">profile</a>, but remember that it will show stats for the browsable API as well.</li>
+      <li>Review the <a href="https://github.com/freelawproject/courtlistener/discussions/1497" class="underline">authentication/throttling tips in our forum</a>.</li>
+    </ol>
+    <p>If, after checking the above, you need your rate limit increased, <a href="{% url "contact" %}" class="underline">please get in touch</a> so we can help.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="performance-tips">
+    <h3>Performance Tips</h3>
+    <p>A few things to consider that may increase your performance:</p>
+    <ol class="">
+      <li>
+        <p>Avoid doing queries like <code>court__id=xyz</code> when you can instead do <code>court=xyz</code>. Doing queries with the extra <code>__id</code> introduces a join that can be expensive.</p>
+      </li>
+      <li>
+        <p>In general, less data is easier and faster to get than more. Could you use a field to filter your result set down to something smaller?</p>
+      </li>
+      <li>
+        <p>When using the <code>search</code> endpoint, smaller result sets are faster. It isn't always possible to tweak your query to return fewer results, but sometimes it is possible to do a more precise query first, thus making a broader query unnecessary. For example, a search for an individual in their expected jurisdiction will be faster than doing it in the entire corpus. This will benefit from profiling in your use case and application.</p>
+      </li>
+    </ol>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="field-details">
+    <h3>Advanced Field Definitions</h3>
+    <p>Placing an HTTP <code>OPTIONS</code> request on an API is the best way to learn about its fields, but some fields require further explanation. Click below to learn about these fields.</p>
+    <p>
+      <a href="{% url "field_api_help" %}" class="btn btn-outline">Learn About Fields</a>
+      </a>
+    </p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="apis">
+    <h2>The APIs</h2>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="case-law-apis">
+    <h3>Case Law APIs</h3>
+    <p>Use this API to build your own collection of case law, complete complex legal research, and more.</p>
+    <a href="{% url "case_law_api_help" %}" class="btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="pacer-apis">
+    <h3>PACER Data APIs</h3>
+    <p>We have almost half a billion PACER-related objects in the RECAP Archive including dockets, entries, documents, parties, and attorneys. Use these APIs to access and understand this data.</p>
+    <a href="{% url "pacer_api_help" %}" class="btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+  
+  <c-layout-with-navigation.section id="recap-apis">
+      <h3>RECAP APIs</h3>
+      <p>Use these APIs to gather data from PACER and to share your PACER data with the public.</p>
+      <a href="{% url "recap_api_help" %}" class="btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="search-api">
+      <h3>Search API</h3>
+      <p>CourtListener allows you to search across hundreds of millions of items with advanced fields and operators. Use this API to automate the CourtListener search engine.</p>
+      <a href="{% url "search_api_help" %}" class="btn btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="judge-apis">
+      <h3>Judge APIs</h3>
+      <p>Use these APIs to query and analyze thousands of federal and state court judges, including their biographical information, political affiliations, education and employment histories, and more.</p>
+      <a href="{% url "judge_api_help" %}" class="btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+  
+  <c-layout-with-navigation.section id="disclosure-apis">
+      <h3>Financial Disclosure APIs</h3>
+      <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have.</p>
+      <p>Use these APIs to work with this information.</p>
+      <a href="{% url "financial_disclosures_api_help" %}" class="btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+  
+  <c-layout-with-navigation.section id="oral-argument-apis">
+      <h3>Oral Argument APIs</h3>
+      <p>CourtListener is home to the largest collection of oral argument recordings on the Internet. Use these APIs to gather and analyze our collection.</p>
+      <a href="{% url "oral_argument_api_help" %}" class="btn btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+  
+  <c-layout-with-navigation.section id="citation-lookup">
+      <h3>Citation Lookup &amp; Verification API</h3>
+      <p>Use this API to look up citations in CourtListener's database of millions of citations.</p>
+      <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.</p>
+      <a href="{% url "citation_lookup_api" %}" class="btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+  
+  <c-layout-with-navigation.section id="citation-network-apis">
+      <h3>Citation Network APIs</h3>
+      <p>Use these APIs to traverse and analyze our network of citations between legal decisions.</p>
+      <a href="{% url "citation_api_help" %}" class="btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+  
+  <c-layout-with-navigation.section id="alerts">
+      <h3>Alert APIs</h3>
+      <p>CourtListener is a scalable system for sending alerts by email or <a href="{% url "webhooks_getting_started" %}" class="underline">webhook</a> based on search queries or for particular cases. Use these APIs to create, modify, list, and delete alerts.</p>
+      <a href="{% url "alert_api_help" %}" class="btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="visualizations">
+      <h3>Visualization APIs</h3>
+      <p>To see and make Supreme Court case visualizations, use these APIs.</p>
+      <a href="{% url "visualization_api_help" %}" class="btn-outline">Learn More</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="available-jurisdictions">
+      <h2>Available Jurisdictions</h2>
+      <p>We currently have <strong>{{ court_count|intcomma }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available, including all abbreviations, can <a class="underline" href="{% url "court_index" %}">be found here</a>.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="upgrades">
+    <h2>Upgrades and Fixes</h2>
+    <p>Like the rest of the CourtListener platform, this API and its documentation are <a href="https://github.com/freelawproject/courtlistener" class="underline">open source</a>. If it lacks functionality that you desire or if you find this documentation lacking, pull requests providing improvements are encouraged. Just get in touch via our <a href="{% url "contact" %}" class="underline">contact form</a> to discuss your ideas. Or, if it's something quick, just go ahead and send us a pull request.</p>
+    <p>Getting this kind support is one of the most rewarding things possible for an organization like ours and is a major goal of <a href="https://free.law" class="underline">Free Law Project</a>. Many of the features you use on CourtListener were built this way. We're building something together.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="maintenance-schedule">
+    <h2>Maintenance Schedule</h2>
+    <p>There is a weekly maintenance window from 21:00-23:59PT on Thursday nights. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.</p>
+    <p>Additionally, we regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles" class="underline">a public calendar</a> for tracking them. You may encounter larger delays while bulk processing jobs are running.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="api-change-log">
+    <h2>API Change Log</h2>
+    <a href="{% url "rest_change_log" %}" class="btn btn-lg btn-primary">View the Change Log</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="copyright">
+    <h2>Copyright</h2>
+    <p>Our data is free of known copyright restrictions.</p>
+    <a rel="license" href="https://creativecommons.org/publicdomain/mark/1.0/">
+      <img src="{% static "png/cc-pd.png" %}" alt="Public Domain Mark" height="31" width="88"/>
+    </a>
+  </c-layout-with-navigation.section>
+</c-layout-with-navigation>
+{% endblock %}
