@@ -364,17 +364,11 @@ async def view_docket(
                 "-recap_sequence_number", "-entry_number"
             )
 
-    page = request.GET.get("page", 1)
+    page = request.GET.get("page", "1")
 
     @sync_to_async
     def paginate_docket_entries(docket_entries, docket_page):
-        paginator = Paginator(docket_entries, 200, orphans=10)
-        try:
-            return paginator.page(docket_page)
-        except PageNotAnInteger:
-            return paginator.page(1)
-        except EmptyPage:
-            return paginator.page(paginator.num_pages)
+        return Paginator(docket_entries, 200, orphans=10).get_page(docket_page)
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
