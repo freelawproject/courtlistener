@@ -53,6 +53,11 @@
 {% block footer-scripts %}
   <script src="{% static "js/progress-bar.js" %}"></script>
   <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
+  {% flag "recap_alert_tooltip_enabled" %}
+  {% if search_form.type.value == SEARCH_TYPES.RECAP %}
+    <script type="text/javascript" src="{% static "js/recap_dismissible_tooltip.js" %}"></script>
+  {% endif %}
+  {% endflag %}
   {% if alerts_context %}
     {{ alerts_context|json_script:"alerts-data" }}
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">
@@ -224,6 +229,27 @@
                                    data-target="#modal-save-alert"
                                    title="{% if request.GET.edit_alert %}Edit this alert{% else %}Create new alert{% endif %}"></i>
                                 </span>
+                                {% flag "recap_alert_tooltip_enabled" %}
+                                {% if search_form.type.value == SEARCH_TYPES.RECAP %}
+                                  <div id="recap-tooltip" class="recap-tooltip">
+                                    <div class="flex flex-column align-items-center">
+                                      <div class="tooltip-arrow"></div>
+                                      <div class="recap-tooltip-body">
+                                        <div class="tooltip-header">
+                                          <span class="text-center">
+                                            <strong>RECAP Search Alerts</strong>
+                                          </span>
+                                          <button id="tooltip-close-btn" class="recap-tooltip-close">&times;</button>
+                                        </div>
+                                        <p>
+                                          Set an alert to get notified when new RECAP data matches your saved search.
+                                          <a href="https://free.law/2025/06/18/recap-search-alerts-for-pacer/">Learn More</a>
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                {% endif %}
+                                {% endflag %}
                               {% endif %}
                             {% endif %}
                             <span class="input-group-btn">
