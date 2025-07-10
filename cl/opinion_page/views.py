@@ -581,7 +581,7 @@ async def make_thumb_if_needed(
             klass=RECAPDocument,
             max_dimension=1068,
         )
-        await rd.arefresh_from_db()
+        await rd.arefresh_from_db(fields=["thumbnail_status", "thumbnail"])
     return rd
 
 
