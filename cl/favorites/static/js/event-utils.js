@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   if (!response.ok) {
-    console.error(' Error when trying to increment count for event ' + event_label.value);
+    console.error(' Error when trying to increment count for event ' + labelElement.value);
     return;
   }
 
