@@ -12,7 +12,13 @@ class AudioSitemap(sitemaps.Sitemap):
     limit = 50_000
 
     def items(self) -> QuerySet:
-        return Audio.objects.filter(blocked=False).order_by("pk")
+        q = (
+            Audio.objects.filter(blocked=False)
+            .select_related("docket")
+            .only("date_modified", "pk", "docket__slug")
+            .order_by("pk")
+        )
+        return q
 
     def lastmod(self, obj: Audio) -> datetime:
         return obj.date_modified
@@ -24,10 +30,16 @@ class BlockedAudioSitemap(sitemaps.Sitemap):
     priority = 0.6
 
     def items(self) -> QuerySet:
-        return Audio.objects.filter(
-            blocked=True,
-            date_blocked__gt=datetime.today() - timedelta(days=30),
-        ).order_by("pk")
+        q = (
+            Audio.objects.filter(
+                blocked=True,
+                date_blocked__gt=datetime.today() - timedelta(days=30),
+            )
+            .select_related("docket")
+            .only("date_modified", "pk", "docket__slug")
+            .order_by("pk")
+        )
+        return q
 
     def lastmod(self, obj: Audio) -> datetime:
         return obj.date_modified
