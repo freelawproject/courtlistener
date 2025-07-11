@@ -271,6 +271,26 @@ class RECAPDocumentFactory(DjangoModelFactory):
             obj.document_number = str(de.entry_number)
 
 
+class RECAPAttachmentFactory(RECAPDocumentFactory):
+    document_type = RECAPDocument.ATTACHMENT
+
+    @classmethod
+    def _fixup(cls, obj):
+        """
+        If an attachment_number wasn't specificed, then set it to the highest
+        for the docket entry.
+        """
+        super()._fixup(obj)
+        if not obj.attachment_number and (de := obj.docket_entry):
+            obj.attachment_number = 1
+            if de.recap_documents.exclude(attachment_number=None).exists():
+                obj.attachment_number += (
+                    de.recap_documents.exclude(attachment_number=None)
+                    .order_by("-attachment_number")
+                    .values_list("attachment_number")[0][0]
+                )
+
+
 class DocketReuseParentMixin(DjangoModelFactory):
     docket = Iterator(Docket.objects.all())
 
