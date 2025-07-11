@@ -228,7 +228,7 @@ class RECAPDocumentFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=750)
     docket_entry = SubFactory(DocketEntryFactory)
     document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
+    pacer_doc_id = Faker("numerify", text="%#####")
 
 
 class DocketReuseParentMixin(DjangoModelFactory):
