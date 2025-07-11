@@ -13,9 +13,8 @@ document.addEventListener('DOMContentLoaded', function () {
     tooltip.style.display = 'block';
   }
 
-  closeBtn.addEventListener('click', (event) => {
+  closeBtn.addEventListener('click', () => {
     tooltip.style.display = 'none';
     localStorage.setItem('recapTooltipDismissed', 'true');
-    event.preventDefault();
   });
 });
