@@ -29,16 +29,6 @@ def mock_read_from_s3(file_path, r):
     return BytesIO(fake_json)
 
 
-def mock_streaming_body(csv_string: str):
-    """Mock a StreamingBody object."""
-
-    class FakeBody(BytesIO):
-        def iter_lines(self, chunk_size=1024):
-            yield from self.getvalue().splitlines()
-
-    return FakeBody(csv_string.encode("utf-8"))
-
-
 class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -169,25 +159,22 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
             f'"com-courtlistener-storage","embeddings/opinions/freelawproject/'
             f'modernbert-embed-base_finetune_512/{opinion_5.pk}.json","2025-06-24T00:00:00.000Z"',
         ]
-        inventory_key = "test_inventory.csv"
-        inventory_rows = len(csv_lines)
-        fake_body = mock_streaming_body("\n".join(csv_lines) + "\n")
-
+        mock_csv_content = "\n".join(csv_lines) + "\n"
         with (
-            mock.patch("boto3.client") as mock_boto_client,
             mock.patch(
                 "cl.search.tasks.AWSMediaStorage.open",
                 side_effect=mock_read_from_s3,
             ),
+            mock.patch("pathlib.Path.exists", return_value=True),
+            mock.patch(
+                "pathlib.Path.open", mock.mock_open(read_data=mock_csv_content)
+            ),
         ):
-            mock_boto_client.return_value.get_object.return_value = {
-                "Body": fake_body
-            }
             call_command(
                 "cl_index_embeddings",
                 batch_size=2,
-                inventory=inventory_key,
-                inventory_rows=inventory_rows,
+                inventory_file="test_inventory.csv",
+                inventory_rows=len(csv_lines),
             )
 
         # Confirm embeddings are indexed.
