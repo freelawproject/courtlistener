@@ -12,6 +12,7 @@ from django.contrib import admin
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.core.paginator import Paginator
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -33,6 +34,10 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
+)
+from cl.lib.search_utils import (
+    enrich_search_results,
+    get_results_from_paginator,
 )
 from cl.lib.test_helpers import (
     RECAPSearchTestCase,
@@ -2679,6 +2684,73 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         for docket in dockets_to_remove:
             docket.delete()
+
+    async def test_get_results_from_paginator(self) -> None:
+        """Assert Paginator Page objects are handled as expected."""
+
+        # Make basic paginator with 50 elements, 10 per page
+        num_items = 50
+        per_page = 10
+        num_pages = num_items // per_page
+        self.assertEqual(num_pages, 5)
+
+        a = [1] * num_items
+        p = Paginator(a, per_page)
+
+        # Default page_num 1
+        r = get_results_from_paginator(p)
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+
+        # Not integer page_num should return first page
+        r = get_results_from_paginator(p, page_num="a")
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+
+        # Higher page number should return last page
+        r = get_results_from_paginator(p, page_num=num_pages + 1)
+        self.assertEqual(r.number, num_pages)
+        self.assertEqual(r.has_previous(), True)
+        self.assertEqual(r.has_next(), False)
+
+        # Empty paginator should return a single empty page
+        p = Paginator([], 1)
+
+        # Default page_num 1
+        r = get_results_from_paginator(p)
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+        self.assertEqual(r.has_next(), False)
+
+        # Not integer page_num should return first page
+        r = get_results_from_paginator(p, page_num="a")
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+        self.assertEqual(r.has_next(), False)
+
+        # Higher page number should return last page
+        r = get_results_from_paginator(p, page_num=2)
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+        self.assertEqual(r.has_next(), False)
+
+    async def test_enrich_search_results(self) -> None:
+        """Assert Paginator Page objects are enriched as expected.
+        Ideally, this would validate each step of the enrichment,
+        but those tests do not appear to exist yet
+        """
+
+        # Create empty paginator
+        paginator = Paginator([], 1)
+        page = paginator.page(1)
+
+        search_type = SEARCH_TYPES.OPINION
+        get_params = {}
+
+        r = enrich_search_results(page, search_type, get_params)
+
+        # Shouldn't be a response
+        self.assertIsNone(r)
 
     @mock.patch("cl.lib.search_utils.fetch_es_results")
     @override_settings(
