@@ -152,15 +152,33 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
             except ResponseNotReady as e:
                 # Threading problem in httplib.
                 raise self.retry(exc=e, countdown=2)
-            except OperationalError:
-                # delay deadlocked tasks, and continue regular process
-                find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-                    (
+            except OperationalError as e:
+                # Delay deadlocked tasks
+                logger.warning(
+                    "Retrying opinion %s due to OperationalError", opinion.id
+                )
+
+                remaining_ids = [o.id for o in opinions[index + 1 :]]
+                if remaining_ids:
+                    # Process remaining ids in a new task
+                    find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
+                        args=(
+                            remaining_ids,
+                            disconnect_pg_signals,
+                            disable_citation_count_update,
+                        ),
+                        countdown=5,
+                    )
+
+                # Retry only the failed opinion, use it to avoid RecursionError being raised when retries are exhausted
+                raise self.retry(
+                    exc=e,
+                    countdown=60,
+                    args=(
                         [opinion.id],
                         disconnect_pg_signals,
                         disable_citation_count_update,
                     ),
-                    countdown=60,
                 )
             except Exception as e:
                 # Send this opinion failure to sentry and continue onward
