@@ -65,12 +65,10 @@
     @apply alert text-yellow-700 bg-yellow-100 border-yellow-500;
   }
 
-   .alert-danger {
+  .alert-danger {
     @apply alert bg-red-100 text-red-700 border-red-500;
   }
-}
 
-@layer components {
   .btn {
     @apply py-2.5 px-3.5 rounded-lg w-fit text-sm font-normal flex gap-1 items-center;
   }
