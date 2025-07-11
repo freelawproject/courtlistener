@@ -169,19 +169,6 @@ class OpinionWithChildrenFactory(OpinionFactory):
     )
 
 
-class CitationWithParentsFactory(DjangoModelFactory):
-    class Meta:
-        model = Citation
-
-    volume = Faker("random_int", min=1, max=100)
-    reporter = "U.S."
-    page = Faker("random_int", min=1, max=100)
-    type = 1
-    cluster = SubFactory(
-        "cl.search.factories.OpinionClusterFactoryWithChildrenAndParents",
-    )
-
-
 class OpinionWithParentsFactory(OpinionFactory):
     cluster = SubFactory(
         "cl.search.factories.OpinionClusterWithParentsFactory",
@@ -260,6 +247,17 @@ class OpinionClusterWithParentsFactory(
     """Make an OpinionCluster with Docket parents"""
 
     pass
+
+
+class CitationWithParentsFactory(DjangoModelFactory):
+    class Meta:
+        model = Citation
+
+    volume = Faker("random_int", min=1, max=100)
+    reporter = "U.S."
+    page = Faker("random_int", min=1, max=100)
+    type = 1
+    cluster = SubFactory(OpinionClusterFactoryWithChildrenAndParents)
 
 
 class DocketEntryFactory(DjangoModelFactory):
