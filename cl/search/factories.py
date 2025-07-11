@@ -230,6 +230,46 @@ class RECAPDocumentFactory(DjangoModelFactory):
     document_type = RECAPDocument.PACER_DOCUMENT
     pacer_doc_id = Faker("numerify", text="%#####")
 
+    @classmethod
+    def _generate(cls, strategy, params):
+        """
+        If document_number is specified, also set the DocketEntry's
+        entry_number.
+        """
+        if "document_number" in params:
+            params["docket_entry__entry_number"] = params["document_number"]
+        return super()._generate(strategy, params)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        obj = model_class(*args, **kwargs)
+        cls._fixup(obj)
+        obj.save()
+        return obj
+
+    @classmethod
+    def _fixup(cls, obj):
+        """
+        If the document has a DocketEntry that is part of a Docket and it
+        doesn't have an entry_number, set it to the highest entry in the docket
+        and then set the document_number to match.
+        """
+        if (
+            not obj.document_number
+            and (de := obj.docket_entry)
+            and (d := de.docket)
+        ):
+            if not de.entry_number:
+                de.entry_number = 1
+                if d.docket_entries.exclude(entry_number=None).exists():
+                    de.entry_number += (
+                        d.docket_entries.exclude(entry_number=None)
+                        .order_by("-entry_number")
+                        .values_list("entry_number")[0][0]
+                    )
+                de.save()
+            obj.document_number = str(de.entry_number)
+
 
 class DocketReuseParentMixin(DjangoModelFactory):
     docket = Iterator(Docket.objects.all())
