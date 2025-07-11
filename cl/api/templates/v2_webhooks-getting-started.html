@@ -1,0 +1,114 @@
+{% extends "new_base.html" %}
+{% load static %}
+{% load extras %}
+
+{% block title %}Getting Started With Webhooks – CourtListener.com{% endblock %}
+{% block og_title %}Getting Started With Webhooks – CourtListener.com{% endblock %}
+{% block description %}A guide to creating and testing your first webhook endpoint to receive real-time event notifications from CourtListener.{% endblock %}
+{% block og_description %}A guide to creating and testing your first webhook endpoint to receive real-time event notifications from CourtListener.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#receive-a-webhook', 'text': 'Receive a Webhook Event'},
+    {'href': '#setup-a-webhook', 'text': 'Set Up a Webhook Endpoint'},
+    {'href': '#testing', 'text': 'Testing an Endpoint'}
+  ]"
+>
+  <c-layout-with-navigation.section id="about">
+    <h1>Getting Started With Webhooks</h1>
+    <p>To create your first webhook, there are a handful of steps you will need to take:</p>
+    <ol class="space-y-2">
+      <li>Creating and receiving webhooks does not require any special access, but sooner or later you will want to have access to the RECAP API endpoints. <a class="underline" href="{% url 'contact' %}">Send us a note with your username and use case</a> to get that process started.</li>
+      <li>You need to <a class="underline" href="#receive-a-webhook">create a URL on your server</a> to receive events from CourtListener.</li>
+      <li>You need to <a class="underline" href="#setup-a-webhook">configure CourtListener to send events</a> to that URL.</li>
+    </ol>
+    <p>Once you have created the URL on your server and linked it up to ours, you can <a class="underline" href="#testing">send test events from CourtListener</a> and you can wait for events to be triggered. As you send test events or events are automatically triggered, they appear in the <a class="underline" href="{% url 'view_webhook_logs' 'logs' %}">logs section of your webhooks panel</a>.</p>
+    <p>Read on to learn more about setting up your first webhook.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="receive-a-webhook">
+    <h2>Receive a Webhook Event on Your Server</h2>
+    <p>Webhook events are nothing more than HTTP POST requests sent to your server. To receive these events, you will need to begin by creating a URL in your application.</p>
+    <p>Some requirements to consider for the URL that you create:</p>
+    <ul class="space-y-2">
+      <li>Our webhook system <a class="underline" href="{% url 'webhooks_docs' %}#security">does not support authentication</a>, so the URL you create should be long and random.</li>
+      <li>Our POST requests will come from one of two static IP addresses, <code>34.210.230.218</code> and <code>54.189.59.91</code>. We recommend only allowing traffic from these addresses.</li>
+      <li>Your URL must receive POST requests and should not accept any other HTTP verbs.</li>
+      <li>If you are using a web framework like Django or Ruby on Rails, the webhook URL will need to be exempted from the cross site request forgery (CSRF) protection system. If this is not done, most web frameworks will block POST requests from outside domains like ours.</li>
+      <li>To avoid <a class="underline" href="{% url 'webhooks_docs' %}#retries">timeout errors and event retries</a>, your application may need to process events asynchronously.</li>
+      <li>Your application must respond to events with a 2xx HTTP status code or else the event will be retried.</li>
+      <li>Your application should use the <a class="underline" href="{% url 'webhooks_docs' %}#headers">Idempotency-Key included in the event headers</a> to ensure that it only processes the event once.</li>
+    </ul>
+    <p>Below are examples of endpoints configured in Flask and Django</p>
+    <p><strong>Flask</strong></p>
+    <c-code>from flask import Flask, request, Response
+app = Flask(__name__)
+
+@app.route("/webhooks/a-long-random-url-here/", methods=["POST"])
+def respond():
+    # Do your event processing.
+    print(request.json)
+    return Response(status=200)
+    </c-code>
+    <p><strong>Django</strong></p>
+    <c-code>from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpRequest, HttpResponse
+
+@csrf_exempt
+def testing_webhook(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        print("Headers: ",request.headers)
+        body = request.body.decode("utf-8")
+        print("Body: ", body)
+
+    return HttpResponse("OK")
+    </c-code>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="setup-a-webhook">
+    <h2>Set Up a Webhook Endpoint in CourtListener</h2>
+    <p>To set up a webhook endpoint, begin by logging into CourtListener and going to the <a class="underline" href="{% url 'view_webhooks' %}">Webhooks panel in your profile</a>:</p>
+    <p><img src="{% static "png/webhooks-panel-v2.png" %}" alt="screenshot of the webhook panel" class="rounded-lg shadow-md w-full"></p>
+    <p>Click the “Add webhook” button and the “Add webhook endpoint” modal pops up:</p>
+    <p><img src="{% static "png/add-webhook-endpoint-v2.png" %}" alt="screenshot of how to add a webhook endpoint" class="rounded-lg shadow-md w-full"></p>
+    <p>Complete the box with the following information:</p>
+    <ol class="space-y-2">
+      <li>The Endpoint URL should be a URL on your server that is long and random. It must be securely served with valid HTTPS.</li>
+      <li>Select the Event Type for which you wish to receive events.</li>
+      <li>Choose the webhook version you wish to set up.
+        <p class="mt-2">We recommend selecting the highest available version for your webhook. Refer to the <a class="underline" href="{% url "webhooks_docs" version="v2" %}#change-log">Change Log</a> for more details on webhook versions.</p>
+        <p class="mt-2">You can only create one Webhook endpoint for each type of event and version. Please get in touch if this limitation causes difficulty for your application.</p>
+      </li>
+      <li>
+        <p>If you are ready to start receiving events at that URL, check the box to enable the webhook.</p>
+        <p>In order to avoid unnecessary errors and retries, we recommend keeping your endpoint disabled until it is live in your application.</p>
+      </li>
+    </ol>
+    <p>Click “Create webhook”</p>
+    <p>Your Webhook endpoint is now created:</p>
+    <p><img src="{% static "png/webhook-disabled-v2.png" %}" alt="screenshot of a disabled webhook endpoint" class="rounded-lg shadow-md w-full"></p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="testing">
+    <h2>Testing a Webhook endpoint.</h2>
+    <p>Getting a webhook working properly can be difficult, so we have a testing tool that will send you a sample webhook event on demand.</p>
+    <p>To use the tool, go to webhooks panel and click the “Test” button for the endpoint you wish to test:</p>
+    <p><img src="{% static "png/webhook-disabled-v2.png" %}" alt="screenshot of a disabled webhook endpoint" class="rounded-lg shadow-md w-full"></p>
+    <p>In the modal that pops up, there are two methods to test your webhook endpoint.</p>
+    <ol class="list-decimal list-inside space-y-4 mt-4">
+      <li><strong>In the “As JSON” tab</strong>, you can ask our server to send a test event to your endpoint. When you click “Send Webhook Test Event” a new event is created with the information shown and is sent to your endpoint. Test events are not retried, but can be seen in the “Test Logs” tab.
+        <p><img src="{% static "png/test-json-webhook-event-v2.png" %}" alt="screenshot of the webhook json test modal" class="rounded-lg shadow-md w-full"></p>
+      </li>
+      <li>
+        <strong>In the “As cURL”</strong> tab, you can copy/paste a curl command that can be used to send a test event to your local dev environment.
+        <p><img src="{% static "png/test-curl-webhook-event-v2.png" %}" alt="screenshot of the webhook curl test modal" class="rounded-lg shadow-md w-full"></p>
+      </li>
+    </ol>
+    <h3>Use <code>ngrok</code> to test your local endpoint.</h3>
+    <p>During the development process, you may want to test your endpoint in your local environment, before moving it to production. To allow CourtListener to reach your development machine over the Internet, you can use a tool like <code>ngrok</code> which will give you a temporary public HTTPS URL that you can use for testing. To learn more about this, <a class="underline" href="https://ngrok.com/docs/getting-started" target="_blank">read ngrok's documentation</a>.</p>
+  </c-layout-with-navigation.section>
+</c-layout-with-navigation>
+{% endblock %}
