@@ -76,6 +76,55 @@ class CourtFactory(DjangoModelFactory):
                     raise (exp)
 
 
+class DocketFactory(DjangoModelFactory):
+    class Meta:
+        model = Docket
+        skip_postgeneration_save = True
+
+    source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
+    court = SubFactory(CourtFactory)
+    appeal_from = SubFactory(CourtFactory)
+    case_name_short = LazyAttribute(
+        lambda self: cnt.make_case_name_short(self.case_name)
+    )
+    case_name = Faker("case_name")
+    case_name_full = Faker("case_name", full=True)
+    pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
+    docket_number = Faker("federal_district_docket_number")
+    slug = Faker("slug")
+    date_argued = Faker("date_object")
+    view_count = 0
+
+    """
+    This hook is necessary to make this factory compatible with the
+    `make_dev_command` by delegating the file creation to the hook, we prevent
+    the model from trying to use our storage settings when the field is not
+    explicitly requested
+    """
+
+    @post_generation
+    def filepath_local(self, create, extracted, **kwargs):
+        """Attaches a stub file to an instance of this factory."""
+        if extracted:
+            self.filepath_local = extracted
+        elif kwargs:
+            # Factory Boy uses the `evaluate` method of each field to calculate
+            # values for object creation. The FileField class only requires the
+            # extra dictionary to create the stub django file.
+            #
+            # Learn more about FactoryBoy's `FileField` class:
+            # https://github.com/FactoryBoy/factory_boy/blob/ac49fb40ec424276c3cd3ca0925ba99a626f05f7/factory/django.py#L249
+            self.filepath_local = FileField().evaluate(None, None, kwargs)
+
+        if create:
+            # Use a Docket queryset to persist filepath_local instead of calling
+            # save(), which can trigger duplicate post_save signals, potentially
+            # causing issues in certain testing scenarios.
+            Docket.objects.filter(pk=self.pk).update(
+                filepath_local=self.filepath_local
+            )
+
+
 class ParentheticalFactory(DjangoModelFactory):
     class Meta:
         model = Parenthetical
@@ -165,7 +214,7 @@ class OpinionClusterFactoryWithChildren(OpinionClusterFactory):
 
 class DocketParentMixin(DjangoModelFactory):
     docket = SubFactory(
-        "cl.search.factories.DocketFactory",
+        DocketFactory,
         # Set the case names on the docket to the ones on this object
         # if it has them. Else generate the case name values.
         case_name=LazyAttribute(
@@ -218,7 +267,7 @@ class DocketEntryFactory(DjangoModelFactory):
         model = DocketEntry
 
     description = Faker("text", max_nb_chars=750)
-    docket = SubFactory("cl.search.factories.DocketFactory")
+    docket = SubFactory(DocketFactory)
 
 
 class RECAPDocumentFactory(DjangoModelFactory):
@@ -268,55 +317,6 @@ class DocketEntryReuseParentsFactory(
     """Make a DocketEntry using existing Dockets as parents"""
 
     pass
-
-
-class DocketFactory(DjangoModelFactory):
-    class Meta:
-        model = Docket
-        skip_postgeneration_save = True
-
-    source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
-    court = SubFactory(CourtFactory)
-    appeal_from = SubFactory(CourtFactory)
-    case_name_short = LazyAttribute(
-        lambda self: cnt.make_case_name_short(self.case_name)
-    )
-    case_name = Faker("case_name")
-    case_name_full = Faker("case_name", full=True)
-    pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
-    docket_number = Faker("federal_district_docket_number")
-    slug = Faker("slug")
-    date_argued = Faker("date_object")
-    view_count = 0
-
-    """
-    This hook is necessary to make this factory compatible with the
-    `make_dev_command` by delegating the file creation to the hook, we prevent
-    the model from trying to use our storage settings when the field is not
-    explicitly requested
-    """
-
-    @post_generation
-    def filepath_local(self, create, extracted, **kwargs):
-        """Attaches a stub file to an instance of this factory."""
-        if extracted:
-            self.filepath_local = extracted
-        elif kwargs:
-            # Factory Boy uses the `evaluate` method of each field to calculate
-            # values for object creation. The FileField class only requires the
-            # extra dictionary to create the stub django file.
-            #
-            # Learn more about FactoryBoy's `FileField` class:
-            # https://github.com/FactoryBoy/factory_boy/blob/ac49fb40ec424276c3cd3ca0925ba99a626f05f7/factory/django.py#L249
-            self.filepath_local = FileField().evaluate(None, None, kwargs)
-
-        if create:
-            # Use a Docket queryset to persist filepath_local instead of calling
-            # save(), which can trigger duplicate post_save signals, potentially
-            # causing issues in certain testing scenarios.
-            Docket.objects.filter(pk=self.pk).update(
-                filepath_local=self.filepath_local
-            )
 
 
 class DocketWithChildrenFactory(DocketFactory):
