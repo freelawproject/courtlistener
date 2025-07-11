@@ -65,7 +65,9 @@ class TestRunner(DiscoverRunner):
         parallel_action.default = parallel_action.const
 
         # Default buffering on, to hide output
-        parser.set_defaults(buffer=True)
+        # This is disabled due to Django bug #36491.
+        # See PR #5888 for more details.
+        # parser.set_defaults(buffer=True)
 
     def setup_databases(self, **kwargs):
         # Force to always delete the database if it exists
