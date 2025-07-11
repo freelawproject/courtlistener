@@ -617,7 +617,6 @@ async def view_recap_document(
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
     """
-    redirect_to_pacer_modal = False
     rds = [
         x
         async for x in RECAPDocument.objects.filter(
@@ -667,6 +666,7 @@ async def view_recap_document(
         raise Http404("No RECAPDocument matches the given query.")
 
     # Check if the user has requested automatic redirection to the document
+    redirect_to_pacer_modal = False
     rd_download_redirect = request.GET.get("redirect_to_download", False)
     redirect_or_modal = request.GET.get("redirect_or_modal", False)
     if rd_download_redirect or redirect_or_modal:
