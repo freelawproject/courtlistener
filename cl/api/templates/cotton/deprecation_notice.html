@@ -1,0 +1,18 @@
+{# deprecation_notice.html #}
+<c-callout type="warning" title="API Deprecation Notice">
+  <p>
+    <strong>Heads up!</strong> Versions 1 and 2 of this API are deprecated as of <strong>January 31, 2016</strong>.
+    Please switch to <a href="{% url "rest_docs" %}" class="underline">the latest API version</a> for the best experience.
+  </p>
+
+  <ul class="ml-6 mb-2">
+    <li><strong>February 29:</strong> No new content will be added to these versions.</li>
+    <li><strong>March 31:</strong> These APIs will return empty responses.</li>
+    <li>After that, all related pages will be gradually removed.</li>
+  </ul>
+
+  <p>
+    We know change can be tricky, but we’re here to help! If you have questions or need a hand migrating,
+    <a href="{% url "contact" %}" class="underline">contact us</a> — we’re happy to assist.
+  </p>
+</c-callout>
