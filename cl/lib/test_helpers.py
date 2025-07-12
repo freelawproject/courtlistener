@@ -47,7 +47,7 @@ from cl.search.models import (
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
 )
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
@@ -842,7 +842,7 @@ class PrayAndPayTestCase(TestCase):
         super().setUpTestData()
 
 
-class CourtTestCase(SimpleTestCase):
+class CourtTestCase(TestCase):
     """Court test case factories"""
 
     @classmethod
@@ -864,7 +864,7 @@ class CourtTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class PeopleTestCase(SimpleTestCase):
+class PeopleTestCase(TestCase):
     """People test case factories"""
 
     @classmethod
@@ -1010,7 +1010,7 @@ class PeopleTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class SearchTestCase(SimpleTestCase):
+class SearchTestCase(TestCase):
     """Search test case factories"""
 
     @classmethod
@@ -1221,7 +1221,7 @@ class SearchTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class RECAPSearchTestCase(SimpleTestCase):
+class RECAPSearchTestCase(TestCase):
     """RECAP Search test case factories"""
 
     @classmethod
@@ -1393,7 +1393,7 @@ class SitemapTest(TestCase):
         )
 
 
-class AudioTestCase(SimpleTestCase):
+class AudioTestCase(TestCase):
     """Audio test case factories"""
 
     @classmethod
@@ -1433,7 +1433,7 @@ class AudioTestCase(SimpleTestCase):
         super().tearDownClass()
 
 
-class AudioESTestCase(SimpleTestCase):
+class AudioESTestCase(TestCase):
     """Audio test case factories for ES"""
 
     fixtures = [
