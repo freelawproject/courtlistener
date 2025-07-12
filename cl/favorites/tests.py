@@ -62,6 +62,7 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
     ]
 
     def setUp(self) -> None:
+        super().setUp()
         # Set up some handy variables
         self.note_cluster_params = {
             "cluster_id": 1,
@@ -114,12 +115,12 @@ class UserNotesTest(BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
+        super().setUp()
         get_homepage_stats.invalidate()
         self.f = NoteFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(
@@ -423,6 +424,7 @@ class APITests(APITestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.pandora = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
@@ -434,6 +436,7 @@ class APITests(APITestCase, TestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.tag_path = reverse("UserTag-list", kwargs={"version": "v3"})
         self.docket_path = reverse("DocketTag-list", kwargs={"version": "v3"})
         self.client = make_client(self.pandora.user.pk)
@@ -442,6 +445,7 @@ class APITests(APITestCase, TestCase):
     def tearDown(cls):
         UserTag.objects.all().delete()
         DocketTag.objects.all().delete()
+        super().tearDown()
 
     async def make_a_good_tag(self, client, tag_name="taggy-tag"):
         data = {
@@ -1701,6 +1705,7 @@ class PrayerAPITests(PrayAndPayTestCase):
     """Check that Prayer API operations work as expected."""
 
     def setUp(self) -> None:
+        super().setUp()
         self.prayer_path = reverse("prayer-list", kwargs={"version": "v4"})
         self.client = make_client(self.user.pk)
         self.client_2 = make_client(self.user_2.pk)
