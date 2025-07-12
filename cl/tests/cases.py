@@ -7,6 +7,7 @@ from asgiref.sync import sync_to_async
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
+from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
@@ -68,13 +69,6 @@ class RestartSentEmailQuotaMixin:
     def tearDown(self):
         self.restart_sent_email_quota()
         super().tearDown()
-
-
-class SimpleTestCase(
-    OneDatabaseMixin,
-    test.SimpleTestCase,
-):
-    pass
 
 
 class TestCase(
