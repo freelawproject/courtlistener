@@ -297,12 +297,8 @@ class OpinionsCitedWithParentsFactory(DjangoModelFactory):
     class Meta:
         model = OpinionsCited
 
-    citing_opinion = SubFactory(
-        "cl.search.factories.OpinionFactory",
-    )
-    cited_opinion = SubFactory(
-        "cl.search.factories.OpinionFactory",
-    )
+    citing_opinion = SubFactory(OpinionFactory)
+    cited_opinion = SubFactory(OpinionFactory)
 
 
 class BankruptcyInformationFactory(DjangoModelFactory):
@@ -319,12 +315,8 @@ class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
     class Meta:
         model = OpinionsCitedByRECAPDocument
 
-    citing_document = SubFactory(
-        "cl.search.factories.RECAPDocumentFactory",
-    )
-    cited_opinion = SubFactory(
-        "cl.search.factories.OpinionFactory",
-    )
+    citing_document = SubFactory(RECAPDocumentFactory)
+    cited_opinion = SubFactory(OpinionFactory)
 
 
 class EmbeddingDataFactory(DictFactory):
