@@ -199,10 +199,6 @@ class OpinionClusterFactoryWithChildren(OpinionClusterFactory):
     )
 
 
-class DocketParentMixin(DjangoModelFactory):
-    docket = SubFactory(DocketFactory)
-
-
 class OpinionClusterWithParentsFactory(OpinionClusterFactory):
     """Make an OpinionCluster with Docket parents"""
 
@@ -286,9 +282,7 @@ class DocketWithChildrenFactory(DocketFactory):
     )
 
 
-class OpinionClusterFactoryMultipleOpinions(
-    OpinionClusterFactory, DocketParentMixin
-):
+class OpinionClusterFactoryMultipleOpinions(OpinionClusterWithParentsFactory):
     """Make an OpinionCluster with Docket parent and multiple opinions"""
 
     class Meta:
