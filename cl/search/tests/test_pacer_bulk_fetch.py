@@ -683,7 +683,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
             cls.rds_to_retrieve.append(
                 RECAPDocumentFactory(
                     docket_entry=de,
-                    document_number=i,
+                    document_number=str(i),
                     pacer_doc_id=f"0{i}",
                     is_available=False,
                     page_count=1000 + i,
@@ -692,7 +692,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
 
         RECAPDocumentFactory(
             docket_entry=de_3,
-            document_number=3,
+            document_number=str(3),
             pacer_doc_id="1234",
             is_available=False,
             page_count=100,
