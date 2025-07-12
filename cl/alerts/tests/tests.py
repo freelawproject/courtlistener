@@ -98,7 +98,6 @@ from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
     SearchAlertsAssertions,
-    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse, make_client
@@ -2221,7 +2220,7 @@ class SearchAlertsWebhooksTest(
         self.assertIn("...", subject)
 
 
-class SearchAlertsUtilsTest(SimpleTestCase):
+class SearchAlertsUtilsTest(TestCase):
     def test_get_cut_off_dates(self):
         """Confirm get_cut_off_start_date and get_cut_off_end_date return the right
         values according to the input date.
