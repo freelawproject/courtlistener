@@ -47,7 +47,7 @@ from cl.search.models import (
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
 )
-from cl.tests.cases import TestCase
+from cl.tests.cases import TestCase, TransactionTestCase
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
@@ -1393,7 +1393,7 @@ class SitemapTest(TestCase):
         )
 
 
-class AudioTestCase(TestCase):
+class AudioTestCase(TransactionTestCase):
     """Audio test case factories"""
 
     @classmethod
