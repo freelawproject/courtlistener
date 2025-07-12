@@ -1398,6 +1398,7 @@ class AudioTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.audio_1 = AudioFactory.create(
             docket_id=1,
             duration=420,
@@ -1533,6 +1534,7 @@ class AudioESTestCase(TestCase):
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
         cls.audio_1.panel.add(cls.author)
+        super.setUpTestData()
 
 
 def skip_if_common_tests_skipped(method):
