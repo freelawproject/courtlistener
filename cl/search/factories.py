@@ -245,10 +245,6 @@ class RECAPDocumentFactory(DjangoModelFactory):
     pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
 
 
-class DocketReuseParentMixin(DjangoModelFactory):
-    docket = Iterator(Docket.objects.all())
-
-
 class DocketEntryForDocketFactory(DjangoModelFactory):
     class Meta:
         model = DocketEntry
@@ -266,13 +262,10 @@ class DocketEntryForDocketFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=750)
 
 
-class DocketEntryReuseParentsFactory(
-    DocketEntryFactory,
-    DocketReuseParentMixin,
-):
+class DocketEntryReuseParentsFactory(DocketEntryFactory):
     """Make a DocketEntry using existing Dockets as parents"""
 
-    pass
+    docket = Iterator(Docket.objects.all())
 
 
 class DocketWithChildrenFactory(DocketFactory):
