@@ -839,7 +839,7 @@ class DRFOrderingTests(TestCase):
         )
 
 
-class FilteringCountTestCase:
+class FilteringCountTestMixin:
     """Mixin for adding an additional test assertion."""
 
     # noinspection PyPep8Naming
@@ -868,7 +868,7 @@ class FilteringCountTestCase:
         return r
 
 
-class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
         Court.objects.all().delete()
@@ -1053,7 +1053,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFJudgeApiFilterTests(
-    SimpleUserDataMixin, TestCase, FilteringCountTestCase
+    SimpleUserDataMixin, TestCase, FilteringCountTestMixin
 ):
     """Do the filters work properly?"""
 
@@ -1247,7 +1247,7 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)  # Bill
 
 
-class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
     fixtures = ["recap_docs.json"]
 
     @classmethod
@@ -1660,7 +1660,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFSearchAppAndAudioAppApiFilterTest(
-    TestCase, AudioTestCase, FilteringCountTestCase
+    AudioTestCase, FilteringCountTestMixin
 ):
     fixtures = [
         "judge_judy.json",
