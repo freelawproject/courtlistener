@@ -230,16 +230,6 @@ class DocketParentMixin(DjangoModelFactory):
     )
 
 
-class OpinionClusterFactoryWithChildrenAndParents(
-    OpinionClusterFactory, DocketParentMixin
-):
-    sub_opinions = RelatedFactory(
-        OpinionWithChildrenFactory,
-        factory_related_name="cluster",
-    )
-    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED  # Always precedential
-
-
 class OpinionClusterWithParentsFactory(
     OpinionClusterFactory,
     DocketParentMixin,
@@ -247,6 +237,12 @@ class OpinionClusterWithParentsFactory(
     """Make an OpinionCluster with Docket parents"""
 
     pass
+
+
+class OpinionClusterFactoryWithChildrenAndParents(
+    OpinionClusterFactoryWithChildren, OpinionClusterWithParentsFactory
+):
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED  # Always precedential
 
 
 class CitationWithParentsFactory(DjangoModelFactory):
