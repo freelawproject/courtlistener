@@ -95,7 +95,7 @@ from cl.users.factories import UserProfileWithParentsFactory
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
-class CitationTextTest(SimpleTestCase):
+class CitationTextTest(TestCase):
     def test_make_html_from_plain_text(self) -> None:
         """Can we convert the plain text of an opinion into HTML?"""
         # fmt: off
