@@ -236,7 +236,7 @@ class RECAPDocumentFactory(DjangoModelFactory):
         If document_number is specified, also set the DocketEntry's
         entry_number.
         """
-        if "document_number" in params:
+        if params.get("document_number", ""):
             params["docket_entry__entry_number"] = params["document_number"]
         return super()._generate(strategy, params)
 
