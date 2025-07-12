@@ -60,7 +60,7 @@ from cl.search.factories import (
     DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
@@ -422,7 +422,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             id="ga_child_l1_1", jurisdiction="FB", parent_court=cls.court_gand
         )
 
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
             docket=DocketFactory(
@@ -436,7 +436,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             docket=DocketFactory(court=cls.court, docket_number="123456"),
@@ -447,7 +447,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 plain_text="Motion",
             ),
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="America vs Bank",
             case_name_full="America vs Bank",
             docket=DocketFactory(
@@ -460,7 +460,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 plain_text="Strickland Motion 247",
             ),
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Johnson v. National",
             case_name_full="Johnson v. National",
             docket=DocketFactory(
@@ -475,7 +475,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             ),
         )
 
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="California v. Nevada",
             case_name_full="California v. Nevada",
             docket=DocketFactory(

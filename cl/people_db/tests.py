@@ -11,7 +11,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionWithChildrenFactory,
 )
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Docket, Opinion
@@ -63,7 +63,7 @@ class PersonPageRelatedCases(ESIndexTestCase, TestCase):
         cls.audio.panel.add(cls.author)
         cls.rebuild_index("audio.Audio")
 
-        cls.opinion_cluster = OpinionClusterFactoryWithChildrenAndParents(
+        cls.opinion_cluster = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),

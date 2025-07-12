@@ -192,7 +192,7 @@ class OpinionClusterFactory(DjangoModelFactory):
     )
 
 
-class OpinionClusterFactoryWithChildren(OpinionClusterFactory):
+class OpinionClusterWithChildrenFactory(OpinionClusterFactory):
     sub_opinions = RelatedFactory(
         OpinionWithChildrenFactory,
         factory_related_name="cluster",
@@ -210,10 +210,26 @@ class OpinionClusterWithParentsFactory(OpinionClusterFactory):
     )
 
 
-class OpinionClusterFactoryWithChildrenAndParents(
-    OpinionClusterFactoryWithChildren, OpinionClusterWithParentsFactory
+class OpinionClusterWithChildrenAndParentsFactory(
+    OpinionClusterWithChildrenFactory, OpinionClusterWithParentsFactory
 ):
     precedential_status = PRECEDENTIAL_STATUS.PUBLISHED  # Always precedential
+
+
+class OpinionClusterWithMultipleOpinionsFactory(
+    OpinionClusterWithParentsFactory
+):
+    """Make an OpinionCluster with Docket parent and multiple opinions"""
+
+    class Meta:
+        skip_postgeneration_save = True
+
+    sub_opinions = RelatedFactoryVariableList(
+        factory=OpinionWithChildrenFactory,
+        factory_related_name="cluster",
+        size=3,  # by default create 3 opinions
+    )
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
 
 
 class CitationWithParentsFactory(DjangoModelFactory):
@@ -224,7 +240,7 @@ class CitationWithParentsFactory(DjangoModelFactory):
     reporter = "U.S."
     page = Faker("random_int", min=1, max=100)
     type = 1
-    cluster = SubFactory(OpinionClusterFactoryWithChildrenAndParents)
+    cluster = SubFactory(OpinionClusterWithChildrenAndParentsFactory)
 
 
 class DocketEntryFactory(DjangoModelFactory):
@@ -270,23 +286,9 @@ class DocketEntryReuseParentsFactory(DocketEntryFactory):
 
 class DocketWithChildrenFactory(DocketFactory):
     clusters = RelatedFactory(
-        OpinionClusterFactoryWithChildren,
+        OpinionClusterWithChildrenFactory,
         factory_related_name="docket",
     )
-
-
-class OpinionClusterFactoryMultipleOpinions(OpinionClusterWithParentsFactory):
-    """Make an OpinionCluster with Docket parent and multiple opinions"""
-
-    class Meta:
-        skip_postgeneration_save = True
-
-    sub_opinions = RelatedFactoryVariableList(
-        factory=OpinionWithChildrenFactory,
-        factory_related_name="cluster",
-        size=3,  # by default create 3 opinions
-    )
-    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
 
 
 class OpinionsCitedWithParentsFactory(DjangoModelFactory):
