@@ -478,6 +478,15 @@ class SearchForm(forms.Form):
         ),
     )
 
+    semantic = forms.BooleanField(
+        label="Whether to enable semantic search in the Search API.",
+        label_suffix="",
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={"class": "external-input form-control left"}
+        ),
+    )
+
     def get_date_field_names(self):
         return {
             f_name.split("_")[0]
