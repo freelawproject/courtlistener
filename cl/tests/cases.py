@@ -24,19 +24,6 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
 
 
-class OneDatabaseMixin:
-    """Only use one DB during tests
-
-    If you have more than one DB in your settings, which we sometimes do,
-    Django creates transactions for each DB and each test. This takes time.
-
-    Since we don't have multi-DB features/tests, simply ensure that all our
-    tests use only one DB, the default one.
-    """
-
-    databases = {"default"}
-
-
 class RestartRateLimitMixin:
     """Restart the rate limiter counter to avoid getting blocked in frontend
     after tests.
@@ -72,7 +59,6 @@ class RestartSentEmailQuotaMixin:
 
 
 class TestCase(
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TestCase,
 ):
@@ -80,7 +66,6 @@ class TestCase(
 
 
 class TransactionTestCase(
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TransactionTestCase,
 ):
@@ -88,7 +73,6 @@ class TransactionTestCase(
 
 
 class LiveServerTestCase(
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     test.LiveServerTestCase,
 ):
@@ -96,7 +80,6 @@ class LiveServerTestCase(
 
 
 class StaticLiveServerTestCase(
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     testing.StaticLiveServerTestCase,
 ):
@@ -104,7 +87,6 @@ class StaticLiveServerTestCase(
 
 
 class APITestCase(
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     DRFTestCase,
 ):
