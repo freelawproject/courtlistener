@@ -5298,13 +5298,13 @@ class RECAPSearchAPIV4Test(
 
         rds_to_create = settings.RECAP_CHILD_HITS_PER_RESULT + 1
         with self.captureOnCommitCallbacks(execute=True):
-            docket_entry = DocketEntryWithParentsFactory(
+            docket_entry = DocketEntryFactory(
                 docket__source=Docket.RECAP,
             )
             for i in range(rds_to_create):
                 RECAPDocumentFactory(
                     docket_entry=docket_entry,
-                    document_number=i,
+                    document_number=str(i),
                 )
 
         search_params = {
