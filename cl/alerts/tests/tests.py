@@ -2588,7 +2588,7 @@ class SearchAlertsUtilsTest(TestCase):
         )
 
 
-class DocketAlertAPITests(APITestCase):
+class DocketAlertAPITests(APITestCase, TestCase):
     """Check that API CRUD operations are working well for docket alerts."""
 
     @classmethod
