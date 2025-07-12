@@ -61,16 +61,17 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         "judge_judy.json",
     ]
 
-    def setUp(self) -> None:
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
         # Set up some handy variables
-        self.note_cluster_params = {
+        cls.note_cluster_params = {
             "cluster_id": 1,
             "name": "foo",
             "notes": "testing notes",
         }
-        self.note_audio_params = {
-            "audio_id": self.audio_1.pk,
+        cls.note_audio_params = {
+            "audio_id": cls.audio_1.pk,
             "name": "foo",
             "notes": "testing notes",
         }

@@ -47,7 +47,7 @@ from cl.search.models import (
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
 )
-from cl.tests.cases import TestCase, TransactionTestCase
+from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
@@ -1341,11 +1341,11 @@ class SerializeLockFileTestMixin(SerializeMixin):
 class SimpleUserDataMixin:
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()  # type: ignore
         UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUpTestData()  # type: ignore
 
 
 class SitemapTest(TestCase):
@@ -1393,7 +1393,7 @@ class SitemapTest(TestCase):
         )
 
 
-class AudioTestCase(TransactionTestCase):
+class AudioTestCase(TestCase):
     """Audio test case factories"""
 
     @classmethod
@@ -1445,6 +1445,7 @@ class AudioESTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.court_1 = CourtFactory(
             id="cabc",
             full_name="Testing Supreme Court",
@@ -1534,7 +1535,6 @@ class AudioESTestCase(TestCase):
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
         cls.audio_1.panel.add(cls.author)
-        super.setUpTestData()
 
 
 def skip_if_common_tests_skipped(method):

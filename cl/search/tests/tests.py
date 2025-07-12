@@ -1560,7 +1560,7 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         )
 
 
-class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
+class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
     These tests should exercise all aspects of using the search box and SERP.
