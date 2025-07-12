@@ -54,7 +54,7 @@ from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
-class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
+class NoteTest(SimpleUserDataMixin, AudioTestCase):
     fixtures = [
         "test_court.json",
         "test_objects_search.json",
