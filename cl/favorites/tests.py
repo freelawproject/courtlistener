@@ -54,22 +54,24 @@ from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
-class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
+class NoteTest(SimpleUserDataMixin, AudioTestCase):
     fixtures = [
         "test_court.json",
         "test_objects_search.json",
         "judge_judy.json",
     ]
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
         # Set up some handy variables
-        self.note_cluster_params = {
+        cls.note_cluster_params = {
             "cluster_id": 1,
             "name": "foo",
             "notes": "testing notes",
         }
-        self.note_audio_params = {
-            "audio_id": self.audio_1.pk,
+        cls.note_audio_params = {
+            "audio_id": cls.audio_1.pk,
             "name": "foo",
             "notes": "testing notes",
         }
@@ -114,12 +116,12 @@ class UserNotesTest(BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
+        super().setUp()
         get_homepage_stats.invalidate()
         self.f = NoteFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(
@@ -413,7 +415,7 @@ class FavoritesTest(TestCase):
         self.assertEqual(favorite_obj.name, "Original alert name")
 
 
-class APITests(APITestCase):
+class APITests(APITestCase, TestCase):
     """Check that tags are created correctly and blocked correctly via APIs"""
 
     fixtures = [
@@ -423,6 +425,7 @@ class APITests(APITestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.pandora = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
@@ -434,6 +437,7 @@ class APITests(APITestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.tag_path = reverse("UserTag-list", kwargs={"version": "v3"})
         self.docket_path = reverse("DocketTag-list", kwargs={"version": "v3"})
         self.client = make_client(self.pandora.user.pk)
@@ -442,6 +446,7 @@ class APITests(APITestCase):
     def tearDown(cls):
         UserTag.objects.all().delete()
         DocketTag.objects.all().delete()
+        super().tearDown()
 
     async def make_a_good_tag(self, client, tag_name="taggy-tag"):
         data = {
@@ -1701,6 +1706,7 @@ class PrayerAPITests(PrayAndPayTestCase):
     """Check that Prayer API operations work as expected."""
 
     def setUp(self) -> None:
+        super().setUp()
         self.prayer_path = reverse("prayer-list", kwargs={"version": "v4"})
         self.client = make_client(self.user.pk)
         self.client_2 = make_client(self.user_2.pk)

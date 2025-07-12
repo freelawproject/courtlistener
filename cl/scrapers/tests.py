@@ -7,6 +7,7 @@ from unittest import TestCase, mock
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.test import SimpleTestCase
 from django.test.utils import override_settings
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
@@ -76,7 +77,6 @@ from cl.search.models import (
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import (
     ESIndexTestCase,
-    SimpleTestCase,
     TestCase,
     TransactionTestCase,
 )

@@ -13,7 +13,7 @@ from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
 from django.core.management import call_command
 from django.db.models.signals import post_delete, post_save
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from elasticsearch import NotFoundError
 from eyecite import get_citations
@@ -87,7 +87,6 @@ from cl.search.models import (
 )
 from cl.tests.cases import (
     ESIndexTestCase,
-    SimpleTestCase,
     TestCase,
     TransactionTestCase,
 )
@@ -96,7 +95,7 @@ from cl.users.factories import UserProfileWithParentsFactory
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
-class CitationTextTest(SimpleTestCase):
+class CitationTextTest(TestCase):
     def test_make_html_from_plain_text(self) -> None:
         """Can we convert the plain text of an opinion into HTML?"""
         # fmt: off

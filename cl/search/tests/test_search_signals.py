@@ -9,11 +9,11 @@ from cl.search.factories import (
 )
 from cl.search.models import RECAPDocument
 from cl.search.signals import handle_recap_doc_change
-from cl.tests.cases import SimpleTestCase
+from cl.tests.cases import TestCase
 
 
 # Test that event hits the receiver function
-class RECAPDocumentSignalTests(SimpleTestCase):
+class RECAPDocumentSignalTests(TestCase):
     def setUp(self):
         post_save.disconnect(handle_recap_doc_change, sender=RECAPDocument)
         self.mock_receiver = Mock()
@@ -37,7 +37,7 @@ class ReceiverTestCase:
     expect_enqueue: bool
 
 
-class RECAPDocumentReceiverTests(SimpleTestCase):
+class RECAPDocumentReceiverTests(TestCase):
     def test_receiver_enqueues_task(self):
         test_cases: list[ReceiverTestCase] = [
             ReceiverTestCase(

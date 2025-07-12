@@ -17,7 +17,7 @@ from django.core.cache import caches
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -108,7 +108,6 @@ from cl.search.models import (
 from cl.stats.models import Event
 from cl.tests.cases import (
     ESIndexTestCase,
-    SimpleTestCase,
     TestCase,
     TransactionTestCase,
 )
@@ -840,7 +839,7 @@ class DRFOrderingTests(TestCase):
         )
 
 
-class FilteringCountTestCase:
+class FilteringCountTestMixin:
     """Mixin for adding an additional test assertion."""
 
     # noinspection PyPep8Naming
@@ -869,7 +868,7 @@ class FilteringCountTestCase:
         return r
 
 
-class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
         Court.objects.all().delete()
@@ -1054,7 +1053,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFJudgeApiFilterTests(
-    SimpleUserDataMixin, TestCase, FilteringCountTestCase
+    SimpleUserDataMixin, TestCase, FilteringCountTestMixin
 ):
     """Do the filters work properly?"""
 
@@ -1248,7 +1247,7 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)  # Bill
 
 
-class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
     fixtures = ["recap_docs.json"]
 
     @classmethod
@@ -1661,7 +1660,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFSearchAppAndAudioAppApiFilterTest(
-    TestCase, AudioTestCase, FilteringCountTestCase
+    AudioTestCase, FilteringCountTestMixin
 ):
     fixtures = [
         "judge_judy.json",
