@@ -413,7 +413,7 @@ class FavoritesTest(TestCase):
         self.assertEqual(favorite_obj.name, "Original alert name")
 
 
-class APITests(APITestCase):
+class APITests(APITestCase, TestCase):
     """Check that tags are created correctly and blocked correctly via APIs"""
 
     fixtures = [
