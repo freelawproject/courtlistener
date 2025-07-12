@@ -200,43 +200,18 @@ class OpinionClusterFactoryWithChildren(OpinionClusterFactory):
 
 
 class DocketParentMixin(DjangoModelFactory):
-    docket = SubFactory(
-        DocketFactory,
-        # Set the case names on the docket to the ones on this object
-        # if it has them. Else generate the case name values.
-        case_name=LazyAttribute(
-            lambda self: getattr(
-                self.factory_parent,
-                "case_name",
-                Faker("case_name").evaluate(None, None, {"locale": None}),
-            )
-        ),
-        case_name_short=LazyAttribute(
-            lambda self: getattr(
-                self.factory_parent,
-                "case_name_short",
-                cnt.make_case_name_short(self.case_name),
-            )
-        ),
-        case_name_full=LazyAttribute(
-            lambda self: getattr(
-                self.factory_parent,
-                "case_name_full",
-                Faker("case_name", full=True).evaluate(
-                    None, None, {"locale": None}
-                ),
-            )
-        ),
-    )
+    docket = SubFactory(DocketFactory)
 
 
-class OpinionClusterWithParentsFactory(
-    OpinionClusterFactory,
-    DocketParentMixin,
-):
+class OpinionClusterWithParentsFactory(OpinionClusterFactory):
     """Make an OpinionCluster with Docket parents"""
 
-    pass
+    docket = SubFactory(
+        DocketFactory,
+        case_name=SelfAttribute("..case_name"),
+        case_name_full=SelfAttribute("..case_name_full"),
+        case_name_short=SelfAttribute("..case_name_short"),
+    )
 
 
 class OpinionClusterFactoryWithChildrenAndParents(
