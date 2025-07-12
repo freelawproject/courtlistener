@@ -57,4 +57,5 @@ class AudioFactory(DjangoModelFactory):
 
 class AudioWithParentsFactory(AudioFactory):
     """Make an Audio with Docket parents"""
+
     docket = SubFactory(DocketFactory, case_name=SelfAttribute("..case_name"))
