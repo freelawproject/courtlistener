@@ -784,7 +784,7 @@ class DocketAlertTest(TestCase):
         RECAPDocument.objects.create(
             docket_entry=de,
             document_type=RECAPDocument.PACER_DOCUMENT,
-            document_number=1,
+            document_number="1",
             pacer_doc_id="232322332",
             is_available=False,
         )

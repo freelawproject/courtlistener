@@ -5303,7 +5303,7 @@ class RECAPSearchAPIV4Test(
             for i in range(rds_to_create):
                 RECAPDocumentFactory(
                     docket_entry=docket_entry,
-                    document_number=i,
+                    document_number=str(i),
                 )
 
         search_params = {
@@ -8187,7 +8187,7 @@ class RECAPIndexingTest(
         )
         rd_1 = RECAPDocumentFactory(
             docket_entry=de_1,
-            document_number=1,
+            document_number="1",
             is_available=True,
             page_count=5,
             filepath_local="test.pdf",
@@ -8195,7 +8195,7 @@ class RECAPIndexingTest(
         )
         rd_2 = RECAPDocumentFactory(
             docket_entry=de_1,
-            document_number=2,
+            document_number="2",
             is_available=True,
             page_count=10,
             filepath_local="test.pdf",

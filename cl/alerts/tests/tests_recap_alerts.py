@@ -390,7 +390,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_old_2.document_number = 3
+            rd_old_2.document_number = "3"
             rd_old_2.save()
 
         # Run the indexer. No new documents re_indexed.
@@ -3437,7 +3437,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_2.document_number = 1
+            rd_2.document_number = "1"
             rd_2.save()
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)

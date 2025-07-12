@@ -2965,7 +2965,7 @@ class RecapPdfFetchApiTest(TestCase):
             docket_entry=DocketEntryFactory(
                 docket=self.appellate_docket, entry_number=1208699339
             ),
-            document_number=1208699339,
+            document_number="1208699339",
             pacer_doc_id="1208699339",
             is_available=True,
             page_count=15,
@@ -3214,7 +3214,7 @@ class RecapPdfFetchApiTest(TestCase):
             docket_entry=DocketEntryFactory(
                 docket=self.appellate_docket, entry_number=2
             ),
-            document_number=2,
+            document_number="2",
             attachment_number=1,
             pacer_doc_id="01302453788",
             is_available=False,
@@ -3276,7 +3276,7 @@ class RecapAttPageFetchApiTest(TestCase):
             docket_entry=DocketEntryFactory(
                 docket=self.appellate_docket, entry_number=1208699339
             ),
-            document_number=1208699339,
+            document_number="1208699339",
             pacer_doc_id="1208699339",
             attachment_number=1,
             is_available=True,
@@ -3616,7 +3616,7 @@ class RecapPdfTaskTest(TestCase):
         self.rd = RECAPDocument.objects.create(
             docket_entry=self.de,
             document_type=RECAPDocument.PACER_DOCUMENT,
-            document_number=1,
+            document_number="1",
             pacer_doc_id="asdf",
             sha1=sha1,
         )
@@ -3752,7 +3752,7 @@ class RecapZipTaskTest(TestCase):
         self.doc12 = RECAPDocument.objects.create(
             docket_entry=self.de,
             document_type=RECAPDocument.PACER_DOCUMENT,
-            document_number=12,
+            document_number="12",
             pacer_doc_id="asdf",
             sha1=doc12_sha1,
         )
@@ -3760,7 +3760,7 @@ class RecapZipTaskTest(TestCase):
         self.doc12_att1 = RECAPDocument.objects.create(
             docket_entry=self.de,
             document_type=RECAPDocument.ATTACHMENT,
-            document_number=12,
+            document_number="12",
             attachment_number=1,
             pacer_doc_id="asdf",
             sha1=doc12_att1_sha1,
