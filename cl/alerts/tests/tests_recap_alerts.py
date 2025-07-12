@@ -3437,7 +3437,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_2.document_number = "1"
+            rd_2.document_number = "2"
             rd_2.save()
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
