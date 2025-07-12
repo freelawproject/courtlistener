@@ -144,6 +144,8 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                     main_doc_id = doc_content.get("docket_id")
                 case SEARCH_TYPES.ORAL_ARGUMENT:
                     main_doc_id = doc_content.get("id")
+                case SEARCH_TYPES.OPINION:
+                    main_doc_id = doc_content.get("cluster_id")
                 case _:
                     # Not supported alert type.
                     continue
@@ -169,7 +171,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                 if alert.alert_type == SEARCH_TYPES.DOCKETS
                 else alert.alert_type
             )
-            # Override query n in the 'View Full Results' URL to
+            # Override query in the 'View Full Results' URL to
             # include a filter by timestamp.
             cut_off_date = get_cut_off_date(rate, now_time)
             qd = override_alert_query(alert, cut_off_date)

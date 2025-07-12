@@ -14,6 +14,7 @@ from lxml import etree
 
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
+from cl.lib.date_time import fixed_midnight_pt
 from cl.lib.utils import deepgetattr
 from cl.people_db.factories import (
     ABARatingFactory,
@@ -49,17 +50,6 @@ from cl.search.models import (
 )
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
-
-
-def midnight_pt_test(d: datetime.date) -> datetime.datetime:
-    """Cast a naive date object to midnight Pacific Time, either PST or PDT,
-    according to the date. This method also considers historical timezone
-    offsets, similar to how they are handled in DRF.
-    """
-    time_zone = timezone.get_current_timezone()
-    d = datetime.datetime.combine(d, datetime.time())
-    return timezone.make_aware(d, time_zone)
-
 
 opinion_cluster_v3_v4_common_fields = {
     "absolute_url": lambda x: x["result"].cluster.get_absolute_url(),
@@ -123,7 +113,7 @@ opinion_cluster_v3_v4_common_fields = {
         (
             x["result"].cluster.docket.date_argued.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].cluster.docket.date_argued
             ).isoformat()
         )
@@ -134,7 +124,7 @@ opinion_cluster_v3_v4_common_fields = {
         (
             x["result"].cluster.date_filed.isoformat()
             if x.get("V4")
-            else midnight_pt_test(x["result"].cluster.date_filed).isoformat()
+            else fixed_midnight_pt(x["result"].cluster.date_filed).isoformat()
         )
         if x["result"].cluster.date_filed
         else None
@@ -143,7 +133,7 @@ opinion_cluster_v3_v4_common_fields = {
         (
             x["result"].cluster.docket.date_reargued.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].cluster.docket.date_reargued
             ).isoformat()
         )
@@ -154,7 +144,7 @@ opinion_cluster_v3_v4_common_fields = {
         (
             x["result"].cluster.docket.date_reargument_denied.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].cluster.docket.date_reargument_denied
             ).isoformat()
         )
@@ -284,7 +274,7 @@ docket_api_common_keys = {
         (
             x["result"].docket_entry.docket.date_argued.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].docket_entry.docket.date_argued
             ).isoformat()
         )
@@ -295,7 +285,7 @@ docket_api_common_keys = {
         (
             x["result"].docket_entry.docket.date_filed.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].docket_entry.docket.date_filed
             ).isoformat()
         )
@@ -306,7 +296,7 @@ docket_api_common_keys = {
         (
             x["result"].docket_entry.docket.date_terminated.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].docket_entry.docket.date_terminated
             ).isoformat()
         )
@@ -424,7 +414,7 @@ recap_document_common_api_keys = {
         (
             x["result"].docket_entry.date_filed.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].docket_entry.date_filed
             ).isoformat()
         )
@@ -699,7 +689,7 @@ audio_common_fields = {
         (
             x["result"].docket.date_argued.isoformat()
             if x.get("V4")
-            else midnight_pt_test(x["result"].docket.date_argued).isoformat()
+            else fixed_midnight_pt(x["result"].docket.date_argued).isoformat()
         )
         if x["result"].docket.date_argued
         else None
@@ -708,7 +698,9 @@ audio_common_fields = {
         (
             x["result"].docket.date_reargued.isoformat()
             if x.get("V4")
-            else midnight_pt_test(x["result"].docket.date_reargued).isoformat()
+            else fixed_midnight_pt(
+                x["result"].docket.date_reargued
+            ).isoformat()
         )
         if x["result"].docket.date_reargued
         else None
@@ -717,7 +709,7 @@ audio_common_fields = {
         (
             x["result"].docket.date_reargument_denied.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].docket.date_reargument_denied
             ).isoformat()
         )

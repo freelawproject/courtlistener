@@ -15,7 +15,7 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
     make_objects,
     save_everything,
 )
-from cl.scrapers.tasks import extract_doc_content
+from cl.scrapers.tasks import extract_opinion_content
 from cl.search.models import SOURCES, Court, Docket, Opinion
 
 
@@ -136,10 +136,9 @@ def import_tn_corpus(
             }
         )
 
-        extract_doc_content.delay(
+        extract_opinion_content.delay(
             opinion.pk,
             ocr_available=ocr_available,
-            citation_jitter=True,
         )
         logging.info(
             "Successfully added Tennessee object cluster: %s", cluster.id
