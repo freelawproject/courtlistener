@@ -270,15 +270,6 @@ class DocketEntryForDocketFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=750)
 
 
-class DocketEntryWithParentsFactory(
-    DocketEntryFactory,
-    DocketParentMixin,
-):
-    """Make a DocketEntry with Docket parents"""
-
-    pass
-
-
 class DocketEntryReuseParentsFactory(
     DocketEntryFactory,
     DocketReuseParentMixin,

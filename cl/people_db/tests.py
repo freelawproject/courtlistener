@@ -9,7 +9,7 @@ from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
 from cl.people_db.models import Person, Position
 from cl.search.factories import (
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionWithChildrenFactory,
@@ -91,7 +91,7 @@ class PersonPageRelatedCases(ESIndexTestCase, TestCase):
             testing_mode=True,
         )
 
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court_1,
                 case_name="SUBPOENAS SERVED ON",

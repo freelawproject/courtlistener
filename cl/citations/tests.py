@@ -67,7 +67,7 @@ from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactoryMultipleOpinions,
     OpinionClusterFactoryWithChildrenAndParents,
@@ -593,7 +593,7 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
         cls.recap_doc = RECAPDocumentFactory.create(
             plain_text="In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020), the Second Circuit held that in the context of settlement of FLSA and NYLL cases, which must be approved by the trial court in accordance with Cheeks v. Freeport Pancake House, Inc., 796 F.3d 199 (2d Cir. 2015), the district court abused its discretion in limiting the amount of recoverable fees to a percentage of the recovery by the successful plaintiffs. But also: sdjnfdsjnk. Fisher, 948 F.3d at 597.",
             ocr_status=RECAPDocument.OCR_UNNECESSARY,
-            docket_entry=DocketEntryWithParentsFactory(),
+            docket_entry=DocketEntryFactory(),
         )
         # Courts
         court_ca2 = CourtFactory(id="ca2")
