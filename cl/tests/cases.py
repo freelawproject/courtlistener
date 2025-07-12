@@ -14,7 +14,7 @@ from django.utils.html import strip_tags
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
 from lxml.html import HtmlElement
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase as DRFTestCase
 from rest_framework.utils.serializer_helpers import ReturnList
 
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
@@ -106,7 +106,7 @@ class StaticLiveServerTestCase(
 class APITestCase(
     OneDatabaseMixin,
     RestartRateLimitMixin,
-    APITestCase,
+    DRFTestCase,
 ):
     pass
 
