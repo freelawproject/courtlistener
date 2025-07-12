@@ -7,6 +7,7 @@ from asgiref.sync import sync_to_async
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
+from django.test.testcases import SerializeMixin
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
@@ -121,7 +122,9 @@ class APITestCase(
     ELASTICSEARCH_DSL_AUTO_REFRESH=True,
     ELASTICSEARCH_DISABLED=False,
 )
-class ESIndexTestCase(SimpleTestCase):
+class ESIndexTestCase(SerializeMixin, SimpleTestCase):
+    lockfile = __file__
+
     @classmethod
     def setUpClass(cls):
         _index_suffixe = cls.__name__.lower()
