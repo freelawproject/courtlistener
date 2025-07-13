@@ -34,7 +34,7 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
+from cl.lib.test_helpers import PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -91,6 +91,7 @@ from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.mixins import CourtMixin
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -2769,7 +2770,7 @@ class ESIndexingTasksUtils(TestCase):
     return_value="es_sweep_indexer:log_test",
 )
 class SweepIndexerCommandTest(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
+    TestCase, CourtMixin, PeopleTestCase, ESIndexTestCase
 ):
     """sweep_indexer command tests for Elasticsearch"""
 

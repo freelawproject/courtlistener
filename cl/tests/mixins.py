@@ -1,4 +1,4 @@
-from cl.search.factories import RECAPDocumentFactory
+from cl.search.factories import CourtFactory, RECAPDocumentFactory
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
@@ -49,4 +49,26 @@ class PrayAndPayMixin:
             pacer_doc_id="98763426",
             document_number="6",
             is_available=False,
+        )
+
+
+class CourtMixin:
+    """Court test case factories"""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.court_1 = CourtFactory(
+            id="ca1",
+            full_name="First Circuit",
+            jurisdiction="F",
+            citation_string="1st Cir.",
+            url="https://www.ca1.uscourts.gov/",
+        )
+        cls.court_2 = CourtFactory(
+            id="test",
+            full_name="Testing Supreme Court",
+            jurisdiction="F",
+            citation_string="Test",
+            url="https://www.courtlistener.com/",
         )

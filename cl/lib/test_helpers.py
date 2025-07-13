@@ -791,28 +791,6 @@ audio_v4_fields.update(
 )
 
 
-class CourtTestCase(TestCase):
-    """Court test case factories"""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.court_1 = CourtFactory(
-            id="ca1",
-            full_name="First Circuit",
-            jurisdiction="F",
-            citation_string="1st Cir.",
-            url="https://www.ca1.uscourts.gov/",
-        )
-        cls.court_2 = CourtFactory(
-            id="test",
-            full_name="Testing Supreme Court",
-            jurisdiction="F",
-            citation_string="Test",
-            url="https://www.courtlistener.com/",
-        )
-        super().setUpTestData()
-
-
 class PeopleTestCase(TestCase):
     """People test case factories"""
 

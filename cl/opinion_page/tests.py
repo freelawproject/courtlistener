@@ -31,7 +31,6 @@ from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
-    CourtTestCase,
     PeopleTestCase,
     SearchTestCase,
     SimpleUserDataMixin,
@@ -90,6 +89,7 @@ from cl.search.models import (
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.mixins import CourtMixin
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -119,14 +119,15 @@ class SimpleLoadTest(TestCase):
 
 
 class OpinionPageLoadTest(
+    TestCase,
     ESIndexTestCase,
-    CourtTestCase,
+    CourtMixin,
     PeopleTestCase,
     SearchTestCase,
-    TestCase,
 ):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.o_cluster_1 = OpinionClusterWithParentsFactory.create(
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             citation_count=1,
@@ -186,7 +187,6 @@ class OpinionPageLoadTest(
             pk_offset=0,
             testing_mode=True,
         )
-        super().setUpTestData()
 
     async def test_simple_opinion_page(self) -> None:
         """Does the page load properly?"""

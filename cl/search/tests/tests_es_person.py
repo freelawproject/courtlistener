@@ -14,7 +14,6 @@ from lxml import html
 from cl.lib.elasticsearch_utils import build_es_base_query, build_es_main_query
 from cl.lib.search_index_utils import extract_field_values
 from cl.lib.test_helpers import (
-    CourtTestCase,
     PeopleTestCase,
     people_v4_fields,
     position_v4_fields,
@@ -42,9 +41,10 @@ from cl.tests.cases import (
     TransactionTestCase,
     V4SearchAPIAssertions,
 )
+from cl.tests.mixins import CourtMixin
 
 
-class PeopleSearchAPICommonTests(CourtTestCase, PeopleTestCase):
+class PeopleSearchAPICommonTests(TestCase, CourtMixin, PeopleTestCase):
     version_api = "v3"
     skip_common_tests = True
 
@@ -1259,14 +1259,14 @@ class PeopleV4APISearchTest(
 
 
 class PeopleSearchTestElasticSearch(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
+    TestCase, CourtMixin, PeopleTestCase, ESIndexTestCase
 ):
     """People search tests for Elasticsearch"""
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("people_db.Person")
         super().setUpTestData()
+        cls.rebuild_index("people_db.Person")
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.PEOPLE,
@@ -1999,14 +1999,14 @@ class PeopleSearchTestElasticSearch(
 
 
 class IndexJudgesPositionsCommandTest(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
+    TestCase, CourtMixin, PeopleTestCase, ESIndexTestCase
 ):
     """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("people_db.Person")
         super().setUpTestData()
+        cls.rebuild_index("people_db.Person")
         cls.delete_index("people_db.Person")
         cls.create_index("people_db.Person")
 
