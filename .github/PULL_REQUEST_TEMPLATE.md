@@ -1,16 +1,20 @@
+## Fixes
+
+What bugs does this fix? Use the syntax to auto-close the issue: 
+
+https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword
+
+E.g.: "Fixes: #XYZ"
+
+
 ## Summary
 
 What does this fix, how did you fix it, what approach did you take, what gotchas are there in your code or compromises did you make?
 
 
-## Fixes
-
-What bugs does this fix? Use the [correct syntax to auto-close the issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword).
-
-
 ## Deployment
 
-1. The following labels control the deploymnet of this PR if they are applied. Please choose which should be applied, then apply them to this PR:
+1. The following labels control the deployment of this PR if they’re applied. Please choose which should be applied, then apply them to this PR:
 
    - [ ] <kbd>skip-deploy</kbd> — The entire deployment can be skipped.
 
@@ -32,7 +36,11 @@ What bugs does this fix? Use the [correct syntax to auto-close the issue](https:
 
     Do scripts need to be run or things like that? 
 
-    If this is more than a quick thing, a [new issue should be created in our infra repo]([url](https://github.com/freelawproject/infrastructure/issues/new)). (If you do not have access to it, just put the steps here.)
+    If this is more than a quick thing, a new issue should be created in our infra repo:
+    
+    https://github.com/freelawproject/infrastructure/issues/new
+
+    If you don’t have access to it, just put the steps here.
 
 
 ## Screenshots
