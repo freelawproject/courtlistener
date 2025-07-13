@@ -1,6 +1,6 @@
 ## Fixes
 
-What bugs does this fix? Use the syntax to auto-close the issue: 
+What bugs does this fix? Use the syntax to auto-close the issue:
 
 https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword
 
@@ -37,7 +37,7 @@ What does this fix, how did you fix it, what approach did you take, what gotchas
     Do scripts need to be run or things like that?
 
     If this is more than a quick thing, a new issue should be created in our infra repo:
-    
+
     https://github.com/freelawproject/infrastructure/issues/new
 
     If you don’t have access to it, just put the steps here.
