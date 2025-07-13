@@ -27,6 +27,7 @@ from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     ACMSAttachmentPage,
+    AcmsCaseSearch,
     ACMSDocketReport,
     AppellateDocketReport,
     CaseQuery,
@@ -65,6 +66,7 @@ from cl.corpus_importer.utils import (
     is_bankruptcy_court,
     is_long_appellate_document_number,
     mark_ia_upload_needed,
+    should_check_acms_court,
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
@@ -2420,8 +2422,25 @@ def purchase_appellate_docket_by_docket_number(
     :param fq: The PacerFetchQueue object
     :return: a dict with information about the docket and the new data
     """
-    report = AppellateDocketReport(map_cl_to_pacer_id(court_id), session)
-    report.query(docket_number, **kwargs)
+    acms_case_id = None
+
+    if should_check_acms_court(court_id):
+        acms_search = AcmsCaseSearch(court_id="ca9", pacer_session=session)
+        acms_search.query(docket_number)
+        acms_case_id = (
+            acms_search.data["pcx_caseid"] if acms_search.data else None
+        )
+
+    pacer_court_id = map_cl_to_pacer_id(court_id)
+    report_class = ACMSDocketReport if acms_case_id else AppellateDocketReport
+    report = report_class(pacer_court_id, session)
+
+    if acms_case_id:
+        # ACMSDocketReport only accepts the case ID; filters are not currently
+        # supported for ACMS docket reports.
+        report.query(acms_case_id)
+    else:
+        report.query(docket_number, **kwargs)
 
     docket_data = report.data
     if not docket_data:
