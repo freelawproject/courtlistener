@@ -52,7 +52,8 @@ jobs:
       ${{
         !contains(needs.get-pr-labels.outputs.labels, 'skip-deploy') &&
         !contains(needs.get-pr-labels.outputs.labels, 'skip-web-deploy') &&
-        !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy')
+        !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy') &&
+        !contains(needs.get-pr-labels.outputs.labels, 'skip-cronjob-deploy')
       }}
     steps:
       - uses: actions/checkout@v4
