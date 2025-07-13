@@ -21,11 +21,11 @@ What does this fix, how did you fix it, what approach did you take, what gotchas
         This might be the case for a small fix, a tweak to documentation or something like that.
 
    - [ ] <kbd>skip-web-deploy</kbd> — The web tier can be skipped.
-  
+
         This is the case if you're working on code that doesn't affect the front end, like management commands, tasks, or documentation.
 
    - [ ] <kbd>skip-celery-deploy</kbd> — Deployment to celery can be skipped.
-  
+
         This is the case if you make no changes to tasks.py or the code that tasks rely on.
 
    - [ ] <kbd>skip-cronjob-deploy</kbd> — Deployment to cron jobs can be skipped.
@@ -34,7 +34,7 @@ What does this fix, how did you fix it, what approach did you take, what gotchas
 
 1. What extra steps are needed to deploy this beyond the standard deploy?
 
-    Do scripts need to be run or things like that? 
+    Do scripts need to be run or things like that?
 
     If this is more than a quick thing, a new issue should be created in our infra repo:
     

@@ -44,12 +44,12 @@ jobs:
             core.setOutput("labels", labels.join(","));
             core.setOutput("pr_number", pr.number);
             console.log(`PR #${pr.number} labels: ${labels.join(", ")}`);
-            
+
   build:
     needs: get-pr-labels
     runs-on: ubuntu-latest
     if: >
-      ${{ 
+      ${{
         !contains(needs.get-pr-labels.outputs.labels, 'skip-deploy') &&
         !contains(needs.get-pr-labels.outputs.labels, 'skip-web-deploy') &&
         !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy')
@@ -133,7 +133,7 @@ jobs:
           exit 1
       - name: Delete Temporary Pod
         run: kubectl delete pod -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }}
-      
+
       # Rollout new versions one by one (watch "deployments" in k9s)
       - name: Rollout cl-python
         if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-web-deploy') }}
@@ -141,7 +141,7 @@ jobs:
       - name: Watch cl-python rollout status
         if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-web-deploy') }}
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-python
-        
+
       - name: Rollout cl-celery-prefork
         if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy') }}
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
