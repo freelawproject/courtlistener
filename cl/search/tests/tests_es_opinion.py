@@ -26,7 +26,6 @@ from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
-    CourtTestCase,
     PeopleTestCase,
     SearchTestCase,
     opinion_document_v4_api_keys,
@@ -79,17 +78,19 @@ from cl.tests.cases import (
     TransactionTestCase,
     V4SearchAPIAssertions,
 )
+from cl.tests.mixins import CourtMixin
 from cl.users.factories import UserProfileWithParentsFactory
 
 
 class OpinionSearchAPICommonTests(
-    CourtTestCase, PeopleTestCase, SearchTestCase
+    TestCase, CourtMixin, PeopleTestCase, SearchTestCase
 ):
     version_api = "v3"
     skip_common_tests = True
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
             court = CourtFactory(
@@ -146,7 +147,6 @@ class OpinionSearchAPICommonTests(
                     scdb_votes_majority=6,
                 )
             )
-            super().setUpTestData()
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -1216,7 +1216,7 @@ class OpinionV4APISearchTest(
 
 
 class OpinionsESSearchTest(
-    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+    TestCase, ESIndexTestCase, CourtMixin, PeopleTestCase, SearchTestCase
 ):
     @classmethod
     def setUpTestData(cls):
@@ -2573,7 +2573,7 @@ class OpinionSearchDecayRelevancyTest(
 
 @override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
-    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+    TestCase, ESIndexTestCase, CourtMixin, PeopleTestCase, SearchTestCase
 ):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3030,18 +3030,20 @@ class RelatedSearchTest(
 
 
 class IndexOpinionDocumentsCommandTest(
-    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+    TestCase, ESIndexTestCase, CourtMixin, PeopleTestCase, SearchTestCase
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.rebuild_index("search.OpinionCluster")
         super().setUpTestData()
         cls.delete_index("search.OpinionCluster")
         cls.create_index("search.OpinionCluster")
 
     def setUp(self) -> None:
+        super().setUp()
         self.r = get_redis_interface("CACHE")
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
@@ -3050,6 +3052,7 @@ class IndexOpinionDocumentsCommandTest(
     def tearDown(self) -> None:
         self.delete_index("search.OpinionCluster")
         self.create_index("search.OpinionCluster")
+        super().tearDown()
 
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index OpinionCluster and their
@@ -3262,6 +3265,7 @@ class EsOpinionsIndexingTest(
         cls.rebuild_index("search.OpinionCluster")
 
     def setUp(self):
+        super().setUp()
         self.court_1 = CourtFactory(
             id="ca1",
             full_name="First Circuit",
@@ -3302,7 +3306,6 @@ class EsOpinionsIndexingTest(
             dob_state="NY",
         )
         self.person_2 = PersonFactory.create()
-        super().setUp()
 
     def test_remove_parent_child_objects_from_index(self) -> None:
         """Confirm join child objects are removed from the index when the
@@ -4052,11 +4055,12 @@ class EsOpinionsIndexingTest(
 
 
 class OpinionFeedTest(
-    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+    TestCase, ESIndexTestCase, CourtMixin, PeopleTestCase, SearchTestCase
 ):
     """Tests for Opinion Search Feed"""
 
     def setUp(self) -> None:
+        super().setUp()
         self.good_item = {
             "title": "Opinion Title",
             "court": "SCOTUS",
@@ -4084,12 +4088,11 @@ class OpinionFeedTest(
         self.null_item = self.good_item.copy()
         self.null_item.update({"local_path": None})
         self.feed = JurisdictionFeed()
-        super().setUp()
 
     @classmethod
     def setUpTestData(cls) -> None:
-        cls.rebuild_index("search.OpinionCluster")
         super().setUpTestData()
+        cls.rebuild_index("search.OpinionCluster")
         court = CourtFactory(
             id="canb",
             jurisdiction="FB",
