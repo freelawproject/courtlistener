@@ -52,6 +52,29 @@ class FakeAppellateDocketReport(FakeDocketReport):
         return data
 
 
+class FakeNewAppellateCaseDocketReport(FakeDocketReport):
+    @property
+    def data(self):
+        data = super(FakeNewAppellateCaseDocketReport, self).data
+        data["court_id"] = "ca1"
+        data["docket_number"] = "10-1081"
+        data["case_name"] = "United States v. Brown"
+        data["pacer_case_id"] = "49959"
+        return data
+
+
+class FakeEmptyAcmsCaseSearch(FakeDocketReport):
+    @property
+    def data(self):
+        return {}
+
+
+class FakeAcmsCaseSearch(FakeDocketReport):
+    @property
+    def data(self):
+        return {"pcx_caseid": "e85b4453-6c94-4c68-93ed-4e2e0018e842"}
+
+
 class FakePossibleCaseNumberApi:
     def __init__(self, *args, **kwargs):
         pass
