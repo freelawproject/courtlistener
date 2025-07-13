@@ -11,8 +11,49 @@ env:
   EKS_NAMESPACE: court-listener
 
 jobs:
-  build:
+  get-pr-labels:
     runs-on: ubuntu-latest
+    outputs:
+      labels: ${{ steps.find_pr.outputs.labels }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Find merged PR by merge_commit_sha
+        id: find_pr
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commitSha = context.sha;
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "closed",
+              sort: "updated",
+              direction: "desc",
+              per_page: 1
+            });
+
+            const pr = prs.find(p => p.merge_commit_sha === commitSha);
+            if (!pr) {
+              core.setOutput("labels", "");
+              core.warning("No merged PR found for this commit.");
+              return;
+            }
+
+            const labels = pr.labels.map(l => l.name);
+            core.setOutput("labels", labels.join(","));
+            core.setOutput("pr_number", pr.number);
+            console.log(`PR #${pr.number} labels: ${labels.join(", ")}`);
+            
+  build:
+    needs: get-pr-labels
+    runs-on: ubuntu-latest
+    if: >
+      ${{ 
+        !contains(needs.get-pr-labels.outputs.labels, 'skip-deploy') &&
+        !contains(needs.get-pr-labels.outputs.labels, 'skip-web-deploy') &&
+        !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy')
+      }}
     steps:
       - uses: actions/checkout@v4
       - name: Login to Docker Hub
@@ -25,8 +66,9 @@ jobs:
           make push-image --file docker/django/Makefile -e VERSION=$(git rev-parse --short HEAD)
 
   deploy:
-    needs: build
+    needs: [get-pr-labels, build]
     runs-on: ubuntu-latest
+    if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-deploy') }}
     concurrency: production
     steps:
       - uses: actions/checkout@v4
@@ -91,24 +133,34 @@ jobs:
           exit 1
       - name: Delete Temporary Pod
         run: kubectl delete pod -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }}
+      
       # Rollout new versions one by one (watch "deployments" in k9s)
       - name: Rollout cl-python
+        if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-web-deploy') }}
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-python rollout status
+        if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-web-deploy') }}
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-python
+        
       - name: Rollout cl-celery-prefork
+        if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy') }}
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-celery-prefork rollout status
+        if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy') }}
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork
 
       - name: Rollout cl-celery-prefork-bulk
+        if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy') }}
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk cl-celery-prefork-bulk=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-celery-prefork-bulk rollout status
+        if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy') }}
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk
 
       - name: Rollout cl-celery-prefork-es-sweep
+        if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy') }}
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-es-sweep cl-celery-prefork-es-sweep=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-celery-prefork-es-sweep rollout status
+        if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy') }}
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-es-sweep
 
       - name: Rollout cl-scrape-rss
@@ -136,9 +188,9 @@ jobs:
       - name: Watch cl-iquery-probe rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-iquery-probe
 
-
       # Watch "cronjobs" in k9s
       - name: Update cronjobs
+        if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-cronjob-deploy') }}
         run: |
           CRONJOB_NAMES=$(kubectl get cronjobs -n court-listener -o jsonpath='{.items.*.metadata.name}' -l image_type=web-prod);
           for name in $CRONJOB_NAMES; do
