@@ -8,6 +8,7 @@ from contextlib import contextmanager
 
 from django.conf import settings
 from django.core.management import call_command
+from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings, tag
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
@@ -36,7 +37,7 @@ if "SELENIUM_TIMEOUT" in os.environ:
     ALLOWED_HOSTS=["*"],
 )
 class BaseSeleniumTest(
-    SerializeLockFileTestMixin, StaticLiveServerTestCase, ESIndexTestCase
+    SerializeMixin, StaticLiveServerTestCase, ESIndexTestCase
 ):
     """Base class for Selenium Tests. Sets up a few attributes:
       * browser - instance of Selenium WebDriver
@@ -48,6 +49,7 @@ class BaseSeleniumTest(
     """
 
     host = "0.0.0.0"
+    lockfile = __file__
 
     @staticmethod
     def _create_browser() -> webdriver.Chrome:
