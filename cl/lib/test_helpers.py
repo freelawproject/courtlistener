@@ -8,7 +8,6 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test.testcases import SerializeMixin
 from django.utils import timezone
 from lxml import etree
 
@@ -1332,10 +1331,6 @@ class RECAPSearchTestCase(TestCase):
             pacer_doc_id="016156723121",
         )
         super().setUpTestData()
-
-
-class SerializeLockFileTestMixin(SerializeMixin):
-    lockfile = __file__
 
 
 class SimpleUserDataMixin:
