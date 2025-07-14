@@ -20,7 +20,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from timeout_decorator import TimeoutError
 
 from cl.lib.decorators import retry
-from cl.lib.test_helpers import SerializeLockFileTestMixin
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, StaticLiveServerTestCase
 
