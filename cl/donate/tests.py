@@ -13,7 +13,7 @@ from django.utils.timezone import now
 from cl.donate.api_views import MembershipWebhookViewSet
 from cl.donate.factories import NeonWebhookEventFactory
 from cl.donate.models import NeonMembership, NeonWebhookEvent
-from cl.lib.test_helpers import UserProfileWithParentsFactory
+from cl.users.factories import UserProfileWithParentsFactory
 from cl.tests.cases import TestCase
 from cl.users.models import UserProfile
 from cl.users.utils import create_stub_account

@@ -8,6 +8,7 @@ from django.contrib.auth.hashers import make_password
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
+from lxml import etree, html
 from lxml.html import HtmlElement
 from rest_framework.utils.serializer_helpers import ReturnList
 
@@ -15,6 +16,7 @@ from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     get_cut_off_date,
 )
 from cl.audio.factories import AudioFactory
+from cl.audio.models import Audio
 from cl.people_db.factories import (
     ABARatingFactory,
     AttorneyFactory,
@@ -41,6 +43,24 @@ from cl.search.factories import (
 )
 from cl.search.models import SEARCH_TYPES, Docket, RECAPDocument
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
+
+
+class RestartRateLimitMixin:
+    """Restart the rate limiter counter to avoid getting blocked in frontend
+    after tests.
+    """
+
+    @classmethod
+    def restart_rate_limit(cls):
+        r = get_redis_interface("CACHE")
+        keys = r.keys(":1:rl:*")
+        if keys:
+            r.delete(*keys)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.restart_rate_limit()
+        super().tearDownClass()
 
 
 class SimpleUserDataMixin:
