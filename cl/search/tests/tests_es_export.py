@@ -7,15 +7,15 @@ from django.http import QueryDict
 from django.urls import reverse
 
 from cl.lib.search_utils import fetch_es_results_for_csv
-from cl.lib.test_helpers import RECAPSearchTestCase
 from cl.search.documents import ESRECAPDocument
 from cl.search.factories import DocketFactory
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.mixins import RECAPSearchMixin
 from cl.users.factories import UserProfileWithParentsFactory
 
 
-class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
+class ExportSearchTest(RECAPSearchMixin, ESIndexTestCase, TestCase):
     errors = [
         ("Unbalance Quotes", 'q="test&type=o'),
         ("Unbalance Parentheses", "q=Leave)&type=o"),
@@ -35,8 +35,9 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ),
         )
         cls.rebuild_index("search.Docket")
-        super().setUpTestData()
         cls.rebuild_index("people_db.Person")
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.RECAP,

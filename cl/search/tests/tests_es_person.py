@@ -43,7 +43,7 @@ from cl.tests.cases import (
 from cl.tests.mixins import CourtMixin, PeopleMixin
 
 
-class PeopleSearchAPICommonTests(CourtMixin, PeopleMixin, TestCase):
+class PeopleSearchAPICommonTests(PeopleMixin, CourtMixin, TestCase):
     version_api = "v3"
     skip_common_tests = True
 
@@ -1258,14 +1258,15 @@ class PeopleV4APISearchTest(
 
 
 class PeopleSearchTestElasticSearch(
-    CourtMixin, PeopleMixin, ESIndexTestCase, TestCase
+    PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     """People search tests for Elasticsearch"""
 
     @classmethod
     def setUpTestData(cls):
-        super().setUpTestData()
         cls.rebuild_index("people_db.Person")
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.PEOPLE,
@@ -1998,16 +1999,17 @@ class PeopleSearchTestElasticSearch(
 
 
 class IndexJudgesPositionsCommandTest(
-    CourtMixin, PeopleMixin, ESIndexTestCase, TestCase
+    PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
 
     @classmethod
     def setUpTestData(cls):
-        super().setUpTestData()
         cls.rebuild_index("people_db.Person")
         cls.delete_index("people_db.Person")
         cls.create_index("people_db.Person")
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
 
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Judges and their positions
