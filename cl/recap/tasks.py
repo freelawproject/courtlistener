@@ -2445,6 +2445,16 @@ def purchase_appellate_docket_by_docket_number(
     docket_data = report.data
     if not docket_data:
         raise ParsingException("No data found in docket report.")
+
+    if acms_case_id:
+        docket_data["docket_entries"] = sorted(
+            docket_data["docket_entries"],
+            key=lambda d: (
+                d["date_filed"],
+                d["document_number"] is None,
+                d["document_number"],
+            ),
+        )
     return create_or_update_docket_data_from_fetch(
         fq, court_id, None, report, docket_data
     )
