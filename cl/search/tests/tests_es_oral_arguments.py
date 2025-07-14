@@ -32,12 +32,11 @@ from cl.search.factories import CourtFactory, DocketFactory, PersonFactory
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.tasks import es_save_document, update_es_document
 from cl.tests.cases import (
-    CountESTasksTestCase,
     ESIndexTestCase,
+    ESIndexTransactionTestCase,
     TestCase,
-    TransactionTestCase,
 )
-from cl.tests.mixins import AudioESMixin, V4SearchAPIMixin
+from cl.tests.mixins import AudioESMixin, CountESTasksMixin, V4SearchAPIMixin
 
 
 class OASearchAPICommonTests(AudioESMixin, TestCase):
@@ -291,17 +290,16 @@ class OASearchAPICommonTests(AudioESMixin, TestCase):
 
 
 class OAV3SearchAPITests(
-    V4SearchAPIMixin, OASearchAPICommonTests, ESIndexTestCase, TestCase
+    V4SearchAPIMixin, OASearchAPICommonTests, ESIndexTestCase
 ):
     version_api = "v3"
     skip_common_tests = False
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.rebuild_index("audio.Audio")
         cls.rebuild_index("alerts.Alert")
-        # Call to super must come after indices are rebuilt
-        super().setUpTestData()
 
     async def test_search_transcript(self) -> None:
         """Test search transcript."""
@@ -494,7 +492,7 @@ class OAV3SearchAPITests(
 
 
 class OAV4SearchAPITests(
-    V4SearchAPIMixin, OASearchAPICommonTests, ESIndexTestCase, TestCase
+    V4SearchAPIMixin, OASearchAPICommonTests, ESIndexTestCase
 ):
     version_api = "v4"
     skip_common_tests = False
@@ -504,10 +502,9 @@ class OAV4SearchAPITests(
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
             cls.rebuild_index("alerts.Alert")
+            super().setUpTestData()
             cls.rebuild_index("audio.Audio")
             cls.rebuild_index("alerts.Alert")
-            # Call to super must come after indices are rebuilt
-            super().setUpTestData()
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -941,16 +938,15 @@ class OAV4SearchAPITests(
             )
 
 
-class OASearchTestElasticSearch(AudioESMixin, ESIndexTestCase, TestCase):
+class OASearchTestElasticSearch(AudioESMixin, ESIndexTestCase):
     """Oral argument search tests for Elasticsearch"""
 
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("alerts.Alert")
+        super().setUpTestData()
         cls.rebuild_index("audio.Audio")
         cls.rebuild_index("alerts.Alert")
-        # Call to super must come after indices are rebuilt
-        super().setUpTestData()
 
     @classmethod
     def delete_documents_from_index(cls, index_alias, queries):
@@ -2607,9 +2603,7 @@ class OASearchTestElasticSearch(AudioESMixin, ESIndexTestCase, TestCase):
         self.assertIn("<mark>Howells</mark>", r.content.decode())
 
 
-class OralArgumentsSearchDecayRelevancyTest(
-    V4SearchAPIMixin, ESIndexTestCase, TestCase
-):
+class OralArgumentsSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
     """Oral Arguments Search Decay Relevancy Tests"""
 
     @classmethod
@@ -2887,10 +2881,9 @@ class OralArgumentsSearchDecayRelevancyTest(
             self._test_results_ordering(test, "id", version="v3")
 
 
-class OralArgumentIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class OralArgumentIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
     def setUp(self):
+        super().setUp()
         self.court_1 = CourtFactory(
             id="cabc",
             full_name="Testing Supreme Court",
@@ -2903,8 +2896,6 @@ class OralArgumentIndexingTest(
         self.docket_2 = DocketFactory.create(
             court_id=self.court_1.pk, source=Docket.SCRAPER
         )
-
-        super().setUp()
 
     @mock.patch(
         "cl.lib.es_signal_processor.allow_es_audio_indexing",

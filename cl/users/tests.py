@@ -3100,7 +3100,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         )
 
 
-class EmailBrokenTest(ESIndexTestCase, TestCase):
+class EmailBrokenTest(ESIndexTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()

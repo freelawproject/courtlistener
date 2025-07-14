@@ -32,18 +32,18 @@ from cl.search.factories import (
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Citation
 from cl.search.tasks import es_save_document, update_es_document
 from cl.tests.cases import (
-    CountESTasksTestCase,
     ESIndexTestCase,
-    TestCase,
-    TransactionTestCase,
+    ESIndexTransactionTestCase,
 )
+from cl.tests.mixins import CountESTasksMixin
 
 
-class ParentheticalESTest(ESIndexTestCase, TestCase):
+class ParentheticalESTest(ESIndexTestCase):
     """Parenthetical ES search related tests"""
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.c1 = CourtFactory(id="canb", jurisdiction="I")
         cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
         cls.c3 = CourtFactory(id="cacd", jurisdiction="FB")
@@ -506,9 +506,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         )
 
 
-class ParentheticalESSignalProcessorTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class ParentheticalESSignalProcessorTest(CountESTasksMixin, ESIndexTransactionTestCase):
     """Parenthetical ES indexing related tests"""
 
     def setUp(self):

@@ -123,7 +123,6 @@ class OpinionPageLoadTest(
     PeopleMixin,
     CourtMixin,
     ESIndexTestCase,
-    TestCase,
 ):
     @classmethod
     def setUpTestData(cls):
@@ -1136,7 +1135,7 @@ class BlockedSitemapTest(SitemapMixin, TestCase):
         )
 
     def setUp(self) -> None:
-        super.setUp()
+        super().setUp()
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": "blocked-opinions"}
         )

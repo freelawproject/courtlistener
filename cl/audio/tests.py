@@ -23,7 +23,7 @@ from cl.tests.mixins import SitemapMixin
 from cl.tests.utils import MockResponse
 
 
-class PodcastTest(ESIndexTestCase, TestCase):
+class PodcastTest(ESIndexTestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()

@@ -117,7 +117,7 @@ from cl.users.models import UserProfile
 from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 
 
-class BasicAPIPageTest(ESIndexTestCase, TestCase):
+class BasicAPIPageTest(ESIndexTestCase):
     """Test the basic views"""
 
     fixtures = [
@@ -206,11 +206,10 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             self.assertContains(response, header)
 
 
-class CoverageTests(ESIndexTestCase, TestCase):
+class CoverageTests(ESIndexTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
-        # Call to super must come after indices are rebuilt
         super().setUpTestData()
         cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FD")

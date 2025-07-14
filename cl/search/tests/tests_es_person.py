@@ -34,15 +34,18 @@ from cl.search.factories import CourtFactory
 from cl.search.models import SEARCH_TYPES
 from cl.search.tasks import es_save_document, update_es_document
 from cl.tests.cases import (
-    CountESTasksTestCase,
     ESIndexTestCase,
-    TestCase,
-    TransactionTestCase,
+    ESIndexTransactionTestCase,
 )
-from cl.tests.mixins import CourtMixin, PeopleMixin, V4SearchAPIMixin
+from cl.tests.mixins import (
+    CountESTasksMixin,
+    CourtMixin,
+    PeopleMixin,
+    V4SearchAPIMixin,
+)
 
 
-class PeopleSearchAPICommonTests(PeopleMixin, CourtMixin, TestCase):
+class PeopleSearchAPICommonTestMixin(PeopleMixin, CourtMixin):
     version_api = "v3"
     skip_common_tests = True
 
@@ -242,15 +245,13 @@ class PeopleSearchAPICommonTests(PeopleMixin, CourtMixin, TestCase):
         self.assertIn("Judith", r.content.decode())
 
 
-class PeopleV3APISearchTest(
-    PeopleSearchAPICommonTests, ESIndexTestCase, TestCase
-):
+class PeopleV3APISearchTest(PeopleSearchAPICommonTestMixin, ESIndexTestCase):
     skip_common_tests = False
 
     @classmethod
     def setUpTestData(cls):
-        super().setUpTestData()
         cls.rebuild_index("people_db.Person")
+        super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.PEOPLE,
@@ -577,9 +578,8 @@ class PeopleV3APISearchTest(
 
 class PeopleV4APISearchTest(
     V4SearchAPIMixin,
-    PeopleSearchAPICommonTests,
+    PeopleSearchAPICommonTestMixin,
     ESIndexTestCase,
-    TestCase,
 ):
     skip_common_tests = False
 
@@ -1257,15 +1257,13 @@ class PeopleV4APISearchTest(
             )
 
 
-class PeopleSearchTestElasticSearch(
-    PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
-):
+class PeopleSearchTestElasticSearch(PeopleMixin, CourtMixin, ESIndexTestCase):
     """People search tests for Elasticsearch"""
 
     @classmethod
     def setUpTestData(cls):
-        super().setUpTestData()
         cls.rebuild_index("people_db.Person")
+        super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.PEOPLE,
@@ -1998,7 +1996,7 @@ class PeopleSearchTestElasticSearch(
 
 
 class IndexJudgesPositionsCommandTest(
-    PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
+    PeopleMixin, CourtMixin, ESIndexTestCase
 ):
     """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
 
@@ -2056,9 +2054,7 @@ class IndexJudgesPositionsCommandTest(
         self.assertEqual(s.count(), 1)
 
 
-class PeopleIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class PeopleIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()

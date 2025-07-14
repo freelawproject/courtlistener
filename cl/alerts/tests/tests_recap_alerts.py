@@ -77,7 +77,7 @@ from cl.users.factories import UserProfileWithParentsFactory
     return_value="alert_hits_sweep",
 )
 class RECAPAlertsSweepIndexTest(
-    SearchAlertsMixin, RECAPSearchMixin, ESIndexTestCase, TestCase
+    SearchAlertsMixin, RECAPSearchMixin, ESIndexTestCase
 ):
     """
     RECAP Alerts Sweep Index Tests
@@ -2654,7 +2654,7 @@ class RECAPAlertsSweepIndexTest(
 )
 @override_settings(NO_MATCH_HL_SIZE=100)
 class RECAPAlertsPercolatorTest(
-    SearchAlertsMixin, RECAPSearchMixin, ESIndexTestCase, TestCase
+    SearchAlertsMixin, RECAPSearchMixin, ESIndexTestCase
 ):
     """
     RECAP Alerts Percolator Tests

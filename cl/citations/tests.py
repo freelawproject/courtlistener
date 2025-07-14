@@ -583,7 +583,7 @@ class CitationTextTest(TestCase):
             )
 
 
-class RECAPDocumentObjectTest(TestCase, ESIndexTestCase):
+class RECAPDocumentObjectTest(ESIndexTestCase):
     # pass
     @classmethod
     def setUpTestData(cls):
@@ -657,7 +657,7 @@ class RECAPDocumentObjectTest(TestCase, ESIndexTestCase):
                 self.assertEqual(citation_obj.depth, depth)
 
 
-class CitationObjectTest(TestCase, ESIndexTestCase):
+class CitationObjectTest(ESIndexTestCase):
     fixtures: list = []
 
     @classmethod
@@ -1582,9 +1582,7 @@ class CitationObjectTest(TestCase, ESIndexTestCase):
         )
 
 
-class CitationFeedTest(
-    SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
-):
+class CitationFeedTest(SearchMixin, ESIndexTestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
@@ -1638,7 +1636,7 @@ class CitationFeedTest(
         self._tree_has_content(r.content, expected_count)
 
 
-class CitationCommandTest(TestCase, ESIndexTestCase):
+class CitationCommandTest(ESIndexTestCase):
     """Test a variety of the ways that find_citations can be called."""
 
     fixtures: list = []

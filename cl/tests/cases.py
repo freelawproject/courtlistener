@@ -1,7 +1,6 @@
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
-from django.test import SimpleTestCase
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
 from rest_framework.test import APITestCase as DRFTestCase
@@ -50,7 +49,7 @@ class APITestCase(
     ELASTICSEARCH_DSL_AUTO_REFRESH=True,
     ELASTICSEARCH_DISABLED=False,
 )
-class ESIndexTestCase(SimpleTestCase):
+class ESIndexTransactionTestCase(TransactionTestCase):
     @classmethod
     def setUpClass(cls):
         _index_suffixe = cls.__name__.lower()
@@ -65,6 +64,10 @@ class ESIndexTestCase(SimpleTestCase):
             index.delete(ignore=[404, 400])
             index._name = index._name.split("-")[0]
         super().tearDownClass()
+
+    def tearDown(self) -> None:
+        self.restart_celery_throttle_key()
+        super().tearDown()
 
     @classmethod
     def rebuild_index(cls, model):
@@ -88,10 +91,6 @@ class ESIndexTestCase(SimpleTestCase):
         if keys:
             r.delete(*keys)
         keys = r.keys("celery_throttle:*")
-
-    def tearDown(self) -> None:
-        self.restart_celery_throttle_key()
-        super().tearDown()
 
     def assert_es_feed_content(self, node_tests, response, namespaces):
         """Common assertion that checks the presence of specified nodes in an
@@ -130,26 +129,5 @@ class ESIndexTestCase(SimpleTestCase):
         return " ".join(counts_text)
 
 
-class CountESTasksTestCase(SimpleTestCase):
-    def setUp(self):
-        self.task_call_count = 0
-
-    def count_task_calls(
-        self, task, immutable_signature, *args, **kwargs
-    ) -> None:
-        """Wraps the task to count its calls and assert the expected count."""
-        # Increment the call count
-        self.task_call_count += 1
-        # Call the task
-        if immutable_signature:
-            return task.s(*args, **kwargs)
-        else:
-            task.apply_async(args=args, kwargs=kwargs)
-
-    def reset_and_assert_task_count(self, expected) -> None:
-        """Resets the task call count and asserts the expected number of calls."""
-
-        assert self.task_call_count == expected, (
-            f"Expected {expected} task calls, but got {self.task_call_count}"
-        )
-        self.task_call_count = 0
+class ESIndexTestCase(ESIndexTransactionTestCase, TestCase):
+    pass
