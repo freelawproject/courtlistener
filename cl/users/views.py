@@ -24,7 +24,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect
 from django.template.defaultfilters import urlencode
-from django.template.response import SimpleTemplateResponse, TemplateResponse
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
@@ -152,7 +152,8 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
         for col in name_map
     }
 
-    return SimpleTemplateResponse(
+    return TemplateResponse(
+        request,
         "profile/alerts.html",
         {
             "docket_alerts": docket_alerts,
