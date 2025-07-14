@@ -506,7 +506,9 @@ class ParentheticalESTest(ESIndexTestCase):
         )
 
 
-class ParentheticalESSignalProcessorTest(CountESTasksMixin, ESIndexTransactionTestCase):
+class ParentheticalESSignalProcessorTest(
+    CountESTasksMixin, ESIndexTransactionTestCase
+):
     """Parenthetical ES indexing related tests"""
 
     def setUp(self):
