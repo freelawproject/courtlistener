@@ -35,7 +35,6 @@ from cl.lib.search_index_utils import (
     get_parties_from_case_name_bankr,
 )
 from cl.lib.test_helpers import (
-    RECAPSearchTestCase,
     rd_type_v4_api_keys,
     recap_document_v4_api_keys,
     recap_type_v4_api_keys,
@@ -97,9 +96,10 @@ from cl.tests.cases import (
     TransactionTestCase,
     V4SearchAPIAssertions,
 )
+from cl.tests.mixins import RECAPSearchMixin
 
 
-class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
+class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase, TestCase):
     """
     RECAP Search Tests
     """
@@ -108,6 +108,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
+        # Call to super must come after indices are rebuilt
         super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
@@ -3236,6 +3237,9 @@ class RECAPSearchDecayRelevancyTest(
     def setUpTestData(cls):
         cls.rebuild_index("search.Docket")
 
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
+
         # Same keywords but different dateFiled
         cls.docket_old = DocketFactory(
             case_name="Keyword Match",
@@ -3380,7 +3384,6 @@ class RECAPSearchDecayRelevancyTest(
             pacer_doc_id="01903600051",
         )
 
-        super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.RECAP,
@@ -3552,7 +3555,7 @@ class RECAPSearchDecayRelevancyTest(
                 self._test_results_ordering(test, "docket_id", version="v3")
 
 
-class RECAPSearchAPICommonTests(RECAPSearchTestCase):
+class RECAPSearchAPICommonTests(RECAPSearchMixin, TestCase):
     version_api = "v3"
     skip_common_tests = True
 
@@ -6057,12 +6060,13 @@ class RECAPSearchAPIV4Test(
                 )
 
 
-class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
+class RECAPFeedTest(RECAPSearchMixin, ESIndexTestCase, TestCase):
     """Tests for RECAP Search Feed"""
 
     @classmethod
     def setUpTestData(cls) -> None:
         cls.rebuild_index("search.Docket")
+        # Call to super must come after indices are rebuilt
         super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
@@ -6767,10 +6771,10 @@ class RECAPIndexingTest(
         cls.rebuild_index("search.Docket")
 
     def setUp(self):
+        super().setUp()
         self.court = CourtFactory(id="canb", jurisdiction="FB")
         self.factory = RequestFactory()
         self.site = admin.site
-        super().setUp()
 
     def _compare_response_child_value(
         self,
@@ -8265,7 +8269,7 @@ class RECAPIndexingTest(
 
 
 class RECAPHistoryTablesIndexingTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase
+    RECAPSearchMixin, ESIndexTestCase, TestCase
 ):
     """RECAP Document indexing from history tables events."""
 
@@ -8273,6 +8277,7 @@ class RECAPHistoryTablesIndexingTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
+        # Call to super must come after indices are rebuilt
         super().setUpTestData()
         # Non-RECAP Docket.
         cls.non_recap_docket = DocketFactory(
@@ -8284,6 +8289,7 @@ class RECAPHistoryTablesIndexingTest(
         )
 
     def setUp(self):
+        super().setUp()
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.RECAP,
