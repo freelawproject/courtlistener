@@ -93,7 +93,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.stats.models import Stat
-from cl.test.mixins import SearchAlertsMixin, SimpleUserDataMixin
+from cl.tests.mixins import SearchAlertsMixin, SimpleUserDataMixin
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,

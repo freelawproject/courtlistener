@@ -2769,7 +2769,7 @@ class ESIndexingTasksUtils(TestCase):
     return_value="es_sweep_indexer:log_test",
 )
 class SweepIndexerCommandTest(
-    CourtMixin, PeopleMixin, ESIndexTestCase, TestCase
+    PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     """sweep_indexer command tests for Elasticsearch"""
 

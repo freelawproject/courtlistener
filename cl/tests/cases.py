@@ -7,24 +7,7 @@ from lxml import etree, html
 from rest_framework.test import APITestCase as DRFTestCase
 
 from cl.lib.redis_utils import get_redis_interface
-
-
-class RestartRateLimitMixin:
-    """Restart the rate limiter counter to avoid getting blocked in frontend
-    after tests.
-    """
-
-    @classmethod
-    def restart_rate_limit(cls):
-        r = get_redis_interface("CACHE")
-        keys = r.keys(":1:rl:*")
-        if keys:
-            r.delete(*keys)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.restart_rate_limit()
-        super().tearDownClass()
+from .mixins import RestartRateLimitMixin
 
 
 class RestartSentEmailQuotaMixin:
