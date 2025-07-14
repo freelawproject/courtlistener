@@ -1,14 +1,9 @@
 import datetime
 import unittest
-from collections.abc import Sized
 from functools import wraps
-from typing import cast
 
-from django.apps import apps
-from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
-from lxml import etree
 
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
@@ -769,51 +764,6 @@ audio_v4_fields.update(
         "meta": [],  # type: ignore
     }
 )
-
-
-class SitemapTest(TestCase):
-    sitemap_url: str
-    expected_item_count: int
-
-    def setUpSiteDomain(self) -> None:
-        # set the domain name in the Sites framework to match the test domain name, set http url schema
-        domain = "testserver"
-        SiteModel = apps.get_model("sites", "Site")
-
-        SiteModel.objects.update_or_create(
-            pk=settings.SITE_ID, defaults={"domain": domain, "name": domain}
-        )
-
-    def assert_sitemap_has_content(self) -> None:
-        """Does content get into the sitemap?"""
-        response = self.client.get(self.sitemap_url)
-        self.assertEqual(
-            200, response.status_code, msg="Did not get a 200 OK status code."
-        )
-        xml_tree = etree.fromstring(response.content)
-        node_count = len(
-            cast(
-                Sized,
-                xml_tree.xpath(
-                    "//s:url",
-                    namespaces={
-                        "s": "http://www.sitemaps.org/schemas/sitemap/0.9"
-                    },
-                ),
-            )
-        )
-        self.assertGreater(
-            self.expected_item_count,
-            0,
-            msg="Didn't get any content in test case.",
-        )
-        self.assertEqual(
-            node_count,
-            self.expected_item_count,
-            msg="Did not get the right number of items in the sitemap.\n"
-            f"\tCounted:\t{node_count}\n"
-            f"\tExpected:\t{self.expected_item_count}",
-        )
 
 
 class AudioTestCase(TestCase):
