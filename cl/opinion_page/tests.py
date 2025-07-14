@@ -30,10 +30,7 @@ from cl.citations.utils import slugify_reporter
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import (
-    SimpleUserDataMixin,
-    SitemapTest,
-)
+from cl.lib.test_helpers import SitemapTest
 from cl.opinion_page.forms import (
     MeCourtUploadForm,
     MissCourtUploadForm,
@@ -87,7 +84,12 @@ from cl.search.models import (
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, TestCase
-from cl.tests.mixins import CourtMixin, PeopleMixin, SearchMixin
+from cl.tests.mixins import (
+    CourtMixin,
+    PeopleMixin,
+    SearchMixin,
+    SimpleUserDataMixin,
+)
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 

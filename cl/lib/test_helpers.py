@@ -6,7 +6,6 @@ from typing import cast
 
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth.hashers import make_password
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from lxml import etree
@@ -29,7 +28,6 @@ from cl.search.models import (
     Docket,
 )
 from cl.tests.cases import TestCase
-from cl.users.factories import UserProfileWithParentsFactory
 
 
 def midnight_pt_test(d: datetime.date) -> datetime.datetime:
@@ -771,16 +769,6 @@ audio_v4_fields.update(
         "meta": [],  # type: ignore
     }
 )
-
-
-class SimpleUserDataMixin:
-    @classmethod
-    def setUpTestData(cls) -> None:
-        super().setUpTestData()  # type: ignore
-        UserProfileWithParentsFactory.create(
-            user__username="pandora",
-            user__password=make_password("password"),
-        )
 
 
 class SitemapTest(TestCase):

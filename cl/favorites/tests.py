@@ -40,16 +40,13 @@ from cl.favorites.utils import (
     prayer_eligible,
     prayer_unavailable,
 )
-from cl.lib.test_helpers import (
-    AudioTestCase,
-    SimpleUserDataMixin,
-)
+from cl.lib.test_helpers import AudioTestCase
 from cl.search.factories import RECAPDocumentFactory
 from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.fakes import FakeAvailableConfirmationPage, FakeConfirmationPage
-from cl.tests.mixins import PrayAndPayMixin
+from cl.tests.mixins import PrayAndPayMixin, SimpleUserDataMixin
 from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 

@@ -50,7 +50,6 @@ from cl.favorites.models import (
 )
 from cl.lib.email_backends import get_email_count
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
@@ -60,6 +59,7 @@ from cl.tests.cases import (
     RestartSentEmailQuotaMixin,
     TestCase,
 )
+from cl.tests.mixins import SimpleUserDataMixin
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_client
 from cl.users.email_handlers import (

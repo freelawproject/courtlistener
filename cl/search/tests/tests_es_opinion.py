@@ -81,7 +81,7 @@ from cl.users.factories import UserProfileWithParentsFactory
 
 
 class OpinionSearchAPICommonTests(
-    CourtMixin, PeopleMixin, SearchMixin, TestCase
+    PeopleMixin, SearchMixin, CourtMixin, TestCase
 ):
     version_api = "v3"
     skip_common_tests = True
@@ -1214,7 +1214,7 @@ class OpinionV4APISearchTest(
 
 
 class OpinionsESSearchTest(
-    CourtMixin, PeopleMixin, SearchMixin, ESIndexTestCase, TestCase
+    PeopleMixin, SearchMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     @classmethod
     def setUpTestData(cls):
@@ -2571,7 +2571,7 @@ class OpinionSearchDecayRelevancyTest(
 
 @override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
-    CourtMixin, PeopleMixin, SearchMixin, ESIndexTestCase, TestCase
+    PeopleMixin, SearchMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3028,7 +3028,7 @@ class RelatedSearchTest(
 
 
 class IndexOpinionDocumentsCommandTest(
-    CourtMixin, PeopleMixin, SearchMixin, ESIndexTestCase, TestCase
+    PeopleMixin, SearchMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
@@ -4052,7 +4052,7 @@ class EsOpinionsIndexingTest(
 
 
 class OpinionFeedTest(
-    CourtMixin, PeopleMixin, SearchMixin, ESIndexTestCase, TestCase
+    PeopleMixin, SearchMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     """Tests for Opinion Search Feed"""
 

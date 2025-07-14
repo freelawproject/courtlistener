@@ -2,6 +2,7 @@ import datetime
 
 from cl.people_db.factories import (
     ABARatingFactory,
+    AttorneyOrganizationFactory,
     EducationFactory,
     PersonFactory,
     PoliticalAffiliationFactory,
@@ -21,6 +22,16 @@ from cl.search.factories import (
 )
 from cl.search.models import Docket
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
+
+
+class SimpleUserDataMixin:
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()  # type: ignore
+        UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
 
 
 class PrayAndPayMixin:
