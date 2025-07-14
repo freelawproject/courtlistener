@@ -15,17 +15,18 @@ from cl.audio.management.commands.transcribe import (
 )
 from cl.audio.models import Audio, AudioTranscriptionMetadata
 from cl.audio.utils import transcription_was_hallucinated
-from cl.lib.test_helpers import SitemapTest
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
+from cl.tests.mixins import SitemapMixin
 from cl.tests.utils import MockResponse
 
 
 class PodcastTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.court_1 = CourtFactory(
             id="ca9",
             full_name="Court of Appeals for the Ninth Circuit",
@@ -248,9 +249,10 @@ class PodcastTest(ESIndexTestCase, TestCase):
         )
 
 
-class AudioSitemapTest(SitemapTest):
+class AudioSitemapTest(SitemapMixin, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         AudioWithParentsFactory.create(
             local_path_mp3__data=ONE_SECOND_MP3_BYTES,
             local_path_original_file__data=ONE_SECOND_MP3_BYTES,
@@ -265,6 +267,7 @@ class AudioSitemapTest(SitemapTest):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.expected_item_count = 1
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": SEARCH_TYPES.ORAL_ARGUMENT}
@@ -277,6 +280,7 @@ class AudioSitemapTest(SitemapTest):
 class TranscriptionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.court_1 = CourtFactory(
             id="ca9",
             full_name="Court of Appeals for the Ninth Circuit",
