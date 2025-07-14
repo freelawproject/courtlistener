@@ -17,6 +17,7 @@ from cl.alerts.management.commands.cl_send_scheduled_alerts import (
 )
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
+from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import (
     ABARatingFactory,
     AttorneyFactory,
