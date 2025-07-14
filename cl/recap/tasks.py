@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import hashlib
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -2182,16 +2183,21 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         )
         raise self.retry(exc=exc)
 
-    text = r.response.text
     is_appellate = is_appellate_court(court_id)
-    # Determine the appropriate parser function based on court jurisdiction
-    # (appellate or district)
-    att_data_parser = (
-        get_data_from_appellate_att_report
-        if is_appellate
-        else get_data_from_att_report
-    )
-    att_data = att_data_parser(text, court_id)
+    is_acms_case = rd.is_acms_document()
+    if not is_acms_case:
+        text = r.response.text
+        # Determine the appropriate parser function based on court jurisdiction
+        # (appellate or district)
+        att_data_parser = (
+            get_data_from_appellate_att_report
+            if is_appellate
+            else get_data_from_att_report
+        )
+        att_data = att_data_parser(text, court_id)
+    else:
+        att_data = r.data
+        text = json.dumps(r.data, default=str)
 
     if att_data == {}:
         msg = "Not a valid attachment page upload"
@@ -2199,15 +2205,23 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         self.request.chain = None
         return []
 
+    if is_acms_case:
+        document_number = att_data["entry_number"]
+    elif is_appellate:
+        # Appellate attachments don't contain a document_number
+        document_number = None
+    else:
+        document_number = att_data["document_number"]
+
     try:
         async_to_sync(merge_attachment_page_data)(
             rd.docket_entry.docket.court,
             pacer_case_id,
             att_data["pacer_doc_id"],
-            # Appellate attachments don't contain a document_number
-            None if is_appellate else att_data["document_number"],
+            document_number,
             text,
             att_data["attachments"],
+            is_acms_attachment=is_acms_case,
         )
     except RECAPDocument.MultipleObjectsReturned:
         msg = (
