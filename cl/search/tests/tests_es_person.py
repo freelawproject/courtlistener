@@ -38,9 +38,8 @@ from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
     TransactionTestCase,
-    V4SearchAPIAssertions,
 )
-from cl.tests.mixins import CourtMixin, PeopleMixin
+from cl.tests.mixins import CourtMixin, PeopleMixin, V4SearchAPIMixin
 
 
 class PeopleSearchAPICommonTests(PeopleMixin, CourtMixin, TestCase):
@@ -250,8 +249,8 @@ class PeopleV3APISearchTest(
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("people_db.Person")
         super().setUpTestData()
+        cls.rebuild_index("people_db.Person")
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.PEOPLE,
@@ -577,10 +576,10 @@ class PeopleV3APISearchTest(
 
 
 class PeopleV4APISearchTest(
+    V4SearchAPIMixin,
     PeopleSearchAPICommonTests,
     ESIndexTestCase,
     TestCase,
-    V4SearchAPIAssertions,
 ):
     skip_common_tests = False
 
@@ -589,6 +588,7 @@ class PeopleV4APISearchTest(
         cls.rebuild_index("people_db.Person")
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
+            # Call to super must come after indices are rebuilt
             super().setUpTestData()
             call_command(
                 "cl_index_parent_and_child_docs",
@@ -1264,9 +1264,8 @@ class PeopleSearchTestElasticSearch(
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("people_db.Person")
-        # Call to super must come after indices are rebuilt
         super().setUpTestData()
+        cls.rebuild_index("people_db.Person")
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.PEOPLE,

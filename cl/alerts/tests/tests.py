@@ -93,12 +93,11 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.stats.models import Stat
-from cl.test.mixins import SimpleUserDataMixin
+from cl.test.mixins import SearchAlertsMixin, SimpleUserDataMixin
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
-    SearchAlertsAssertions,
     TestCase,
 )
 from cl.tests.utils import MockResponse, make_client
@@ -150,6 +149,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         # Set up some handy variables
         self.alert_params = {
             "query": "q=asdf",
@@ -161,6 +161,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
 
     def tearDown(self) -> None:
         Alert.objects.all().delete()
+        super().tearDown()
 
     async def test_create_alert(self) -> None:
         """Can we create an alert by sending a post?"""
@@ -752,6 +753,7 @@ class DocketAlertTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.user = UserFactory()
         cls.court = Court.objects.get(id="scotus")
 
@@ -764,6 +766,7 @@ class DocketAlertTest(TestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.before = now()
         # Create a new docket
         self.docket = Docket.objects.create(
@@ -794,6 +797,7 @@ class DocketAlertTest(TestCase):
         Docket.objects.all().delete()
         DocketAlert.objects.all().delete()
         DocketEntry.objects.all().delete()
+        super().tearDown()
 
     def test_triggering_docket_alert(self) -> None:
         """Does the alert trigger when it should?"""
@@ -1481,15 +1485,15 @@ class AlertAPITests(APITestCase, ESIndexTestCase, TestCase):
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
-class SearchAlertsWebhooksTest(
-    ESIndexTestCase, TestCase, SearchAlertsAssertions
-):
+class SearchAlertsWebhooksTest(SearchAlertsMixin, ESIndexTestCase, TestCase):
     """Test Search Alerts Webhooks"""
 
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("alerts.Alert")
         cls.rebuild_index("search.OpinionCluster")
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
         cls.user_profile = UserProfileWithParentsFactory()
         cls.user_profile_1 = UserProfileWithParentsFactory()
         NeonMembership.objects.create(
@@ -3361,13 +3365,15 @@ class DocketAlertGetNotesTagsTests(TestCase):
     side_effect=lambda x, y: True,
 )
 @override_settings(NO_MATCH_HL_SIZE=100)
-class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
+class SearchAlertsOAESTests(SearchAlertsMixin, ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""
 
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("audio.Audio")
         cls.rebuild_index("alerts.Alert")
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
         cls.court_1 = CourtFactory(
             id="cabc",
             full_name="Testing Supreme Court",
@@ -4736,6 +4742,7 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user_profile = UserProfileWithParentsFactory()
         cls.user_profile_2 = UserProfileWithParentsFactory()
 
@@ -4785,6 +4792,7 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
     def tearDown(self) -> None:
         self.delete_index("alerts.Alert")
         self.create_index("alerts.Alert")
+        super().tearDown()
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=20)
     @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
@@ -4899,6 +4907,7 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
 class OneClickUnsubscribeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user_profile = UserProfileWithParentsFactory()
         cls.alert = DocketAlertWithParentsFactory(
             docket__source=Docket.RECAP,
@@ -4928,6 +4937,7 @@ class OneClickUnsubscribeTests(TestCase):
 @override_settings(EMAIL_BACKEND="cl.lib.email_backends.EmailBackend")
 class EmailWithSurrogatesTest(TestCase):
     def setUp(self):
+        super().setUp()
         EmailSent.objects.all().delete()
 
     @mock.patch("django_ses.SESBackend.get_rate_limit", return_value=10)

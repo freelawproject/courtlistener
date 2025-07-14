@@ -119,9 +119,9 @@ class SimpleLoadTest(TestCase):
 
 
 class OpinionPageLoadTest(
-    CourtMixin,
-    PeopleMixin,
     SearchMixin,
+    PeopleMixin,
+    CourtMixin,
     ESIndexTestCase,
     TestCase,
 ):

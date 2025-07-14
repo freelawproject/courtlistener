@@ -74,14 +74,18 @@ from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
     TransactionTestCase,
-    V4SearchAPIAssertions,
 )
-from cl.tests.mixins import CourtMixin, PeopleMixin, SearchMixin
+from cl.tests.mixins import (
+    CourtMixin,
+    PeopleMixin,
+    SearchMixin,
+    V4SearchAPIMixin,
+)
 from cl.users.factories import UserProfileWithParentsFactory
 
 
 class OpinionSearchAPICommonTests(
-    PeopleMixin, SearchMixin, CourtMixin, TestCase
+    SearchMixin, PeopleMixin, CourtMixin, TestCase
 ):
     version_api = "v3"
     skip_common_tests = True
@@ -561,10 +565,10 @@ class OpinionV3APISearchTest(
 
 
 class OpinionV4APISearchTest(
+    V4SearchAPIMixin,
     OpinionSearchAPICommonTests,
     ESIndexTestCase,
     TestCase,
-    V4SearchAPIAssertions,
 ):
     version_api = "v4"
     skip_common_tests = False
@@ -1214,7 +1218,7 @@ class OpinionV4APISearchTest(
 
 
 class OpinionsESSearchTest(
-    PeopleMixin, SearchMixin, CourtMixin, ESIndexTestCase, TestCase
+    SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     @classmethod
     def setUpTestData(cls):
@@ -2305,7 +2309,7 @@ class OpinionsESSearchTest(
 
 
 class OpinionSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    V4SearchAPIMixin, ESIndexTestCase, TestCase
 ):
     """
     Opinion Search Decay Relevancy Tests
@@ -2316,6 +2320,8 @@ class OpinionSearchDecayRelevancyTest(
         # Rebuild the Opinion index
         cls.rebuild_index("search.OpinionCluster")
 
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
         # Same keywords but different dateFiled
         cls.opinion_old = OpinionClusterFactory.create(
             case_name="Keyword Match",
@@ -2449,7 +2455,6 @@ class OpinionSearchDecayRelevancyTest(
             author_str="",
         )
 
-        super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.OPINION,
@@ -2571,7 +2576,7 @@ class OpinionSearchDecayRelevancyTest(
 
 @override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
-    PeopleMixin, SearchMixin, CourtMixin, ESIndexTestCase, TestCase
+    SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3028,7 +3033,7 @@ class RelatedSearchTest(
 
 
 class IndexOpinionDocumentsCommandTest(
-    PeopleMixin, SearchMixin, CourtMixin, ESIndexTestCase, TestCase
+    SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
@@ -4052,7 +4057,7 @@ class EsOpinionsIndexingTest(
 
 
 class OpinionFeedTest(
-    PeopleMixin, SearchMixin, CourtMixin, ESIndexTestCase, TestCase
+    SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     """Tests for Opinion Search Feed"""
 
