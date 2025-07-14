@@ -663,7 +663,7 @@ class APITests(APITestCase, TestCase):
         self.assertEqual(response.json()["count"], 1)
 
 
-class RECAPPrayAndPay(TestCase, SimpleUserDataMixin, PrayAndPayMixin):
+class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayMixin, TestCase):
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
         """Does the prayer_eligible method work properly?"""
@@ -1434,7 +1434,7 @@ class RECAPPrayAndPay(TestCase, SimpleUserDataMixin, PrayAndPayMixin):
 
 @patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
 @patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
-class PrayAndPaySignalTests(TestCase, PrayAndPayMixin):
+class PrayAndPaySignalTests(PrayAndPayMixin, TestCase):
     @patch("cl.favorites.signals.check_prayer_pacer")
     async def test_create_prayer_no_pacer_doc_id(
         self,
@@ -1561,7 +1561,7 @@ class PrayAndPaySignalTests(TestCase, PrayAndPayMixin):
 
 @patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
 @patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
-class PrayAndPayCheckAvailabilityTaskTests(TestCase, PrayAndPayMixin):
+class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayMixin, TestCase):
     @patch(
         "cl.favorites.tasks.DownloadConfirmationPage", new=FakeConfirmationPage
     )
@@ -1702,7 +1702,7 @@ class PrayAndPayCheckAvailabilityTaskTests(TestCase, PrayAndPayMixin):
         mock_check_prayer_pacer.delay.assert_called_once()
 
 
-class PrayerAPITests(TestCase, PrayAndPayMixin):
+class PrayerAPITests(PrayAndPayMixin, TestCase):
     """Check that Prayer API operations work as expected."""
 
     def setUp(self) -> None:
