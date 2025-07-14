@@ -42,7 +42,6 @@ jobs:
 
             const labels = pr.labels.map(l => l.name);
             core.setOutput("labels", labels.join(","));
-            core.setOutput("pr_number", pr.number);
             console.log(`PR #${pr.number} labels: ${labels.join(", ")}`);
 
   build:
