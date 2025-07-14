@@ -7,23 +7,8 @@ from lxml import etree, html
 from rest_framework.test import APITestCase as DRFTestCase
 
 from cl.lib.redis_utils import get_redis_interface
+
 from .mixins import RestartRateLimitMixin
-
-
-class RestartSentEmailQuotaMixin:
-    """Restart sent email quota in redis."""
-
-    @classmethod
-    def restart_sent_email_quota(cls, prefix="email"):
-        r = get_redis_interface("CACHE")
-        keys = r.keys(f"{prefix}:*")
-
-        if keys:
-            r.delete(*keys)
-
-    def tearDown(self):
-        self.restart_sent_email_quota()
-        super().tearDown()
 
 
 class TestCase(
