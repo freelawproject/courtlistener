@@ -107,7 +107,7 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_docket_alerts(request: HttpRequest) -> HttpResponse:
+def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
     order_by_param = request.GET.get("order_by", "")
     if order_by_param.startswith("-"):
         direction = "-"
