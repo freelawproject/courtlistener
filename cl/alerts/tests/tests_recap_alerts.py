@@ -66,8 +66,8 @@ from cl.search.tasks import (
     index_docket_parties_in_es,
 )
 from cl.stats.models import Stat
-from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
-from cl.tests.mixins import RECAPSearchMixin
+from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.mixins import RECAPSearchMixin, SearchAlertsMixin
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -77,7 +77,7 @@ from cl.users.factories import UserProfileWithParentsFactory
     return_value="alert_hits_sweep",
 )
 class RECAPAlertsSweepIndexTest(
-    RECAPSearchMixin, ESIndexTestCase, TestCase, SearchAlertsAssertions
+    SearchAlertsMixin, RECAPSearchMixin, ESIndexTestCase, TestCase
 ):
     """
     RECAP Alerts Sweep Index Tests
@@ -2654,7 +2654,7 @@ class RECAPAlertsSweepIndexTest(
 )
 @override_settings(NO_MATCH_HL_SIZE=100)
 class RECAPAlertsPercolatorTest(
-    RECAPSearchMixin, ESIndexTestCase, TestCase, SearchAlertsAssertions
+    SearchAlertsMixin, RECAPSearchMixin, ESIndexTestCase, TestCase
 ):
     """
     RECAP Alerts Percolator Tests

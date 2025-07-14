@@ -94,9 +94,8 @@ from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
     TransactionTestCase,
-    V4SearchAPIAssertions,
 )
-from cl.tests.mixins import RECAPSearchMixin
+from cl.tests.mixins import RECAPSearchMixin, V4SearchAPIMixin
 
 
 class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase, TestCase):
@@ -3227,7 +3226,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase, TestCase):
 
 
 class RECAPSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    V4SearchAPIMixin, ESIndexTestCase, TestCase
 ):
     """
     RECAP Search Decay Relevancy  Tests
@@ -3884,7 +3883,7 @@ class RECAPSearchAPICommonTests(RECAPSearchMixin, TestCase):
 
 
 class RECAPSearchAPIV3Test(
-    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    V4SearchAPIMixin, RECAPSearchAPICommonTests, ESIndexTestCase, TestCase
 ):
     """
     RECAP Search API V3 Tests
@@ -4263,7 +4262,7 @@ class RECAPESResultSerializerTest(RECAPESResultSerializer):
 
 
 class RECAPSearchAPIV4Test(
-    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    V4SearchAPIMixin, RECAPSearchAPICommonTests, ESIndexTestCase, TestCase
 ):
     """
     RECAP Search API V4 Tests
@@ -4278,6 +4277,7 @@ class RECAPSearchAPIV4Test(
         cls.rebuild_index("search.Docket")
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
+            # Call to super must come after indices are rebuilt
             super().setUpTestData()
             call_command(
                 "cl_index_parent_and_child_docs",

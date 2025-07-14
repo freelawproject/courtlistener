@@ -44,7 +44,8 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import Docket, DocketEntry, RECAPDocument
-from cl.tests.cases import SearchAlertsAssertions, TestCase
+from cl.tests.cases import TestCase
+from cl.tests.mixins import SearchAlertsMixin
 from cl.tests.utils import AsyncAPIClient, MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -57,6 +58,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.court = CourtFactory(id="txwd", jurisdiction="FB")
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with open(
@@ -71,6 +73,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
             }
 
     def setUp(self) -> None:
+        super().setUp()
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
         token = f"Token {self.user.auth_token.key}"
@@ -148,11 +151,12 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
     "cl.recap.tasks.is_docket_entry_sealed",
     return_value=False,
 )
-class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
+class RecapEmailDocketAlerts(SearchAlertsMixin, TestCase):
     """Test recap email docket alerts"""
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user_profile = UserProfileWithParentsFactory()
         cls.user_profile_2 = UserProfileWithParentsFactory()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
@@ -293,6 +297,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
         token = f"Token {self.user.auth_token.key}"
@@ -2672,6 +2677,7 @@ class GetAndCopyRecapAttachments(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user = User.objects.get(username="recap-email")
         cls.d_1 = Docket.objects.create(
             source=0, court_id="scotus", pacer_case_id="12345"
@@ -2853,6 +2859,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.court_ca9 = CourtFactory(id="ca9", jurisdiction="F")
         cls.court_ca11 = CourtFactory(id="ca11", jurisdiction="F")
         cls.court_ca2 = CourtFactory(id="ca2", jurisdiction="F")
@@ -2902,6 +2909,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         }
 
     def setUp(self) -> None:
+        super().setUp()
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
         token = f"Token {self.user.auth_token.key}"
@@ -3199,6 +3207,7 @@ class RecapEmailContentReplication(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user_profile = UserProfileWithParentsFactory()
         cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
 
@@ -3243,6 +3252,7 @@ class RecapEmailContentReplication(TestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
         token = f"Token {self.user.auth_token.key}"

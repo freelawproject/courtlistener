@@ -36,9 +36,8 @@ from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
     TransactionTestCase,
-    V4SearchAPIAssertions,
 )
-from cl.tests.mixins import AudioESMixin
+from cl.tests.mixins import AudioESMixin, V4SearchAPIMixin
 
 
 class OASearchAPICommonTests(AudioESMixin, TestCase):
@@ -292,7 +291,7 @@ class OASearchAPICommonTests(AudioESMixin, TestCase):
 
 
 class OAV3SearchAPITests(
-    OASearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    V4SearchAPIMixin, OASearchAPICommonTests, ESIndexTestCase, TestCase
 ):
     version_api = "v3"
     skip_common_tests = False
@@ -495,7 +494,7 @@ class OAV3SearchAPITests(
 
 
 class OAV4SearchAPITests(
-    OASearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    V4SearchAPIMixin, OASearchAPICommonTests, ESIndexTestCase, TestCase
 ):
     version_api = "v4"
     skip_common_tests = False
@@ -505,9 +504,10 @@ class OAV4SearchAPITests(
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
             cls.rebuild_index("alerts.Alert")
-            super().setUpTestData()
             cls.rebuild_index("audio.Audio")
             cls.rebuild_index("alerts.Alert")
+            # Call to super must come after indices are rebuilt
+            super().setUpTestData()
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -941,15 +941,16 @@ class OAV4SearchAPITests(
             )
 
 
-class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
+class OASearchTestElasticSearch(AudioESMixin, ESIndexTestCase, TestCase):
     """Oral argument search tests for Elasticsearch"""
 
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("alerts.Alert")
-        super().setUpTestData()
         cls.rebuild_index("audio.Audio")
         cls.rebuild_index("alerts.Alert")
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
 
     @classmethod
     def delete_documents_from_index(cls, index_alias, queries):
@@ -2607,12 +2608,13 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
 
 class OralArgumentsSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    V4SearchAPIMixin, ESIndexTestCase, TestCase
 ):
     """Oral Arguments Search Decay Relevancy Tests"""
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         # Same keywords but different dateArgued
         with cls.captureOnCommitCallbacks(execute=True):
             cls.docket_old = DocketFactory.create(
