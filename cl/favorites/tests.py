@@ -443,7 +443,7 @@ class APITests(APITestCase, TestCase):
         self.client = make_client(self.pandora.user.pk)
         self.client2 = make_client(self.unconfirmed.user.pk)
 
-    def tearDown(cls):
+    def tearDown(self):
         UserTag.objects.all().delete()
         DocketTag.objects.all().delete()
         super().tearDown()
