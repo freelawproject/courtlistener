@@ -43,7 +43,7 @@
       <li>Your application should use the <a class="underline" href="{% url 'webhooks_docs' %}#headers">Idempotency-Key included in the event headers</a> to ensure that it only processes the event once.</li>
     </ul>
     <p>Below are examples of endpoints configured in Flask and Django</p>
-    <p><strong>Flask</strong></p>
+    <h3>Flask</h3>
     <c-code>from flask import Flask, request, Response
 app = Flask(__name__)
 
@@ -53,7 +53,7 @@ def respond():
     print(request.json)
     return Response(status=200)
     </c-code>
-    <p><strong>Django</strong></p>
+    <h3>Django</h3>
     <c-code>from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpRequest, HttpResponse
 
