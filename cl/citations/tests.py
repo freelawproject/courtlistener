@@ -1583,7 +1583,7 @@ class CitationObjectTest(TestCase, ESIndexTestCase):
 
 
 class CitationFeedTest(
-    CourtMixin, PeopleMixin, SearchMixin, ESIndexTestCase, TestCase
+    PeopleMixin, SearchMixin, CourtMixin, ESIndexTestCase, TestCase
 ):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -2347,7 +2347,7 @@ class GroupParentheticalsTest(SimpleTestCase):
     "cl.api.utils.CitationCountRateThrottle.get_cache_key_for_citations",
     return_value="citations_tests",
 )
-class CitationLookUpApiTest(CourtMixin, PeopleMixin, SearchMixin, TestCase):
+class CitationLookUpApiTest(PeopleMixin, SearchMixin, CourtMixin, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()

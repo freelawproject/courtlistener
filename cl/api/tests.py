@@ -51,7 +51,7 @@ from cl.disclosures.api_views import (
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.favorites.models import GenericCount
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
+from cl.lib.test_helpers import AudioTestCase
 from cl.people_db.api_views import (
     ABARatingViewSet,
     AttorneyViewSet,
@@ -111,6 +111,7 @@ from cl.tests.cases import (
     TestCase,
     TransactionTestCase,
 )
+from cl.tests.mixins import SimpleUserDataMixin
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 from cl.users.models import UserProfile

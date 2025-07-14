@@ -67,7 +67,7 @@ from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
-from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
+from cl.lib.test_helpers import opinion_v3_search_api_keys
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
     ES_CHILD_ID,
@@ -93,6 +93,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.stats.models import Stat
+from cl.test.mixins import SimpleUserDataMixin
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
