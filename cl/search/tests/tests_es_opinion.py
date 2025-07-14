@@ -26,7 +26,6 @@ from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
-    SearchTestCase,
     opinion_document_v4_api_keys,
     opinion_v3_search_api_keys,
     opinion_v4_search_api_keys,
@@ -77,12 +76,12 @@ from cl.tests.cases import (
     TransactionTestCase,
     V4SearchAPIAssertions,
 )
-from cl.tests.mixins import CourtMixin, PeopleMixin
+from cl.tests.mixins import CourtMixin, PeopleMixin, SearchMixin
 from cl.users.factories import UserProfileWithParentsFactory
 
 
 class OpinionSearchAPICommonTests(
-    CourtMixin, PeopleMixin, SearchTestCase, TestCase
+    CourtMixin, PeopleMixin, SearchMixin, TestCase
 ):
     version_api = "v3"
     skip_common_tests = True
@@ -1215,7 +1214,7 @@ class OpinionV4APISearchTest(
 
 
 class OpinionsESSearchTest(
-    ESIndexTestCase, CourtMixin, PeopleMixin, SearchTestCase, TestCase
+    CourtMixin, PeopleMixin, SearchMixin, ESIndexTestCase, TestCase
 ):
     @classmethod
     def setUpTestData(cls):
@@ -2572,7 +2571,7 @@ class OpinionSearchDecayRelevancyTest(
 
 @override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
-    ESIndexTestCase, CourtMixin, PeopleMixin, SearchTestCase, TestCase
+    CourtMixin, PeopleMixin, SearchMixin, ESIndexTestCase, TestCase
 ):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3029,7 +3028,7 @@ class RelatedSearchTest(
 
 
 class IndexOpinionDocumentsCommandTest(
-    ESIndexTestCase, CourtMixin, PeopleMixin, SearchTestCase, TestCase
+    CourtMixin, PeopleMixin, SearchMixin, ESIndexTestCase, TestCase
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
@@ -4053,7 +4052,7 @@ class EsOpinionsIndexingTest(
 
 
 class OpinionFeedTest(
-    ESIndexTestCase, CourtMixin, PeopleMixin, SearchTestCase, TestCase
+    CourtMixin, PeopleMixin, SearchMixin, ESIndexTestCase, TestCase
 ):
     """Tests for Opinion Search Feed"""
 
