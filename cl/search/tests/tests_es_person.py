@@ -14,7 +14,6 @@ from lxml import html
 from cl.lib.elasticsearch_utils import build_es_base_query, build_es_main_query
 from cl.lib.search_index_utils import extract_field_values
 from cl.lib.test_helpers import (
-    PeopleTestCase,
     people_v4_fields,
     position_v4_fields,
     skip_if_common_tests_skipped,
@@ -41,10 +40,10 @@ from cl.tests.cases import (
     TransactionTestCase,
     V4SearchAPIAssertions,
 )
-from cl.tests.mixins import CourtMixin
+from cl.tests.mixins import CourtMixin, PeopleMixin
 
 
-class PeopleSearchAPICommonTests(TestCase, CourtMixin, PeopleTestCase):
+class PeopleSearchAPICommonTests(TestCase, CourtMixin, PeopleMixin):
     version_api = "v3"
     skip_common_tests = True
 
@@ -1259,7 +1258,7 @@ class PeopleV4APISearchTest(
 
 
 class PeopleSearchTestElasticSearch(
-    TestCase, CourtMixin, PeopleTestCase, ESIndexTestCase
+    TestCase, CourtMixin, PeopleMixin, ESIndexTestCase
 ):
     """People search tests for Elasticsearch"""
 
@@ -1999,7 +1998,7 @@ class PeopleSearchTestElasticSearch(
 
 
 class IndexJudgesPositionsCommandTest(
-    TestCase, CourtMixin, PeopleTestCase, ESIndexTestCase
+    TestCase, CourtMixin, PeopleMixin, ESIndexTestCase
 ):
     """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
 

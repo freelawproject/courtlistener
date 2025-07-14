@@ -31,7 +31,6 @@ from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
-    PeopleTestCase,
     SearchTestCase,
     SimpleUserDataMixin,
     SitemapTest,
@@ -89,7 +88,7 @@ from cl.search.models import (
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, TestCase
-from cl.tests.mixins import CourtMixin
+from cl.tests.mixins import CourtMixin, PeopleMixin
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -122,7 +121,7 @@ class OpinionPageLoadTest(
     TestCase,
     ESIndexTestCase,
     CourtMixin,
-    PeopleTestCase,
+    PeopleMixin,
     SearchTestCase,
 ):
     @classmethod
