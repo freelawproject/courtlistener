@@ -4,8 +4,11 @@ from django.contrib.auth.hashers import make_password
 
 from cl.people_db.factories import (
     ABARatingFactory,
+    AttorneyFactory,
     AttorneyOrganizationFactory,
     EducationFactory,
+    PartyFactory,
+    PartyTypeFactory,
     PersonFactory,
     PoliticalAffiliationFactory,
     PositionFactory,
@@ -662,3 +665,106 @@ class AudioMixin:
     def tearDownClass(cls):
         Audio.objects.all().delete()
         super().tearDownClass()
+
+
+class AudioESMixin:
+    """Audio test case factories for ES"""
+
+    fixtures = [
+        "test_court.json",
+        "judge_judy.json",
+        "test_objects_search.json",
+    ]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.court_1 = CourtFactory(
+            id="cabc",
+            full_name="Testing Supreme Court",
+            jurisdiction="FB",
+            citation_string="Bankr. C.D. Cal.",
+        )
+        cls.court_2 = CourtFactory(
+            id="nyed",
+            full_name="Court of Appeals for the First Circuit",
+            jurisdiction="FB",
+            citation_string="Bankr. C.D. Cal.",
+        )
+        cls.docket_1 = DocketFactory.create(
+            docket_number="1:21-bk-1234",
+            court_id=cls.court_1.pk,
+            date_argued=datetime.date(2015, 8, 16),
+            date_reargued=datetime.date(2016, 9, 16),
+            date_reargument_denied=datetime.date(2017, 10, 16),
+        )
+        cls.docket_2 = DocketFactory.create(
+            docket_number="19-5734",
+            court_id=cls.court_1.pk,
+            date_argued=datetime.date(2015, 8, 15),
+        )
+        cls.docket_3 = DocketFactory.create(
+            docket_number="ASBCA No. 59126",
+            court_id=cls.court_2.pk,
+            date_argued=datetime.date(2015, 8, 14),
+        )
+        cls.docket_4 = DocketFactory.create(
+            docket_number="1:21-cv-1234-ABC",
+            court_id=cls.court_1.pk,
+            date_argued=datetime.date(2013, 8, 14),
+        )
+        cls.transcript = "This is the best transcript. Nunc egestas sem sed libero feugiat, at interdum quam viverra. Pellentesque hendrerit ut augue at sagittis. Mauris faucibus fringilla lacus, eget maximus risus. Phasellus id mi at eros fermentum vestibulum nec nec diam. In nec sapien nunc. Ut massa ante, accumsan a erat eget, rhoncus pellentesque felis."
+        cls.filepath_local = SimpleUploadedFile(
+            "sec_frank.mp3", b"mp3 binary content", content_type="audio/mpeg"
+        )
+        cls.audio_1 = AudioFactory.create(
+            case_name="SEC v. Frank J. Information, WikiLeaks",
+            case_name_full="a_random_title",
+            docket_id=cls.docket_1.pk,
+            duration=420,
+            judges="Mary Deposit Learning rd Administrative procedures act",
+            local_path_original_file="test/audio/ander_v._leo.mp3",
+            local_path_mp3=cls.filepath_local,
+            source="C",
+            blocked=False,
+            sha1="a49ada009774496ac01fb49818837e2296705c97",
+            stt_status=Audio.STT_COMPLETE,
+            stt_transcript=cls.transcript,
+        )
+        cls.audio_2 = AudioFactory.create(
+            case_name="Jose A. Dominguez v. Loretta E. Lynch",
+            docket_id=cls.docket_2.pk,
+            duration=837,
+            judges="Wallace and Friedland Learn of rd",
+            local_path_original_file="mp3/2014/06/09/ander_v._leo.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            source="C",
+            sha1="a49ada009774496ac01fb49818837e2296705c92",
+        )
+        cls.audio_3 = AudioFactory.create(
+            case_name="Hong Liu Yang v. Lynch-Loretta E. Howell",
+            docket_id=cls.docket_3.pk,
+            duration=653,
+            judges="Joseph Information Deposition H Administrative magazine",
+            local_path_original_file="mp3/2015/07/08/hong_liu_yang_v._loretta_e._lynch.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            source="CR",
+            sha1="a49ada009774496ac01fb49818837e2296705c93",
+        )
+        cls.author = PersonFactory.create()
+        cls.audio_4 = AudioFactory.create(
+            case_name="Hong Liu Lorem v. Lynch-Loretta E.",
+            docket_id=cls.docket_3.pk,
+            duration=653,
+            judges="John Smith ptsd mag",
+            sha1="a49ada009774496ac01fb49818837e2296705c94",
+        )
+        cls.audio_4.panel.add(cls.author)
+        cls.audio_5 = AudioFactory.create(
+            case_name="Freedom of Inform Wikileaks Howells",
+            docket_id=cls.docket_4.pk,
+            duration=400,
+            judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate Freedom of Inform Wikileaks",
+            sha1="a49ada009774496ac01fb49818837e2296705c95",
+        )
+        cls.audio_1.panel.add(cls.author)

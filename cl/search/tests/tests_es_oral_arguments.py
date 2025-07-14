@@ -22,7 +22,6 @@ from cl.lib.elasticsearch_utils import (
     fetch_es_results,
 )
 from cl.lib.test_helpers import (
-    AudioESTestCase,
     audio_v3_fields,
     audio_v4_fields,
     skip_if_common_tests_skipped,
@@ -39,9 +38,10 @@ from cl.tests.cases import (
     TransactionTestCase,
     V4SearchAPIAssertions,
 )
+from cl.tests.mixins import AudioESMixin
 
 
-class OASearchAPICommonTests(AudioESTestCase):
+class OASearchAPICommonTests(AudioESMixin, TestCase):
     version_api = "v3"
     skip_common_tests = True
 
@@ -299,9 +299,10 @@ class OAV3SearchAPITests(
 
     @classmethod
     def setUpTestData(cls):
-        super().setUpTestData()
         cls.rebuild_index("audio.Audio")
         cls.rebuild_index("alerts.Alert")
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
 
     async def test_search_transcript(self) -> None:
         """Test search transcript."""
