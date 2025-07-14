@@ -1214,9 +1214,7 @@ class OpinionV4APISearchTest(
                 self.assertEqual(r.data["results"][0][field], [])
 
 
-class OpinionsESSearchTest(
-    SearchMixin, ESIndexTestCase
-):
+class OpinionsESSearchTest(SearchMixin, ESIndexTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
