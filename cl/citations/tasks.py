@@ -185,18 +185,20 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         if disconnect_pg_signals:
             reconnect_parenthetical_group_signals()
 
-    # Schedule a new retry task with the opinions that failed due to OperationalError
+    # Retry task with the opinions that failed due to OperationalError
     if failed_ids:
         logger.warning(
-            "Scheduling retry for %d failed opinions", len(failed_ids)
+            "Retrying %d failed opinions due to OperationalError:",
+            len(failed_ids),
         )
-        find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
+        raise self.retry(
+            exc=OperationalError("Batch retry for failed opinion ids"),
+            countdown=5,
             args=(
                 failed_ids,
                 disconnect_pg_signals,
                 disable_citation_count_update,
             ),
-            countdown=5,
         )
 
 
