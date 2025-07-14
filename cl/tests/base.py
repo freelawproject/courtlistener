@@ -21,7 +21,7 @@ from timeout_decorator import TimeoutError
 
 from cl.lib.decorators import retry
 from cl.search.models import SEARCH_TYPES
-from cl.tests.cases import ESIndexTestCase, StaticLiveServerTestCase
+from cl.tests.cases import ESIndexTransactionTestCase, StaticLiveServerTestCase
 
 SELENIUM_TIMEOUT = 120
 if "SELENIUM_TIMEOUT" in os.environ:
@@ -36,7 +36,7 @@ if "SELENIUM_TIMEOUT" in os.environ:
     ALLOWED_HOSTS=["*"],
 )
 class BaseSeleniumTest(
-    SerializeMixin, StaticLiveServerTestCase, ESIndexTestCase
+    SerializeMixin, StaticLiveServerTestCase, ESIndexTransactionTestCase
 ):
     """Base class for Selenium Tests. Sets up a few attributes:
       * browser - instance of Selenium WebDriver
