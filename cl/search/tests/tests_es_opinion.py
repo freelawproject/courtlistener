@@ -26,7 +26,6 @@ from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
-    PeopleTestCase,
     SearchTestCase,
     opinion_document_v4_api_keys,
     opinion_v3_search_api_keys,
@@ -78,12 +77,12 @@ from cl.tests.cases import (
     TransactionTestCase,
     V4SearchAPIAssertions,
 )
-from cl.tests.mixins import CourtMixin
+from cl.tests.mixins import CourtMixin, PeopleMixin
 from cl.users.factories import UserProfileWithParentsFactory
 
 
 class OpinionSearchAPICommonTests(
-    TestCase, CourtMixin, PeopleTestCase, SearchTestCase
+    TestCase, CourtMixin, PeopleMixin, SearchTestCase
 ):
     version_api = "v3"
     skip_common_tests = True
@@ -1216,7 +1215,7 @@ class OpinionV4APISearchTest(
 
 
 class OpinionsESSearchTest(
-    TestCase, ESIndexTestCase, CourtMixin, PeopleTestCase, SearchTestCase
+    TestCase, ESIndexTestCase, CourtMixin, PeopleMixin, SearchTestCase
 ):
     @classmethod
     def setUpTestData(cls):
@@ -2573,7 +2572,7 @@ class OpinionSearchDecayRelevancyTest(
 
 @override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
-    TestCase, ESIndexTestCase, CourtMixin, PeopleTestCase, SearchTestCase
+    TestCase, ESIndexTestCase, CourtMixin, PeopleMixin, SearchTestCase
 ):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3030,7 +3029,7 @@ class RelatedSearchTest(
 
 
 class IndexOpinionDocumentsCommandTest(
-    TestCase, ESIndexTestCase, CourtMixin, PeopleTestCase, SearchTestCase
+    TestCase, ESIndexTestCase, CourtMixin, PeopleMixin, SearchTestCase
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
@@ -3038,7 +3037,6 @@ class IndexOpinionDocumentsCommandTest(
     def setUpTestData(cls):
         super().setUpTestData()
         cls.rebuild_index("search.OpinionCluster")
-        super().setUpTestData()
         cls.delete_index("search.OpinionCluster")
         cls.create_index("search.OpinionCluster")
 
@@ -4055,7 +4053,7 @@ class EsOpinionsIndexingTest(
 
 
 class OpinionFeedTest(
-    TestCase, ESIndexTestCase, CourtMixin, PeopleTestCase, SearchTestCase
+    TestCase, ESIndexTestCase, CourtMixin, PeopleMixin, SearchTestCase
 ):
     """Tests for Opinion Search Feed"""
 
