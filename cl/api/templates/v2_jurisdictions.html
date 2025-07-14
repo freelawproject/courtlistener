@@ -24,59 +24,38 @@
     </p>
 
     <div class="overflow-x-auto">
-        <table class="table-fixed w-full">
-            <thead class="text-left">
-                <tr>
-                    <th class="w-1/4 py-2">Name</th>
-                    <th class="w-1/12 py-2" title="The number of cases in this court on CourtListener">Count</th>
-                    <th class="w-1/6 py-2">Jurisdiction</th>
-                    <th class="w-1/6 py-2">Homepage</th>
-                    <th class="w-1/12 py-2" title="The value used in our URLs, bulk data, etc.">
-                        Abbreviation
-                    </th>
-                    <th class="w-1/6 py-2" title="Gathered from Blue Book, Cornell.edu and ALWD">
-                        Citation Abbreviation
-                    </th>
-                    <th class="w-1/12 py-2" title="The date the court came into existence">
-                        Start&nbsp;Date
-                    </th>
-                    <th class="w-1/12 py-2" title="The date the court was abolished, if applicable">
-                        End&nbsp;Date
-                    </th>
-                    <th class="w-1/12 py-2" title="Whether the court is in use in CourtListener">
-                        In&nbsp;Use
-                    </th>
-                    <th class="w-1/12 py-2" title="When this row was last modified in our database">
-                        Modified
-                    </th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for court in courts %}
-                <tr class="border-t">
-                    <td class="py-2">{{ court.full_name }}</td>
-                    <td class="py-2">{{ court.count|intcomma }}</td>
-                    <td class="py-2">{{ court.get_jurisdiction_display|nbsp }}</td>
-                    <td class="py-2 truncate" title="{{ court.url }}">
-                        <a href="{{ court.url }}" target="_blank" class="underline">
-                            {{ court.url|slice:"20" }}{% if court.url|length > 20 %}&hellip;{% endif %}
-                        </a>
-                    </td>
-                    <td class="py-2">
-                        <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc"
-                           rel="nofollow"
-                           class="underline"
-                        >{{ court.pk }}</a>
-                    </td>
-                    <td class="py-2">{{ court.citation_string }}</td>
-                    <td class="py-2">{{ court.start_date|date:"Y-m-d"|default:"Unknown" }}</td>
-                    <td class="py-2">{{ court.end_date|date:"Y-m-d"|default:"Unknown" }}</td>
-                    <td class="py-2">{{ court.in_use|yesno|title }}</td>
-                    <td class="py-2">{{ court.date_modified|date:"c"|slice:"16"|default:"None yet" }}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        <c-data-table
+        safe
+        caption="A list of all courts in the database and their metadata."
+        :columns="[
+          {'label': 'Name', 'field': 'name'},
+          {'label': 'Count', 'field': 'count'},
+          {'label': 'Jurisdiction', 'field': 'jurisdiction'},
+          {'label': 'Homepage', 'field': 'homepage'},
+          {'label': 'Abbreviation', 'field': 'abbreviation'},
+          {'label': 'Citation Abbreviation', 'field': 'citation'},
+          {'label': 'Start Date', 'field': 'start_date'},
+          {'label': 'End Date', 'field': 'end_date'},
+          {'label': 'In Use', 'field': 'in_use'},
+          {'label': 'Modified', 'field': 'modified'}
+        ]"
+        :rows="[
+          {% for court in courts %}
+            {
+              'name': '{{ court.full_name|escapejs }}',
+              'count': '{{ court.count|intcomma }}',
+              'jurisdiction': '{{ court.get_jurisdiction_display|nbsp }}',
+              'homepage': '<a href=\'{{ court.url }}\' target=\'_blank\' class=\'underline\'>{{ court.url|slice:"20" }}{% if court.url|length > 20 %}&hellip;{% endif %}</a>',
+              'abbreviation': '<a href=\'/?q=&court_{{ court.pk }}=on&order_by=score+desc\' rel=\'nofollow\' class=\'underline\'>{{ court.pk }}</a>',
+              'citation': '{{ court.citation_string|escapejs }}',
+              'start_date': '{{ court.start_date|date:"Y-m-d"|default:"Unknown" }}',
+              'end_date': '{{ court.end_date|date:"Y-m-d"|default:"Unknown" }}',
+              'in_use': '{{ court.in_use|yesno|title }}',
+              'modified': '{{ court.date_modified|date:"c"|slice:"16"|default:"None yet" }}'
+            }{% if not forloop.last %},{% endif %}
+          {% endfor %}
+        ]"
+      ></c-data-table>
     </div>
   </c-layout-without-navigation.section>
 </c-layout-without-navigation>
