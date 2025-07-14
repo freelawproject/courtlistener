@@ -9,6 +9,7 @@ from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
 from cl.api.utils import (
+    DeferredFieldsMixin,
     LoggingMixin,
     NoFilterCacheListMixin,
     RECAPUsersReadOnly,
@@ -124,7 +125,10 @@ class DocketViewSet(
 
 
 class DocketEntryViewSet(
-    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
 ):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = DocketEntrySerializer
@@ -150,7 +154,6 @@ class DocketEntryViewSet(
             "docket",  # For links back to dockets
         )
         .prefetch_related(
-            "recap_documents",  # Sub items
             "recap_documents__tags",  # Sub-sub items
             "tags",  # Tags on docket entries
         )
@@ -159,7 +162,10 @@ class DocketEntryViewSet(
 
 
 class RECAPDocumentViewSet(
-    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
 ):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = RECAPDocumentSerializer

@@ -4,7 +4,10 @@ from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
-from cl.api.utils import HyperlinkedModelSerializerWithId
+from cl.api.utils import (
+    HyperlinkedModelSerializerWithId,
+    NestedDynamicFieldsWithFieldsMixin,
+)
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.extras import get_highlight
 from cl.lib.document_serializer import (
@@ -117,7 +120,7 @@ class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
 
 class RECAPDocumentSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    NestedDynamicFieldsWithFieldsMixin, HyperlinkedModelSerializerWithId
 ):
     tags = serializers.HyperlinkedRelatedField(
         many=True,
@@ -135,7 +138,7 @@ class RECAPDocumentSerializer(
 
 
 class DocketEntrySerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    NestedDynamicFieldsWithFieldsMixin, HyperlinkedModelSerializerWithId
 ):
     docket = serializers.HyperlinkedRelatedField(
         many=False,

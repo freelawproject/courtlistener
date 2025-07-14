@@ -17,14 +17,17 @@ from django.core.cache import caches
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
+from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import Cursor, CursorPagination
 from rest_framework.request import Request
+from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
@@ -94,8 +97,10 @@ from cl.search.api_views import (
 )
 from cl.search.factories import (
     CourtFactory,
+    DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -103,7 +108,9 @@ from cl.search.models import (
     SOURCES,
     Court,
     Docket,
+    DocketEntry,
     Opinion,
+    RECAPDocument,
 )
 from cl.stats.models import Event
 from cl.tests.cases import (
@@ -3739,3 +3746,251 @@ class EventCountApiTest(TestCase):
         event_record.refresh_from_db()
         # Assert that the value of the event record has been incremented by 1
         self.assertEqual(event_record.value, 4)
+
+
+class DeferredDocketEntryTestMixin:
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        deferred_or_only_fields, _ = qs.query.deferred_loading
+        return Response(
+            {
+                "deferred_or_only": set(deferred_or_only_fields),
+                "prefetches": qs._prefetch_related_lookups,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class DeferredDocketEntryViewSet(
+    DeferredDocketEntryTestMixin, DocketEntryViewSet
+):
+    queryset = (
+        DocketEntry.objects.select_related(
+            "docket",
+        )
+        .prefetch_related(
+            "recap_documents__tags",
+            "tags",
+        )
+        .defer("recap_sequence_number")
+        .order_by("-id")
+    )
+
+
+class DeferredDocketEntryOnlyViewSet(
+    DeferredDocketEntryTestMixin, DocketEntryViewSet
+):
+    queryset = (
+        DocketEntry.objects.select_related(
+            "docket",
+        )
+        .prefetch_related(
+            "recap_documents__tags",
+            "tags",
+        )
+        .only("id", "recap_sequence_number")
+        .order_by("-id")
+    )
+
+
+class DynamicNestedFieldsMixinTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.factory = RequestFactory()
+        cls.view = DeferredDocketEntryViewSet.as_view({"get": "list"})
+        cls.view_2 = DeferredDocketEntryOnlyViewSet.as_view({"get": "list"})
+
+        cls.user_1 = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
+        ps = Permission.objects.filter(codename="has_recap_api_access")
+        ps_upload = Permission.objects.filter(
+            codename="has_recap_upload_access"
+        )
+        cls.user_1.user.user_permissions.add(*ps)
+        cls.user_1.user.user_permissions.add(*ps_upload)
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+
+        cls.docket = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.court,
+            docket_number="23-4567",
+            pacer_case_id="104490",
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket,
+            ),
+            document_number="1",
+            is_available=True,
+            is_free_on_pacer=True,
+            page_count=17,
+            pacer_doc_id="17711118263",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
+        token, _ = Token.objects.get_or_create(user=cls.user_1.user)
+        cls.token, _ = Token.objects.get_or_create(user=cls.user_1.user)
+
+    async def _api_v4_request(self, endpoint, params):
+        url = reverse(endpoint, kwargs={"version": "v4"})
+        api_client = await sync_to_async(make_client)(self.user_1.user.pk)
+        return await api_client.get(url, params)
+
+    async def test_omit_nested_field(self) -> None:
+        """Confirm that specifying 'omit' for parent or nested fields excludes
+        them from the API response.
+        """
+        response = await self._api_v4_request(
+            "docketentry-list",
+            {"omit": "entry_number,recap_documents__plain_text"},
+        )
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        # Assert top‐level keys exactly match
+        self.assertNotIn("entry_number", set(results[0].keys()))
+
+        # Assert nested fields.
+        self.assertNotIn(
+            "plain_text", set(results[0]["recap_documents"][0].keys())
+        )
+
+    async def test_allowed_nested_field(self) -> None:
+        """Confirm that specifying 'fields' for parent or nested fields filters
+        the API response to include only those fields.
+        """
+        response = await self._api_v4_request(
+            "docketentry-list",
+            {"fields": "entry_number,recap_documents__plain_text"},
+        )
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        # Assert top‐level keys exactly match
+        self.assertEqual(len(results[0].keys()), 2)
+        self.assertIn("entry_number", set(results[0].keys()))
+
+        # Assert nested fields.
+        self.assertEqual(len(results[0]["recap_documents"][0].keys()), 1)
+        self.assertIn(
+            "plain_text", set(results[0]["recap_documents"][0].keys())
+        )
+
+    async def test_fields_all_gone_nested(self):
+        """If no fields are selected, all fields are omitted, including those
+        from the nested serializer.
+        """
+        response = await self._api_v4_request(
+            "docketentry-list",
+            {"fields": ""},
+        )
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        # Assert top‐level keys exactly match
+        self.assertEqual(len(results[0].keys()), 0)
+
+    async def test_nested_omit_and_fields_used(self):
+        """Omit and fields can be used together at the nested field level."""
+        response = await self._api_v4_request(
+            "docketentry-list",
+            {
+                "fields": "id,entry_number,description,recap_documents__plain_text,recap_documents__id",
+                "omit": "description,recap_documents__plain_text",
+            },
+        )
+
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        # Assert top‐level keys exactly match
+        self.assertEqual(len(results[0].keys()), 3)
+        self.assertEqual(
+            set(results[0].keys()), {"id", "entry_number", "recap_documents"}
+        )
+
+        # Assert nested fields.
+        self.assertEqual(len(results[0]["recap_documents"][0].keys()), 1)
+        self.assertEqual(set(results[0]["recap_documents"][0].keys()), {"id"})
+
+    def test_deffer_fields_custom_queryset(self):
+        """Confirms that the deferring fields logic works correctly with a custom
+        queryset that uses select_related and prefetch_related.
+        """
+        request = self.factory.get(
+            "/",
+            {
+                "fields": "id,entry_number,recap_sequence_number,description,recap_documents__plain_text,recap_documents__id",
+            },
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        response = self.view(request)
+        self.assertEqual(response.status_code, 200)
+
+        deferred_fields = response.data["deferred_or_only"]
+        self.assertEqual(
+            deferred_fields,
+            {
+                "date_filed",
+                "date_created",
+                "date_modified",
+                "pacer_sequence_number",
+                "recap_sequence_number",
+                "time_filed",
+                "tags",
+            },
+        )
+
+        prefetches = response.data["prefetches"]
+        self.assertEqual(len(prefetches), 3)
+        self.assertIn("recap_documents__tags", prefetches)
+        self.assertIn("tags", prefetches)
+
+    def test_deffer_omit_fields_custom_queryset(self):
+        """Confirms that the deferring fields logic works correctly with a custom
+        queryset that uses select_related and prefetch_related.
+        """
+        request = self.factory.get(
+            "/",
+            {
+                "omit": "entry_number,description,recap_documents__plain_text,recap_documents__pacer_doc_id",
+            },
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        response = self.view(request)
+        self.assertEqual(response.status_code, 200)
+
+        deferred_fields = response.data["deferred_or_only"]
+        self.assertEqual(
+            deferred_fields,
+            {"entry_number", "description", "recap_sequence_number"},
+        )
+
+        prefetches = response.data["prefetches"]
+        self.assertEqual(len(prefetches), 3)
+        self.assertIn("recap_documents__tags", prefetches)
+        self.assertIn("tags", prefetches)
+
+    def test_deffer_fields_custom_queryset_with_only(self):
+        """Confirms that the deferring fields logic doesn't modify original
+        only statements in the queryset.
+        """
+        request = self.factory.get(
+            "/",
+            {
+                "fields": "id,entry_number,recap_sequence_number,description,recap_documents__plain_text,recap_documents__id",
+            },
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        response = self.view_2(request)
+        self.assertEqual(response.status_code, 200)
+
+        only_fields = response.data["deferred_or_only"]
+        self.assertEqual(only_fields, {"id", "recap_sequence_number"})
+
+        prefetches = response.data["prefetches"]
+        self.assertEqual(len(prefetches), 3)
+        self.assertIn("recap_documents__tags", prefetches)
+        self.assertIn("tags", prefetches)
