@@ -48,7 +48,10 @@ from cl.citations.match_citations import (
     resolve_fullcase_citation,
 )
 from cl.citations.match_citations_queries import es_search_db_for_full_citation
-from cl.citations.models import UnmatchedCitation
+from cl.citations.models import (
+    UnmatchedCitation,
+    UnmatchedCitationFromRECAPDocument,
+)
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
@@ -585,18 +588,27 @@ class CitationTextTest(SimpleTestCase):
 
 
 class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
-    # pass
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
         super().setUpTestData()
+        plain_text = """
+        In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020), the
+        Second Circuit held  that in the context of settlement of FLSA and NYLL
+        cases, which must be approved by the trial court in accordance with
+        Cheeks v. Freeport Pancake House, Inc., 796 F.3d 199 (2d Cir. 2015),
+        the district court abused its discretion in limiting the amount of
+        recoverable fees to a percentage of the recovery by the successful
+        plaintiffs. But also: sdjnfdsjnk. Fisher, 948 F.3d at 597.
+        This will be an UnmatchedCitation; Doe, 1 U.S. 1 (2025)
+        """
         cls.recap_doc = RECAPDocumentFactory.create(
-            plain_text="In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020), the Second Circuit held that in the context of settlement of FLSA and NYLL cases, which must be approved by the trial court in accordance with Cheeks v. Freeport Pancake House, Inc., 796 F.3d 199 (2d Cir. 2015), the district court abused its discretion in limiting the amount of recoverable fees to a percentage of the recovery by the successful plaintiffs. But also: sdjnfdsjnk. Fisher, 948 F.3d at 597.",
+            plain_text=plain_text,
             ocr_status=RECAPDocument.OCR_UNNECESSARY,
             docket_entry=DocketEntryWithParentsFactory(),
         )
         # Courts
-        court_ca2 = CourtFactory(id="ca2")
+        court_ca2 = cls.court_ca2 = CourtFactory(id="ca2")
 
         # Citation 1
         cls.citation1 = CitationWithParentsFactory.create(
@@ -631,8 +643,8 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
 
     def test_opinionscited_recap_creation(self):
         """
-        Tests that OpinionsCitedByRECAPDocument objects are created in the database,
-        with correct citation counts.
+        Tests that OpinionsCitedByRECAPDocument and UnmatchedCitationFromRECAP
+        objects are created in the database, with correct citation counts.
         """
         test_recap_document = self.recap_doc
 
@@ -656,6 +668,37 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
                     citing_document=test_recap_document, cited_opinion=cited_op
                 )
                 self.assertEqual(citation_obj.depth, depth)
+
+        # Test UnmatchedCitationsFromRECAPDocument saving
+        unmatched_citation = UnmatchedCitationFromRECAPDocument.objects.get(
+            citing_recapdocument=self.recap_doc
+        )
+        self.assertEqual(
+            unmatched_citation.citation_string,
+            "1 U.S. 1",
+            "UnmatchedCitationFromRECAP does not have proper citation_string value",
+        )
+        self.assertEqual(
+            unmatched_citation.year,
+            2025,
+            "UnmatchedCitationFromRECAP does not have proper year value",
+        )
+
+        # Test status update when the Citation is found
+        citation2 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=self.court_ca2),
+                case_name="Something",
+                date_filed=date(2025, 1, 1),
+            ),
+        )
+        unmatched_citation.refresh_from_db()
+        self.assertEqual(
+            unmatched_citation.status, UnmatchedCitationFromRECAPDocument.FOUND
+        )
 
 
 class CitationObjectTest(ESIndexTestCase, TestCase):
