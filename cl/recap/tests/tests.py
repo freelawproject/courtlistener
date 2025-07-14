@@ -42,7 +42,10 @@ from cl.api.utils import (
     get_next_webhook_retry_date,
     get_webhook_deprecation_date,
 )
-from cl.corpus_importer.utils import is_appellate_court
+from cl.corpus_importer.utils import (
+    is_appellate_court,
+    should_check_acms_court,
+)
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
@@ -2541,12 +2544,18 @@ class RecapDocketFetchApiTest(TestCase):
         "cl.recap.tasks.AppellateDocketReport",
         new=fakes.FakeAppellateDocketReport,
     )
+    @mock.patch("cl.recap.tasks.AcmsCaseSearch")
+    @mock.patch(
+        "cl.recap.tasks.should_check_acms_court", wraps=should_check_acms_court
+    )
     @mock.patch(
         "cl.recap.tasks.fetch_appellate_docket", wraps=fetch_appellate_docket
     )
     def test_fetch_appellate_docket_by_docket_id(
         self,
         mock_fetch_appellate_docket,
+        mock_should_check_acms_court,
+        mock_acms_case_search,
         mock_court_accessible,
         mock_cookies,
     ):
@@ -2569,19 +2578,44 @@ class RecapDocketFetchApiTest(TestCase):
         # correct fetch queue ID.
         mock_fetch_appellate_docket.si.assert_called_once_with(fq.pk)
 
+        # Verify that court_id validation was performed before attempting to
+        # retrieve the docket report.
+        mock_should_check_acms_court.assert_called_once_with(
+            self.appellate_docket.court_id
+        )
+
+        # Verify that the ACMS case search was not triggered since the court
+        # is ca1.
+        mock_acms_case_search.assert_not_called()
+
         # Assert that a RECAPDocument was created.
-        rds = RECAPDocument.objects.all()
+        rds = RECAPDocument.objects.filter(
+            docket_entry__docket=self.appellate_docket
+        )
         self.assertEqual(rds.count(), 1)
 
     @mock.patch(
         "cl.recap.tasks.AppellateDocketReport",
-        new=fakes.FakeAppellateDocketReport,
+        new=fakes.FakeNewAppellateCaseDocketReport,
+    )
+    @mock.patch(
+        "cl.recap.tasks.AcmsCaseSearch",
+        new=fakes.FakeEmptyAcmsCaseSearch,
+    )
+    @mock.patch("cl.recap.tasks.AcmsCaseSearch")
+    @mock.patch(
+        "cl.recap.tasks.should_check_acms_court", wraps=should_check_acms_court
     )
     @mock.patch(
         "cl.recap.tasks.fetch_appellate_docket", wraps=fetch_appellate_docket
     )
     def test_fetch_appellate_docket_by_docket_number(
-        self, mock_fetch_appellate_docket, mock_court_accessible, mock_cookies
+        self,
+        mock_fetch_appellate_docket,
+        mock_should_check_acms_court,
+        mock_acms_case_search,
+        mock_court_accessible,
+        mock_cookies,
     ) -> None:
         fq = PacerFetchQueue.objects.create(
             user=self.user,
@@ -2595,15 +2629,36 @@ class RecapDocketFetchApiTest(TestCase):
         # Refresh the fetch queue entry from the database to get the updated
         # status.
         fq.refresh_from_db()
-        self.assertEqual(fq.docket, self.appellate_docket)
+        self.assertIsNotNone(fq.docket)
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
 
         # Assert that the fetch_appellate_docket task was called once with the
         # correct fetch queue ID.
         mock_fetch_appellate_docket.si.assert_called_once_with(fq.pk)
 
-        # Assert that a RECAPDocument was created.
-        rds = RECAPDocument.objects.all()
+        # Verify that court_id validation was performed before attempting to
+        # retrieve the docket report.
+        mock_should_check_acms_court.assert_called_once_with(
+            self.appellate_docket.court_id
+        )
+
+        # Verify that the ACMS case search was not triggered since the court
+        # is ca1.
+        mock_acms_case_search.assert_not_called()
+
+        # Verify that the docket was created.
+        appellate_docket = Docket.objects.filter(pacer_case_id="49959").first()
+        self.assertIsNotNone(appellate_docket)
+
+        # Check that the docket fields match the expected fake data.
+        self.assertEqual(appellate_docket.court_id, "ca1")
+        self.assertEqual(appellate_docket.docket_number, "10-1081")
+        self.assertEqual(appellate_docket.case_name, "United States v. Brown")
+
+        # Verify that a RECAPDocument was created and linked to the docket.
+        rds = RECAPDocument.objects.filter(
+            docket_entry__docket=appellate_docket
+        )
         self.assertEqual(rds.count(), 1)
 
     def test_fetch_docket_send_alert(
