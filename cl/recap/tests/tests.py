@@ -3490,6 +3490,30 @@ class RecapAttPageFetchApiTest(TestCase):
             recap_document_id=self.rd_appellate.pk,
         )
 
+        self.acms_court = CourtFactory(
+            id="ca9", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        self.acms_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.acms_court,
+            pacer_case_id="5d8e355d-b229-4b16-b00f-7552d2f79d4f",
+        )
+        self.rd_acms = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=self.acms_docket, entry_number=9
+            ),
+            document_number=9,
+            pacer_doc_id="4e108d6c-ad5b-f011-bec2-001dd80b194b",
+            is_available=False,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        self.fq_acms = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=self.rd_acms.pk,
+        )
+
     def test_fetch_attachment_page_no_pacer_doc_id(
         self, mock_court_accessible
     ) -> None:
@@ -3595,6 +3619,56 @@ class RecapAttPageFetchApiTest(TestCase):
         self.assertIn(
             "Successfully completed fetch", self.fq_appellate.message
         )
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.ACMSAttachmentPage",
+        new=fakes.FakeAcmsAttachmentPage,
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.AppellateAttachmentPage",
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.AttachmentPage",
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.is_appellate_court", wraps=is_appellate_court
+    )
+    @mock.patch("cl.recap.tasks.is_appellate_court", wraps=is_appellate_court)
+    def test_fetch_att_page_from_acms(
+        self,
+        mock_court_check_task,
+        mock_court_check_parser,
+        mock_district_report_parser,
+        mock_appellate_report_parser,
+        mock_get_cookies,
+        mock_court_accessible,
+    ):
+        # Trigger the fetch operation for an ACMS attachment page
+        result = do_pacer_fetch(self.fq_acms)
+        result.get()
+
+        self.fq_acms.refresh_from_db()
+
+        docket_entry = self.rd_acms.docket_entry
+        amcs_court_id = docket_entry.docket.court_id
+        # Verify court validation calls with expected court ID
+        mock_court_check_task.assert_called_with(amcs_court_id)
+        mock_court_check_parser.assert_called_with(amcs_court_id)
+
+        # Ensure that only the ACMS parser was used
+        mock_district_report_parser.assert_not_called()
+        mock_appellate_report_parser.assert_not_called()
+
+        # Assert successful fetch status and expected message
+        self.assertEqual(self.fq_acms.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertIn("Successfully completed fetch", self.fq_acms.message)
+
+        # Verify that 3 RECAPDocument objects were created for the docket entry
+        docket_entry.refresh_from_db()
+        self.assertEqual(docket_entry.recap_documents.count(), 3)
 
 
 class ProcessingQueueApiFilterTest(TestCase):
