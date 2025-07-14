@@ -2350,7 +2350,7 @@ def create_or_update_docket_data_from_fetch(
     fq: PacerFetchQueue,
     court_id: str,
     pacer_case_id: str | None,
-    report: DocketReport | AppellateDocketReport,
+    report: DocketReport | AppellateDocketReport | ACMSDocketReport,
     docket_data: dict[str, Any],
 ) -> dict[str, str | bool]:
     """Creates or updates docket data in the database from fetched data.
