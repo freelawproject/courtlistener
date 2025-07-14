@@ -21,56 +21,78 @@
   </c-layout-without-navigation.section>
 
   <c-layout-without-navigation.section id="comparison">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col" style="min-width: 10em !important;" >Learn More About&hellip;</th>
-            <th scope="col">Update<br>Speed</th>
-            <th scope="col">Data<br>Fidelity</th>
-            <th scope="col">Query<br>Flexibility</th>
-            <th scope="col">Learning<br>Curve</th>
-            <th scope="col">Setup</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><a href="{% url "replication_docs" %}" class="btn btn-primary">Replication</a></td>
-            <td>Instant</td>
-            <td>Complete</td>
-            <td>Unlimited<br>SQL Queries</td>
-            <td>Short</td>
-            <td>Complex</td>
-          </tr>
-          <tr>
-            <td><a href="{% url "bulk_data_index" %}" class="btn btn-primary">Bulk Data</a></td>
-            <td>Slow</td>
-            <td>Great</td>
-            <td>None</td>
-            <td>Short</td>
-            <td>None</td>
-          </tr>
-          <tr>
-            <td><a href="{% url "rest_docs" %}" class="btn btn-primary">REST APIs</a></td>
-            <td>Fast</td>
-            <td>Good</td>
-            <td>Filters &amp;<br> Joins</td>
-            <td>Longer</td>
-            <td>None</td>
-          </tr>
-          <tr>
-            <td><a href="{% url "webhooks_docs" %}" class="btn btn-primary">Webhooks</a></td>
-            <td>Instant</td>
-            <td>Good</td>
-            <td>Subscribe to Events</td>
-            <td>Medium</td>
-            <td>Complex</td>
-          </tr>
-          <tr>
-            <td><a href="https://free.law/data-consulting/" class="btn btn-outline whitespace-nowrap">Data Services</a></td>
-            <td colspan="5" class="py-3 px-2 text-left">Engage with Free Law Project, the non-profit behind CourtListener and RECAP, for the most flexibility.</td>
-          </tr>
-        </tbody>
-      </table>
+      <c-data-table
+      safe
+      caption="Comparison of different methods for accessing CourtListener data."
+      :columns="[
+        {
+          'label': 'Learn More About…',
+          'field': 'learn_more',
+        },
+        {
+          'label': 'Update Speed',
+          'field': 'update_speed',
+        },
+        {
+          'label': 'Data Fidelity',
+          'field': 'data_fidelity',
+        },
+        {
+          'label': 'Query Flexibility',
+          'field': 'query_flexibility',
+        },
+        {
+          'label': 'Learning Curve',
+          'field': 'learning_curve',
+        },
+        {
+          'label': 'Setup',
+          'field': 'setup',
+        },
+      ]"
+      :rows="[
+        {
+          'learn_more': '<a href=\'{% url "replication_docs" %}\' class=\'btn btn-outline\'>Replication</a>',
+          'update_speed': 'Instant',
+          'data_fidelity': 'Complete',
+          'query_flexibility': 'Unlimited<br>SQL Queries',
+          'learning_curve': 'Short',
+          'setup': 'Complex',
+        },
+        {
+          'learn_more': '<a href=\'{% url "bulk_data_index" %}\' class=\'btn btn-outline\'>Bulk Data</a>',
+          'update_speed': 'Slow',
+          'data_fidelity': 'Great',
+          'query_flexibility': 'None',
+          'learning_curve': 'Short',
+          'setup': 'None',
+        },
+        {
+          'learn_more': '<a href=\'{% url "rest_docs" %}\' class=\'btn btn-outline\'>REST APIs</a>',
+          'update_speed': 'Fast',
+          'data_fidelity': 'Good',
+          'query_flexibility': 'Filters &amp;<br> Joins',
+          'learning_curve': 'Longer',
+          'setup': 'None',
+        },
+        {
+          'learn_more': '<a href=\'{% url "webhooks_docs" %}\' class=\'btn btn-outline\'>Webhooks</a>',
+          'update_speed': 'Instant',
+          'data_fidelity': 'Good',
+          'query_flexibility': 'Subscribe to Events',
+          'learning_curve': 'Medium',
+          'setup': 'Complex',
+        },
+        {
+          'learn_more': '<a href=\'https://free.law/data-consulting/\' class=\'btn btn-outline\'>Data Services</a>',
+          'update_speed': 'Engage with Free Law Project, the non-profit behind CourtListener and RECAP, for the most flexibility.',
+          'data_fidelity': '',
+          'query_flexibility': '',
+          'learning_curve': '',
+          'setup': '',
+        },
+      ]"
+    ></c-data-table>
   </c-layout-without-navigation.section>
 
   <c-layout-without-navigation.section id="pricing">
@@ -81,7 +103,7 @@
   </c-layout-without-navigation.section>
 
   <c-layout-without-navigation.section id="pride">
-    <h2 class="text-2xl font-bold">We're Proud of our Data</h2>
+    <h2>We're Proud of our Data</h2>
     <p>For over a decade, we have worked to make the data in CourtListener the best on the open Web.</p>
     <p>Among the minor enhancements we make on a regular basis, we've made significant improvements to our data that you won't find in other sources:</p>
     <ul class="list-decimal space-y-2 ml-4">
@@ -94,7 +116,7 @@
   </c-layout-without-navigation.section>
 
   <c-layout-without-navigation.section id="privacy">
-    <h2 class="text-2xl font-bold">Privacy of Court Materials</h2>
+    <h2>Privacy of Court Materials</h2>
     <p>As is <a class="underline" href="{% url "terms" %}#removal">explained in our removal policy</a>, we block public search engines from indexing many of the cases available on our website. We do this to protect vulnerable people.</p>
     <p>If you plan to use this data on the Internet, carefully consider how you will protect these people and their privacy wishes. The simplest way to do that is to use the <code>blocked</code> flag that's available on most objects.</p>
   </c-layout-without-navigation.section>
