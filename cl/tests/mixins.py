@@ -1,10 +1,14 @@
 import re
+from collections.abc import Sized
 from datetime import date, datetime
 from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
+from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
@@ -72,6 +76,32 @@ class SimpleUserDataMixin:
             user__username="pandora",
             user__password=make_password("password"),
         )
+
+
+class CountESTasksMixin:
+    def setUp(self):
+        super().setUp()
+        self.task_call_count = 0
+
+    def count_task_calls(
+        self, task, immutable_signature, *args, **kwargs
+    ) -> None:
+        """Wraps the task to count its calls and assert the expected count."""
+        # Increment the call count
+        self.task_call_count += 1
+        # Call the task
+        if immutable_signature:
+            return task.s(*args, **kwargs)
+        else:
+            task.apply_async(args=args, kwargs=kwargs)
+
+    def reset_and_assert_task_count(self, expected) -> None:
+        """Resets the task call count and asserts the expected number of calls."""
+
+        assert self.task_call_count == expected, (
+            f"Expected {expected} task calls, but got {self.task_call_count}"
+        )
+        self.task_call_count = 0
 
 
 class PrayAndPayMixin:

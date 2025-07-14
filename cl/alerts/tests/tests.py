@@ -93,19 +93,22 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.stats.models import Stat
-from cl.tests.mixins import SearchAlertsMixin, SimpleUserDataMixin
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
     TestCase,
 )
+from cl.tests.mixins import (
+    SearchAlertsMixin,
+    SimpleUserDataMixin,
+)
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 from cl.users.models import EmailSent
 
 
-class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
+class AlertTest(SimpleUserDataMixin, ESIndexTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -994,21 +997,24 @@ class AlertSeleniumTest(BaseSeleniumTest):
         self.assert_text_in_node("editing your alert", "body")
 
 
-class AlertAPITests(APITestCase, ESIndexTestCase, TestCase):
+class AlertAPITests(APITestCase, ESIndexTestCase):
     """Check that API CRUD operations are working well for search alerts."""
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.user_1 = UserFactory()
         cls.user_2 = UserFactory()
 
     def setUp(self) -> None:
+        super().setUp()
         self.alert_path = reverse("alert-list", kwargs={"version": "v4"})
         self.client = make_client(self.user_1.pk)
         self.client_2 = make_client(self.user_2.pk)
 
     def tearDown(cls):
         Alert.objects.all().delete()
+        super().tearDown()
 
     async def make_an_alert(
         self,
@@ -1485,7 +1491,7 @@ class AlertAPITests(APITestCase, ESIndexTestCase, TestCase):
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
-class SearchAlertsWebhooksTest(SearchAlertsMixin, ESIndexTestCase, TestCase):
+class SearchAlertsWebhooksTest(SearchAlertsMixin, ESIndexTestCase):
     """Test Search Alerts Webhooks"""
 
     @classmethod
@@ -3365,7 +3371,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
     side_effect=lambda x, y: True,
 )
 @override_settings(NO_MATCH_HL_SIZE=100)
-class SearchAlertsOAESTests(SearchAlertsMixin, ESIndexTestCase, TestCase):
+class SearchAlertsOAESTests(SearchAlertsMixin, ESIndexTestCase):
     """Test ES Search Alerts"""
 
     @classmethod
@@ -4737,7 +4743,7 @@ class SearchAlertsOAESTests(SearchAlertsMixin, ESIndexTestCase, TestCase):
 
 
 @override_settings(ELASTICSEARCH_DISABLED=True)
-class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
+class SearchAlertsIndexingCommandTests(ESIndexTestCase):
     """Test the cl_index_search_alerts command"""
 
     @classmethod

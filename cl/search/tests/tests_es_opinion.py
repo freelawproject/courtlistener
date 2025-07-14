@@ -70,12 +70,12 @@ from cl.search.tasks import (
     update_es_document,
 )
 from cl.tests.cases import (
-    CountESTasksTestCase,
     ESIndexTestCase,
+    ESIndexTransactionTestCase,
     TestCase,
-    TransactionTestCase,
 )
 from cl.tests.mixins import (
+    CountESTasksMixin,
     CourtMixin,
     PeopleMixin,
     SearchMixin,
@@ -399,9 +399,7 @@ class OpinionSearchAPICommonTests(
         )
 
 
-class OpinionV3APISearchTest(
-    OpinionSearchAPICommonTests, ESIndexTestCase, TestCase
-):
+class OpinionV3APISearchTest(OpinionSearchAPICommonTests, ESIndexTestCase):
     skip_common_tests = False
 
     @classmethod
@@ -568,7 +566,6 @@ class OpinionV4APISearchTest(
     V4SearchAPIMixin,
     OpinionSearchAPICommonTests,
     ESIndexTestCase,
-    TestCase,
 ):
     version_api = "v4"
     skip_common_tests = False
@@ -1218,7 +1215,7 @@ class OpinionV4APISearchTest(
 
 
 class OpinionsESSearchTest(
-    SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
+    SearchMixin, ESIndexTestCase
 ):
     @classmethod
     def setUpTestData(cls):
@@ -2308,9 +2305,7 @@ class OpinionsESSearchTest(
         cluster_2.delete()
 
 
-class OpinionSearchDecayRelevancyTest(
-    V4SearchAPIMixin, ESIndexTestCase, TestCase
-):
+class OpinionSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
     """
     Opinion Search Decay Relevancy Tests
     """
@@ -2575,9 +2570,7 @@ class OpinionSearchDecayRelevancyTest(
 
 
 @override_settings(RELATED_MLT_MINTF=1)
-class RelatedSearchTest(
-    SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
-):
+class RelatedSearchTest(SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
@@ -3033,7 +3026,7 @@ class RelatedSearchTest(
 
 
 class IndexOpinionDocumentsCommandTest(
-    SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
+    SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
@@ -3258,9 +3251,7 @@ class IndexOpinionDocumentsCommandTest(
         self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
 
 
-class EsOpinionsIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class EsOpinionsIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -4056,9 +4047,7 @@ class EsOpinionsIndexingTest(
         o_c.docket.delete()
 
 
-class OpinionFeedTest(
-    SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase, TestCase
-):
+class OpinionFeedTest(SearchMixin, PeopleMixin, CourtMixin, ESIndexTestCase):
     """Tests for Opinion Search Feed"""
 
     def setUp(self) -> None:

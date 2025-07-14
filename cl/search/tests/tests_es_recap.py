@@ -90,15 +90,18 @@ from cl.search.tasks import (
 )
 from cl.search.types import EventTable
 from cl.tests.cases import (
-    CountESTasksTestCase,
     ESIndexTestCase,
+    ESIndexTransactionTestCase,
     TestCase,
-    TransactionTestCase,
 )
-from cl.tests.mixins import RECAPSearchMixin, V4SearchAPIMixin
+from cl.tests.mixins import (
+    CountESTasksMixin,
+    RECAPSearchMixin,
+    V4SearchAPIMixin,
+)
 
 
-class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase, TestCase):
+class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
     """
     RECAP Search Tests
     """
@@ -3225,9 +3228,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase, TestCase):
                 )
 
 
-class RECAPSearchDecayRelevancyTest(
-    V4SearchAPIMixin, ESIndexTestCase, TestCase
-):
+class RECAPSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
     """
     RECAP Search Decay Relevancy  Tests
     """
@@ -3883,7 +3884,7 @@ class RECAPSearchAPICommonTests(RECAPSearchMixin, TestCase):
 
 
 class RECAPSearchAPIV3Test(
-    V4SearchAPIMixin, RECAPSearchAPICommonTests, ESIndexTestCase, TestCase
+    V4SearchAPIMixin, RECAPSearchAPICommonTests, ESIndexTestCase
 ):
     """
     RECAP Search API V3 Tests
@@ -4262,7 +4263,7 @@ class RECAPESResultSerializerTest(RECAPESResultSerializer):
 
 
 class RECAPSearchAPIV4Test(
-    V4SearchAPIMixin, RECAPSearchAPICommonTests, ESIndexTestCase, TestCase
+    V4SearchAPIMixin, RECAPSearchAPICommonTests, ESIndexTestCase
 ):
     """
     RECAP Search API V4 Tests
@@ -6060,7 +6061,7 @@ class RECAPSearchAPIV4Test(
                 )
 
 
-class RECAPFeedTest(RECAPSearchMixin, ESIndexTestCase, TestCase):
+class RECAPFeedTest(RECAPSearchMixin, ESIndexTestCase):
     """Tests for RECAP Search Feed"""
 
     @classmethod
@@ -6354,12 +6355,11 @@ class RECAPFeedTest(RECAPSearchMixin, ESIndexTestCase, TestCase):
         )
 
 
-class IndexDocketRECAPDocumentsCommandTest(
-    ESIndexTestCase, TransactionTestCase
-):
+class IndexDocketRECAPDocumentsCommandTest(ESIndexTransactionTestCase):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
     def setUp(self):
+        super().setUp()
         self.factory = RequestFactory()
         self.site = admin.site
         self.rebuild_index("search.Docket")
@@ -6761,9 +6761,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.assertEqual(es_rd_2.filepath_local, rd_2.filepath_local)
 
 
-class RECAPIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -8268,9 +8266,7 @@ class RECAPIndexingTest(
         docket.delete()
 
 
-class RECAPHistoryTablesIndexingTest(
-    RECAPSearchMixin, ESIndexTestCase, TestCase
-):
+class RECAPHistoryTablesIndexingTest(RECAPSearchMixin, ESIndexTestCase):
     """RECAP Document indexing from history tables events."""
 
     @classmethod
@@ -8620,7 +8616,7 @@ class RECAPHistoryTablesIndexingTest(
             self.r.delete(*keys)
 
 
-class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
+class RECAPFixBrokenRDLinksTest(ESIndexTestCase):
     """Test fix RECAPDocument broken links by leveraging history table events."""
 
     @classmethod
