@@ -143,6 +143,8 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         disconnect_parenthetical_group_signals()
 
     update_citation_count = not disable_citation_count_update
+    failed_ids: list[int] = []
+
     try:
         for index, opinion in enumerate(opinions):
             try:
@@ -152,16 +154,13 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
             except ResponseNotReady as e:
                 # Threading problem in httplib.
                 raise self.retry(exc=e, countdown=2)
-            except OperationalError:
-                # delay deadlocked tasks, and continue regular process
-                find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-                    (
-                        [opinion.id],
-                        disconnect_pg_signals,
-                        disable_citation_count_update,
-                    ),
-                    countdown=60,
+            except OperationalError as e:
+                # Delay deadlocked tasks
+                logger.warning(
+                    "Retrying opinion %s later due to OperationalError",
+                    opinion.id,
                 )
+                failed_ids.append(opinion.id)
             except Exception as e:
                 # Send this opinion failure to sentry and continue onward
                 logger.error(
@@ -171,13 +170,13 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 )
 
                 # do not retry the whole loop on an unknown exception
-                ids = [o.id for o in opinions[index + 1 :]]
-                if ids:
+                remaining_ids = [o.id for o in opinions[index + 1 :]]
+                if remaining_ids:
                     raise self.retry(
                         exc=e,
                         countdown=2,
                         args=(
-                            ids,
+                            remaining_ids,
                             disconnect_pg_signals,
                             disable_citation_count_update,
                         ),
@@ -185,6 +184,22 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     finally:
         if disconnect_pg_signals:
             reconnect_parenthetical_group_signals()
+
+    # Retry task with the opinions that failed due to OperationalError
+    if failed_ids:
+        logger.warning(
+            "Retrying %d failed opinions due to OperationalError:",
+            len(failed_ids),
+        )
+        raise self.retry(
+            exc=OperationalError("Batch retry for failed opinion ids"),
+            countdown=5,
+            args=(
+                failed_ids,
+                disconnect_pg_signals,
+                disable_citation_count_update,
+            ),
+        )
 
 
 def store_opinion_citations_and_update_parentheticals(
