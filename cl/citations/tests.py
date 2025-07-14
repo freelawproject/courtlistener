@@ -62,7 +62,6 @@ from cl.citations.unmatched_citations_utils import (
 from cl.citations.utils import (
     make_get_citations_kwargs,
 )
-from cl.lib.test_helpers import SearchTestCase
 from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -90,7 +89,7 @@ from cl.tests.cases import (
     TestCase,
     TransactionTestCase,
 )
-from cl.tests.mixins import CourtMixin, PeopleMixin
+from cl.tests.mixins import CourtMixin, PeopleMixin, SearchMixin
 from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -1584,7 +1583,7 @@ class CitationObjectTest(TestCase, ESIndexTestCase):
 
 
 class CitationFeedTest(
-    CourtMixin, PeopleMixin, ESIndexTestCase, SearchTestCase, TestCase
+    CourtMixin, PeopleMixin, SearchMixin, ESIndexTestCase, TestCase
 ):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -2348,7 +2347,7 @@ class GroupParentheticalsTest(SimpleTestCase):
     "cl.api.utils.CitationCountRateThrottle.get_cache_key_for_citations",
     return_value="citations_tests",
 )
-class CitationLookUpApiTest(CourtMixin, PeopleMixin, SearchTestCase, TestCase):
+class CitationLookUpApiTest(CourtMixin, PeopleMixin, SearchMixin, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
