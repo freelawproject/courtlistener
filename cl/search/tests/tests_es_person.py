@@ -43,7 +43,7 @@ from cl.tests.cases import (
 from cl.tests.mixins import CourtMixin, PeopleMixin
 
 
-class PeopleSearchAPICommonTests(TestCase, CourtMixin, PeopleMixin):
+class PeopleSearchAPICommonTests(CourtMixin, PeopleMixin, TestCase):
     version_api = "v3"
     skip_common_tests = True
 
@@ -1258,7 +1258,7 @@ class PeopleV4APISearchTest(
 
 
 class PeopleSearchTestElasticSearch(
-    TestCase, CourtMixin, PeopleMixin, ESIndexTestCase
+    CourtMixin, PeopleMixin, ESIndexTestCase, TestCase
 ):
     """People search tests for Elasticsearch"""
 
@@ -1998,7 +1998,7 @@ class PeopleSearchTestElasticSearch(
 
 
 class IndexJudgesPositionsCommandTest(
-    TestCase, CourtMixin, PeopleMixin, ESIndexTestCase
+    CourtMixin, PeopleMixin, ESIndexTestCase, TestCase
 ):
     """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
 

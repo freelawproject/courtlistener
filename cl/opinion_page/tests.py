@@ -118,11 +118,11 @@ class SimpleLoadTest(TestCase):
 
 
 class OpinionPageLoadTest(
-    TestCase,
-    ESIndexTestCase,
     CourtMixin,
     PeopleMixin,
+    ESIndexTestCase,
     SearchTestCase,
+    TestCase,
 ):
     @classmethod
     def setUpTestData(cls):
