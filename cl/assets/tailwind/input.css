@@ -84,6 +84,9 @@
   .skip-link {
     @apply transition-[opacity,transform] ease-in-out pointer-events-none focus-visible:pointer-events-auto top-0 left-0 bg-primary-600 text-white absolute p-2 m-2 -translate-y-24 focus-visible:translate-y-0 focus-visible:opacity-100 opacity-0 focus-visible:ring focus-visible:ring-primary-900 focus-visible:outline focus-visible:outline-primary-900 z-50;
   }
+  .input-text {
+    @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3;
+  }
 }
 
 @tailwind utilities;
@@ -94,5 +97,8 @@
   }
   .lead {
     @apply text-xl text-greyscale-700 font-normal;
+  }
+  .focus-container {
+    @apply [&:has(input:focus)]:border-2 [&:has(input:focus)]:border-primary-600 flex;
   }
 }
