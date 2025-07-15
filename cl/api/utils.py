@@ -21,7 +21,6 @@ from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
 from django_ratelimit.core import get_header
-from drf_dynamic_fields import NestedDynamicFieldsMixin
 from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
@@ -1221,7 +1220,7 @@ def handle_webhook_events(results: list[int | float], user: User) -> None:
         )
 
 
-class NestedDynamicFieldsWithFieldsMixin(NestedDynamicFieldsMixin):
+class RetrieveFilteredFieldsMixin:
     def _filter_top_level_fields_to_defer(self, field_list, keep_if):
         """Method to retrieve the top-level fields to defer, given a list of
         field names (allow or omit) and a condition that determines which
@@ -1270,7 +1269,10 @@ class NestedDynamicFieldsWithFieldsMixin(NestedDynamicFieldsMixin):
                 continue
 
             child_serializer = getattr(field, "child", field)
-            nested_model = getattr(child_serializer.Meta, "model", None)
+            meta = getattr(child_serializer, "Meta", None)
+            nested_model = (
+                getattr(meta, "model", None) if meta is not None else None
+            )
             if nested_model is None:
                 continue
 

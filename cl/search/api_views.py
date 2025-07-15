@@ -68,7 +68,9 @@ from cl.search.models import (
 )
 
 
-class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
+class OriginatingCourtInformationViewSet(
+    DeferredFieldsMixin, viewsets.ModelViewSet
+):
     serializer_class = OriginalCourtInformationSerializer
     permission_classes = [
         DjangoModelPermissionsOrAnonReadOnly,
@@ -86,7 +88,10 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
 
 
 class DocketViewSet(
-    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
 ):
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
@@ -154,6 +159,7 @@ class DocketEntryViewSet(
             "docket",  # For links back to dockets
         )
         .prefetch_related(
+            "recap_documents",  # Sub items
             "recap_documents__tags",  # Sub-sub items
             "tags",  # Tags on docket entries
         )
@@ -188,7 +194,7 @@ class RECAPDocumentViewSet(
     )
 
 
-class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
+class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     serializer_class = CourtSerializer
     filterset_class = CourtFilter
     permission_classes = [
@@ -212,7 +218,10 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class OpinionClusterViewSet(
-    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
 ):
     serializer_class = OpinionClusterSerializer
     filterset_class = OpinionClusterFilter
@@ -247,7 +256,10 @@ class OpinionClusterViewSet(
 
 
 class OpinionViewSet(
-    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
 ):
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
@@ -279,7 +291,10 @@ class OpinionViewSet(
 
 
 class OpinionsCitedViewSet(
-    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
 ):
     serializer_class = OpinionsCitedSerializer
     filterset_class = OpinionsCitedFilter
@@ -294,7 +309,7 @@ class OpinionsCitedViewSet(
     queryset = OpinionsCited.objects.all().order_by("-id")
 
 
-class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
+class TagViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = TagSerializer
     # Default cursor ordering key

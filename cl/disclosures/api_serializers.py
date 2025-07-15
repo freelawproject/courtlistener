@@ -1,8 +1,11 @@
 from django.conf import settings
-from drf_dynamic_fields import DynamicFieldsMixin
+from drf_dynamic_fields import DynamicFieldsMixin, NestedDynamicFieldsMixin
 from rest_framework import serializers
 
-from cl.api.utils import HyperlinkedModelSerializerWithId
+from cl.api.utils import (
+    HyperlinkedModelSerializerWithId,
+    RetrieveFilteredFieldsMixin,
+)
 from cl.disclosures.models import (
     Agreement,
     Debt,
@@ -18,42 +21,60 @@ from cl.people_db.models import Person
 
 
 class AgreementSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     class Meta:
         model = Agreement
         fields = "__all__"
 
 
-class DebtSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class DebtSerializer(
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     class Meta:
         model = Debt
         fields = "__all__"
 
 
 class InvestmentSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     class Meta:
         model = Investment
         fields = "__all__"
 
 
-class GiftSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class GiftSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     class Meta:
         model = Gift
         fields = "__all__"
 
 
 class NonInvestmentIncomeSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     class Meta:
         model = NonInvestmentIncome
         fields = "__all__"
 
 
-class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class PositionSerializer(
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     resource_uri = serializers.SerializerMethodField()
 
     def get_resource_uri(self, position: Position) -> str:
@@ -79,7 +100,9 @@ class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
 
 class ReimbursementSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     class Meta:
         model = Reimbursement
@@ -87,7 +110,9 @@ class ReimbursementSerializer(
 
 
 class SpouseIncomeSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     class Meta:
         model = SpouseIncome
@@ -95,7 +120,9 @@ class SpouseIncomeSerializer(
 
 
 class FinancialDisclosureSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     agreements = AgreementSerializer(many=True, read_only=True)
     debts = DebtSerializer(many=True, read_only=True)

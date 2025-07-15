@@ -3922,7 +3922,7 @@ class DynamicNestedFieldsMixinTests(TestCase):
         request = self.factory.get(
             "/",
             {
-                "fields": "id,entry_number,recap_sequence_number,description,recap_documents__plain_text,recap_documents__id",
+                "fields": "id__test,id,entry_number,recap_sequence_number,description,recap_documents__plain_text,recap_documents__id",
             },
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
