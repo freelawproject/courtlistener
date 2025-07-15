@@ -73,8 +73,23 @@ document.addEventListener('alpine:init', () => {
       this.$store.corpusSearch.selected = this.$el.dataset?.scope;
       this.closeScopeMenu();
     },
-    isActiveScope() {
-      return this.$el.dataset?.scope === this.$store.corpusSearch.selected;
+    updateFieldsets(newSelected) {
+      const updateFieldset = (scope) => {
+        const fieldsetEl = document.getElementById(scope.fieldset);
+        if (newSelected === scope.label) fieldsetEl.removeAttribute('disabled');
+        else fieldsetEl.setAttribute('disabled', 'disabled');
+      };
+      this.searchScopes.forEach((scope) => updateFieldset(scope));
+    },
+    onSubmit() {
+      Array.from(this.$el.elements).forEach((el) => {
+        if (el.tagName === 'INPUT' && !el.value.trim()) {
+          el.setAttribute('disabled', 'disabled');
+        }
+      });
+    },
+    init() {
+      this.$watch('selectedScope', (newVal) => this.updateFieldsets(newVal));
     },
   }));
 });
