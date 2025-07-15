@@ -3,11 +3,16 @@ document.addEventListener('alpine:init', () => {
     scopeMenuExpanded: false,
     selected: 'Case Law',
     searchScopes: [
-      { label: 'Case Law', type: 'o' },
-      { label: 'RECAP Archive', type: 'r' },
-      { label: 'Oral Arguments', type: 'oa' },
-      { label: 'Judges', type: 'p' },
+      { label: 'Case Law', type: 'o', shortDescription: '10M+ Opinions', fieldset: 'o-fieldset' },
+      { label: 'RECAP Archive', type: 'r', shortDescription: '500M+ Records', fieldset: 'r-fieldset' },
+      { label: 'Oral Arguments', type: 'oa', shortDescription: '90k+ Audio Files', fieldset: 'oa-fieldset' },
+      { label: 'Judges', type: 'p', shortDescription: '15k+ Profiles', fieldset: 'p-fieldset' },
     ],
+    get selectedScope() {
+      const index = this.searchScopes.findIndex((scope) => scope.label === this.selected);
+      if (index === -1) return 'o';
+      return this.searchScopes[index];
+    },
   });
   Alpine.data('search', () => ({
     get scopeMenuExpanded() {
@@ -17,9 +22,7 @@ document.addEventListener('alpine:init', () => {
       return this.$store.corpusSearch.selected;
     },
     get selectedScopeType() {
-      const index = this.searchScopes.findIndex((scope) => scope.label === this.selectedScope);
-      if (index === -1) return 'o';
-      return this.searchScopes[index].type;
+      return this.$store.corpusSearch.selectedScope.type;
     },
     get searchScopes() {
       return this.$store.corpusSearch.searchScopes;
@@ -42,11 +45,17 @@ document.addEventListener('alpine:init', () => {
     get inputElement() {
       return document.getElementById(this.inputId);
     },
+    get isActiveScope() {
+      return this.$el.dataset?.scope === this.$store.corpusSearch.selected;
+    },
     get triggerButtonId() {
       return this.$id('trigger-button');
     },
     get triggerButtonElement() {
       return document.getElementById(this.triggerButtonId);
+    },
+    get scopeTabClass() {
+      return this.isActiveScope ? 'font-semibold text-greyscale-900' : 'font-medium text-greyscale-700';
     },
     openScopeMenu() {
       this.$store.corpusSearch.scopeMenuExpanded = true;

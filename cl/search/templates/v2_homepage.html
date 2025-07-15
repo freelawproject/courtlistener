@@ -3,6 +3,7 @@
 
 {% block head %}
   {% require_script "js/alpine/components/homepage.js" %}
+  {% require_script "js/alpine/components/corpus_search.js" %}
   {% require_script "js/alpine/composables/focus.js" %}
   {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 {% endblock %}
@@ -21,12 +22,38 @@
 {% block content_wrapper %}
 <div x-data="homepage">
   <div class="w-full flex flex-col bg-greyscale-100">
+    {#  HERO  #}
     <div class="flex flex-col justify-center items-center gap-6 p-5">
       {# CourtListener logo #}
       <div class="md:w-[310px] md:h-35 h-20 w-44">
         {% svg "logos/courtlistener" class="bg-greyscale-800" %}
       </div>
-      <h1 class="w-full text-center lg:text-display-sm-cooper text-xl">Search millions of opinions across hundreds of jurisdictions</h1>
+      {# Tagline #}
+      <h1 class="w-full text-center lg:text-display-sm-cooper text-xl" x-text="tagline"></h1>
+    </div>
+
+    {#  SEARCH TABS  #}
+    <div class="p-10">
+      <c-corpus-search class="w-full !flex-col" only>
+        {# Scope selector tabs #}
+        <c-corpus-search.scope
+          class="text-greyscale-600"
+          menu_class="left-0 top-14 w-55 text-md font-cooper text-greyscale-800"
+          item_class="py-1.5"
+          variant="tabs"
+          only
+        />
+        {# Search panel #}
+        <section class="bg-white flex flex-col rounded-b-2xl rounded-tr-2xl">
+          <div class="p-4 flex flex-row flex-nowrap">
+            <c-corpus-search.input class="rounded-l-xl" :request="request" only/>
+            <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
+              {% svg "magnifier" class="text-white" aria_hidden="true" %}
+            </c-corpus-search.button>
+          </div>
+          <c-corpus-search.filters/>
+        </section>
+      </c-corpus-search>
     </div>
   </div>
 

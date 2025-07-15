@@ -1,3 +1,10 @@
+const scopeTaglines = [
+  { scope: 'o', tagline: 'Search millions of opinions across hundreds of jurisdictions' },
+  { scope: 'r', tagline: 'Search our database of millions of PACER documents and dockets' },
+  { scope: 'oa', tagline: 'Search the biggest collection…' },
+  { scope: 'p', tagline: 'Search our database of thousands of State and Federal judges' },
+];
+
 document.addEventListener('alpine:init', () => {
   Alpine.data('homepage', () => ({
     ...createFocus(),
@@ -5,6 +12,12 @@ document.addEventListener('alpine:init', () => {
     atEnd: false,
     get stepWidth() {
       return this.$refs.container.clientWidth * 0.9;
+    },
+    get tagline() {
+      const selected = this.$store.corpusSearch?.selectedScope.type;
+      const index = scopeTaglines.findIndex((el) => el.scope === selected);
+      if (index === -1) return scopeTaglines[0].tagline;
+      return scopeTaglines[index].tagline;
     },
     init() {
       this.updateButtons();
