@@ -83,7 +83,7 @@ class IncrementalNewTemplateMiddleware:
     def process_template_response(self, request, response):
         if settings.TESTING:
             return response
-        
+
         use_new_design = flag_is_active(request, "use_new_design")
 
         if (
