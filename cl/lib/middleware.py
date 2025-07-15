@@ -6,6 +6,8 @@ from django.http import HttpRequest, HttpResponseBase
 from django.template.response import TemplateResponse
 from waffle import flag_is_active
 
+from cl.search.forms import CorpusSearchForm
+
 
 class RobotsHeaderMiddleware:
     """Adds x-robots-tag HTTP header to any request that has `private=True`
@@ -90,6 +92,7 @@ class IncrementalNewTemplateMiddleware:
             and isinstance(response, TemplateResponse)
             and not response.is_rendered
         ):
+            response.context_data["search_form"] = CorpusSearchForm()
             old_template = response.template_name
             if isinstance(old_template, str):
                 new_template = f"v2_{old_template}"
