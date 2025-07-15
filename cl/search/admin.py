@@ -35,6 +35,7 @@ class OpinionAdmin(CursorPaginatorAdmin):
         "cluster",
         "author",
         "joined_by",
+        "main_version",
     )
     search_fields = (
         "plain_text",
