@@ -99,6 +99,6 @@
     @apply text-xl text-greyscale-700 font-normal;
   }
   .focus-container {
-    @apply [&:has(*:focus)]:ring-2 [&:has(*:focus)]:ring-primary-600 flex;
+    @apply [&:has(*:focus)]:outline [&:has(*:focus)]:outline-2 [&:has(*:focus)]:outline-primary-600 flex;
   }
 }

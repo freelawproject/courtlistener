@@ -3,7 +3,7 @@
 <c-vars rounded class=""></c-vars>
 
 <div
-  class="focus-container bg-greyscale-100 flex flex-row gap-2 items-center pl-4 pr-2 flex-grow h-[--corpus-search-height] border-t border-b border-greyscale-200{% if rounded %} rounded-lg border-l border-r{% endif %} {{ class }}"
+  class="focus-container -outline-offset-2 bg-greyscale-100 flex flex-row gap-2 items-center pl-4 pr-2 flex-grow h-[--corpus-search-height] border-y border-greyscale-200{% if rounded %} rounded-lg border-x{% endif %} {{ class }}"
 >
   {% svg "magnifier" class="text-greyscale-400 flex-grow-0 h-5 w-5" aria_hidden="true" %}
   <input type="hidden" name="type" x-bind:value="selectedScopeType">
