@@ -8,6 +8,26 @@ from cl.recap.models import UPLOAD_TYPE, PacerFetchQueue, ProcessingQueue
 from cl.search.models import Docket, RECAPDocument
 
 
+def sort_acms_docket_entries(
+    entries: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Sort docket entries to ensure consistent ordering.
+
+    The primary sort key is 'date_filed', followed by 'document_number'.
+    Entries with no document number are placed last for a given date.
+    This ordering reflects the typical structure of docket reports.
+    """
+    return sorted(
+        entries,
+        key=lambda d: (
+            d["date_filed"],
+            d["document_number"] is None,
+            d["document_number"],
+        ),
+    )
+
+
 def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
     """Extracts the court ID from a PacerFetchQueue object or a dictionary.
 

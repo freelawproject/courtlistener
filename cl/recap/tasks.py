@@ -112,6 +112,7 @@ from cl.recap.utils import (
     find_subdocket_pdf_rds_from_data,
     get_court_id_from_fetch_queue,
     get_main_rds,
+    sort_acms_docket_entries,
 )
 from cl.scrapers.tasks import (
     extract_recap_pdf,
@@ -1495,17 +1496,7 @@ async def process_recap_acms_docket(pk):
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
 
     # Sort docket entries to ensure consistent ordering
-    # The primary sort is by 'date_filed', followed by 'document_number' (nulls
-    # last for a given date). This approach aligns the order with how docket
-    # reports are typically displayed.
-    data["docket_entries"] = sorted(
-        data["docket_entries"],
-        key=lambda d: (
-            d["date_filed"],
-            d["document_number"] is None,
-            d["document_number"],
-        ),
-    )
+    data["docket_entries"] = sort_acms_docket_entries(data["docket_entries"])
     des_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
@@ -2447,13 +2438,8 @@ def purchase_appellate_docket_by_docket_number(
         raise ParsingException("No data found in docket report.")
 
     if acms_case_id:
-        docket_data["docket_entries"] = sorted(
-            docket_data["docket_entries"],
-            key=lambda d: (
-                d["date_filed"],
-                d["document_number"] is None,
-                d["document_number"],
-            ),
+        docket_data["docket_entries"] = sort_acms_docket_entries(
+            docket_data["docket_entries"]
         )
     return create_or_update_docket_data_from_fetch(
         fq, court_id, None, report, docket_data
