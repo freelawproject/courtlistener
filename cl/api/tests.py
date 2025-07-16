@@ -871,8 +871,7 @@ class FilteringCountTestMixin:
 class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
-        Court.objects.all().delete()
-
+        super().setUpTestData()
         cls.parent_court = CourtFactory(
             id="parent1",
             full_name="Parent Court",
@@ -881,7 +880,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
             in_use=True,
             has_opinion_scraper=True,
             has_oral_argument_scraper=False,
-            position=1,
+            position=10,
             start_date=date(2000, 1, 1),
             end_date=None,
             jurisdiction=Court.FEDERAL_APPELLATE,
@@ -897,7 +896,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
             in_use=False,
             has_opinion_scraper=False,
             has_oral_argument_scraper=True,
-            position=2,
+            position=20,
             start_date=date(2010, 6, 15),
             end_date=date(2020, 12, 31),
             jurisdiction=Court.STATE_SUPREME,
@@ -912,7 +911,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
             in_use=True,
             has_opinion_scraper=False,
             has_oral_argument_scraper=False,
-            position=3,
+            position=30,
             start_date=date(2015, 5, 20),
             end_date=None,
             jurisdiction=Court.STATE_TRIAL,
@@ -927,16 +926,17 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
             in_use=True,
             has_opinion_scraper=False,
             has_oral_argument_scraper=False,
-            position=4,
+            position=40,
             start_date=date(2012, 8, 25),
             end_date=None,
             jurisdiction=Court.FEDERAL_DISTRICT,
             date_modified=datetime(2023, 5, 5, tzinfo=UTC),
         )
+        cls.qs = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
+        cls.path = reverse("court-list", kwargs={"version": "v4"})
 
-    @async_to_sync
-    async def setUp(self):
-        self.path = reverse("court-list", kwargs={"version": "v4"})
+    def setUp(self):
+        super().setUp()
         self.q: dict[str, Any] = {}
 
     async def test_parent_court_filter(self):
@@ -956,7 +956,8 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     async def test_no_parent_court_filter(self):
         """Do we get all courts when using no filters?"""
         self.q = {}
-        await self.assertCountInResults(4)  # Should return all four courts
+        count = await self.qs.acount()
+        await self.assertCountInResults(count)
 
     async def test_invalid_parent_court_filter(self):
         """Do we handle invalid parent_court values correctly?"""
@@ -972,65 +973,91 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     async def test_in_use_filter(self):
         """Can we filter courts by in_use field?"""
         self.q = {"in_use": "true"}
-        await self.assertCountInResults(3)  # parent1, child2, orphan
+        in_use_count = await self.qs.filter(in_use=True).acount()
+        await self.assertCountInResults(in_use_count)
         self.q = {"in_use": "false"}
-        await self.assertCountInResults(1)  # child1
+        not_in_use_count = await self.qs.filter(in_use=False).acount()
+        await self.assertCountInResults(not_in_use_count)
 
     async def test_has_opinion_scraper_filter(self):
         """Can we filter courts by has_opinion_scraper field?"""
         self.q = {"has_opinion_scraper": "true"}
-        await self.assertCountInResults(1)  # parent1
+        has_scraper = await self.qs.filter(has_opinion_scraper=True).acount()
+        await self.assertCountInResults(has_scraper)
         self.q = {"has_opinion_scraper": "false"}
-        await self.assertCountInResults(3)  # child1, child2, orphan
+        hasnt_scraper = await self.qs.filter(
+            has_opinion_scraper=False
+        ).acount()
+        await self.assertCountInResults(
+            hasnt_scraper
+        )  # child1, child2, orphan
 
     async def test_has_oral_argument_scraper_filter(self):
         """Can we filter courts by has_oral_argument_scraper field?"""
         self.q = {"has_oral_argument_scraper": "true"}
-        await self.assertCountInResults(1)  # child1
+        has_scraper = await self.qs.filter(
+            has_oral_argument_scraper=True
+        ).acount()
+        await self.assertCountInResults(has_scraper)
         self.q = {"has_oral_argument_scraper": "false"}
-        await self.assertCountInResults(3)  # parent1, child2, orphan
+        hasnt_scraper = await self.qs.filter(
+            has_oral_argument_scraper=False
+        ).acount()
+        await self.assertCountInResults(hasnt_scraper)
 
     async def test_position_filter(self):
         """Can we filter courts by position with integer lookups?"""
-        self.q = {"position__gt": "2"}
-        await self.assertCountInResults(2)  # child2 (3), orphan (4)
-        self.q = {"position__lte": "2"}
-        await self.assertCountInResults(2)  # parent1 (1), child1 (2)
+        self.q = {"position__gt": "20"}
+        count = await self.qs.filter(position__gt=20).acount()
+        await self.assertCountInResults(count)
+        self.q = {"position__lte": "20"}
+        count = await self.qs.filter(position__lte=20).acount()
+        await self.assertCountInResults(count)
 
     async def test_start_date_filter(self):
         """Can we filter courts by start_date with date lookups?"""
         self.q = {"start_date__year": "2015"}
-        await self.assertCountInResults(1)  # child2 (2015-05-20)
+        count = await self.qs.filter(start_date__year=2015).acount()
+        await self.assertCountInResults(count)
         self.q = {"start_date__gte": "2010-01-01"}
-        await self.assertCountInResults(3)  # child1, child2, orphan
+        count = await self.qs.filter(start_date__gte="2010-01-01").acount()
+        await self.assertCountInResults(count)
 
     async def test_end_date_filter(self):
         """Can we filter courts by end_date with date lookups?"""
         self.q = {"end_date__day": "31"}
-        await self.assertCountInResults(1)  # parent1, child2, orphan
+        count = await self.qs.filter(end_date__day=31).acount()
+        await self.assertCountInResults(count)
         self.q = {"end_date__year": "2024"}
-        await self.assertCountInResults(0)
+        count = await self.qs.filter(end_date__year=2024).acount()
+        await self.assertCountInResults(count)
 
     async def test_short_name_filter(self):
         """Can we filter courts by short_name with text lookups?"""
         self.q = {"short_name__iexact": "Cc1"}
-        await self.assertCountInResults(1)  # child1
+        count = await self.qs.filter(short_name__iexact="Cc1").acount()
+        await self.assertCountInResults(count)
         self.q = {"short_name__icontains": "cc"}
-        await self.assertCountInResults(2)  # child1, child2
+        count = await self.qs.filter(short_name__icontains="cc").acount()
+        await self.assertCountInResults(count)
 
     async def test_full_name_filter(self):
         """Can we filter courts by full_name with text lookups?"""
         self.q = {"full_name__istartswith": "Child"}
-        await self.assertCountInResults(2)  # child1, child2
+        count = await self.qs.filter(full_name__istartswith="Child").acount()
+        await self.assertCountInResults(count)
         self.q = {"full_name__iendswith": "Court"}
-        await self.assertCountInResults(2)  # parent1, orphan
+        count = await self.qs.filter(full_name__iendswith="Court").acount()
+        await self.assertCountInResults(count)
 
     async def test_citation_string_filter(self):
         """Can we filter courts by citation_string with text lookups?"""
         self.q = {"citation_string": "OC"}
-        await self.assertCountInResults(1)  # orphan
+        count = await self.qs.filter(citation_string="OC").acount()
+        await self.assertCountInResults(count)
         self.q = {"citation_string__icontains": "2"}
-        await self.assertCountInResults(1)  # child2
+        count = await self.qs.filter(citation_string__icontains="2").acount()
+        await self.assertCountInResults(count)
 
     async def test_jurisdiction_filter(self):
         """Can we filter courts by jurisdiction?"""
@@ -1040,7 +1067,10 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
                 Court.FEDERAL_DISTRICT,
             ]
         }
-        await self.assertCountInResults(2)  # parent1 and orphan
+        count = await self.qs.filter(
+            jurisdiction__in=[Court.FEDERAL_APPELLATE, Court.FEDERAL_DISTRICT]
+        ).acount()
+        await self.assertCountInResults(count)  # parent1 and orphan
 
     async def test_combined_filters(self):
         """Can we filter courts with multiple filters applied?"""
@@ -1049,7 +1079,10 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
             "has_opinion_scraper": "false",
             "position__gt": "2",
         }
-        await self.assertCountInResults(2)  # child2 and orphan
+        count = await self.qs.filter(
+            in_use=True, has_opinion_scraper=False, position__gt=2
+        ).acount()
+        await self.assertCountInResults(count)
 
 
 class DRFJudgeApiFilterTests(
