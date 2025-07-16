@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import operator
 import re
@@ -33,6 +34,7 @@ from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.date_time import midnight_pt
+from cl.lib.microservice_utils import microservice
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
     ApiPositionMapping,
@@ -82,6 +84,7 @@ from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
     ElasticBadRequestError,
+    InputTooLongError,
     InvalidRelativeDateSyntax,
     QueryType,
     UnbalancedParenthesesQuery,
@@ -2677,6 +2680,73 @@ def apply_custom_score_to_main_query(
             min_score=min_score,
         )
     return query
+
+
+def build_semantic_query(
+    text_query: str, fields: list[str], filters: list[QueryString | Range]
+) -> tuple[str, list[Query]]:
+    """
+    Build a hybrid Elasticsearch query using both exact keyword matching and
+    semantic vector search.
+
+    :param text_query: The raw user query string, which may include quoted
+        phrases for exact matching.
+    :param fields: A list of fields to target with the full-text keyword query.
+    :param filters: A list of filter clauses to apply as pre-filtering to the
+        semantic KNN search query.
+    :return: A two-tuple:
+        - keyword_query: A string representing the AND-joined quoted phrases, if any.
+        - semantic_query: A list of Elasticsearch Q objects, including the KNN vector search
+          and optionally a keyword-based full-text query.
+    :raises InputTooLongError: If the cleaned query string exceeds the maximum allowed length
+        for generating embeddings.
+    """
+    semantic_query: list[Query] = []
+    # Extract quoted phrases from the input string (for exact keyword matching)
+    exact_keywords = re.findall(r'"([^"]*)"', text_query)
+
+    # Join extracted phrases with AND to form a keyword query string
+    keyword_query = " AND ".join([f'"{s}"' for s in exact_keywords])
+
+    # Remove quotes from the query to prepare for embedding
+    cleaned_text_query = text_query.replace('"', "")
+
+    # Enforce character limit to avoid exceeding embedding constraints
+    if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
+        raise InputTooLongError(QueryType.QUERY_STRING)
+
+    # Generate embedding vector using external microservice
+    embedding_request = async_to_sync(microservice)(
+        service="inception-query",
+        data=json.dumps({"text": cleaned_text_query}),
+    )
+    embedding_request.raise_for_status()
+    vectors = embedding_request.json()["embedding"]
+
+    # If exact keyword query exists, build and add full-text query to results
+    # This enables hybrid search by combining keyword and semantic results
+    if keyword_query:
+        semantic_query.extend(
+            build_fulltext_query(fields, keyword_query, only_queries=True)
+        )
+
+    # Add the semantic vector-based query using KNN with pre-filtering
+    semantic_query.append(
+        Q(
+            "nested",
+            path="embeddings",
+            query=Q(
+                "knn",
+                field="embeddings.embedding",
+                k=settings.KNN_SEARCH_K,
+                query_vector=vectors,
+                filter=filters,
+                similarity=settings.KNN_SIMILARITY,
+                boost=settings.KNN_SEARCH_BOOST,
+            ),
+        )
+    )
+    return keyword_query, semantic_query
 
 
 def build_full_join_es_queries(
