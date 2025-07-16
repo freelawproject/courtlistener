@@ -2425,7 +2425,7 @@ def purchase_appellate_docket_by_docket_number(
     acms_case_id = None
 
     if should_check_acms_court(court_id):
-        acms_search = AcmsCaseSearch(court_id="ca9", pacer_session=session)
+        acms_search = AcmsCaseSearch(court_id=court_id, pacer_session=session)
         acms_search.query(docket_number)
         acms_case_id = (
             acms_search.data["pcx_caseid"] if acms_search.data else None
