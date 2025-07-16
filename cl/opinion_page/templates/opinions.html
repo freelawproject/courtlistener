@@ -45,7 +45,7 @@
                         {% if perms.search.change_opinion %}
                             {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                                 <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
-                                   class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion{% if sub_opinion.main_version %} [main] {% endif %}</a>
+                                   class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion{% if sub_opinion.main_version %} [version] {% endif %}</a>
                             {% endfor %}
                         {% endif %}
                         {% if request.user.is_superuser %}
