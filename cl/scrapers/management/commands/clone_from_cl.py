@@ -169,7 +169,7 @@ def clone_opinion_cluster(
         non_participating_judges_data = cluster_datum[
             "non_participating_judges"
         ]
-        sub_opinions_data = cluster_datum["sub_opinions"]
+        sub_opinions_urls = cluster_datum["sub_opinions"]
         # delete unneeded fields
         for f in [
             "resource_uri",
@@ -253,38 +253,6 @@ def clone_opinion_cluster(
                 ]
             )
 
-        # Clone opinions
-        prepared_opinion_data = []
-        added_opinions_ids = []
-
-        for op in sub_opinions_data:
-            # Get opinion from api
-            op_data = get_json_data(op, session)
-            author = op_data["author"]
-
-            # Delete fields with fk or m2m relations or unneeded fields
-            for f in [
-                "opinions_cited",
-                "cluster",
-                "absolute_url",
-                "resource_uri",
-                "author",
-                "joined_by",
-            ]:
-                del op_data[f]
-
-            if author:
-                cloned_person = clone_person(
-                    session, [get_id_from_url(author)], person_positions
-                )
-
-                if cloned_person:
-                    # Add id of cloned person
-                    op_data["author"] = cloned_person[0]
-
-            # Append new data
-            prepared_opinion_data.append(op_data)
-
         with transaction.atomic():
             # Create opinion cluster
             opinion_cluster = model.objects.create(**cluster_datum)
@@ -312,15 +280,12 @@ def clone_opinion_cluster(
                 cite_data["cluster_id"] = opinion_cluster.pk
                 Citation.objects.create(**cite_data)
 
-            for opinion_data in prepared_opinion_data:
-                # Update cluster_id in opinion's json
-                opinion_data["cluster_id"] = opinion_cluster.pk
-
-                # Create opinion
-                op = Opinion.objects.create(**opinion_data)
-
-                # Store created opinion id
-                added_opinions_ids.append(op.id)
+            # Clone opinions
+            sub_opinions_ids = [
+                get_id_from_url(url) for url in sub_opinions_urls
+            ]
+            for opinion_id in sub_opinions_ids:
+                clone_opinion(session, opinion_id, opinion_cluster.pk)
 
             opinion_clusters.append(opinion_cluster)
             print(
@@ -329,6 +294,84 @@ def clone_opinion_cluster(
             )
 
     return opinion_clusters
+
+
+def clone_opinion(
+    session: Session,
+    opinion_id: int,
+    opinion_cluster_id: int,
+    person_positions: bool = False,
+    object_type="search.Opinion",
+):
+    """Download opinion data from courtlistener.com and add it to local
+    environment
+    :param session: a Requests session
+    :param opinion_id: opinion id to clone
+    :param opinion_cluster_id: cluster id related to opinions
+    :param person_positions: True if we should clone person positions
+    :param object_type: Opinion app name with model name
+    :return:
+    """
+
+    model = apps.get_model(object_type)
+    opinion_path = reverse(
+        "opinion-detail",
+        kwargs={"version": "v4", "pk": opinion_id},
+    )
+    opinion_url = f"{domain}{opinion_path}"
+
+    try:
+        opinion = model.objects.get(pk=opinion_id)
+        print(f"Opinion already exists: {opinion_id}")
+        return opinion
+    except model.DoesNotExist:
+        pass
+
+    print(f"Cloning opinion id: {opinion_id}")
+
+    op_data = get_json_data(opinion_url, session)
+    author = op_data["author"]
+    main_version = op_data["main_version"]
+
+    # Delete fields with fk or m2m relations or unneeded fields
+    for f in [
+        "opinions_cited",
+        "cluster",
+        "absolute_url",
+        "resource_uri",
+        "author",
+        "joined_by",
+        "main_version",
+    ]:
+        del op_data[f]
+
+    if author:
+        cloned_person = clone_person(
+            session, [get_id_from_url(author)], person_positions
+        )
+
+        if cloned_person:
+            # Add id of cloned person
+            op_data["author"] = cloned_person[0]
+
+    if main_version:
+        # Get opinion id of main opinion
+        main_version_id = int(main_version.split("/")[-2])
+        try:
+            _ = model.objects.get(pk=main_version_id)
+        except model.DoesNotExist:
+            clone_opinion(
+                session, main_version_id, opinion_cluster_id, person_positions
+            )
+
+        op_data["main_version_id"] = main_version_id
+
+    op_data["cluster_id"] = opinion_cluster_id
+
+    # Create opinion
+    op = Opinion.objects.create(**op_data)
+
+    return op
 
 
 def clone_docket(
