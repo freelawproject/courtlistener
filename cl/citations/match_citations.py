@@ -113,9 +113,12 @@ def resolve_fullcase_citation(
 
         # If there is one search result, try to return it
         if len(db_search_results) == 1:
-            result_id = db_search_results[0]["id"]
+            match = db_search_results[0]
+            if match["cluster_id"] == full_citation.citing_opinion.cluster.pk:
+                # Self Citation
+                return NO_MATCH_RESOURCE
             try:
-                return Opinion.objects.get(pk=result_id)
+                return Opinion.objects.get(pk=match["id"])
             except (Opinion.DoesNotExist, Opinion.MultipleObjectsReturned):
                 pass
 
