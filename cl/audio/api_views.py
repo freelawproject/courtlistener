@@ -2,13 +2,13 @@ from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
 from cl.api.api_permissions import V3APIPermission
-from cl.api.utils import LoggingMixin
+from cl.api.utils import DeferredFieldsMixin, LoggingMixin
 from cl.audio.api_serializers import AudioSerializer
 from cl.audio.filters import AudioFilter
 from cl.audio.models import Audio
 
 
-class AudioViewSet(LoggingMixin, viewsets.ModelViewSet):
+class AudioViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     serializer_class = AudioSerializer
     filterset_class = AudioFilter
     permission_classes = [

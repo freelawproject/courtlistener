@@ -177,8 +177,10 @@ p_field_mapping = {
     "save": {
         Person: {
             "self": {
-                "name_full": ["name"],
-                "name_full_reverse": ["name_reverse"],
+                "name_first": ["name", "name_reverse"],
+                "name_middle": ["name", "name_reverse"],
+                "name_last": ["name", "name_reverse"],
+                "name_suffix": ["name", "name_reverse"],
                 "religion": ["religion"],
                 "gender": ["gender"],
                 "dob_city": ["dob_city"],
@@ -218,16 +220,28 @@ position_field_mapping = {
     "save": {
         Person: {
             "appointer__person": {
-                "name_full_reverse": ["appointer"],
+                "name_first": ["appointer"],
+                "name_middle": ["appointer"],
+                "name_last": ["appointer"],
+                "name_suffix": ["appointer"],
             },
             "predecessor": {
-                "name_full_reverse": ["predecessor"],
+                "name_first": ["predecessor"],
+                "name_middle": ["predecessor"],
+                "name_last": ["predecessor"],
+                "name_suffix": ["predecessor"],
             },
             "supervisor": {
-                "name_full_reverse": ["supervisor"],
+                "name_first": ["supervisor"],
+                "name_middle": ["supervisor"],
+                "name_last": ["supervisor"],
+                "name_suffix": ["supervisor"],
             },
             "person": {
-                "name_full": ["name"],
+                "name_first": ["name"],
+                "name_middle": ["name"],
+                "name_last": ["name"],
+                "name_suffix": ["name"],
                 "religion": ["religion"],
                 "gender": ["gender"],
                 "dob_city": ["dob_city"],
@@ -305,10 +319,16 @@ docket_field_mapping = {
         },
         Person: {
             "assigned_to": {
-                "name_full": ["assignedTo"],
+                "name_first": ["assignedTo"],
+                "name_middle": ["assignedTo"],
+                "name_last": ["assignedTo"],
+                "get_name_suffix_display": ["assignedTo"],
             },
             "referred_to": {
-                "name_full": ["referredTo"],
+                "name_first": ["referredTo"],
+                "name_middle": ["referredTo"],
+                "name_last": ["referredTo"],
+                "get_name_suffix_display": ["referredTo"],
             },
         },
     },
@@ -371,10 +391,16 @@ recap_document_field_mapping = {
         },
         Person: {
             "assigned_to": {
-                "name_full": ["assignedTo"],
+                "name_first": ["assignedTo"],
+                "name_middle": ["assignedTo"],
+                "name_last": ["assignedTo"],
+                "get_name_suffix_display": ["assignedTo"],
             },
             "referred_to": {
-                "name_full": ["referredTo"],
+                "name_first": ["referredTo"],
+                "name_middle": ["referredTo"],
+                "name_last": ["referredTo"],
+                "get_name_suffix_display": ["referredTo"],
             },
         },
     },
