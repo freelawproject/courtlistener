@@ -22,6 +22,7 @@ from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
+from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import Cursor, CursorPagination
 from rest_framework.request import Request
@@ -96,11 +97,13 @@ from cl.search.factories import (
     CourtFactory,
     DocketFactory,
     OpinionClusterWithChildrenAndParentsFactory,
+    OpinionClusterWithParentsFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     SOURCES,
+    ClusterRedirection,
     Court,
     Docket,
     Opinion,
@@ -3738,3 +3741,42 @@ class EventCountApiTest(TestCase):
         event_record.refresh_from_db()
         # Assert that the value of the event record has been incremented by 1
         self.assertEqual(event_record.value, 4)
+
+
+class ClusterRedirectionTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.deleted_cluster_id = 999999
+        cls.redirect_to_cluster = OpinionClusterWithParentsFactory.create()
+        ClusterRedirection.objects.create(
+            deleted_cluster_id=cls.deleted_cluster_id,
+            cluster=cls.redirect_to_cluster,
+            reason=ClusterRedirection.VERSIONING,
+        )
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="a-user",
+            user__password=make_password("password"),
+        )
+
+    async def test_opinion_cluster_redirection(self):
+        """Test that a deleted cluster redirects to an existing cluster"""
+        url = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v4", "pk": self.deleted_cluster_id},
+        )
+        api_client = await sync_to_async(make_client)(self.user.user.pk)
+        response = await api_client.get(url)
+        self.assertEqual(
+            response.status_code, status.HTTP_301_MOVED_PERMANENTLY
+        )
+
+        redirect_response = await api_client.get(response.headers["Location"])
+        data = json.loads(redirect_response.content)
+        self.assertEqual(data["id"], self.redirect_to_cluster.id)
+
+        # Check that we don't get false redirections for non-existent record
+        url = reverse(
+            "opinioncluster-detail", kwargs={"version": "v4", "pk": 777777}
+        )
+        response = await api_client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

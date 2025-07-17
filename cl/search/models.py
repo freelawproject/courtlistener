@@ -3786,3 +3786,41 @@ class SearchQuery(models.Model):
             models.Index(fields=["date_created"]),
         ]
         verbose_name_plural = "Search Queries"
+
+
+class ClusterRedirection(models.Model):
+    """Model to prevent dead /opinion/ links"""
+
+    VERSIONING = 1
+    DUPLICATE = 2
+    CONSOLIDATION = 3
+    SEALED = 4
+    REDIRECTION_REASON = (
+        (
+            VERSIONING,
+            "Opinion versions clusters were consolidated in a single one",
+        ),
+        (DUPLICATE, "Clusters were duplicated"),
+        (
+            CONSOLIDATION,
+            "Opinion types clusters were consolidated in a single one",
+        ),
+        (SEALED, "Cluster was deleted due to sealing"),
+    )
+
+    deleted_cluster_id = models.IntegerField()
+    cluster = models.ForeignKey(
+        OpinionCluster,
+        help_text="The existing cluster the deleted clusters now point to",
+        related_name="merged_clusters",
+        # if a cluster with `merged_cluster` is to be deleted, it will raise
+        # an IntegrityError. User should assign a different cluster before
+        # deleting the current cluster
+        on_delete=models.DO_NOTHING,
+        # need null values for SEALED opinions
+        null=True,
+    )
+    reason = models.SmallIntegerField(
+        help_text="The reason why the old cluster was deleted",
+        choices=REDIRECTION_REASON,
+    )
