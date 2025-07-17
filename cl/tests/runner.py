@@ -3,13 +3,13 @@ import sys
 import warnings
 from unittest import TestLoader
 
+from django.test import SimpleTestCase
 from django.test.runner import DiscoverRunner
 from override_storage import override_storage
 
 from cl.tests.cases import (
     APITestCase,
     LiveServerTestCase,
-    SimpleTestCase,
     StaticLiveServerTestCase,
     TestCase,
     TransactionTestCase,
