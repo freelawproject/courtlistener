@@ -9,11 +9,13 @@ from unittest.mock import Mock, patch
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from bs4 import BeautifulSoup
+from celery.exceptions import Retry
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
 from django.core.management import call_command
+from django.db import OperationalError
 from django.db.models.signals import post_delete, post_save
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from elasticsearch import NotFoundError
 from eyecite import get_citations
@@ -87,7 +89,6 @@ from cl.search.models import (
 )
 from cl.tests.cases import (
     ESIndexTestCase,
-    SimpleTestCase,
     TestCase,
     TransactionTestCase,
 )
@@ -96,7 +97,7 @@ from cl.users.factories import UserProfileWithParentsFactory
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
-class CitationTextTest(SimpleTestCase):
+class CitationTextTest(TestCase):
     def test_make_html_from_plain_text(self) -> None:
         """Can we convert the plain text of an opinion into HTML?"""
         # fmt: off
@@ -3183,3 +3184,111 @@ class UnmatchedCitationTest(TransactionTestCase):
             1,
             "Incorrect number of citations saved",
         )
+
+
+class TasksTest(TestCase):
+    """Test citations tasks"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
+
+        cls.ca_court = CourtFactory(id="ca")
+
+        cls.opinion_1 = OpinionWithChildrenFactory(
+            plain_text="Sample text 1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.ca_court),
+                case_name="Opinion 1",
+                date_filed=date(2025, 4, 25),
+            ),
+        )
+
+        cls.opinion_2 = OpinionWithChildrenFactory(
+            plain_text="Sample text 2",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.ca_court),
+                case_name="Opinion 2",
+                date_filed=date(2025, 4, 26),
+            ),
+        )
+        cls.opinion_3 = OpinionWithChildrenFactory(
+            plain_text="Sample text 3",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=cls.ca_court),
+                case_name="Opinion 3",
+                date_filed=date(2025, 4, 27),
+            ),
+        )
+
+    @patch(
+        "cl.citations.tasks.store_opinion_citations_and_update_parentheticals"
+    )
+    @patch("celery.app.task.Task.retry", side_effect=Retry())
+    def test_operational_error_does_not_cause_recursion(
+        self, mock_retry, mock_store
+    ):
+        """Ensure retry of failed opinion ids by OperationalError triggers retry but does not cause recursion"""
+
+        # Simulate every call raises OperationalError
+        mock_store.side_effect = OperationalError()
+
+        # Call the task once, it should raise Retry
+        with self.assertRaises(Retry):
+            find_citations_and_parentheticals_for_opinion_by_pks.apply(
+                args=([self.opinion_1.id, self.opinion_2.id], False, False),
+                throw=True,
+            )
+
+        # Confirm retry was triggered once with the batch of ids
+        mock_retry.assert_called_once()
+        retry_args = mock_retry.call_args.kwargs
+
+        self.assertIsInstance(retry_args["exc"], OperationalError)
+        self.assertEqual(
+            retry_args["args"],
+            ([self.opinion_1.id, self.opinion_2.id], False, False),
+        )
+        self.assertEqual(retry_args["countdown"], 5)
+
+
+@patch("celery.app.task.Task.retry", side_effect=Retry())
+@patch("cl.citations.tasks.store_opinion_citations_and_update_parentheticals")
+def test_operational_error_accumulates_failed_ids_and_retries_together(
+    self, mock_store, mock_retry
+):
+    """Ensure multiple OperationalError cases are retried in batch with self.retry"""
+
+    def side_effect(opinion, *_):
+        """Mocks store_opinion_citations_and_update_parentheticals call
+        Simulates a failure for opinion_1 and opinon_3
+
+        :param opinion: The opinion object being processed
+        :param *_: Ignored positional arguments passed by the task
+        :return: None for all other opinions to simulate success
+        """
+        if opinion.id in [self.opinion_2.id, self.opinion_3.id]:
+            raise OperationalError()
+        return None
+
+    mock_store.side_effect = side_effect
+
+    with self.assertRaises(Retry):
+        find_citations_and_parentheticals_for_opinion_by_pks.apply(
+            args=(
+                [self.opinion_1.id, self.opinion_2.id, self.opinion_3.id],
+                False,
+                False,
+            ),
+            throw=True,
+        )
+
+    called_args = mock_retry.call_args.kwargs
+
+    self.assertEqual(called_args["countdown"], 5)
+    self.assertIsInstance(called_args["exc"], OperationalError)
+    self.assertEqual(
+        set(called_args["args"][0]),
+        {self.opinion_2.id, self.opinion_3.id},
+        "Should retry only failed opinion IDs",
+    )
