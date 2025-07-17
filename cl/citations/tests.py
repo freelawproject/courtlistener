@@ -3246,49 +3246,52 @@ class TasksTest(TestCase):
 
         self.assertIsInstance(retry_args["exc"], OperationalError)
         self.assertEqual(
-            retry_args["args"],
-            ([self.opinion_1.id, self.opinion_2.id], False, False),
+            sorted(retry_args["args"][0]),
+            sorted([self.opinion_1.id, self.opinion_2.id]),
         )
+        self.assertEqual(retry_args["args"][1:], (False, False))
+
         self.assertEqual(retry_args["countdown"], 5)
 
-
-@patch("celery.app.task.Task.retry", side_effect=Retry())
-@patch("cl.citations.tasks.store_opinion_citations_and_update_parentheticals")
-def test_operational_error_accumulates_failed_ids_and_retries_together(
-    self, mock_store, mock_retry
-):
-    """Ensure multiple OperationalError cases are retried in batch with self.retry"""
-
-    def side_effect(opinion, *_):
-        """Mocks store_opinion_citations_and_update_parentheticals call
-        Simulates a failure for opinion_1 and opinon_3
-
-        :param opinion: The opinion object being processed
-        :param *_: Ignored positional arguments passed by the task
-        :return: None for all other opinions to simulate success
-        """
-        if opinion.id in [self.opinion_2.id, self.opinion_3.id]:
-            raise OperationalError()
-        return None
-
-    mock_store.side_effect = side_effect
-
-    with self.assertRaises(Retry):
-        find_citations_and_parentheticals_for_opinion_by_pks.apply(
-            args=(
-                [self.opinion_1.id, self.opinion_2.id, self.opinion_3.id],
-                False,
-                False,
-            ),
-            throw=True,
-        )
-
-    called_args = mock_retry.call_args.kwargs
-
-    self.assertEqual(called_args["countdown"], 5)
-    self.assertIsInstance(called_args["exc"], OperationalError)
-    self.assertEqual(
-        set(called_args["args"][0]),
-        {self.opinion_2.id, self.opinion_3.id},
-        "Should retry only failed opinion IDs",
+    @patch("celery.app.task.Task.retry", side_effect=Retry())
+    @patch(
+        "cl.citations.tasks.store_opinion_citations_and_update_parentheticals"
     )
+    def test_operational_error_accumulates_failed_ids_and_retries_together(
+        self, mock_store, mock_retry
+    ):
+        """Ensure multiple OperationalError cases are retried in batch with self.retry"""
+
+        def side_effect(opinion, *_):
+            """Mocks store_opinion_citations_and_update_parentheticals call
+            Simulates a failure for opinion_1 and opinon_3
+
+            :param opinion: The opinion object being processed
+            :param *_: Ignored positional arguments passed by the task
+            :return: None for all other opinions to simulate success
+            """
+            if opinion.id in [self.opinion_2.id, self.opinion_3.id]:
+                raise OperationalError()
+            return None
+
+        mock_store.side_effect = side_effect
+
+        with self.assertRaises(Retry):
+            find_citations_and_parentheticals_for_opinion_by_pks.apply(
+                args=(
+                    [self.opinion_1.id, self.opinion_2.id, self.opinion_3.id],
+                    False,
+                    False,
+                ),
+                throw=True,
+            )
+
+        called_args = mock_retry.call_args.kwargs
+
+        self.assertEqual(called_args["countdown"], 5)
+        self.assertIsInstance(called_args["exc"], OperationalError)
+        self.assertEqual(
+            set(called_args["args"][0]),
+            {self.opinion_2.id, self.opinion_3.id},
+            "Should retry only failed opinion IDs",
+        )
