@@ -428,7 +428,7 @@ def fetch_and_paginate_results(
 
             elif type(cache_data) is Response:
                 # Create Django paginator for insights as ES metadata is not stored
-                paginator = Paginator(cache_data, page)
+                paginator = Paginator(cache_data, rows_per_page)
                 results = get_results_from_paginator(paginator, page)
                 enrich_search_results(results, search_type, get_params)
 
