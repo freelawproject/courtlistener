@@ -45,6 +45,8 @@ class TestRunner(DiscoverRunner):
     def __init__(self, *args, enable_logging, **kwargs):
         super().__init__(*args, **kwargs)
         self.enable_logging = enable_logging
+        self.use_clones = kwargs["use_clones"]
+        self.keepdb = self.use_clones or self.keepdb
 
     @classmethod
     def add_arguments(cls, parser):
@@ -55,6 +57,14 @@ class TestRunner(DiscoverRunner):
             default=False,
             help="Display all log lines",
         )
+
+        parser.add_argument(
+            "--use-clones",
+            action="store_true",
+            default=False,
+            help="Runs all tests against fresh clones of the test DB.",
+        )
+
         super().add_arguments(parser)
 
         # Modify parallel option to default to number of CPU cores
@@ -74,55 +84,38 @@ class TestRunner(DiscoverRunner):
         # Force to always delete the database if it exists
         interactive = self.interactive
         self.interactive = False
+        if self.use_clones:
+            # --keepdb doesn't really work. See Django bug #25251:
+            # https://code.djangoproject.com/ticket/25251. In addition to
+            # TransactionTestCases, it appears TestCases can also delete
+            # migration data. To resolve that, this flag always runs tests
+            # against clones of the test database, never the real thing.
+            # The cost is usually negligible. The --timing flag will show
+            # exactly how long it takes.
 
-        try:
-            if self.keepdb:
-                # --keepdb doesn't really work. See Django bug #25251:
-                # https://code.djangoproject.com/ticket/25251. In addition to
-                # TransactionTestCases, it appears TestCases can also delete
-                # migration data. To resolve that, this modifies the test
-                # runner to never run against the actual test database if we're
-                # trying to keep it. Instead, always run against a clone that
-                # gets destroyed at the end of testing.
-
-                # Because we don't want to run through migrations twice,
-                # we use the normal process to create the actual test database, then
-                # manually clone it and the parallel clones.
-                parallel = self.parallel
-                self.parallel = 1
-                old_config = super().setup_databases(*args, **kwargs)
-                self.parallel = parallel
-                # Create the clones ourselves
-                for c in (x for x, y, z in old_config if z):
-                    # Create test_database_clone and replace the real test database.
-                    db_clone_name = c.settings_dict["NAME"] + "_clone"
-                    with self.time_keeper.timed(f"  Cloning '{c.alias}'"):
+            # Because we don't want to run through migrations twice,
+            # we use the normal process to create the actual test database, then
+            # manually create the clones.
+            parallel = self.parallel or 1
+            self.parallel = 1
+            old_config = super().setup_databases(*args, **kwargs)
+            self.parallel = parallel
+            # Create the clones ourselves for each database being used.
+            # Don't clone aliases.
+            for c in (x for x, y, z in old_config if z):
+                with self.time_keeper.timed(f"  Cloning '{c.alias}'"):
+                    for index in range(1, self.parallel + 1):
                         c.creation.clone_test_db(
-                            "clone", verbosity=self.verbosity
+                            suffix=str(index), verbosity=self.verbosity
                         )
-                    settings.DATABASES[c.alias]["NAME"] = db_clone_name
-                    c.settings_dict["NAME"] = db_clone_name
-                    # Create parallel clones.
-                    if parallel > 1:
-                        for index in range(1, self.parallel + 1):
-                            with self.time_keeper.timed(
-                                f"  Cloning '{c.alias}'"
-                            ):
-                                c.creation.clone_test_db(
-                                    str(index), verbosity=self.verbosity
-                                )
-                return old_config
-            else:
-                return super().setup_databases(*args, **kwargs)
-        finally:
-            self.interactive = interactive
-
-    def teardown_databases(self, *args, **kwargs):
-        keepdb = self.keepdb
-        # Always delete the cloned DBs.
-        self.keepdb = False
-        super().teardown_databases(*args, **kwargs)
-        self.keebdb = keepdb
+                if parallel == 1:
+                    cloned_db_name = f"{c.settings_dict['NAME']}_1"
+                    settings.DATABASES[c.alias]["NAME"] = cloned_db_name
+                    c.settings_dict["NAME"] = cloned_db_name
+        else:
+            old_config = super().setup_databases(*args, **kwargs)
+        self.interactive = interactive
+        return old_config
 
     @override_storage()
     def run_tests(self, *args, **kwargs):
