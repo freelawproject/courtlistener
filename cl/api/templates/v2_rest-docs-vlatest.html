@@ -62,7 +62,7 @@
     <p>Note that when you press the button in your browser, you get an HTML result, but when you run <code>curl</code> you get a JSON object. This is <a class="underline" href="#formats">discussed in more depth below</a>.</p>
     <div class="alert-warning alert">
         <strong >Listen Up!</strong> Something else that's curious just happened. You didn't authenticate to the API. To encourage experimentation, many of our APIs are open by default. The biggest gotcha people have is that they forget to enable authentication before deploying their code. Don't make this mistake! Remember to add <a href="#authentication" class="underline">authentication</a>.
-    </div>    
+    </div>
     <p>The APIs listed in this response can be used to make queries against our database or search engine.</p>
     <p>To learn more about an API, you can send an <a class="underline" href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/OPTIONS">HTTP OPTIONS</a> request, like so:</p>
     <c-code disable_copy>curl -X OPTIONS "{% get_full_host %}{% url "api-root" version="v4" %}"</c-code>
@@ -98,7 +98,7 @@
     <p>Some of our APIs are only available to select users. If you need greater access to these APIs, <a class="underline" href="{% url "contact" %}">please get in touch</a>.</p>
     <p>All other endpoints are available according to the <a class="underline" href="#rates">throttling</a> and <a class="underline" href="#authentication">authentication</a> limitations listed below.</p>
   </c-layout-with-navigation.section>
-  
+
   <div class="p-6 border rounded-lg banner w-full">
     <h4>Your Authorization Token</h4>
     {% if user.is_authenticated %}
@@ -112,9 +112,9 @@
   </div>
 
   <c-layout-with-navigation.section id="authentication">
-    
+
     <h3>Authentication</h3>
-    
+
     <p>Authentication is necessary to monitor and throttle the system, and so we can assist with any errors that may occur.</p>
     <p>Per our <a class="underline" href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your queries in the API, though we do collect statistical information for system monitoring.</p>
     <p>There are currently three types of authentication available on the API:</p>
@@ -249,7 +249,7 @@
     <c-code disable_copy>curl "{% get_full_host %}{% url "docket-list" version="v4" %}?court__jurisdiction!=F"</c-code>
     <p>You can see more examples of filters in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/api/tests.py" target="_blank" class="underline">our automated tests</a>.</p>
   </c-layout-with-navigation.section>
-  
+
   <c-layout-with-navigation.section id="ordering">
     <h3>Ordering</h3>
     <p>With the exception of the search API, you can see which fields can be used for ordering, by looking at the <code>ordering</code> key in an <code>OPTIONS</code> request. For example, the <code>Position</code> endpoint contains this:
@@ -278,13 +278,13 @@
     <p>Ordering by fields with duplicate values is non-deterministic. If you wish to order by such a field, you should provide a second field as a tie-breaker to consistently order results. For example, ordering by <code>date_filed</code> will not return consistent ordering for items that have the same date, but this can be fixed by ordering by <code>date_filed,id</code>. In that case, if two items have the same <code>date_filed</code> value, the tie will be broken by the <code>id</code> field.
     </p>
   </c-layout-with-navigation.section>
-  
+
   <c-layout-with-navigation.section id="counting">
     <h3>Counting</h3>
     <p>To retrieve the total number of items matching your query without fetching all the data, you can use the <code>count=on</code> parameter. This is useful for verifying filters and understanding the scope of your query results without incurring the overhead of retrieving full datasets.</p>
     <c-code disable_copy>
   curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cited_opinion=32239&count=on"
-  
+
   {"count": 3302}
     </c-code>
     <p>When <code>count=on</code> is specified:</p>
@@ -296,7 +296,7 @@
     <p>In standard paginated responses, a <code>count</code> key is included with the URL to obtain the total count for your query:</p>
     <c-code disable_copy>
   curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cited_opinion=32239"
-  
+
   {
     "count": "https://www.courtlistener.com/api/rest/v4/opinions/?cited_opinion=32239&count=on",
     "next": "https://www.courtlistener.com/api/rest/v4/opinions/?cited_opinion=32239&cursor=2",
@@ -308,7 +308,7 @@
     </c-code>
     <p>You can follow this URL to get the total count of items matching your query.</p>
   </c-layout-with-navigation.section>
-  
+
   <c-layout-with-navigation.section id="field-selection">
     <h3>Field Selection</h3>
     <p>To save bandwidth and increase serialization performance, fields can be limited by using the <code>fields</code> parameter with a comma-separated list of fields.</p>
@@ -343,7 +343,7 @@
     </c-code>
     <p>You can also exclude fields using <code>omit=educations,date_modified</code>. Unfortunately, this cannot currently be used for nested resources.</p>
   </c-layout-with-navigation.section>
-  
+
   <c-layout-with-navigation.section id="pagination">
     <h3>Pagination</h3>
     <p>Most APIs can be paginated by using the <code>page</code> GET parameter, but that will be limited to 100 pages of results.</p>
@@ -408,7 +408,7 @@
     <p>We have almost half a billion PACER-related objects in the RECAP Archive including dockets, entries, documents, parties, and attorneys. Use these APIs to access and understand this data.</p>
     <a href="{% url "pacer_api_help" %}" class="btn-outline">Learn More</a>
   </c-layout-with-navigation.section>
-  
+
   <c-layout-with-navigation.section id="recap-apis">
       <h3>RECAP APIs</h3>
       <p>Use these APIs to gather data from PACER and to share your PACER data with the public.</p>
@@ -426,33 +426,33 @@
       <p>Use these APIs to query and analyze thousands of federal and state court judges, including their biographical information, political affiliations, education and employment histories, and more.</p>
       <a href="{% url "judge_api_help" %}" class="btn-outline">Learn More</a>
   </c-layout-with-navigation.section>
-  
+
   <c-layout-with-navigation.section id="disclosure-apis">
       <h3>Financial Disclosure APIs</h3>
       <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have.</p>
       <p>Use these APIs to work with this information.</p>
       <a href="{% url "financial_disclosures_api_help" %}" class="btn-outline">Learn More</a>
   </c-layout-with-navigation.section>
-  
+
   <c-layout-with-navigation.section id="oral-argument-apis">
       <h3>Oral Argument APIs</h3>
       <p>CourtListener is home to the largest collection of oral argument recordings on the Internet. Use these APIs to gather and analyze our collection.</p>
       <a href="{% url "oral_argument_api_help" %}" class="btn btn-outline">Learn More</a>
   </c-layout-with-navigation.section>
-  
+
   <c-layout-with-navigation.section id="citation-lookup">
       <h3>Citation Lookup &amp; Verification API</h3>
       <p>Use this API to look up citations in CourtListener's database of millions of citations.</p>
       <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.</p>
       <a href="{% url "citation_lookup_api" %}" class="btn-outline">Learn More</a>
   </c-layout-with-navigation.section>
-  
+
   <c-layout-with-navigation.section id="citation-network-apis">
       <h3>Citation Network APIs</h3>
       <p>Use these APIs to traverse and analyze our network of citations between legal decisions.</p>
       <a href="{% url "citation_api_help" %}" class="btn-outline">Learn More</a>
   </c-layout-with-navigation.section>
-  
+
   <c-layout-with-navigation.section id="alerts">
       <h3>Alert APIs</h3>
       <p>CourtListener is a scalable system for sending alerts by email or <a href="{% url "webhooks_getting_started" %}" class="underline">webhook</a> based on search queries or for particular cases. Use these APIs to create, modify, list, and delete alerts.</p>
