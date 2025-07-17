@@ -20,7 +20,7 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import transaction
-from django.test import RequestFactory
+from django.test import RequestFactory, SimpleTestCase
 from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
@@ -143,7 +143,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.tests import fakes
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 from cl.tests.utils import (
     AsyncAPIClient,
     MockACMSAttachmentPage,
@@ -2823,7 +2823,7 @@ class RecapDocketFetchApiTest(TestCase):
 
 
 @mock.patch("cl.recap.api_serializers.get_or_cache_pacer_cookies")
-class RecapFetchApiSerializationTestCase(SimpleTestCase):
+class RecapFetchApiSerializationTestCase(TestCase):
     @classmethod
     def setUp(cls) -> None:
         cls.user = UserWithChildProfileFactory.create()
