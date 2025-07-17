@@ -83,6 +83,7 @@ class IncrementalNewTemplateMiddleware:
     def process_template_response(self, request, response):
         if settings.TESTING:
             return response
+
         use_new_design = flag_is_active(request, "use_new_design")
 
         if (
@@ -90,9 +91,19 @@ class IncrementalNewTemplateMiddleware:
             and isinstance(response, TemplateResponse)
             and not response.is_rendered
         ):
-            old_template = response.template_name
-            if isinstance(old_template, str):
-                new_template = f"v2_{old_template}"
-                response.template_name = [new_template, old_template]
+            # The template_name can be a string or a list/tuple.
+            current_templates = response.template_name
+            print(current_templates)
+
+            # Normalize to a list to simplify logic
+            if isinstance(current_templates, str):
+                current_templates = [current_templates]
+
+            if isinstance(current_templates, (list, tuple)):
+                # Create a list of new v2 templates to try first
+                new_v2_templates = [f"v2_{name}" for name in current_templates]
+                # The final list allows Django to try the v2 template, and if it
+                # doesn't exist, fall back to the original.
+                response.template_name = new_v2_templates + current_templates
 
         return response
