@@ -3529,6 +3529,20 @@ class RecapAttPageFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
+        return_value=None,
+    )
+    def test_fetch_att_page_no_cookies(
+        self, mock_get_cookies, mock_court_accessible
+    ) -> None:
+        result = do_pacer_fetch(self.fq)
+        result.get()
+
+        self.fq.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn("Unable to find cached cookies", self.fq.message)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
     )
     @mock.patch(
         "cl.recap.tasks.get_data_from_att_report",
