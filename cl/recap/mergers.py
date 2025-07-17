@@ -1813,8 +1813,13 @@ async def merge_attachment_page_data(
         pacer_file = await sync_to_async(PacerHtmlFiles)(
             content_object=de, upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE
         )
+        pacer_file_name = (
+            "attachment_page.json"
+            if is_acms_attachment
+            else "attachment_page.html"
+        )
         await sync_to_async(pacer_file.filepath.save)(
-            "attachment_page.html",  # Irrelevant b/c S3PrivateUUIDStorageTest
+            pacer_file_name,  # Irrelevant b/c S3PrivateUUIDStorageTest
             ContentFile(text.encode()),
         )
 
