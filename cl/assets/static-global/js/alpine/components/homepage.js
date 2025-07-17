@@ -1,7 +1,7 @@
 const scopeTaglines = [
   { scope: 'o', tagline: 'Search millions of opinions across hundreds of jurisdictions' },
   { scope: 'r', tagline: 'Search our database of millions of PACER documents and dockets' },
-  { scope: 'oa', tagline: 'Search the biggest collection…' },
+  { scope: 'oa', tagline: 'Search the biggest collection of oral argument audio on the Internet' },
   { scope: 'p', tagline: 'Search our database of thousands of State and Federal judges' },
 ];
 

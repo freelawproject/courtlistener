@@ -894,11 +894,11 @@ class CorpusSearchForm(forms.Form):
 
     entry_date_filed_after = FloorDateOrRelativeField(
         required=False,
-        label="Entry Filed After",
+        label="Entry Date",
         label_suffix="",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "mm/dd/yyyy",
+                "placeholder": "After",
                 "class": "focus:ring-0 focus:outline-none w-full",
                 "autocomplete": "off",
             }
@@ -908,11 +908,11 @@ class CorpusSearchForm(forms.Form):
 
     entry_date_filed_before = CeilingDateOrRelativeField(
         required=False,
-        label="Entry Filed Before",
+        label="Entry Date",
         label_suffix="",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "mm/dd/yyyy",
+                "placeholder": "Before",
                 "class": "focus:ring-0 focus:outline-none w-full",
                 "autocomplete": "off",
             }
@@ -965,6 +965,7 @@ class CorpusSearchForm(forms.Form):
     name = forms.CharField(
         required=False,
         label="Name",
+        label_suffix="",
         widget=forms.TextInput(
             attrs={
                 "class": "focus:ring-0 focus:outline-none w-full",
@@ -976,6 +977,7 @@ class CorpusSearchForm(forms.Form):
     born_after = FloorDateOrRelativeField(
         required=False,
         label="Born After",
+        label_suffix="",
         widget=forms.TextInput(
             attrs={
                 "placeholder": "mm/dd/yyyy",
@@ -988,6 +990,7 @@ class CorpusSearchForm(forms.Form):
     born_before = CeilingDateOrRelativeField(
         required=False,
         label="Born Before",
+        label_suffix="",
         widget=forms.TextInput(
             attrs={
                 "placeholder": "mm/dd/yyyy",
@@ -1001,6 +1004,7 @@ class CorpusSearchForm(forms.Form):
     dob_city = forms.CharField(
         required=False,
         label="Birth City",
+        label_suffix="",
         widget=forms.TextInput(
             attrs={
                 "class": "focus:ring-0 focus:outline-none w-full",
@@ -1013,6 +1017,7 @@ class CorpusSearchForm(forms.Form):
         choices=[("", "")] + list(STATE_CHOICES),
         required=False,
         label="Birth State",
+        label_suffix="",
         widget=forms.Select(
             attrs={
                 "class": "focus:ring-0 focus:outline-none w-full input-text"
@@ -1023,6 +1028,7 @@ class CorpusSearchForm(forms.Form):
     school = forms.CharField(
         required=False,
         label="School Attended",
+        label_suffix="",
         widget=forms.TextInput(
             attrs={
                 "class": "focus:ring-0 focus:outline-none w-full",
@@ -1034,6 +1040,7 @@ class CorpusSearchForm(forms.Form):
     appointer = forms.CharField(
         required=False,
         label="Appointed By",
+        label_suffix="",
         widget=forms.TextInput(
             attrs={
                 "class": "focus:ring-0 focus:outline-none w-full",
@@ -1046,6 +1053,7 @@ class CorpusSearchForm(forms.Form):
         choices=[("", "")] + list(PoliticalAffiliation.POLITICAL_PARTIES),
         required=False,
         label="Political Affiliation",
+        label_suffix="",
         initial="None",
         widget=forms.Select(
             attrs={
