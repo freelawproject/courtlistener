@@ -12,12 +12,17 @@ def sort_acms_docket_entries(
     entries: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """
-    Sort docket entries to ensure consistent ordering.
+    Sort ACMs docket entries to ensure consistent and predictable ordering.
 
-    The primary sort key is 'date_filed', followed by 'document_number'.
-    Entries with no document number are placed last for a given date.
-    This ordering reflects the typical structure of docket reports.
+    If all entries have a 'document_number', the list is sorted solely by that
+    field. Otherwise, entries are sorted primarily by 'date_filed', then by the
+    presence of a 'document_number' (placing entries without one last for each
+    date), and finally by 'document_number'.
+
+    This approach mirrors the typical ordering found in docket reports.
     """
+    if all([d["document_number"] for d in entries]):
+        return sorted(entries, key=lambda d: d["document_number"])
     return sorted(
         entries,
         key=lambda d: (
