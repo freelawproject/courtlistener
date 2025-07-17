@@ -91,6 +91,7 @@ from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import (
     SEARCH_TYPES,
     Citation,
+    ClusterRedirection,
     Court,
     Docket,
     DocketEntry,
@@ -102,6 +103,27 @@ from cl.search.models import (
 from cl.search.selectors import get_clusters_from_citation_str
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+
+async def aget_cluster_or_404(qs, pk: int) -> OpinionCluster:
+    """If a cluster does not exist, check the ClusterRedirection table
+    before raising a 404
+    """
+    try:
+        cluster: OpinionCluster = await aget_object_or_404(await qs, pk=pk)
+    except Http404 as e:
+        try:
+            redirection = ClusterRedirection.objects.aget(
+                deleted_cluster_id=pk
+            )
+            cluster = redirection.cluster
+            if not cluster:
+                # TODO return sealed page
+                raise e
+        except ClusterRedirection.DoesNotExist:
+            raise e
+
+    return cluster
 
 
 async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -983,7 +1005,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     :param _: url slug
     :return: The old or new opinion HTML
     """
-    cluster: OpinionCluster = await aget_object_or_404(
+    cluster: OpinionCluster = await aget_cluster_or_404(
         await get_opinions_base_queryset(), pk=pk
     )
     return await render_opinion_view(request, cluster, "opinions")
