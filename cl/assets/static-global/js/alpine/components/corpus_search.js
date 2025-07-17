@@ -83,7 +83,8 @@ document.addEventListener('alpine:init', () => {
     },
     onSubmit() {
       Array.from(this.$el.elements).forEach((el) => {
-        if (el.tagName === 'INPUT' && !el.value.trim()) {
+        const isInput = ['INPUT', 'SELECT'].includes(el.tagName);
+        if (isInput && !el.value.trim()) {
           el.setAttribute('disabled', 'disabled');
         }
       });

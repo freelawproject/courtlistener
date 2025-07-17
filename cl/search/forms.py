@@ -1049,6 +1049,17 @@ class CorpusSearchForm(forms.Form):
         ),
     )
     appointer.as_str_types = [SEARCH_TYPES.PEOPLE]
+    selection_method = forms.ChoiceField(
+        choices=[("", "")] + list(Position.SELECTION_METHODS),
+        required=False,
+        label="Selection Method",
+        label_suffix="",
+        initial="None",
+        widget=forms.Select(
+            attrs={"class": "focus:ring-0 focus:outline-none w-full"}
+        ),
+    )
+    selection_method.as_str_types = [SEARCH_TYPES.PEOPLE]
     political_affiliation = forms.ChoiceField(
         choices=[("", "")] + list(PoliticalAffiliation.POLITICAL_PARTIES),
         required=False,
@@ -1062,6 +1073,32 @@ class CorpusSearchForm(forms.Form):
         ),
     )
     political_affiliation.as_str_types = [SEARCH_TYPES.PEOPLE]
+    argued_after = FloorDateOrRelativeField(
+        required=False,
+        label="Argued After",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "mm/dd/yyy",
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    argued_after.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
+    argued_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Argued Before",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "mm/dd/yyy",
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    argued_before.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
 
 
 def clean_up_date_formats(
