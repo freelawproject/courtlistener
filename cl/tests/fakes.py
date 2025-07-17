@@ -52,6 +52,70 @@ class FakeAppellateDocketReport(FakeDocketReport):
         return data
 
 
+class FakeNewAppellateCaseDocketReport(FakeDocketReport):
+    @property
+    def data(self):
+        data = super(FakeNewAppellateCaseDocketReport, self).data
+        data["court_id"] = "ca1"
+        data["docket_number"] = "10-1081"
+        data["case_name"] = "United States v. Brown"
+        data["pacer_case_id"] = "49959"
+        return data
+
+
+class FakeEmptyAcmsCaseSearch(FakeDocketReport):
+    @property
+    def data(self):
+        return {}
+
+
+class FakeAcmsCaseSearch(FakeDocketReport):
+    @property
+    def data(self):
+        return {"pcx_caseid": "e85b4453-6c94-4c68-93ed-4e2e0018e842"}
+
+
+class FakeAcmsDocketReport(FakeDocketReport):
+    @property
+    def data(self):
+        return {
+            "court_id": "ca9",
+            "pacer_case_id": "e85b4453-6c94-4c68-93ed-4e2e0018e842",
+            "docket_number": "25-4097",
+            "case_name": "Wortman, et al. v. All Nippon Airways",
+            "date_filed": date(2025, 7, 1),
+            "appeal_from": "San Francisco, Northern California",
+            "fee_status": "Paid",
+            "originating_court_information": {
+                "name": "San Francisco, Northern California"
+            },
+            "case_type_information": "Civil, Private",
+            "parties": [],
+            "docket_entries": [
+                {
+                    "document_number": 2,
+                    "description_html": "<p>fake docket entry</p>",
+                    "description": "fake docket entry",
+                    "date_entered": "2025-07-01 16:42:00",
+                    "date_filed": date(2025, 7, 1),
+                    "pacer_doc_id": "acc416ff-d456-f011-877b-001dd80bcf93",
+                    "page_count": 6,
+                }
+            ],
+        }
+
+
+class FakeAcmsDocketReportToUpdate(FakeAcmsDocketReport):
+    @property
+    def data(self):
+        data = super(FakeAcmsDocketReportToUpdate, self).data
+        data["court_id"] = "ca2"
+        data["docket_number"] = "25-1671"
+        data["case_name"] = "G.F.F. v. Trump"
+        data["pacer_case_id"] = "2f1af701-d529-410e-a653-376e1fdc4034"
+        return data
+
+
 class FakePossibleCaseNumberApi:
     def __init__(self, *args, **kwargs):
         pass

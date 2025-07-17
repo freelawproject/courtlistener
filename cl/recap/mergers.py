@@ -1,4 +1,5 @@
 # Code for merging PACER content into the DB
+import json
 import logging
 import re
 from copy import deepcopy
@@ -1584,9 +1585,21 @@ def merge_pacer_docket_into_cl_docket(
         UPLOAD_TYPE.APPELLATE_DOCKET if appellate else UPLOAD_TYPE.DOCKET
     )
     pacer_file = PacerHtmlFiles(content_object=d, upload_type=upload_type)
+
+    # Determine how to store the report data.
+    # Most PACER reports include a raw HTML response and set the `response`
+    # attribute. However, ACMS reports typically construct the data from a
+    # series of API calls, and do not include a single HTML response. In those
+    # cases, we store the data as JSON instead.
+    pacer_file_name = "docket.html" if report.response else "docket.json"
+    pacer_file_content = (
+        report.response.text.encode()
+        if report.response
+        else json.dumps(report.data, default=str).encode()
+    )
     pacer_file.filepath.save(
-        "docket.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
-        ContentFile(report.response.text.encode()),
+        pacer_file_name,  # We only care about the ext w/S3PrivateUUIDStorageTest
+        ContentFile(pacer_file_content),
     )
 
     # Merge parties before adding docket entries, so they can access parties'

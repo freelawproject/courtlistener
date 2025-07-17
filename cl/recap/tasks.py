@@ -27,6 +27,7 @@ from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     ACMSAttachmentPage,
+    AcmsCaseSearch,
     ACMSDocketReport,
     AppellateDocketReport,
     CaseQuery,
@@ -65,6 +66,7 @@ from cl.corpus_importer.utils import (
     is_bankruptcy_court,
     is_long_appellate_document_number,
     mark_ia_upload_needed,
+    should_check_acms_court,
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
@@ -110,6 +112,7 @@ from cl.recap.utils import (
     find_subdocket_pdf_rds_from_data,
     get_court_id_from_fetch_queue,
     get_main_rds,
+    sort_acms_docket_entries,
 )
 from cl.scrapers.tasks import (
     extract_recap_pdf,
@@ -1493,17 +1496,7 @@ async def process_recap_acms_docket(pk):
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
 
     # Sort docket entries to ensure consistent ordering
-    # The primary sort is by 'date_filed', followed by 'document_number' (nulls
-    # last for a given date). This approach aligns the order with how docket
-    # reports are typically displayed.
-    data["docket_entries"] = sorted(
-        data["docket_entries"],
-        key=lambda d: (
-            d["date_filed"],
-            d["document_number"] is None,
-            d["document_number"],
-        ),
-    )
+    data["docket_entries"] = sort_acms_docket_entries(data["docket_entries"])
     des_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
@@ -2348,7 +2341,7 @@ def create_or_update_docket_data_from_fetch(
     fq: PacerFetchQueue,
     court_id: str,
     pacer_case_id: str | None,
-    report: DocketReport | AppellateDocketReport,
+    report: DocketReport | AppellateDocketReport | ACMSDocketReport,
     docket_data: dict[str, Any],
 ) -> dict[str, str | bool]:
     """Creates or updates docket data in the database from fetched data.
@@ -2420,12 +2413,34 @@ def purchase_appellate_docket_by_docket_number(
     :param fq: The PacerFetchQueue object
     :return: a dict with information about the docket and the new data
     """
-    report = AppellateDocketReport(map_cl_to_pacer_id(court_id), session)
-    report.query(docket_number, **kwargs)
+    acms_case_id = None
+
+    if should_check_acms_court(court_id):
+        acms_search = AcmsCaseSearch(court_id=court_id, pacer_session=session)
+        acms_search.query(docket_number)
+        acms_case_id = (
+            acms_search.data["pcx_caseid"] if acms_search.data else None
+        )
+
+    pacer_court_id = map_cl_to_pacer_id(court_id)
+    report_class = ACMSDocketReport if acms_case_id else AppellateDocketReport
+    report = report_class(pacer_court_id, session)
+
+    if acms_case_id:
+        # ACMSDocketReport only accepts the case ID; filters are not currently
+        # supported for ACMS docket reports.
+        report.query(acms_case_id)
+    else:
+        report.query(docket_number, **kwargs)
 
     docket_data = report.data
     if not docket_data:
         raise ParsingException("No data found in docket report.")
+
+    if acms_case_id:
+        docket_data["docket_entries"] = sort_acms_docket_entries(
+            docket_data["docket_entries"]
+        )
     return create_or_update_docket_data_from_fetch(
         fq, court_id, None, report, docket_data
     )
