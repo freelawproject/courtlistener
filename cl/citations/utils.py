@@ -46,6 +46,10 @@ def slugify_reporter(reporter: str) -> str:
             slugify(f"{reporter} {REPORTERS[reporter][0]['cite_type']}")
         )
 
+    # final fallback check for known variations
+    if reporter in VARIATIONS_ONLY and len(VARIATIONS_ONLY[reporter]) == 1:
+        return slugify(VARIATIONS_ONLY[reporter][0])
+
     return slug
 
 
