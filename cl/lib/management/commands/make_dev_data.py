@@ -118,6 +118,10 @@ class Command(VerboseCommand):
                     "docket alerts and their parent objects",
                     DocketAlertWithParentsFactory,
                 ),
+                (
+                    "audio and their parent objects",
+                    AudioWithParentsFactory,
+                ),
             ):
                 logger.info(f"Making {count} {note}")
                 Factory.create_batch(count)
