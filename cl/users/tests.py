@@ -3375,7 +3375,7 @@ class MockResponse:
         return self.json_data
 
 
-class WebhooksHTMXTests(APITestCase, TestCase):
+class WebhooksHTMXTests(APITestCase):
     """Check that API CRUD operations are working well for search webhooks."""
 
     @classmethod
