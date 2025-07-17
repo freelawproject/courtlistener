@@ -2129,6 +2129,13 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         self.request.chain = None
         return []
 
+    is_acms_case = rd.is_acms_document()
+    if is_acms_case and not pacer_case_id:
+        msg = f"Unable to complete purchase: Missing case_id for RECAP Document object {rd.pk}."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
+        self.request.chain = None
+        return []
+
     session_data = get_pacer_cookie_from_cache(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
@@ -2184,7 +2191,6 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         raise self.retry(exc=exc)
 
     is_appellate = is_appellate_court(court_id)
-    is_acms_case = rd.is_acms_document()
     if not is_acms_case:
         text = r.response.text
         # Determine the appropriate parser function based on court jurisdiction
