@@ -1,5 +1,6 @@
 from http import HTTPStatus
 
+from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
@@ -80,24 +81,8 @@ def celery_fail(request: HttpRequest) -> HttpResponse:
 
 
 def celery_queue_lengths(request: HttpRequest) -> HttpResponse:
-    celery_queues = (
-        "celery",
-        "feeds",
-        "batch0",
-        "batch1",
-        "batch2",
-        "batch3",
-        "etl_tasks",
-        "iquery",
-        "free_pacer_docs",
-        "ia_uploads",
-        "inception_s3",
-        "inception_gpu",
-        "es_sweep",
-        "recap_fetch",
-    )
     queue_lengths = {}
-    for q in celery_queues:
+    for q in settings.CELERY_QUEUES:
         queue_lengths[q] = get_queue_length(q)
 
     return JsonResponse(queue_lengths)
