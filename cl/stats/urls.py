@@ -12,10 +12,11 @@ from cl.stats.views import (
 )
 
 urlpatterns = [
-    path("monitoring/celery-queues/",
-         celery_queue_lengths,
-         name="celery_queue_lengths"
-     ),
+    path(
+        "monitoring/celery-queues/",
+        celery_queue_lengths,
+        name="celery_queue_lengths",
+    ),
     path("monitoring/heartbeat/", heartbeat, name="heartbeat"),
     path("monitoring/health-check/", health_check, name="health_check"),
     path("monitoring/redis-writes/", redis_writes, name="check_redis_writes"),

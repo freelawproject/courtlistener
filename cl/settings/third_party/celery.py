@@ -10,8 +10,7 @@ CELERY_QUEUES = (
     "batch0",
     "batch1",
     "batch2",
-    "batch3"
-    "celery",
+    "batch3celery",
     "es_sweep",
     "etl_tasks",
     "feeds",
