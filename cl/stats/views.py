@@ -1,9 +1,11 @@
 from http import HTTPStatus
 
+from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
 from cl.celery_init import fail_task
+from cl.lib.celery_utils import get_queue_length
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.utils import (
     check_elasticsearch,
@@ -76,3 +78,11 @@ def sentry_fail(request: HttpRequest) -> HttpResponse:
 def celery_fail(request: HttpRequest) -> HttpResponse:
     fail_task.delay()
     return HttpResponse("Successfully failed Celery.")
+
+
+def celery_queue_lengths(request: HttpRequest) -> HttpResponse:
+    queue_lengths = {}
+    for q in settings.CELERY_QUEUES:
+        queue_lengths[q] = get_queue_length(q)
+
+    return JsonResponse(queue_lengths)
