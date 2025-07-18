@@ -50,7 +50,7 @@ class LegalProvider(BaseProvider):
                 "Eruptanyom",  # Kelvin's pretend world
             ]
         )
-        last_word = f"{last_word}-{str(uuid4)[:8]}"
+        last_word = f"{last_word}-{str(uuid4())[:8]}"
 
         return " ".join([first_word, mid_word, last_word])
 
