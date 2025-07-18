@@ -1,4 +1,5 @@
 import random
+from uuid import uuid4
 
 from faker import Faker
 from faker.providers import BaseProvider
@@ -24,9 +25,9 @@ class LegalProvider(BaseProvider):
         """
         Generate court names like:
 
-         - First circuit for the zoo
-         - District court of albatross
-         - Appeals court of eczema
+         - First circuit for 157e9efe-119a-405f-ba8a-b76850ef82fc
+         - District court of 39cfe641-c872-4c93-95fb-cba740aaa02f
+         - Eruptanyom of 56e19a11-8898-4c97-bd83-94a92a15287e
 
         :return: A court name
         """
@@ -36,21 +37,11 @@ class LegalProvider(BaseProvider):
                 "District court",
                 "Appeals court",
                 "Superior court",
-            ]
-        )
-        mid_word = random.choice(["of the", "for the"])
-        last_word = random.choice(
-            [
-                "Zoo",
-                "Medical Worries",
-                "Programming Horrors",
-                "dragons",
-                "Dirty Dishes",
                 "Eruptanyom",  # Kelvin's pretend world
             ]
         )
-
-        return " ".join([first_word, mid_word, last_word])
+        mid_word = random.choice(["of the", "for the"])
+        return " ".join([first_word, mid_word, str(uuid4())])
 
     def federal_district_docket_number(self) -> str:
         """Make a docket number like you'd see in a district court, of the
@@ -64,17 +55,12 @@ class LegalProvider(BaseProvider):
 
     @staticmethod
     def _make_random_party(full: bool = False) -> str:
-        do_company = random.choice([True, False])
-        if do_company:
-            if full:
-                return oxford_join([fake.company() for _ in range(5)])
-            else:
-                return fake.company()
-        else:
-            if full:
-                return oxford_join([fake.name() for _ in range(5)])
-            else:
-                return fake.last_name()
+        name_funcs = [fake.name, fake.last_name]
+        if random.choice([True, False]):
+            name_funcs = [fake.company] * 2
+        if full:
+            return oxford_join([name_funcs[0]() for _ in range(5)])
+        return name_funcs[1]()
 
     def case_name(self, full: bool = False) -> str:
         """Makes a clean case name like "O'Neil v. Jordan" """
