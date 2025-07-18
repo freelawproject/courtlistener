@@ -4,7 +4,7 @@ set -e
 echo "Installing utilities"
 
 # Make sure the sudo package is installed
-apt install -y sudo
+apt-get update && apt-get install -y sudo
 
 # Set up Sentry
 curl -sL https://sentry.io/get-cli/ | bash

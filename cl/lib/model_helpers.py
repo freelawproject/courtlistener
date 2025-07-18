@@ -10,7 +10,7 @@ from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
 from cl.lib.string_utils import normalize_dashes, trunc
 
-dist_d_num_regex = r"(?:\d:)?(\d\d)-..-(\d+)"
+dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
 
 
@@ -47,7 +47,7 @@ def clean_docket_number(docket_number: str | None) -> str:
     # Normalize to lowercase
     docket_number = docket_number.lower()
     # Match all the valid district docket numbers in a string.
-    district_m = re.findall(r"\b(?:\d:)?\d\d-..-\d+", docket_number)
+    district_m = re.findall(r"\b(?:\d:)?\d\d-[a-zA-Z]{1,5}-\d+", docket_number)
     if len(district_m) == 1:
         return district_m[0]
 

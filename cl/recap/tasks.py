@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import hashlib
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -27,6 +28,7 @@ from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     ACMSAttachmentPage,
+    AcmsCaseSearch,
     ACMSDocketReport,
     AppellateDocketReport,
     CaseQuery,
@@ -65,6 +67,7 @@ from cl.corpus_importer.utils import (
     is_bankruptcy_court,
     is_long_appellate_document_number,
     mark_ia_upload_needed,
+    should_check_acms_court,
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
@@ -110,6 +113,7 @@ from cl.recap.utils import (
     find_subdocket_pdf_rds_from_data,
     get_court_id_from_fetch_queue,
     get_main_rds,
+    sort_acms_docket_entries,
 )
 from cl.scrapers.tasks import (
     extract_recap_pdf,
@@ -1491,6 +1495,9 @@ async def process_recap_acms_docket(pk):
     # Merge parties before adding docket entries, so they can access parties'
     # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
+
+    # Sort docket entries to ensure consistent ordering
+    data["docket_entries"] = sort_acms_docket_entries(data["docket_entries"])
     des_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
@@ -2113,9 +2120,10 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         self.request.chain = None
         return []
 
-    if rd.is_acms_document():
-        msg = "ACMS attachment pages are not currently supported"
-        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+    is_acms_case = rd.is_acms_document()
+    if is_acms_case and not pacer_case_id:
+        msg = f"Unable to complete purchase: Missing case_id for RECAP Document object {rd.pk}."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
         self.request.chain = None
         return []
 
@@ -2173,16 +2181,20 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         )
         raise self.retry(exc=exc)
 
-    text = r.response.text
     is_appellate = is_appellate_court(court_id)
-    # Determine the appropriate parser function based on court jurisdiction
-    # (appellate or district)
-    att_data_parser = (
-        get_data_from_appellate_att_report
-        if is_appellate
-        else get_data_from_att_report
-    )
-    att_data = att_data_parser(text, court_id)
+    if not is_acms_case:
+        text = r.response.text
+        # Determine the appropriate parser function based on court jurisdiction
+        # (appellate or district)
+        att_data_parser = (
+            get_data_from_appellate_att_report
+            if is_appellate
+            else get_data_from_att_report
+        )
+        att_data = att_data_parser(text, court_id)
+    else:
+        att_data = r.data
+        text = json.dumps(r.data, default=str)
 
     if att_data == {}:
         msg = "Not a valid attachment page upload"
@@ -2190,15 +2202,23 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
         self.request.chain = None
         return []
 
+    if is_acms_case:
+        document_number = att_data["entry_number"]
+    elif is_appellate:
+        # Appellate attachments don't contain a document_number
+        document_number = None
+    else:
+        document_number = att_data["document_number"]
+
     try:
         async_to_sync(merge_attachment_page_data)(
             rd.docket_entry.docket.court,
             pacer_case_id,
             att_data["pacer_doc_id"],
-            # Appellate attachments don't contain a document_number
-            None if is_appellate else att_data["document_number"],
+            document_number,
             text,
             att_data["attachments"],
+            is_acms_attachment=is_acms_case,
         )
     except RECAPDocument.MultipleObjectsReturned:
         msg = (
@@ -2335,7 +2355,7 @@ def create_or_update_docket_data_from_fetch(
     fq: PacerFetchQueue,
     court_id: str,
     pacer_case_id: str | None,
-    report: DocketReport | AppellateDocketReport,
+    report: DocketReport | AppellateDocketReport | ACMSDocketReport,
     docket_data: dict[str, Any],
 ) -> dict[str, str | bool]:
     """Creates or updates docket data in the database from fetched data.
@@ -2407,12 +2427,34 @@ def purchase_appellate_docket_by_docket_number(
     :param fq: The PacerFetchQueue object
     :return: a dict with information about the docket and the new data
     """
-    report = AppellateDocketReport(map_cl_to_pacer_id(court_id), session)
-    report.query(docket_number, **kwargs)
+    acms_case_id = None
+
+    if should_check_acms_court(court_id):
+        acms_search = AcmsCaseSearch(court_id=court_id, pacer_session=session)
+        acms_search.query(docket_number)
+        acms_case_id = (
+            acms_search.data["pcx_caseid"] if acms_search.data else None
+        )
+
+    pacer_court_id = map_cl_to_pacer_id(court_id)
+    report_class = ACMSDocketReport if acms_case_id else AppellateDocketReport
+    report = report_class(pacer_court_id, session)
+
+    if acms_case_id:
+        # ACMSDocketReport only accepts the case ID; filters are not currently
+        # supported for ACMS docket reports.
+        report.query(acms_case_id)
+    else:
+        report.query(docket_number, **kwargs)
 
     docket_data = report.data
     if not docket_data:
         raise ParsingException("No data found in docket report.")
+
+    if acms_case_id:
+        docket_data["docket_entries"] = sort_acms_docket_entries(
+            docket_data["docket_entries"]
+        )
     return create_or_update_docket_data_from_fetch(
         fq, court_id, None, report, docket_data
     )
