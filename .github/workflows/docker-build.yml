@@ -47,13 +47,7 @@ jobs:
   build:
     needs: get-pr-labels
     runs-on: ubuntu-latest
-    if: >
-      ${{
-        !contains(needs.get-pr-labels.outputs.labels, 'skip-deploy') &&
-        !contains(needs.get-pr-labels.outputs.labels, 'skip-web-deploy') &&
-        !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy') &&
-        !contains(needs.get-pr-labels.outputs.labels, 'skip-cronjob-deploy')
-      }}
+    if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-deploy') }}
     steps:
       - uses: actions/checkout@v4
       - name: Login to Docker Hub
@@ -68,7 +62,6 @@ jobs:
   deploy:
     needs: [get-pr-labels, build]
     runs-on: ubuntu-latest
-    if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-deploy') }}
     concurrency: production
     steps:
       - uses: actions/checkout@v4
