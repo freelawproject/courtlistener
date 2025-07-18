@@ -3197,6 +3197,7 @@ def do_es_api_query(
         BadProximityQuery,
         DisallowedWildcardPattern,
         InvalidRelativeDateSyntax,
+        InputTooLongError,
     ) as e:
         raise ElasticBadRequestError(detail=e.message)
 
