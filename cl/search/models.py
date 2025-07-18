@@ -2878,6 +2878,8 @@ class OpinionCluster(AbstractDateTimeModel):
     def ordered_opinions(self):
         # Fetch all sub-opinions ordered by ordering_key
         sub_opinions = self.sub_opinions.all().order_by("ordering_key")
+        if self.sub_opinions.filter(main_version__isnull=False).exists():
+            sub_opinions = sub_opinions.filter(main_version__isnull=True)
 
         # Check if there is more than one sub-opinion
         if sub_opinions.count() > 1:

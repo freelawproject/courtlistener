@@ -110,6 +110,8 @@ def compute_parenthetical_groups(
     )
 
     parenthetical_groups: list[ComputedParentheticalGroup] = []
+    # start the visited_nodes set here to prevent recomputing components, since
+    # the same component will be found when starting from any of it's nodes
     visited_nodes: set[str] = set()
     for node, neighbors in similarity_graph.items():
         if component := get_graph_component(
@@ -161,19 +163,29 @@ def get_graph_component(
     :param node: The starting node from which to probe the component
     :param graph: A dictionary encoding the graph with key: node and value:
     list of neighbors
-    :param visited: A set containing the nodes already visited in the DFS
+    :param visited: A set containing the nodes already visited in all groups
+        processing
     :return: A list of all nodes in param :node's component
     """
-    current_cluster = []
-    # Perform a depth-first search to find all nodes in the component
-    if node not in visited:
-        visited.add(node)
-        current_cluster.append(node)
-        for neighbor in graph[node]:
-            current_cluster.extend(
-                get_graph_component(neighbor, graph, visited)
-            )
-    return current_cluster
+    cluster = []
+    queue = [node]
+
+    while queue:
+        # Queue (FIFO) for DFS
+        current_node = queue.pop(0)
+
+        if current_node in visited:
+            continue
+
+        visited.add(current_node)
+        cluster.append(current_node)
+
+        # Add all unvisited neighbors to the queue
+        for neighbor in graph.get(current_node, []):
+            if neighbor not in visited:
+                queue.append(neighbor)
+
+    return cluster
 
 
 def get_group_from_component(
