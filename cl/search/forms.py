@@ -1099,6 +1099,18 @@ class CorpusSearchForm(forms.Form):
         ),
     )
     argued_before.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
+    cause = forms.CharField(
+        required=False,
+        label="Cause",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    cause.as_str_types = [SEARCH_TYPES.RECAP]
 
 
 def clean_up_date_formats(
