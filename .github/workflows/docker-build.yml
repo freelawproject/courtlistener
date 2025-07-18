@@ -155,9 +155,18 @@ jobs:
     strategy:
       matrix:
         deployment:
-          - cl-celery-prefork
-          - cl-celery-prefork-bulk
-          - cl-celery-prefork-es-sweep
+          - celery-default
+          - celery-feeds
+          - celery-bulk0
+          - celery-bulk1
+          - celery-bulk2
+          - celery-bulk3
+          - celery-etl
+          - celery-iquery
+          - celery-free-pacer-docs
+          - celery-inception
+          - celery-es-sweep
+          - celery-recap-fetch
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
