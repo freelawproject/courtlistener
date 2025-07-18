@@ -454,11 +454,15 @@ def clone_docket(
                     ("appeal_from", lambda x: clone_court(session, [x])[0]),
                     (
                         "assigned_to",
-                        lambda x: clone_person(session, [x], person_positions)[0],
+                        lambda x: clone_person(session, [x], person_positions)[
+                            0
+                        ],
                     ),
                     (
                         "referred_to",
-                        lambda x: clone_person(session, [x], person_positions)[0],
+                        lambda x: clone_person(session, [x], person_positions)[
+                            0
+                        ],
                     ),
                 ):
                     if docket_data[field]:
