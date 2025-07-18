@@ -1110,6 +1110,9 @@ def build_has_child_query(
         highlighting_fields, hl_tag, child_highlighting
     )
 
+    if child_type == "opinion":
+        fields_to_exclude.append("embeddings")
+
     inner_hits = {
         "name": f"filter_query_inner_{child_type}",
         "size": child_hits_limit,
