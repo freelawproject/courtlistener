@@ -44,8 +44,6 @@ This message brought to you by the 501(c)(3) non-profit Free Law Project
 
  - BlueSky: https://bsky.app/profile/free.law
 
- - X: https://x.com/freelawproject/
-
  - Donate: https://donate.free.law/forms/supportflp
 
  - Become a Member: https://donate.free.law/forms/membership

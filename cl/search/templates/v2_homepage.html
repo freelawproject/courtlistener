@@ -73,6 +73,17 @@
 
       <c-icon-link
         x-on:focus="scrollIntoView"
+        href="https://free.law/recap/"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Learn about the RECAP Suite (opens in new tab)"
+        icon="logos/recap_tiny"
+      >
+        About<br>RECAP
+      </c-icon-link>
+
+      <c-icon-link
+        x-on:focus="scrollIntoView"
         href="https://donate.free.law/forms/membership"
         target="_blank"
         rel="noopener noreferrer"
@@ -88,7 +99,7 @@
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Subscribe to the Free Law Project newsletter (opens in new tab)"
-        icon="bell_plus"
+        icon="newspaper"
       >
         Get Our Newsletter
       </c-icon-link>
@@ -99,7 +110,7 @@
         aria-label="Learn about creating alerts in CourtListener"
         icon="bell"
       >
-        Create an Alert
+        Learn About Alerts
       </c-icon-link>
 
       <c-icon-link
@@ -108,26 +119,16 @@
         aria-label="Use our Citation Lookup Tool"
         icon="court"
       >
-        Find a Citation
-      </c-icon-link>
-
-      <c-icon-link
-        x-on:focus="scrollIntoView"
-        href="https://free.law/recap"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Learn how to contribute documents using RECAP (opens in new tab)"
-        icon="file_text"
-      >
-        Send&nbsp;us PACER&nbsp;Docs
+        Find a<br>Citation
       </c-icon-link>
 
       <c-icon-link
         x-on:focus="scrollIntoView"
         href="{% url "podcasts" %}"
+        aria-label="Subscribe to our oral argument podcasts or create your own"
         icon="microphone"
       >
-        Create Custom Podcast
+        Oral Argument Podcasts
       </c-icon-link>
     </div>
 

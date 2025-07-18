@@ -150,6 +150,20 @@ async def ais_appellate_court(court_id: str) -> bool:
     return await appellate_court_ids.filter(pk=court_id).aexists()
 
 
+def should_check_acms_court(court_id: str) -> bool:
+    """
+    Checks whether the given court_id should be checked using ACMS-specific logic.
+
+    This helper is used to identify courts that require special handling,
+    currently limited to a known set of appellate courts.
+
+    :param court_id: The unique identifier of the court.
+
+    :return: True if the court_id is one that uses ACMS; False otherwise.
+    """
+    return court_id in ["ca2", "ca9"]
+
+
 def get_start_of_quarter(d: date | None = None) -> date:
     """Get the start date of the  calendar quarter requested
 
