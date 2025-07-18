@@ -701,7 +701,12 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                     direction = "-"
                     order_name = "hit"
                 das.sort(key=sorter, reverse=True if direction else False)
-                self.assertEqual(list(c["docket_alerts"]), das)
+                self.assertEqual(
+                    list(c["docket_alerts"]),
+                    das,
+                    f"\nExpected {order_name}: {[sorter(x) for x in das]}\n"
+                    f"Got      {order_name}: {[sorter(x) for x in c['docket_alerts']]}",
+                )
 
                 sorting_fields = c["sorting_fields"]
                 for col, vals in sorting_fields.items():
@@ -3392,7 +3397,7 @@ class MockResponse:
         return self.json_data
 
 
-class WebhooksHTMXTests(APITestCase, TestCase):
+class WebhooksHTMXTests(APITestCase):
     """Check that API CRUD operations are working well for search webhooks."""
 
     @classmethod

@@ -353,7 +353,7 @@ class TestVizAjaxCrud(TestCase):
         self.assertIsNotNone(viz.date_published)
 
 
-class APIVisualizationTestCase(APITestCase, TestCase):
+class APIVisualizationTestCase(APITestCase):
     """Check that visualizations are created properly through the API."""
 
     fixtures = ["api_scotus_map_data.json"]

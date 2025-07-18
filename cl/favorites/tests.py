@@ -1,7 +1,7 @@
 import time
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import time_machine
 from asgiref.sync import sync_to_async
@@ -411,7 +411,7 @@ class FavoritesTest(TestCase):
         self.assertEqual(favorite_obj.name, "Original alert name")
 
 
-class APITests(APITestCase, TestCase):
+class APITests(APITestCase):
     """Check that tags are created correctly and blocked correctly via APIs"""
 
     fixtures = [
@@ -659,6 +659,7 @@ class APITests(APITestCase, TestCase):
         self.assertEqual(response.json()["count"], 1)
 
 
+@patch("cl.favorites.signals.check_prayer_pacer.delay", new=MagicMock)
 class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayMixin, TestCase):
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
@@ -1698,6 +1699,7 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayMixin, TestCase):
         mock_check_prayer_pacer.delay.assert_called_once()
 
 
+@patch("cl.favorites.signals.check_prayer_pacer.delay", new=MagicMock)
 class PrayerAPITests(PrayAndPayMixin, TestCase):
     """Check that Prayer API operations work as expected."""
 

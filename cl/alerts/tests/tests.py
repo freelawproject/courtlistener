@@ -997,7 +997,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
         self.assert_text_in_node("editing your alert", "body")
 
 
-class AlertAPITests(APITestCase, ESIndexTestCase):
+class AlertAPITests(ESIndexTestCase, APITestCase):
     """Check that API CRUD operations are working well for search alerts."""
 
     @classmethod
@@ -2599,7 +2599,7 @@ class SearchAlertsUtilsTest(TestCase):
         )
 
 
-class DocketAlertAPITests(APITestCase, TestCase):
+class DocketAlertAPITests(APITestCase):
     """Check that API CRUD operations are working well for docket alerts."""
 
     @classmethod
