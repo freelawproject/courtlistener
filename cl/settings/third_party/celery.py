@@ -5,6 +5,7 @@ from .redis import REDIS_DATABASES, REDIS_HOST, REDIS_PORT
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 CELERY_ETL_TASK_QUEUE = env("CELERY_ETL_TASK_QUEUE", default="celery")
+CELERY_PACER_FETCH_QUEUE = env("CELERY_PACER_FETCH_QUEUE", default="celery")
 CELERY_IQUERY_QUEUE = env("CELERY_IQUERY_QUEUE", default="celery")
 CELERY_QUEUES = (
     "batch0",
