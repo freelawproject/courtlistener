@@ -1,7 +1,7 @@
 import datetime
 
 from django.template import Context
-from django.test import RequestFactory
+from django.test import RequestFactory, SimpleTestCase
 
 from cl.custom_filters.templatetags.extras import (
     get_canonical_element,
@@ -18,7 +18,6 @@ from cl.people_db.models import (
     GRANULARITY_MONTH,
     GRANULARITY_YEAR,
 )
-from cl.tests.cases import SimpleTestCase
 
 
 class TestOxfordJoinFilter(SimpleTestCase):

@@ -34,6 +34,7 @@ from httpx import (
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
+    ACMSAttachmentPage,
     AppellateAttachmentPage,
     AppellateDocketReport,
     AttachmentPage,
@@ -1868,11 +1869,24 @@ def get_att_report_by_rd(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    if is_appellate_court(pacer_court_id):
-        att_report = AppellateAttachmentPage(pacer_court_id, s)
+    is_appellate_case = is_appellate_court(pacer_court_id)
+    is_acms_document = rd.is_acms_document()
+
+    if is_acms_document:
+        report_class = ACMSAttachmentPage
+    elif is_appellate_case:
+        report_class = AppellateAttachmentPage
     else:
-        att_report = AttachmentPage(pacer_court_id, s)
-    att_report.query(rd.pacer_doc_id)
+        report_class = AttachmentPage
+
+    att_report = report_class(pacer_court_id, s)
+
+    if is_acms_document:
+        docket_case_id = rd.docket_entry.docket.pacer_case_id
+        rd_entry_id = rd.pacer_doc_id
+        att_report.query(docket_case_id, rd_entry_id)
+    else:
+        att_report.query(rd.pacer_doc_id)
     return att_report
 
 
