@@ -3536,7 +3536,6 @@ class RecapAttPageFetchApiTest(TestCase):
         self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find cached cookies", self.fq.message)
 
-
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
     )
