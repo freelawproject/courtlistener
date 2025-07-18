@@ -2777,6 +2777,10 @@ def build_full_join_es_queries(
 
     q_should = []
     has_text_query = False
+    is_semantic_query = cd.get("semantic", False) and cd["type"] in [
+        SEARCH_TYPES.OPINION
+    ]
+    keyword_text_query = ""
     match cd["type"]:
         case (
             SEARCH_TYPES.RECAP
@@ -2806,13 +2810,6 @@ def build_full_join_es_queries(
         # Build child text query.
         child_fields = child_query_fields[child_type]
 
-        if mlt_query:
-            child_text_query = [mlt_query]
-        else:
-            child_text_query = build_fulltext_query(
-                child_fields, cd.get("q", ""), only_queries=True
-            )
-
         # Build parent filters.
         parent_filters = build_join_es_filters(cd)
         parties_filters = [
@@ -2841,6 +2838,21 @@ def build_full_join_es_queries(
                 # with the party filters included to match only child documents
                 # whose parents match the party filters.
                 child_filters.append(has_parent_parties_filter)
+
+        if mlt_query:
+            child_text_query = [mlt_query]
+        else:
+            string_query = cd.get("q", "")
+            if is_semantic_query and string_query:
+                keyword_text_query, child_text_query = build_semantic_query(
+                    string_query,
+                    child_fields,
+                    child_filters,
+                )
+            else:
+                child_text_query = build_fulltext_query(
+                    child_fields, string_query, only_queries=True
+                )
 
         # Build the child query based on child_filters and child child_text_query
         match child_filters, child_text_query:
@@ -2904,9 +2916,11 @@ def build_full_join_es_queries(
 
         # Build the parent filter and text queries.
         string_query = build_fulltext_query(
-            parent_query_fields, cd.get("q", ""), only_queries=True
+            parent_query_fields,
+            keyword_text_query if is_semantic_query else cd.get("q", ""),
+            only_queries=True,
         )
-        has_text_query = True if string_query else False
+        has_text_query = True if string_query or is_semantic_query else False
 
         # If child filters are set, add a has_child query as a filter to the
         # parent query to exclude results without matching children.
@@ -2950,7 +2964,10 @@ def build_full_join_es_queries(
                     should=string_query,
                     minimum_should_match=1,
                 )
-        if parent_query and not mlt_query:
+        should_append_parent_query = (
+            parent_query and not mlt_query and not is_semantic_query
+        ) or keyword_text_query
+        if should_append_parent_query:
             q_should.append(parent_query)
 
     if not q_should:
