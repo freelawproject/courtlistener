@@ -27,7 +27,7 @@ The following labels control the deployment of this PR if they’re applied. Ple
 | `skip-web-deploy`      | The web tier can be skipped.            | This is the case if you're working on code that doesn't affect the front end, like management commands, tasks, or documentation. |
 | `skip-celery-deploy`   | Deployment to celery can be skipped.    | This is the case if you make no changes to tasks.py or the code that tasks rely on.                                              |
 | `skip-cronjob-deploy`  | Deployment to cron jobs can be skipped. | This is the case if no changes are made that affect cronjobs.                                                                    |
-| `skip-daemon-deploy`   | Deployment of daemons can be skipped    | This is the case if you haven't updated daemons or the code they depend on                                                       | 
+| `skip-daemon-deploy`   | Deployment of daemons can be skipped    | This is the case if you haven't updated daemons or the code they depend on                                                       |
 
 **If deployment is required:**
 
