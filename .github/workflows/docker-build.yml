@@ -157,10 +157,10 @@ jobs:
         deployment:
           - celery-default
           - celery-feeds
-          - celery-bulk0
-          - celery-bulk1
-          - celery-bulk2
-          - celery-bulk3
+          - celery-batch0
+          - celery-batch1
+          - celery-batch2
+          - celery-batch3
           - celery-etl
           - celery-iquery
           - celery-free-pacer-docs
