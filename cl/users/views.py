@@ -107,19 +107,26 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_docket_alerts(request: HttpRequest) -> HttpResponse:
-    order_by = request.GET.get("order_by", "date_created")
-    if order_by.startswith("-"):
+def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
+    order_by_param = request.GET.get("order_by", "")
+    if order_by_param.startswith("-"):
         direction = "-"
-        order_by = order_by.lstrip("-")
+        order_name = order_by_param.lstrip("-")
     else:
         direction = ""
+        order_name = order_by_param
     name_map = {
         "name": "docket__case_name",
         "court": "docket__court__short_name",
         "hit": "date_last_hit",
+        "date_filed": "docket__date_filed",
+        "docket_number": "docket__docket_number",
     }
-    order_by = name_map.get(order_by, "date_created")
+    if not (order_by := name_map.get(order_name)):
+        # Set default order
+        direction = "-"
+        order_name = "hit"
+        order_by = name_map[order_name]
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
     )
@@ -135,6 +142,16 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
     else:
         docket_alerts = docket_alerts.order_by(f"{direction}{order_by}")
 
+    sorting_fields = {
+        col: {
+            "url_param": f"{'-' if order_name == col and direction == '' else ''}{col}",
+            "direction": "down"
+            if (order_name == col and direction == "-")
+            else "up",
+        }
+        for col in name_map
+    }
+
     return TemplateResponse(
         request,
         "profile/alerts.html",
@@ -143,6 +160,7 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
             "page": "docket_alerts",
             "private": True,
             "page_title": "Docket Alerts",
+            "sorting_fields": sorting_fields,
         },
     )
 
