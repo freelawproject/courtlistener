@@ -5,7 +5,24 @@ from .redis import REDIS_DATABASES, REDIS_HOST, REDIS_PORT
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 CELERY_ETL_TASK_QUEUE = env("CELERY_ETL_TASK_QUEUE", default="celery")
+CELERY_PACER_FETCH_QUEUE = env("CELERY_PACER_FETCH_QUEUE", default="celery")
 CELERY_IQUERY_QUEUE = env("CELERY_IQUERY_QUEUE", default="celery")
+CELERY_QUEUES = (
+    "batch0",
+    "batch1",
+    "batch2",
+    "batch3",
+    "celery",
+    "es_sweep",
+    "etl_tasks",
+    "feeds",
+    "free_pacer_docs",
+    "ia_uploads",
+    "inception_gpu",
+    "inception_s3",
+    "iquery",
+    "recap_fetch",
+)
 
 # This can be useful in a dev environment:
 # .virtualenvs/courtlistener/bin/celery worker -n w1 --app=cl  --loglevel=INFO
