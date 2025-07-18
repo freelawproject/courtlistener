@@ -53,12 +53,12 @@
     display: none !important;
   }
   input[type="checkbox"] {
-    @apply relative appearance-none flex-shrink-0 w-5 h-5 rounded border border-greyscale-300 bg-white;
-    @apply checked:border-primary-600 checked:bg-primary-600 indeterminate:border-primary-600 indeterminate:bg-primary-600;
-    @apply focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-primary-600/60;
-    @apply disabled:border-greyscale-300 disabled:bg-greyscale-100 disabled:checked:bg-greyscale-100 forced-colors:appearance-auto;
-    @apply before:absolute before:inset-0 before:m-auto before:w-4 before:h-4;
-    @apply before:bg-white before:scale-0 checked:before:scale-100 before:transform before:duration-150;
+    @apply relative appearance-none flex-shrink-0 w-5 h-5 rounded border border-greyscale-300 bg-white; /* base checkbox */
+    @apply checked:border-primary-600 checked:bg-primary-600 indeterminate:border-primary-600 indeterminate:bg-primary-600; /* checked or indeterminate */
+    @apply focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-primary-600/60; /* focus */
+    @apply disabled:border-greyscale-300 disabled:bg-greyscale-100 disabled:checked:bg-greyscale-100 forced-colors:appearance-auto; /* disabled and a11y */
+    @apply before:absolute before:inset-0 before:m-auto before:w-4 before:h-4 before:bg-white; /* check icon container */
+    @apply checked:before:scale-100 before:scale-0 before:transform before:duration-100 transition-colors; /* animate check icon */
   }
   input[type="checkbox"]::before {
     mask: url("/static/svg/check_thick.svg") no-repeat center/contain;
