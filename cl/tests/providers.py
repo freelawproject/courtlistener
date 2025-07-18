@@ -1,5 +1,4 @@
 import random
-from uuid import uuid4
 
 from faker import Faker
 from faker.providers import BaseProvider
@@ -50,7 +49,10 @@ class LegalProvider(BaseProvider):
                 "Eruptanyom",  # Kelvin's pretend world
             ]
         )
-        last_word = f"{last_word}-{str(uuid4())[:8]}"
+        # The names only give us 5.58 bits of entropy, so we append an extra
+        # 4 bytes to give us 37.58, a reasonable amount of randomness for test
+        # sample sizes.
+        last_word = f"{last_word}-{hex(random.getrandbits(32))[2:]}"
 
         return " ".join([first_word, mid_word, last_word])
 
@@ -67,6 +69,7 @@ class LegalProvider(BaseProvider):
     @staticmethod
     def _make_random_party(full: bool = False) -> str:
         name_funcs = [fake.name, fake.last_name]
+        # If True, create a company instead of a person
         if random.choice([True, False]):
             name_funcs = [fake.company] * 2
         if full:
