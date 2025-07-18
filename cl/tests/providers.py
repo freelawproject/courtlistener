@@ -25,9 +25,9 @@ class LegalProvider(BaseProvider):
         """
         Generate court names like:
 
-         - First circuit for 157e9efe-119a-405f-ba8a-b76850ef82fc
-         - District court of 39cfe641-c872-4c93-95fb-cba740aaa02f
-         - Eruptanyom of 56e19a11-8898-4c97-bd83-94a92a15287e
+         - First circuit for the zoo
+         - District court of albatross
+         - Appeals court of eczema
 
         :return: A court name
         """
@@ -37,11 +37,22 @@ class LegalProvider(BaseProvider):
                 "District court",
                 "Appeals court",
                 "Superior court",
-                "Eruptanyom",  # Kelvin's pretend world
             ]
         )
         mid_word = random.choice(["of the", "for the"])
-        return " ".join([first_word, mid_word, str(uuid4())])
+        last_word = random.choice(
+            [
+                "Zoo",
+                "Medical Worries",
+                "Programming Horrors",
+                "dragons",
+                "Dirty Dishes",
+                "Eruptanyom",  # Kelvin's pretend world
+            ]
+        )
+        last_word = f"{last_word}-{str(uuid4)[:8]}"
+
+        return " ".join([first_word, mid_word, last_word])
 
     def federal_district_docket_number(self) -> str:
         """Make a docket number like you'd see in a district court, of the
