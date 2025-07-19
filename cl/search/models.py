@@ -1546,9 +1546,8 @@ class RECAPDocument(
                         "and we are unable to fix it automatically for "
                         f"rd: {self.pk}"
                     )
-                else:
-                    # Only one duplicate. Attempt auto-resolution.
-                    other = others[0]
+                # Only one duplicate. Attempt auto-resolution.
+                other = others[0]
                 if other.pacer_doc_id == self.pacer_doc_id:
                     # Delete "other"; the new one probably has better data.
                     # Lots of code could be written here to merge "other" into
