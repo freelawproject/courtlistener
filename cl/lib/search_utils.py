@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import Any, TypedDict
 from urllib.parse import parse_qs, urlencode
 
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
@@ -60,7 +60,6 @@ from cl.search.models import (
     SEARCH_TYPES,
     Court,
     OpinionCluster,
-    RECAPDocument,
     SearchQuery,
 )
 
@@ -250,24 +249,6 @@ async def add_depth_counts(
             return cited_cluster
     else:
         return None
-
-
-async def clean_up_recap_document_file(item: RECAPDocument) -> None:
-    """Clean up the RecapDocument file-related fields after detecting the file
-    doesn't exist in the storage.
-
-    :param item: The RECAPDocument to work on.
-    :return: None
-    """
-
-    if isinstance(item, RECAPDocument):
-        await sync_to_async(item.filepath_local.delete)()
-        item.sha1 = ""
-        item.date_upload = None
-        item.file_size = None
-        item.page_count = None
-        item.is_available = False
-        await item.asave()
 
 
 def store_search_query(request: HttpRequest, search_results: dict) -> None:
