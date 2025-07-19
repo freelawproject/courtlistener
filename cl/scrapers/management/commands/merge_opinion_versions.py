@@ -5,7 +5,6 @@ from difflib import Differ, SequenceMatcher
 
 from django.db import transaction
 from django.db.models import Count, Q, QuerySet
-from elasticsearch import NotFoundError
 from eyecite import clean_text
 
 from cl.alerts.models import DocketAlert
@@ -33,6 +32,7 @@ from cl.search.models import (
     OpinionClusterNonParticipatingJudges,
     OpinionClusterPanel,
 )
+from cl.search.tasks import remove_document_from_es_index
 
 MIN_SEQUENCE_SIMILARITY = 0.9
 DRY_RUN = False
@@ -476,6 +476,15 @@ def merge_opinion_versions(
         version_opinion.main_version = main_opinion
         version_opinion.save()
 
+        # since the cluster was reassigned, this opinion was not cascade
+        # deleted, and then deleted from the ES index. We don't want versions
+        # to show up on search
+        remove_document_from_es_index.delay(
+            OpinionDocument.__name__,
+            ES_CHILD_ID(version_opinion.id).OPINION,
+            version_cluster.id,
+        )
+
         # Both Opinion and Citation have a ForeignKey to OpinionCluster, with
         # on_delete=models.CASCADE. Also, there are signals (see
         # o_cluster_field_mapping) to delete the related Elasticsearch docs
@@ -485,15 +494,6 @@ def merge_opinion_versions(
 
         if not is_same_docket:
             version_docket.delete()
-
-        # since the cluster was reassigned, this opinion was not deleted from
-        # the ES index. We don't want versions to show up on search
-        try:
-            OpinionDocument.get(
-                id=ES_CHILD_ID(version_opinion.id).OPINION
-            ).delete()
-        except NotFoundError:
-            pass
 
 
 def merge_versions_by_download_url(
