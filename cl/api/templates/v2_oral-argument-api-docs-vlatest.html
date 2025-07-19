@@ -20,7 +20,7 @@
 >
   <c-layout-with-navigation.section id="about">
     {% if version == "v3" %}
-      {% include "v2_includes/v3-deprecated-warning.html" %}
+      <c-v3-deprecated-warning />
     {% endif %}
     <h1>Oral Argument Recordings&nbsp;APIs</h1>
     <p>Use these APIs to gather and analyze the largest collection of oral argument recordings on the Internet.</p>
@@ -46,7 +46,7 @@
   <c-layout-with-navigation.section id="docket-endpoint">
     <h3>Dockets</h3>
     <p><code>{% url "docket-list" version=version %}</code></p>
-    {% include "v2_includes/docket-endpoint.html" %}
+    <c-docket-endpoint />
   </c-layout-with-navigation.section>
 
 </c-layout-with-navigation>
