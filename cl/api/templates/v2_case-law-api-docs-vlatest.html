@@ -28,7 +28,7 @@
 >
   <c-layout-with-navigation.section id="about">
     {% if version == "v3" %}
-      {% include "v2_includes/v3-deprecated-warning.html" %}
+      <c-v3-deprecated-warning />
     {% endif %}
     <h1>Case Law API</h1>
     <p>Use these APIs to access our huge and growing database of case law.</p>
@@ -59,7 +59,7 @@
   <c-layout-with-navigation.section id="docket-endpoint">
     <h3>Dockets</h3>
     <p><code>{% url "docket-list" version=version %}</code></p>
-    {% include "v2_includes/docket-endpoint.html" %}
+    <c-docket-endpoint />
     <p>The name of a docket can change in response to the outside world, but the names of clusters do not change. Therefore, we have <code>case_name</code> fields on both the docket and the cluster.</p>
     <p>For example, a suit filed against the EPA administrator might be captioned <em>Petroleum Co. v. Regan</em>. That would go into the case name fields of the docket and any decisions that were issued. But if the administrator resigns before the case is resolved, the docket would get a new case name, <em>Petroleum Co. v. New Administrator</em>, while the case name fields on the clusters would not change.</p>
     <p>For more information on case names, see the <a class="underline" href="{% url "field_api_help" %}#case-names">help article on this topic</a>.</p>
@@ -116,7 +116,7 @@
   <c-layout-with-navigation.section id="court-endpoint">
     <h3>Courts</h3>
     <p><code>{% url "court-list" version=version %}</code></p>
-    {% include "v2_includes/court-endpoint.html" %}
+    <c-court-endpoint />
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="examples">
