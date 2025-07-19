@@ -3197,7 +3197,7 @@ class TasksTest(TestCase):
 
         cls.opinion_1 = OpinionWithChildrenFactory(
             plain_text="Sample text 1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.ca_court),
                 case_name="Opinion 1",
                 date_filed=date(2025, 4, 25),
@@ -3206,7 +3206,7 @@ class TasksTest(TestCase):
 
         cls.opinion_2 = OpinionWithChildrenFactory(
             plain_text="Sample text 2",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.ca_court),
                 case_name="Opinion 2",
                 date_filed=date(2025, 4, 26),
@@ -3214,7 +3214,7 @@ class TasksTest(TestCase):
         )
         cls.opinion_3 = OpinionWithChildrenFactory(
             plain_text="Sample text 3",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.ca_court),
                 case_name="Opinion 3",
                 date_filed=date(2025, 4, 27),
