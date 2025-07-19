@@ -7,7 +7,7 @@ from unittest.mock import patch
 from asgiref.sync import async_to_sync
 from django.core.cache import cache
 from django.core.files.base import ContentFile
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from requests.cookies import RequestsCookieJar
 
 from cl.lib.courts import (
@@ -63,7 +63,7 @@ from cl.search.factories import (
     OpinionClusterFactoryMultipleOpinions,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 
 
 class TestPacerUtils(TestCase):

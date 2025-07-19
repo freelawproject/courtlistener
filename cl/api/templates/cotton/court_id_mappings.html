@@ -1,0 +1,16 @@
+{# court_id_mappings.html #}
+<c-data-table
+  safe
+  caption="CourtListener court IDs match the subdomains on PACER, except for the following mapping:"
+  :columns="[
+    { 'label': 'PACER Code', 'field': 'pacer_code' },
+    { 'label': 'CL ID', 'field': 'cl_id' },
+    { 'label': 'Description', 'field': 'description' }
+  ]"
+  :rows="[
+    { 'pacer_code': 'azb', 'cl_id': 'arb', 'description': 'Arizona Bankruptcy Court' },
+    { 'pacer_code': 'cofc', 'cl_id': 'uscfc', 'description': 'Court of Federal Claims' },
+    { 'pacer_code': 'neb', 'cl_id': 'nebraskab', 'description': 'Nebraska Bankruptcy' },
+    { 'pacer_code': 'nysb-mega', 'cl_id': 'nysb', 'description': 'Do not use \'mega\'' }
+  ]"
+></c-data-table>
