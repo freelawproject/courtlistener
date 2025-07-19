@@ -19,7 +19,7 @@
 >
   <c-layout-with-navigation.section id="about">
     {% if version == "v3" %}
-      {% include "v2_includes/v3-deprecated-warning.html" %}
+      <c-v3-deprecated-warning />
     {% endif %}
     <h1>Supreme Court Visualization&nbsp;API</h1>
     <h2><code>{% url "scotusmap-list" version=version %}</code></h2>
