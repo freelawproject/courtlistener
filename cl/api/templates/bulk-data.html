@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% load extras static humanize %}
 
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/api/templates/v2_bulk-data.html                                      ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
 {% block title %}Bulk Legal Data – CourtListener.com{% endblock %}
 {% block description %}Free legal bulk data for federal and state case law, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
 {% block og_description %}Free legal bulk data for federal and state case law, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
