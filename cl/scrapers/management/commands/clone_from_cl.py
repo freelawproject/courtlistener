@@ -23,7 +23,8 @@ manage.py clone_from_cl --type search.Court --id mspb leechojibtr
 manage.py clone_from_cl --type people_db.Person --id 16212 16211
 
 Now you can clone docket entries and recap documents if you have the
-permissions, for example:
+permissions. If the Docket already exists, the entries and documents will be
+updated. For example:
 
 manage.py clone_from_cl --type search.Docket --id 17090923 --add-docket-entries
 
@@ -71,6 +72,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     RECAPDocument,
+    Tag,
 )
 
 VALID_TYPES = (
@@ -305,7 +307,6 @@ def clone_opinion(
     opinion_id: int,
     opinion_cluster_id: int,
     person_positions: bool = False,
-    object_type="search.Opinion",
 ):
     """Download opinion data from courtlistener.com and add it to local
     environment
@@ -313,11 +314,9 @@ def clone_opinion(
     :param opinion_id: opinion id to clone
     :param opinion_cluster_id: cluster id related to opinions
     :param person_positions: True if we should clone person positions
-    :param object_type: Opinion app name with model name
     :return:
     """
 
-    model = apps.get_model(object_type)
     opinion_path = reverse(
         "opinion-detail",
         kwargs={"version": "v4", "pk": opinion_id},
@@ -325,10 +324,10 @@ def clone_opinion(
     opinion_url = f"{domain}{opinion_path}"
 
     try:
-        opinion = model.objects.get(pk=opinion_id)
+        opinion = Opinion.objects.get(pk=opinion_id)
         print(f"Opinion already exists: {opinion_id}")
         return opinion
-    except model.DoesNotExist:
+    except Opinion.DoesNotExist:
         pass
 
     print(f"Cloning opinion id: {opinion_id}")
@@ -362,8 +361,8 @@ def clone_opinion(
         # Get opinion id of main opinion
         main_version_id = int(main_version.split("/")[-2])
         try:
-            _ = model.objects.get(pk=main_version_id)
-        except model.DoesNotExist:
+            _ = Opinion.objects.get(pk=main_version_id)
+        except Opinion.DoesNotExist:
             clone_opinion(
                 session, main_version_id, opinion_cluster_id, person_positions
             )
@@ -909,7 +908,7 @@ def clone_person(
     return people
 
 
-def clone_court(session: Session, court_ids: list, object_type="search.Court"):
+def clone_court(session: Session, court_ids: list):
     """Download court data from courtlistener.com and add it to local
     environment
 
@@ -1042,9 +1041,10 @@ class Command(BaseCommand):
             "--add-docket-entries",
             action="store_true",
             default=False,
-            help="Use this flag to clone docket entries when cloning "
-            "clusters. It requires to have RECAP permissions or it will "
-            "raise 403 error.",
+            help="Use this flag to clone docket entries when cloning clusters."
+            " It will update docket entries and RECAP documents if the Docket "
+            "already exists. The API token must have RECAP permissions or it "
+            "will raise a 403 error.",
         )
 
         parser.add_argument(
