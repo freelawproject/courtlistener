@@ -27,7 +27,7 @@
 >
   <c-layout-with-navigation.section id="about">
     {% if version == "v3" %}
-      {% include "v2_includes/v3-deprecated-warning.html" %}
+      <c-v3-deprecated-warning />
     {% endif %}
     <h1>PACER Data&nbsp;APIs</h1>
     <p>Use these APIs to access almost half a billion items we have in our collection of PACER data.</p>
@@ -46,7 +46,7 @@
   <c-layout-with-navigation.section id="docket-endpoint">
     <h3>Dockets</h3>
     <p><code>{% url "docket-list" version=version %}</code></p>
-    {% include "v2_includes/docket-endpoint.html" %}
+    <c-docket-endpoint />
     <p>Ideally, docket entries, parties, and attorneys would be nested within the docket object you request, but this is not possible because some dockets have a vast number of these objects. Listing so many values in a single response from the server is impractical. To access docket entries, parties, or attorneys for a specific docket, use the docket entry, party, or attorney endpoints and filter by docket ID.</p>
     <p>The court fields are references to our Court API, described below.</p>
   </c-layout-with-navigation.section>
@@ -54,7 +54,7 @@
   <c-layout-with-navigation.section id="court-endpoint">
       <h3>Courts</h3>
       <p><code>{% url "court-list" version=version %}</code></p>
-      {% include "v2_includes/court-endpoint.html" %}
+      <c-court-endpoint />
       </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="docket-entry-endpoint">
@@ -313,7 +313,7 @@
     }
   ]
 }</c-code>
-    {% include "v2_includes/court-id-mappings.html" %}
+    <c-court-id-mappings />
     <p><strong>Careful:</strong> When placing queries, the fourth digit of a PACER document ID can be a zero or one. We always normalize it to zero, and you will need to do so in your queries.</p>
     <p>To query whether a case is in our system, use the <code>Docket</code> endpoint described above.</p>
     {% if not perms.search.has_recap_api_access %}
