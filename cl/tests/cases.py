@@ -11,6 +11,7 @@ from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
+from django.utils.timezone import now
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
 from lxml.html import HtmlElement
@@ -19,6 +20,12 @@ from rest_framework.utils.serializer_helpers import ReturnList
 
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     get_cut_off_date,
+)
+from cl.alerts.models import Alert
+from cl.alerts.utils import (
+    build_plain_percolator_query,
+    percolate_es_document,
+    prepare_percolator_content,
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
@@ -514,6 +521,10 @@ class SearchAlertsAssertions:
                         f"Expected: {expected_child_hits} - Got: {child_hit_count}\n\n",
                     )
                     break
+            else:
+                self.fail(
+                    f"Case title '{case_title}' was not found in the alert."
+                )
 
     def _assert_child_hits_content(
         self,
@@ -600,7 +611,8 @@ class SearchAlertsAssertions:
         alert_title,
         expected_hits,
         expected_child_hits,
-        expected_child_descriptions,
+        expected_child_ids,
+        nested_field="recap_documents",
     ):
         """Confirm the following assertions for the percolator search alert
         webhook:
@@ -626,9 +638,9 @@ class SearchAlertsAssertions:
                     ),
                 )
                 alert_child_hits = alert_child_hits + len(
-                    webhook["payload"]["results"][0]["recap_documents"]
+                    webhook["payload"]["results"][0][nested_field]
                 )
-                for rd in webhook["payload"]["results"][0]["recap_documents"]:
+                for rd in webhook["payload"]["results"][0][nested_field]:
                     alert_child_ids.add(rd["id"])
 
         self.assertEqual(
@@ -641,10 +653,10 @@ class SearchAlertsAssertions:
             expected_child_hits,
             msg=f"Did not get the right number of child hits for alert {alert_title}. ",
         )
-        if expected_child_descriptions:
+        if expected_child_ids:
             self.assertEqual(
                 alert_child_ids,
-                set(expected_child_descriptions),
+                set(expected_child_ids),
                 msg=f"Did not get the right child hits IDs for alert {alert_title}. ",
             )
 
@@ -729,3 +741,40 @@ class SearchAlertsAssertions:
 
         snippet_text = snippet_content[0].text_content().strip()
         return snippet_text.replace("…", "").replace("&hellip;", "")
+
+    @staticmethod
+    def confirm_query_matched(response, query_id) -> bool:
+        """Confirm if a percolator query matched."""
+
+        matched = False
+        for hit in response:
+            if hit.meta.id == query_id:
+                matched = True
+        return matched
+
+    @staticmethod
+    def save_percolator_query(cd, es_document):
+        query = build_plain_percolator_query(cd)
+        query_dict = query.to_dict()
+        percolator_query = es_document(
+            percolator_query=query_dict,
+            rate=Alert.REAL_TIME,
+            date_created=now(),
+        )
+        percolator_query.save(refresh=True)
+
+        return percolator_query.meta.id
+
+    @staticmethod
+    def prepare_and_percolate_document(app_label, document_id):
+        percolator_index, es_document_index, documents_to_percolate = (
+            prepare_percolator_content(app_label, document_id)
+        )
+        responses = percolate_es_document(
+            str(document_id),
+            percolator_index,
+            es_document_index,
+            documents_to_percolate,
+            app_label=app_label,
+        )
+        return responses
