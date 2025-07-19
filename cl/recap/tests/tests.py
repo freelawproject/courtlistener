@@ -3494,7 +3494,7 @@ class RecapAttPageFetchApiTest(TestCase):
             pacer_case_id="5d8e355d-b229-4b16-b00f-7552d2f79d4f",
         )
         self.rd_acms = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=self.acms_docket, entry_number=9
             ),
             document_number=9,
