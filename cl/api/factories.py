@@ -32,13 +32,7 @@ class WebhookEventFactory(DjangoModelFactory):
     )
 
 
-class WebhookParentMixin(DjangoModelFactory):
-    webhook = SubFactory(
-        "cl.api.factories.WebhookFactory",
-    )
-
-
-class WebhookEventWithParentsFactory(WebhookEventFactory, WebhookParentMixin):
+class WebhookEventWithParentsFactory(WebhookEventFactory):
     """Make a WebhookEvent with a parent Webhook"""
 
-    pass
+    webhook = SubFactory(WebhookFactory)

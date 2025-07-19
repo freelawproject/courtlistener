@@ -69,10 +69,10 @@ from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
-    OpinionClusterFactoryMultipleOpinions,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
+    OpinionClusterWithMultipleOpinionsFactory,
     OpinionWithChildrenFactory,
     RECAPDocumentFactory,
 )
@@ -261,7 +261,7 @@ class CitationTextTest(TestCase):
         # end to end
         opinion = OpinionWithChildrenFactory(
             plain_text="No citations found here",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=CourtFactory(id="ca")),
                 case_name="Some placeholder",
                 date_filed=date(2025, 4, 25),
@@ -594,7 +594,7 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
         cls.recap_doc = RECAPDocumentFactory.create(
             plain_text="In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020), the Second Circuit held that in the context of settlement of FLSA and NYLL cases, which must be approved by the trial court in accordance with Cheeks v. Freeport Pancake House, Inc., 796 F.3d 199 (2d Cir. 2015), the district court abused its discretion in limiting the amount of recoverable fees to a percentage of the recovery by the successful plaintiffs. But also: sdjnfdsjnk. Fisher, 948 F.3d at 597.",
             ocr_status=RECAPDocument.OCR_UNNECESSARY,
-            docket_entry=DocketEntryWithParentsFactory(),
+            docket_entry=DocketEntryFactory(),
         )
         # Courts
         court_ca2 = CourtFactory(id="ca2")
@@ -604,7 +604,7 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
             volume="948",
             reporter="F.3d",
             page="593",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=court_ca2),
                 case_name="Fisher v. SD Protection Inc.",
                 date_filed=date(2020, 1, 1),
@@ -616,7 +616,7 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
             volume="796",
             reporter="F.3d",
             page="199",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=court_ca2),
                 case_name="Cheeks v. Freeport Pancake House, Inc.",
                 date_filed=date(2015, 1, 1),
@@ -680,7 +680,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="U.S.",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_scotus),
                 case_name="Foo v. Bar",
                 date_filed=date(
@@ -694,7 +694,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="2",
             reporter="F.3d",
             page="2",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=court_ca1),
                 case_name="Qwerty v. Uiop",
                 date_filed=date(2000, 1, 1),  # F.3d must be after 1993
@@ -712,7 +712,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="U.S.",
             page="50",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_scotus),
                 case_name="Lorem v. Ipsum",
             ),
@@ -723,7 +723,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="U.S.",
             page="999",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_scotus),
                 case_name="Abcdef v. Ipsum",
                 sub_opinions=RelatedFactory(
@@ -739,7 +739,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="123",
             reporter="U.S.",
             page="123",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_scotus),
                 case_name="Bush v. Gore",
                 date_filed=date.today(),  # Must be later than any cited opinion
@@ -755,7 +755,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="114",
             reporter="F.3d",
             page="1182",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Foo v. Bar",
                 date_filed=date(1997, 4, 10),
@@ -766,7 +766,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="114",
             reporter="F.3d",
             page="1182",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Lorem v. Ipsum",
                 date_filed=date(1997, 4, 8),
@@ -777,7 +777,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="U.S.",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="John v. Doe",
                 date_filed=date(1997, 4, 9),
@@ -793,7 +793,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="114",
             reporter="F.3d",
             page="1181",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Lorem v. Ipsum",
                 date_filed=date(1997, 4, 8),
@@ -804,7 +804,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="114",
             reporter="F.3d",
             page="1181",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Lorem v. Ipsum",
                 date_filed=date(1997, 4, 8),
@@ -815,7 +815,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="U.S.",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Foo v. Bar",
                 date_filed=date(1997, 4, 9),
@@ -831,7 +831,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="8",
             reporter="Barb.",
             page="415",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 case_name="Shaffer v. Lee",
                 date_filed=date(1850, 4, 9),
                 sub_opinions=RelatedFactory(
@@ -842,7 +842,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ),
         )
 
-        cls.cluster_1 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_1 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_illappct,
                 case_name="People v. Williams",
@@ -856,7 +856,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ],
         )
 
-        cls.cluster_2 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_2 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_illappct,
                 case_name="People v. Jackson",
@@ -870,7 +870,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ],
         )
 
-        cls.cluster_3 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_3 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_nj,
                 case_name="State v. Gatson",
@@ -884,7 +884,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ],
         )
 
-        cls.cluster_4 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_4 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_nj,
                 case_name="State v. Gerrard",
@@ -896,7 +896,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ],
         )
 
-        cls.cluster_5 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_5 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_dc,
                 case_name="Good v. United States",
@@ -908,7 +908,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ],
         )
 
-        cls.cluster_6 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_6 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_dc,
                 case_name="Duncan v. United States",
@@ -972,7 +972,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                     volume="3",
                     reporter="U.S.",
                     page="888",
-                    cluster=OpinionClusterFactoryWithChildrenAndParents(
+                    cluster=OpinionClusterWithChildrenAndParentsFactory(
                         docket=DocketFactory(court=self.court_scotus),
                         case_name="Obama v. Clinton",
                         date_filed=date.today(),
@@ -991,7 +991,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 volume="3",
                 reporter="U.S.",
                 page="888",
-                cluster=OpinionClusterFactoryWithChildrenAndParents(
+                cluster=OpinionClusterWithChildrenAndParentsFactory(
                     docket=DocketFactory(court=self.court_scotus),
                     case_name="America v. Maxwell",
                     date_filed=date.today(),
@@ -1657,7 +1657,7 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="Yeates",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 # Yeates was published from 1791 to 1808
                 date_filed=date(1800, 1, 1),
             ),
@@ -1668,7 +1668,7 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             volume="56",
             reporter="F.2d",
             page="9",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=court_scotus),
                 case_name="Foo v. Bar",
                 date_filed=date.today(),  # Must be later than any cited opinion
@@ -3062,7 +3062,7 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cluster = OpinionClusterFactoryWithChildrenAndParents()
+        cls.cluster = OpinionClusterWithChildrenAndParentsFactory()
         cls.opinion = cls.cluster.sub_opinions.first()
         UnmatchedCitation.objects.all().delete()
 
@@ -3146,7 +3146,7 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     def test_self_citation(self) -> None:
         """Can we prevent a self citation being stored as UnmatchedCitation?"""
-        cluster = OpinionClusterFactoryWithChildrenAndParents()
+        cluster = OpinionClusterWithChildrenAndParentsFactory()
         CitationWithParentsFactory.create(
             volume="948",
             reporter="F.3d",
@@ -3169,7 +3169,7 @@ class UnmatchedCitationTest(TransactionTestCase):
     def test_saving_non_standard_year_format(self) -> None:
         """Can we prevent crash with atypical year format?"""
 
-        cluster = OpinionClusterFactoryWithChildrenAndParents()
+        cluster = OpinionClusterWithChildrenAndParentsFactory()
         eyecite_citations = get_citations(
             """2018 WL 1915078, at *2 (Mass. 1993-94).""",
             tokenizer=HYPERSCAN_TOKENIZER,
@@ -3197,7 +3197,7 @@ class TasksTest(TestCase):
 
         cls.opinion_1 = OpinionWithChildrenFactory(
             plain_text="Sample text 1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.ca_court),
                 case_name="Opinion 1",
                 date_filed=date(2025, 4, 25),
@@ -3206,7 +3206,7 @@ class TasksTest(TestCase):
 
         cls.opinion_2 = OpinionWithChildrenFactory(
             plain_text="Sample text 2",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.ca_court),
                 case_name="Opinion 2",
                 date_filed=date(2025, 4, 26),
@@ -3214,7 +3214,7 @@ class TasksTest(TestCase):
         )
         cls.opinion_3 = OpinionWithChildrenFactory(
             plain_text="Sample text 3",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.ca_court),
                 case_name="Opinion 3",
                 date_filed=date(2025, 4, 27),
