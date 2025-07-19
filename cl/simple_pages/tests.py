@@ -218,6 +218,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
             # Monitoring pages
+            {"viewname": "celery_queue_lengths"},
             {"viewname": "heartbeat"},
             {"viewname": "health_check"},
             {"viewname": "check_redis_writes"},
