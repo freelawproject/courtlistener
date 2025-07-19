@@ -31,7 +31,7 @@
 >
   <c-layout-with-navigation.section id="about">
     {% if version == "v3" %}
-      {% include "v2_includes/v3-deprecated-warning.html" %}
+      <c-v3-deprecated-warning />
     {% endif %}
     <h1>RECAP APIs for&nbsp;PACER</h1>
     <p>Use these APIs to scrape PACER data and to upload data into CourtListener's database of federal court cases and filings.</p>
@@ -155,7 +155,7 @@
           <li><code>pacer_case_id</code> is the internal ID in the PACER system.</li>
           <li><code>docket_number</code> is the visible docket number humans use to refer to the case.</li>
           <li><code>court</code> is the CourtListener court ID.
-            {% include "v2_includes/court-id-mappings.html" %}
+            <c-court-id-mappings />
           </li>
         </ul>
       </li>
@@ -231,7 +231,7 @@
       <li><code>upload_type</code> <em>(required)</em> &mdash; This field accepts integers representing object types in PACER. Send an HTTP <code>OPTIONS</code> request to this API to learn the possible values for this field.</li>
       <li><code>filepath_local</code> <em>(required)</em> &mdash; Use this field to upload the binary data you are submitting, whether it HTML of a docket or attachment menu or a PDF file.</li>
       <li><code>court</code> <em>(required)</em> &mdash; The CourtListener court id.
-        {% include "v2_includes/court-id-mappings.html" %}
+        <c-court-id-mappings />
       </li>
       <li><code>debug</code> <em>(optional)</em> &mdash; While you are developing, use this field to test your work. When it is set to <code>true</code>, your uploads will not make changes to the RECAP Archive, but you will create processing requests which will be processed in debug mode.</li>
     </ul>
