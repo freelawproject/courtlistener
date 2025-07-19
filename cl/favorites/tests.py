@@ -40,21 +40,17 @@ from cl.favorites.utils import (
     prayer_eligible,
     prayer_unavailable,
 )
-from cl.lib.test_helpers import (
-    AudioTestCase,
-    PrayAndPayTestCase,
-    SimpleUserDataMixin,
-)
 from cl.search.factories import RECAPDocumentFactory
 from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.fakes import FakeAvailableConfirmationPage, FakeConfirmationPage
+from cl.tests.mixins import AudioMixin, PrayAndPayMixin, SimpleUserDataMixin
 from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
-class NoteTest(SimpleUserDataMixin, AudioTestCase):
+class NoteTest(SimpleUserDataMixin, AudioMixin, TestCase):
     fixtures = [
         "test_court.json",
         "test_objects_search.json",
@@ -664,7 +660,7 @@ class APITests(APITestCase):
 
 
 @patch("cl.favorites.signals.check_prayer_pacer.delay", new=MagicMock)
-class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
+class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayMixin, TestCase):
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
         """Does the prayer_eligible method work properly?"""
@@ -1435,7 +1431,7 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
 @patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
 @patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
-class PrayAndPaySignalTests(PrayAndPayTestCase):
+class PrayAndPaySignalTests(PrayAndPayMixin, TestCase):
     @patch("cl.favorites.signals.check_prayer_pacer")
     async def test_create_prayer_no_pacer_doc_id(
         self,
@@ -1562,7 +1558,7 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
 
 @patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
 @patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
-class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
+class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayMixin, TestCase):
     @patch(
         "cl.favorites.tasks.DownloadConfirmationPage", new=FakeConfirmationPage
     )
@@ -1704,7 +1700,7 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
 
 
 @patch("cl.favorites.signals.check_prayer_pacer.delay", new=MagicMock)
-class PrayerAPITests(PrayAndPayTestCase):
+class PrayerAPITests(PrayAndPayMixin, TestCase):
     """Check that Prayer API operations work as expected."""
 
     def setUp(self) -> None:

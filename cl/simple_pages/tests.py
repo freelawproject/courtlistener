@@ -9,8 +9,8 @@ from django.urls import reverse
 from lxml.html import fromstring
 
 from cl.audio.factories import AudioWithParentsFactory
-from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.tests.cases import TestCase
+from cl.tests.mixins import SimpleUserDataMixin
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests

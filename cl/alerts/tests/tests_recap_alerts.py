@@ -36,7 +36,6 @@ from cl.api.utils import get_webhook_deprecation_date
 from cl.donate.models import NeonMembership
 from cl.lib.date_time import midnight_pt
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import RECAPSearchTestCase
 from cl.people_db.factories import (
     AttorneyFactory,
     AttorneyOrganizationFactory,
@@ -67,7 +66,8 @@ from cl.search.tasks import (
     index_docket_parties_in_es,
 )
 from cl.stats.models import Stat
-from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
+from cl.tests.cases import ESIndexTestCase
+from cl.tests.mixins import RECAPSearchMixin, SearchAlertsMixin
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -77,7 +77,7 @@ from cl.users.factories import UserProfileWithParentsFactory
     return_value="alert_hits_sweep",
 )
 class RECAPAlertsSweepIndexTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
+    SearchAlertsMixin, RECAPSearchMixin, ESIndexTestCase
 ):
     """
     RECAP Alerts Sweep Index Tests
@@ -115,6 +115,7 @@ class RECAPAlertsSweepIndexTest(
             )
 
     def setUp(self):
+        super().setUp()
         self.r = get_redis_interface("CACHE")
         self.r.delete("alert_sweep:task_id")
         keys = self.r.keys("alert_hits_sweep:*")
@@ -2653,7 +2654,7 @@ class RECAPAlertsSweepIndexTest(
 )
 @override_settings(NO_MATCH_HL_SIZE=100)
 class RECAPAlertsPercolatorTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
+    SearchAlertsMixin, RECAPSearchMixin, ESIndexTestCase
 ):
     """
     RECAP Alerts Percolator Tests
@@ -2711,6 +2712,7 @@ class RECAPAlertsPercolatorTest(
             )
 
     def setUp(self):
+        super().setUp()
         RECAPPercolator._index.delete(ignore=404)
         RECAPPercolator.init()
 

@@ -22,7 +22,6 @@ from cl.lib.elasticsearch_utils import (
     fetch_es_results,
 )
 from cl.lib.test_helpers import (
-    AudioESTestCase,
     audio_v3_fields,
     audio_v4_fields,
     skip_if_common_tests_skipped,
@@ -33,15 +32,14 @@ from cl.search.factories import CourtFactory, DocketFactory, PersonFactory
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.tasks import es_save_document, update_es_document
 from cl.tests.cases import (
-    CountESTasksTestCase,
     ESIndexTestCase,
+    ESIndexTransactionTestCase,
     TestCase,
-    TransactionTestCase,
-    V4SearchAPIAssertions,
 )
+from cl.tests.mixins import AudioESMixin, CountESTasksMixin, V4SearchAPIMixin
 
 
-class OASearchAPICommonTests(AudioESTestCase):
+class OASearchAPICommonTests(AudioESMixin, TestCase):
     version_api = "v3"
     skip_common_tests = True
 
@@ -292,7 +290,7 @@ class OASearchAPICommonTests(AudioESTestCase):
 
 
 class OAV3SearchAPITests(
-    OASearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    V4SearchAPIMixin, OASearchAPICommonTests, ESIndexTestCase
 ):
     version_api = "v3"
     skip_common_tests = False
@@ -494,7 +492,7 @@ class OAV3SearchAPITests(
 
 
 class OAV4SearchAPITests(
-    OASearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    V4SearchAPIMixin, OASearchAPICommonTests, ESIndexTestCase
 ):
     version_api = "v4"
     skip_common_tests = False
@@ -940,7 +938,7 @@ class OAV4SearchAPITests(
             )
 
 
-class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
+class OASearchTestElasticSearch(AudioESMixin, ESIndexTestCase):
     """Oral argument search tests for Elasticsearch"""
 
     @classmethod
@@ -2605,13 +2603,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertIn("<mark>Howells</mark>", r.content.decode())
 
 
-class OralArgumentsSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
-):
+class OralArgumentsSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
     """Oral Arguments Search Decay Relevancy Tests"""
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         # Same keywords but different dateArgued
         with cls.captureOnCommitCallbacks(execute=True):
             cls.docket_old = DocketFactory.create(
@@ -2884,10 +2881,9 @@ class OralArgumentsSearchDecayRelevancyTest(
             self._test_results_ordering(test, "id", version="v3")
 
 
-class OralArgumentIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class OralArgumentIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
     def setUp(self):
+        super().setUp()
         self.court_1 = CourtFactory(
             id="cabc",
             full_name="Testing Supreme Court",
@@ -2900,8 +2896,6 @@ class OralArgumentIndexingTest(
         self.docket_2 = DocketFactory.create(
             court_id=self.court_1.pk, source=Docket.SCRAPER
         )
-
-        super().setUp()
 
     @mock.patch(
         "cl.lib.es_signal_processor.allow_es_audio_indexing",

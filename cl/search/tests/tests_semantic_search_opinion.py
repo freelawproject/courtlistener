@@ -16,7 +16,7 @@ from cl.search.factories import (
     OpinionFactory,
 )
 from cl.search.models import PRECEDENTIAL_STATUS, Docket
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase
 
 
 def mock_read_from_s3(file_path, r):
@@ -29,10 +29,11 @@ def mock_read_from_s3(file_path, r):
     return BytesIO(fake_json)
 
 
-class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
+class OpinionEmbeddingIndexingTests(ESIndexTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         cls.court = CourtFactory(
             id="canb",
             jurisdiction="FB",

@@ -77,16 +77,17 @@ from cl.search.models import (
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import (
     ESIndexTestCase,
+    ESIndexTransactionTestCase,
     TestCase,
-    TransactionTestCase,
 )
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 from cl.users.factories import UserProfileWithParentsFactory
 
 
-class ScraperIngestionTest(ESIndexTestCase, TestCase):
+class ScraperIngestionTest(ESIndexTestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.court = CourtFactory(id="test", jurisdiction="F")
         cls.user_profile = UserProfileWithParentsFactory()
         cls.webhook_enabled = WebhookFactory(
@@ -1056,7 +1057,7 @@ class CommandInputTest(TestCase):
         )
 
 
-class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
+class OpinionVersionTest(ESIndexTransactionTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
