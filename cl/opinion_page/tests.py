@@ -16,7 +16,12 @@ from django.contrib.auth.models import AnonymousUser, Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import connection
-from django.test import AsyncRequestFactory, RequestFactory, override_settings
+from django.test import (
+    AsyncRequestFactory,
+    RequestFactory,
+    SimpleTestCase,
+    override_settings,
+)
 from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -87,7 +92,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
-from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 

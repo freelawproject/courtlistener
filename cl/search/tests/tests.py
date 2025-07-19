@@ -34,7 +34,7 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import AudioTestCase, CourtTestCase, PeopleTestCase
+from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -1560,7 +1560,7 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         )
 
 
-class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
+class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
     These tests should exercise all aspects of using the search box and SERP.
@@ -1574,11 +1574,11 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
+        super().setUp()
         self.pandora_profile = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUp()
 
     def _perform_wildcard_search(self):
         searchbox = self.browser.find_element(By.ID, "id_q")

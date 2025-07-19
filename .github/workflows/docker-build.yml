@@ -11,8 +11,43 @@ env:
   EKS_NAMESPACE: court-listener
 
 jobs:
-  build:
+  get-pr-labels:
     runs-on: ubuntu-latest
+    outputs:
+      labels: ${{ steps.find_pr.outputs.labels }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Find merged PR by merge_commit_sha
+        id: find_pr
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commitSha = context.sha;
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "closed",
+              sort: "updated",
+              direction: "desc",
+              per_page: 1
+            });
+
+            const pr = prs.find(p => p.merge_commit_sha === commitSha);
+            if (!pr) {
+              core.setOutput("labels", "");
+              core.warning("No merged PR found for this commit.");
+              return;
+            }
+
+            const labels = pr.labels.map(l => l.name);
+            core.setOutput("labels", labels.join(","));
+            console.log(`PR #${pr.number} labels: ${labels.join(", ")}`);
+
+  build:
+    needs: get-pr-labels
+    runs-on: ubuntu-latest
+    if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-deploy') }}
     steps:
       - uses: actions/checkout@v4
       - name: Login to Docker Hub
@@ -24,10 +59,11 @@ jobs:
         run: |
           make push-image --file docker/django/Makefile -e VERSION=$(git rev-parse --short HEAD)
 
-  deploy:
-    needs: build
+  setup-deploy:
+    needs: [get-pr-labels, build]
     runs-on: ubuntu-latest
-    concurrency: production
+    outputs:
+      sha_short: ${{ steps.vars.outputs.sha_short }}
     steps:
       - uses: actions/checkout@v4
       - name: Set shortcode
@@ -91,56 +127,125 @@ jobs:
           exit 1
       - name: Delete Temporary Pod
         run: kubectl delete pod -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }}
-      # Rollout new versions one by one (watch "deployments" in k9s)
+
+  # Roll out the application code
+  deploy-python:
+    needs: [get-pr-labels, setup-deploy]
+    runs-on: ubuntu-latest
+    if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-web-deploy') }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Create Kubeconfig with AWS CLI
+        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+
       - name: Rollout cl-python
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener:${{ needs.setup-deploy.outputs.sha_short }}-prod
       - name: Watch cl-python rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-python
-      - name: Rollout cl-celery-prefork
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
-      - name: Watch cl-celery-prefork rollout status
-        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork
 
-      - name: Rollout cl-celery-prefork-bulk
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk cl-celery-prefork-bulk=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
-      - name: Watch cl-celery-prefork-bulk rollout status
-        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk
+  deploy-celery:
+    needs: [get-pr-labels, setup-deploy]
+    runs-on: ubuntu-latest
+    if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-celery-deploy') }}
+    strategy:
+      matrix:
+        deployment:
+          - celery-default
+          - celery-feeds
+          - celery-batch0
+          - celery-batch1
+          - celery-batch2
+          - celery-batch3
+          - celery-etl
+          - celery-iquery
+          - celery-free-pacer-docs
+          - celery-inception
+          - celery-es-sweep
+          - celery-recap-fetch
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Create Kubeconfig with AWS CLI
+        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
-      - name: Rollout cl-celery-prefork-es-sweep
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-es-sweep cl-celery-prefork-es-sweep=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
-      - name: Watch cl-celery-prefork-es-sweep rollout status
-        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-es-sweep
+      - name: Rollout ${{ matrix.deployment }}
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/${{ matrix.deployment }} ${{ matrix.deployment }}=freelawproject/courtlistener:${{ needs.setup-deploy.outputs.sha_short }}-prod
+      - name: Watch ${{ matrix.deployment }} rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/${{ matrix.deployment }}
 
-      - name: Rollout cl-scrape-rss
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss scrape-rss=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
-      - name: Watch cl-scrape-rss rollout status
-        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss
+  deploy-daemons:
+    needs: [get-pr-labels, setup-deploy]
+    if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-daemon-deploy') }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        deployment:
+          - name: cl-scrape-rss
+            image_label: scrape-rss
+          - name: cl-retry-webhooks
+            image_label: retry-webhooks
+          - name: cl-send-rt-percolator-alerts
+            image_label: cl-send-rt-percolator-alerts
+          - name: cl-es-sweep-indexer
+            image_label: sweep-indexer
+          - name: cl-iquery-probe
+            image_label: cl-iquery-probe
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Create Kubeconfig with AWS CLI
+        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
-      - name: Rollout cl-retry-webhooks
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks retry-webhooks=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
-      - name: Watch cl-retry-webhooks rollout status
-        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks
+      - name: Rollout ${{ matrix.deployment.name }}
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/${{ matrix.deployment.name }} ${{ matrix.deployment.image_label }}=freelawproject/courtlistener:${{ needs.setup-deploy.outputs.sha_short }}-prod
+      - name: Watch ${{ matrix.deployment.name }} rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/${{ matrix.deployment.name }}
 
-      - name: Rollout cl-send-rt-percolator-alerts
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-send-rt-percolator-alerts cl-send-rt-percolator-alerts=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
-      - name: Watch cl-send-rt-percolator-alerts rollout status
-        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-send-rt-percolator-alerts
+  deploy-cronjobs:
+    needs: [get-pr-labels, setup-deploy]
+    runs-on: ubuntu-latest
+    if: ${{ !contains(needs.get-pr-labels.outputs.labels, 'skip-cronjob-deploy') }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Create Kubeconfig with AWS CLI
+        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
-      - name: Rollout cl-es-sweep-indexer
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer sweep-indexer=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
-      - name: Watch cl-es-sweep-indexer rollout status
-        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer
-
-      - name: Rollout cl-iquery-probe
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-iquery-probe cl-iquery-probe=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
-      - name: Watch cl-iquery-probe rollout status
-        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-iquery-probe
-
-
-      # Watch "cronjobs" in k9s
       - name: Update cronjobs
         run: |
-          CRONJOB_NAMES=$(kubectl get cronjobs -n court-listener -o jsonpath='{.items.*.metadata.name}' -l image_type=web-prod);
+          CRONJOB_NAMES=$(kubectl get cronjobs -n ${{ env.EKS_NAMESPACE }} -o jsonpath='{.items.*.metadata.name}' -l image_type=web-prod);
           for name in $CRONJOB_NAMES; do
-             kubectl set image -n ${{ env.EKS_NAMESPACE }} CronJob/$name job=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod;
+             kubectl set image -n ${{ env.EKS_NAMESPACE }} CronJob/$name job=freelawproject/courtlistener:${{ needs.setup-deploy.outputs.sha_short }}-prod;
           done;
+
+  # Orchestration job to ensure all deployments complete
+  complete-deploy:
+    needs:
+      [
+        deploy-python,
+        deploy-celery,
+        deploy-daemons,
+        deploy-cronjobs,
+      ]
+    runs-on: ubuntu-latest
+    concurrency: production
+    steps:
+      - name: Deployment Complete
+        run: echo "All deployments and cronjob updates have finished."
