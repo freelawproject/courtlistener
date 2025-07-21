@@ -60,7 +60,7 @@ from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
-    OpinionClusterFactoryMultipleOpinions,
+    OpinionClusterWithMultipleOpinionsFactory,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import TestCase
@@ -1044,7 +1044,7 @@ class TestFactoriesClasses(TestCase):
         court_scotus = CourtFactory(id="scotus")
 
         # Create 3 opinions by default
-        cluster_1 = OpinionClusterFactoryMultipleOpinions(
+        cluster_1 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=court_scotus,
                 case_name="Foo v. Bar",
@@ -1058,7 +1058,7 @@ class TestFactoriesClasses(TestCase):
         self.assertEqual(cluster_1.sub_opinions.all().count(), 3)
 
         # Create 3 opinions specifying type for each one
-        cluster_2 = OpinionClusterFactoryMultipleOpinions(
+        cluster_2 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=court_scotus,
                 case_name="Lorem v. Ipsum",
