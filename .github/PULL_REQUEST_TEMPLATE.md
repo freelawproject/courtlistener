@@ -38,12 +38,18 @@ This PR...
 1. To deploy...
 
 
-## Screenshots
+<!-- DELETE this section if your PR doesn't require screenshots. -->
 <!-- If this changes the front end, please include desktop and mobile screenshots or videos showing the new feature. -->
-**Desktop**
+<details closed>
+<summary><h2>Screenshots</h2></summary>
+<details open>
+<summary><h4>Desktop</h4></summary>
 <!-- YOUR IMAGE(S) HERE -->
-
-**Mobile**
+</details>
+<details open>
+<summary><h4>Mobile</h4></summary>
 <!-- YOUR IMAGE(S) HERE -->
+</details>
+<!-- END DELETE -->
 
 <!-- Thank you for contributing and filling out this form! -->
