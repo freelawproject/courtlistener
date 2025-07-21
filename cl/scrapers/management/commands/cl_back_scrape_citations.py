@@ -9,11 +9,13 @@ downloaded. If we find an Opinion we don't have in the database,
 we ingest it as in a regular scrape
 """
 
+from asgiref.sync import async_to_sync
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
 
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
+from cl.lib.microservice_utils import microservice
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import BadContentError
 from cl.scrapers.management.commands import cl_back_scrape_opinions
@@ -50,23 +52,40 @@ class Command(cl_back_scrape_opinions.Command):
         court = Court.objects.get(id=court_str)
         dup_checker = DupChecker(court, full_crawl=True)
 
+        uses_extract_from_text = False
+        # Check if extract from text is subclassed
+        if getattr(site.__class__, "extract_from_text") != getattr(
+            site.__class__.__base__, "extract_from_text"
+        ):
+            uses_extract_from_text = True
+
         for case in site:
-            citation = case.get("citations")
-            parallel_citation = case.get("parallel_citations")
-            if not citation and not parallel_citation:
+            citations = [case.get("citations"), case.get("parallel_citations")]
+            try:
+                content = get_binary_content(case["download_urls"], site)
+            except BadContentError:
+                continue
+
+            if uses_extract_from_text:
+                # Check for Citation
+                extracted_data = async_to_sync(microservice)(
+                    service="document-extract",
+                    file_type="pdf",
+                    file=content,
+                )
+                doc_content = extracted_data.json().get("content")
+                metadata_dict = site.extract_from_text(doc_content)
+                extracted_citation = metadata_dict.get("Citation", None)
+                citations.append(extracted_citation)
+
+            if not any(citations):
                 logger.debug(
                     "No citation, skipping row for case %s",
                     case.get("case_names"),
                 )
                 continue
 
-            try:
-                content = get_binary_content(case["download_urls"], site)
-            except BadContentError:
-                continue
-
             sha1_hash = sha1(force_bytes(content))
-
             try:
                 cluster = Opinion.objects.get(sha1=sha1_hash).cluster
             except Opinion.DoesNotExist:
@@ -78,13 +97,13 @@ class Command(cl_back_scrape_opinions.Command):
                     "Has a citation '%s'. Will try to ingest all objects",
                     case["case_names"],
                     case["download_urls"],
-                    citation or parallel_citation,
+                    citations,
                 )
 
                 self.ingest_a_case(case, None, True, site, dup_checker, court)
                 continue
 
-            for cite in [citation, parallel_citation]:
+            for cite in citations:
                 if not cite:
                     continue
 
