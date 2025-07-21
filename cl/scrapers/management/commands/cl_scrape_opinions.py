@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any
 
 from asgiref.sync import async_to_sync
+from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
@@ -29,7 +30,6 @@ from cl.scrapers.exceptions import (
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
-    get_binary_content,
     get_child_court,
     get_extension,
     make_citation,
@@ -234,24 +234,43 @@ class Command(ScraperCommand):
         full_crawl: bool = False,
         ocr_available: bool = True,
         backscrape: bool = False,
+        max_wait: int = 20,
     ):
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
         court_str = site.court_id.split(".")[-1].split("_")[0]
         court = Court.objects.get(pk=court_str)
 
-        dup_checker = DupChecker(court, full_crawl=full_crawl)
-        if dup_checker.abort_by_url_hash(site.url, site.hash):
-            logger.debug("Aborting by url hash.")
-            return
+        cache_key = f"{site.court_id}_cases"
+        cases = cache.get(cache_key)
 
-        if site.cookies:
-            logger.info("Using cookies: %s", site.cookies)
+        if not cases:
+            dup_checker = DupChecker(court, full_crawl=full_crawl)
+            if dup_checker.abort_by_url_hash(site.url, site.hash):
+                logger.debug("Aborting by url hash.")
+                return
 
-        logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
+            if site.cookies:
+                logger.info("Using cookies: %s", site.cookies)
+
+            logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
+            cases =  list(enumerate(site))
+
+        if hasattr(site, "get_allowed_requests_in_minutes"):
+            max_cases = site.get_allowed_requests_in_minutes(max_wait)
+            if max_cases:
+                logger.info(
+                    "Limiting to %s cases in the next %s minutes.",
+                    max_cases,
+                    max_wait,
+                )
+                cases = list(cases)
+                cache.set(cache_key, cases[max_cases:])
+                cases = cases[:max_cases]
+
 
         added = 0
-        for i, item in enumerate(site):
+        for i, item in cases:
             try:
                 next_date = site[i + 1]["case_dates"]
             except IndexError:
@@ -295,7 +314,7 @@ class Command(ScraperCommand):
         if item.get("content"):
             content = item.pop("content")
         else:
-            content = get_binary_content(item["download_urls"], site)
+            content = site.download_content(item["download_urls"])
 
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.

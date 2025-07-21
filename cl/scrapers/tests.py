@@ -47,7 +47,6 @@ from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
     case_names_are_too_different,
     check_duplicate_ingestion,
-    get_binary_content,
     get_existing_docket,
     get_extension,
     update_or_create_docket,
@@ -675,44 +674,6 @@ class ScraperContentTypeTest(TestCase):
         self.site = test_opinion_scraper.Site()
         self.site.method = "GET"
         self.logger = logger
-
-    @mock.patch("requests.Session.get")
-    def test_unexpected_content_type(self, mock_get):
-        """Test when content type doesn't match scraper expectation."""
-        mock_get.return_value = self.mock_response
-        self.site.expected_content_types = ["text/html"]
-        self.assertRaises(
-            UnexpectedContentTypeError,
-            get_binary_content,
-            "/dummy/url/",
-            self.site,
-        )
-
-    @mock.patch("requests.Session.get")
-    def test_correct_content_type(self, mock_get):
-        """Test when content type matches scraper expectation."""
-        mock_get.return_value = self.mock_response
-        self.site.expected_content_types = ["application/pdf"]
-
-        with mock.patch.object(self.logger, "error") as error_mock:
-            _ = get_binary_content("/dummy/url/", self.site)
-
-            self.mock_response.headers = {
-                "Content-Type": "application/pdf;charset=utf-8"
-            }
-            mock_get.return_value = self.mock_response
-            _ = get_binary_content("/dummy/url/", self.site)
-            error_mock.assert_not_called()
-
-    @mock.patch("requests.Session.get")
-    def test_no_content_type(self, mock_get):
-        """Test for no content type expected (ie. Montana)"""
-        mock_get.return_value = self.mock_response
-        self.site.expected_content_types = None
-
-        with mock.patch.object(self.logger, "error") as error_mock:
-            _ = get_binary_content("/dummy/url/", self.site)
-            error_mock.assert_not_called()
 
 
 class ScrapeCitationsTest(TestCase):
