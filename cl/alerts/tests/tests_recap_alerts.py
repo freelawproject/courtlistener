@@ -55,7 +55,7 @@ from cl.search.documents import (
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CitationWithParentsFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
     OpinionFactory,
@@ -269,7 +269,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(mock_two_days_before, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -314,7 +314,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de_2 = DocketEntryWithParentsFactory(
+            alert_de_2 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -353,7 +353,7 @@ class RECAPAlertsSweepIndexTest(
                 docket_number="1:21-bk-1254",
                 source=Docket.RECAP,
             )
-            alert_de_old = DocketEntryWithParentsFactory(
+            alert_de_old = DocketEntryFactory(
                 docket=docket_old,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -391,7 +391,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_old_2.document_number = 3
+            rd_old_2.document_number = "3"
             rd_old_2.save()
 
         # Run the indexer. No new documents re_indexed.
@@ -525,7 +525,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -915,7 +915,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1273,7 +1273,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=self.de.docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1367,7 +1367,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=self.de.docket,
                 entry_number=2,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1534,7 +1534,7 @@ class RECAPAlertsSweepIndexTest(
                 )
                 dockets_created.append(docket_created)
 
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1943,7 +1943,7 @@ class RECAPAlertsSweepIndexTest(
             # RECAPDocument filed today that belongs to a docket filed outside
             # the estimation range.
             date_outside_range = now() - datetime.timedelta(days=102)
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Frequency Test RECAP",
@@ -1985,7 +1985,7 @@ class RECAPAlertsSweepIndexTest(
             # RECAPDocument filed today that belongs to a docket filed outside
             # the estimation range.
             date_outside_range = now() - datetime.timedelta(days=102)
-            alert_de_2 = DocketEntryWithParentsFactory(
+            alert_de_2 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Frequency Test RECAP 2",
@@ -2110,7 +2110,7 @@ class RECAPAlertsSweepIndexTest(
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -2414,7 +2414,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -3284,7 +3284,7 @@ class RECAPAlertsPercolatorTest(
             time_machine.travel(self.mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="SUBPOENAS SERVED OFF",
@@ -3353,7 +3353,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de_2 = DocketEntryWithParentsFactory(
+            alert_de_2 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="SUBPOENAS SERVED ON",
@@ -3439,7 +3439,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_2.document_number = 1
+            rd_2.document_number = "2"
             rd_2.save()
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
@@ -3633,7 +3633,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="SUBPOENAS SERVED OFF",
@@ -3701,7 +3701,7 @@ class RECAPAlertsPercolatorTest(
                 if i < 2:
                     docket_case_names.append(docket_created.case_name)
 
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -4069,7 +4069,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -4542,7 +4542,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),

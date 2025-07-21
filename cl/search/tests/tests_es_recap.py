@@ -67,7 +67,6 @@ from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
     DocketEntryFactory,
-    DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
@@ -563,7 +562,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
 
         # Filter by case by docket_number containing repeated numbers like: 1:21-bk-0021
         with self.captureOnCommitCallbacks(execute=True):
-            entry = DocketEntryWithParentsFactory(
+            entry = DocketEntryFactory(
                 docket__docket_number="1:21-bk-0021",
                 docket__court=self.court,
                 docket__source=Docket.RECAP,
@@ -726,7 +725,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
 
         # add a document that is not available to the new docket
         with self.captureOnCommitCallbacks(execute=True):
-            entry = DocketEntryWithParentsFactory(
+            entry = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -785,7 +784,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
                 nature_of_suit="440",
                 source=Docket.RECAP,
             )
-            e_1_d_1 = DocketEntryWithParentsFactory(
+            e_1_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -797,7 +796,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
                 is_available=True,
                 page_count=5,
             )
-            e_2_d_1 = DocketEntryWithParentsFactory(
+            e_2_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=2,
                 date_filed=datetime.date(2015, 8, 19),
@@ -816,7 +815,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
                 docket_number="1:17-cv-04465",
                 source=Docket.RECAP,
             )
-            e_28_d_2 = DocketEntryWithParentsFactory(
+            e_28_d_2 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=28,
                 description="ORDER granting 27 Motion to Continue",
@@ -827,7 +826,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
                 is_available=False,
                 page_count=5,
             )
-            e_29_d_2 = DocketEntryWithParentsFactory(
+            e_29_d_2 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=29,
                 description="ORDER granting 23 Motion for More Definite Statement. Signed by Judge Mary H Murguia",
@@ -844,7 +843,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
                 docket_number="1:17-cv-04465",
                 source=Docket.RECAP,
             )
-            e_14_d_3 = DocketEntryWithParentsFactory(
+            e_14_d_3 = DocketEntryFactory(
                 docket=docket_3,
                 entry_number=14,
                 description="Petition Completed March 29, 2019 Filed by Debtor Kathleen B. Thomas",
@@ -854,7 +853,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
                 document_number="14",
                 is_available=False,
             )
-            e_27_d_3 = DocketEntryWithParentsFactory(
+            e_27_d_3 = DocketEntryFactory(
                 docket=docket_3,
                 entry_number=27,
                 description="Financial Management Course Certificate Filed by Debtor Kathleen B. Thomas",
@@ -1049,7 +1048,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
                 nature_of_suit="440",
                 source=Docket.RECAP,
             )
-            e_1_d_1 = DocketEntryWithParentsFactory(
+            e_1_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -1078,7 +1077,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
                 is_available=True,
                 page_count=5,
             )
-            e_2_d_1 = DocketEntryWithParentsFactory(
+            e_2_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=2,
                 date_filed=datetime.date(2015, 8, 19),
@@ -1113,7 +1112,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
                 ),
                 docket=docket_2,
             )
-            d3 = DocketEntryWithParentsFactory(
+            d3 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=3,
                 date_filed=datetime.date(2015, 8, 19),
@@ -1148,7 +1147,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
                 ),
                 docket=docket_3,
             )
-            d4 = DocketEntryWithParentsFactory(
+            d4 = DocketEntryFactory(
                 docket=docket_3,
                 entry_number=4,
                 date_filed=datetime.date(2015, 8, 19),
@@ -2109,7 +2108,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
         async_to_sync(self._test_article_count)(params, 2, "order score desc")
 
         with self.captureOnCommitCallbacks(execute=True):
-            de_4 = DocketEntryWithParentsFactory(
+            de_4 = DocketEntryFactory(
                 docket=DocketFactory(
                     docket_number="12-1236",
                     court=self.court_2,
@@ -2142,7 +2141,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             )
             index_docket_parties_in_es.delay(de_4.docket.pk)
 
-            de_5 = DocketEntryWithParentsFactory(
+            de_5 = DocketEntryFactory(
                 docket=DocketFactory(
                     docket_number="12-1238",
                     court=self.court_2,
@@ -2157,7 +2156,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             )
 
             # Docket entry with a very old date_filed.
-            de_6 = DocketEntryWithParentsFactory(
+            de_6 = DocketEntryFactory(
                 docket=DocketFactory(
                     docket_number="12-0000",
                     court=self.court_2,
@@ -2403,7 +2402,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
         # Add dockets with no documents
         with self.captureOnCommitCallbacks(execute=True):
             # District document initial document available
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=district_court,
                     case_name="Lorem District vs Complaint Available",
@@ -2436,7 +2435,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             )
 
             # District document initial document not available
-            de_2 = DocketEntryWithParentsFactory(
+            de_2 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=district_court,
                     case_name="Lorem District vs Complaint Not Available",
@@ -2466,7 +2465,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             )
 
             # Appellate document initial not available and not pacer_doc_id
-            de_3 = DocketEntryWithParentsFactory(
+            de_3 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Appellate Complaint Not Available no pacer_doc_id",
@@ -2486,7 +2485,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             )
 
             # Appellate document initial document available
-            de_4 = DocketEntryWithParentsFactory(
+            de_4 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Lorem Appellate vs Complaint Available",
@@ -2510,7 +2509,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             )
 
             # Appellate document notice of appeal not available
-            de_5 = DocketEntryWithParentsFactory(
+            de_5 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Lorem Appellate vs Notice of appeal not Available",
@@ -2540,7 +2539,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             )
             dockets_to_remove.append(empty_docket)
             # Bankruptcy document initial document available
-            de_6 = DocketEntryWithParentsFactory(
+            de_6 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Bankruptcy vs Petition Available",
@@ -2563,7 +2562,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             )
 
             # Bankruptcy document initial document not available
-            de_7 = DocketEntryWithParentsFactory(
+            de_7 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Bankruptcy vs Petition Not Available",
@@ -2896,7 +2895,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
         """
 
         with self.captureOnCommitCallbacks(execute=True):
-            de = DocketEntryWithParentsFactory(
+            de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Howell v. Indiana",
@@ -3080,7 +3079,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             time_machine.travel(mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            entry = DocketEntryWithParentsFactory(
+            entry = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -3207,7 +3206,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             self.captureOnCommitCallbacks(execute=True),
         ):
             # 9 days ago
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Ipsum SUBPOENAS Lorem",
                 docket__case_name_full="",
@@ -3220,7 +3219,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             )
 
             # 40 days ago
-            de_2 = DocketEntryWithParentsFactory(
+            de_2 = DocketEntryFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Ipsum SUBPOENAS Lorem",
                 docket__case_name_full="",
@@ -3233,7 +3232,7 @@ class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
             )
 
             # 400 days ago
-            de_3 = DocketEntryWithParentsFactory(
+            de_3 = DocketEntryFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Ipsum SUBPOENAS Lorem",
                 docket__case_name_full="",
@@ -3322,7 +3321,7 @@ class RECAPSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
             date_filed=datetime.date(1832, 2, 23),
         )
         cls.rd_old = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_old,
                 entry_number=1,
                 description="",
@@ -3341,7 +3340,7 @@ class RECAPSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
             date_filed=datetime.date(2024, 2, 23),
         )
         cls.rd_recent = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_recent,
                 entry_number=1,
                 description="",
@@ -3362,7 +3361,7 @@ class RECAPSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
             date_filed=datetime.date(2022, 2, 23),
         )
         cls.rd_low_relevance = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_low_relevance,
                 entry_number=1,
                 description="",
@@ -3383,7 +3382,7 @@ class RECAPSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
             date_filed=datetime.date(2022, 2, 23),
         )
         cls.rd_high_relevance = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_high_relevance,
                 entry_number=1,
                 description="",
@@ -3405,7 +3404,7 @@ class RECAPSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
             date_filed=datetime.date(1900, 2, 23),
         )
         cls.rd_high_relevance_old_date = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_high_relevance_old_date,
                 entry_number=1,
                 description="",
@@ -3426,7 +3425,7 @@ class RECAPSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
             date_filed=None,
         )
         cls.rd_high_relevance_null_date = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_high_relevance_null_date,
                 entry_number=1,
                 description="",
@@ -3446,7 +3445,7 @@ class RECAPSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
             date_filed=datetime.date(2024, 12, 23),
         )
         cls.rd_low_relevance_new_date = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_low_relevance_new_date,
                 entry_number=1,
                 description="",
@@ -3640,7 +3639,7 @@ class RECAPSearchAPICommonTests(RECAPSearchMixin, TestCase):
         cls.court_api = CourtFactory(
             id="ca9", jurisdiction="F", citation_string="Appeals. CA9."
         )
-        cls.de_api = DocketEntryWithParentsFactory(
+        cls.de_api = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court_api,
                 case_name="America vs API Lorem",
@@ -3696,7 +3695,7 @@ class RECAPSearchAPICommonTests(RECAPSearchMixin, TestCase):
             docket=cls.de_api.docket, trustee_str="Lorem Ipsum"
         )
 
-        cls.de_empty_fields_api = DocketEntryWithParentsFactory(
+        cls.de_empty_fields_api = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court_api,
                 date_reargued=None,
@@ -4634,7 +4633,7 @@ class RECAPSearchAPIV4Test(
 
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             # This Docket will be matched only by its RECAPDocument.
-            docket_entry_recent = DocketEntryWithParentsFactory(
+            docket_entry_recent = DocketEntryFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Lorem Ipsum",
                 docket__case_name_full="",
@@ -4923,7 +4922,7 @@ class RECAPSearchAPIV4Test(
         dockets_to_create = 20
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             for _ in range(dockets_to_create):
-                docket_entry = DocketEntryWithParentsFactory(
+                docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
                 )
                 RECAPDocumentFactory(
@@ -5374,13 +5373,13 @@ class RECAPSearchAPIV4Test(
 
         rds_to_create = settings.RECAP_CHILD_HITS_PER_RESULT + 1
         with self.captureOnCommitCallbacks(execute=True):
-            docket_entry = DocketEntryWithParentsFactory(
+            docket_entry = DocketEntryFactory(
                 docket__source=Docket.RECAP,
             )
             for i in range(rds_to_create):
                 RECAPDocumentFactory(
                     docket_entry=docket_entry,
-                    document_number=i,
+                    document_number=str(i),
                 )
 
         search_params = {
@@ -5477,7 +5476,7 @@ class RECAPSearchAPIV4Test(
         """
 
         with self.captureOnCommitCallbacks(execute=True):
-            de_no_cites = DocketEntryWithParentsFactory(
+            de_no_cites = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
                     date_reargued=None,
@@ -5522,7 +5521,7 @@ class RECAPSearchAPIV4Test(
         """
 
         with self.captureOnCommitCallbacks(execute=True):
-            docket_entry = DocketEntryWithParentsFactory(
+            docket_entry = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
                     source=Docket.RECAP_AND_SCRAPER,
@@ -5562,7 +5561,7 @@ class RECAPSearchAPIV4Test(
         """
 
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            latest_null_date_filed = DocketEntryWithParentsFactory(
+            latest_null_date_filed = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
                     date_reargued=None,
@@ -5707,7 +5706,7 @@ class RECAPSearchAPIV4Test(
         dockets_to_create = 10
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             for _ in range(dockets_to_create):
-                docket_entry = DocketEntryWithParentsFactory(
+                docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
                 )
                 RECAPDocumentFactory(
@@ -6032,7 +6031,7 @@ class RECAPSearchAPIV4Test(
             self.captureOnCommitCallbacks(execute=True),
         ):
             # 9 days ago
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Ipsum SUBPOENAS Lorem",
                 docket__case_name_full="",
@@ -6045,7 +6044,7 @@ class RECAPSearchAPIV4Test(
             )
 
             # 40 days ago
-            de_2 = DocketEntryWithParentsFactory(
+            de_2 = DocketEntryFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Ipsum SUBPOENAS Lorem",
                 docket__case_name_full="",
@@ -6058,7 +6057,7 @@ class RECAPSearchAPIV4Test(
             )
 
             # 400 days ago
-            de_3 = DocketEntryWithParentsFactory(
+            de_3 = DocketEntryFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Ipsum SUBPOENAS Lorem",
                 docket__case_name_full="",
@@ -6153,7 +6152,7 @@ class RECAPFeedTest(RECAPSearchMixin, ESIndexTestCase):
         """Can we make a RECAP Search Feed?"""
         with self.captureOnCommitCallbacks(execute=True):
             # Docket entry without date_filed it should be excluded from feed.
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Ipsum",
@@ -6347,7 +6346,7 @@ class RECAPFeedTest(RECAPSearchMixin, ESIndexTestCase):
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Ipsum",
@@ -6443,7 +6442,7 @@ class IndexDocketRECAPDocumentsCommandTest(ESIndexTransactionTestCase):
             date_argued=datetime.date(2012, 6, 23),
             source=Docket.HARVARD,
         )
-        self.de = DocketEntryWithParentsFactory(
+        self.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 date_filed=datetime.date(2015, 8, 16),
@@ -6464,7 +6463,7 @@ class IndexDocketRECAPDocumentsCommandTest(ESIndexTransactionTestCase):
             attachment_number=2,
             document_type=RECAPDocument.ATTACHMENT,
         )
-        self.de_1 = DocketEntryWithParentsFactory(
+        self.de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 date_filed=datetime.date(2016, 8, 16),
@@ -6883,7 +6882,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
     def test_minute_entry_indexing(self) -> None:
         """Confirm a minute entry can be properly indexed."""
 
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -6904,7 +6903,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
         """Confirm an unnumbered entry which uses the pacer_doc_id as number
         can be properly indexed."""
 
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -6935,7 +6934,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
             source=Docket.HARVARD,
         )
 
-        docket_entry_1 = DocketEntryWithParentsFactory(
+        docket_entry_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED ON",
@@ -6971,7 +6970,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
             pacer_doc_id="018036652436",
         )
 
-        docket_entry_2 = DocketEntryWithParentsFactory(
+        docket_entry_2 = DocketEntryFactory(
             docket=DocketFactory(
                 docket_number="12-1235",
                 court=self.court,
@@ -7021,7 +7020,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
             nature_of_suit="440",
             source=Docket.HARVARD,
         )
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 case_name="Lorem Ipsum",
@@ -7238,7 +7237,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
         self.assertEqual(judge_2.pk, rd_doc.referred_to_id)
 
         # Update docket entry ID.
-        de_2 = DocketEntryWithParentsFactory(
+        de_2 = DocketEntryFactory(
             docket=de_1.docket,
             description="Notification docket entry 2",
         )
@@ -7298,7 +7297,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
         judge_2 = PersonFactory.create(
             name_first="Persephone", name_last="Sinclair"
         )
-        de = DocketEntryWithParentsFactory(
+        de = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 case_name="USA vs Bank Lorem",
@@ -7711,7 +7710,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
                 es_save_document, True, *args, **kwargs
             ),
         ):
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=docket,
                 date_filed=datetime.date(2015, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -7736,7 +7735,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
                 update_es_document, True, *args, **kwargs
             ),
         ):
-            de_2 = DocketEntryWithParentsFactory(
+            de_2 = DocketEntryFactory(
                 docket=docket,
             )
             RECAPDocumentFactory(
@@ -7803,7 +7802,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
         docket_2 = DocketFactory(
             court=self.court, docket_number="21-0000", source=Docket.RECAP
         )
-        de_2 = DocketEntryWithParentsFactory(
+        de_2 = DocketEntryFactory(
             docket=docket_2,
             date_filed=datetime.date(2016, 8, 19),
             description="Notification for Lorem Ipsum",
@@ -8003,7 +8002,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
     def test_remove_control_chars_on_plain_text_indexing(self) -> None:
         """Confirm control chars are removed at indexing time."""
 
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2024, 8, 19),
             entry_number=1,
@@ -8254,7 +8253,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
             case_name="Vargas v. Wilkins",
             source=Docket.RECAP,
         )
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=docket,
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -8262,7 +8261,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
         )
         rd_1 = RECAPDocumentFactory(
             docket_entry=de_1,
-            document_number=1,
+            document_number="1",
             is_available=True,
             page_count=5,
             filepath_local="test.pdf",
@@ -8270,7 +8269,7 @@ class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
         )
         rd_2 = RECAPDocumentFactory(
             docket_entry=de_1,
-            document_number=2,
+            document_number="2",
             is_available=True,
             page_count=10,
             filepath_local="test.pdf",
@@ -8748,7 +8747,7 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase):
             source=Docket.RECAP,
         )
         cls.rd_2 = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_2,
             ),
             document_number="2",
@@ -8764,7 +8763,7 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase):
             source=Docket.RECAP,
         )
         cls.rd_3 = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_3,
             ),
             document_number="3",

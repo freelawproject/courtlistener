@@ -72,7 +72,7 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
                 "SELECT count(*) AS exact_count FROM search_recapdocument"
             )
             filter_clause = """
-            WHERE is_available=True AND page_count>0 AND ocr_status!=1
+            WHERE is_available=True AND page_count>0
             """
         case SEARCH_TYPES.OPINION:
             base_query = (
@@ -151,9 +151,7 @@ def get_custom_query(
     match type:
         case SEARCH_TYPES.RECAP_DOCUMENT:
             base_query = "SELECT id from search_recapdocument"
-            filter_clause = (
-                "WHERE is_available=True AND page_count>0 AND ocr_status!=1"
-            )
+            filter_clause = "WHERE is_available=True AND page_count>0"
         case SEARCH_TYPES.OPINION:
             base_query = (
                 "SELECT O.id "

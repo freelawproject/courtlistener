@@ -131,7 +131,6 @@ from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
-    DocketEntryWithParentsFactory,
     DocketFactory,
     RECAPDocumentFactory,
 )
@@ -167,7 +166,7 @@ class RecapUtilsTest(TestCase):
             pacer_case_id="104490",
         )
         self.rd = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=self.docket,
             ),
             document_number="1",
@@ -815,7 +814,7 @@ class RecapUploadsTest(TestCase):
         use regular numbers. We avoid updating the document_number from the PQ.
         """
 
-        de = DocketEntryWithParentsFactory(
+        de = DocketEntryFactory(
             docket__court=self.court_appellate,
             entry_number=4505578698,
             docket__source=Docket.RECAP,
@@ -892,14 +891,14 @@ class RecapUploadsTest(TestCase):
         """
 
         # Appellate entry
-        de = DocketEntryWithParentsFactory(
+        de = DocketEntryFactory(
             docket__court=self.court_appellate,
             entry_number=1,
             docket__source=Docket.RECAP,
             docket__pacer_case_id="104490",
         )
         # District entry
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket__court=self.court,
             entry_number=1,
             docket__source=Docket.RECAP,
@@ -991,7 +990,7 @@ class RecapUploadsTest(TestCase):
         fixed during an attachment page merge.
         """
 
-        de = DocketEntryWithParentsFactory(
+        de = DocketEntryFactory(
             docket__court=self.court_appellate,
             entry_number=4505578698,
             docket__source=Docket.RECAP,
@@ -1299,9 +1298,7 @@ class RecapUploadsTest(TestCase):
                 )
             ],
         )
-        de = DocketEntryWithParentsFactory(
-            docket__court=self.court, entry_number=5
-        )
+        de = DocketEntryFactory(docket__court=self.court, entry_number=5)
         rd = RECAPDocumentFactory(
             docket_entry=de,
             document_type=RECAPDocument.PACER_DOCUMENT,
@@ -1344,9 +1341,7 @@ class RecapUploadsTest(TestCase):
                 )
             ],
         )
-        de = DocketEntryWithParentsFactory(
-            docket__court=self.court, entry_number=5
-        )
+        de = DocketEntryFactory(docket__court=self.court, entry_number=5)
         RECAPDocumentFactory(
             document_type=RECAPDocument.PACER_DOCUMENT,
             docket_entry=de,
@@ -3053,7 +3048,7 @@ class RecapFetchApiSerializationTestCase(TestCase):
     def test_recap_fetch_validate_court_of_rd(self, mock) -> None:
         """Can we validate the court when fetching a PDF?"""
         rd = RECAPDocumentFactory.create(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket__court=self.court_federal_special
             ),
         )
@@ -3140,7 +3135,7 @@ class RecapPdfFetchApiTest(TestCase):
             docket_number="3:92-cr-00139-T",
             slug="united-states-v-curlin",
         )
-        self.de = DocketEntryWithParentsFactory(
+        self.de = DocketEntryFactory(
             docket=self.docket,
             description=" Memorandum Opinion and Order as to Albert Evans Curlin: Clerk is directed to file a copy of this opinion in the criminal action - Petition in 3:01cv429, filed pursuant to 28:2241, is properly construed as a motion to vacate pursuant to 28:2255 and is denied for failure of pet to file it within the statutory period of limitations.  (Signed by Judge Jerry Buchmeyer on 7/12/2002) (lrl, )",
             entry_number=1,
@@ -3170,10 +3165,10 @@ class RecapPdfFetchApiTest(TestCase):
             pacer_case_id="41651",
         )
         self.appellate_rd = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=self.appellate_docket, entry_number=1208699339
             ),
-            document_number=1208699339,
+            document_number="1208699339",
             pacer_doc_id="1208699339",
             is_available=True,
             page_count=15,
@@ -3330,7 +3325,7 @@ class RecapPdfFetchApiTest(TestCase):
         self, mock_court_accessible, mock_get_cookies
     ):
         rd_acms = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(docket=DocketFactory()),
+            docket_entry=DocketEntryFactory(docket=DocketFactory()),
             pacer_doc_id="784459c4-e2cd-ef11-b8e9-001dd804c0b4",
         )
         fq_acms = PacerFetchQueue.objects.create(
@@ -3420,10 +3415,10 @@ class RecapPdfFetchApiTest(TestCase):
         )
 
         appellate_rd_attachment = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=self.appellate_docket, entry_number=2
             ),
-            document_number=2,
+            document_number="2",
             attachment_number=1,
             pacer_doc_id="01302453788",
             is_available=False,
@@ -3457,7 +3452,7 @@ class RecapAttPageFetchApiTest(TestCase):
             source=Docket.RECAP, court=self.district_court
         )
         self.rd = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=self.district_docket,
             ),
             document_number="1",
@@ -3483,10 +3478,10 @@ class RecapAttPageFetchApiTest(TestCase):
             pacer_case_id=41651,
         )
         self.rd_appellate = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=self.appellate_docket, entry_number=1208699339
             ),
-            document_number=1208699339,
+            document_number="1208699339",
             pacer_doc_id="1208699339",
             attachment_number=1,
             is_available=True,
@@ -3509,7 +3504,7 @@ class RecapAttPageFetchApiTest(TestCase):
             pacer_case_id="5d8e355d-b229-4b16-b00f-7552d2f79d4f",
         )
         self.rd_acms = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=self.acms_docket, entry_number=9
             ),
             document_number=9,
@@ -3884,7 +3879,7 @@ class RecapPdfTaskTest(TestCase):
         self.rd = RECAPDocument.objects.create(
             docket_entry=self.de,
             document_type=RECAPDocument.PACER_DOCUMENT,
-            document_number=1,
+            document_number="1",
             pacer_doc_id="asdf",
             sha1=sha1,
         )
@@ -4022,7 +4017,7 @@ class RecapZipTaskTest(TestCase):
         self.doc12 = RECAPDocument.objects.create(
             docket_entry=self.de,
             document_type=RECAPDocument.PACER_DOCUMENT,
-            document_number=12,
+            document_number="12",
             pacer_doc_id="asdf",
             sha1=doc12_sha1,
         )
@@ -4030,7 +4025,7 @@ class RecapZipTaskTest(TestCase):
         self.doc12_att1 = RECAPDocument.objects.create(
             docket_entry=self.de,
             document_type=RECAPDocument.ATTACHMENT,
-            document_number=12,
+            document_number="12",
             attachment_number=1,
             pacer_doc_id="asdf",
             sha1=doc12_att1_sha1,
@@ -7310,7 +7305,7 @@ class RecapFetchWebhooksTest(TestCase):
         att_page = fakes.FakeAttachmentPage()
         pacer_doc_id = att_page.data["pacer_doc_id"]
         document_number = att_page.data["document_number"]
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket__court=cls.court, entry_number=document_number
         )
         cls.rd = RECAPDocumentFactory(

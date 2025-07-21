@@ -246,6 +246,9 @@ jobs:
       ]
     runs-on: ubuntu-latest
     concurrency: production
+    # Ensure this job runs even if the needs are skipped, to ensure only one deployment
+    # runs at a time.
+    if: always()
     steps:
       - name: Deployment Complete
         run: echo "All deployments and cronjob updates have finished."
