@@ -13,10 +13,10 @@ This PR...
 **This PR should:**
 <!-- The following labels control the deployment of this PR if they’re applied. -->
 <!-- Please put an "X" in the box on ones that apply. -->
+
 <!-- Check here if the entire deployment can be skipped -->
 <!-- This might be the case for a small fix, a tweak to documentation or something like that. -->
 - [ ] `skip-deploy`
-
 <!-- Check here if the web tier can be skipped -->
 <!-- This is the case if you're working on code that doesn't affect the front end, like management commands, tasks, or documentation. -->
 - [ ] `skip-web-deploy`
