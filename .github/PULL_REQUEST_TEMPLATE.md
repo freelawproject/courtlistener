@@ -9,12 +9,6 @@ This fixes...
 This PR...
 
 ## Deployment
-<!-- Deployment instructions. Include things like: -->
-<!-- What extra steps are needed to deploy this beyond the standard deploy? -->
-<!-- Do scripts need to be run or things like that? -->
-<!-- If this is more than a quick thing, a new issue should be created in our infra repo: https://github.com/freelawproject/infrastructure/issues/new (if you don’t have access to it, just put the steps here) -->
-<!-- Please use an ordered list or delete this if no special steps required: -->
-1. To deploy...
 
 **This PR should:**
 <!-- The following labels control the deployment of this PR if they’re applied. -->
@@ -34,6 +28,14 @@ This PR...
 - [ ] `skip-daemon-deploy`
 <!-- Deployment of daemons can be skipped -->
 <!-- This is the case if you haven't updated daemons or the code they depend on. -->
+
+<!-- **If deployment is required:** -->
+<!-- What extra steps are needed to deploy this beyond the standard deploy? -->
+<!-- Do scripts need to be run or things like that? -->
+<!-- If this is more than a quick thing, a new issue should be created in our infra repo: https://github.com/freelawproject/infrastructure/issues/new (if you don’t have access to it, just put the steps here) -->
+<!-- Please use an ordered list or delete this if no special steps are required: -->
+1. To deploy...
+
 
 ## Screenshots
 <!-- If this changes the front end, please include desktop and mobile screenshots or videos showing the new feature. -->
