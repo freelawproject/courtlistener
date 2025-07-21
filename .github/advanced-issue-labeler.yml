@@ -1,0 +1,62 @@
+policy:
+  - section:
+    - id: [component]
+      label:
+        # Needs to be in sync with the issue template dropdown
+        - name: 'alerts'
+          keys: ['Alerts']
+        - name: 'api'
+          keys: ['API']
+        - name: 'caching'
+          keys: ['Caching']
+        - name: 'citator'
+          keys: ['Citator']
+        - name: 'continuous integration'
+          keys: ['Continuous Integration']
+        - name: 'data-quality'
+          keys: ['Data Quality']
+        - name: 'database'
+          keys: ['Database']
+        - name: 'design'
+          keys: ['Design']
+        - name: 'documentation'
+          keys: ['Documentation']
+        - name: 'HTML'
+          keys: ['HTML']
+        - name: 'javascript'
+          keys: ['Javascript']
+        - name: 'judge-db'
+          keys: ['Judge DB']
+        - name: 'oral arguments'
+          keys: ['Oral Arguments']
+        - name: 'performance'
+          keys: ['Performance']
+        - name: 'recap.email'
+          keys: ['@recap.email']
+        - name: 'search'
+          keys: ['Search']
+        - name: 'security'
+          keys: ['Security']
+        - name: 'tests'
+          keys: ['Tests']
+        - name: 'ux'
+          keys: ['Ux']
+        - name: 'visualizations'
+          keys: ['Visualizations']
+        - name: 'webhook'
+          keys: ['Webhook']
+    - id: [severity]
+      label:
+        # Needs to be in sync with the issue template dropdown
+        - name: 'severity: trivial'
+          keys: ['Trivial']
+        - name: 'severity: low'
+          keys: ['Low']
+        - name: 'severity: medium'
+          keys: ['Medium']
+        - name: 'severity: high'
+          keys: ['High']
+        - name: 'severity: critical'
+          keys: ['Critical']
+        
+    
