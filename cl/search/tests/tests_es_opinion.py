@@ -48,7 +48,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
@@ -98,7 +98,7 @@ class OpinionSearchAPICommonTests(
                 full_name="court of the Medical Worries",
             )
             cls.opinion_cluster_4 = (
-                OpinionClusterFactoryWithChildrenAndParents(
+                OpinionClusterWithChildrenAndParentsFactory(
                     case_name="Strickland v. Washington.",
                     case_name_full="Strickland v. Washington.",
                     docket=DocketFactory(
@@ -125,7 +125,7 @@ class OpinionSearchAPICommonTests(
                 )
             )
             cls.opinion_cluster_5 = (
-                OpinionClusterFactoryWithChildrenAndParents(
+                OpinionClusterWithChildrenAndParentsFactory(
                     case_name="Strickland v. Lorem.",
                     case_name_full="Strickland v. Lorem.",
                     date_filed=datetime.date(2020, 8, 15),
@@ -801,7 +801,7 @@ class OpinionV4APISearchTest(
         cluster_to_create = 6
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             for _ in range(cluster_to_create):
-                cluster = OpinionClusterFactoryWithChildrenAndParents(
+                cluster = OpinionClusterWithChildrenAndParentsFactory(
                     docket=DocketFactory(
                         court=self.court_1,
                         source=Docket.HARVARD,
@@ -1228,7 +1228,7 @@ class OpinionsESSearchTest(
             jurisdiction="FB",
             full_name="court of the Medical Worries",
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
             docket=DocketFactory(
@@ -1254,7 +1254,7 @@ class OpinionsESSearchTest(
             scdb_votes_minority=3,
             scdb_votes_majority=6,
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
@@ -4097,7 +4097,7 @@ class OpinionFeedTest(
             jurisdiction="FB",
             full_name="court of the Medical Worries",
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             date_filed=datetime.date(2020, 8, 15),
             docket=DocketFactory(
                 court=court, docket_number="123456", source=Docket.HARVARD
@@ -4331,7 +4331,7 @@ class OpinionFeedTest(
                 id="ca1_test",
                 jurisdiction="FB",
             )
-            o_c = OpinionClusterFactoryWithChildrenAndParents(
+            o_c = OpinionClusterWithChildrenAndParentsFactory(
                 date_filed=datetime.date(2020, 8, 15),
                 docket=DocketFactory(
                     court=court, docket_number="123456", source=Docket.HARVARD

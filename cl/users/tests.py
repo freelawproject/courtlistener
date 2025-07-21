@@ -3864,3 +3864,58 @@ class NeonAccountUpdateTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         create_account_mock.delay.assert_called_once_with(self.up.user.pk)
         update_account_mock.delay.assert_not_called()
+
+
+@patch("cl.users.views.OptInConsentForm.is_valid", new=lambda self: True)
+@patch(
+    "cl.custom_filters.decorators.verify_honeypot_value",
+    new=lambda request, field_name: None,
+)
+class RegisterViewTest(TestCase):
+    async def test_register_with_valid_ascii_username(self) -> None:
+        """Register a user with a valid username."""
+        data = {
+            "username": "admin1",
+            "email": "admin1@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertTrue(await User.objects.filter(username="admin1").aexists())
+
+    async def test_register_rejects_homoglyph_username(self) -> None:
+        """Register a user with an invalid username containing a homoglyph.
+        It must be rejected:
+        """
+
+        invalid_username = "adm" + "\u0456" + "n2"
+        data = {
+            "username": invalid_username,
+            "email": "admin2@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # The user must not be registered.
+        self.assertFalse(
+            await User.objects.filter(username=invalid_username).aexists()
+        )
+
+        form = response.context.get("form")
+        self.assertIsNotNone(form, "Expected 'form' in template context")
+        # The username field should display an error.
+        self.assertIn("username", form.errors)
