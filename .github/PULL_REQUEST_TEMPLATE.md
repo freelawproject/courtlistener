@@ -13,21 +13,22 @@ This PR...
 **This PR should:**
 <!-- The following labels control the deployment of this PR if they’re applied. -->
 <!-- Please put an "X" in the box on ones that apply. -->
-- [ ] `skip-deploy`
-<!-- The entire deployment can be skipped -->
+<!-- Check here if the entire deployment can be skipped -->
 <!-- This might be the case for a small fix, a tweak to documentation or something like that. -->
-- [ ] `skip-web-deploy`
-<!-- The web tier can be skipped -->
+- [ ] `skip-deploy`
+
+<!-- Check here if the web tier can be skipped -->
 <!-- This is the case if you're working on code that doesn't affect the front end, like management commands, tasks, or documentation. -->
-- [ ] `skip-celery-deploy`
-<!-- Deployment to celery can be skipped -->
+- [ ] `skip-web-deploy`
+<!-- Check here if the deployment to celery can be skipped -->
 <!--This is the case if you make no changes to tasks.py or the code that tasks rely on. -->
-- [ ] `skip-cronjob-deploy`
-<!-- Deployment to cron jobs can be skipped -->
+- [ ] `skip-celery-deploy`
+<!-- check this if deployment to cron jobs can be skipped -->
 <!-- This is the case if no changes are made that affect cronjobs. -->
-- [ ] `skip-daemon-deploy`
+- [ ] `skip-cronjob-deploy`
 <!-- Deployment of daemons can be skipped -->
 <!-- This is the case if you haven't updated daemons or the code they depend on. -->
+- [ ] `skip-daemon-deploy`
 
 <!-- **If deployment is required:** -->
 <!-- What extra steps are needed to deploy this beyond the standard deploy? -->
