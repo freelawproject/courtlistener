@@ -58,5 +58,5 @@ policy:
           keys: ['High']
         - name: 'severity: critical'
           keys: ['Critical']
-        
-    
+
+
