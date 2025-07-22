@@ -613,6 +613,56 @@ async def view_recap_document(
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
     """
+    return await recap_document_context(
+        request,
+        docket_id,
+        doc_num,
+        att_num,
+        slug,
+        is_og_bot,
+        "recap_document.html",
+    )
+
+
+async def view_recap_authorities(
+    request: HttpRequest,
+    docket_id: int | None = None,
+    doc_num: int | None = None,
+    att_num: int | None = None,
+    slug: str = "",
+    is_og_bot: bool = False,
+) -> HttpResponse:
+    """This view can display authorities of an attachment or a regular
+    document, depending on the URL pattern that is matched.
+    """
+    response = await recap_document_context(
+        request,
+        docket_id,
+        doc_num,
+        att_num,
+        slug,
+        is_og_bot,
+        "recap_authorities.html",
+    )
+    if isinstance(response, SimpleTemplateResponse):
+        c = response.context
+        c["authorities"] = c["rd"].authorities_with_data
+    return response
+
+
+async def recap_document_context(
+    request: HttpRequest,
+    docket_id: int | None = None,
+    doc_num: int | None = None,
+    att_num: int | None = None,
+    slug: str = "",
+    is_og_bot: bool = False,
+    template: str = "",
+) -> HttpResponse:
+    """
+    Returns an HttpResponse for a RECAPDocument.
+    This can be either an HttpResponseRedirect or a TemplateResponse.
+    """
     rds = [
         x
         async for x in RECAPDocument.objects.filter(
@@ -716,7 +766,7 @@ async def view_recap_document(
 
     return TemplateResponse(
         request,
-        "recap_document.html",
+        template,
         {
             "rd": rd,
             "title": title,
@@ -727,64 +777,6 @@ async def view_recap_document(
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
             "authorities": rd.authorities,
             "attachments": rds if len(rds) > 1 else None,
-        },
-    )
-
-
-async def view_recap_authorities(
-    request: HttpRequest,
-    docket_id: int | None = None,
-    doc_num: int | None = None,
-    att_num: int | None = None,
-    slug: str = "",
-    is_og_bot: bool = False,
-) -> HttpResponse:
-    """This view can display authorities of an attachment or a regular
-    document, depending on the URL pattern that is matched.
-    """
-    rd = (
-        await RECAPDocument.objects.filter(
-            docket_entry__docket__id=docket_id,
-            document_number=doc_num,
-            attachment_number=att_num,
-        )
-        .order_by("pk")
-        .select_related("docket_entry__docket__court")
-        .afirst()
-    )
-    title = make_rd_title(rd)
-    rd = await make_thumb_if_needed(request, rd)
-
-    try:
-        note = await Note.objects.aget(
-            recap_doc_id=rd.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not saved in notes or anonymous user
-        note_form = NoteForm(
-            initial={
-                "recap_doc_id": rd.pk,
-                "name": trunc(title, 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
-
-    # Override the og:url if we're serving a request to an OG crawler bot
-    og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
-    court_id = rd.docket_entry.docket.court.id
-    return TemplateResponse(
-        request,
-        "recap_authorities.html",
-        {
-            "rd": rd,
-            "title": title,
-            "og_file_path": og_file_path_override,
-            "note_form": note_form,
-            "private": True,  # Always True for RECAP docs.
-            "timezone": COURT_TIMEZONES.get(court_id, "US/Eastern"),
-            "authorities": rd.authorities_with_data,
         },
     )
 
