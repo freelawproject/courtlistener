@@ -663,24 +663,20 @@ async def recap_document_context(
     Returns an HttpResponse for a RECAPDocument.
     This can be either an HttpResponseRedirect or a TemplateResponse.
     """
-    rds = [
+
+    # Tuples of (pk, attachment_number, description)
+    rd_values = [
         x
         async for x in RECAPDocument.objects.filter(
             docket_entry__docket__id=docket_id,
             document_number=doc_num,
         )
         .order_by("pk")
-        .select_related("docket_entry__docket__court")
-        .annotate(
-            authorities=Exists(
-                OpinionsCitedByRECAPDocument.objects.filter(
-                    citing_document=OuterRef("pk")
-                )
-            )
-        )
+        .values_list("pk", "attachment_number", "description")
     ]
-    if rds_tmp := list(filter(lambda x: x.attachment_number == att_num, rds)):
-        rd: RECAPDocument = rds_tmp[0]
+
+    if rd_values_tmp := list(filter(lambda x: x[1] == att_num, rd_values)):
+        rd_value = rd_values_tmp[0]
     else:
         # Unable to find the docket entry the normal way. In appellate courts, this
         # can be because the main document was converted to an attachment, leaving no
@@ -693,7 +689,7 @@ async def recap_document_context(
         if att_num:
             raise Http404("No RECAPDocument matches the given query.")
 
-        if list(filter(lambda x: x.attachment_number == 1, rds)):
+        if list(filter(lambda x: x[1] == 1, rd_values)):
             # Get the URL to the attachment page and use the querystring
             # if the request included one
             attachment_page = reverse(
@@ -710,6 +706,20 @@ async def recap_document_context(
             return HttpResponseRedirect(attachment_page)
 
         raise Http404("No RECAPDocument matches the given query.")
+
+    rd = (
+        await RECAPDocument.objects.select_related(
+            "docket_entry__docket__court"
+        )
+        .annotate(
+            authorities=Exists(
+                OpinionsCitedByRECAPDocument.objects.filter(
+                    citing_document=OuterRef("pk")
+                )
+            )
+        )
+        .aget(pk=rd_value[0])
+    )
 
     # Check if the user has requested automatic redirection to the document
     redirect_to_pacer_modal = False
@@ -764,6 +774,9 @@ async def recap_document_context(
 
     court_id = rd.docket_entry.docket.court.id
 
+    # Generate attachment info
+    attachments = get_attachment_values(rd, rd_values)
+
     return TemplateResponse(
         request,
         template,
@@ -776,9 +789,86 @@ async def recap_document_context(
             "timezone": COURT_TIMEZONES.get(court_id, "US/Eastern"),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
             "authorities": rd.authorities,
-            "attachments": rds if len(rds) > 1 else None,
+            "attachments": attachments,
         },
     )
+
+
+def get_attachment_values(
+    rd: RECAPDocument, rd_values: list[list[int | str | None]]
+) -> list[dict[str, Any]]:
+    """
+    Moved this out of recap_document_context because it is easily severable and
+    just clutters it up.
+    """
+
+    # How many documents to return
+    max_displayed = 20
+    # How many of those should be previous docs
+    max_before = 3  # includes current doc
+    attachments = []
+    if (doc_len := len(rd_values)) > 1:
+        if doc_len <= max_displayed + 2:
+            # Add two because there is no point having summaries like "plus one
+            # additional document" when we could have just shown it.
+            start = 0
+            end = doc_len
+        else:
+            rd_index = (
+                rd_values.index((rd.pk, rd.attachment_number, rd.description))
+                + 1
+            )
+            max_after = max_displayed - max_before
+            # If there aren't enough after docs to fill max_displayed,
+            # display additional before docs.
+            if (under_max := doc_len - (rd_index + 1 + max_after)) < 0:
+                max_before -= under_max  # under_max is negative
+            if rd_index - max_before <= 1:
+                start = 0
+            elif rd_index > max_before:
+                # Add a description-only with the number of additional
+                # documents before
+                attachments.append(
+                    {
+                        "attachment_number": None,
+                        "url": "",
+                        "description": f"...and {rd_index - max_before} previous",
+                    }
+                )
+                # This shouldn't be able to go negative, but just making sure.
+                start = rd_index - max_before
+            end = rd_index + 1 + max_after  # Doesn't matter if this is over
+        # Save rd values
+        rd_attachment_number = rd.attachment_number
+        rd_document_type = rd.document_type
+        # Now loop through and build attachment dicts.
+        for rdv in rd_values[start:end]:
+            # To get the correct URL, modify the RECAPDocument object we have
+            rd.attachment_number = rdv[1]
+            if rd.attachment_number:
+                rd.document_type = rd.ATTACHMENT
+            else:
+                rd.document_type = rd.PACER_DOCUMENT
+            attachments.append(
+                {
+                    "attachment_number": rdv[1],
+                    "url": rd.get_absolute_url(),
+                    "description": rdv[2],
+                }
+            )
+        # Reset rd
+        rd.attachment_number = rd_attachment_number
+        rd.document_type = rd_document_type
+
+        if end < doc_len:
+            attachments.append(
+                {
+                    "attachment_number": None,
+                    "url": "",
+                    "description": f"...and {doc_len - end} more",
+                }
+            )
+    return attachments
 
 
 async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:

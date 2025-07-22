@@ -274,7 +274,7 @@ class ViewRecapDocumentTest(TestCase):
         self.assertIsNotNone(c["timezone"])
         self.assertFalse(c["redirect_to_pacer_modal"])
         self.assertFalse(c["authorities"])
-        self.assertIsNone(c["attachments"])
+        self.assertFalse(c["attachments"])
 
     async def test_invalid_attachment(self) -> None:
         rd = await sync_to_async(RECAPDocumentFactory)(
@@ -301,8 +301,16 @@ class ViewRecapDocumentTest(TestCase):
         c = r.context
         self.assertEqual(ra, c["rd"])
         self.assertEqual(
-            [x async for x in ra.docket_entry.recap_documents.all()],
-            c["attachments"],
+            set([rd.attachment_number, ra.attachment_number]),
+            {x["attachment_number"] for x in c["attachments"]},
+        )
+        self.assertEqual(
+            set([rd.description, ra.description]),
+            {x["description"] for x in c["attachments"]},
+        )
+        self.assertEqual(
+            set([rd.get_absolute_url(), ra.get_absolute_url()]),
+            {x["url"] for x in c["attachments"]},
         )
 
     async def test_redirect_to_attachment(self) -> None:

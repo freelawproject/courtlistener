@@ -21,31 +21,22 @@
 
       <ul class="dropdown-menu">
         {% for doc in attachments %}
-          <li {% if doc == rd %}class="disabled"{% endif %}>
-            {% flag "alt-attachment-button" %}
+          <li {% if doc.attachment_number == rd.attachment_number or not doc.url %}class="disabled"{% endif %}>
+            {% if not doc.url %}
+              <span style="font-size:21px; font-weight:500; padding:3px 18px;">{{ doc.description }}</span>
+            {% else %}
               <a
-                href="{% if doc != rd %}{{ doc.get_absolute_url }}{% else %}#{% endif %}"
+                href="{% if doc.attachment_number != rd.attachment_number %}{{ doc.url }}{% else %}#{% endif %}"
                 style="font-size:21px; font-weight:500; padding:3px 18px;"
-                title="{% if doc.description %}{{ doc.description }}{% elif doc.attachment_number%}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ doc.document_number }}{% endif %}"
+                title="{% if doc.description %}{{ doc.description }}{% elif doc.attachment_number%}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ rd.document_number }}{% endif %}"
               >
-                {% if doc.attachment_number %}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ doc.document_number }}{% endif %}
+                {% if doc.attachment_number %}#{{ doc.attachment_number }}{% else %}Document #{{ rd.document_number }}{% endif %}
                 {% if doc.description %}
                   <span class="gray">&mdash;</span>
                   {{ doc.description }}
                 {% endif %}
               </a>
-            {% else %}
-              <a
-                href="{% if doc != rd %}{{ doc.get_absolute_url }}{% else %}#{% endif %}"
-                style="font-size:21px; font-weight:500; padding:3px 18px;"
-                title="{% if doc.attachment_number %}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ doc.document_number }}{% endif %}"
-              >
-                {% if doc.description %}{{ doc.description }}
-                  <span class="gray">&mdash;</span>
-                {% endif %}
-                {% if doc.attachment_number %}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ doc.document_number }}{% endif %}
-              </a>
-            {% endflag %}
+            {% endif %}
           </li>
         {% endfor %}
       </ul>
