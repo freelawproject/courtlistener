@@ -228,13 +228,25 @@ class Command(ScraperCommand):
             help="Disable duplicate aborting.",
         )
 
+        parser.add_argument(
+            "--max_wait",
+            dest="max_wait",
+            type=int,
+            default=30,
+            help=(
+                "The maximum number of minutes to wait for a site to"
+                " return results. If the site has a method "
+                "`get_allowed_requests_in_minutes`, it will be used to "
+            )
+        )
+
     def scrape_court(
         self,
         site,
         full_crawl: bool = False,
         ocr_available: bool = True,
         backscrape: bool = False,
-        max_wait: int = 20,
+        max_wait: int = 30,
     ):
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
@@ -380,7 +392,7 @@ class Command(ScraperCommand):
 
     def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site(save_response_fn=save_response).parse()
-        self.scrape_court(site, options["full_crawl"])
+        self.scrape_court(site, options["full_crawl"], max_wait=options["max_wait"])
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
