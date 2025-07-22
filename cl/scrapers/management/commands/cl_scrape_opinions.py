@@ -237,7 +237,7 @@ class Command(ScraperCommand):
                 "The maximum number of minutes to wait for a site to"
                 " return results. If the site has a method "
                 "`get_allowed_requests_in_minutes`, it will be used to "
-            )
+            ),
         )
 
     def scrape_court(
@@ -266,7 +266,7 @@ class Command(ScraperCommand):
                 logger.info("Using cookies: %s", site.cookies)
 
             logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
-            cases =  list(enumerate(site))
+            cases = list(enumerate(site))
 
         if hasattr(site, "get_allowed_requests_in_minutes"):
             max_cases = site.get_allowed_requests_in_minutes(max_wait)
@@ -279,7 +279,6 @@ class Command(ScraperCommand):
                 cases = list(cases)
                 cache.set(cache_key, cases[max_cases:])
                 cases = cases[:max_cases]
-
 
         added = 0
         for i, item in cases:
@@ -392,7 +391,9 @@ class Command(ScraperCommand):
 
     def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site(save_response_fn=save_response).parse()
-        self.scrape_court(site, options["full_crawl"], max_wait=options["max_wait"])
+        self.scrape_court(
+            site, options["full_crawl"], max_wait=options["max_wait"]
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)

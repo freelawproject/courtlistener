@@ -1,21 +1,17 @@
 import json
-import os
 import re
 from datetime import date, datetime
 from urllib.parse import urljoin
 
 import httpx
-import requests
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
-from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db.models import Q
 from eyecite.find import get_citations
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
-from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 from reporters_db import REPORTERS
 from requests import Response, Session
@@ -26,11 +22,6 @@ from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.lib.storage import S3GlacierInstantRetrievalStorage
 from cl.recap.mergers import find_docket_object
-from cl.scrapers.exceptions import (
-    EmptyFileError,
-    NoDownloadUrlError,
-    UnexpectedContentTypeError,
-)
 from cl.search.models import Citation, Court, Docket, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")

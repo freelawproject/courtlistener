@@ -25,7 +25,6 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
     SingleDuplicateError,
-    UnexpectedContentTypeError,
 )
 from cl.scrapers.management.commands import (
     cl_back_scrape_citations,
