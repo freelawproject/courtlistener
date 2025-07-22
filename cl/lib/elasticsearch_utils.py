@@ -2708,8 +2708,8 @@ def build_semantic_query(
     # Extract quoted phrases from the input string (for exact keyword matching)
     exact_keywords = re.findall(r'"([^"]*)"', text_query)
 
-    # Join extracted phrases with AND to form a keyword query string
-    keyword_query = " AND ".join([f'"{s}"' for s in exact_keywords])
+    # Join extracted phrases to form a keyword query string
+    keyword_query = " ".join([f'"{s}"' for s in exact_keywords])
 
     # Remove quotes from the query to prepare for embedding
     cleaned_text_query = text_query.replace('"', "")
