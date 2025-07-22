@@ -542,6 +542,9 @@ async def docket_authorities(
 
 
 def make_rd_title(rd: RECAPDocument) -> str:
+    """
+    This will result in three database loads if rd hasn't already cached the objects.
+    """
     de = rd.docket_entry
     d = de.docket
     court = d.court
