@@ -191,6 +191,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 
 
 @override_settings(KNN_SIMILARITY=0.3)
+@override_settings(KNN_SEARCH_ENABLED=True)
 @mock.patch("cl.lib.elasticsearch_utils.microservice")
 class SemanticSearchTests(ESIndexTestCase, TestCase):
     @classmethod

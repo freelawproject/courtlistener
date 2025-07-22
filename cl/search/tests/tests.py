@@ -1559,6 +1559,7 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
             r.data["detail"], "The query contains unbalanced parentheses."
         )
 
+    @override_settings(KNN_SEARCH_ENABLED=True)
     async def test_handle_long_semantic_input(self) -> None:
         """Can we properly handle the InputTooLongError exception?"""
         params = {
