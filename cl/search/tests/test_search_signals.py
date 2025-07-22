@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 from django.db.models.signals import post_save
 
 from cl.search.factories import (
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import RECAPDocument
@@ -23,7 +23,7 @@ class RECAPDocumentSignalTests(TestCase):
         recap_doc = RECAPDocumentFactory.create(
             plain_text="In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020), the Second Circuit held that in the context of settlement of FLSA and NYLL cases, which must be approved by the trial court in accordance with Cheeks v. Freeport Pancake House, Inc., 796 F.3d 199 (2d Cir. 2015), the district court abused its discretion in limiting the amount of recoverable fees to a percentage of the recovery by the successful plaintiffs. But also: sdjnfdsjnk. Fisher, 948 F.3d at 597.",
             ocr_status=RECAPDocument.OCR_UNNECESSARY,
-            docket_entry=DocketEntryWithParentsFactory(),
+            docket_entry=DocketEntryFactory(),
         )
 
         recap_doc.save(update_fields=["ocr_status", "plain_text"])
@@ -70,7 +70,7 @@ class RECAPDocumentReceiverTests(TestCase):
                     recap_doc = RECAPDocumentFactory.create(
                         plain_text='"During the whole of his trip down town and return[,] Cornish had been ill, the journey being marked by frequent interruptions necessitated by the condition of his stomach and bowels. People v. Molineux, 168 NY 264, 275-276 (N.Y. 1901)."',
                         ocr_status=test_case.ocr_status,
-                        docket_entry=DocketEntryWithParentsFactory(),
+                        docket_entry=DocketEntryFactory(),
                     )
 
                     recap_doc.save(update_fields=test_case.update_fields)
