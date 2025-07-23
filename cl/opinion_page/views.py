@@ -648,7 +648,7 @@ async def view_recap_authorities(
         "recap_authorities.html",
     )
     if isinstance(response, SimpleTemplateResponse):
-        c = response.context
+        c = response.context  # type: ignore[attr-defined]
         c["authorities"] = c["rd"].authorities_with_data
     return response
 
@@ -656,7 +656,7 @@ async def view_recap_authorities(
 async def recap_document_context(
     request: HttpRequest,
     docket_id: int | None = None,
-    doc_num: int | None = None,
+    doc_num: str | None = None,
     att_num: int | None = None,
     slug: str = "",
     og_bot: bool = False,
@@ -671,7 +671,7 @@ async def recap_document_context(
     rd_values = [
         x
         async for x in RECAPDocument.objects.filter(
-            docket_entry__docket__id=docket_id,
+            docket_entry__docket_id=docket_id,
             document_number=doc_num,
         )
         .order_by("pk")
@@ -780,8 +780,8 @@ async def recap_document_context(
         existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
 
     # Merge counts and existing prayer status to RECAPDocuments.
-    rd.prayer_count = prayer_counts.get(rd.id, 0)
-    rd.prayer_exists = existing_prayers.get(rd.id, False)
+    rd.prayer_count = prayer_counts.get(rd.id, 0)  # type: ignore[attr-defined]
+    rd.prayer_exists = existing_prayers.get(rd.id, False)  # type: ignore[attr-defined]
 
     court_id = rd.docket_entry.docket.court.id
 
@@ -806,8 +806,8 @@ async def recap_document_context(
 
 
 def get_attachment_values(
-    rd: RECAPDocument, rd_values: list[list[int | str | None]]
-) -> list[dict[str, Any]]:
+    rd: RECAPDocument, rd_values: list[tuple[int, int | None, str]]
+) -> list[dict[str, str | int | None]]:
     """
     Moved this out of recap_document_context because it is easily severable and
     just clutters it up.
