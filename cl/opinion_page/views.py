@@ -27,7 +27,7 @@ from django.shortcuts import (  # type: ignore[attr-defined]
     aget_object_or_404,
     render,
 )
-from django.template.response import TemplateResponse
+from django.template.response import SimpleTemplateResponse, TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
@@ -608,7 +608,7 @@ def download_docket_entries_csv(
 async def view_recap_document(
     request: HttpRequest,
     docket_id: int | None = None,
-    doc_num: int | None = None,
+    doc_num: str | None = None,
     att_num: int | None = None,
     slug: str = "",
     is_og_bot: bool = False,
@@ -630,7 +630,7 @@ async def view_recap_document(
 async def view_recap_authorities(
     request: HttpRequest,
     docket_id: int | None = None,
-    doc_num: int | None = None,
+    doc_num: str | None = None,
     att_num: int | None = None,
     slug: str = "",
     is_og_bot: bool = False,
@@ -659,7 +659,7 @@ async def recap_document_context(
     doc_num: int | None = None,
     att_num: int | None = None,
     slug: str = "",
-    is_og_bot: bool = False,
+    og_bot: bool = False,
     template: str = "",
 ) -> HttpResponse:
     """
@@ -743,7 +743,15 @@ async def recap_document_context(
                 redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)
-    rd = await make_thumb_if_needed(request, rd)
+    needs_thumb = rd.thumbnail_status != THUMBNAIL_STATUSES.COMPLETE
+    if all([needs_thumb, rd.has_valid_pdf, is_og_bot(request)]):
+        await make_png_thumbnail_for_instance(
+            pk=rd.pk,
+            klass=RECAPDocument,
+            max_dimension=1068,
+        )
+        await rd.arefresh_from_db(fields=["thumbnail_status", "thumbnail"])
+
     try:
         note = await Note.objects.aget(
             recap_doc_id=rd.pk,
@@ -761,7 +769,7 @@ async def recap_document_context(
         note_form = NoteForm(instance=note)
 
     # Override the og:url if we're serving a request to an OG crawler bot
-    og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
+    og_file_path_override = f"/{rd.filepath_local}" if og_bot else None
 
     prayer_counts = await get_prayer_counts_in_bulk([rd])
     existing_prayers = {}
