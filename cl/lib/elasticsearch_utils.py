@@ -2967,7 +2967,9 @@ def build_full_join_es_queries(
                     minimum_should_match=1,
                 )
         should_append_parent_query = (
-            parent_query and not mlt_query and not is_semantic_query
+            parent_query
+            and not mlt_query
+            and not (is_semantic_query and cd.get("q", ""))
         ) or keyword_text_query
         if should_append_parent_query:
             q_should.append(parent_query)
