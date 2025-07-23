@@ -74,7 +74,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
@@ -739,7 +739,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -754,7 +754,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="3",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -769,7 +769,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -784,7 +784,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -817,7 +817,7 @@ class CitationRedirectorTest(TestCase):
             reporter="U.S.",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="scotus")
@@ -868,7 +868,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="40M",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=df,
                 case_name="People v. Davis",
@@ -1744,7 +1744,7 @@ class TestBlockSearchItemAjax(TestCase):
         # Courts
         court_ca2 = CourtFactory(id="ca2")
         # cluster
-        cls.cluster = OpinionClusterFactoryWithChildrenAndParents(
+        cls.cluster = OpinionClusterWithChildrenAndParentsFactory(
             docket=DocketFactory(court=court_ca2),
             case_name="Fisher v. SD Protection Inc.",
             date_filed=date(2020, 1, 1),

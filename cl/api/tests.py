@@ -95,7 +95,7 @@ from cl.search.api_views import (
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -210,7 +210,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
         cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FD")
 
-        cls.c_scotus_1 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_scotus_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             docket=DocketFactory(
                 court=cls.court_scotus, docket_number="123456"
@@ -218,7 +218,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             date_filed=date(2000, 8, 15),
         )
-        cls.c_scotus_2 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_scotus_2 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="America vs Bank",
             docket=DocketFactory(
                 court=cls.court_scotus, docket_number="34-2535"
@@ -226,7 +226,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             precedential_status=PRECEDENTIAL_STATUS.ERRATA,
             date_filed=date(2024, 6, 15),
         )
-        cls.c_cand_1 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_cand_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Johnson v. National",
             docket=DocketFactory(
                 court=cls.court_cand, docket_number="36-2000"
