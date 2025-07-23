@@ -2,7 +2,12 @@ document.addEventListener('alpine:init', () => {
   Alpine.store('corpusSearch', {
     scopeMenuExpanded: false,
     selected: 'Case Law',
-    searchScopes: [{ label: 'Case Law' }, { label: 'RECAP Archive' }, { label: 'Oral Arguments' }, { label: 'Judges' }],
+    searchScopes: [
+      { label: 'Case Law', type: 'o' },
+      { label: 'RECAP Archive', type: 'r' },
+      { label: 'Oral Arguments', type: 'oa' },
+      { label: 'Judges', type: 'p' },
+    ],
   });
   Alpine.data('search', () => ({
     get scopeMenuExpanded() {
@@ -10,6 +15,11 @@ document.addEventListener('alpine:init', () => {
     },
     get selectedScope() {
       return this.$store.corpusSearch.selected;
+    },
+    get selectedScopeType() {
+      const index = this.searchScopes.findIndex((scope) => scope.label === this.selectedScope);
+      if (index === -1) return 'o';
+      return this.searchScopes[index].type;
     },
     get searchScopes() {
       return this.$store.corpusSearch.searchScopes;

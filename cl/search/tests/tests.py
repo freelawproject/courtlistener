@@ -3,7 +3,7 @@ import io
 import re
 from http import HTTPStatus
 from unittest import mock
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote_plus
 
 import pytz
 import time_machine
@@ -34,7 +34,7 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import AudioTestCase, CourtTestCase, PeopleTestCase
+from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -57,10 +57,10 @@ from cl.search.documents import (
 from cl.search.exception import InvalidRelativeDateSyntax
 from cl.search.factories import (
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
@@ -338,7 +338,7 @@ class DocketValidationTest(TestCase):
 class RECAPDocumentValidationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.docket_entry = DocketEntryWithParentsFactory()
+        cls.docket_entry = DocketEntryFactory()
 
     def test_attachment_with_attachment_number(self):
         """Attachments with attachment_number should not raise ValidationError."""
@@ -422,7 +422,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             id="ga_child_l1_1", jurisdiction="FB", parent_court=cls.court_gand
         )
 
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
             docket=DocketFactory(
@@ -436,7 +436,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             docket=DocketFactory(court=cls.court, docket_number="123456"),
@@ -447,7 +447,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 plain_text="Motion",
             ),
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="America vs Bank",
             case_name_full="America vs Bank",
             docket=DocketFactory(
@@ -460,7 +460,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 plain_text="Strickland Motion 247",
             ),
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Johnson v. National",
             case_name_full="Johnson v. National",
             docket=DocketFactory(
@@ -475,7 +475,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             ),
         )
 
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="California v. Nevada",
             case_name_full="California v. Nevada",
             docket=DocketFactory(
@@ -1559,8 +1559,22 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
             r.data["detail"], "The query contains unbalanced parentheses."
         )
 
+    @override_settings(KNN_SEARCH_ENABLED=True)
+    async def test_handle_long_semantic_input(self) -> None:
+        """Can we properly handle the InputTooLongError exception?"""
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "This is a test" * 100,
+            "semantic": True,
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("The input is too long to process.", r.data["detail"])
 
-class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
+
+class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
     These tests should exercise all aspects of using the search box and SERP.
@@ -1574,11 +1588,11 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
+        super().setUp()
         self.pandora_profile = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUp()
 
     def _perform_wildcard_search(self):
         searchbox = self.browser.find_element(By.ID, "id_q")
@@ -1672,7 +1686,6 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
             "Citations:",
             "Docket Number:",
             "Nature of Suit:",
-            "Posture:",
             "Full Case Name:",
         ]
         for header in headers:
@@ -1833,7 +1846,8 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         # Dora remembers this Lissner guy and wonders if he's been involved
         # in any litigation. She types his name into the search box and hits
         # Enter
-        search_box.send_keys("lissner")
+        test_query_box = 'lissner OR "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce rutrumd"'
+        search_box.send_keys(test_query_box)
         search_box.submit()
 
         # The browser brings her to a search engine result page with some
@@ -1843,7 +1857,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
 
         self.assertIn("1 Opinion", result_count.text)
         search_box = get_with_wait(wait, (By.ID, "id_q"))
-        self.assertEqual("lissner", search_box.get_attribute("value"))
+        self.assertEqual(test_query_box, search_box.get_attribute("value"))
 
         facet_sidebar = get_with_wait(wait, (By.ID, "extra-search-fields"))
         self.assertIn("Precedential Status", facet_sidebar.text)
@@ -1871,14 +1885,16 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         btn.click()
 
         # After logging in, she goes to the homepage. From there, she goes back
-        # to where she was, which still has "lissner" in the search box.
+        # to where she was, which still has
+        # 'lissner OR "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce rutrumd"'
+        # in the search box.
         self.browser.get(results_url)
         page_text = get_with_wait(wait, (By.TAG_NAME, "body")).text
         self.assertNotIn(
             "Please enter a correct username and password.", page_text
         )
         search_box = get_with_wait(wait, (By.ID, "id_q"))
-        self.assertEqual("lissner", search_box.get_attribute("value"))
+        self.assertEqual(test_query_box, search_box.get_attribute("value"))
 
         # She now opens the modal for the form for creating an alert
         alert_bell = get_with_wait(
@@ -1895,7 +1911,14 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
         self.assertIn("How often should we notify you?", page_text)
-        get_with_wait(wait, (By.ID, "id_name"))
+        alert_name = get_with_wait(wait, (By.ID, "id_name"))
+        # Confirm the Alert name is truncated to 75 chars.
+        self.assertEqual(
+            len(alert_name.get_attribute("value")),
+            75,
+            "The Alert name doesn't match its size.",
+        )
+
         get_with_wait(wait, (By.ID, "id_rate"))
         btn = get_with_wait(wait, (By.ID, "alertSave"))
         self.assertEqual("Create Alert", btn.text)
@@ -1939,7 +1962,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         # We are taking advantage of the queries done with authenticated and
         # anonymous user to see if SearchQuery collection is working
         lookup = {
-            "get_params": "q=lissner",
+            "get_params": f"q={quote_plus(test_query_box)}",
             "user": None,
             "query_time_ms__gte": 0,
         }
@@ -2608,7 +2631,7 @@ class ESIndexingTasksUtils(TestCase):
             how_selected="e_part",
             nomination_process="fed_senate",
         )
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 docket_number="12-09876",
@@ -2768,7 +2791,7 @@ class SweepIndexerCommandTest(
     def setUpTestData(cls):
         super().setUpTestData()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 date_filed=datetime.date(2015, 8, 16),
@@ -2789,7 +2812,7 @@ class SweepIndexerCommandTest(
             attachment_number=2,
             document_type=RECAPDocument.ATTACHMENT,
         )
-        cls.de_1 = DocketEntryWithParentsFactory(
+        cls.de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 date_filed=datetime.date(2016, 8, 16),

@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import operator
 import re
@@ -33,6 +34,7 @@ from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.date_time import midnight_pt
+from cl.lib.microservice_utils import microservice
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
     ApiPositionMapping,
@@ -82,6 +84,7 @@ from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
     ElasticBadRequestError,
+    InputTooLongError,
     InvalidRelativeDateSyntax,
     QueryType,
     UnbalancedParenthesesQuery,
@@ -1106,6 +1109,9 @@ def build_has_child_query(
     highlight_options, fields_to_exclude = build_highlights_dict(
         highlighting_fields, hl_tag, child_highlighting
     )
+
+    if child_type == "opinion":
+        fields_to_exclude.append("embeddings")
 
     inner_hits = {
         "name": f"filter_query_inner_{child_type}",
@@ -2679,6 +2685,73 @@ def apply_custom_score_to_main_query(
     return query
 
 
+def build_semantic_query(
+    text_query: str, fields: list[str], filters: list[QueryString | Range]
+) -> tuple[str, list[Query]]:
+    """
+    Build a hybrid Elasticsearch query using both exact keyword matching and
+    semantic vector search.
+
+    :param text_query: The raw user query string, which may include quoted
+        phrases for exact matching.
+    :param fields: A list of fields to target with the full-text keyword query.
+    :param filters: A list of filter clauses to apply as pre-filtering to the
+        semantic KNN search query.
+    :return: A two-tuple:
+        - keyword_query: A string representing the AND-joined quoted phrases, if any.
+        - semantic_query: A list of Elasticsearch Q objects, including the KNN vector search
+          and optionally a keyword-based full-text query.
+    :raises InputTooLongError: If the cleaned query string exceeds the maximum allowed length
+        for generating embeddings.
+    """
+    semantic_query: list[Query] = []
+    # Extract quoted phrases from the input string (for exact keyword matching)
+    exact_keywords = re.findall(r'"([^"]*)"', text_query)
+
+    # Join extracted phrases to form a keyword query string
+    keyword_query = " ".join([f'"{s}"' for s in exact_keywords])
+
+    # Remove quotes from the query to prepare for embedding
+    cleaned_text_query = text_query.replace('"', "")
+
+    # Enforce character limit to avoid exceeding embedding constraints
+    if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
+        raise InputTooLongError(QueryType.QUERY_STRING)
+
+    # Generate embedding vector using external microservice
+    embedding_request = async_to_sync(microservice)(
+        service="inception-query",
+        data=json.dumps({"text": cleaned_text_query}),
+    )
+    embedding_request.raise_for_status()
+    vectors = embedding_request.json()["embedding"]
+
+    # If exact keyword query exists, build and add full-text query to results
+    # This enables hybrid search by combining keyword and semantic results
+    if keyword_query:
+        semantic_query.extend(
+            build_fulltext_query(fields, keyword_query, only_queries=True)
+        )
+
+    # Add the semantic vector-based query using KNN with pre-filtering
+    semantic_query.append(
+        Q(
+            "nested",
+            path="embeddings",
+            query=Q(
+                "knn",
+                field="embeddings.embedding",
+                k=settings.KNN_SEARCH_K,
+                query_vector=vectors,
+                filter=filters,
+                similarity=settings.KNN_SIMILARITY,
+                boost=settings.KNN_SEARCH_BOOST,
+            ),
+        )
+    )
+    return keyword_query, semantic_query
+
+
 def build_full_join_es_queries(
     cd: CleanData,
     child_query_fields: dict[str, list[str]],
@@ -2704,6 +2777,16 @@ def build_full_join_es_queries(
 
     q_should = []
     has_text_query = False
+    # True if the user explicitly enabled semantic search and the search type
+    # supports it
+    semantic_search_enabled = cd.get("semantic", False) and cd["type"] in [
+        SEARCH_TYPES.OPINION
+    ]
+
+    # True if semantic search is enabled and the query has content to generate
+    # an embedding
+    has_valid_semantic_query = semantic_search_enabled and cd.get("q", "")
+    keyword_text_query = ""
     match cd["type"]:
         case (
             SEARCH_TYPES.RECAP
@@ -2733,13 +2816,6 @@ def build_full_join_es_queries(
         # Build child text query.
         child_fields = child_query_fields[child_type]
 
-        if mlt_query:
-            child_text_query = [mlt_query]
-        else:
-            child_text_query = build_fulltext_query(
-                child_fields, cd.get("q", ""), only_queries=True
-            )
-
         # Build parent filters.
         parent_filters = build_join_es_filters(cd)
         parties_filters = [
@@ -2768,6 +2844,23 @@ def build_full_join_es_queries(
                 # with the party filters included to match only child documents
                 # whose parents match the party filters.
                 child_filters.append(has_parent_parties_filter)
+
+        if mlt_query:
+            child_text_query = [mlt_query]
+        else:
+            string_query = cd.get("q", "")
+            if has_valid_semantic_query:
+                keyword_text_query, child_text_query = build_semantic_query(
+                    string_query,
+                    child_fields,
+                    child_filters,
+                )
+                if not keyword_text_query:
+                    child_filters = []
+            else:
+                child_text_query = build_fulltext_query(
+                    child_fields, string_query, only_queries=True
+                )
 
         # Build the child query based on child_filters and child child_text_query
         match child_filters, child_text_query:
@@ -2831,9 +2924,15 @@ def build_full_join_es_queries(
 
         # Build the parent filter and text queries.
         string_query = build_fulltext_query(
-            parent_query_fields, cd.get("q", ""), only_queries=True
+            parent_query_fields,
+            keyword_text_query
+            if has_valid_semantic_query
+            else cd.get("q", ""),
+            only_queries=True,
         )
-        has_text_query = True if string_query else False
+        has_text_query = (
+            True if string_query or has_valid_semantic_query else False
+        )
 
         # If child filters are set, add a has_child query as a filter to the
         # parent query to exclude results without matching children.
@@ -2877,7 +2976,10 @@ def build_full_join_es_queries(
                     should=string_query,
                     minimum_should_match=1,
                 )
-        if parent_query and not mlt_query:
+        should_append_parent_query = (
+            parent_query and not mlt_query and not has_valid_semantic_query
+        ) or keyword_text_query
+        if should_append_parent_query:
             q_should.append(parent_query)
 
     if not q_should:
@@ -3107,6 +3209,7 @@ def do_es_api_query(
         BadProximityQuery,
         DisallowedWildcardPattern,
         InvalidRelativeDateSyntax,
+        InputTooLongError,
     ) as e:
         raise ElasticBadRequestError(detail=e.message)
 

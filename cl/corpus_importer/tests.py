@@ -10,7 +10,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
@@ -119,8 +119,8 @@ from cl.search.factories import (
     DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionClusterFactoryMultipleOpinions,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
+    OpinionClusterWithMultipleOpinionsFactory,
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
@@ -137,7 +137,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.settings import MEDIA_ROOT
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -1071,7 +1071,7 @@ class CorpusImporterManagementCommmandsTests(TestCase):
 
         # Create opinion cluster with opinion and docket
         cluster = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Foo v. Bar",
@@ -1148,7 +1148,7 @@ class CleanUpMisMatchedDockets(TestCase):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         # Opinion cluster with mis matched docket.
         cls.cluster = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=cls.court,
                     source=Docket.HARVARD,
@@ -1166,7 +1166,7 @@ class CleanUpMisMatchedDockets(TestCase):
 
         # Opinion cluster with correct docket
         cluster_2 = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=cls.court,
                     source=Docket.HARVARD,
@@ -1252,7 +1252,7 @@ class HarvardMergerTests(TestCase):
             (<cross_reference><span class="citation no-link">137 S.E. 791</span></cross_reference>), and cit.; <em>Kuck</em> v. <em>State,</em> <cross_reference><span class="citation" data-id="5582722"><a href="/opinion/5732248/kuck-v-state/">149 Ga. 191</a></span></cross_reference>
             (<cross_reference><span class="citation no-link">99 S.E. 622</span></cross_reference>). I concur in the reversal for this additional reason.</p>"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -1313,7 +1313,7 @@ class HarvardMergerTests(TestCase):
         }
         self.read_json_func.return_value = case_data
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(),
             attorneys="B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
         )
@@ -1330,7 +1330,7 @@ class HarvardMergerTests(TestCase):
         )
 
         # Test that we can ignore matching fields
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(),
             attorneys="B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
         )
@@ -1429,7 +1429,7 @@ class HarvardMergerTests(TestCase):
     def test_add_opinions_without_authors_in_cl(self):
         """Can we add opinion and update authors"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -1495,7 +1495,7 @@ class HarvardMergerTests(TestCase):
         """Can we update an opinion and leave author_str alone if already
         assigned"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -2009,7 +2009,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
         )
 
         # Factory create cluster, data from cluster id: 1589121
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             case_name="Mendoza v. State",
             case_name_full="Pioquinto MENDOZA, III, Appellant, v. the STATE of Texas, "
             "Appellee",
