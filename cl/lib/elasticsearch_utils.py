@@ -2777,9 +2777,15 @@ def build_full_join_es_queries(
 
     q_should = []
     has_text_query = False
-    is_semantic_query = cd.get("semantic", False) and cd["type"] in [
+    # True if the user explicitly enabled semantic search and the search type
+    # supports it
+    semantic_search_enabled = cd.get("semantic", False) and cd["type"] in [
         SEARCH_TYPES.OPINION
     ]
+
+    # True if semantic search is enabled and the query has content to generate
+    # an embedding
+    has_valid_semantic_query = semantic_search_enabled and cd.get("q", "")
     keyword_text_query = ""
     match cd["type"]:
         case (
@@ -2843,7 +2849,7 @@ def build_full_join_es_queries(
             child_text_query = [mlt_query]
         else:
             string_query = cd.get("q", "")
-            if is_semantic_query and string_query:
+            if has_valid_semantic_query:
                 keyword_text_query, child_text_query = build_semantic_query(
                     string_query,
                     child_fields,
@@ -2919,10 +2925,14 @@ def build_full_join_es_queries(
         # Build the parent filter and text queries.
         string_query = build_fulltext_query(
             parent_query_fields,
-            keyword_text_query if is_semantic_query else cd.get("q", ""),
+            keyword_text_query
+            if has_valid_semantic_query
+            else cd.get("q", ""),
             only_queries=True,
         )
-        has_text_query = True if string_query or is_semantic_query else False
+        has_text_query = (
+            True if string_query or has_valid_semantic_query else False
+        )
 
         # If child filters are set, add a has_child query as a filter to the
         # parent query to exclude results without matching children.
@@ -2967,9 +2977,7 @@ def build_full_join_es_queries(
                     minimum_should_match=1,
                 )
         should_append_parent_query = (
-            parent_query
-            and not mlt_query
-            and not (is_semantic_query and cd.get("q", ""))
+            parent_query and not mlt_query and not has_valid_semantic_query
         ) or keyword_text_query
         if should_append_parent_query:
             q_should.append(parent_query)
