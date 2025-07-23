@@ -119,8 +119,11 @@
 
               <p class="bottom">
                 <a href="https://donate.free.law/forms/membership"
-                   class="btn btn-danger"
+                   id="no-member-button" class="hidden btn btn-danger"
                    target="_blank">Join Free.law</a>
+                <a href="https://donate.free.law/constituent/memberships/upgrade/{{ alerts_context.neon_id }}"
+                   id="member-button" class="hidden btn btn-danger"
+                   target="_blank">Upgrade Membership</a>
               </p>
             </div>
             {% if request.GET.edit_alert %}

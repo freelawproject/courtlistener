@@ -17,7 +17,7 @@ from django.core.cache import caches
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -49,6 +49,7 @@ from cl.disclosures.api_views import (
     SpouseIncomeViewSet,
 )
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
+from cl.favorites.models import GenericCount
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
@@ -94,7 +95,7 @@ from cl.search.api_views import (
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -107,7 +108,6 @@ from cl.search.models import (
 from cl.stats.models import Event
 from cl.tests.cases import (
     ESIndexTestCase,
-    SimpleTestCase,
     TestCase,
     TransactionTestCase,
 )
@@ -210,7 +210,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
         cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FD")
 
-        cls.c_scotus_1 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_scotus_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             docket=DocketFactory(
                 court=cls.court_scotus, docket_number="123456"
@@ -218,7 +218,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             date_filed=date(2000, 8, 15),
         )
-        cls.c_scotus_2 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_scotus_2 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="America vs Bank",
             docket=DocketFactory(
                 court=cls.court_scotus, docket_number="34-2535"
@@ -226,7 +226,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             precedential_status=PRECEDENTIAL_STATUS.ERRATA,
             date_filed=date(2024, 6, 15),
         )
-        cls.c_cand_1 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_cand_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Johnson v. National",
             docket=DocketFactory(
                 court=cls.court_cand, docket_number="36-2000"
@@ -839,7 +839,7 @@ class DRFOrderingTests(TestCase):
         )
 
 
-class FilteringCountTestCase:
+class FilteringCountTestMixin:
     """Mixin for adding an additional test assertion."""
 
     # noinspection PyPep8Naming
@@ -868,7 +868,7 @@ class FilteringCountTestCase:
         return r
 
 
-class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
         Court.objects.all().delete()
@@ -1053,7 +1053,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFJudgeApiFilterTests(
-    SimpleUserDataMixin, TestCase, FilteringCountTestCase
+    SimpleUserDataMixin, TestCase, FilteringCountTestMixin
 ):
     """Do the filters work properly?"""
 
@@ -1247,7 +1247,7 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)  # Bill
 
 
-class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
     fixtures = ["recap_docs.json"]
 
     @classmethod
@@ -1660,7 +1660,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFSearchAppAndAudioAppApiFilterTest(
-    TestCase, AudioTestCase, FilteringCountTestCase
+    AudioTestCase, FilteringCountTestMixin
 ):
     fixtures = [
         "judge_judy.json",
@@ -3554,6 +3554,29 @@ class CacheListApiResponseTest(TestCase):
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
 
+    def test_count_request_with_filters_not_cached(
+        self, mock_cache_key_method
+    ):
+        """
+        Test that a v4 count request is not cached when filters are applied.
+        """
+        fake_cache_key = "count_request_w_filters_no_cache"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Resolve the URL for the 'docket-list' endpoint and add the count
+        # parameter
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"count": "on", "pacer_case_id": 533886}
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Make the request with filters
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
     def test_no_filters_ordering_request_cached(self, mock_cache_key_method):
         """
         Test that a ordered response is cached when no filters are requested.
@@ -3618,3 +3641,100 @@ class CacheListApiResponseTest(TestCase):
 
         # Confirm the cache key still does not exist after the request
         self.assertFalse(self.cache.has_key(fake_cache_key))
+
+    def test_dynamic_fields_applied_not_cached(self, mock_cache_key_method):
+        """
+        Test that responses with dynamic 'fields' or 'omit' parameters are not cached.
+        """
+        fake_cache_key = "cache_dynamic_fields"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Resolve the URL for the 'docket-list' endpoint
+        path = reverse("docket-list", kwargs={"version": "v4"})
+
+        # --- Test with 'fields' parameter ---
+        # Define parameters to request specific fields.
+        params = {"fields": "id"}
+
+        # Make the request with the fields param
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # --- Test with 'omit' parameter ---
+        # Define parameters to omit specific fields.
+        params = {"omit": "id"}
+
+        # Make the request with the omit param
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+
+class EventCountApiTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Get the versioned URL for the increment-event endpoint
+        cls.increment_event_v4 = reverse(
+            "increment-event-list", kwargs={"version": "v4"}
+        )
+
+    def test_can_validate_label_format(self):
+        """Verify invalid event labels are rejected with a 400 response."""
+        invalid_label = "invalid-label-format"
+        response = self.client.post(
+            self.increment_event_v4, {"label": invalid_label}
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+        data = response.data
+        self.assertEqual(data["label"][0], "Invalid label format provided.")
+
+        more_than_10_digit_label = "d.12345678910:view"
+        response = self.client.post(
+            self.increment_event_v4, {"label": more_than_10_digit_label}
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+        data = response.data
+        self.assertEqual(data["label"][0], "Invalid label format provided.")
+
+    def test_can_create_new_events(self):
+        """Verify new events can be created through the API."""
+        label = "d.123:view"
+
+        # Ensure no existing record
+        event_record = GenericCount.objects.filter(label=label)
+        self.assertFalse(event_record.exists())
+
+        # First request — should create the counter with value 0, return it
+        response = self.client.post(self.increment_event_v4, {"label": label})
+        self.assertEqual(response.status_code, HTTPStatus.ACCEPTED)
+
+        data = response.data
+        self.assertEqual(data["label"], label)
+        self.assertEqual(data["value"], 0)
+
+        # Counter should now exist and be 1
+        view_counter = event_record.first()
+        self.assertIsNotNone(view_counter)
+        self.assertEqual(view_counter.value, 1)
+
+    def test_can_increment_exiting_events(self):
+        """Verify existing events can be incremented through the API."""
+        # Create an initial event record
+        label = "d.345:view"
+        event_record = GenericCount.objects.create(label=label, value=3)
+
+        response = self.client.post(self.increment_event_v4, {"label": label})
+        self.assertEqual(response.status_code, HTTPStatus.ACCEPTED)
+
+        # Refresh the event_record object from the database
+        event_record.refresh_from_db()
+        # Assert that the value of the event record has been incremented by 1
+        self.assertEqual(event_record.value, 4)

@@ -98,7 +98,6 @@ from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
     SearchAlertsAssertions,
-    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse, make_client
@@ -332,6 +331,9 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             "You've used all of the alerts included with your membership.",
             content,
         )
+        neon_id = self.user_member_tier_1.user.membership.neon_id
+        expected_upgrade_url = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
+        self.assertIn(expected_upgrade_url, content)
 
         # no new alert should be created
         self.assertEqual(await alert_user.acount(), 5)
@@ -353,6 +355,10 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             "You've used all of the alerts included with your membership.",
             content,
         )
+        neon_id = self.user_member.user.membership.neon_id
+        expected_upgrade_url = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
+        self.assertIn(expected_upgrade_url, content)
+
         alerts = Alert.objects.filter(user=self.user_member.user)
         self.assertEqual(await alerts.acount(), 0)
 
@@ -468,6 +474,9 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             "You've used all of the alerts included with your membership.",
             content,
         )
+        neon_id = self.user_member_tier_1.user.membership.neon_id
+        expected_upgrade_url = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
+        self.assertIn(expected_upgrade_url, content)
 
         # no new alert should be created
         self.assertEqual(await alerts.acount(), 10)
@@ -774,7 +783,7 @@ class DocketAlertTest(TestCase):
         RECAPDocument.objects.create(
             docket_entry=de,
             document_type=RECAPDocument.PACER_DOCUMENT,
-            document_number=1,
+            document_number="1",
             pacer_doc_id="232322332",
             is_available=False,
         )
@@ -980,7 +989,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
         self.assert_text_in_node("editing your alert", "body")
 
 
-class AlertAPITests(APITestCase, ESIndexTestCase):
+class AlertAPITests(ESIndexTestCase, APITestCase):
     """Check that API CRUD operations are working well for search alerts."""
 
     @classmethod
@@ -2211,7 +2220,7 @@ class SearchAlertsWebhooksTest(
         self.assertIn("...", subject)
 
 
-class SearchAlertsUtilsTest(SimpleTestCase):
+class SearchAlertsUtilsTest(TestCase):
     def test_get_cut_off_dates(self):
         """Confirm get_cut_off_start_date and get_cut_off_end_date return the right
         values according to the input date.
