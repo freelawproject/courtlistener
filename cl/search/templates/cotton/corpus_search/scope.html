@@ -13,7 +13,7 @@
     data-title="{{ title }}"
     role="tablist"
     aria-label="Select the scope of your search"
-    class="w-full gap-1 hidden md:flex items-stretch"
+    class="w-full gap-1 items-stretch {{ class }}"
     x-data="focus"
     x-bind:aria-activedescendant="selectedScope"
     x-on:keydown.left="focusPrevious"

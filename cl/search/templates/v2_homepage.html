@@ -33,17 +33,41 @@
     </div>
 
     {#  SEARCH TABS  #}
-    <div class="p-10">
-      <c-corpus-search class="w-full !flex-col" only>
+    <div class="p-10 max-md:px-4">
+      {#   MOBILE SEARCH   #}
+      <c-corpus-search class="p-4 w-full !flex-col md:hidden bg-white rounded-2xl" only>
+        <c-corpus-search.scope
+          class="w-full text-greyscale-500 md:hidden"
+          menu_class="w-full text-sm text-greyscale-600"
+          item_class="py-[10px]"
+          only
+        />
+
+        {# Search panel without advanced filters #}
+        <section class="flex flex-col">
+          <div class="py-4 flex flex-row flex-nowrap">
+            <c-corpus-search.input class="rounded-l-xl" :request="request" only/>
+            <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
+              {% svg "magnifier" class="text-white" aria_hidden="true" %}
+            </c-corpus-search.button>
+          </div>
+          <button
+            type="button"
+            class="btn w-full text-primary-600 text-sm font-medium py-2 hover:bg-greyscale-100 flex justify-center"
+          >Advanced Search</button>
+        </section>
+      </c-corpus-search>
+
+      {#   DESKTOP SEARCH   #}
+      <c-corpus-search class="w-full max-md:hidden !flex-col" only>
         {# Scope selector tabs #}
         <c-corpus-search.scope
-          class="text-greyscale-600"
-          menu_class="left-0 top-14 w-55 text-md font-cooper text-greyscale-800"
-          item_class="py-1.5"
+          class="text-greyscale-600 hidden md:flex"
           variant="tabs"
           only
         />
-        {# Search panel #}
+
+        {# Search panel with advanced filters #}
         <section class="bg-white flex flex-col rounded-b-2xl rounded-tr-2xl">
           <div class="p-4 flex flex-row flex-nowrap">
             <c-corpus-search.input class="rounded-l-xl" :request="request" only/>
@@ -51,6 +75,7 @@
               {% svg "magnifier" class="text-white" aria_hidden="true" %}
             </c-corpus-search.button>
           </div>
+
           <c-corpus-search.filters/>
         </section>
       </c-corpus-search>
