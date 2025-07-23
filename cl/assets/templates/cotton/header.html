@@ -2,6 +2,7 @@
 {% require_script "js/alpine/components/header.js" %}
 {% require_script "js/alpine/composables/focus.js" %}
 {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/collapse@3.14.8" defer=True %}
 
 <c-vars variant request class=""></c-vars>
 
@@ -99,26 +100,7 @@
   <div class="lg:w-[--profile-menu-width] flex justify-end items-center relative">
     {# MOBILE SEARCH TRIGGER + DIALOG #}
     {% if variant != "homepage" %}
-      <c-corpus-search class="md:hidden" only>
-        <c-corpus-search.mobile :request="request" only>
-          <c-corpus-search.input :request="request" rounded only/>
-          <c-corpus-search.scope
-            class="w-full text-greyscale-500"
-            menu_class="w-full text-sm text-greyscale-600"
-            item_class="py-[10px]"
-            :request="request"
-            only
-          />
-          <button
-            type="button"
-            class="btn w-full text-primary-600 text-sm font-medium py-2 hover:bg-greyscale-100 flex justify-center"
-          >Advanced Search</button>
-          <c-corpus-search.button class="w-full max-md:btn-xl flex items-center justify-center">
-            {% svg "magnifier" class="text-white w-5 h-5 mr-1.5" aria_hidden="true" %}
-            Search
-          </c-corpus-search.button>
-        </c-corpus-search.mobile>
-      </c-corpus-search>
+      <c-corpus-search.mobile :request="request" :search_form="search_form" only/>
     {% endif %}
 
     {% if request.user.is_authenticated %}

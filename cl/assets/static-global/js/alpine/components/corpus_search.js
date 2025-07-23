@@ -15,6 +15,7 @@ document.addEventListener('alpine:init', () => {
     },
   });
   Alpine.data('search', () => ({
+    advancedFiltersExpanded: false,
     get scopeMenuExpanded() {
       return this.$store.corpusSearch.scopeMenuExpanded;
     },
@@ -56,6 +57,15 @@ document.addEventListener('alpine:init', () => {
     },
     get scopeTabClass() {
       return this.isActiveScope ? 'font-semibold text-greyscale-900' : 'font-medium text-greyscale-700';
+    },
+    get advancedFiltersCollapsed() {
+      return !this.advancedFiltersExpanded;
+    },
+    toggleAdvancedFilters() {
+      this.advancedFiltersExpanded = !this.advancedFiltersExpanded;
+    },
+    openAdvancedFilters() {
+      this.advancedFiltersExpanded = true;
     },
     openScopeMenu() {
       this.$store.corpusSearch.scopeMenuExpanded = true;
