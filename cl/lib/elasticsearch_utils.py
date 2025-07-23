@@ -2849,6 +2849,8 @@ def build_full_join_es_queries(
                     child_fields,
                     child_filters,
                 )
+                if not keyword_text_query:
+                    child_filters = []
             else:
                 child_text_query = build_fulltext_query(
                     child_fields, string_query, only_queries=True
