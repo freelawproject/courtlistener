@@ -376,7 +376,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
     }
 
     def list(self, request, *args, **kwargs):
-        search_form = SearchForm(request.GET)
+        search_form = SearchForm(request.GET, request=request)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]
