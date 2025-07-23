@@ -1,7 +1,9 @@
 from functools import wraps
+from http import HTTPStatus
 
 from django.http import Http404
 from django.shortcuts import redirect
+from django.template.response import TemplateResponse
 
 from cl.search.models import ClusterRedirection
 
@@ -24,10 +26,14 @@ def handle_cluster_redirection(view_func):
                     deleted_cluster_id=kwargs["pk"]
                 )
                 cluster_id = redirection.cluster_id
-
                 if not cluster_id:
-                    # TODO: should redirect to sealed page
                     raise exc
+
+                if redirection.reason == ClusterRedirection.SEALED:
+                    return TemplateResponse(
+                        request, "410.html", status=HTTPStatus.GONE
+                    )
+
             except ClusterRedirection.DoesNotExist:
                 raise exc
 

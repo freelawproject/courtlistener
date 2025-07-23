@@ -3751,7 +3751,7 @@ class ClusterRedirectionTest(TestCase):
         ClusterRedirection.objects.create(
             deleted_cluster_id=cls.deleted_cluster_id,
             cluster=cls.redirect_to_cluster,
-            reason=ClusterRedirection.VERSIONING,
+            reason=ClusterRedirection.VERSION,
         )
         cls.user = UserProfileWithParentsFactory.create(
             user__username="a-user",

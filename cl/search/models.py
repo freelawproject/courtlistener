@@ -3791,24 +3791,24 @@ class SearchQuery(models.Model):
 class ClusterRedirection(models.Model):
     """Model to prevent dead /opinion/ links"""
 
-    VERSIONING = 1
+    VERSION = 1
     DUPLICATE = 2
     CONSOLIDATION = 3
     SEALED = 4
     REDIRECTION_REASON = (
         (
-            VERSIONING,
-            "Opinion versions clusters were consolidated in a single one",
+            VERSION,
+            "Cluster replaced by a newer version of the same opinion",
         ),
-        (DUPLICATE, "Clusters were duplicated"),
+        (DUPLICATE, "Cluster removed as a duplicate"),
         (
             CONSOLIDATION,
-            "Opinion types clusters were consolidated in a single one",
+            "Spread opinions were consolidated in a single cluster (e.g., a dissent opinion added to a cluster containing the majority opinion)",
         ),
-        (SEALED, "Cluster was deleted due to sealing"),
+        (SEALED, "Cluster removed by court order"),
     )
 
-    deleted_cluster_id = models.IntegerField()
+    deleted_cluster_id = models.IntegerField(unique=True)
     cluster = models.ForeignKey(
         OpinionCluster,
         help_text="The existing cluster the deleted clusters now point to",
