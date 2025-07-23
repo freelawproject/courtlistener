@@ -89,7 +89,7 @@ def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
         ConnectionError,
         RequestError,
     ) as e:
-        logger.error("Error getting sweep alert index task status: %s", e)
+        logger.warning("Error getting sweep alert index task status: %s", e)
         return {}
 
 

@@ -49,6 +49,10 @@ class LegalProvider(BaseProvider):
                 "Eruptanyom",  # Kelvin's pretend world
             ]
         )
+        # The names only give us 5.58 bits of entropy, so we append an extra
+        # 4 bytes to give us 37.58, a reasonable amount of randomness for test
+        # sample sizes.
+        last_word = f"{last_word}-{hex(random.getrandbits(32))[2:]}"
 
         return " ".join([first_word, mid_word, last_word])
 
@@ -64,17 +68,13 @@ class LegalProvider(BaseProvider):
 
     @staticmethod
     def _make_random_party(full: bool = False) -> str:
-        do_company = random.choice([True, False])
-        if do_company:
-            if full:
-                return oxford_join([fake.company() for _ in range(5)])
-            else:
-                return fake.company()
-        else:
-            if full:
-                return oxford_join([fake.name() for _ in range(5)])
-            else:
-                return fake.last_name()
+        name_funcs = [fake.name, fake.last_name]
+        # If True, create a company instead of a person
+        if random.choice([True, False]):
+            name_funcs = [fake.company] * 2
+        if full:
+            return oxford_join([name_funcs[0]() for _ in range(5)])
+        return name_funcs[1]()
 
     def case_name(self, full: bool = False) -> str:
         """Makes a clean case name like "O'Neil v. Jordan" """
