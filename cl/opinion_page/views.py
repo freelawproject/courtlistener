@@ -671,7 +671,7 @@ async def recap_document_context(
     rd_values = [
         x
         async for x in RECAPDocument.objects.filter(
-            docket_entry__docket_id=docket_id,
+            docket_entry__docket_id=docket_id,  # type: ignore[misc]
             document_number=doc_num,
         )
         .order_by("pk")
@@ -862,7 +862,7 @@ def get_attachment_values(
                 rd.document_type = rd.PACER_DOCUMENT
             attachments.append(
                 {
-                    "attachment_number": rdv[1],
+                    "attachment_number": rdv[1],  # type: ignore[dict-item]
                     "url": rd.get_absolute_url(),
                     "description": rdv[2],
                 }
@@ -879,7 +879,7 @@ def get_attachment_values(
                     "description": f"...and {doc_len - end} more",
                 }
             )
-    return attachments
+    return attachments  # type: ignore[return-value]
 
 
 async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
