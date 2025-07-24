@@ -1,11 +1,29 @@
 from io import BufferedReader
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from httpx import AsyncClient, Response
 
 from cl.audio.models import Audio
-from cl.lib.search_utils import clean_up_recap_document_file
 from cl.search.models import Opinion, RECAPDocument
+
+
+async def clean_up_recap_document_file(item: RECAPDocument) -> None:
+    """Clean up the RecapDocument file-related fields after detecting the file
+    doesn't exist in the storage.
+
+    :param item: The RECAPDocument to work on.
+    :return: None
+    """
+
+    if isinstance(item, RECAPDocument):
+        await sync_to_async(item.filepath_local.delete)()
+        item.sha1 = ""
+        item.date_upload = None
+        item.file_size = None
+        item.page_count = None
+        item.is_available = False
+        await item.asave()
 
 
 async def microservice(

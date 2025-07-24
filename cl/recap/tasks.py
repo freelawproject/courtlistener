@@ -175,29 +175,33 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     :return: None
     """
     result = None
-    if fq.request_type == REQUEST_TYPE.DOCKET:
-        # Request by docket_id
-        court_id = get_court_id_from_fetch_queue(fq)
-        c = (
-            chain(fetch_appellate_docket.si(fq.pk))
-            if is_appellate_court(court_id)
-            else chain(fetch_docket.si(fq.pk))
-        )
-        c = c | mark_fq_successful.si(fq.pk)
-        result = c.apply_async()
-    elif fq.request_type == REQUEST_TYPE.PDF:
-        # Request by recap_document_id
-        rd_pk = fq.recap_document_id
-        result = chain(
-            fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
-            extract_recap_pdf.si(rd_pk),
-            mark_fq_successful.si(fq.pk),
-        ).apply_async()
-    elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
-        result = chain(
-            fetch_attachment_page.si(fq.pk),
-            replicate_fq_att_page_to_subdocket_rds.s(),
-        ).apply_async()
+    match fq.request_type:
+        case REQUEST_TYPE.DOCKET:
+            court_id = get_court_id_from_fetch_queue(fq)
+            c = (
+                chain(fetch_appellate_docket.si(fq.pk))
+                if is_appellate_court(court_id)
+                else chain(fetch_docket.si(fq.pk))
+            )
+            c = c | mark_fq_successful.si(fq.pk)
+        case REQUEST_TYPE.ATTACHMENT_PAGE:
+            c = chain(
+                fetch_attachment_page.si(fq.pk),
+                replicate_fq_att_page_to_subdocket_rds.s(),
+            )
+        case REQUEST_TYPE.PDF:
+            rd_pk = fq.recap_document_id
+            c = chain(
+                fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
+                extract_recap_pdf.si(rd_pk),
+                mark_fq_successful.si(fq.pk),
+            )
+        case _:
+            raise NotImplementedError(
+                f"Unsupported request_type: {fq.request_type}"
+            )
+
+    result = c.apply_async(queue=settings.CELERY_PACER_FETCH_QUEUE)
     return result
 
 
