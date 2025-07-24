@@ -112,6 +112,6 @@
     @apply text-xl text-greyscale-700 font-normal;
   }
   .focus-container {
-    @apply [&:has(*:focus)]:outline [&:has(*:focus)]:outline-2 [&:has(*:focus)]:outline-primary-600 flex;
+    @apply [&:has(input:focus)]:outline [&:has(input:focus)]:outline-2 [&:has(input:focus)]:outline-primary-600 flex;
   }
 }
