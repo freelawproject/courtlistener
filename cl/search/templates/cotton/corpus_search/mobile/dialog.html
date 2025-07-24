@@ -35,7 +35,10 @@
             x-on:click="toggleAdvancedFilters"
             x-show="advancedFiltersCollapsed"
             class="btn-outline w-full justify-center"
-          >Filters</button>
+          >
+            {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
+            Filters
+          </button>
         </div>
         <div
           class="flex-shrink overflow-auto border-b border-greyscale-200 border-t-4 mt-4"

@@ -47,14 +47,15 @@
                 x-init="openAdvancedFilters"
                 aria-haspopup="dialog"
                 type="button"
-                class="w-full btn-outline bg-white h-12 justify-center"
+                class="w-full btn-outline bg-white h-12 justify-center text-md text-greyscale-600 gap-2"
               >
+                {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
                 Filters
               </button>
             </c-slot>
           </c-corpus-search.mobile.dialog>
           <div class="md:hidden w-full py-4">
-            <c-corpus-search.button class="w-full justify-center h-12">
+            <c-corpus-search.button class="w-full justify-center h-12 text-md gap-2">
               {% svg "magnifier" class="text-white" aria_hidden="true" %} Search
             </c-corpus-search.button>
           </div>
