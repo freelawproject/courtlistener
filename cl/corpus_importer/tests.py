@@ -2898,10 +2898,17 @@ class ScrapeIqueryPagesTest(TestCase):
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
         self.assertEqual(court_wait_cacd, None)
 
+        monday = datetime(2025, 7, 21)
+        monday_local = timezone.make_aware(
+            monday, timezone.get_default_timezone()
+        )
         for test in range(1, 5):
             with self.subTest(test=test):
                 r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with (
+                    time_machine.travel(monday_local, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -2922,7 +2929,10 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with (
+            time_machine.travel(monday_local, tick=False),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -2979,10 +2989,17 @@ class ScrapeIqueryPagesTest(TestCase):
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_vib.pk}")
         self.assertEqual(court_wait_cacd, None)
 
+        monday = datetime(2025, 7, 21)
+        monday_local = timezone.make_aware(
+            monday, timezone.get_default_timezone()
+        )
         for test in range(1, 30):
             with self.subTest(test=test):
                 r.delete(f"iquery:court_wait:{self.court_vib.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with (
+                    time_machine.travel(monday_local, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -2999,7 +3016,10 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_vib.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with (
+            time_machine.travel(monday_local, tick=False),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -3018,6 +3038,80 @@ class ScrapeIqueryPagesTest(TestCase):
             f"iquery:court_empty_probe_attempts:{self.court_vib.pk}"
         )
         self.assertEqual(int(court_empty_attempts), 0)
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    @patch("cl.corpus_importer.tasks.logger")
+    @patch(
+        "cl.corpus_importer.management.commands.probe_iquery_pages_daemon.logger"
+    )
+    @override_settings(
+        IQUERY_EMPTY_PROBES_LIMIT_HOURS={
+            "default": 0.41,
+        },
+        IQUERY_PROBE_WAIT=300,
+    )
+    def test_probe_iquery_pages_daemon_ignores_empty_probes_on_weekends(
+        self, mock_logger_daemon, mock_logger, mock_cookies
+    ):
+        """Test probe_iquery_pages_daemon ignores empty probes on weekends.
+        Courts typically do not publish new cases on weekends.
+        """
+
+        r = get_redis_interface("CACHE")
+        r.hset("iquery:highest_known_pacer_case_id", self.court_cacd.pk, 0)
+
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 100, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
+
+        court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
+        self.assertEqual(court_wait_cacd, None)
+
+        saturday = datetime(2025, 7, 19)
+        saturday_local = timezone.make_aware(
+            saturday, timezone.get_default_timezone()
+        )
+        sunday = datetime(2025, 7, 20)
+        sunday_local = timezone.make_aware(
+            sunday, timezone.get_default_timezone()
+        )
+        for test in range(1, 6):
+            with self.subTest(test=test):
+                r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
+                weekend_day = sunday_local if test % 2 == 0 else saturday_local
+                with (
+                    time_machine.travel(weekend_day, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
+                    call_command(
+                        "probe_iquery_pages_daemon",
+                        testing_iterations=1,
+                    )
+
+                # court_empty_probe_attempts for court 'cacd' shouldn't be
+                # incremented, since all empty probes are occurring over the
+                # weekend.
+                empty_probe_attempts = r.get(
+                    f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
+                )
+                self.assertEqual(empty_probe_attempts, None)
+                mock_logger.info.assert_called_with(
+                    "Ignoring empty probe over the weekend for court %s - case IDs from %s to %s.",
+                    self.court_cacd.pk,
+                    str(0),
+                    str(416),
+                )
 
     @patch(
         "cl.scrapers.tasks.CaseQuery",
