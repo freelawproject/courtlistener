@@ -2,6 +2,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.store('corpusSearch', {
     scopeMenuExpanded: false,
     selected: 'Case Law',
+    keywordQuery: '',
     searchScopes: [
       { label: 'Case Law', type: 'o', shortDescription: '10M+ Opinions', fieldset: 'o-fieldset' },
       { label: 'RECAP Archive', type: 'r', shortDescription: '500M+ Records', fieldset: 'r-fieldset' },
@@ -22,6 +23,9 @@ document.addEventListener('alpine:init', () => {
     get selectedScope() {
       return this.$store.corpusSearch.selected;
     },
+    get keywordQuery() {
+      return this.$store.corpusSearch.keywordQuery;
+    },
     get selectedScopeType() {
       return this.$store.corpusSearch.selectedScope.type;
     },
@@ -32,7 +36,10 @@ document.addEventListener('alpine:init', () => {
       return this.scopeMenuExpanded ? 'transform rotate-180' : '';
     },
     get corpusSearchIdGroup() {
-      return ['scope-menu', 'corpus-search-input', 'trigger-button'];
+      return ['scope-menu', 'trigger-button'];
+    },
+    get corpusInputIdGroup() {
+      return ['corpus-search-input'];
     },
     get menuId() {
       return this.$id('scope-menu');
@@ -60,6 +67,9 @@ document.addEventListener('alpine:init', () => {
     },
     get advancedFiltersCollapsed() {
       return !this.advancedFiltersExpanded;
+    },
+    updateKeyword(event) {
+      this.$store.corpusSearch.keywordQuery = event.target.value;
     },
     toggleAdvancedFilters() {
       this.advancedFiltersExpanded = !this.advancedFiltersExpanded;

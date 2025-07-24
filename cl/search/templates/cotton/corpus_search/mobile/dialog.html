@@ -1,8 +1,8 @@
 {% load svg_tags %}
 
-<c-vars request></c-vars>
+<c-vars request class=""></c-vars>
 
-<div class="md:hidden w-full">
+<div class="md:hidden {{ class }}">
   <c-dialog class="w-full" panel_class="absolute pt-0 flex flex-col max-h-screen overflow-hidden" only>
     <c-slot name="trigger_button">
       {{ trigger_button }}

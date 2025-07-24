@@ -37,11 +37,17 @@
       {#   MOBILE SEARCH   #}
       <div class="md:hidden bg-white rounded-2xl flex flex-col">
         <c-corpus-search class="p-4 w-full !flex-col" only>
-          <c-corpus-search.mobile.top-controls :request="request" only />
-        </c-corpus-search>
-
-        <c-corpus-search class="md:hidden w-full px-4 pb-4" only>
-          <c-corpus-search.mobile.dialog :request="request" :search_form="search_form" only>
+          <div class="flex flex-col gap-2">
+            <c-corpus-search.scope
+              class="w-full text-greyscale-500"
+              menu_class="w-full text-sm text-greyscale-600"
+              item_class="py-[10px]"
+              :request="request"
+              only
+            />
+            <c-corpus-search.input :request="request" rounded only/>
+          </div>
+          <c-corpus-search.mobile.dialog class="w-full mt-2" :request="request" :search_form="search_form" only>
             <c-slot name="trigger_button">
               <button
                 x-on:click="open"
@@ -56,6 +62,11 @@
               </button>
             </c-slot>
           </c-corpus-search.mobile.dialog>
+          <div class="md:hidden w-full py-4">
+            <c-corpus-search.button class="w-full justify-center h-12">
+              {% svg "magnifier" class="text-white" aria_hidden="true" %} Search
+            </c-corpus-search.button>
+          </div>
         </c-corpus-search>
       </div>
 
