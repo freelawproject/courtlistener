@@ -142,6 +142,10 @@ class UserProfile(models.Model):
         help_text="If enabled, the user's pending document prayers will be viewable by the public",
         default=False,
     )
+    recap_query_count = models.PositiveIntegerField(
+        help_text="Number of RECAP Archive searches performed by this user",
+        default=0,
+    )
 
     @property
     def is_member(self) -> bool:

@@ -279,6 +279,23 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
 
     search_query.save()
 
+    # Increment RECAP query count for authenticated users
+    if (
+        not request.user.is_anonymous
+        and not is_error
+        and request.GET.get("type") == SEARCH_TYPES.RECAP
+    ):
+        try:
+            profile = request.user.profile
+            profile.recap_query_count += 1
+            profile.save(update_fields=["recap_query_count"])
+        except Exception:
+            # If there's any error updating the profile, just log it and continue
+            # We don't want to break the search functionality
+            logging.warning(
+                f"Failed to increment recap_query_count for user {request.user.id}"
+            )
+
 
 def store_search_api_query(
     request: HttpRequest, failed: bool, query_time: int | None, engine: int
@@ -301,6 +318,23 @@ def store_search_api_query(
         source=SearchQuery.API,
         engine=engine,
     )
+
+    # Increment RECAP query count for authenticated users
+    if (
+        not request.user.is_anonymous
+        and not failed
+        and request.GET.get("type") == SEARCH_TYPES.RECAP
+    ):
+        try:
+            profile = request.user.profile
+            profile.recap_query_count += 1
+            profile.save(update_fields=["recap_query_count"])
+        except Exception:
+            # If there's any error updating the profile, just log it and continue
+            # We don't want to break the search functionality
+            logging.warning(
+                f"Failed to increment recap_query_count for user {request.user.id}"
+            )
 
 
 class CachedESSearchResults(TypedDict):
