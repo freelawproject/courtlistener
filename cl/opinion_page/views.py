@@ -94,6 +94,7 @@ from cl.search.models import (
     Court,
     Docket,
     DocketEntry,
+    Opinion,
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
@@ -882,9 +883,33 @@ async def setup_opinion_context(
     return context
 
 
-async def get_opinions_base_queryset() -> QuerySet:
+async def get_opinions_queryset(
+    sub_opinions_prefetch: str | Prefetch,
+) -> QuerySet:
+    """Prepare a cluster queryset with common prefetchs to prevent extra
+    queries
+
+    :param sub_opinions_prefetch: a plain string which identifies a prefetch
+        path. If it has the `no_text_fields`, it will get the sub_opinions
+        without their big text fields, for performance improvements
+    :return: the queryset
+    """
+    if sub_opinions_prefetch == "no_text_fields":
+        sub_opinions_prefetch = Prefetch(
+            "sub_opinions",
+            Opinion.objects.defer(
+                "html_with_citations",
+                "html",
+                "plain_text",
+                "xml_harvard",
+                "html_lawbox",
+                "html_columbia",
+                "html_anon_2020",
+            ),
+        )
+
     return OpinionCluster.objects.prefetch_related(
-        "sub_opinions__opinions_cited", "citations"
+        sub_opinions_prefetch, "citations"
     ).select_related("docket__court")
 
 
@@ -945,7 +970,8 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
     if ui_flag_for_o_es:
         # Flag enabled, query ES to get counts
         sub_opinion_pks = [
-            str(opinion.pk) async for opinion in cluster.sub_opinions.all()
+            str(opinion.pk)
+            async for opinion in cluster.sub_opinions.all().only("pk")
         ]
         cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
         related_cases_count = await es_related_case_count(
@@ -984,7 +1010,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     :return: The old or new opinion HTML
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("sub_opinions"), pk=pk
     )
     return await render_opinion_view(request, cluster, "opinions")
 
@@ -1000,7 +1026,7 @@ async def view_opinion_pdf(
     :return: Opinion PDF tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("no_text_fields"), pk=pk
     )
     return await render_opinion_view(request, cluster, "pdf")
 
@@ -1016,7 +1042,8 @@ async def view_opinion_authorities(
     :return: Table of Authorities tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("sub_opinions__opinions_cited"),
+        pk=pk,
     )
 
     additional_context = {
@@ -1038,7 +1065,7 @@ async def view_opinion_cited_by(
     :return: Cited By tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("sub_opinions__opinions_cited"), pk=pk
     )
     cited_query = await es_get_cited_clusters_with_cache(cluster, request)
     additional_context = {
@@ -1061,7 +1088,7 @@ async def view_opinion_summaries(
     :return: Summaries tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("no_text_fields"), pk=pk
     )
     parenthetical_groups_qs = await get_or_create_parenthetical_groups(cluster)
     parenthetical_groups = [
@@ -1099,7 +1126,7 @@ async def view_opinion_related_cases(
     :return: Related Cases tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("no_text_fields"), pk=pk
     )
     related_cluster_object = await es_get_related_clusters_with_cache(
         cluster, request
