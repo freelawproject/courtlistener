@@ -100,7 +100,15 @@
   <div class="lg:w-[--profile-menu-width] flex justify-end items-center relative">
     {# MOBILE SEARCH TRIGGER + DIALOG #}
     {% if variant != "homepage" %}
-      <c-corpus-search.mobile :request="request" :search_form="search_form" only/>
+      <c-corpus-search class="md:hidden" only>
+        <c-corpus-search.mobile.dialog :request="request" :search_form="search_form" only>
+          <c-slot name="trigger_button">
+            <c-dialog.trigger-button>
+              {% svg "magnifier" class="text-greyscale-400 w-5 h-5" %}
+            </c-dialog.trigger-button>
+          </c-slot>
+        </c-corpus-search.mobile.dialog>
+      </c-corpus-search>
     {% endif %}
 
     {% if request.user.is_authenticated %}
