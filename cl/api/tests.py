@@ -3756,6 +3756,12 @@ class ClusterRedirectionTest(TestCase):
             user__username="a-user",
             user__password=make_password("password"),
         )
+        cls.sealed_cluster_id = 6666666
+        ClusterRedirection.objects.create(
+            reason=ClusterRedirection.SEALED,
+            deleted_cluster_id=cls.sealed_cluster_id,
+            cluster=None,
+        )
 
     async def test_opinion_cluster_redirection(self):
         """Test that a deleted cluster redirects to an existing cluster"""
@@ -3777,3 +3783,15 @@ class ClusterRedirectionTest(TestCase):
         )
         response = await api_client.get(url)
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
+        # Check that a sealed record returns proper code and message
+        message = dict(ClusterRedirection.REDIRECTION_REASON)[
+            ClusterRedirection.SEALED
+        ]
+        url = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v4", "pk": self.sealed_cluster_id},
+        )
+        response = await api_client.get(url)
+        self.assertEqual(response.json()["detail"], message)
+        self.assertEqual(response.status_code, HTTPStatus.GONE)

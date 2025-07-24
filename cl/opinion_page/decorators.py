@@ -25,17 +25,15 @@ def handle_cluster_redirection(view_func):
                 redirection = await ClusterRedirection.objects.aget(
                     deleted_cluster_id=kwargs["pk"]
                 )
-                cluster_id = redirection.cluster_id
-                if not cluster_id:
-                    raise exc
-
-                if redirection.reason == ClusterRedirection.SEALED:
-                    return TemplateResponse(
-                        request, "410.html", status=HTTPStatus.GONE
-                    )
-
             except ClusterRedirection.DoesNotExist:
                 raise exc
+
+            if redirection.reason == ClusterRedirection.SEALED:
+                return TemplateResponse(
+                    request, "410.html", status=HTTPStatus.GONE
+                )
+
+            cluster_id = redirection.cluster_id
 
             # redirect to the same URL, only change the target PK
             url_name = request.resolver_match.url_name
