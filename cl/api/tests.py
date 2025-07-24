@@ -22,7 +22,6 @@ from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
-from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import Cursor, CursorPagination
 from rest_framework.request import Request
@@ -3766,9 +3765,7 @@ class ClusterRedirectionTest(TestCase):
         )
         api_client = await sync_to_async(make_client)(self.user.user.pk)
         response = await api_client.get(url)
-        self.assertEqual(
-            response.status_code, status.HTTP_301_MOVED_PERMANENTLY
-        )
+        self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
 
         redirect_response = await api_client.get(response.headers["Location"])
         data = json.loads(redirect_response.content)
@@ -3779,4 +3776,4 @@ class ClusterRedirectionTest(TestCase):
             "opinioncluster-detail", kwargs={"version": "v4", "pk": 777777}
         )
         response = await api_client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
