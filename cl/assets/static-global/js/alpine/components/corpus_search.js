@@ -1,13 +1,40 @@
+const fieldsetIdSeeds = {
+  opinions: 'o-fieldset',
+  recap: 'r-fieldset',
+  oralArgs: 'oa-fieldset',
+  judges: 'p-fieldset',
+};
+
 document.addEventListener('alpine:init', () => {
   Alpine.store('corpusSearch', {
     scopeMenuExpanded: false,
     selected: 'Case Law',
     keywordQuery: '',
     searchScopes: [
-      { label: 'Case Law', type: 'o', shortDescription: '10M+ Opinions', fieldset: 'o-fieldset' },
-      { label: 'RECAP Archive', type: 'r', shortDescription: '500M+ Records', fieldset: 'r-fieldset' },
-      { label: 'Oral Arguments', type: 'oa', shortDescription: '90k+ Audio Files', fieldset: 'oa-fieldset' },
-      { label: 'Judges', type: 'p', shortDescription: '15k+ Profiles', fieldset: 'p-fieldset' },
+      {
+        label: 'Case Law',
+        type: 'o',
+        shortDescription: '10M+ Opinions',
+        fieldset: fieldsetIdSeeds['opinions'],
+      },
+      {
+        label: 'RECAP Archive',
+        type: 'r',
+        shortDescription: '500M+ Records',
+        fieldset: fieldsetIdSeeds['recap'],
+      },
+      {
+        label: 'Oral Arguments',
+        type: 'oa',
+        shortDescription: '90k+ Audio Files',
+        fieldset: fieldsetIdSeeds['oralArgs'],
+      },
+      {
+        label: 'Judges',
+        type: 'p',
+        shortDescription: '15k+ Profiles',
+        fieldset: fieldsetIdSeeds['judges'],
+      },
     ],
     get selectedScope() {
       const index = this.searchScopes.findIndex((scope) => scope.label === this.selected);
@@ -36,10 +63,24 @@ document.addEventListener('alpine:init', () => {
       return this.scopeMenuExpanded ? 'transform rotate-180' : '';
     },
     get corpusSearchIdGroup() {
-      return ['scope-menu', 'trigger-button'];
+      const fieldsetIdGroup = [
+        fieldsetIdSeeds['opinions'],
+        fieldsetIdSeeds['recap'],
+        fieldsetIdSeeds['oralArgs'],
+        fieldsetIdSeeds['judges'],
+      ];
+      return ['scope-menu', 'trigger-button', ...fieldsetIdGroup];
     },
     get corpusInputIdGroup() {
       return ['corpus-search-input'];
+    },
+    get fieldsetIds() {
+      return {
+        opinions: this.$id(fieldsetIdSeeds['opinions']),
+        recap: this.$id(fieldsetIdSeeds['recap']),
+        oralArgs: this.$id(fieldsetIdSeeds['oralArgs']),
+        judges: this.$id(fieldsetIdSeeds['judges']),
+      };
     },
     get menuId() {
       return this.$id('scope-menu');
@@ -95,7 +136,8 @@ document.addEventListener('alpine:init', () => {
     },
     updateFieldsets(newSelected) {
       const updateFieldset = (scope) => {
-        const fieldsetEl = document.getElementById(scope.fieldset);
+        const fieldsetId = this.$id(scope.fieldset);
+        const fieldsetEl = document.getElementById(fieldsetId);
         if (newSelected === scope.label) fieldsetEl.removeAttribute('disabled');
         else fieldsetEl.setAttribute('disabled', 'disabled');
       };
