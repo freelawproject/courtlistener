@@ -3807,7 +3807,10 @@ class ClusterRedirection(models.Model):
         ),
         (SEALED, "Cluster removed by court order"),
     )
-
+    date_created = models.DateTimeField(
+        help_text="Datetime when the record was created.",
+        auto_now_add=True,
+    )
     deleted_cluster_id = models.IntegerField(unique=True)
     cluster = models.ForeignKey(
         OpinionCluster,
