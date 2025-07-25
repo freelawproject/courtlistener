@@ -546,7 +546,7 @@ class RECAPSearchMixin:
         cls.judge_2 = PersonFactory.create(
             name_first="Persephone", name_last="Sinclair"
         )
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 case_name="SUBPOENAS SERVED ON",
@@ -619,7 +619,7 @@ class RECAPSearchMixin:
         cls.judge_4 = PersonFactory.create(
             name_first="Leopold", name_last="Featherstone"
         )
-        cls.de_1 = DocketEntryWithParentsFactory(
+        cls.de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 docket_number="12-1235",
                 court=cls.court_2,
