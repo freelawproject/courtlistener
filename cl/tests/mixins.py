@@ -38,7 +38,7 @@ from cl.people_db.models import Race
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
     OpinionFactory,
