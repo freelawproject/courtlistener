@@ -120,15 +120,15 @@ def find_citations_and_parantheticals_for_recap_documents(
 def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
     opinion_pks: list[int],
-    disconnect_pg_signals: bool = False,
+    disable_parenthetical_groups: bool = False,
     disable_citation_count_update: bool = False,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
-    :param disconnect_pg_signals: True if ParentheticalGroup post_save and
-        post_delete signals should be disconnected; useful in batch jobs
-        from the `find_citations` command
+    :param disable_parenthetical_groups: True if not ParentheticalGroup should
+        be created; and their  post_save and post_delete signals should be
+        disconnected; useful in batch jobs from the `find_citations` command
     :param disable_citation_count_update: if True,
         OpinionCluster.citation_count and related ElasticSearch fields will not
         be updated. Useful to prevent database overloading during bulk work
@@ -139,26 +139,34 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         pk__in=opinion_pks
     )
 
-    if disconnect_pg_signals:
+    if disable_parenthetical_groups:
         disconnect_parenthetical_group_signals()
 
     update_citation_count = not disable_citation_count_update
     failed_ids: list[int] = []
 
+    logger.info("Processing opinions: %s", opinion_pks)
     try:
         for index, opinion in enumerate(opinions):
             try:
+                logger.info("Starting opinion: %s", opinion.id)
                 store_opinion_citations_and_update_parentheticals(
-                    opinion, update_citation_count
+                    opinion,
+                    update_citation_count,
+                    disable_parenthetical_groups,
                 )
             except ResponseNotReady as e:
                 # Threading problem in httplib.
+                logger.warning("ResponseNotReady error for: %s", opinion.id)
                 raise self.retry(exc=e, countdown=2)
             except OperationalError as e:
                 # Delay deadlocked tasks
                 logger.warning(
-                    "Retrying opinion %s later due to OperationalError",
+                    "OperationalError processing opinion %s: %s",
                     opinion.id,
+                    e,
+                    exc_info=True,
+                    extra={"opinion_id": opinion.id},
                 )
                 failed_ids.append(opinion.id)
             except Exception as e:
@@ -173,17 +181,20 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 # do not retry the whole loop on an unknown exception
                 remaining_ids = [o.id for o in opinions[index + 1 :]]
                 if remaining_ids:
+                    logger.warning(
+                        "Retrying remaining opinions: %s", remaining_ids
+                    )
                     raise self.retry(
                         exc=e,
                         countdown=2,
                         args=(
                             remaining_ids,
-                            disconnect_pg_signals,
+                            disable_parenthetical_groups,
                             disable_citation_count_update,
                         ),
                     )
     finally:
-        if disconnect_pg_signals:
+        if disable_parenthetical_groups:
             reconnect_parenthetical_group_signals()
 
     # Retry task with the opinions that failed due to OperationalError
@@ -197,7 +208,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
             countdown=5,
             args=(
                 failed_ids,
-                disconnect_pg_signals,
+                disable_parenthetical_groups,
                 disable_citation_count_update,
             ),
         )
@@ -206,6 +217,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
 def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion,
     update_citation_count: bool = True,
+    disable_parenthetical_groups: bool = False,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion,
@@ -217,6 +229,7 @@ def store_opinion_citations_and_update_parentheticals(
         - `index_related_cites_fields` that updates OpinionDocument and
             OpinionClusterDocument
         this is useful to prevent database overloading during bulk work
+    :param disable_parenthetical_groups: Skip creating ParentheticalGroups
     :return: None
     """
     # Extract the citations from the opinion's text
@@ -235,23 +248,28 @@ def store_opinion_citations_and_update_parentheticals(
         )
         return
 
+    # Extract citations
+    logger.debug("Extracting citations for opinion %s", opinion.pk)
     citations: list[CitationBase] = get_citations(
         tokenizer=HYPERSCAN_TOKENIZER,
         **get_citations_kwargs,
     )
 
+    logger.debug("Resolving citations %s", opinion.pk)
     # Resolve all those different citation objects to Opinion objects,
     # using a variety of heuristics.
     citation_resolutions: dict[
         MatchedResourceType, list[SupportedCitationType]
     ] = do_resolve_citations(citations, opinion)
 
+    logger.debug("Creating HTML with Citations %s", opinion.pk)
     # Generate the citing opinion's new HTML with inline citation links
     opinion.html_with_citations = create_cited_html(
         citation_resolutions, get_citations_kwargs
     )
     if not citation_resolutions:
         # there was nothing to annotate, just save the `html_with_citations`
+        logger.debug("No annotations: Saving %s", opinion.pk)
         opinion.save()
         return
 
@@ -291,8 +309,13 @@ def store_opinion_citations_and_update_parentheticals(
 
     # Finally, commit these changes to the database in a single
     # transaction block.
+    logger.debug("Begin transaction: %s", opinion.pk)
     with transaction.atomic():
         if update_citation_count:
+            logger.debug(
+                "Update citation count for %s",
+                opinion.pk,
+            )
             cluster_ids_to_update = get_cited_clusters_ids_to_update(
                 citation_resolutions.keys(), opinion.pk
             )
@@ -305,6 +328,7 @@ def store_opinion_citations_and_update_parentheticals(
             unmatched_citations + ambiguous_matches,
             citation_resolutions,
         )
+        logger.debug("Recreate OpCited and Parens: %s", opinion.pk)
 
         # Nuke existing citations and parentheticals
         OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
@@ -323,12 +347,14 @@ def store_opinion_citations_and_update_parentheticals(
         )
         Parenthetical.objects.bulk_create(parentheticals)
 
-        # Update parenthetical groups for clusters that we have added
-        # parentheticals for from this opinion
-        for cluster_id in clusters_to_update_par_groups_for:
-            create_parenthetical_groups(
-                OpinionCluster.objects.get(pk=cluster_id)
-            )
+        if disable_parenthetical_groups is False:
+            # Update parenthetical groups for clusters that we have added
+            # parentheticals for from this opinion
+            logger.debug("Create parenthetical groups: %s", opinion.pk)
+            for cluster_id in clusters_to_update_par_groups_for:
+                create_parenthetical_groups(
+                    OpinionCluster.objects.get(pk=cluster_id)
+                )
 
         # Save all the changes to the citing opinion
         opinion.save()
@@ -338,8 +364,12 @@ def store_opinion_citations_and_update_parentheticals(
     # - OpinionDocument.citeCount
     # - OpinionDocument.cites
     if update_citation_count:
+        logger.debug("Index related cites: %s", opinion.pk)
+
         index_related_cites_fields.delay(
             OpinionsCited.__name__,
             opinion.pk,
             cluster_ids_to_update,
         )
+
+    logger.debug("Finished %s", opinion.pk)
