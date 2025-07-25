@@ -120,15 +120,15 @@ def find_citations_and_parantheticals_for_recap_documents(
 def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
     opinion_pks: list[int],
-    disconnect_pg_signals: bool = False,
+    disable_parenthetical_groups: bool = False,
     disable_citation_count_update: bool = False,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
-    :param disconnect_pg_signals: True if ParentheticalGroup post_save and
-        post_delete signals should be disconnected; useful in batch jobs
-        from the `find_citations` command
+    :param disable_parenthetical_groups: True if not ParentheticalGroup should
+        be created; and their  post_save and post_delete signals should be
+        disconnected; useful in batch jobs from the `find_citations` command
     :param disable_citation_count_update: if True,
         OpinionCluster.citation_count and related ElasticSearch fields will not
         be updated. Useful to prevent database overloading during bulk work
@@ -139,7 +139,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         pk__in=opinion_pks
     )
 
-    if disconnect_pg_signals:
+    if disable_parenthetical_groups:
         disconnect_parenthetical_group_signals()
 
     update_citation_count = not disable_citation_count_update
@@ -151,7 +151,9 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
             try:
                 logger.info("Starting opinion: %s", opinion.id)
                 store_opinion_citations_and_update_parentheticals(
-                    opinion, update_citation_count, disconnect_pg_signals
+                    opinion,
+                    update_citation_count,
+                    disable_parenthetical_groups,
                 )
             except ResponseNotReady as e:
                 # Threading problem in httplib.
@@ -187,12 +189,12 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                         countdown=2,
                         args=(
                             remaining_ids,
-                            disconnect_pg_signals,
+                            disable_parenthetical_groups,
                             disable_citation_count_update,
                         ),
                     )
     finally:
-        if disconnect_pg_signals:
+        if disable_parenthetical_groups:
             reconnect_parenthetical_group_signals()
 
     # Retry task with the opinions that failed due to OperationalError
@@ -206,7 +208,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
             countdown=5,
             args=(
                 failed_ids,
-                disconnect_pg_signals,
+                disable_parenthetical_groups,
                 disable_citation_count_update,
             ),
         )
@@ -215,7 +217,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
 def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion,
     update_citation_count: bool = True,
-    skip_group_parentheticals: bool = False,
+    disable_parenthetical_groups: bool = False,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion,
@@ -227,7 +229,7 @@ def store_opinion_citations_and_update_parentheticals(
         - `index_related_cites_fields` that updates OpinionDocument and
             OpinionClusterDocument
         this is useful to prevent database overloading during bulk work
-    :param skip_group_parentheticals: Skip creating group parentheticals
+    :param disable_parenthetical_groups: Skip creating ParentheticalGroups
     :return: None
     """
     # Extract the citations from the opinion's text
@@ -345,10 +347,10 @@ def store_opinion_citations_and_update_parentheticals(
         )
         Parenthetical.objects.bulk_create(parentheticals)
 
-        if skip_group_parentheticals is False:
+        if disable_parenthetical_groups is False:
             # Update parenthetical groups for clusters that we have added
             # parentheticals for from this opinion
-            logger.debug("Create paren groups: %s", opinion.pk)
+            logger.debug("Create parenthetical groups: %s", opinion.pk)
             for cluster_id in clusters_to_update_par_groups_for:
                 create_parenthetical_groups(
                     OpinionCluster.objects.get(pk=cluster_id)
