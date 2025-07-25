@@ -52,7 +52,7 @@ body:
     attributes:
       label: What is the severity of the bug?
       options:
-        - TBD
+        - Unknown
         - Trivial
         - Low
         - Medium
