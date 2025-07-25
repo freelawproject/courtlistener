@@ -4,11 +4,12 @@ from collections import defaultdict
 from difflib import Differ, SequenceMatcher
 
 from django.db import transaction
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Count, F, Q, QuerySet
 from eyecite import clean_text
 
 from cl.alerts.models import DocketAlert
 from cl.audio.models import Audio
+from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.favorites.models import DocketTag, Note
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.models import (
@@ -31,6 +32,8 @@ from cl.search.models import (
     OpinionCluster,
     OpinionClusterNonParticipatingJudges,
     OpinionClusterPanel,
+    OpinionsCited,
+    Parenthetical,
 )
 from cl.search.tasks import remove_document_from_es_index
 
@@ -426,6 +429,48 @@ def merge_metadata(
     return changed
 
 
+def delete_version_related_objects(version: Opinion) -> None:
+    """Delete objects related to citations that point to the version
+
+    :param version: the versioned opinion
+    :return None
+    """
+    # Decrease citation_count of all clusters cited by the version
+    cited_clusters = (
+        version.opinions_cited.all()
+        .only("cluster_id")
+        .values_list("cluster_id", flat=True)
+    )
+    if cited_clusters:
+        OpinionCluster.objects.filter(id__in=list(cited_clusters)).update(
+            citation_count=F("citation_count") - 1
+        )
+
+    OpinionsCited.objects.filter(
+        Q(citing_opinion_id=version.id) | Q(cited_opinion_id=version.id)
+    ).delete()
+
+    described_by_version = Parenthetical.objects.filter(
+        describing_opinion_id=version.id
+    )
+    if described_by_version.exists():
+        # recompute parenthetical groups for clusters described by the version
+        ids = described_by_version.only(
+            "describing_opinion__cluster_id"
+        ).values_list("describing_opinion__cluster_id", flat=True)
+        Parenthetical.objects.filter(
+            Q(described_opinion_id=version.id)
+            | Q(describing_opinion_id=version.id)
+        ).delete()
+        for cluster in OpinionCluster.objects.filter(id__in=ids):
+            create_parenthetical_groups(cluster)
+
+    else:
+        Parenthetical.objects.filter(described_opinion_id=version.id).delete()
+
+    version.unmatched_citations.all().delete()
+
+
 def merge_opinion_versions(
     main_opinion: Opinion, version_opinion: Opinion
 ) -> None:
@@ -474,7 +519,9 @@ def merge_opinion_versions(
 
         version_opinion.cluster_id = main_opinion.cluster.id
         version_opinion.main_version = main_opinion
+        version_opinion.html_with_citations = ""
         version_opinion.save()
+        delete_version_related_objects(version_opinion)
 
         # since the cluster was reassigned, this opinion was not cascade
         # deleted, and then deleted from the ES index. We don't want versions
