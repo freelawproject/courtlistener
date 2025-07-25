@@ -44,9 +44,11 @@ from cl.disclosures.api_views import (
     GiftViewSet,
     InvestmentViewSet,
     NonInvestmentIncomeViewSet,
-    PositionViewSet,
     ReimbursementViewSet,
     SpouseIncomeViewSet,
+)
+from cl.disclosures.api_views import (
+    PositionViewSet as DisclosurePositionViewSet,
 )
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.favorites.models import GenericCount
@@ -60,10 +62,12 @@ from cl.people_db.api_views import (
     PersonDisclosureViewSet,
     PersonViewSet,
     PoliticalAffiliationViewSet,
-    PositionViewSet,
     RetentionEventViewSet,
     SchoolViewSet,
     SourceViewSet,
+)
+from cl.people_db.api_views import (
+    PositionViewSet as PeoplePositionViewSet,
 )
 from cl.people_db.factories import (
     AttorneyFactory,
@@ -2554,7 +2558,7 @@ class V4DRFPaginationTest(TestCase):
             default_ordering="-id",
             secondary_cursor_key="date_created",
             non_cursor_key="date_elected",
-            viewset=PositionViewSet,
+            viewset=PeoplePositionViewSet,
         )
 
     async def test_retention_events_endpoint(self):
@@ -2830,7 +2834,7 @@ class V4DRFPaginationTest(TestCase):
             default_ordering="-id",
             secondary_cursor_key="date_modified",
             non_cursor_key="",
-            viewset=PositionViewSet,
+            viewset=DisclosurePositionViewSet,
         )
 
     async def test_reimbursement_endpoint(self):
