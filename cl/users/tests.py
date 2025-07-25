@@ -3625,6 +3625,54 @@ class WebhooksHTMXTests(APITestCase):
         # Webhook failure count shouldn't be increased by a webhook test event
         self.assertEqual(webhook_event_last.webhook.failure_count, 0)
 
+    async def test_send_webhook_test_all_types(self) -> None:
+        """Can we send a webhook test event for all webhook types?"""
+
+        test_cases = {
+            f"{event_type.label} - {version.label}": {
+                "event_type": event_type,
+                "version": version,
+            }
+            for event_type, version in product(
+                WebhookEventType, WebhookVersions
+            )
+        }
+
+        for label, params in test_cases.items():
+            with self.subTest(label=label):
+                await Webhook.objects.all().adelete()
+                await WebhookEvent.objects.all().adelete()
+                await self.make_a_webhook(
+                    self.client,
+                    event_type=params["event_type"],
+                    version=params["version"],
+                )
+                webhooks = Webhook.objects.all()
+                self.assertEqual(await webhooks.acount(), 1)
+
+                webhooks_first = await webhooks.afirst()
+                webhook_1_path_test = reverse(
+                    "webhooks-test-webhook",
+                    kwargs={"pk": webhooks_first.pk, "format": "json"},
+                )
+                with mock.patch(
+                    "cl.api.webhooks.requests.post",
+                    side_effect=lambda *args, **kwargs: MockPostResponse(
+                        200, mock_raw=True
+                    ),
+                ):
+                    response = await self.client.post(webhook_1_path_test, {})
+                # Compare the test webhook event data.
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                webhook_event = WebhookEvent.objects.all().order_by(
+                    "date_created"
+                )
+                webhook_event_first = await webhook_event.afirst()
+                self.assertEqual(
+                    webhook_event_first.status_code, HTTPStatus.OK
+                )
+                self.assertEqual(webhook_event_first.debug, True)
+
     async def test_list_webhook_events(self) -> None:
         """Can we list the user's webhook events?"""
 
