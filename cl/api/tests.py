@@ -113,7 +113,6 @@ from cl.stats.models import Event
 from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
-    TransactionTestCase,
 )
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -345,7 +344,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
     "cl.api.utils.get_logging_prefix",
     return_value="api:test_counts",
 )
-class ApiQueryCountTests(TransactionTestCase):
+class ApiQueryCountTests(TestCase):
     """Check that the number of queries for an API doesn't explode
 
     I expect these tests to regularly need updating as new features are added
@@ -1443,7 +1442,6 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
         await self.assertCountInResults(0)
 
         # Adds extra role to the existing attorney
-        docket = await Docket.objects.afirst()
         attorney = await Attorney.objects.afirst()
         party = await sync_to_async(PartyFactory)(
             docket=self.docket_2,
