@@ -97,7 +97,7 @@ from cl.search.api_views import (
 )
 from cl.search.factories import (
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterWithChildrenAndParentsFactory,
     RECAPDocumentFactory,
@@ -3818,7 +3818,7 @@ class DynamicNestedFieldsMixinTests(TestCase):
             pacer_case_id="104490",
         )
         cls.rd = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket,
             ),
             document_number="1",

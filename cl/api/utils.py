@@ -1221,6 +1221,16 @@ def handle_webhook_events(results: list[int | float], user: User) -> None:
 
 
 class RetrieveFilteredFieldsMixin:
+
+    @staticmethod
+    def _get_concrete_fields_for_model(model):
+        return [
+            f.name
+            for f in model._meta.get_fields()
+            if getattr(f, "concrete", False)
+        ]
+
+
     def _filter_top_level_fields_to_defer(self, field_list, keep_if):
         """Method to retrieve the top-level fields to defer, given a list of
         field names (allow or omit) and a condition that determines which
@@ -1230,11 +1240,7 @@ class RetrieveFilteredFieldsMixin:
         if not field_list or model is None:
             return []
 
-        all_fields = [
-            f.name
-            for f in model._meta.get_fields()
-            if getattr(f, "concrete", False)
-        ]
+        all_fields = self._get_concrete_fields_for_model(model)
         return [name for name in all_fields if keep_if(name, field_list)]
 
     def _get_disallowed_top_level_fields_to_defer(self):
@@ -1278,12 +1284,7 @@ class RetrieveFilteredFieldsMixin:
 
             # Filter out nested fields that have a database column associated
             # with them.
-            field_names = [
-                f.name
-                for f in nested_model._meta.get_fields()
-                if getattr(f, "concrete", False)
-            ]
-
+            field_names = self._get_concrete_fields_for_model(nested_model)
             # Determine which nested fields to defer
             for name in field_names:
                 if should_defer(name, items):
@@ -1325,19 +1326,10 @@ class RetrieveFilteredFieldsMixin:
         try:
             request = self.context["request"]
         except KeyError:
-            conf = getattr(settings, "DRF_DYNAMIC_FIELDS", {})
-            if conf.get("SUPPRESS_CONTEXT_WARNING", False) is not True:
-                logger.warning(
-                    "Context does not have access to request. "
-                    "See README for more information."
-                )
+            logger.error("Serializer context does not have access to request.")
+            return []
 
-        # NOTE: drf test framework builds a request object where the query
-        # parameters are found under the GET attribute.
-        params = getattr(
-            request, "query_params", getattr(request, "GET", None)
-        )
-
+        params = request.GET
         try:
             filter_fields = params.get("fields", None).split(",")
         except AttributeError:
@@ -1359,7 +1351,7 @@ class RetrieveFilteredFieldsMixin:
             else:
                 self._flat_allow.add(filtered_field)
 
-            # store top-level and nested fields in the `omit` argument.
+        # store top-level and nested fields in the `omit` argument.
         for omitted_field in omit_fields:
             if "__" in omitted_field:
                 parent, child = omitted_field.split("__", 1)
@@ -1427,14 +1419,9 @@ class DeferredFieldsMixin:
         existing_simple_lookups = list(qs._prefetch_related_lookups)
         for parent_field, child_fields in nested_map.items():
             field = serializer.fields.get(parent_field)
-            if not field:
-                continue
-
             child_serializer = getattr(field, "child", field)
             child_model = getattr(child_serializer.Meta, "model", None)
             parent_model = serializer.Meta.model
-            if not child_model or not parent_model:
-                continue
 
             # Look for FKs in the child serializer linked to the parent model.
             # f.many_to_one is True for ForeignKey fields
