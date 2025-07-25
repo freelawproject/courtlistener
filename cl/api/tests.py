@@ -17,7 +17,7 @@ from django.core.cache import caches
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test import SimpleTestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
