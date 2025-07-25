@@ -15,7 +15,12 @@ from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import connection
-from django.test import AsyncRequestFactory, RequestFactory, override_settings
+from django.test import (
+    AsyncRequestFactory,
+    RequestFactory,
+    SimpleTestCase,
+    override_settings,
+)
 from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -67,7 +72,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
@@ -84,7 +89,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
-from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -572,7 +577,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -587,7 +592,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="3",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -602,7 +607,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -617,7 +622,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -650,7 +655,7 @@ class CitationRedirectorTest(TestCase):
             reporter="U.S.",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="scotus")
@@ -701,7 +706,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="40M",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=df,
                 case_name="People v. Davis",
@@ -1577,7 +1582,7 @@ class TestBlockSearchItemAjax(TestCase):
         # Courts
         court_ca2 = CourtFactory(id="ca2")
         # cluster
-        cls.cluster = OpinionClusterFactoryWithChildrenAndParents(
+        cls.cluster = OpinionClusterWithChildrenAndParentsFactory(
             docket=DocketFactory(court=court_ca2),
             case_name="Fisher v. SD Protection Inc.",
             date_filed=date(2020, 1, 1),

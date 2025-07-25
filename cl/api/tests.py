@@ -17,7 +17,7 @@ from django.core.cache import caches
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test import RequestFactory, override_settings
+from django.test import SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -99,7 +99,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import (
@@ -115,7 +115,6 @@ from cl.search.models import (
 from cl.stats.models import Event
 from cl.tests.cases import (
     ESIndexTestCase,
-    SimpleTestCase,
     TestCase,
     TransactionTestCase,
 )
@@ -218,7 +217,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
         cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FD")
 
-        cls.c_scotus_1 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_scotus_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             docket=DocketFactory(
                 court=cls.court_scotus, docket_number="123456"
@@ -226,7 +225,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             date_filed=date(2000, 8, 15),
         )
-        cls.c_scotus_2 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_scotus_2 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="America vs Bank",
             docket=DocketFactory(
                 court=cls.court_scotus, docket_number="34-2535"
@@ -234,7 +233,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             precedential_status=PRECEDENTIAL_STATUS.ERRATA,
             date_filed=date(2024, 6, 15),
         )
-        cls.c_cand_1 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_cand_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Johnson v. National",
             docket=DocketFactory(
                 court=cls.court_cand, docket_number="36-2000"
@@ -847,7 +846,7 @@ class DRFOrderingTests(TestCase):
         )
 
 
-class FilteringCountTestCase:
+class FilteringCountTestMixin:
     """Mixin for adding an additional test assertion."""
 
     # noinspection PyPep8Naming
@@ -876,7 +875,7 @@ class FilteringCountTestCase:
         return r
 
 
-class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
         Court.objects.all().delete()
@@ -1061,7 +1060,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFJudgeApiFilterTests(
-    SimpleUserDataMixin, TestCase, FilteringCountTestCase
+    SimpleUserDataMixin, TestCase, FilteringCountTestMixin
 ):
     """Do the filters work properly?"""
 
@@ -1255,7 +1254,7 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)  # Bill
 
 
-class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
     fixtures = ["recap_docs.json"]
 
     @classmethod
@@ -1668,7 +1667,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFSearchAppAndAudioAppApiFilterTest(
-    TestCase, AudioTestCase, FilteringCountTestCase
+    AudioTestCase, FilteringCountTestMixin
 ):
     fixtures = [
         "judge_judy.json",
