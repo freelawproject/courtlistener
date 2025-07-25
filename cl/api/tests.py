@@ -880,7 +880,6 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
             in_use=True,
             has_opinion_scraper=True,
             has_oral_argument_scraper=False,
-            position=10,
             start_date=date(2000, 1, 1),
             end_date=None,
             jurisdiction=Court.FEDERAL_APPELLATE,
@@ -896,7 +895,6 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
             in_use=False,
             has_opinion_scraper=False,
             has_oral_argument_scraper=True,
-            position=20,
             start_date=date(2010, 6, 15),
             end_date=date(2020, 12, 31),
             jurisdiction=Court.STATE_SUPREME,
@@ -911,7 +909,6 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
             in_use=True,
             has_opinion_scraper=False,
             has_oral_argument_scraper=False,
-            position=30,
             start_date=date(2015, 5, 20),
             end_date=None,
             jurisdiction=Court.STATE_TRIAL,
@@ -926,7 +923,6 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
             in_use=True,
             has_opinion_scraper=False,
             has_oral_argument_scraper=False,
-            position=40,
             start_date=date(2012, 8, 25),
             end_date=None,
             jurisdiction=Court.FEDERAL_DISTRICT,
@@ -1007,11 +1003,15 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
 
     async def test_position_filter(self):
         """Can we filter courts by position with integer lookups?"""
-        self.q = {"position__gt": "20"}
-        count = await self.qs.filter(position__gt=20).acount()
+        self.q = {"position__gt": self.child_court1.position}
+        count = await self.qs.filter(
+            position__gt=self.child_court1.position
+        ).acount()
         await self.assertCountInResults(count)
-        self.q = {"position__lte": "20"}
-        count = await self.qs.filter(position__lte=20).acount()
+        self.q = {"position__lte": self.child_court1.position}
+        count = await self.qs.filter(
+            position__lte=self.child_court1.position
+        ).acount()
         await self.assertCountInResults(count)
 
     async def test_start_date_filter(self):
@@ -1077,10 +1077,12 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
         self.q = {
             "in_use": "true",
             "has_opinion_scraper": "false",
-            "position__gt": "2",
+            "position__gt": self.child_court1.position,
         }
         count = await self.qs.filter(
-            in_use=True, has_opinion_scraper=False, position__gt=2
+            in_use=True,
+            has_opinion_scraper=False,
+            position__gt=self.child_court1.position,
         ).acount()
         await self.assertCountInResults(count)
 
