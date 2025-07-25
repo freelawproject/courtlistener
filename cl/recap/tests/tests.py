@@ -157,6 +157,7 @@ from cl.users.factories import (
 
 class RecapUtilsTest(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         self.court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
         self.docket = DocketFactory(
             source=Docket.RECAP,
@@ -238,6 +239,7 @@ class RecapUploadsTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         CourtFactory(id="canb", jurisdiction="FB")
         cls.court = CourtFactory.create(
             id="nysd", jurisdiction="FD", in_use=True
@@ -271,6 +273,7 @@ class RecapUploadsTest(TestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap")
         token = f"Token {self.user.auth_token.key}"
@@ -1412,6 +1415,7 @@ class ReplicateRecapUploadsTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         user_profile = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
@@ -2459,6 +2463,7 @@ class RecapDocketFetchApiTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.user_profile = UserProfileWithParentsFactory()
         cls.docket = DocketFactory(
             source=Docket.RECAP,
@@ -2493,6 +2498,7 @@ class RecapDocketFetchApiTest(TestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.user = User.objects.get(username="recap")
 
     def test_fetch_docket_by_docket_number(
@@ -2820,7 +2826,8 @@ class RecapDocketFetchApiTest(TestCase):
 @mock.patch("cl.recap.api_serializers.get_or_cache_pacer_cookies")
 class RecapFetchApiSerializationTestCase(TestCase):
     @classmethod
-    def setUp(cls) -> None:
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.user = UserWithChildProfileFactory.create()
         cls.request = RequestFactory().request()
         cls.request.user = cls.user
@@ -3117,6 +3124,7 @@ class RecapPdfFetchApiTest(TestCase):
     """Can we fetch PDFs properly?"""
 
     def setUp(self) -> None:
+        super().setUp()
         self.district_court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
         self.docket = DocketFactory(
             court=self.district_court,
@@ -3176,6 +3184,7 @@ class RecapPdfFetchApiTest(TestCase):
     def tearDown(self) -> None:
         RECAPDocument.objects.update(is_available=True)
         self.rd.refresh_from_db()
+        super().tearDown()
 
     @mock.patch(
         "cl.corpus_importer.tasks.FreeOpinionReport",
@@ -3437,6 +3446,7 @@ class RecapPdfFetchApiTest(TestCase):
 )
 class RecapAttPageFetchApiTest(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         self.district_court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
         self.district_docket = DocketFactory(
             source=Docket.RECAP, court=self.district_court
@@ -3682,6 +3692,7 @@ class RecapAttPageFetchApiTest(TestCase):
 
 class ProcessingQueueApiFilterTest(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap")
         token = f"Token {self.user.auth_token.key}"
@@ -3749,6 +3760,7 @@ class DebugRecapUploadtest(TestCase):
     """
 
     def setUp(self) -> None:
+        super().setUp()
         self.user = User.objects.get(username="recap")
         self.pdf = SimpleUploadedFile("file.pdf", b"file content more content")
         test_dir = os.path.join(
@@ -3769,6 +3781,7 @@ class DebugRecapUploadtest(TestCase):
         Docket.objects.all().delete()
         DocketEntry.objects.all().delete()
         RECAPDocument.objects.all().delete()
+        super().tearDown()
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
     @mock.patch(
@@ -3838,6 +3851,7 @@ class DebugRecapUploadtest(TestCase):
 
 class RecapPdfTaskTest(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         user = User.objects.get(username="recap")
         self.filename = "file.pdf"
         self.file_content = b"file content more content"
@@ -3881,6 +3895,7 @@ class RecapPdfTaskTest(TestCase):
             self.docket.delete()  # This cascades to self.de and self.rd
         except (Docket.DoesNotExist, AssertionError, ValueError):
             pass
+        super().tearDown()
 
     def test_pq_has_default_status(self) -> None:
         self.assertTrue(self.pq.status == PROCESSING_STATUS.ENQUEUED)
@@ -3991,6 +4006,7 @@ class RecapZipTaskTest(TestCase):
     )
 
     def setUp(self) -> None:
+        super().setUp()
         self.docket = Docket.objects.create(
             source=Docket.DEFAULT, court_id="scotus", pacer_case_id="asdf"
         )
@@ -4018,6 +4034,7 @@ class RecapZipTaskTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         filename = "1-20-cv-10189-FDS.zip"
         user = User.objects.get(username="recap")
 
@@ -4033,6 +4050,7 @@ class RecapZipTaskTest(TestCase):
     def tearDown(self) -> None:
         Docket.objects.all().delete()
         ProcessingQueue.objects.all().delete()
+        super().tearDown()
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
     def test_simple_zip_upload(self, mock_extract):
@@ -4088,6 +4106,7 @@ class RecapZipTaskTest(TestCase):
 
 class RecapAddAttorneyTest(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         self.atty_org_name = "Lane Powell LLC"
         self.atty_phone = "907-276-2631"
         self.atty_email = "jamiesonb@lanepowell.com"
@@ -4172,6 +4191,7 @@ class DocketCaseNameUpdateTest(SimpleTestCase):
     """
 
     def setUp(self) -> None:
+        super().setUp()
         self.d = Docket()
         self.v_case_name = "x v. y"
         self.new_case_name = "x v. z"
@@ -4247,7 +4267,7 @@ class TerminatedEntitiesTest(TestCase):
         #     Attorney self.extraneous_a2 via Role.
         #   Party: self.extraneous_p via PartyType, which has...
         #     Attorney: self.extraneous_a via Role.
-
+        super().setUp()
         self.d = Docket.objects.create(
             source=0,
             court_id="scotus",
@@ -4410,6 +4430,7 @@ class RecapMinuteEntriesTest(TestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.user = User.objects.get(username="recap")
 
     def tearDown(self) -> None:
@@ -4418,6 +4439,7 @@ class RecapMinuteEntriesTest(TestCase):
             pq.filepath_local.delete()
             pq.delete()
         Docket.objects.all().delete()
+        super().tearDown()
 
     def test_all_entries_ingested_without_duplicates(self) -> None:
         """Are all of the docket entries ingested?"""
@@ -4723,6 +4745,7 @@ class DescriptionCleanupTest(SimpleTestCase):
 class RecapDocketTaskTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.court = CourtFactory(id="scotus", jurisdiction="F")
         cls.judge = PersonFactory.create(name_first="John", name_last="Miller")
         PositionFactory.create(
@@ -4748,6 +4771,7 @@ class RecapDocketTaskTest(TestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.user = User.objects.get(username="recap")
         self.filename = "cand.html"
         path = os.path.join(
@@ -4767,6 +4791,7 @@ class RecapDocketTaskTest(TestCase):
         self.pq.filepath_local.delete()
         self.pq.delete()
         Docket.objects.all().delete()
+        super().tearDown()
 
     def test_parsing_docket_does_not_exist(self) -> None:
         """Can we parse an HTML docket we have never seen before?"""
@@ -5286,9 +5311,11 @@ class RecapDocketTaskTest(TestCase):
 class RecapDocketAttachmentTaskTest(TestCase):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.court = CourtFactory(id="cand", jurisdiction="FD")
 
     def setUp(self) -> None:
+        super().setUp()
         self.user = User.objects.get(username="recap")
         self.filename = "cand_7.html"
         path = os.path.join(
@@ -5309,6 +5336,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
         self.pq.delete()
         Docket.objects.all().delete()
         RECAPDocument.objects.all().delete()
+        super().tearDown()
 
     def test_attachments_get_created(self):
         """Do attachments get created if we have a RECAPDocument to match
@@ -5560,9 +5588,11 @@ class ClaimsRegistryTaskTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         CourtFactory(id="canb", jurisdiction="FB")
 
     def setUp(self) -> None:
+        super().setUp()
         self.user = User.objects.get(username="recap")
         self.filename = "claims_registry_njb.html"
         path = os.path.join(
@@ -5582,6 +5612,7 @@ class ClaimsRegistryTaskTest(TestCase):
         self.pq.filepath_local.delete()
         self.pq.delete()
         Docket.objects.all().delete()
+        super().tearDown()
 
     def test_parsing_docket_does_not_exist(self) -> None:
         """Can we parse the claims registry when the docket doesn't exist?"""
@@ -5617,6 +5648,7 @@ class RecapDocketAppellateTaskTest(TestCase):
     fixtures = ["hawaii_court.json"]
 
     def setUp(self) -> None:
+        super().setUp()
         self.user = User.objects.get(username="recap")
         self.filename = "ca9.html"
         path = os.path.join(
@@ -5637,6 +5669,7 @@ class RecapDocketAppellateTaskTest(TestCase):
         self.pq.delete()
         Docket.objects.all().delete()
         OriginatingCourtInformation.objects.all().delete()
+        super().tearDown()
 
     def test_parsing_appellate_docket(self) -> None:
         """Can we parse an HTML docket we have never seen before?"""
@@ -5663,6 +5696,7 @@ class RecapCriminalDataUploadTaskTest(TestCase):
     """
 
     def setUp(self) -> None:
+        super().setUp()
         self.user = User.objects.get(username="recap")
         self.filename = "cand_criminal.html"
         path = os.path.join(
@@ -5682,6 +5716,7 @@ class RecapCriminalDataUploadTaskTest(TestCase):
         self.pq.filepath_local.delete()
         self.pq.delete()
         Docket.objects.all().delete()
+        super().tearDown()
 
     def test_criminal_data_gets_created(self) -> None:
         """Does the criminal data appear in the DB properly when we process
@@ -5701,6 +5736,7 @@ class RecapCriminalDataUploadTaskTest(TestCase):
 
 class RecapAttachmentPageTaskTest(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         user = User.objects.get(username="recap")
         self.filename = "cand.html"
         test_dir = os.path.join(
@@ -5731,6 +5767,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         RECAPDocument.objects.filter(
             document_type=RECAPDocument.ATTACHMENT,
         ).delete()
+        super().tearDown()
 
     def test_attachments_get_created(self):
         """Do attachments get created if we have a RECAPDocument to match
@@ -5764,6 +5801,7 @@ class RecapAttachmentPageTaskTest(TestCase):
 
 class RecapUploadAuthenticationTest(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         self.async_client = AsyncAPIClient()
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
 
@@ -5836,6 +5874,7 @@ class IdbMergeTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.court = Court.objects.get(id="scotus")
         cls.docket_1 = DocketFactory(
             case_name="BARTON v. State Board for Rodgers Educator Certification",
@@ -5864,6 +5903,7 @@ class IdbMergeTest(TestCase):
 
     def tearDown(self) -> None:
         FjcIntegratedDatabase.objects.all().delete()
+        super().tearDown()
 
     def test_merge_from_idb_chunk(self) -> None:
         """Can we successfully merge a chunk of IDB data?"""
@@ -5892,6 +5932,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
     """
 
     def setUp(self) -> None:
+        super().setUp()
         d = Docket.objects.create(
             source=0, court_id="scotus", pacer_case_id="asdf"
         )
@@ -5999,6 +6040,7 @@ class CheckCourtConnectivityTest(TestCase):
     """Test the is_pacer_court_accessible method."""
 
     def setUp(self) -> None:
+        super().setUp()
         self.court_id = "alnb"
         self.r = get_redis_interface("CACHE")
         key = self.r.keys(f"status:pacer:court.{self.court_id}:ip.127.0.0.1")
@@ -6060,6 +6102,7 @@ class WebhooksRetries(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user_profile = UserProfileWithParentsFactory()
         cls.user_profile_2 = UserProfileWithParentsFactory()
         cls.court_nda = CourtFactory(id="ca9", jurisdiction="F")
@@ -6105,6 +6148,7 @@ class WebhooksRetries(TestCase):
         cls.file_stream_error = ContentFile("ERROR")
 
     def setUp(self) -> None:
+        super().setUp()
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
         token = f"Token {self.user.auth_token.key}"
@@ -7232,6 +7276,7 @@ class RecapFetchWebhooksTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.user_profile = UserProfileWithParentsFactory()
         cls.webhook_v1_enabled = WebhookFactory(
@@ -7473,6 +7518,7 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.cand = CourtFactory(id="cand", jurisdiction="FB")
         cls.nyed = CourtFactory(id="nyed", jurisdiction="FB")
         cls.nysd = CourtFactory(id="nysd", jurisdiction="FB")
@@ -7631,6 +7677,7 @@ class LookupDocketsTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
 
@@ -8335,6 +8382,7 @@ class RemoveDuplicatedMinuteEntries(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.cand = CourtFactory(id="cand", jurisdiction="FD")
         cls.d = DocketFactory(
             source=Docket.RECAP,

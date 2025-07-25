@@ -64,7 +64,6 @@ from cl.citations.unmatched_citations_utils import (
 from cl.citations.utils import (
     make_get_citations_kwargs,
 )
-from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
 from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -92,6 +91,7 @@ from cl.tests.cases import (
     TestCase,
     TransactionTestCase,
 )
+from cl.tests.mixins import CourtMixin, PeopleMixin, SearchMixin
 from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -585,7 +585,7 @@ class CitationTextTest(TestCase):
             )
 
 
-class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
+class RECAPDocumentObjectTest(ESIndexTestCase):
     # pass
     @classmethod
     def setUpTestData(cls):
@@ -659,7 +659,7 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
                 self.assertEqual(citation_obj.depth, depth)
 
 
-class CitationObjectTest(ESIndexTestCase, TestCase):
+class CitationObjectTest(ESIndexTestCase):
     fixtures: list = []
 
     @classmethod
@@ -1584,13 +1584,11 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         )
 
 
-class CitationFeedTest(
-    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
-):
+class CitationFeedTest(SearchMixin, ESIndexTestCase):
     @classmethod
     def setUpTestData(cls) -> None:
-        cls.rebuild_index("search.OpinionCluster")
         super().setUpTestData()
+        cls.rebuild_index("search.OpinionCluster")
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.OPINION,
@@ -1640,7 +1638,7 @@ class CitationFeedTest(
         self._tree_has_content(r.content, expected_count)
 
 
-class CitationCommandTest(ESIndexTestCase, TestCase):
+class CitationCommandTest(ESIndexTestCase):
     """Test a variety of the ways that find_citations can be called."""
 
     fixtures: list = []
@@ -2349,16 +2347,14 @@ class GroupParentheticalsTest(SimpleTestCase):
     "cl.api.utils.CitationCountRateThrottle.get_cache_key_for_citations",
     return_value="citations_tests",
 )
-class CitationLookUpApiTest(
-    CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
-):
+class CitationLookUpApiTest(SearchMixin, PeopleMixin, CourtMixin, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         UserProfileWithParentsFactory.create(
             user__username="citation-user",
             user__password=make_password("password"),
         )
-        super().setUpTestData()
 
     @async_to_sync
     async def setUp(self) -> None:

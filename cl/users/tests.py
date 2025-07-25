@@ -50,16 +50,15 @@ from cl.favorites.models import (
 )
 from cl.lib.email_backends import get_email_count
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
     LiveServerTestCase,
-    RestartSentEmailQuotaMixin,
     TestCase,
 )
+from cl.tests.mixins import SimpleUserDataMixin
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_client
 from cl.users.email_handlers import (
@@ -735,6 +734,7 @@ class DisposableEmailTest(SimpleUserDataMixin, TestCase):
     bad_email = f"{user}@{bad_domain}"
 
     def setUp(self) -> None:
+        super().setUp()
         self.client = AsyncClient()
 
     async def test_can_i_create_account_with_bad_email_address(self) -> None:
@@ -774,6 +774,7 @@ class DisposableEmailTest(SimpleUserDataMixin, TestCase):
 
 class LiveUserTest(BaseSeleniumTest):
     def setUp(self) -> None:
+        super().setUp()
         self.up = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
@@ -838,6 +839,7 @@ class LiveUserTest(BaseSeleniumTest):
 class SNSWebhookTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
             open(
@@ -1468,6 +1470,22 @@ class SNSWebhookTest(TestCase):
         )
 
 
+class RestartSentEmailQuotaMixin:
+    """Restart sent email quota in redis."""
+
+    @classmethod
+    def restart_sent_email_quota(cls, prefix="email"):
+        r = get_redis_interface("CACHE")
+        keys = r.keys(f"{prefix}:*")
+
+        if keys:
+            r.delete(*keys)
+
+    def tearDown(self):
+        self.restart_sent_email_quota()
+        super().tearDown()
+
+
 @override_settings(
     EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
     BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -1476,6 +1494,7 @@ class SNSWebhookTest(TestCase):
 class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user = UserFactory()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
@@ -2510,6 +2529,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 class DeleteOldEmailsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.msg1 = EmailSentFactory()
         cls.msg2 = EmailSentFactory()
         cls.msg3 = EmailSentFactory()
@@ -2545,6 +2565,7 @@ class DeleteOldEmailsTest(TestCase):
 class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user = UserFactory()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
@@ -3084,9 +3105,10 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         )
 
 
-class EmailBrokenTest(ESIndexTestCase, TestCase):
+class EmailBrokenTest(ESIndexTestCase):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
             open(
@@ -3380,16 +3402,19 @@ class WebhooksHTMXTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user_1 = UserFactory()
         cls.user_2 = UserFactory()
 
     def setUp(self) -> None:
+        super().setUp()
         self.webhook_path = reverse("webhooks-list")
         self.client = make_client(self.user_1.pk)
         self.client_2 = make_client(self.user_2.pk)
 
     def tearDown(cls):
         Webhook.objects.all().delete()
+        super().tearDown()
 
     async def make_a_webhook(
         self,
@@ -3866,6 +3891,7 @@ class NeonAccountCreationTest(TestCase):
 @patch("cl.users.views.update_neon_account")
 class NeonAccountUpdateTest(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         self.client = AsyncClient()
         self.up = UserProfileWithParentsFactory.create(
             user__username="pandora",

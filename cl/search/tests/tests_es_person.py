@@ -14,8 +14,6 @@ from lxml import html
 from cl.lib.elasticsearch_utils import build_es_base_query, build_es_main_query
 from cl.lib.search_index_utils import extract_field_values
 from cl.lib.test_helpers import (
-    CourtTestCase,
-    PeopleTestCase,
     people_v4_fields,
     position_v4_fields,
     skip_if_common_tests_skipped,
@@ -36,15 +34,18 @@ from cl.search.factories import CourtFactory
 from cl.search.models import SEARCH_TYPES
 from cl.search.tasks import es_save_document, update_es_document
 from cl.tests.cases import (
-    CountESTasksTestCase,
     ESIndexTestCase,
-    TestCase,
-    TransactionTestCase,
-    V4SearchAPIAssertions,
+    ESIndexTransactionTestCase,
+)
+from cl.tests.mixins import (
+    CountESTasksMixin,
+    CourtMixin,
+    PeopleMixin,
+    V4SearchAPIMixin,
 )
 
 
-class PeopleSearchAPICommonTests(CourtTestCase, PeopleTestCase):
+class PeopleSearchAPICommonTestMixin(PeopleMixin, CourtMixin):
     version_api = "v3"
     skip_common_tests = True
 
@@ -244,9 +245,7 @@ class PeopleSearchAPICommonTests(CourtTestCase, PeopleTestCase):
         self.assertIn("Judith", r.content.decode())
 
 
-class PeopleV3APISearchTest(
-    PeopleSearchAPICommonTests, ESIndexTestCase, TestCase
-):
+class PeopleV3APISearchTest(PeopleSearchAPICommonTestMixin, ESIndexTestCase):
     skip_common_tests = False
 
     @classmethod
@@ -578,10 +577,9 @@ class PeopleV3APISearchTest(
 
 
 class PeopleV4APISearchTest(
-    PeopleSearchAPICommonTests,
+    V4SearchAPIMixin,
+    PeopleSearchAPICommonTestMixin,
     ESIndexTestCase,
-    TestCase,
-    V4SearchAPIAssertions,
 ):
     skip_common_tests = False
 
@@ -590,6 +588,7 @@ class PeopleV4APISearchTest(
         cls.rebuild_index("people_db.Person")
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
+            # Call to super must come after indices are rebuilt
             super().setUpTestData()
             call_command(
                 "cl_index_parent_and_child_docs",
@@ -1258,9 +1257,7 @@ class PeopleV4APISearchTest(
             )
 
 
-class PeopleSearchTestElasticSearch(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
-):
+class PeopleSearchTestElasticSearch(PeopleMixin, CourtMixin, ESIndexTestCase):
     """People search tests for Elasticsearch"""
 
     @classmethod
@@ -1999,16 +1996,17 @@ class PeopleSearchTestElasticSearch(
 
 
 class IndexJudgesPositionsCommandTest(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
+    PeopleMixin, CourtMixin, ESIndexTestCase
 ):
     """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
 
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
-        super().setUpTestData()
         cls.delete_index("people_db.Person")
         cls.create_index("people_db.Person")
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
 
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Judges and their positions
@@ -2056,9 +2054,7 @@ class IndexJudgesPositionsCommandTest(
         self.assertEqual(s.count(), 1)
 
 
-class PeopleIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class PeopleIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()

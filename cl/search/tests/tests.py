@@ -34,7 +34,6 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -91,6 +90,7 @@ from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.mixins import CourtMixin, PeopleMixin
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -393,10 +393,11 @@ class RECAPDocumentValidationTest(TestCase):
     "cl.lib.courts.get_cache_key_for_court_list",
     return_value="common_search:minimal-court-list",
 )
-class ESCommonSearchTest(ESIndexTestCase, TestCase):
+class ESCommonSearchTest(ESIndexTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.child_court_1 = CourtFactory(
             id="ny_child_l1_1", jurisdiction="FB", parent_court=cls.court
@@ -1494,7 +1495,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertEqual(body["lte"], "2025-05-10T23:59:59Z")
 
 
-class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
+class SearchAPIV4CommonTest(ESIndexTestCase):
     """Common tests for the Search API V4 endpoints."""
 
     async def test_es_general_bad_request_error_(self) -> None:
@@ -2782,9 +2783,7 @@ class ESIndexingTasksUtils(TestCase):
     "cl.search.management.commands.sweep_indexer.compose_indexer_redis_key",
     return_value="es_sweep_indexer:log_test",
 )
-class SweepIndexerCommandTest(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
-):
+class SweepIndexerCommandTest(PeopleMixin, CourtMixin, ESIndexTestCase):
     """sweep_indexer command tests for Elasticsearch"""
 
     @classmethod
@@ -3175,7 +3174,7 @@ class SweepIndexerCommandTest(
     "cl.search.management.commands.sweep_indexer.compose_indexer_redis_key",
     return_value="es_sweep_indexer:log_remove",
 )
-class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
+class RemoveContentFromESCommandTest(ESIndexTestCase):
     """cl_remove_content_from_es command tests for Elasticsearch"""
 
     @classmethod

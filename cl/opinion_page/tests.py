@@ -30,13 +30,6 @@ from cl.citations.utils import slugify_reporter
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import (
-    CourtTestCase,
-    PeopleTestCase,
-    SearchTestCase,
-    SimpleUserDataMixin,
-    SitemapTest,
-)
 from cl.opinion_page.forms import (
     MeCourtUploadForm,
     MissCourtUploadForm,
@@ -90,6 +83,13 @@ from cl.search.models import (
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.mixins import (
+    CourtMixin,
+    PeopleMixin,
+    SearchMixin,
+    SimpleUserDataMixin,
+    SitemapMixin,
+)
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -119,14 +119,14 @@ class SimpleLoadTest(TestCase):
 
 
 class OpinionPageLoadTest(
+    SearchMixin,
+    PeopleMixin,
+    CourtMixin,
     ESIndexTestCase,
-    CourtTestCase,
-    PeopleTestCase,
-    SearchTestCase,
-    TestCase,
 ):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.o_cluster_1 = OpinionClusterWithParentsFactory.create(
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             citation_count=1,
@@ -186,7 +186,6 @@ class OpinionPageLoadTest(
             pk_offset=0,
             testing_mode=True,
         )
-        super().setUpTestData()
 
     async def test_simple_opinion_page(self) -> None:
         """Does the page load properly?"""
@@ -972,9 +971,10 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
         self.assertInHTML("Get Docket Alerts", r.content.decode())
 
 
-class OpinionSitemapTest(SitemapTest):
+class OpinionSitemapTest(SitemapMixin, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         # Included b/c so new
         OpinionClusterWithParentsFactory.create(
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
@@ -1001,6 +1001,7 @@ class OpinionSitemapTest(SitemapTest):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": SEARCH_TYPES.OPINION}
         )
@@ -1010,9 +1011,10 @@ class OpinionSitemapTest(SitemapTest):
         super().assert_sitemap_has_content()
 
 
-class DocketSitemapTest(SitemapTest):
+class DocketSitemapTest(SitemapMixin, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         # Included b/c so new
         DocketFactory.create(
             source=Docket.RECAP,
@@ -1034,6 +1036,7 @@ class DocketSitemapTest(SitemapTest):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.setUpSiteDomain()
 
         self.sitemap_url = reverse(
@@ -1064,9 +1067,10 @@ class DocketSitemapTest(SitemapTest):
         super().assert_sitemap_has_content()
 
 
-class DocketEmptySitemapTest(SitemapTest):
+class DocketEmptySitemapTest(SitemapMixin, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         # Excluded b/c old
         DocketFactory.create(
             source=Docket.RECAP,
@@ -1087,6 +1091,7 @@ class DocketEmptySitemapTest(SitemapTest):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.setUpSiteDomain()
 
         self.sitemap_url = reverse(
@@ -1112,11 +1117,12 @@ class DocketEmptySitemapTest(SitemapTest):
         )
 
 
-class BlockedSitemapTest(SitemapTest):
+class BlockedSitemapTest(SitemapMixin, TestCase):
     """Do we create sitemaps of recently blocked opinions?"""
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         # Included b/c recently blocked
         OpinionClusterWithParentsFactory.create(
             blocked=True,
@@ -1129,6 +1135,7 @@ class BlockedSitemapTest(SitemapTest):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": "blocked-opinions"}
         )

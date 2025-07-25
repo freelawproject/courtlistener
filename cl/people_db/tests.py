@@ -15,7 +15,7 @@ from cl.search.factories import (
     OpinionWithChildrenFactory,
 )
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Docket, Opinion
-from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
+from cl.tests.cases import ESIndexTestCase, TransactionTestCase
 
 
 class TestPersonWithChildrenFactory(TransactionTestCase):
@@ -35,11 +35,12 @@ class TestPersonWithChildrenFactory(TransactionTestCase):
         )
 
 
-class PersonPageRelatedCases(ESIndexTestCase, TestCase):
+class PersonPageRelatedCases(ESIndexTestCase):
     """Ensure that related cases are properly displayed on the Person detail page."""
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.court_1 = CourtFactory(
             id="cabc",
             full_name="Testing Supreme Court",

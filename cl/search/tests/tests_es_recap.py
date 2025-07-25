@@ -40,7 +40,6 @@ from cl.lib.search_utils import (
     get_results_from_paginator,
 )
 from cl.lib.test_helpers import (
-    RECAPSearchTestCase,
     rd_type_v4_api_keys,
     recap_document_v4_api_keys,
     recap_type_v4_api_keys,
@@ -95,15 +94,18 @@ from cl.search.tasks import (
 )
 from cl.search.types import EventTable
 from cl.tests.cases import (
-    CountESTasksTestCase,
     ESIndexTestCase,
+    ESIndexTransactionTestCase,
     TestCase,
-    TransactionTestCase,
-    V4SearchAPIAssertions,
+)
+from cl.tests.mixins import (
+    CountESTasksMixin,
+    RECAPSearchMixin,
+    V4SearchAPIMixin,
 )
 
 
-class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
+class RECAPSearchTest(RECAPSearchMixin, ESIndexTestCase):
     """
     RECAP Search Tests
     """
@@ -112,6 +114,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
+        # Call to super must come after indices are rebuilt
         super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
@@ -3296,9 +3299,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 )
 
 
-class RECAPSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
-):
+class RECAPSearchDecayRelevancyTest(V4SearchAPIMixin, ESIndexTestCase):
     """
     RECAP Search Decay Relevancy  Tests
     """
@@ -3306,6 +3307,9 @@ class RECAPSearchDecayRelevancyTest(
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.Docket")
+
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
 
         # Same keywords but different dateFiled
         cls.docket_old = DocketFactory(
@@ -3451,7 +3455,6 @@ class RECAPSearchDecayRelevancyTest(
             pacer_doc_id="01903600051",
         )
 
-        super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.RECAP,
@@ -3623,7 +3626,7 @@ class RECAPSearchDecayRelevancyTest(
                 self._test_results_ordering(test, "docket_id", version="v3")
 
 
-class RECAPSearchAPICommonTests(RECAPSearchTestCase):
+class RECAPSearchAPICommonTests(RECAPSearchMixin, TestCase):
     version_api = "v3"
     skip_common_tests = True
 
@@ -3952,7 +3955,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
 
 class RECAPSearchAPIV3Test(
-    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    V4SearchAPIMixin, RECAPSearchAPICommonTests, ESIndexTestCase
 ):
     """
     RECAP Search API V3 Tests
@@ -4331,7 +4334,7 @@ class RECAPESResultSerializerTest(RECAPESResultSerializer):
 
 
 class RECAPSearchAPIV4Test(
-    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    V4SearchAPIMixin, RECAPSearchAPICommonTests, ESIndexTestCase
 ):
     """
     RECAP Search API V4 Tests
@@ -4346,6 +4349,7 @@ class RECAPSearchAPIV4Test(
         cls.rebuild_index("search.Docket")
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
+            # Call to super must come after indices are rebuilt
             super().setUpTestData()
             call_command(
                 "cl_index_parent_and_child_docs",
@@ -6128,12 +6132,13 @@ class RECAPSearchAPIV4Test(
                 )
 
 
-class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
+class RECAPFeedTest(RECAPSearchMixin, ESIndexTestCase):
     """Tests for RECAP Search Feed"""
 
     @classmethod
     def setUpTestData(cls) -> None:
         cls.rebuild_index("search.Docket")
+        # Call to super must come after indices are rebuilt
         super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
@@ -6421,12 +6426,11 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
 
-class IndexDocketRECAPDocumentsCommandTest(
-    ESIndexTestCase, TransactionTestCase
-):
+class IndexDocketRECAPDocumentsCommandTest(ESIndexTransactionTestCase):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
     def setUp(self):
+        super().setUp()
         self.factory = RequestFactory()
         self.site = admin.site
         self.rebuild_index("search.Docket")
@@ -6828,9 +6832,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.assertEqual(es_rd_2.filepath_local, rd_2.filepath_local)
 
 
-class RECAPIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class RECAPIndexingTest(CountESTasksMixin, ESIndexTransactionTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -6838,10 +6840,10 @@ class RECAPIndexingTest(
         cls.rebuild_index("search.Docket")
 
     def setUp(self):
+        super().setUp()
         self.court = CourtFactory(id="canb", jurisdiction="FB")
         self.factory = RequestFactory()
         self.site = admin.site
-        super().setUp()
 
     def _compare_response_child_value(
         self,
@@ -8335,15 +8337,14 @@ class RECAPIndexingTest(
         docket.delete()
 
 
-class RECAPHistoryTablesIndexingTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase
-):
+class RECAPHistoryTablesIndexingTest(RECAPSearchMixin, ESIndexTestCase):
     """RECAP Document indexing from history tables events."""
 
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
+        # Call to super must come after indices are rebuilt
         super().setUpTestData()
         # Non-RECAP Docket.
         cls.non_recap_docket = DocketFactory(
@@ -8355,6 +8356,7 @@ class RECAPHistoryTablesIndexingTest(
         )
 
     def setUp(self):
+        super().setUp()
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.RECAP,
@@ -8685,7 +8687,7 @@ class RECAPHistoryTablesIndexingTest(
             self.r.delete(*keys)
 
 
-class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
+class RECAPFixBrokenRDLinksTest(ESIndexTestCase):
     """Test fix RECAPDocument broken links by leveraging history table events."""
 
     @classmethod

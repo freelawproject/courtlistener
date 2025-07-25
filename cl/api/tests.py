@@ -51,7 +51,6 @@ from cl.disclosures.api_views import (
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.favorites.models import GenericCount
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
     ABARatingViewSet,
     AttorneyViewSet,
@@ -111,13 +110,14 @@ from cl.tests.cases import (
     TestCase,
     TransactionTestCase,
 )
+from cl.tests.mixins import AudioMixin, SimpleUserDataMixin
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 from cl.users.models import UserProfile
 from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 
 
-class BasicAPIPageTest(ESIndexTestCase, TestCase):
+class BasicAPIPageTest(ESIndexTestCase):
     """Test the basic views"""
 
     fixtures = [
@@ -129,8 +129,11 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
+        # Call to super must come after indices are rebuilt
+        super().setUpTestData()
 
     def setUp(self) -> None:
+        super().setUp()
         self.async_client = AsyncClient()
 
     async def test_api_root(self) -> None:
@@ -203,10 +206,11 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             self.assertContains(response, header)
 
 
-class CoverageTests(ESIndexTestCase, TestCase):
+class CoverageTests(ESIndexTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FD")
 
@@ -367,6 +371,7 @@ class ApiQueryCountTests(TransactionTestCase):
         self.addCleanup(ContentType.objects.clear_cache)
 
     def setUp(self) -> None:
+        super().setUp()
         # Add the permissions to the user.
         up = UserProfileWithParentsFactory.create(
             user__username="recap-user",
@@ -388,6 +393,7 @@ class ApiQueryCountTests(TransactionTestCase):
 
     def tearDown(self) -> None:
         UserProfile.objects.all().delete()
+        super().tearDown()
 
     def test_audio_api_query_counts(self, mock_logging_prefix) -> None:
         with self.assertNumQueries(4):
@@ -512,15 +518,18 @@ class ApiEventCreationTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.user = UserFactory.create()
 
     def setUp(self) -> None:
+        super().setUp()
         self.r = get_redis_interface("STATS")
         self.flush_stats()
         self.endpoint_name = "audio-list"
 
     def tearDown(self) -> None:
         self.flush_stats()
+        super().tearDown()
 
     def flush_stats(self) -> None:
         # Flush existing stats (else previous tests cause issues)
@@ -665,6 +674,7 @@ class BlockV3APITests(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.user_1 = UserFactory()
         cls.user_2 = UserFactory()
         cls.client_1 = make_client(cls.user_1.pk)
@@ -676,11 +686,13 @@ class BlockV3APITests(TestCase):
         cls.debt_path_v3 = reverse("debt-list", kwargs={"version": "v3"})
 
     def setUp(self) -> None:
+        super().setUp()
         self.r = get_redis_interface("STATS")
         self.flush_stats()
 
     def tearDown(self) -> None:
         self.flush_stats()
+        super().tearDown()
 
     def flush_stats(self) -> None:
         keys = self.r.keys("api-block-test:*")
@@ -871,6 +883,7 @@ class FilteringCountTestMixin:
 class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         Court.objects.all().delete()
 
         cls.parent_court = CourtFactory(
@@ -936,6 +949,7 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
 
     @async_to_sync
     async def setUp(self):
+        super().setUp()
         self.path = reverse("court-list", kwargs={"version": "v4"})
         self.q: dict[str, Any] = {}
 
@@ -1660,7 +1674,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
 
 
 class DRFSearchAppAndAudioAppApiFilterTest(
-    AudioTestCase, FilteringCountTestMixin
+    AudioMixin, FilteringCountTestMixin, TestCase
 ):
     fixtures = [
         "judge_judy.json",
@@ -1677,6 +1691,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
 
     @async_to_sync
     async def setUp(self) -> None:
+        super().setUp()
         self.assertTrue(
             await self.async_client.alogin(
                 username="recap-user", password="password"
@@ -1896,6 +1911,7 @@ def handle_database_cursor_pagination_wrapper(*args, **kwargs):
 class V4DRFPaginationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user_1 = UserProfileWithParentsFactory.create(
             user__username="recap-user",
             user__password=make_password("password"),
@@ -1915,6 +1931,8 @@ class V4DRFPaginationTest(TestCase):
             )
 
     def setUp(self) -> None:
+        super().setUp()
+
         class SimplePagination(VersionBasedPagination):
             page_size = 5
             max_pagination_depth = 10
@@ -2934,6 +2952,7 @@ class WebhooksProxySecurityTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user_profile = UserProfileWithParentsFactory()
         cls.webhook_https = WebhookFactory(
             user=cls.user_profile.user,
@@ -3018,6 +3037,7 @@ class WebhooksMilestoneEventsTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.user_profile_1 = UserProfileWithParentsFactory()
         cls.user_profile_2 = UserProfileWithParentsFactory()
         cls.webhook_user_1 = WebhookFactory(
@@ -3034,11 +3054,13 @@ class WebhooksMilestoneEventsTest(TestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.r = get_redis_interface("STATS")
         self.flush_stats()
 
     def tearDown(self) -> None:
         self.flush_stats()
+        super().tearDown()
 
     def flush_stats(self) -> None:
         # Flush existing stats
@@ -3215,6 +3237,7 @@ class WebhooksMilestoneEventsTest(TestCase):
 class CountParameterTests(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.user_1 = UserProfileWithParentsFactory.create(
             user__username="recap-user",
             user__password=make_password("password"),
@@ -3243,6 +3266,7 @@ class CountParameterTests(TestCase):
             )
 
     def setUp(self):
+        super().setUp()
         self.client = make_client(self.user_1.user.pk)
 
     async def test_count_on_returns_only_count(self):
@@ -3317,6 +3341,7 @@ class TestApiUsage(SimpleTestCase):
         Set up test environment before each test.
         We create fresh mocks to avoid state bleeding between tests.
         """
+        super().setUp()
         self.mock_redis = MagicMock()
         self.mock_pipeline = MagicMock()
         self.mock_redis.pipeline.return_value = self.mock_pipeline
@@ -3468,8 +3493,8 @@ class TestApiUsage(SimpleTestCase):
 @patch("cl.api.utils.make_cache_key_for_no_filter_mixin")
 class CacheListApiResponseTest(TestCase):
     def setUp(self):
+        super().setUp()
         self.cache = caches["db_cache"]
-        return super().setUp()
 
     def _check_cached_request(self, path, params, cache_key):
         """
@@ -3679,6 +3704,7 @@ class CacheListApiResponseTest(TestCase):
 class EventCountApiTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         # Get the versioned URL for the increment-event endpoint
         cls.increment_event_v4 = reverse(
             "increment-event-list", kwargs={"version": "v4"}
