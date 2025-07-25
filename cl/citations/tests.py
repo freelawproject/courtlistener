@@ -1527,7 +1527,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # have Parentheticals for
         opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
         find_citations_and_parentheticals_for_opinion_by_pks(
-            opinion_pks=[opinion5.pk], disconnect_pg_signals=True
+            opinion_pks=[opinion5.pk], disable_parenthetical_groups=True
         )
         self.assertEqual(
             post_save.receivers[-1][0][0],
