@@ -207,8 +207,10 @@ class Person(AbstractDateTimeModel):
     )
     es_p_field_tracker = FieldTracker(
         fields=[
-            "name_full",
-            "name_full_reverse",
+            "name_first",
+            "name_middle",
+            "name_last",
+            "name_suffix",
             "religion",
             "gender",
             "dob_city",
@@ -221,7 +223,9 @@ class Person(AbstractDateTimeModel):
             "slug",
         ]
     )
-    es_rd_field_tracker = FieldTracker(fields=["name_full"])
+    es_rd_field_tracker = FieldTracker(
+        fields=["name_first", "name_middle", "name_last", "name_suffix"]
+    )
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name_full}"

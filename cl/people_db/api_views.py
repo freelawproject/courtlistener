@@ -5,6 +5,7 @@ from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import TinyAdjustablePagination
 from cl.api.utils import (
+    DeferredFieldsMixin,
     LoggingMixin,
     NoFilterCacheListMixin,
     RECAPUsersReadOnly,
@@ -115,7 +116,7 @@ class PersonDisclosureViewSet(viewsets.ModelViewSet):
     ]
 
 
-class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
+class PersonViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     queryset = (
         Person.objects.all()
         .prefetch_related(
@@ -152,7 +153,9 @@ class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
+class PositionViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = Position.objects.all().order_by("-id")
     serializer_class = PositionSerializer
     filterset_class = PositionFilter
@@ -185,7 +188,9 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
+class RetentionEventViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = RetentionEvent.objects.all().order_by("-id")
     serializer_class = RetentionEventSerializer
     filterset_class = RetentionEventFilter
@@ -204,7 +209,9 @@ class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
+class EducationViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = Education.objects.all().order_by("-id")
     serializer_class = EducationSerializer
     filterset_class = EducationFilter
@@ -223,7 +230,7 @@ class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
+class SchoolViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     queryset = School.objects.all().order_by("-id")
     serializer_class = SchoolSerializer
     filterset_class = SchoolFilter
@@ -242,7 +249,9 @@ class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
+class PoliticalAffiliationViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = PoliticalAffiliation.objects.all().order_by("-id")
     serializer_class = PoliticalAffiliationSerializer
     filterset_class = PoliticalAffiliationFilter
@@ -267,7 +276,7 @@ class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
+class SourceViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     queryset = Source.objects.all().order_by("-id")
     serializer_class = SourceSerializer
     filterset_class = SourceFilter
@@ -286,7 +295,9 @@ class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
     cursor_ordering_fields = ["id", "date_modified"]
 
 
-class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
+class ABARatingViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = ABARating.objects.all().order_by("-id")
     serializer_class = ABARatingSerializer
     filterset_class = ABARatingFilter

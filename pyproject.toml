@@ -137,6 +137,7 @@ dev = [
 
 [tool.uv.sources]
 djangorestframework = { git = "https://github.com/encode/django-rest-framework.git", rev = "cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2" }
+drf-dynamic-fields = { git = "https://github.com/albertisfu/drf-dynamic-fields", branch = "support-filtering-nested-fields" }
 
 [tool.ruff]
 line-length = 79
