@@ -25,7 +25,6 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
     SingleDuplicateError,
-    UnexpectedContentTypeError,
 )
 from cl.scrapers.management.commands import (
     cl_back_scrape_citations,
@@ -47,7 +46,6 @@ from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
     case_names_are_too_different,
     check_duplicate_ingestion,
-    get_binary_content,
     get_existing_docket,
     get_extension,
     update_or_create_docket,
@@ -683,7 +681,7 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = ["text/html"]
         self.assertRaises(
             UnexpectedContentTypeError,
-            get_binary_content,
+            self.site.download_content,
             "/dummy/url/",
             self.site,
         )
@@ -695,13 +693,13 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = ["application/pdf"]
 
         with mock.patch.object(self.logger, "error") as error_mock:
-            _ = get_binary_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/", self.site)
 
             self.mock_response.headers = {
                 "Content-Type": "application/pdf;charset=utf-8"
             }
             mock_get.return_value = self.mock_response
-            _ = get_binary_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/", self.site)
             error_mock.assert_not_called()
 
     @mock.patch("requests.Session.get")
@@ -711,7 +709,7 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = None
 
         with mock.patch.object(self.logger, "error") as error_mock:
-            _ = get_binary_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/", self.site)
             error_mock.assert_not_called()
 
 
