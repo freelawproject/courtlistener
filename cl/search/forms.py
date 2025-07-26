@@ -2,7 +2,9 @@ import datetime
 import re
 from collections import OrderedDict
 
+import waffle
 from django import forms
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.forms import ChoiceField, DateField
 from django.utils.datastructures import MultiValueDictKeyError
@@ -478,6 +480,15 @@ class SearchForm(forms.Form):
         ),
     )
 
+    semantic = forms.BooleanField(
+        label="Whether to enable semantic search in the Search API.",
+        label_suffix="",
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={"class": "external-input form-control left"}
+        ),
+    )
+
     def get_date_field_names(self):
         return {
             f_name.split("_")[0]
@@ -487,6 +498,7 @@ class SearchForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         self.courts = kwargs.pop("courts", None)
+        self.request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
 
         """
@@ -682,6 +694,16 @@ class SearchForm(forms.Form):
         for k, v in cleaned_data.items():
             if isinstance(v, str):
                 cleaned_data[k] = v.strip()
+
+        should_disable_knn_search = (
+            not settings.KNN_SEARCH_ENABLED
+            or not self.request
+            or not waffle.flag_is_active(
+                self.request, "enable_semantic_search"
+            )
+        )
+        if should_disable_knn_search:
+            cleaned_data["semantic"] = False
 
         return cleaned_data
 

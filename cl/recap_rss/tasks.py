@@ -10,6 +10,7 @@ import requests
 from asgiref.sync import async_to_sync
 from celery import Task
 from dateparser import parse
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
@@ -161,8 +162,14 @@ def abort_task(task: Task, feed_status: RssFeedStatus):
     return
 
 
-@app.task(bind=True, max_retries=0)
-def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
+@app.task(
+    bind=True,
+    max_retries=0,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
+def check_if_feed_changed(
+    self: Task, court_pk: str, feed_status_pk: int, date_last_built: datetime
+):
     """Check if the feed changed
 
     For now, we do this in a very simple way, by using the lastBuildDate field
@@ -294,12 +301,12 @@ def hash_item(item):
     return item_hash
 
 
-async def is_cached(item_hash):
+async def is_cached(item_hash: str) -> bool:
     """Check if a hash is in the RSS Item Cache"""
     return await RssItemCache.objects.filter(hash=item_hash).aexists()
 
 
-async def cache_hash(item_hash):
+async def cache_hash(item_hash: str) -> bool:
     """Add a new hash to the RSS Item Cache
 
     :param item_hash: A SHA1 hash you wish to cache.
@@ -315,7 +322,11 @@ async def cache_hash(item_hash):
         return True
 
 
-@app.task(bind=True, max_retries=1)
+@app.task(
+    bind=True,
+    max_retries=1,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
 def merge_rss_feed_contents(
     self, feed_data, court_pk, metadata_only=False
 ) -> list[tuple[int, datetime]]:
@@ -392,15 +403,23 @@ def merge_rss_feed_contents(
     return d_pks_to_alert
 
 
-@app.task
-def mark_status_successful(feed_status_pk):
+@app.task(
+    bind=True,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
+def mark_status_successful(self: Task, feed_status_pk: int) -> None:
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     logger.info("Marking %s as a success.", feed_status.court_id)
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)
 
 
-@app.task
-def trim_rss_data(cache_days=2, status_days=14):
+@app.task(
+    bind=True,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
+def trim_rss_data(
+    self: Task, cache_days: int = 2, status_days: int = 14
+) -> None:
     """Trim the various tracking objects used during RSS parsing
 
     :param cache_days: RssItemCache objects older than this number of days will

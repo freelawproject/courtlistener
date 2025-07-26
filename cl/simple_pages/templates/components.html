@@ -21,10 +21,11 @@
         {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
         {'href': '#data-table', 'text': 'Data table'},
         {'href': '#dialog', 'text': 'Dialog'},
+        {'href': '#callout', 'text': 'Callout'},
       ]},
-      {'href': '#misc', 'text': 'Other components', 'children': [
-        {'href': '#support-banner', 'text': 'Support plea banner'},
-      ]},
+      {'href': '#pure-markup', 'text': 'Pure markup', 'children': [
+      {'href': '#support-banner', 'text': 'Support plea banner'},
+    ]},
   ]"
 >
   <section class="max-w-full w-full" x-intersect.margin.-100px="show" id="main-title">
@@ -675,6 +676,54 @@ Sample code here.
       </c-code>
     </c-expansion-panel>
   </c-layout-with-navigation.section>
+
+  {# CALLOUT #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="callout">
+    <h2 class="mt-6 mb-3">Callout</h2>
+    <p>Displays a highlighted message box for warnings, info, or other notices.</p>
+    <h4 class="mt-3">Demo</h4>
+    <c-callout type="default" title="Default">
+      This is a default callout. Use for general information.
+    </c-callout>
+    <c-callout type="warning" title="Warning!" class="mt-3">
+      This is a warning callout. You can use <strong>bold</strong> or <em>emphasis</em> inside.
+    </c-callout>
+    <c-callout type="danger" title="Danger!" class="mt-3">
+      This is a danger callout. Use for critical alerts.
+    </c-callout>
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>type</code></c-slot>
+        <c-slot name="description">Type of callout. Options: <code>default</code>, <code>warning</code>, <code>danger</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>title</code></c-slot>
+        <c-slot name="description">Title text displayed in bold at the top of the callout.</c-slot>
+      </c-library.item>
+    </c-library.list>
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Content of the callout.</c-slot>
+      </c-library.item>
+    </c-library.list>
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-callout type="default" title="Default"&gt;
+  This is a default callout. Use for general information.
+&lt;/c-callout&gt;
+
+&lt;c-callout type="warning" title="Warning!"&gt;
+  This is a warning callout. You can use &lt;strong&gt;bold&lt;/strong&gt; or &lt;em&gt;emphasis&lt;/em&gt; inside.
+&lt;/c-callout&gt;
+
+&lt;c-callout type="danger" title="Danger!"&gt;
+  This is a danger callout. Use for critical alerts.
+&lt;/c-callout&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
 
   {# SUPPORT PLEA BANNER #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="support-banner">
