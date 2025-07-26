@@ -20,6 +20,7 @@ from cl.opinion_page.views import (
     view_opinion_pdf,
     view_opinion_related_cases,
     view_opinion_summaries,
+    view_opinion_version,
     view_parties,
     view_recap_authorities,
     view_recap_document,
@@ -45,6 +46,11 @@ urlpatterns = [
         name="update_opinion_tabs",
     ),
     path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),  # type: ignore[arg-type]
+    path(
+        "opinion/<int:pk>/<blank-slug:_>/version/<int:opinion_id>/",
+        view_opinion_version,
+        name="view_case_version",
+    ),  # type: ignore[arg-type]
     path(
         "opinion/<int:pk>/<blank-slug:_>/authorities/",
         view_opinion_authorities,

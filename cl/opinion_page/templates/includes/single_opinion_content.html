@@ -1,0 +1,70 @@
+{% if version and not sub_opinion %}
+    <div class="hidden-xs col-sm-2 col-md-2"></div>
+    <div class="col-xs-12 col-sm-8 col-md-8 text-center op-version-error">
+    <h3>We couldn't find the opinion version you are looking for.</h3>
+        <p>Sorry about this. If you continue having problems, please do let us know.</p>
+    <p style="text-indent: 0;">
+        <a href="{% url 'view_case' pk=cluster.id _=cluster.slug %}" class="btn btn-primary btn-sm">
+            Go back to original case
+        </a>
+    </p>
+    </div>
+{% else %}
+    {% if version %}
+        <div class="alert alert-info" role="alert" style="margin-top:20px">
+          You are viewing and old version of the opinion. If you want to view the latest opinion <a href="{% url 'view_case' pk=cluster.id _=cluster.slug %}">Click here</a>
+        </div>
+        {% endif %}
+
+    <h3 class="opinion-section-title jump-link" id="o{{ forloop.counter }}">
+        {{ sub_opinion.get_type_display }}
+        {% if sub_opinion.author %}
+            by <a href="{{ sub_opinion.author.get_absolute_url }}">{{ sub_opinion.author.name_full }}</a>
+        {% elif sub_opinion.author_str %}
+            by {{ sub_opinion.author_str }}
+        {% endif %}
+    </h3>
+    <hr class="hr-opinion">
+
+     {% if 'U' in cluster.source %}
+        <div id="harvard-text" class="v-offset-above-2">
+     {% elif 'Z' in cluster.source %}
+        <div id="columbia-text" class="v-offset-above-2">
+    {% elif 'L' in cluster.source %}
+        <div id="lawbox-text" class="v-offset-above-2">
+    {% elif 'R' in cluster.source %}
+        <div id="resource-org-text" class="v-offset-above-2">
+    {% else %}
+        <div id="default-text" class="v-offset-above-2">
+    {% endif %}
+
+    <div class="subopinion-content">
+        {% if sub_opinion.xml_harvard and sub_opinion.html_with_citations %}
+          <div class="serif-text harvard">{{ sub_opinion.html_with_citations|safe }}</div>
+         {% elif sub_opinion.xml_harvard  %}
+              <div class="serif-text harvard">{{ sub_opinion.xml_harvard|safe }}</div>
+        {% elif sub_opinion.html_with_citations %}
+          {% if cluster.source == "C" %}
+        {# It's a PDF with no HTML enrichment#}
+              {% if sub_opinion.html %}
+                  {# for scrpaed HTML eg. Colo, Okla we do not want to insert line breaks #}
+                  <div class="serif-text scraped-html">{{ sub_opinion.html_with_citations|safe }}</div>
+              {% else %}
+                  <div class="plaintext">{{ sub_opinion.html_with_citations|safe|linebreaksbr }}</div>
+              {% endif %}
+          {% else %}
+            <div class="serif-text">{{ sub_opinion.html_with_citations|safe }}</div>
+          {% endif %}
+        {% elif sub_opinion.html_columbia %}
+          <div class="serif-text">{{ sub_opinion.html_columbia|safe }}</div>
+        {% elif sub_opinion.html_lawbox %}
+          <div class="serif-text">{{ sub_opinion.html_lawbox|safe }}</div>
+        {% elif sub_opinion.html_anon_2020 %}
+          <div class="serif-text">{{ sub_opinion.html_anon_2020|safe }}</div>
+        {% elif sub_opinion.html %}
+          <div class="serif-text">{{sub_opinion.html|safe}}</div>
+        {% else %}
+          <pre>{{sub_opinion.plain_text}}</pre>
+        {% endif %}
+    </div>
+{% endif %}

@@ -114,6 +114,28 @@
                 </a>
               </li>
               {% endfor %}
+
+        {%  if cluster.opinions_versions %}
+        <p style="margin-top: 10px;">
+          <button class="btn btn-light btn-sm collapsed" type="button" data-toggle="collapse" data-target="#collapseVersions" aria-expanded="false" aria-controls="collapseVersions">
+            Opinion versions
+          </button>
+        </p>
+        <div class="collapse" id="collapseVersions" aria-expanded="false" style="height: 0px;">
+          <div class="card card-body">
+              <ul style="padding-inline-start: 20px;">
+              {% for sub_opinion in cluster.opinions_versions %}
+                    <li>
+                        <a href="#version{{ sub_opinion.pk }}" style="color: gray"
+                           hx-get="{% url 'view_case_version' cluster.pk cluster.slug sub_opinion.pk %}"
+                           hx-target="#opinion-container">{{ sub_opinion.date_created }}</a>
+                    </li>
+              {% endfor %}
+              </ul>
+          </div>
+        </div>
+        {% endif %}
+
           </div>
         {% endif %}
 
