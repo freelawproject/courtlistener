@@ -35,17 +35,3 @@ def is_bot(request: HttpRequest) -> bool:
         "yodaobot",
     ]
     return base_bot_matcher(request, known_bots)
-
-
-def is_og_bot(request: HttpRequest) -> bool:
-    """Check if it's a bot that understands opengraph / twitter cards"""
-    known_bots = [
-        "facebookexternalhit",
-        "iframely",  # A service for getting open graph data?
-        "LinkedInBot",
-        "mastodon",
-        "skypeuripreview",
-        "slackbot-linkexpanding",
-        "twitterbot",
-    ]
-    return base_bot_matcher(request, known_bots)
