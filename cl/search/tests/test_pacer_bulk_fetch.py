@@ -477,7 +477,7 @@ class PacerBulkFetchUnitTest(TestCase):
         RECAPDocumentFactory(
             docket_entry=de_5,
             document_number=4,
-            pacer_doc_id=f"11236",
+            pacer_doc_id="11236",
             is_available=False,
             page_count=1500,
             description="Notice of Transcript of",
@@ -485,7 +485,7 @@ class PacerBulkFetchUnitTest(TestCase):
         RECAPDocumentFactory(
             docket_entry=de_5,
             document_number=5,
-            pacer_doc_id=f"11237",
+            pacer_doc_id="11237",
             is_available=False,
             page_count=1500,
             description="96 Transcripts-Part 3",
@@ -493,7 +493,7 @@ class PacerBulkFetchUnitTest(TestCase):
         RECAPDocumentFactory(
             docket_entry=de_5,
             document_number=6,
-            pacer_doc_id=f"11238",
+            pacer_doc_id="11238",
             is_available=False,
             page_count=1500,
             description="Deposition Transcripts by",
@@ -501,7 +501,7 @@ class PacerBulkFetchUnitTest(TestCase):
         RECAPDocumentFactory(
             docket_entry=de_5,
             document_number=7,
-            pacer_doc_id=f"11239",
+            pacer_doc_id="11239",
             is_available=False,
             page_count=1500,
             description="Exhibit PX 25 (transcripts)",
@@ -753,7 +753,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
         RECAPDocumentFactory(
             docket_entry=de_3,
             document_number=4,
-            pacer_doc_id=f"1236",
+            pacer_doc_id="1236",
             is_available=False,
             page_count=1500,
             description="Trial Transcripts",
@@ -765,7 +765,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
         RECAPDocumentFactory(
             docket_entry=de_5,
             document_number=4,
-            pacer_doc_id=f"1237",
+            pacer_doc_id="1237",
             is_available=False,
             page_count=1500,
             description="",
