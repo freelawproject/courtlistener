@@ -3,8 +3,12 @@ from collections.abc import Awaitable, Callable
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 from django.conf import settings
 from django.http import HttpRequest, HttpResponseBase
+from django.template import TemplateDoesNotExist
+from django.template.loader import select_template
 from django.template.response import TemplateResponse
 from waffle import flag_is_active
+
+from cl.search.forms import CorpusSearchForm
 
 
 class RobotsHeaderMiddleware:
@@ -92,7 +96,15 @@ class IncrementalNewTemplateMiddleware:
         ):
             old_template = response.template_name
             if isinstance(old_template, str):
-                new_template = f"v2_{old_template}"
-                response.template_name = [new_template, old_template]
+                new_template_name = f"v2_{old_template}"
+
+                try:
+                    # verify the new template actually exists
+                    select_template([new_template_name])
+                except TemplateDoesNotExist:
+                    return response
+
+                response.template_name = new_template_name
+                response.context_data["search_form"] = CorpusSearchForm()
 
         return response

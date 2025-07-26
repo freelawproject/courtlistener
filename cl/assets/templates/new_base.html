@@ -73,7 +73,7 @@
 
 <body class="{% block body-classes %}{% endblock %}">
   {% block header %}
-    <c-header :request="request" only></c-header>
+    <c-header :request="request" :search_form="search_form" only></c-header>
   {% endblock %}
 
   <main id="main">

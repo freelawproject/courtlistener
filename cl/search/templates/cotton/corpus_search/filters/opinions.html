@@ -1,0 +1,61 @@
+{% load svg_tags %}
+
+<c-vars search_form/>
+
+<fieldset x-bind:id="fieldsetIds.opinions" class="contents" x-show="isActiveScope" data-scope="Case Law">
+  <legend class="sr-only">Case law filters</legend>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.case_name.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.case_name }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.docket_number.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.docket_number }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.citation.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.citation }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.judge.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.judge }}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-2">
+    <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+      {{ search_form.filed_after.label_tag }}
+      <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
+        {% svg "calendar" class="w-5 h-5" %}
+        {{ search_form.filed_after }}
+      </div>
+    </div>
+    <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+      {{ search_form.filed_before.label_tag }}
+      <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
+        {% svg "calendar" class="w-5 h-5" %}
+        {{ search_form.filed_before }}
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    <label>Precedential Status</label>
+    <div class="focus-container input-text">
+{#        {% for facet_field in facet_fields %}#}
+{#          <option value=""></option>#}
+{#        {% endfor %}#}
+    </div>
+  </div>
+</fieldset>
