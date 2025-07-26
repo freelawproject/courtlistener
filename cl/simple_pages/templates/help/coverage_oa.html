@@ -45,13 +45,13 @@
 </div>
 
 <div class="col-xs-12 col-md-8 col-lg-6" role="main">
-  <h1 id="overview">Data Coverage — What Oral Argument Recordings Does CourtListener Have?</h1>
+  <h1 id="overview">Data Coverage — What Oral Arguments Does CourtListener Have?</h1>
   <p class="lead">Our <a href="{% url "advanced_oa" %}">database of oral argument recordings</a> is the largest on the Internet.
   </p>
 
   <p>Each hour, we gather audio files from the Supreme Court and the Federal Circuit Courts listed below. For many of these courts, we also gathered everything they had available on their website so that we would have as complete a collection as possible. We are seeking partnerships with courts to host their older content from their archives.
   </p>
-  <p>As we gather audio files from court websites, we convert them into enhanced audio files, which we make available in our <a href="{% url "advanced_oa" %}">search engine</a>, <a href="{% url "alert_help" %}">alerts</a>, <a href="{% url "api_index" %}">APIs</a>, and <a href="{% url "podcasts" %}">podcasts</a>.
+  <p>As we gather audio files from court websites, we convert them into enhanced audio files, which we make available in our <a href="{% url "advanced_oa" %}">search engine</a>, <a href="{% url "alert_help" %}">alerts</a>, <a href="{% url "api_index" %}">APIs</a>, and <a href="{% url "podcasts" %}">podcasts</a>. We also create transcripts for nearly every audio file just minutes after the audio becomes available on court websites, making oral arguments more searchable and accessible.
   <p id="courts">These circuit courts are currently supported:</p>
   <div class="row">
     {% for row in courts_with_oral_argument_scrapers|rows:2 %}
