@@ -1,5 +1,5 @@
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Mapping
 
 from cl.lib.redis_utils import get_redis_interface
 

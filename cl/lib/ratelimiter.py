@@ -1,7 +1,6 @@
 import functools
 import socket
 import sys
-from typing import Tuple
 
 from django.conf import settings
 from django.core.cache import caches
@@ -197,7 +196,7 @@ def is_allowlisted(request: HttpRequest) -> bool:
     return approved_crawler
 
 
-def parse_rate(rate: str) -> Tuple[int, int]:
+def parse_rate(rate: str) -> tuple[int, int]:
     """
 
     Given the request rate string, return a two tuple of:

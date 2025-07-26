@@ -10,7 +10,15 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.mail import EmailMessage
-from django.db.models import Count, QuerySet, Sum
+from django.db.models import (
+    Case,
+    Count,
+    IntegerField,
+    QuerySet,
+    Sum,
+    Value,
+    When,
+)
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.template import loader
 from django.template.response import TemplateResponse
@@ -84,16 +92,31 @@ async def help_home(request: HttpRequest) -> HttpResponse:
 
 
 async def alert_help(request: HttpRequest) -> HttpResponse:
-    no_feeds = Court.federal_courts.all_pacer_courts().filter(
-        pacer_has_rss_feed=False,
+    jurisdiction_ordering = Case(
+        When(jurisdiction="F", then=Value(0)),
+        When(jurisdiction="FD", then=Value(1)),
+        When(jurisdiction="FB", then=Value(2)),
+        default=Value(999),
+        output_field=IntegerField(),
+    )  # Sort apellate courts first, then district, then bankruptcy.
+
+    no_feeds = (
+        Court.federal_courts.all_pacer_courts()
+        .filter(
+            pacer_has_rss_feed=False,
+        )
+        .order_by(jurisdiction_ordering)
     )
     partial_feeds = (
         Court.federal_courts.all_pacer_courts()
         .filter(pacer_has_rss_feed=True)
         .exclude(pacer_rss_entry_types="all")
+        .order_by(jurisdiction_ordering)
     )
-    full_feeds = Court.federal_courts.all_pacer_courts().filter(
-        pacer_has_rss_feed=True, pacer_rss_entry_types="all"
+    full_feeds = (
+        Court.federal_courts.all_pacer_courts()
+        .filter(pacer_has_rss_feed=True, pacer_rss_entry_types="all")
+        .order_by(jurisdiction_ordering)
     )
     cache_key = "alert-help-stats"
     data = await cache.aget(cache_key)
@@ -113,6 +136,9 @@ async def alert_help(request: HttpRequest) -> HttpResponse:
         "partial_feeds": partial_feeds,
         "full_feeds": full_feeds,
         "private": False,
+        "rt_alerts_sending_rate": int(
+            settings.REAL_TIME_ALERTS_SENDING_RATE / 60
+        ),
     }
     context.update(data)
     return TemplateResponse(request, "help/alert_help.html", context)
@@ -140,6 +166,13 @@ async def prayer_help(request: HttpRequest) -> HttpResponse:
     }
 
     return TemplateResponse(request, "help/prayer_help.html", context)
+
+
+async def relative_dates(request: HttpRequest) -> HttpResponse:
+    context = {
+        "private": False,
+    }
+    return TemplateResponse(request, "help/relative_dates_help.html", context)
 
 
 async def tag_notes_help(request: HttpRequest) -> HttpResponse:
@@ -279,7 +312,15 @@ async def coverage_oa(request: HttpRequest) -> HttpResponse:
         request,
         "help/coverage_oa.html",
         {
-            "courts_with_oral_argument_scrapers": oral_argument_courts,
+            "courts_with_oral_argument_scrapers": oral_argument_courts,  # -> can be safely removed once new design is launched
+            "courts_list": [
+                {
+                    "href": f"/?q=&court_{court.pk}=on&order_by=dateArgued+desc&type=oa",
+                    "label": court,
+                    "ref": "nofollow",
+                }
+                async for court in oral_argument_courts
+            ],
             "private": False,
         },
     )
@@ -392,8 +433,7 @@ async def contact(
 
             default_from = settings.DEFAULT_FROM_EMAIL
             message = EmailMessage(
-                subject="[CourtListener] Contact: "
-                "{phone_number}".format(**cd),
+                subject="[CourtListener] Contact: {phone_number}".format(**cd),
                 body="Subject: {phone_number}\n"
                 "From: {name}\n"
                 "User Email: <{email}>\n"
@@ -448,9 +488,10 @@ async def old_terms(request: HttpRequest, v: str) -> HttpResponse:
         request,
         f"terms/{v}.html",
         {
-            "title": "Archived Terms of Service and Policies, v%s – "
-            "CourtListener.com" % v,
+            "title": f"Archived Terms of Service and Policies, v{v} – "
+            "CourtListener.com",
             "private": True,
+            "is_archived": True,
         },
     )
 

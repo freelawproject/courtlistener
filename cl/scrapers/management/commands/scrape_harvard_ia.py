@@ -1,11 +1,10 @@
 # !/usr/bin/python
-# -*- coding: utf-8 -*-
 
 import json
 import os
 import re
 from pathlib import Path
-from typing import List, Optional, TypedDict
+from typing import TypedDict
 
 import internetarchive as ia
 import requests
@@ -21,13 +20,13 @@ from cl.lib.utils import human_sort
 
 class OptionsType(TypedDict):
     reporter: str
-    volumes: Optional[range]
+    volumes: range | None
 
 
 def fetch_ia_volumes(
     ia_session: ArchiveSession,
     options: OptionsType,
-) -> List[str]:
+) -> list[str]:
     """Find and order volumes for a reporter (if found).
 
     :param ia_session: The IA archive session object
@@ -56,10 +55,12 @@ def fetch_ia_volumes(
 
     # Return only the volumes requested, if specified
     vol_pattern = "|".join(
-        f"(.*{reporter}.{volume}(_\d+)?$)" for volume in volumes
+        rf"(.*{reporter}.{volume}(_\d+)?$)" for volume in volumes
     )
     results = [
-        res for res in results if re.match(vol_pattern, res["identifier"])  # type: ignore
+        res
+        for res in results
+        if re.match(vol_pattern, res["identifier"])  # type: ignore
     ]
     return results
 

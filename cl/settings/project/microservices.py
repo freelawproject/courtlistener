@@ -4,6 +4,13 @@ env = environ.FileAwareEnv()
 
 DISCLOSURE_HOST = env("DISCLOSURE_HOST", default="http://cl-disclosures:5050")
 DOCTOR_HOST = env("DOCTOR_HOST", default="http://cl-doctor:5050")
+INCEPTION_CPU_HOST = env(
+    "INCEPTION_CPU_HOST", default="http://host.docker.internal:8005"
+)
+INCEPTION_GPU_HOST = env(
+    "INCEPTION_GPU_HOST", default="http://host.docker.internal:8005"
+)
+INCEPTION_TIMEOUT = env.int("INCEPTION_TIMEOUT", default=60)
 
 MICROSERVICE_URLS = {
     # DOCTOR Endpoints
@@ -70,5 +77,13 @@ MICROSERVICE_URLS = {
     "extract-disclosure": {
         "url": f"{DISCLOSURE_HOST}/extract/disclosure/",
         "timeout": 60 * 60 * 2,
+    },
+    "inception-batch": {
+        "url": f"{INCEPTION_GPU_HOST}/api/v1/embed/batch",
+        "timeout": INCEPTION_TIMEOUT,
+    },
+    "inception-query": {
+        "url": f"{INCEPTION_CPU_HOST}/api/v1/embed/query",
+        "timeout": INCEPTION_TIMEOUT,
     },
 }

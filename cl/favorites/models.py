@@ -2,6 +2,7 @@ import pghistory
 from django.contrib.auth.models import User
 from django.core.validators import MaxLengthValidator
 from django.db import models
+from django.utils import timezone
 
 from cl.audio.models import Audio
 from cl.lib.models import AbstractDateTimeModel
@@ -200,3 +201,54 @@ class Prayer(models.Model):
                 name="favorites_prayer_date_created_user_id_status_880d7280_idx",
             ),
         ]
+
+
+# model to keep track of when we last checked whether a given PACER document was still unavailable for purchase
+class PrayerAvailability(models.Model):
+    recap_document = models.ForeignKey(
+        RECAPDocument,
+        help_text="The document people prayed for.",
+        related_name="prayeravailability",
+        on_delete=models.CASCADE,
+    )
+    last_checked = models.DateTimeField(
+        help_text="The time when the availability of this document was last checked.",
+        default=timezone.now,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recap_document"],
+                name="unique_recap_document",
+                include=["last_checked"],
+            ),
+        ]
+        verbose_name_plural = "Prayer Availabilities"
+
+
+class GenericCount(models.Model):
+    label = models.CharField(
+        max_length=255,
+        primary_key=True,
+        unique=True,
+        help_text=(
+            "A namespaced identifier for the object and action being tracked. "
+            "Use a consistent format like 'd.1234:view' for views on docket "
+            "with ID 1234, or 'o.456:view' for views on opinion with ID 456."
+        ),
+    )
+    value = models.BigIntegerField(
+        default=0,
+        help_text=(
+            "The number of times the action (e.g., view) has occurred for "
+            "the object identified by the key."
+        ),
+    )
+
+    class Meta:
+        verbose_name = "Generic Counter"
+        verbose_name_plural = "Generic Counters"
+
+    def __str__(self):
+        return f"{self.label}: {self.value}"

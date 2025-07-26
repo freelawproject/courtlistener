@@ -1,5 +1,7 @@
 import time
 
+from django.conf import settings
+
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     query_and_send_alerts_by_rate,
 )
@@ -33,4 +35,4 @@ class Command(VerboseCommand):
                 break
 
             # Wait for 5 minutes.
-            time.sleep(300)
+            time.sleep(settings.REAL_TIME_ALERTS_SENDING_RATE)

@@ -143,7 +143,7 @@ def naturalduration(seconds, autoescape=None, as_dict=False):
             "s": trunc_s,
         }
     else:
-        duration = "%02d:%02d:%02d:%02d" % (trunc_d, trunc_h, trunc_m, trunc_s)
+        duration = f"{trunc_d:02d}:{trunc_h:02d}:{trunc_m:02d}:{trunc_s:02d}"
         trimmed_duration = duration.lstrip("0:")
         if len(trimmed_duration) == 0:
             # It was ALL trimmed away.

@@ -378,9 +378,7 @@
   "date_modified": "2023-03-31T07:15:28.409594-07:00"
 },
 ...</pre>
-    <p>You can also exclude fields using <code>fields!=educations,date_modified</code>.
-    </p>
-    <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/wimglenn/djangorestframework-queryfields/issues/8" target="_blank">there is an open issue tracking this</a>.
+    <p>You can also exclude fields using <code>omit=educations,date_modified</code>. Unfortunately, this cannot currently be used for nested resources.
     </p>
 
     <h3 id="pagination">Pagination</h3>
@@ -394,7 +392,7 @@
     </ol>
 
     <h3 id="rates">Rate Limits</h3>
-    <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation.
+    <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation. Creating more than one account per project, person, or organization is forbidden. If you are in doubt, please contact us before creating multiple accounts.
     </p>
     <p>To debug throttling issues:</p>
     <ol>

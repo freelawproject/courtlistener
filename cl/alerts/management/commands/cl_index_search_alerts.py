@@ -1,7 +1,7 @@
 from cl.alerts.models import Alert
 from cl.alerts.tasks import es_save_alert_document
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.documents import AudioPercolator
+from cl.search.documents import AudioPercolator, RECAPPercolator
 from cl.search.models import SEARCH_TYPES
 
 
@@ -21,16 +21,27 @@ class Command(VerboseCommand):
             choices=SEARCH_TYPES.ALL_TYPES,
             help=f"The Search Alert query type to index ({', '.join(SEARCH_TYPES.ALL_TYPES)})",
         )
+        parser.add_argument(
+            "--index-name",
+            help="The ES target index name. If not provided, the default for "
+            "the alert type will be used.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
         pk_offset = options["pk_offset"]
         alert_type = options["alert_type"]
+        index_name = options.get("index_name")
 
+        alerts_types = (
+            [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+            if alert_type == SEARCH_TYPES.RECAP
+            else [alert_type]
+        )
         # Filter Alert objects by pk_offset and query alert type to index.
         queryset = (
             Alert.objects.filter(
-                pk__gte=pk_offset, query__icontains=f"type={alert_type}"
+                pk__gte=pk_offset, alert_type__in=alerts_types
             )
             .only("pk", "rate", "query")
             .order_by("pk")
@@ -38,6 +49,8 @@ class Command(VerboseCommand):
 
         if alert_type == SEARCH_TYPES.ORAL_ARGUMENT:
             es_document = AudioPercolator
+        elif alert_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+            es_document = RECAPPercolator
         else:
             logger.info(
                 f"'{alert_type}' Alert type indexing is not supported yet."
@@ -48,7 +61,9 @@ class Command(VerboseCommand):
         # Indexing the Alert objects
         for alert in queryset.iterator():
             logger.info(f"Indexing Alert with ID: {alert.pk}")
-            es_save_alert_document.delay(alert.pk, es_document.__name__)
+            es_save_alert_document.delay(
+                alert.pk, es_document.__name__, index_name
+            )
             indexing_counter += 1
 
         self.stdout.write(

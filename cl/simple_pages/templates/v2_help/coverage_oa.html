@@ -1,0 +1,44 @@
+{% extends 'new_base.html' %}
+{% load partition_util %}
+
+
+{% block title %}Oral Argument Archive Coverage — CourtListener.com{% endblock %}
+{% block og_title %}Oral Argument Archive Coverage — CourtListener.com{% endblock %}
+{% block description %}CourtListener has the biggest collection of oral argument recordings on the Internet. Learn more about what we have in this vast collection.{% endblock %}
+{% block og_description %}CourtListener has the biggest collection of oral argument recordings on the Internet. Learn more about what we have in this vast collection.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#courts', 'text': 'Included Courts'},
+  ]"
+>
+  <c-layout-with-navigation.section id="about">
+    <h1 class="text-display-xs">Data Coverage — What Oral Argument Recordings Does CourtListener Have?</h1>
+    <p class="lead">Our <a class="text-primary-600" href="{% url "advanced_oa" %}">database of oral argument recordings</a> is the largest on the Internet.
+    </p>
+    <p>Each hour, we gather audio files from the Supreme Court and the Federal Circuit Courts listed below. For many of these courts, we also gathered everything they had available on their website so that we would have as complete a collection as possible. We are seeking partnerships with courts to host their older content from their archives.
+    </p>
+    <p>As we gather audio files from court websites, we convert them into enhanced audio files, which we make available in our <a class="text-primary-600" href="{% url "advanced_oa" %}">search engine</a>, <a class="text-primary-600" href="{% url "alert_help" %}">alerts</a>, <a class="text-primary-600" href="{% url "api_index" %}">APIs</a>, and <a class="text-primary-600" href="{% url "podcasts" %}">podcasts</a>.
+    </p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="courts">
+    <p>These circuit courts are currently supported:</p>
+    <div class="flex flex-col md:flex-row justify-between">
+    <c-two-column-list
+      responsive
+      :list="courts_list"
+      link_class="text-primary-600 underline"
+      class="marker:text-primary-600 text-md font-normal"
+    ></c-two-column-list>
+    </div>
+    <p>This list continues to grow as we receive <a class="underline" target="_blank" rel="noopener noreferrer" href="https://donate.free.law/forms/supportflp">financial support</a>, code contributions, and <a class="text-primary-600" href="{% url "contact" %}">requests</a> for additional jurisdictions. As with everything we do, your support helps make this project possible.
+    </p>
+  </c-layout-with-navigation.section>
+
+  <c-support-plea-banner></c-support-plea-banner>
+</c-layout-with-navigation>
+{% endblock %}

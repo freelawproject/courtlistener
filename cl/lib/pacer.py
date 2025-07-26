@@ -3,8 +3,9 @@ import pickle
 import re
 import socket
 from collections import OrderedDict
-from datetime import date, datetime, timezone
-from typing import Mapping, Optional, TypedDict
+from collections.abc import Mapping
+from datetime import UTC, date, datetime
+from typing import TypedDict
 
 import requests
 import usaddress
@@ -114,7 +115,9 @@ def lookup_and_save(new, debug=False):
     if not debug:
         d.save()
         logger.info(
-            f"Saved as Docket {d.pk}: https://www.courtlistener.com{d.get_absolute_url()}"
+            "Saved as Docket %s: https://www.courtlistener.com%s",
+            d.pk,
+            d.get_absolute_url(),
         )
     return d
 
@@ -210,7 +213,7 @@ def process_docket_data(
     d: Docket,
     report_type: int,
     filepath: str | None = None,
-) -> Optional[int]:
+) -> int | None:
     """Process docket data file.
 
     :param d: A docket object to work on.
@@ -242,12 +245,12 @@ def process_docket_data(
         report = ClaimsRegister(court_id)
     else:
         raise NotImplementedError(
-            "The report type with id '%s' is not yet "
-            "supported. Perhaps you need to add it?" % report_type
+            f"The report type with id '{report_type}' is not yet "
+            "supported. Perhaps you need to add it?"
         )
 
     if filepath:
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             text = f.read()
     else:
         # This is an S3 path, so get it remotely.
@@ -515,8 +518,8 @@ def normalize_attorney_contact(c, fallback_name=""):
         # See https://github.com/datamade/probableparsing/issues/2 for why we
         # catch the UnicodeEncodeError. Oy.
         logger.warning(
-            "Unable to parse address (RepeatedLabelError): %s"
-            % ", ".join(c.split("\n"))
+            "Unable to parse address (RepeatedLabelError): %s",
+            ", ".join(c.split("\n")),
         )
         return {}, atty_info
 
@@ -525,8 +528,8 @@ def normalize_attorney_contact(c, fallback_name=""):
 
     if any([address_type == "Ambiguous", "CountryName" in address_info]):
         logger.warning(
-            "Unable to parse address (Ambiguous address type): %s"
-            % ", ".join(c.split("\n"))
+            "Unable to parse address (Ambiguous address type): %s",
+            ", ".join(c.split("\n")),
         )
         return {}, atty_info
 
@@ -568,7 +571,7 @@ def check_pacer_court_connectivity(court_id: str) -> ConnectionType:
     blocked_dict: ConnectionType = {
         "connection_ok": connection_ok,
         "status_code": status_code,
-        "date_time": datetime.now(timezone.utc),
+        "date_time": datetime.now(UTC),
     }
     return blocked_dict
 

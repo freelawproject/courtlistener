@@ -44,29 +44,37 @@ info_tips = (
     'In 2017, Free Law Project <a href="https://free.law/2017/01/10/le-hackie-2016/">was awarded a Le Hackie from D.C. Legal Hackers</a> for our research and blogging about PACER.'
     # Open source
     'All of the code powering CourtListener is <a href="https://github.com/freelawproject/courtlistener">open source</a> and can be copied, shared, and contributed to.',
-    'We need volunteers to help us with coding, design, and legal research. <a href="%s">Contact us for more info</a>.'
-    % reverse("contact"),
+    'We need volunteers to help us with coding, design, and legal research. <a href="{}">Contact us for more info</a>.'.format(
+        reverse("contact")
+    ),
     'The current design of CourtListener was <a href="https://free.law/2014/11/13/check-out-courtlisteners-new-paint-and-features/">created by a volunteer</a>.',
     # Neutral Citations
-    'WestLaw currently has a monopoly on citations. This hinders legal innovation but few courts have adopted <a href="%s#explain-neutral-citations">neutral citations</a>.'
-    % reverse("faq"),
+    'WestLaw currently has a monopoly on citations. This hinders legal innovation but few courts have adopted <a href="{}#explain-neutral-citations">neutral citations</a>.'.format(
+        reverse("faq")
+    ),
     # Features
-    'You can <a href="%s">create an alert</a> for any query to receive an email if the query has new results.'
-    % reverse("alert_help"),
-    'There is an <a href="%s">RSS feed</a> for every query so you can easily stay up to date.'
-    % reverse("feeds_info"),
-    'You can make sophisticated queries using a number of <a href="%s">advanced search features</a>.'
-    % reverse("advanced_search"),
+    'You can <a href="{}">create an alert</a> for any query to receive an email if the query has new results.'.format(
+        reverse("alert_help")
+    ),
+    'There is an <a href="{}">RSS feed</a> for every query so you can easily stay up to date.'.format(
+        reverse("feeds_info")
+    ),
+    'You can make sophisticated queries using a number of <a href="{}">advanced search features</a>.'.format(
+        reverse("advanced_search")
+    ),
     'You can get an alert whenever an opinion is cited by <a href="https://free.law/2020/02/20/citation-alerts/">using a Citation Search</a>.',
     'We <a href="https://free.law/2016/02/22/viz/">partnered with University of Baltimore</a> to make a system of visualizing Supreme Court Cases.',
     'Information from the Supreme Court Database <a href="https://free.law/2016/09/06/legacy-scdb/">is available for nearly every SCOTUS case</a>, making it easy to get in-depth analysis.',
     # Oral Arguments
-    'A podcast is created for every oral argument query that you make using <a href="%s">the oral Argument search engine</a>.'
-    % reverse("advanced_oa"),
-    'CourtListener has an <a href="%s">API</a> so anybody can easily use our data.'
-    % reverse("api_index"),
-    'Oral argument podcasts <a href="%s">are available wherever you get your podcasts</a>.'
-    % reverse("podcasts"),
+    'A podcast is created for every oral argument query that you make using <a href="{}">the oral Argument search engine</a>.'.format(
+        reverse("advanced_oa")
+    ),
+    'CourtListener has an <a href="{}">API</a> so anybody can easily use our data.'.format(
+        reverse("api_index")
+    ),
+    'Oral argument podcasts <a href="{}">are available wherever you get your podcasts</a>.'.format(
+        reverse("podcasts")
+    ),
     "We have more than a million minutes of oral argument audio. More than anywhere else on the Internet.",
     # RECAP & PACER
     '<a href="https://free.law/recap/">RECAP</a> is our browser extension that saves you money whenever you use PACER.',
@@ -81,8 +89,9 @@ info_tips = (
     'Want to learn more about PACER? <a href="https://free.law/pacer-facts/">We have an extensive fact sheet</a>.',
     'You can <a href="https://free.law/recap/hacking-recap-links/">use the link to any RECAP PDF to pull up the docket</a>.',
     "We have more than 200 million pages of PACER documents searchable in the RECAP Archive.",
-    'You can <a href="%s">create an alert for any docket in the RECAP Archive</a>. Just press the "Get Alerts" button.'
-    % reverse("alert_help"),
+    'You can <a href="{}">create an alert for any docket in the RECAP Archive</a>. Just press the "Get Alerts" button.'.format(
+        reverse("alert_help")
+    ),
 )
 
 

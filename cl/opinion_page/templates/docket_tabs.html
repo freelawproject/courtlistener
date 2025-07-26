@@ -63,7 +63,7 @@
     {% if perms.search.change_docket %}
       <p class="float-right">
         <a href="{% url 'admin:search_docket_change' docket.id %}"
-           class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;({{ docket.view_count }} views)&nbsp;<i class="fa fa-pencil"></i>
+           class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;(<span id="event_count"><i class="fa fa-spinner fa-spin"></i></span> views)&nbsp;<i class="fa fa-pencil"></i>
         </a>
         {% if request.user.is_superuser %}
           {% if private %}
@@ -487,7 +487,7 @@
         {% if docket.idb_data %}
         <li class="{% block nav-idb %}inactive{% endblock %}"
             role="presentation">
-          <a href="{% url "docket_idb_data" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-info-circle"></i>&nbsp;FJC Integrated Database
+          <a href="{% url "docket_idb_data" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-info-circle gray"></i>&nbsp;FJC Integrated Database
           </a>
         </li>
         {% endif %}

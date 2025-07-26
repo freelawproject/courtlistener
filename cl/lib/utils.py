@@ -1,17 +1,40 @@
+import datetime
 import re
 from collections.abc import Iterable
+from collections.abc import Iterable as IterableType
 from itertools import chain, islice, tee
+from re import Match
 from typing import Any
-from typing import Iterable as IterableType
-from typing import Match, Optional, Tuple
 
-from django.core.cache import caches
+from django.core.cache import cache
 
-import cl.search.models as search_model
-from cl.lib.crypto import sha256
+from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.types import CleanData
-from cl.search.exception import DisallowedWildcardPattern, QueryType
+from cl.search.exception import (
+    DisallowedWildcardPattern,
+    InvalidRelativeDateSyntax,
+    QueryType,
+)
+
+RELATIVE_DATES_SYNTAX = re.compile(
+    r"""
+    ^\s*                   # Start of string, allow leading whitespaces
+    (?:past\s*)?           # Optional 'past'
+    (?P<minus>-?)          # Optional '-' minus sign
+    \s*                    # Optional whitespace
+    (?P<number>\d+)        # One or more digits
+    \s*                    # Optional whitespace
+    (?P<unit>              # Capturing group for units.
+        d|day|days         #   'd', 'day', or 'days'
+      | m|month|months     #   'm', 'month', or 'months'
+      | y|year|years       #   'y', 'year', or 'years'
+    )
+    (?:\s*ago)?            # Optional 'ago
+    \s*$                   # Optional trailing whitespace
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
 
 
 class _UNSPECIFIED:
@@ -83,18 +106,18 @@ def is_iter(item: Any) -> bool:
     return isinstance(item, Iterable)
 
 
-def remove_duplicate_dicts(l: list[dict]) -> list[dict]:
+def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
     """Given a list of dicts, remove any that are the same.
 
     See: https://stackoverflow.com/a/9427216/64911
     """
-    return [dict(t) for t in {tuple(d.items()) for d in l}]
+    return [dict(t) for t in {tuple(d.items()) for d in dicts}]
 
 
 def human_sort(
-    unordered_list: IterableType[str | Tuple[str, Any]],
-    key: Optional[str] = None,
-) -> IterableType[str | Tuple[str, Any]]:
+    unordered_list: IterableType[str | tuple[str, Any]],
+    key: str | None = None,
+) -> IterableType[str | tuple[str, Any]]:
     """Human sort Lists of strings or list of dictionaries
 
     :param unordered_list: The list we want to sort
@@ -144,38 +167,6 @@ def get_array_of_selected_fields(cd: CleanData, prefix: str) -> list[str]:
     ]
 
 
-def lookup_child_courts(parent_courts: list[str]) -> set[str]:
-    """Recursively fetches child courts for the given parent courts.
-
-    :param parent_courts: List of parent court_ids.
-    :return: Set of all child court IDs.
-    """
-
-    cache = caches["db_cache"]
-    all_child_courts = set()
-    sorted_courts_hash = sha256("-".join(sorted(parent_courts)))
-    cache_key = f"child_courts:{sorted_courts_hash}"
-    cached_result = cache.get(cache_key)
-
-    if cached_result is not None:
-        return set(cached_result)
-
-    child_courts = search_model.Court.objects.filter(
-        parent_court_id__in=parent_courts
-    ).values_list("id", flat=True)
-    all_child_courts.update(child_courts)
-    if not all_child_courts:
-        return set()
-
-    final_results = all_child_courts.union(
-        lookup_child_courts(list(all_child_courts))
-    )
-    sorted_final_results = sorted(final_results)
-    one_month = 60 * 60 * 24 * 30
-    cache.set(cache_key, sorted_final_results, one_month)
-    return set(sorted_final_results)
-
-
 def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
     """
     Retrieves and combines court IDs from both the given parents and their
@@ -185,7 +176,7 @@ def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
     :return: A string containing the unique combination of parent and child courts.
     """
     unique_courts = set(re.findall(r'"(.*?)"', selected_courts_string))
-    unique_courts.update(lookup_child_courts(list(unique_courts)))
+    unique_courts.update(lookup_child_courts_cache(list(unique_courts)))
     courts = [f'"{c}"' for c in sorted(list(unique_courts))]
     return " OR ".join(courts)
 
@@ -326,7 +317,10 @@ def cleanup_main_query(query_string: str) -> str:
 
     query_string = perform_special_character_replacements(query_string)
 
-    for item in re.split(r'([^a-zA-Z0-9_\-^~":]+)', query_string):
+    # Tweaks to the following regex for special characters exceptions
+    # like §, $, %, and ¶ should also be applied to type_table in
+    # custom_word_delimiter_filter.
+    for item in re.split(r'([^a-zA-Z0-9_\-^~":§$%¶]+)', query_string):
         if not item:
             continue
 
@@ -503,3 +497,88 @@ def map_to_docket_entry_sorting(sort_string: str) -> str:
         return "entry_date_filed desc"
     else:
         return sort_string
+
+
+def append_value_in_cache(key, value):
+    """Append a value to a cached list associated with the given key.
+    If the key does not exist, a new list is created and the value is added.
+
+    :param key: The cache key to retrieve or store the list.
+    :param value: The value to be appended to the cached list.
+    :return: None.
+    """
+
+    cached_docs = cache.get(key)
+    if cached_docs is None:
+        cached_docs = []
+    cached_docs.append(value)
+    one_month = 60 * 60 * 24 * 7 * 4
+    cache.set(key, cached_docs, timeout=one_month)
+
+
+def convert_to_es_date_match(date_string: str) -> str:
+    """Parse and convert a provided relative-date string into an ES date-math
+    expression.
+
+    Raises ValueError for anything that isn’t explicitly:
+      - negative (e.g: '-10d', '-5 months ago')
+      - suffixed 'ago'    (e.g: '5d ago', '3 years ago')
+      - prefixed 'past '  (e.g: 'past 7 days', 'past 1 year')
+
+    ValueError examples:
+      5d
+      10m
+      1y
+    :param date_string: The provided relative date string to parse.
+    :return: the ES compatible date-math expression as a string.
+    """
+
+    date_string_clean = date_string.strip().lower()
+    rd_matched = RELATIVE_DATES_SYNTAX.match(date_string_clean)
+    if not rd_matched:
+        raise ValueError(f"Invalid relative-date syntax: {date_string!r}")
+
+    # Reject ambiguous relative dates that have no '-', no 'ago' or no 'past'
+    minus = rd_matched.group("minus")
+    if (
+        minus == ""
+        and not date_string_clean.endswith("ago")
+        and not date_string_clean.startswith("past ")
+    ):
+        raise ValueError(
+            f"Ambiguous relative-date (no minus/ago/past): {date_string!r}"
+        )
+
+    number = int(rd_matched.group("number"))
+    unit_key = rd_matched.group("unit").lower()
+
+    # Since we need to support custom day values for months and years:
+    # m = 30 days and y = 365 days, do the math.
+    if unit_key in ("m", "month", "months"):
+        number *= 30
+    elif unit_key in ("y", "year", "years"):
+        number *= 365
+
+    return f"now-{number}d/d"
+
+
+def parse_string_date(date_value: datetime.date | str) -> str | None:
+    """Parse a provided relative string date or ignore incompatible relative
+    date syntax.
+    :param date_value: The relative date to parse.
+    :return: The ES-compatible date math expression as a string, or None if
+    the date syntax is incompatible.
+    """
+
+    if not date_value:
+        return None
+
+    # No relative date string. Ignore it.
+    if not isinstance(date_value, str):
+        return None
+
+    # Try to parse the relative string.
+    try:
+        return convert_to_es_date_match(date_value)
+    except ValueError:
+        raise InvalidRelativeDateSyntax(QueryType.FILTER)

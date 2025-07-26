@@ -1,8 +1,8 @@
 import logging
 from collections import OrderedDict, defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from itertools import batched, chain
-from typing import Any, Dict, List, Set, TypedDict, Union
+from typing import Any, TypedDict
 
 import eyecite
 from dateutil import parser
@@ -10,6 +10,8 @@ from dateutil.rrule import DAILY, rrule
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
+from django.core.cache import caches
+from django.core.cache.backends.base import BaseCache
 from django.db.models import F
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
@@ -26,6 +28,7 @@ from rest_framework.exceptions import Throttled
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
+from rest_framework.response import Response as DRFResponse
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
@@ -272,9 +275,7 @@ class SimpleMetadataWithFilters(SimpleMetadata):
             else:
                 # Exact match or RelatedFilter
                 if isinstance(filter_type, RelatedFilter):
-                    model_name = (
-                        filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
-                    )
+                    model_name = filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
                     attrs["lookup_types"] = (
                         f"See available filters for '{model_name}'"
                     )
@@ -437,12 +438,7 @@ class LoggingMixin:
         if user.is_authenticated:
             if user_count in self.milestones:
                 Event.objects.create(
-                    description="User '%s' has placed their %s API %s request."
-                    % (
-                        user.username,
-                        intcomma(ordinal(user_count)),
-                        api_version,
-                    ),
+                    description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
                     user=user,
                 )
 
@@ -455,6 +451,112 @@ class CacheListMixin:
     @method_decorator(vary_on_headers("Cookie", "Authorization"))
     def list(self, *args, **kwargs):
         return super().list(*args, **kwargs)
+
+
+def make_cache_key_for_no_filter_mixin(
+    prefix: str, ordering_key: str, is_count_request: bool
+) -> str:
+    """
+    Generates a cache key for the `NoFilterCacheListMixin`.
+
+    The key varies based on whether a count or ordered is requested. Useful
+    for mocking the logger.
+    """
+    return (
+        f"{prefix}_count" if is_count_request else f"{prefix}_{ordering_key}"
+    )
+
+
+class NoFilterCacheListMixin:
+    """
+    A mixin that caches list of results when there's no pagination and either a
+    count is requested or no filters are applied to the queryset.
+
+    It leverages Django's caching mechanism to store responses when no filters
+    or pagination are applied to the queryset, improving performance by
+    avoiding repeated database queries for frequently accessed data.
+
+    Attributes:
+        no_filters_cache_key (str, optional): A custom prefix for the cache key.
+            If not provided, the class name will be used as the prefix.
+    """
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        has_filters = queryset.query.has_filters()
+        is_count_request = (
+            request.query_params.get("count") == "on"
+            and request.version == "v4"
+        )
+        has_pagination = request.query_params.get(
+            "cursor"
+        ) or request.query_params.get("page")
+        has_dynamic_fields = request.query_params.get(
+            "fields"
+        ) or request.query_params.get("omit")
+        is_v3_request = request.version == "v3"
+
+        # Determine the cache key prefix. Uses a custom key if provided,
+        # otherwise default to the class name.
+        prefix = getattr(self, "no_filters_cache_key", self.__class__.__name__)
+        # Get the ordering key from the request, defaulting to the view's
+        # ordering
+        ordering_key = request.query_params.get("order_by", self.ordering)
+
+        cache = caches["db_cache"]
+        cache_key = make_cache_key_for_no_filter_mixin(
+            prefix, ordering_key, is_count_request
+        )
+
+        # Attempt to retrieve the response from cache only if eligible.
+        # Caching is applied when there's no pagination and either a count is
+        # requested or no filters are active, ensuring we cache full,
+        # unfiltered/unpaginated datasets or counts, which are likely to be
+        # reused frequently.
+        should_cache_response = (
+            not is_v3_request
+            and not has_pagination
+            and not has_dynamic_fields
+            and not has_filters
+        )
+        if should_cache_response:
+            cached_data = cache.get(cache_key) or None
+            if cached_data:
+                # For backward compatibility, Handle legacy Response objects
+                # still in cache. This branch can be removed once all cached
+                # responses are migrated away from DRFResponse instances.
+                if isinstance(cached_data, DRFResponse):
+                    return cached_data
+                return DRFResponse(cached_data)
+
+        def _save_page_in_cache(
+            cache_connection: BaseCache, key: str, data: dict[str, Any]
+        ):
+            """
+            Helper function to save the response in the cache.
+
+            Args:
+                cache_connection: The cache instance (e.g., Django's `caches["db_cache"]`).
+                key (str): The cache key under which to store the response.
+                data (dict): Dictionary containing the data to be cached.
+            """
+            # Cache the response for 10 minutes
+            cache_connection.set(key, data, 10 * 60)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            # If pagination is applied, serialize the paginated data
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+            if should_cache_response:
+                _save_page_in_cache(cache, cache_key, response.data)
+            return response
+
+        serializer = self.get_serializer(queryset, many=True)
+        response = DRFResponse(serializer.data)
+        if should_cache_response:
+            _save_page_in_cache(cache, cache_key, response.data)
+        return response
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):
@@ -626,7 +728,7 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
             )
             if remaining_citation < max_num_citations or not idx:
                 datetime_obj = datetime.fromtimestamp(
-                    self.history[idx][-1], timezone.utc
+                    self.history[idx][-1], UTC
                 )
                 soonest_time = datetime_obj.isoformat()
                 break
@@ -682,9 +784,9 @@ class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
 
 
 def make_date_str_list(
-    start: Union[str, datetime],
-    end: Union[str, datetime],
-) -> List[str]:
+    start: str | datetime,
+    end: str | datetime,
+) -> list[str]:
     """Make a list of date strings for a date span
 
     :param start: The beginning date, as a string or datetime object
@@ -701,10 +803,10 @@ def make_date_str_list(
 
 
 def invert_user_logs(
-    start: Union[str, datetime],
-    end: Union[str, datetime],
+    start: str | datetime,
+    end: str | datetime,
     add_usernames: bool = True,
-) -> Dict[str, Dict[str, int]]:
+) -> dict[str, dict[str, int]]:
     """Aggregate API usage statistics per user over a date range.
 
     - Anonymous users are aggregated under the key 'AnonymousUser'.
@@ -785,9 +887,9 @@ def invert_user_logs(
 
 
 def get_user_ids_for_date_range(
-    start: Union[str, datetime],
-    end: Union[str, datetime],
-) -> Set[int]:
+    start: str | datetime,
+    end: str | datetime,
+) -> set[int]:
     """Get a list of user IDs that used the API during a span of time
 
     :param start: The beginning of when you want to find users. A str to be
@@ -1032,9 +1134,7 @@ def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
 
     deprecation_date = (
         datetime.strptime(webhook_deprecation_date, "%Y-%m-%d")
-        .replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
-        )
+        .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
         .isoformat()
     )
     return deprecation_date

@@ -8,12 +8,7 @@ updates:
   ignore:
   # Ignore all tooling (it can get old, it's mature enough)
   - dependency-name: selenium
-  - dependency-name: black
-  - dependency-name: pylint
-  - dependency-name: flake8
-  - dependency-name: isort
   - dependency-name: mypy
-  - dependency-name: flynt
   # Ignore all patch updates.
   - dependency-name: '*'
     update-types: ["version-update:semver-patch"]

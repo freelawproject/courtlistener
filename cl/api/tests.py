@@ -1,8 +1,8 @@
 import json
 from collections import OrderedDict, defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
-from typing import Any, Dict
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
@@ -13,10 +13,11 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
+from django.core.cache import caches
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -43,11 +44,14 @@ from cl.disclosures.api_views import (
     GiftViewSet,
     InvestmentViewSet,
     NonInvestmentIncomeViewSet,
-    PositionViewSet,
     ReimbursementViewSet,
     SpouseIncomeViewSet,
 )
+from cl.disclosures.api_views import (
+    PositionViewSet as DisclosurePositionViewSet,
+)
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
+from cl.favorites.models import GenericCount
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
@@ -58,10 +62,12 @@ from cl.people_db.api_views import (
     PersonDisclosureViewSet,
     PersonViewSet,
     PoliticalAffiliationViewSet,
-    PositionViewSet,
     RetentionEventViewSet,
     SchoolViewSet,
     SourceViewSet,
+)
+from cl.people_db.api_views import (
+    PositionViewSet as PeoplePositionViewSet,
 )
 from cl.people_db.factories import (
     AttorneyFactory,
@@ -93,7 +99,7 @@ from cl.search.api_views import (
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -106,9 +112,7 @@ from cl.search.models import (
 from cl.stats.models import Event
 from cl.tests.cases import (
     ESIndexTestCase,
-    SimpleTestCase,
     TestCase,
-    TransactionTestCase,
 )
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -203,14 +207,13 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
 
 
 class CoverageTests(ESIndexTestCase, TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
         cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FD")
 
-        cls.c_scotus_1 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_scotus_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             docket=DocketFactory(
                 court=cls.court_scotus, docket_number="123456"
@@ -218,7 +221,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             date_filed=date(2000, 8, 15),
         )
-        cls.c_scotus_2 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_scotus_2 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="America vs Bank",
             docket=DocketFactory(
                 court=cls.court_scotus, docket_number="34-2535"
@@ -226,7 +229,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             precedential_status=PRECEDENTIAL_STATUS.ERRATA,
             date_filed=date(2024, 6, 15),
         )
-        cls.c_cand_1 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_cand_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Johnson v. National",
             docket=DocketFactory(
                 court=cls.court_cand, docket_number="36-2000"
@@ -341,7 +344,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
     "cl.api.utils.get_logging_prefix",
     return_value="api:test_counts",
 )
-class ApiQueryCountTests(TransactionTestCase):
+class ApiQueryCountTests(TestCase):
     """Check that the number of queries for an API doesn't explode
 
     I expect these tests to regularly need updating as new features are added
@@ -463,7 +466,7 @@ class ApiQueryCountTests(TransactionTestCase):
         and another to select the count.
         """
         with CaptureQueriesContext(connection) as ctx:
-            path = reverse("docket-list", kwargs={"version": "v4"})
+            path = reverse("audio-list", kwargs={"version": "v4"})
             params = {"count": "on"}
             self.client.get(path, params)
 
@@ -591,7 +594,8 @@ class ApiEventCreationTestCase(TestCase):
     # run in parallel do not affect this one.
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args, **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args,
+        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
     )
     async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
@@ -622,7 +626,8 @@ class ApiEventCreationTestCase(TestCase):
 
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args, **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args,
+        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
     )
     async def test_api_logged_correctly_v4(self, mock_logging_prefix) -> None:
         # Global stats
@@ -837,7 +842,7 @@ class DRFOrderingTests(TestCase):
         )
 
 
-class FilteringCountTestCase:
+class FilteringCountTestMixin:
     """Mixin for adding an additional test assertion."""
 
     # noinspection PyPep8Naming
@@ -866,11 +871,10 @@ class FilteringCountTestCase:
         return r
 
 
-class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
-        Court.objects.all().delete()
-
+        super().setUpTestData()
         cls.parent_court = CourtFactory(
             id="parent1",
             full_name="Parent Court",
@@ -879,11 +883,10 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             in_use=True,
             has_opinion_scraper=True,
             has_oral_argument_scraper=False,
-            position=1,
             start_date=date(2000, 1, 1),
             end_date=None,
             jurisdiction=Court.FEDERAL_APPELLATE,
-            date_modified=datetime(2021, 1, 1, tzinfo=timezone.utc),
+            date_modified=datetime(2021, 1, 1, tzinfo=UTC),
         )
 
         cls.child_court1 = CourtFactory(
@@ -895,11 +898,10 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             in_use=False,
             has_opinion_scraper=False,
             has_oral_argument_scraper=True,
-            position=2,
             start_date=date(2010, 6, 15),
             end_date=date(2020, 12, 31),
             jurisdiction=Court.STATE_SUPREME,
-            date_modified=datetime(2022, 6, 15, tzinfo=timezone.utc),
+            date_modified=datetime(2022, 6, 15, tzinfo=UTC),
         )
         cls.child_court2 = CourtFactory(
             id="child2",
@@ -910,11 +912,10 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             in_use=True,
             has_opinion_scraper=False,
             has_oral_argument_scraper=False,
-            position=3,
             start_date=date(2015, 5, 20),
             end_date=None,
             jurisdiction=Court.STATE_TRIAL,
-            date_modified=datetime(2023, 3, 10, tzinfo=timezone.utc),
+            date_modified=datetime(2023, 3, 10, tzinfo=UTC),
         )
 
         cls.orphan_court = CourtFactory(
@@ -925,17 +926,17 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             in_use=True,
             has_opinion_scraper=False,
             has_oral_argument_scraper=False,
-            position=4,
             start_date=date(2012, 8, 25),
             end_date=None,
             jurisdiction=Court.FEDERAL_DISTRICT,
-            date_modified=datetime(2023, 5, 5, tzinfo=timezone.utc),
+            date_modified=datetime(2023, 5, 5, tzinfo=UTC),
         )
+        cls.qs = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
+        cls.path = reverse("court-list", kwargs={"version": "v4"})
 
-    @async_to_sync
-    async def setUp(self):
-        self.path = reverse("court-list", kwargs={"version": "v4"})
-        self.q: Dict[str, Any] = {}
+    def setUp(self):
+        super().setUp()
+        self.q: dict[str, Any] = {}
 
     async def test_parent_court_filter(self):
         """Can we filter courts by parent_court id?"""
@@ -954,7 +955,8 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
     async def test_no_parent_court_filter(self):
         """Do we get all courts when using no filters?"""
         self.q = {}
-        await self.assertCountInResults(4)  # Should return all four courts
+        count = await self.qs.acount()
+        await self.assertCountInResults(count)
 
     async def test_invalid_parent_court_filter(self):
         """Do we handle invalid parent_court values correctly?"""
@@ -970,65 +972,95 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
     async def test_in_use_filter(self):
         """Can we filter courts by in_use field?"""
         self.q = {"in_use": "true"}
-        await self.assertCountInResults(3)  # parent1, child2, orphan
+        in_use_count = await self.qs.filter(in_use=True).acount()
+        await self.assertCountInResults(in_use_count)
         self.q = {"in_use": "false"}
-        await self.assertCountInResults(1)  # child1
+        not_in_use_count = await self.qs.filter(in_use=False).acount()
+        await self.assertCountInResults(not_in_use_count)
 
     async def test_has_opinion_scraper_filter(self):
         """Can we filter courts by has_opinion_scraper field?"""
         self.q = {"has_opinion_scraper": "true"}
-        await self.assertCountInResults(1)  # parent1
+        has_scraper = await self.qs.filter(has_opinion_scraper=True).acount()
+        await self.assertCountInResults(has_scraper)
         self.q = {"has_opinion_scraper": "false"}
-        await self.assertCountInResults(3)  # child1, child2, orphan
+        hasnt_scraper = await self.qs.filter(
+            has_opinion_scraper=False
+        ).acount()
+        await self.assertCountInResults(
+            hasnt_scraper
+        )  # child1, child2, orphan
 
     async def test_has_oral_argument_scraper_filter(self):
         """Can we filter courts by has_oral_argument_scraper field?"""
         self.q = {"has_oral_argument_scraper": "true"}
-        await self.assertCountInResults(1)  # child1
+        has_scraper = await self.qs.filter(
+            has_oral_argument_scraper=True
+        ).acount()
+        await self.assertCountInResults(has_scraper)
         self.q = {"has_oral_argument_scraper": "false"}
-        await self.assertCountInResults(3)  # parent1, child2, orphan
+        hasnt_scraper = await self.qs.filter(
+            has_oral_argument_scraper=False
+        ).acount()
+        await self.assertCountInResults(hasnt_scraper)
 
     async def test_position_filter(self):
         """Can we filter courts by position with integer lookups?"""
-        self.q = {"position__gt": "2"}
-        await self.assertCountInResults(2)  # child2 (3), orphan (4)
-        self.q = {"position__lte": "2"}
-        await self.assertCountInResults(2)  # parent1 (1), child1 (2)
+        self.q = {"position__gt": self.child_court1.position}
+        count = await self.qs.filter(
+            position__gt=self.child_court1.position
+        ).acount()
+        await self.assertCountInResults(count)
+        self.q = {"position__lte": self.child_court1.position}
+        count = await self.qs.filter(
+            position__lte=self.child_court1.position
+        ).acount()
+        await self.assertCountInResults(count)
 
     async def test_start_date_filter(self):
         """Can we filter courts by start_date with date lookups?"""
         self.q = {"start_date__year": "2015"}
-        await self.assertCountInResults(1)  # child2 (2015-05-20)
+        count = await self.qs.filter(start_date__year=2015).acount()
+        await self.assertCountInResults(count)
         self.q = {"start_date__gte": "2010-01-01"}
-        await self.assertCountInResults(3)  # child1, child2, orphan
+        count = await self.qs.filter(start_date__gte="2010-01-01").acount()
+        await self.assertCountInResults(count)
 
     async def test_end_date_filter(self):
         """Can we filter courts by end_date with date lookups?"""
         self.q = {"end_date__day": "31"}
-        await self.assertCountInResults(1)  # parent1, child2, orphan
+        count = await self.qs.filter(end_date__day=31).acount()
+        await self.assertCountInResults(count)
         self.q = {"end_date__year": "2024"}
-        await self.assertCountInResults(0)
+        count = await self.qs.filter(end_date__year=2024).acount()
+        await self.assertCountInResults(count)
 
     async def test_short_name_filter(self):
         """Can we filter courts by short_name with text lookups?"""
         self.q = {"short_name__iexact": "Cc1"}
-        await self.assertCountInResults(1)  # child1
+        count = await self.qs.filter(short_name__iexact="Cc1").acount()
+        await self.assertCountInResults(count)
         self.q = {"short_name__icontains": "cc"}
-        await self.assertCountInResults(2)  # child1, child2
+        count = await self.qs.filter(short_name__icontains="cc").acount()
+        await self.assertCountInResults(count)
 
     async def test_full_name_filter(self):
         """Can we filter courts by full_name with text lookups?"""
         self.q = {"full_name__istartswith": "Child"}
-        await self.assertCountInResults(2)  # child1, child2
+        count = await self.qs.filter(full_name__istartswith="Child").acount()
+        await self.assertCountInResults(count)
         self.q = {"full_name__iendswith": "Court"}
-        await self.assertCountInResults(2)  # parent1, orphan
+        count = await self.qs.filter(full_name__iendswith="Court").acount()
+        await self.assertCountInResults(count)
 
     async def test_citation_string_filter(self):
         """Can we filter courts by citation_string with text lookups?"""
         self.q = {"citation_string": "OC"}
-        await self.assertCountInResults(1)  # orphan
+        count = await self.qs.filter(citation_string="OC").acount()
+        await self.assertCountInResults(count)
         self.q = {"citation_string__icontains": "2"}
-        await self.assertCountInResults(1)  # child2
+        count = await self.qs.filter(citation_string__icontains="2").acount()
+        await self.assertCountInResults(count)
 
     async def test_jurisdiction_filter(self):
         """Can we filter courts by jurisdiction?"""
@@ -1038,20 +1070,28 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
                 Court.FEDERAL_DISTRICT,
             ]
         }
-        await self.assertCountInResults(2)  # parent1 and orphan
+        count = await self.qs.filter(
+            jurisdiction__in=[Court.FEDERAL_APPELLATE, Court.FEDERAL_DISTRICT]
+        ).acount()
+        await self.assertCountInResults(count)  # parent1 and orphan
 
     async def test_combined_filters(self):
         """Can we filter courts with multiple filters applied?"""
         self.q = {
             "in_use": "true",
             "has_opinion_scraper": "false",
-            "position__gt": "2",
+            "position__gt": self.child_court1.position,
         }
-        await self.assertCountInResults(2)  # child2 and orphan
+        count = await self.qs.filter(
+            in_use=True,
+            has_opinion_scraper=False,
+            position__gt=self.child_court1.position,
+        ).acount()
+        await self.assertCountInResults(count)
 
 
 class DRFJudgeApiFilterTests(
-    SimpleUserDataMixin, TestCase, FilteringCountTestCase
+    SimpleUserDataMixin, TestCase, FilteringCountTestMixin
 ):
     """Do the filters work properly?"""
 
@@ -1064,7 +1104,7 @@ class DRFJudgeApiFilterTests(
                 username="pandora", password="password"
             )
         )
-        self.q: Dict[Any, Any] = {}
+        self.q: dict[Any, Any] = {}
 
     async def test_judge_filtering_by_first_name(self) -> None:
         """Can we filter by first name?"""
@@ -1245,7 +1285,7 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)  # Bill
 
 
-class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
     fixtures = ["recap_docs.json"]
 
     @classmethod
@@ -1299,7 +1339,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
                 username="recap-user", password="password"
             )
         )
-        self.q: Dict[Any, Any] = {}
+        self.q: dict[Any, Any] = {}
 
     async def test_docket_entry_to_docket_filters(self) -> None:
         """Do a variety of docket entry filters work?"""
@@ -1402,7 +1442,6 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         await self.assertCountInResults(0)
 
         # Adds extra role to the existing attorney
-        docket = await Docket.objects.afirst()
         attorney = await Attorney.objects.afirst()
         party = await sync_to_async(PartyFactory)(
             docket=self.docket_2,
@@ -1658,7 +1697,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFSearchAppAndAudioAppApiFilterTest(
-    TestCase, AudioTestCase, FilteringCountTestCase
+    AudioTestCase, FilteringCountTestMixin
 ):
     fixtures = [
         "judge_judy.json",
@@ -1680,7 +1719,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
                 username="recap-user", password="password"
             )
         )
-        self.q: Dict[Any, Any] = {}
+        self.q: dict[Any, Any] = {}
 
     async def test_cluster_filters(self) -> None:
         """Do a variety of cluster filters work?"""
@@ -1947,6 +1986,21 @@ class V4DRFPaginationTest(TestCase):
         if method == "post":
             return await api_client.post(url, params)
 
+    @classmethod
+    def generate_test_cursor(cls, paginator, ordering_key: str) -> str | None:
+        """Generates a valid cursor for testing according to the ordering
+        key type.
+        :param paginator: paginator object to encode cursor.
+        :param ordering_key: The ordering key of the cursor.
+        :return: A valid cursor for testing.
+        """
+        position = 10 if "id" in ordering_key else now()
+        cursor = Cursor(offset=1, reverse=False, position=position)  # type: ignore
+        encoded_cursor = paginator.encode_cursor(cursor)
+        parsed_url = urlparse(encoded_cursor)
+        query_params = parse_qs(parsed_url.query)
+        return query_params.get("cursor", [None])[0]
+
     async def _base_test_for_v4_endpoints(
         self,
         endpoint,
@@ -1960,19 +2014,6 @@ class V4DRFPaginationTest(TestCase):
         cursor_paginator = CursorPagination()
         cursor_paginator.base_url = "/"
 
-        def generate_test_cursor(ordering_key: str) -> str | None:
-            """Generates a valid cursor for testing according to the ordering
-            key type.
-            :param ordering_key: The ordering key of the cursor.
-            :return: A valid cursor for testing.
-            """
-            position = 10 if "id" in ordering_key else now()
-            cursor = Cursor(offset=1, reverse=False, position=position)  # type: ignore
-            encoded_cursor = cursor_paginator.encode_cursor(cursor)
-            parsed_url = urlparse(encoded_cursor)
-            query_params = parse_qs(parsed_url.query)
-            return query_params.get("cursor", [None])[0]
-
         # Mock handle_database_cursor_pagination
         # Initialize call count and call arguments tracking
         handle_database_cursor_pagination_wrapper.call_count = 0
@@ -1982,7 +2023,9 @@ class V4DRFPaginationTest(TestCase):
             "handle_database_cursor_pagination",
             new=handle_database_cursor_pagination_wrapper,
         ) as mock_cursor_pagination:
-            cursor_value = generate_test_cursor(default_ordering)
+            cursor_value = V4DRFPaginationTest.generate_test_cursor(
+                cursor_paginator, default_ordering
+            )
             # Confirm the default sorting key works with cursor pagination
             response = await self._api_v4_request(
                 endpoint, {"cursor": cursor_value}
@@ -2004,7 +2047,9 @@ class V4DRFPaginationTest(TestCase):
         )
 
         # Try a different cursor sorting key.
-        cursor_value = generate_test_cursor(secondary_cursor_key)
+        cursor_value = V4DRFPaginationTest.generate_test_cursor(
+            cursor_paginator, secondary_cursor_key
+        )
         params = {"order_by": secondary_cursor_key, "cursor": cursor_value}
         handle_database_cursor_pagination_wrapper.call_count = 0
         handle_database_cursor_pagination_wrapper.call_args = None
@@ -2214,7 +2259,7 @@ class V4DRFPaginationTest(TestCase):
             await sync_to_async(DocketFactory)(
                 court=self.court,
                 source=Docket.HARVARD,
-                pacer_case_id=f"1234{i+1}",
+                pacer_case_id=f"1234{i + 1}",
                 date_filed=date(2015, 8, i + 1),
             )
 
@@ -2511,7 +2556,7 @@ class V4DRFPaginationTest(TestCase):
             default_ordering="-id",
             secondary_cursor_key="date_created",
             non_cursor_key="date_elected",
-            viewset=PositionViewSet,
+            viewset=PeoplePositionViewSet,
         )
 
     async def test_retention_events_endpoint(self):
@@ -2787,7 +2832,7 @@ class V4DRFPaginationTest(TestCase):
             default_ordering="-id",
             secondary_cursor_key="date_modified",
             non_cursor_key="",
-            viewset=PositionViewSet,
+            viewset=DisclosurePositionViewSet,
         )
 
     async def test_reimbursement_endpoint(self):
@@ -3455,3 +3500,278 @@ class TestApiUsage(SimpleTestCase):
         dates = list(anonymous_data.keys())
         dates.remove("total")
         self.assertEqual(dates, ["2023-01-01", "2023-01-02"])
+
+
+@patch("cl.api.utils.make_cache_key_for_no_filter_mixin")
+class CacheListApiResponseTest(TestCase):
+    def setUp(self):
+        self.cache = caches["db_cache"]
+        return super().setUp()
+
+    def _check_cached_request(self, path, params, cache_key):
+        """
+        Helper method to verify caching behavior for a given request.
+
+        Args:
+            path (str): The URL path to make the request to.
+            params (dict): Dictionary of query parameters for the request.
+            cache_key (str): The expected cache key for the response.
+        """
+        # Checks the cache key does not exist before the first request
+        self.assertFalse(self.cache.has_key(cache_key))
+
+        # Make the first request and capture the number of database queries
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.get(path, params)
+
+        # After the first request, the cache key should exist
+        self.assertTrue(self.cache.has_key(cache_key))
+        # Verify that more than one query was executed for the initial request
+        self.assertGreater(len(ctx.captured_queries), 1)
+
+        # Repeat the same query to verify it's served from the cache
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.get(path, params)
+
+        # For the cached request, at most 2 queries should be executed: one to
+        # check the authenticated user, and another to get the cached data.
+        self.assertLessEqual(
+            len(ctx.captured_queries),
+            2,
+            msg=f"{len(ctx.captured_queries)} queries executed, at most 2 expected",
+        )
+
+    def test_no_filters_no_pagination_cached(self, mock_cache_key_method):
+        """
+        Test that a response is cached when there are no filters and no pagination.
+        """
+        fake_cache_key = "cache_no_filter_no_pagination"
+        # Mock the method that generates the cache key to return a predictable value
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Call the helper method to check caching behavior with no parameters
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        self._check_cached_request(
+            path=path, params={}, cache_key=fake_cache_key
+        )
+
+        # Delete the fake key after the test
+        self.cache.delete(fake_cache_key)
+
+    def test_can_ignore_invalid_filters(self, mock_cache_key_method):
+        """
+        Test that a response is cached when there are invalid filters.
+        """
+        fake_cache_key = "cache_no_filter_no_pagination"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Call the helper method to check caching behavior with invalid filters
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"evil_filter": "1"}
+        self._check_cached_request(path, params, cache_key=fake_cache_key)
+
+        # Delete the fake key after the test
+        self.cache.delete(fake_cache_key)
+
+    def test_no_filters_count_request_cached(self, mock_cache_key_method):
+        """
+        Test that a v4 count request is cached when no filters are applied.
+        """
+        fake_cache_key = "cache_no_filter_count_request"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Resolve the URL for the 'docket-list' endpoint and add the count
+        # parameter
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"count": "on"}
+
+        # Call the helper method to check caching behavior with parameters
+        self._check_cached_request(path, params, fake_cache_key)
+
+        # Delete the fake key after the test
+        self.cache.delete(fake_cache_key)
+
+    def test_count_request_with_filters_not_cached(
+        self, mock_cache_key_method
+    ):
+        """
+        Test that a v4 count request is not cached when filters are applied.
+        """
+        fake_cache_key = "count_request_w_filters_no_cache"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Resolve the URL for the 'docket-list' endpoint and add the count
+        # parameter
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"count": "on", "pacer_case_id": 533886}
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Make the request with filters
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+    def test_no_filters_ordering_request_cached(self, mock_cache_key_method):
+        """
+        Test that a ordered response is cached when no filters are requested.
+        """
+        fake_cache_key = "cache_no_filter_count_request"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Resolve the URL for the 'docket-list' endpoint and add a custom order
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"order_by": "-id"}
+
+        # Call the helper method to check caching behavior with parameters
+        self._check_cached_request(path, params, fake_cache_key)
+
+        # Delete the fake key after the test
+        self.cache.delete(fake_cache_key)
+
+    def test_filters_applied_not_cached(self, mock_cache_key_method):
+        """
+        Test that a response is NOT cached when filters are applied.
+        """
+        fake_cache_key = "cache_filters_key"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Resolve the URL for the 'docket-list' endpoint and add a filter
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        params = {"court": "ca1"}
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Make the request with filters
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Delete the fake key after the test
+        self.cache.delete(fake_cache_key)
+
+    def test_pagination_applied_not_cached(self, mock_cache_key_method):
+        """
+        Test that a response is NOT cached when pagination (cursor or page) is applied.
+        """
+        fake_cache_key = "cache_page_or_cursor"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Resolve the URL for the 'docket-list' endpoint and add a cursor
+        path = reverse("docket-list", kwargs={"version": "v4"})
+        cursor_paginator = CursorPagination()
+        cursor_paginator.base_url = "/"
+        cursor = V4DRFPaginationTest.generate_test_cursor(
+            cursor_paginator, "id"
+        )
+        params = {"cursor": cursor}
+
+        # Make the request with cursor pagination
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+    def test_dynamic_fields_applied_not_cached(self, mock_cache_key_method):
+        """
+        Test that responses with dynamic 'fields' or 'omit' parameters are not cached.
+        """
+        fake_cache_key = "cache_dynamic_fields"
+        mock_cache_key_method.return_value = fake_cache_key
+
+        # Checks the cache key does not exist before the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # Resolve the URL for the 'docket-list' endpoint
+        path = reverse("docket-list", kwargs={"version": "v4"})
+
+        # --- Test with 'fields' parameter ---
+        # Define parameters to request specific fields.
+        params = {"fields": "id"}
+
+        # Make the request with the fields param
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+        # --- Test with 'omit' parameter ---
+        # Define parameters to omit specific fields.
+        params = {"omit": "id"}
+
+        # Make the request with the omit param
+        self.client.get(path, params)
+
+        # Confirm the cache key still does not exist after the request
+        self.assertFalse(self.cache.has_key(fake_cache_key))
+
+
+class EventCountApiTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Get the versioned URL for the increment-event endpoint
+        cls.increment_event_v4 = reverse(
+            "increment-event-list", kwargs={"version": "v4"}
+        )
+
+    def test_can_validate_label_format(self):
+        """Verify invalid event labels are rejected with a 400 response."""
+        invalid_label = "invalid-label-format"
+        response = self.client.post(
+            self.increment_event_v4, {"label": invalid_label}
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+        data = response.data
+        self.assertEqual(data["label"][0], "Invalid label format provided.")
+
+        more_than_10_digit_label = "d.12345678910:view"
+        response = self.client.post(
+            self.increment_event_v4, {"label": more_than_10_digit_label}
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+        data = response.data
+        self.assertEqual(data["label"][0], "Invalid label format provided.")
+
+    def test_can_create_new_events(self):
+        """Verify new events can be created through the API."""
+        label = "d.123:view"
+
+        # Ensure no existing record
+        event_record = GenericCount.objects.filter(label=label)
+        self.assertFalse(event_record.exists())
+
+        # First request — should create the counter with value 0, return it
+        response = self.client.post(self.increment_event_v4, {"label": label})
+        self.assertEqual(response.status_code, HTTPStatus.ACCEPTED)
+
+        data = response.data
+        self.assertEqual(data["label"], label)
+        self.assertEqual(data["value"], 0)
+
+        # Counter should now exist and be 1
+        view_counter = event_record.first()
+        self.assertIsNotNone(view_counter)
+        self.assertEqual(view_counter.value, 1)
+
+    def test_can_increment_exiting_events(self):
+        """Verify existing events can be incremented through the API."""
+        # Create an initial event record
+        label = "d.345:view"
+        event_record = GenericCount.objects.create(label=label, value=3)
+
+        response = self.client.post(self.increment_event_v4, {"label": label})
+        self.assertEqual(response.status_code, HTTPStatus.ACCEPTED)
+
+        # Refresh the event_record object from the database
+        event_record.refresh_from_db()
+        # Assert that the value of the event record has been incremented by 1
+        self.assertEqual(event_record.value, 4)

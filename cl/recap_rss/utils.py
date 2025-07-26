@@ -1,10 +1,8 @@
-from typing import Dict
-
 from django.conf import settings
 
 from cl.lib.types import EmailType
 
-emails: Dict[str, EmailType] = {
+emails: dict[str, EmailType] = {
     "changed_rss_feed": {
         "subject": "PACER RSS feed changed for: %s",
         "body": "Dear admin:\n\n%s's RSS feed has changed:\n\n"

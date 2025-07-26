@@ -227,7 +227,6 @@ class CursorESList:
         self.reverse = False
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
-
         self.cursor = cursor
         if self.cursor is not None:
             self.reverse = self.cursor.reverse

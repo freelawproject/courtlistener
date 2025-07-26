@@ -1,0 +1,146 @@
+{% extends "new_base.html" %}
+{% load static svg_tags %}
+
+{% block title %}Help with Tags and Notes – CourtListener.com{% endblock %}
+
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="tags"
+  :nav_items="[
+    {'href': '#tags', 'text': 'Tag Overview', 'children': [
+      {'href': '#making-tags', 'text': 'Making Tags'},
+      {'href': '#editing-tags', 'text': 'Editing or Deleting Tags'},
+    ]},
+    {'href': '#notes', 'text': 'Note Overview', 'children': [
+      {'href': '#making-notes', 'text': 'Making Notes'},
+      {'href': '#editing-notes', 'text': 'Working with Notes'},
+    ]},
+  ]"
+>
+  <section>
+    <h1>Help with Tags and Notes on CourtListener</h1>
+    <p>Our tagging and notes features help you to tag, organize, and share cases that you are working with. To learn more about these features, continue reading below.
+    </p>
+    <p>We hope that if you find these tools useful, you will become a member of <a class="underline" href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP. It is the best thing you can do to support ongoing feature development and maintenance.
+    </p>
+    <a class="btn-primary flex" href="https://donate.free.law/forms/membership">
+      {% svg "heart" class="mr-1" aria_hidden="true" %} Join Now
+    </a>
+  </section>
+
+  <c-layout-with-navigation.section id="tags">
+    <h2>Tags</h2>
+    <p>Every tag you create has a page on CourtListener listing items that are labelled with that tag. This allows you to organize and describe our content for your own purposes or to share your tags with others.
+    </p>
+    <p>When you are on one of your tag pages, you can add a description of the tag using <a class="text-primary-600" href="{% url "markdown_help" %}">markdown</a>, and you can make the tag public so that other people can see it too.
+    </p>
+    <p>
+      If you do not make a tag page public, nobody else will know you have that tag. Once a tag is made public it is immediately visible to others until you make it private again. All of your public tags will be visible to others as a
+      {% if user.is_authenticated %}
+        <a class="text-primary-600" href="{% url "tag_list" username=user.get_username %}">list of tags in your profile</a>
+      {% else %}
+        list of tags in your profile
+      {% endif %}.
+    </p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="making-tags">
+    <h3>Tagging a Docket</h3>
+    <p>Tags can be added to any docket by clicking the Tags button on a docket. Once clicked, a tagging tool will appear:
+    </p>
+    <div class="w-full flex justify-center rounded-2xl bg-greyscale-50 md:py-[47px]">
+      <img src="{% static "png/screenshots/tagging_widget.png" %}"
+         alt="screenshot of the tagging tool"
+         class=""
+         height="332"
+         width="300">
+    </div>
+    <p>In that window, you can create new tags by typing in a name and pressing enter. If that tag already exists, it will be checked or unchecked when you press enter. If the tag does not yet exist, it will be created and the docket will be tagged with it. When you're done creating tags, close the tagging tool.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="editing-tags">
+    <h3>Editing or Deleting a Tag</h3>
+    <p>Tags can be edited or deleted. To edit a tag, either find it on
+      {% if user.is_authenticated %}
+        <a class="text-primary-600" href="{% url "tag_list" username=user.get_username %}">your list of tags</a>
+      {% else %}
+        your list of tags
+      {% endif %} or open it via the icon in the tagging tool.
+    </p>
+    <p>When editing a tag, you can add a description to it using our editor or you can make it either public or private by toggling the setting in the actions drop down. Public tag pages are immediately visible to others.
+    </p>
+    <div>
+      <img src="{% static "png/tag-page.png" %}"
+           alt="screenshot of the tag page showing edit features"
+           class=""
+           height=729
+           width=800>
+    </div>
+    <p>Tags can be deleted either from the list of tags in your profile page or by using the actions drop down on a tag page, as shown above.
+    </p>
+  </c-layout-with-navigation.section>
+
+  <section>
+    <h3>Coming Soon</h3>
+    <p>For now, we only allow tagging dockets, but we hope to add more tags to more parts of CourtListener too.
+    </p>
+    <p>Please stay tuned!</p>
+  </section>
+
+  <c-layout-with-navigation.section id="notes">
+    <h2>Notes</h2>
+    <p>You can use the Notes feature to save dockets, PACER documents, case law, and oral arguments to the
+      <a class="text-primary-600" href="{% url 'profile_notes' %}">Notes tab</a>
+      in your account. You can add notes to each note item as well.
+    </p>
+    <p>Notes on dockets will be shown in <a class="text-primary-600" href="{% url 'alert_help' %}#recap-alerts">docket alerts</a> that we send you, if you subscribe to a case, but are otherwise always private.
+    </p>
+  </c-layout-with-navigation.section>
+
+  <section x-intersect.margin.-20%.0.-75%.0="show" id="making-notes">
+    <h3>Save a Note</h3>
+    <p>To save a note on an item on CourtListener, log in and click <strong>Add Note</strong> button on a docket, PACER document, decision, or oral argument recording.</p>
+    <div class="">
+      <img src="{% static "png/screenshots/add_a_note.png" %}"
+        alt="screenshot of the star icon to add a note to an item"
+        class=""
+        width="100%">
+    </div>
+    <p>A modal pops up:</p>
+    <div><img src="{% static "png/screenshots/add_note_modal.png" %}"
+         alt="screenshot of the creating a note modal"
+         class=""
+         height=""
+         width="100%">
+    </div>
+    <p>Complete the box with following information:</p>
+    <ol class="list-decimal ml-5 pl-6">
+      <li><strong>Name:</strong> Required field, by default the item title, you can change it.</li>
+      <li><strong>Notes:</strong> Optional, a private note explaining why the item is important or relevant to you (500 character limit).</li>
+    </ol>
+    <p>Click the save button.</p>
+  </section>
+
+  <c-layout-with-navigation.section id="editing-notes">
+    <h3>Viewing, Editing or Deleting a Note</h3>
+    <p>You can view your notes items in the <a class="text-primary-600" href="{% url 'profile_notes' %}">Notes tab</a> within your user profile panel.</p>
+    <div><img src="{% static "png/screenshots/notes_tab.png" %}"
+         alt="screenshot of the notes tab"
+         class=""
+         height=""
+         width="100%">
+    </div>
+    <p>Here, you can edit or delete a note item by clicking on the "Edit/Delete" button.</p>
+    <p>A modal pops up:</p>
+    <div><img src="{% static "png/screenshots/save_note_modal.png" %}"
+         alt="screenshot of the edit/delete notes modal"
+         class=""
+         height=""
+         width="100%">
+    </div>
+   <p>You can change the content of the note and save or you can delete it by clicking the "Delete" button in the bottom left corner.</p>
+  </c-layout-with-navigation.section>
+</c-layout-with-navigation>
+
+{% endblock %}

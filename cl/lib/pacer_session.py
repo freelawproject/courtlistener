@@ -1,7 +1,6 @@
 import pickle
 import random
 from dataclasses import dataclass
-from typing import Union
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -57,8 +56,12 @@ class ProxyPacerSession(PacerSession):
         password=None,
         client_code=None,
         proxy=None,
+        *args,
+        **kwargs,
     ):
-        super().__init__(cookies, username, password, client_code)
+        super().__init__(
+            cookies, username, password, client_code, *args, **kwargs
+        )
         self.proxy_address = proxy if proxy else self._pick_proxy_connection()
         self.proxies = {
             "http": self.proxy_address,
@@ -111,6 +114,22 @@ class ProxyPacerSession(PacerSession):
     def get(self, url, *args, **kwargs):
         return super().get(self._change_protocol(url), **kwargs)
 
+    def _get_saml_auth_request_parameters(
+        self, court_id: str
+    ) -> dict[str, str]:
+        """
+        Override base method to tweak cookies for proxy compatibility.
+
+        Ensures that all cookies obtained during the initial SAML authentication
+        workflow can be reused in subsequent requests through a proxy connection
+        by setting their 'secure' attribute to False.
+        """
+        saml_credentials = super()._get_saml_auth_request_parameters(court_id)
+        # Update cookies so they can be sent over non-HTTPS connections
+        for cookie in self.cookies:
+            cookie.secure = False
+        return saml_credentials
+
 
 def log_into_pacer(
     username: str,
@@ -135,7 +154,7 @@ def log_into_pacer(
 
 
 def get_or_cache_pacer_cookies(
-    user_pk: Union[str, int],
+    user_pk: str | int,
     username: str,
     password: str,
     client_code: str | None = None,
@@ -179,7 +198,7 @@ def get_or_cache_pacer_cookies(
 
 
 def get_pacer_cookie_from_cache(
-    user_pk: Union[str, int],
+    user_pk: str | int,
     r: Redis | None = None,
 ):
     """Get the cookie for a user from the cache.
@@ -197,7 +216,7 @@ def get_pacer_cookie_from_cache(
 
 
 def delete_pacer_cookie_from_cache(
-    user_pk: Union[str, int],
+    user_pk: str | int,
     r: Redis | None = None,
 ):
     """Deletes the cookie for a user from the cache.

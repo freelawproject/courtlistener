@@ -1,4 +1,4 @@
-from datetime import timezone
+from datetime import UTC
 
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
@@ -390,10 +390,8 @@ class ScoreDataSerializer(serializers.Serializer):
 class BaseMetaDataSerializer(serializers.Serializer):
     """The metadata serializer V4 Search API."""
 
-    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
-    date_created = TimeStampField(
-        read_only=True, default_timezone=timezone.utc
-    )
+    timestamp = TimeStampField(read_only=True, default_timezone=UTC)
+    date_created = TimeStampField(read_only=True, default_timezone=UTC)
 
 
 class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):

@@ -1,5 +1,5 @@
 import typing
-from typing import Any, Optional
+from typing import Any
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -89,7 +89,7 @@ class EmptyModelChoiceField(forms.ModelChoiceField):
     """
 
     @typing.no_type_check
-    def to_python(self, value: Optional[Any]) -> Any:
+    def to_python(self, value: Any | None) -> Any:
         if value in self.empty_values:
             return None
         try:

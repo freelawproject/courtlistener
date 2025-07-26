@@ -1,6 +1,6 @@
 import itertools
 import time
-from typing import List, TypedDict
+from typing import TypedDict
 
 from django.conf import settings
 from django.core.management import CommandParser  # type: ignore
@@ -19,7 +19,7 @@ from cl.search.models import Court, Docket
 
 class OptionsType(TypedDict):
     queue: str
-    courts: List[str]
+    courts: list[str]
     iterations: int
     iteration_delay: float
 

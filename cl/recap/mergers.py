@@ -1,9 +1,10 @@
 # Code for merging PACER content into the DB
+import json
 import logging
 import re
 from copy import deepcopy
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.exceptions import ValidationError
@@ -14,6 +15,10 @@ from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 
+from cl.alerts.utils import (
+    set_skip_percolation_if_bankruptcy_data,
+    set_skip_percolation_if_parties_data,
+)
 from cl.corpus_importer.utils import (
     ais_appellate_court,
     is_long_appellate_document_number,
@@ -43,6 +48,7 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
+from cl.recap.constants import bankruptcy_data_fields
 from cl.recap.models import (
     PROCESSING_STATUS,
     UPLOAD_TYPE,
@@ -280,7 +286,7 @@ def add_attorney(atty, p, d):
     elif count >= 2:
         # Too many found, choose the most recent attorney.
         logger.info(
-            f"Got too many results for atty: '{atty}'. Picking earliest."
+            "Got too many results for atty: '%s'. Picking earliest.", atty
         )
         a = attys.earliest("date_created")
 
@@ -368,7 +374,7 @@ def update_case_names(d, new_case_name):
 
 
 async def update_docket_metadata(
-    d: Docket, docket_data: Dict[str, Any]
+    d: Docket, docket_data: dict[str, Any]
 ) -> Docket:
     """Update the Docket object with the data from Juriscraper.
 
@@ -773,7 +779,7 @@ def add_create_docket_entry_transaction(d, docket_entry):
 
 async def get_or_make_docket_entry(
     d: Docket, docket_entry: dict[str, any]
-) -> Optional[tuple[DocketEntry, bool]]:
+) -> tuple[DocketEntry, bool] | None:
     """Lookup or create a docket entry to match the one that was scraped.
 
     :param d: The docket we expect to find it in.
@@ -998,7 +1004,9 @@ async def add_docket_entries(
         except RECAPDocument.MultipleObjectsReturned:
             logger.info(
                 "Multiple recap documents found for document entry number'%s' "
-                "while processing '%s'" % (docket_entry["document_number"], d)
+                "while processing '%s'",
+                docket_entry["document_number"],
+                d,
             )
             if params["document_type"] == RECAPDocument.ATTACHMENT:
                 continue
@@ -1359,7 +1367,7 @@ def add_parties_and_attorneys(d, parties):
 
 
 @transaction.atomic
-def add_bankruptcy_data_to_docket(d: Docket, metadata: Dict[str, str]) -> None:
+def add_bankruptcy_data_to_docket(d: Docket, metadata: dict[str, str]) -> None:
     """Add bankruptcy data to the docket from the claims data, RSS feeds, or
     another location.
     """
@@ -1368,16 +1376,8 @@ def add_bankruptcy_data_to_docket(d: Docket, metadata: Dict[str, str]) -> None:
     except BankruptcyInformation.DoesNotExist:
         bankr_data = BankruptcyInformation(docket=d)
 
-    fields = [
-        "date_converted",
-        "date_last_to_file_claims",
-        "date_last_to_file_govt",
-        "date_debtor_dismissed",
-        "chapter",
-        "trustee_str",
-    ]
     do_save = False
-    for field in fields:
+    for field in bankruptcy_data_fields:
         if metadata.get(field):
             do_save = True
             setattr(bankr_data, field, metadata[field])
@@ -1506,7 +1506,7 @@ def add_claims_to_docket(d, new_claims, tag_names=None):
             add_claim_history_entry(new_history, db_claim)
 
 
-def get_data_from_att_report(text: str, court_id: str) -> Dict[str, str]:
+def get_data_from_att_report(text: str, court_id: str) -> dict[str, str]:
     att_page = AttachmentPage(map_cl_to_pacer_id(court_id))
     att_page._parse_text(text)
     att_data = att_page.data
@@ -1515,7 +1515,7 @@ def get_data_from_att_report(text: str, court_id: str) -> Dict[str, str]:
 
 def get_data_from_appellate_att_report(
     text: str, court_id: str
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Get attachments data from Juriscraper AppellateAttachmentPage
 
     :param text: The attachment page text to parse.
@@ -1528,7 +1528,7 @@ def get_data_from_appellate_att_report(
     return att_data
 
 
-async def add_tags_to_objs(tag_names: List[str], objs: Any) -> list[Tag]:
+async def add_tags_to_objs(tag_names: list[str], objs: Any) -> list[Tag]:
     """Add tags by name to objects
 
     :param tag_names: A list of tag name strings
@@ -1564,6 +1564,10 @@ def merge_pacer_docket_into_cl_docket(
 
     d.add_recap_source()
     async_to_sync(update_docket_metadata)(d, docket_data)
+
+    # Skip the percolator request for this save if parties data will be merged
+    # afterward.
+    set_skip_percolation_if_parties_data(docket_data["parties"], d)
     d.save()
 
     if appellate:
@@ -1581,28 +1585,43 @@ def merge_pacer_docket_into_cl_docket(
         UPLOAD_TYPE.APPELLATE_DOCKET if appellate else UPLOAD_TYPE.DOCKET
     )
     pacer_file = PacerHtmlFiles(content_object=d, upload_type=upload_type)
+
+    # Determine how to store the report data.
+    # Most PACER reports include a raw HTML response and set the `response`
+    # attribute. However, ACMS reports typically construct the data from a
+    # series of API calls, and do not include a single HTML response. In those
+    # cases, we store the data as JSON instead.
+    pacer_file_name = "docket.html" if report.response else "docket.json"
+    pacer_file_content = (
+        report.response.text.encode()
+        if report.response
+        else json.dumps(report.data, default=str).encode()
+    )
     pacer_file.filepath.save(
-        "docket.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
-        ContentFile(report.response.text.encode()),
+        pacer_file_name,  # We only care about the ext w/S3PrivateUUIDStorageTest
+        ContentFile(pacer_file_content),
     )
 
-    items_returned, rds_created, content_updated = async_to_sync(
-        add_docket_entries
-    )(d, docket_data["docket_entries"], tags=tags)
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
     add_parties_and_attorneys(d, docket_data["parties"])
     if docket_data["parties"]:
         # Index or re-index parties only if the docket has parties.
         index_docket_parties_in_es.delay(d.pk)
+
+    items_returned, rds_created, content_updated = async_to_sync(
+        add_docket_entries
+    )(d, docket_data["docket_entries"], tags=tags)
     async_to_sync(process_orphan_documents)(
         rds_created, d.court_id, d.date_filed
     )
-    logger.info(f"Created/updated docket: {d}")
+    logger.info("Created/updated docket: %s", d)
     return rds_created, content_updated
 
 
 async def clean_duplicate_attachment_entries(
     de: DocketEntry,
-    attachment_dicts: List[Dict[str, Union[int, str]]],
+    attachment_dicts: list[dict[str, int | str]],
 ):
     """Remove attachment page entries with duplicate pacer_doc_id's that
     have incorrect attachment numbers. This is needed because older attachment
@@ -1656,10 +1675,10 @@ async def merge_attachment_page_data(
     pacer_doc_id: int,
     document_number: int | None,
     text: str | None,
-    attachment_dicts: List[Dict[str, Union[int, str]]],
+    attachment_dicts: list[dict[str, int | str]],
     debug: bool = False,
     is_acms_attachment: bool = False,
-) -> Tuple[List[RECAPDocument], DocketEntry]:
+) -> tuple[list[RECAPDocument], DocketEntry]:
     """Merge attachment page data into the docket
 
     :param court: The court object we're working with
@@ -1794,8 +1813,13 @@ async def merge_attachment_page_data(
         pacer_file = await sync_to_async(PacerHtmlFiles)(
             content_object=de, upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE
         )
+        pacer_file_name = (
+            "attachment_page.json"
+            if is_acms_attachment
+            else "attachment_page.html"
+        )
         await sync_to_async(pacer_file.filepath.save)(
-            "attachment_page.html",  # Irrelevant b/c S3PrivateUUIDStorageTest
+            pacer_file_name,  # Irrelevant b/c S3PrivateUUIDStorageTest
             ContentFile(text.encode()),
         )
 
@@ -1877,9 +1901,9 @@ async def merge_attachment_page_data(
                         except RECAPDocument.MultipleObjectsReturned:
                             rd.description = ""
                             logger.info(
-                                f"Failed to migrate description for "
-                                f"{attachment["pacer_doc_id"]}, "
-                                f"multiple source documents found."
+                                "Failed to migrate description for "
+                                "%s, multiple source documents found.",
+                                attachment["pacer_doc_id"],
                             )
                         rd.attachment_number = None
                         rd.document_type = RECAPDocument.PACER_DOCUMENT
@@ -1900,9 +1924,8 @@ async def merge_attachment_page_data(
                         except RECAPDocument.MultipleObjectsReturned:
                             rd.description = ""
                             logger.info(
-                                f"Failed to migrate description for "
-                                f"{attachment["pacer_doc_id"]}, "
-                                f"multiple source documents found."
+                                "Failed to migrate description for %s, multiple source documents found.",
+                                attachment["pacer_doc_id"],
                             )
                     rds_created.append(rd)
 
@@ -1951,12 +1974,12 @@ async def merge_attachment_page_data(
 
 def save_iquery_to_docket(
     self,
-    iquery_data: Dict[str, str],
+    iquery_data: dict[str, str],
     iquery_text: str,
     d: Docket,
-    tag_names: Optional[List[str]],
+    tag_names: list[str] | None,
     skip_iquery_sweep: bool = False,
-) -> Optional[int]:
+) -> int | None:
     """Merge iquery results into a docket
 
     :param self: The celery task calling this function
@@ -1971,6 +1994,9 @@ def save_iquery_to_docket(
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
     d.skip_iquery_sweep = skip_iquery_sweep
+    # Skip the percolator request for this save if bankruptcy data will
+    # be merged afterward.
+    set_skip_percolation_if_bankruptcy_data(iquery_data, d)
     try:
         d.save()
         add_bankruptcy_data_to_docket(d, iquery_data)
@@ -1983,7 +2009,7 @@ def save_iquery_to_docket(
         raise self.retry(exc=exc)
 
     async_to_sync(add_tags_to_objs)(tag_names, [d])
-    logger.info(f"Created/updated docket: {d}")
+    logger.info("Created/updated docket: %s", d)
 
     # Add the CASE_QUERY_PAGE to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles.objects.create(
@@ -1998,7 +2024,7 @@ def save_iquery_to_docket(
 
 
 async def process_orphan_documents(
-    rds_created: List[RECAPDocument],
+    rds_created: list[RECAPDocument],
     court_id: int,
     docket_date: date,
 ) -> None:
@@ -2044,7 +2070,7 @@ def process_case_query_report(
     report_text: str,
     skip_iquery_sweep: bool = False,
 ) -> None:
-    """Process the case query report from probe_iquery_pages task.
+    """Process the case query report from probe_or_scrape_iquery_pages task.
     Find and update/store the docket accordingly. This method is able to retry
     on IntegrityError due to a race condition when saving the docket.
 
@@ -2070,10 +2096,16 @@ def process_case_query_report(
     d.add_recap_source()
     d = async_to_sync(update_docket_metadata)(d, report_data)
     d.skip_iquery_sweep = skip_iquery_sweep
+    # Skip the percolator request for this save if bankruptcy data will
+    # be merged afterward.
+    set_skip_percolation_if_bankruptcy_data(report_data, d)
     d.save()
     add_bankruptcy_data_to_docket(d, report_data)
     logger.info(
-        f"Created/updated docket: {d} from court: {court_id} and pacer_case_id {pacer_case_id}"
+        "Created/updated docket: %s from court: %s and pacer_case_id %s",
+        d,
+        court_id,
+        pacer_case_id,
     )
 
     # Add the CASE_QUERY_PAGE to the docket in case we need it someday.

@@ -1,7 +1,8 @@
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, NotRequired, TypedDict, Union
+from typing import Any, NotRequired, TypedDict
 
 from django.http import HttpRequest
 from django_elasticsearch_dsl.search import Search
@@ -9,8 +10,8 @@ from elasticsearch_dsl.query import QueryString
 
 from cl.users.models import User
 
-CleanData = Dict[str, Any]
-TaskData = Dict[str, Any]
+CleanData = dict[str, Any]
+TaskData = dict[str, Any]
 
 
 class AuthenticatedHttpRequest(HttpRequest):
@@ -21,7 +22,7 @@ class EmailType(TypedDict, total=False):
     subject: str
     body: str
     from_email: str
-    to: List[str]
+    to: list[str]
 
 
 class ESRangeQueryParams(TypedDict):
@@ -35,7 +36,7 @@ SearchParam = TypedDict(
     "SearchParam",
     {
         "q": str,
-        "fq": List[str],
+        "fq": list[str],
         "mm": int,
 
         # Pagination & ordering
@@ -70,7 +71,7 @@ SearchParam = TypedDict(
         "boost": str,
         "qf": str,
         "pf": str,
-        "ps": Union[float, str],
+        "ps": float | str,
 
         # More Like This
         "mlt": str,
@@ -88,7 +89,7 @@ SearchParam = TypedDict(
 # fmt: on
 
 
-OptionsType = Dict[str, Union[str, Callable]]
+OptionsType = dict[str, str | Callable]
 
 
 """

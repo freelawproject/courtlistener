@@ -14,18 +14,38 @@ from cl.lib.redis_utils import (
     make_update_pacer_case_id_key,
     release_redis_lock,
 )
-from cl.search.models import Court, Docket
+from cl.search.models import Docket
 
 
-def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
+def update_latest_case_id_and_schedule_iquery_sweep(
+    docket: Docket | None,
+    court_pk: str | None = None,
+    fixed_case_id_sweep: int | None = None,
+) -> None:
     """Updates the latest PACER case ID and schedules iquery retrieval tasks.
 
-    :param docket: The incoming Docket instance.
+    Note: Provide either a Docket instance or a court_id with fixed_case_id_sweep.
+
+    :param docket: The Docket instance, if triggered by a Docket post_save signal.
+    :param court_pk: The court ID, if triggered in fixed sweep mode.
+    :param fixed_case_id_sweep: The target case ID for performing a fixed sweep.
     :return: None
     """
 
     r = get_redis_interface("CACHE")
-    court_id: str = docket.court_id
+    court_id: str
+    incoming_pacer_case_id: int
+    if docket is not None:
+        court_id = docket.court_id
+        incoming_pacer_case_id = int(docket.pacer_case_id)
+    elif court_pk is not None and fixed_case_id_sweep is not None:
+        court_id = court_pk
+        incoming_pacer_case_id = fixed_case_id_sweep
+    else:
+        raise ValueError(
+            "Provide either a Docket instance or court_id + fixed_case_id_sweep"
+        )
+
     # Get the latest pacer_case_id from Redis using a lock to avoid race conditions
     # when getting and updating it.
     update_lock_key = make_update_pacer_case_id_key(court_id)
@@ -38,14 +58,8 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     iquery_pacer_case_id_current = int(
         r.hget("iquery:pacer_case_id_current", court_id) or 0
     )
-    incoming_pacer_case_id = int(docket.pacer_case_id)
     found_higher_case_id = False
     if incoming_pacer_case_id > highest_known_pacer_case_id:
-        r.hset(
-            "iquery:highest_known_pacer_case_id",
-            court_id,
-            incoming_pacer_case_id,
-        )
         found_higher_case_id = True
 
     if found_higher_case_id:
@@ -53,26 +67,36 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
             incoming_pacer_case_id - iquery_pacer_case_id_current
         )
         logger.info(
-            "Found %s tasks to schedule for pacer case IDs ranging from %s to %s.",
+            "Found %s %s tasks to schedule for pacer case IDs ranging from %s to %s.",
             tasks_to_schedule,
+            court_id,
             iquery_pacer_case_id_current,
             incoming_pacer_case_id,
         )
-        if tasks_to_schedule > 10_800:
-            # Considering a Celery countdown of 1 second applied via
-            # throttle_task and a visibility_timeout of 6 hours, the maximum
-            # countdown time should be set to 21,600 to avoid a celery runaway.
-            # It's safer to abort if more than 10,800 tasks are attempted to be
+        if (
+            tasks_to_schedule
+            > settings.IQUERY_PROBE_MAX_OFFSET + settings.IQUERY_MAX_PROBE
+        ):
+            # Don't schedule more than IQUERY_PROBE_MAX_OFFSET tasks at a time
+            # to prevent Redis from being filled up.
+            # It's safer to abort if more than 600 tasks are attempted to be
             # scheduled. This could indicate an issue with retrieving the
             # highest_known_pacer_case_id or a loss of the
             # iquery_pacer_case_id_current for the court in Redis.
             logger.error(
-                "Tried to schedule more than 10,800 iquery pages to scrape for "
-                "court %s aborting it to avoid Celery runaways.",
+                "Tried to schedule more than %s iquery pages to scrape for "
+                "court %s; aborting to avoid Redis memory exhaustion.",
+                tasks_to_schedule,
                 court_id,
             )
             release_redis_lock(r, update_lock_key, lock_value)
             return None
+
+        r.hset(
+            "iquery:highest_known_pacer_case_id",
+            court_id,
+            incoming_pacer_case_id,
+        )
         task_to_schedule_count = 0
         while iquery_pacer_case_id_current + 1 < incoming_pacer_case_id:
             iquery_pacer_case_id_current += 1
@@ -123,7 +147,7 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
         return None
 
     if getattr(instance, "skip_iquery_sweep", False):
-        # This is an instance added by the probe_iquery_pages task
+        # This is an instance added by the probe_or_scrape_iquery_pages task
         # or the iquery sweep scraper that should be ignored (no the highest
         # pacer_case_id)
         return None
@@ -132,7 +156,7 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
     # - The docket belongs to a RECAP district or bankruptcy court,
     # - The docket has a pacer_case_id,
     # - The docket was newly created (when IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True), or
-    # - The docket was created or updated by the last probe iteration from probe_iquery_pages.
+    # - The docket was created or updated by the last probe iteration from probe_or_scrape_iquery_pages.
     check_probe_or_created = (
         not getattr(instance, "skip_iquery_sweep", False) or created
     )

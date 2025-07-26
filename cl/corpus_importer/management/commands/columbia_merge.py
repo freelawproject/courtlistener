@@ -21,12 +21,11 @@ manage.py columbia_merge --debug --csv-file /opt/courtlistener/cl/assets/media/t
 import os.path
 import re
 from difflib import SequenceMatcher
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 from bs4 import BeautifulSoup
 from django.db import transaction
-from django.db.models import Q
 from juriscraper.lib.string_utils import titlecase
 
 from cl.corpus_importer.import_columbia.columbia_utils import (
@@ -299,7 +298,7 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
 
 def merge_field(
     cluster: OpinionCluster,
-    file_value: Optional[str],
+    file_value: str | None,
     field_name: str,
     skip_judge_merger: bool = False,
 ) -> dict:

@@ -51,6 +51,8 @@ class MVLatestOpinion(models.Model):
     class Meta:
         managed = False
         db_table = "scrapers_mv_latest_opinion"
+        verbose_name = "Latest Opinion Report"
+        verbose_name_plural = "Latest Opinion Reports"
 
 
 @admin.register(MVLatestOpinion)

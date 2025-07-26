@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 import environ
 from django.contrib.messages import constants as message_constants
@@ -45,7 +44,7 @@ if env("DB_REPLICA_HOST", default=""):
     }
 
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
-API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
+API_READ_DATABASES: list[str] = env("API_READ_DATABASES", default="replica")
 
 ####################
 # Cache & Sessions #
@@ -180,10 +179,12 @@ INSTALLED_APPS = [
     "cl.scrapers",
     "cl.search",
     "cl.simple_pages",
+    "cl.sitemaps_infinite",
     "cl.stats",
     "cl.users",
     "cl.visualizations",
     "tailwind",
+    "django_cotton",
 ]
 
 if DEVELOPMENT:
@@ -194,8 +195,6 @@ if DEVELOPMENT:
     MIDDLEWARE.append(
         "django_browser_reload.middleware.BrowserReloadMiddleware"
     )
-    if not TESTING:
-        MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
 
 # TODO: Shift to a global Tailwind config and pull out of simple_pages app
 TAILWIND_APP_NAME = "cl.simple_pages"
@@ -241,6 +240,8 @@ MESSAGE_TAGS = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
+FORMS_URLFIELD_ASSUME_HTTPS = True
 
 SILENCED_SYSTEM_CHECKS = [
     # Allow index names >30 characters, because we aren’t using Oracle

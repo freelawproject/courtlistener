@@ -6,19 +6,21 @@ from http import HTTPStatus
 from unittest import mock
 
 import time_machine
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import admin
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import AsyncClient, RequestFactory, override_settings
+from django.core.paginator import Paginator
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
 
+from cl.alerts.utils import add_cutoff_timestamp_filter
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     compute_lowest_possible_estimate,
@@ -33,6 +35,10 @@ from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
 )
+from cl.lib.search_utils import (
+    enrich_search_results,
+    get_results_from_paginator,
+)
 from cl.lib.test_helpers import (
     RECAPSearchTestCase,
     rd_type_v4_api_keys,
@@ -43,7 +49,6 @@ from cl.lib.test_helpers import (
     v4_meta_keys,
     v4_recap_meta_keys,
 )
-from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
     AttorneyFactory,
     AttorneyOrganizationFactory,
@@ -63,7 +68,6 @@ from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
     DocketEntryFactory,
-    DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
@@ -126,11 +130,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in Frontend with %s "
+            msg=f"Did not get the right number of search results in Frontend with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -143,9 +147,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of child documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n" % (field_name, expected_count, got),
+            msg=f"Did not get the right number of child documents {field_name}\n"
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n",
         )
 
     def _compare_child_entry_date_filed(
@@ -155,7 +159,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         tree = html.fromstring(html_content)
         article = tree.xpath("//article")[article]
         col_md_offset_half_elements = article.xpath(
-            f".//div[@class='bottom']//div[@class='col-md-offset-half']"
+            ".//div[@class='bottom']//div[@class='col-md-offset-half']"
         )
         col_md_offset_half_elem = col_md_offset_half_elements[child_index]
         inline_element = col_md_offset_half_elem.xpath(
@@ -167,8 +171,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             meta_data_value,
             expected_date,
             msg="Did not get the right expected entry date filed \n"
-            "Expected: %s\n"
-            "     Got: %s\n\n" % (expected_date, meta_data_value),
+            f"Expected: {expected_date}\n"
+            f"     Got: {meta_data_value}\n\n",
         )
 
     def _assert_results_header_content(self, html_content, expected_text):
@@ -196,10 +200,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             total_query_results,
             parent_expected,
-            msg="Did not get the right number of parent documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            % (field_name, parent_expected, total_query_results),
+            msg=f"Did not get the right number of parent documents {field_name}\n"
+            f"Expected: {parent_expected}\n"
+            f"     Got: {total_query_results}\n\n",
         )
         return hits.to_dict()
 
@@ -230,9 +233,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             expected_count,
             got,
-            msg="Did not get the right number of child documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n" % (field_name, expected_count, got),
+            msg=f"Did not get the right number of child documents {field_name}\n"
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n",
         )
 
     @staticmethod
@@ -556,7 +559,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Filter by case by docket_number containing repeated numbers like: 1:21-bk-0021
         with self.captureOnCommitCallbacks(execute=True):
-            entry = DocketEntryWithParentsFactory(
+            entry = DocketEntryFactory(
                 docket__docket_number="1:21-bk-0021",
                 docket__court=self.court,
                 docket__source=Docket.RECAP,
@@ -658,6 +661,28 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "filed_before")
 
+    async def test_entry_filed_after_filter(self) -> None:
+        """Confirm entry_filed_after filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_after": "2015-08-19",
+        }
+
+        # Frontend
+        r = await self._test_article_count(params, 1, "filed_after")
+        self.assertIn(self.de.description, r.content.decode())
+
+    async def test_entry_filed_before_filter(self) -> None:
+        """Confirm entry_filed_before filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_before": "2014-07-05",
+        }
+
+        # Frontend, 1 result expected since RECAPDocuments are grouped by case
+        r = await self._test_article_count(params, 1, "filed_before")
+        self.assertIn(self.de_1.description, r.content.decode())
+
     async def test_document_number_filter(self) -> None:
         """Confirm document number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "document_number": "3"}
@@ -697,7 +722,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # add a document that is not available to the new docket
         with self.captureOnCommitCallbacks(execute=True):
-            entry = DocketEntryWithParentsFactory(
+            entry = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -756,7 +781,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 nature_of_suit="440",
                 source=Docket.RECAP,
             )
-            e_1_d_1 = DocketEntryWithParentsFactory(
+            e_1_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -768,7 +793,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=True,
                 page_count=5,
             )
-            e_2_d_1 = DocketEntryWithParentsFactory(
+            e_2_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=2,
                 date_filed=datetime.date(2015, 8, 19),
@@ -787,7 +812,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket_number="1:17-cv-04465",
                 source=Docket.RECAP,
             )
-            e_28_d_2 = DocketEntryWithParentsFactory(
+            e_28_d_2 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=28,
                 description="ORDER granting 27 Motion to Continue",
@@ -798,7 +823,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=False,
                 page_count=5,
             )
-            e_29_d_2 = DocketEntryWithParentsFactory(
+            e_29_d_2 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=29,
                 description="ORDER granting 23 Motion for More Definite Statement. Signed by Judge Mary H Murguia",
@@ -815,7 +840,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket_number="1:17-cv-04465",
                 source=Docket.RECAP,
             )
-            e_14_d_3 = DocketEntryWithParentsFactory(
+            e_14_d_3 = DocketEntryFactory(
                 docket=docket_3,
                 entry_number=14,
                 description="Petition Completed March 29, 2019 Filed by Debtor Kathleen B. Thomas",
@@ -825,7 +850,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 document_number="14",
                 is_available=False,
             )
-            e_27_d_3 = DocketEntryWithParentsFactory(
+            e_27_d_3 = DocketEntryFactory(
                 docket=docket_3,
                 entry_number=27,
                 description="Financial Management Course Certificate Filed by Debtor Kathleen B. Thomas",
@@ -936,6 +961,45 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket.delete()
             docket_2.delete()
 
+    def test_cause_filter(self) -> None:
+        """Confirm cause filter works properly"""
+        # Confirm parties extracted from case_name are available in filters.
+        with self.captureOnCommitCallbacks(execute=True):
+            d = DocketFactory(
+                court=self.court,
+                docket_number="23-cv-12335",
+                case_name="Lockhart v. Gainwell Technologies LLC",
+                cause="31:3730 Qui Tam False Claims Act",
+                source=Docket.RECAP,
+            )
+            d_2 = DocketFactory(
+                court=self.court,
+                docket_number="22-cv-00526",
+                case_name="Schermerhorn v. Quality Enterprises USA, Inc.",
+                cause="31:3730 Qui Tam False Claims Act",
+                source=Docket.RECAP,
+            )
+
+        cause_str = "31:3730 Qui Tam False Claims Act"
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            # Do it in main query box
+            "q": f'cause:"{cause_str}"',
+        }
+        async_to_sync(self._test_article_count)(
+            params, 2, "faceted_cause_query_string"
+        )
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            # Do it in the cause field as a phrase
+            "cause": f'"{cause_str}"',
+        }
+        async_to_sync(self._test_article_count)(params, 2, "cause_filter")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            d.delete()
+            d_2.delete()
+
     def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
 
@@ -981,7 +1045,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 nature_of_suit="440",
                 source=Docket.RECAP,
             )
-            e_1_d_1 = DocketEntryWithParentsFactory(
+            e_1_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -1010,7 +1074,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=True,
                 page_count=5,
             )
-            e_2_d_1 = DocketEntryWithParentsFactory(
+            e_2_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=2,
                 date_filed=datetime.date(2015, 8, 19),
@@ -1045,7 +1109,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 ),
                 docket=docket_2,
             )
-            d3 = DocketEntryWithParentsFactory(
+            d3 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=3,
                 date_filed=datetime.date(2015, 8, 19),
@@ -1080,7 +1144,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 ),
                 docket=docket_3,
             )
-            d4 = DocketEntryWithParentsFactory(
+            d4 = DocketEntryFactory(
                 docket=docket_3,
                 entry_number=4,
                 date_filed=datetime.date(2015, 8, 19),
@@ -2041,7 +2105,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         async_to_sync(self._test_article_count)(params, 2, "order score desc")
 
         with self.captureOnCommitCallbacks(execute=True):
-            de_4 = DocketEntryWithParentsFactory(
+            de_4 = DocketEntryFactory(
                 docket=DocketFactory(
                     docket_number="12-1236",
                     court=self.court_2,
@@ -2074,7 +2138,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
             index_docket_parties_in_es.delay(de_4.docket.pk)
 
-            de_5 = DocketEntryWithParentsFactory(
+            de_5 = DocketEntryFactory(
                 docket=DocketFactory(
                     docket_number="12-1238",
                     court=self.court_2,
@@ -2089,7 +2153,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # Docket entry with a very old date_filed.
-            de_6 = DocketEntryWithParentsFactory(
+            de_6 = DocketEntryFactory(
                 docket=DocketFactory(
                     docket_number="12-0000",
                     court=self.court_2,
@@ -2316,40 +2380,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
 
-    @mock.patch("cl.lib.es_signal_processor.chain")
-    async def test_avoid_updating_docket_in_es_on_view_count_increment(
-        self, mock_es_save_chain
-    ) -> None:
-        """Confirm a docket is not updated in ES on a view_count increment."""
-
-        with self.captureOnCommitCallbacks(execute=True):
-            docket = await sync_to_async(DocketFactory)(
-                court=self.court,
-                case_name="Lorem Ipsum",
-                case_name_full="Jackson & Sons Holdings vs. Bank",
-                date_filed=datetime.date(2015, 8, 16),
-                date_argued=datetime.date(2013, 5, 20),
-                docket_number="1:21-bk-1234",
-                assigned_to=None,
-                referred_to=None,
-                nature_of_suit="440",
-                source=Docket.RECAP,
-            )
-        # Restart save chain mock count.
-        mock_es_save_chain.reset_mock()
-        self.assertEqual(mock_es_save_chain.call_count, 0)
-
-        request_factory = AsyncClient()
-        request = await request_factory.get("/docket/")
-        with mock.patch("cl.lib.view_utils.is_bot", return_value=False):
-            # Increase the view_count.
-            await increment_view_count(docket, request)
-
-        # The save chain shouldn't be called.
-        self.assertEqual(mock_es_save_chain.call_count, 0)
-        with self.captureOnCommitCallbacks(execute=True):
-            await docket.adelete()
-
     async def test_fail_rd_type_gracefully_frontend(self) -> None:
         """Confirm that the rd type fails gracefully in the frontend."""
 
@@ -2368,9 +2398,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         dockets_to_remove = []
         # Add dockets with no documents
         with self.captureOnCommitCallbacks(execute=True):
-
             # District document initial document available
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=district_court,
                     case_name="Lorem District vs Complaint Available",
@@ -2403,7 +2432,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # District document initial document not available
-            de_2 = DocketEntryWithParentsFactory(
+            de_2 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=district_court,
                     case_name="Lorem District vs Complaint Not Available",
@@ -2433,7 +2462,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # Appellate document initial not available and not pacer_doc_id
-            de_3 = DocketEntryWithParentsFactory(
+            de_3 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Appellate Complaint Not Available no pacer_doc_id",
@@ -2453,7 +2482,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # Appellate document initial document available
-            de_4 = DocketEntryWithParentsFactory(
+            de_4 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Lorem Appellate vs Complaint Available",
@@ -2477,7 +2506,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # Appellate document notice of appeal not available
-            de_5 = DocketEntryWithParentsFactory(
+            de_5 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Lorem Appellate vs Notice of appeal not Available",
@@ -2507,7 +2536,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
             dockets_to_remove.append(empty_docket)
             # Bankruptcy document initial document available
-            de_6 = DocketEntryWithParentsFactory(
+            de_6 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Bankruptcy vs Petition Available",
@@ -2530,7 +2559,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # Bankruptcy document initial document not available
-            de_7 = DocketEntryWithParentsFactory(
+            de_7 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Bankruptcy vs Petition Not Available",
@@ -2654,6 +2683,73 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         for docket in dockets_to_remove:
             docket.delete()
+
+    async def test_get_results_from_paginator(self) -> None:
+        """Assert Paginator Page objects are handled as expected."""
+
+        # Make basic paginator with 50 elements, 10 per page
+        num_items = 50
+        per_page = 10
+        num_pages = num_items // per_page
+        self.assertEqual(num_pages, 5)
+
+        a = [1] * num_items
+        p = Paginator(a, per_page)
+
+        # Default page_num 1
+        r = get_results_from_paginator(p)
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+
+        # Not integer page_num should return first page
+        r = get_results_from_paginator(p, page_num="a")
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+
+        # Higher page number should return last page
+        r = get_results_from_paginator(p, page_num=num_pages + 1)
+        self.assertEqual(r.number, num_pages)
+        self.assertEqual(r.has_previous(), True)
+        self.assertEqual(r.has_next(), False)
+
+        # Empty paginator should return a single empty page
+        p = Paginator([], 1)
+
+        # Default page_num 1
+        r = get_results_from_paginator(p)
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+        self.assertEqual(r.has_next(), False)
+
+        # Not integer page_num should return first page
+        r = get_results_from_paginator(p, page_num="a")
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+        self.assertEqual(r.has_next(), False)
+
+        # Higher page number should return last page
+        r = get_results_from_paginator(p, page_num=2)
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+        self.assertEqual(r.has_next(), False)
+
+    async def test_enrich_search_results(self) -> None:
+        """Assert Paginator Page objects are enriched as expected.
+        Ideally, this would validate each step of the enrichment,
+        but those tests do not appear to exist yet
+        """
+
+        # Create empty paginator
+        paginator = Paginator([], 1)
+        page = paginator.page(1)
+
+        search_type = SEARCH_TYPES.OPINION
+        get_params = {}
+
+        r = enrich_search_results(page, search_type, get_params)
+
+        # Shouldn't be a response
+        self.assertIsNone(r)
 
     @mock.patch("cl.lib.search_utils.fetch_es_results")
     @override_settings(
@@ -2796,7 +2892,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         """
 
         with self.captureOnCommitCallbacks(execute=True):
-            de = DocketEntryWithParentsFactory(
+            de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Howell v. Indiana",
@@ -2925,6 +3021,280 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         de.docket.delete()
         docket_2.delete()
 
+    def test_timestamp_filtering(self) -> None:
+        """Confirm the timestamp fielded filter works properly"""
+
+        # Add docket with no document
+        mock_date = now().replace(
+            day=29, hour=0, minute=0, second=0, microsecond=0
+        )
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Lorem vs Natural Gas ",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="5:90-cv-04007",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(params["q"], mock_date)
+        # Docket with mock_date as timestamp should be found.
+        async_to_sync(self._test_article_count)(params, 1, "timestamp")
+
+        # Filter by date:
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date.date()
+        )
+        # Docket with mock_date as timestamp should be found.
+        async_to_sync(self._test_article_count)(params, 1, "timestamp")
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date + datetime.timedelta(seconds=1)
+        )
+        # Querying for a timestamp one second greater than mock_date shouldn't return any results.
+        async_to_sync(self._test_article_count)(params, 0, "timestamp")
+
+        # Test timestamp filter for RDs.
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            entry = DocketEntryFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="1",
+                is_available=False,
+                page_count=5,
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="2",
+                is_available=True,
+                page_count=5,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "New File",
+            "available_only": True,
+        }
+        params["q"] = add_cutoff_timestamp_filter(params["q"], mock_date)
+        # RECAPDocument with mock_date as timestamp should be found.
+        r = async_to_sync(self._test_article_count)(params, 1, "timestamp")
+        self._count_child_documents(0, r.content.decode(), 1, "timestamp")
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "New File",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date + datetime.timedelta(seconds=1)
+        )
+        # Querying for a timestamp one second greater than mock_date shouldn't return any results.
+        async_to_sync(self._test_article_count)(params, 0, "timestamp")
+
+        docket.delete()
+
+    def test_relative_dates_filtering(self):
+        """Confirm that the relative date filter works properly by returning
+        the expected documents within the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            d_1 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23456",
+                docket_number="55-1234",
+            )
+            # 40 days ago
+            d_2 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23457",
+                docket_number="56-1234",
+            )
+            # 400 days ago
+            d_3 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23458",
+                docket_number="57-1234",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No case within the range.
+            ("9d ago", [d_1]),  # Only the 9-day old
+            ("past 10 days", [d_1]),  # Only the 9-day old
+            ("30d ago", [d_1]),  # only the 9-day old
+            ("60d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1m ago", [d_1]),  # only the 9-day old
+            ("2m ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("365d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1y ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("2y ago", [d_1, d_2, d_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                cd = {**params, "filed_after": relative_date}
+                r = async_to_sync(self._test_article_count)(
+                    cd,
+                    len(expected_cases),
+                    f"filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for docket in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(docket.docket_number, r.content.decode())
+
+        d_1.delete()
+        d_2.delete()
+        d_3.delete()
+
+    def test_relative_dates_entry_filed_filtering(self):
+        """Confirm that the relative date filter works properly for the
+        entry_date_filed  field by returning the expected documents within
+        the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            de_1 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="SUBPOENAS SERVED 9 days ago",
+            )
+
+            # 40 days ago
+            de_2 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=de_2,
+                description="SUBPOENAS SERVED 40 days ago",
+            )
+
+            # 400 days ago
+            de_3 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+            )
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=de_3,
+                description="SUBPOENAS SERVED 400 days ago",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No document within the range.
+            ("9d ago", [rd_1]),  # Only the 9-day old
+            ("past 10 days", [rd_1]),  # Only the 9-day old
+            ("30d ago", [rd_1]),  # only the 9-day old
+            ("60d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1m ago", [rd_1]),  # only the 9-day old
+            ("2m ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("365d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1y ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("2y ago", [rd_1, rd_2, rd_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                cd = {**params, "entry_date_filed_after": relative_date}
+                r = async_to_sync(self._test_article_count)(
+                    cd,
+                    len(expected_cases),
+                    f"entry_date_filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for rd in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(rd.description, r.content.decode())
+
+        de_1.docket.delete()
+        de_2.docket.delete()
+        de_3.docket.delete()
+
+    def test_invalid_relative_date_syntax(self):
+        """Confirm that a custom error is displayed to users when they enter an
+        invalid relative date syntax.
+        """
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+        test_cases = ["1d", "5 day", "invalid date", "12/05-23"]
+        for invalid_date in test_cases:
+            with self.subTest(expr=invalid_date):
+                cd = {**params, "filed_after": invalid_date}
+                r = async_to_sync(self._test_article_count)(
+                    cd, 0, "Invalid date syntax."
+                )
+                self.assertIn(
+                    "The date entered has an invalid format.",
+                    r.content.decode(),
+                )
+
 
 class RECAPSearchDecayRelevancyTest(
     ESIndexTestCase, V4SearchAPIAssertions, TestCase
@@ -2947,7 +3317,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(1832, 2, 23),
         )
         cls.rd_old = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_old,
                 entry_number=1,
                 description="",
@@ -2966,7 +3336,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(2024, 2, 23),
         )
         cls.rd_recent = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_recent,
                 entry_number=1,
                 description="",
@@ -2987,7 +3357,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(2022, 2, 23),
         )
         cls.rd_low_relevance = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_low_relevance,
                 entry_number=1,
                 description="",
@@ -3008,7 +3378,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(2022, 2, 23),
         )
         cls.rd_high_relevance = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_high_relevance,
                 entry_number=1,
                 description="",
@@ -3030,7 +3400,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(1900, 2, 23),
         )
         cls.rd_high_relevance_old_date = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_high_relevance_old_date,
                 entry_number=1,
                 description="",
@@ -3051,7 +3421,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=None,
         )
         cls.rd_high_relevance_null_date = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_high_relevance_null_date,
                 entry_number=1,
                 description="",
@@ -3071,7 +3441,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(2024, 12, 23),
         )
         cls.rd_low_relevance_new_date = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_low_relevance_new_date,
                 entry_number=1,
                 description="",
@@ -3224,7 +3594,7 @@ class RECAPSearchDecayRelevancyTest(
                 r = async_to_sync(self._test_article_count)(
                     test["search_params"],
                     len(test["expected_order_frontend"]),
-                    f"Failed count {test["name"]}",
+                    f"Failed count {test['name']}",
                 )
                 self._assert_order_in_html(
                     r.content.decode(), test["expected_order_frontend"]
@@ -3254,7 +3624,6 @@ class RECAPSearchDecayRelevancyTest(
 
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
-
     version_api = "v3"
     skip_common_tests = True
 
@@ -3267,7 +3636,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         cls.court_api = CourtFactory(
             id="ca9", jurisdiction="F", citation_string="Appeals. CA9."
         )
-        cls.de_api = DocketEntryWithParentsFactory(
+        cls.de_api = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court_api,
                 case_name="America vs API Lorem",
@@ -3323,7 +3692,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             docket=cls.de_api.docket, trustee_str="Lorem Ipsum"
         )
 
-        cls.de_empty_fields_api = DocketEntryWithParentsFactory(
+        cls.de_empty_fields_api = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court_api,
                 date_reargued=None,
@@ -3356,11 +3725,11 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -3468,6 +3837,32 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         await self._test_api_results_count(
             params, expected_results, "filed_before"
         )
+
+    @skip_if_common_tests_skipped
+    async def test_entry_filed_after_filter(self) -> None:
+        """Confirm entry_filed_after filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_after": "2020-08-19",
+        }
+        # API
+        r = await self._test_api_results_count(
+            params, 1, "entry_date_filed_after"
+        )
+        self.assertIn(self.de_api.description, r.content.decode())
+
+    @skip_if_common_tests_skipped
+    async def test_entry_filed_before_filter(self) -> None:
+        """Confirm entry_filed_before filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_before": "2014-07-05",
+        }
+        # API, 1 result expected since RECAPDocuments are grouped by case
+        r = await self._test_api_results_count(
+            params, 1, "entry_date_filed_before"
+        )
+        self.assertIn(self.de_1.description, r.content.decode())
 
     @skip_if_common_tests_skipped
     async def test_document_number_filter(self) -> None:
@@ -3992,11 +4387,11 @@ class RECAPSearchAPIV4Test(
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -4234,7 +4629,7 @@ class RECAPSearchAPIV4Test(
 
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             # This Docket will be matched only by its RECAPDocument.
-            docket_entry_recent = DocketEntryWithParentsFactory(
+            docket_entry_recent = DocketEntryFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Lorem Ipsum",
                 docket__case_name_full="",
@@ -4449,9 +4844,12 @@ class RECAPSearchAPIV4Test(
 
         original_datetime = now().replace(day=1, hour=5, minute=0)
         for search_params in all_tests:
-            with self.subTest(
-                search_params=search_params, msg="Test stable scores."
-            ), time_machine.travel(original_datetime, tick=False) as traveler:
+            with (
+                self.subTest(
+                    search_params=search_params, msg="Test stable scores."
+                ),
+                time_machine.travel(original_datetime, tick=False) as traveler,
+            ):
                 # Two first-page requests (no cursor) made on the same day will
                 # now have consistent scores because scores are now computed
                 # based on the same day's date.
@@ -4520,7 +4918,7 @@ class RECAPSearchAPIV4Test(
         dockets_to_create = 20
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             for _ in range(dockets_to_create):
-                docket_entry = DocketEntryWithParentsFactory(
+                docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
                 )
                 RECAPDocumentFactory(
@@ -4971,13 +5369,13 @@ class RECAPSearchAPIV4Test(
 
         rds_to_create = settings.RECAP_CHILD_HITS_PER_RESULT + 1
         with self.captureOnCommitCallbacks(execute=True):
-            docket_entry = DocketEntryWithParentsFactory(
+            docket_entry = DocketEntryFactory(
                 docket__source=Docket.RECAP,
             )
             for i in range(rds_to_create):
                 RECAPDocumentFactory(
                     docket_entry=docket_entry,
-                    document_number=i,
+                    document_number=str(i),
                 )
 
         search_params = {
@@ -5074,7 +5472,7 @@ class RECAPSearchAPIV4Test(
         """
 
         with self.captureOnCommitCallbacks(execute=True):
-            de_no_cites = DocketEntryWithParentsFactory(
+            de_no_cites = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
                     date_reargued=None,
@@ -5119,7 +5517,7 @@ class RECAPSearchAPIV4Test(
         """
 
         with self.captureOnCommitCallbacks(execute=True):
-            docket_entry = DocketEntryWithParentsFactory(
+            docket_entry = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
                     source=Docket.RECAP_AND_SCRAPER,
@@ -5159,7 +5557,7 @@ class RECAPSearchAPIV4Test(
         """
 
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            latest_null_date_filed = DocketEntryWithParentsFactory(
+            latest_null_date_filed = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
                     date_reargued=None,
@@ -5304,7 +5702,7 @@ class RECAPSearchAPIV4Test(
         dockets_to_create = 10
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             for _ in range(dockets_to_create):
-                docket_entry = DocketEntryWithParentsFactory(
+                docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
                 )
                 RECAPDocumentFactory(
@@ -5525,6 +5923,210 @@ class RECAPSearchAPIV4Test(
         with self.captureOnCommitCallbacks(execute=True):
             d.delete()
 
+    def test_relative_dates_filtering(self):
+        """Confirm that the relative date filter in the API works properly by returning
+        the expected documents within the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            d_1 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23456",
+                docket_number="55-1234",
+            )
+            # 40 days ago
+            d_2 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23457",
+                docket_number="56-1234",
+            )
+            # 400 days ago
+            d_3 = DocketFactory(
+                court=self.court,
+                case_name="Ipsum SUBPOENAS Lorem",
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+                source=Docket.RECAP,
+                pacer_case_id="23458",
+                docket_number="57-1234",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No case within the range.
+            ("9d ago", [d_1]),  # Only the 9-day old
+            ("past 10 days", [d_1]),  # Only the 9-day old
+            ("30d ago", [d_1]),  # only the 9-day old
+            ("60d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1m ago", [d_1]),  # only the 9-day old
+            ("2m ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("365d ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("1y ago", [d_1, d_2]),  # 10-day + 40-day old
+            ("2y ago", [d_1, d_2, d_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                search_params = {**params, "filed_after": relative_date}
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertEqual(
+                    len(r.data["results"]),
+                    len(expected_cases),
+                    f"filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for docket in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(docket.docket_number, r.content.decode())
+
+        # Test a relative date range that is supported in the API.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+            "filed_after": "1y ago",
+            "filed_before": "30d ago",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            cd,
+        )
+
+        # only the d_2 docket falls between 365d and 30d ago
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertIn(d_2.docket_number, r.content.decode())
+
+        d_1.delete()
+        d_2.delete()
+        d_3.delete()
+
+    def test_relative_dates_entry_filed_filtering(self):
+        """Confirm that the relative date filter works properly for the
+        entry_date_filed  field by returning the expected documents within
+        the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            de_1 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="SUBPOENAS SERVED 9 days ago",
+            )
+
+            # 40 days ago
+            de_2 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=de_2,
+                description="SUBPOENAS SERVED 40 days ago",
+            )
+
+            # 400 days ago
+            de_3 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+            )
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=de_3,
+                description="SUBPOENAS SERVED 400 days ago",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No document within the range.
+            ("9d ago", [rd_1]),  # Only the 9-day old
+            ("past 10 days", [rd_1]),  # Only the 9-day old
+            ("30d ago", [rd_1]),  # only the 9-day old
+            ("60d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1m ago", [rd_1]),  # only the 9-day old
+            ("2m ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("365d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1y ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("2y ago", [rd_1, rd_2, rd_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                search_params = {
+                    **params,
+                    "entry_date_filed_after": relative_date,
+                }
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertEqual(
+                    len(r.data["results"]),
+                    len(expected_cases),
+                    f"entry_date_filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for rd in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(rd.description, r.content.decode())
+
+        de_1.docket.delete()
+        de_2.docket.delete()
+        de_3.docket.delete()
+
+    def test_invalid_relative_date_syntax(self):
+        """Confirm that a custom error is displayed to users when they enter an
+        invalid relative date syntax.
+        """
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+        test_cases = ["1d", "5 day", "invalid date", "12/05-23"]
+        for invalid_date in test_cases:
+            with self.subTest(expr=invalid_date):
+                search_params = {**params, "filed_after": invalid_date}
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertIn(
+                    "The date entered has an invalid format.",
+                    r.content.decode(),
+                )
+
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     """Tests for RECAP Search Feed"""
@@ -5545,7 +6147,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         """Can we make a RECAP Search Feed?"""
         with self.captureOnCommitCallbacks(execute=True):
             # Docket entry without date_filed it should be excluded from feed.
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Ipsum",
@@ -5732,11 +6334,14 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         """Can we remove control characters in the plain_text for a proper XML
         rendering?
         """
-        with mock.patch(
-            "cl.search.documents.escape",
-            return_value="Lorem ipsum control chars \x07\x08\x0b.",
-        ), self.captureOnCommitCallbacks(execute=True):
-            de_1 = DocketEntryWithParentsFactory(
+        with (
+            mock.patch(
+                "cl.search.documents.escape",
+                return_value="Lorem ipsum control chars \x07\x08\x0b.",
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            de_1 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Ipsum",
@@ -5833,7 +6438,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             date_argued=datetime.date(2012, 6, 23),
             source=Docket.HARVARD,
         )
-        self.de = DocketEntryWithParentsFactory(
+        self.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 date_filed=datetime.date(2015, 8, 16),
@@ -5854,7 +6459,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             attachment_number=2,
             document_type=RECAPDocument.ATTACHMENT,
         )
-        self.de_1 = DocketEntryWithParentsFactory(
+        self.de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 date_filed=datetime.date(2016, 8, 16),
@@ -6192,9 +6797,10 @@ class IndexDocketRECAPDocumentsCommandTest(
         request = self.factory.post(url)
         queryset = RECAPDocument.objects.filter(pk__in=[rd_1.pk])
         mock_date = now().replace(day=15, hour=0)
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_documents"
-        ), time_machine.travel(mock_date, tick=False):
+        with (
+            mock.patch("cl.lib.es_signal_processor.update_es_documents"),
+            time_machine.travel(mock_date, tick=False),
+        ):
             recap_admin.seal_documents(request, queryset)
 
         recap_admin.message_user.assert_called_once_with(
@@ -6265,17 +6871,16 @@ class RECAPIndexingTest(
         self.assertEqual(
             total_query_results,
             parent_expected,
-            msg="Did not get the right number of parent documents %s\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            % (field_name, parent_expected, total_query_results),
+            msg=f"Did not get the right number of parent documents {field_name}\n"
+            f"Expected: {parent_expected}\n"
+            f"     Got: {total_query_results}\n\n",
         )
         return hits.to_dict()
 
     def test_minute_entry_indexing(self) -> None:
         """Confirm a minute entry can be properly indexed."""
 
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -6296,7 +6901,7 @@ class RECAPIndexingTest(
         """Confirm an unnumbered entry which uses the pacer_doc_id as number
         can be properly indexed."""
 
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -6327,7 +6932,7 @@ class RECAPIndexingTest(
             source=Docket.HARVARD,
         )
 
-        docket_entry_1 = DocketEntryWithParentsFactory(
+        docket_entry_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED ON",
@@ -6363,7 +6968,7 @@ class RECAPIndexingTest(
             pacer_doc_id="018036652436",
         )
 
-        docket_entry_2 = DocketEntryWithParentsFactory(
+        docket_entry_2 = DocketEntryFactory(
             docket=DocketFactory(
                 docket_number="12-1235",
                 court=self.court,
@@ -6413,7 +7018,7 @@ class RECAPIndexingTest(
             nature_of_suit="440",
             source=Docket.HARVARD,
         )
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 case_name="Lorem Ipsum",
@@ -6630,7 +7235,7 @@ class RECAPIndexingTest(
         self.assertEqual(judge_2.pk, rd_doc.referred_to_id)
 
         # Update docket entry ID.
-        de_2 = DocketEntryWithParentsFactory(
+        de_2 = DocketEntryFactory(
             docket=de_1.docket,
             description="Notification docket entry 2",
         )
@@ -6690,7 +7295,7 @@ class RECAPIndexingTest(
         judge_2 = PersonFactory.create(
             name_first="Persephone", name_last="Sinclair"
         )
-        de = DocketEntryWithParentsFactory(
+        de = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 case_name="USA vs Bank Lorem",
@@ -7103,7 +7708,7 @@ class RECAPIndexingTest(
                 es_save_document, True, *args, **kwargs
             ),
         ):
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=docket,
                 date_filed=datetime.date(2015, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -7128,7 +7733,7 @@ class RECAPIndexingTest(
                 update_es_document, True, *args, **kwargs
             ),
         ):
-            de_2 = DocketEntryWithParentsFactory(
+            de_2 = DocketEntryFactory(
                 docket=docket,
             )
             RECAPDocumentFactory(
@@ -7195,7 +7800,7 @@ class RECAPIndexingTest(
         docket_2 = DocketFactory(
             court=self.court, docket_number="21-0000", source=Docket.RECAP
         )
-        de_2 = DocketEntryWithParentsFactory(
+        de_2 = DocketEntryFactory(
             docket=docket_2,
             date_filed=datetime.date(2016, 8, 19),
             description="Notification for Lorem Ipsum",
@@ -7395,7 +8000,7 @@ class RECAPIndexingTest(
     def test_remove_control_chars_on_plain_text_indexing(self) -> None:
         """Confirm control chars are removed at indexing time."""
 
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2024, 8, 19),
             entry_number=1,
@@ -7646,7 +8251,7 @@ class RECAPIndexingTest(
             case_name="Vargas v. Wilkins",
             source=Docket.RECAP,
         )
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=docket,
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -7654,7 +8259,7 @@ class RECAPIndexingTest(
         )
         rd_1 = RECAPDocumentFactory(
             docket_entry=de_1,
-            document_number=1,
+            document_number="1",
             is_available=True,
             page_count=5,
             filepath_local="test.pdf",
@@ -7662,7 +8267,7 @@ class RECAPIndexingTest(
         )
         rd_2 = RECAPDocumentFactory(
             docket_entry=de_1,
-            document_number=2,
+            document_number="2",
             is_available=True,
             page_count=10,
             filepath_local="test.pdf",
@@ -8140,7 +8745,7 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             source=Docket.RECAP,
         )
         cls.rd_2 = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_2,
             ),
             document_number="2",
@@ -8156,7 +8761,7 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             source=Docket.RECAP,
         )
         cls.rd_3 = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_3,
             ),
             document_number="3",

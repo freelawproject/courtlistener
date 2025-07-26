@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict
+from typing import Any
 
 from django import forms
 from hcaptcha.fields import hCaptchaField
@@ -52,7 +52,7 @@ class ContactForm(forms.Form):
 
     hcaptcha = hCaptchaField()
 
-    def clean(self) -> Dict[str, Any] | None:
+    def clean(self) -> dict[str, Any] | None:
         cleaned_data: dict[str, Any] | None = super().clean()
         if cleaned_data is None:
             return cleaned_data

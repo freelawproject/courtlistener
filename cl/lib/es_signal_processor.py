@@ -187,7 +187,16 @@ def update_es_documents(
             # No fields from the current mapping need updating. Omit it.
             continue
         match instance:
-            case RECAPDocument() | Docket() | ParentheticalGroup() | Audio() | Person() | Position() | OpinionCluster() | Opinion() if mapping_fields.get("self", None):  # type: ignore
+            case (
+                RECAPDocument()
+                | Docket()
+                | ParentheticalGroup()
+                | Audio()
+                | Person()
+                | Position()
+                | OpinionCluster()
+                | Opinion()
+            ) if mapping_fields.get("self", None):  # type: ignore
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
                 transaction.on_commit(
@@ -202,6 +211,9 @@ def update_es_documents(
                                 ),
                                 (compose_app_label(instance), instance.pk),
                                 fields_map,
+                                getattr(
+                                    instance, "skip_percolator_request", False
+                                ),
                             ),
                             send_or_schedule_search_alerts.s(),
                             percolator_response_processing.s(),
@@ -232,7 +244,9 @@ def update_es_documents(
                             fields_map,
                         )
                     )
-            case Person() if es_document is PositionDocument and query == "person":  # type: ignore
+            case Person() if (
+                es_document is PositionDocument and query == "person"
+            ):  # type: ignore
                 """
                 This case handles the update of one or more fields that belongs to
                 the parent model(The person model).
@@ -448,7 +462,9 @@ def update_reverse_related_documents(
         )
 
     match instance:
-        case ABARating() | PoliticalAffiliation() | Education() if es_document is PersonDocument:  # type: ignore
+        case ABARating() | PoliticalAffiliation() | Education() if (
+            es_document is PersonDocument
+        ):  # type: ignore
             # bulk update position documents when a reverse related record is created/updated.
             related_record = Person.objects.filter(**{query_string: instance})
             for person in related_record:
@@ -616,7 +632,7 @@ def allow_es_audio_indexing(
     :return: True if indexing should be avoided, False otherwise.
     """
 
-    if type(instance) == Audio and (
+    if isinstance(instance, Audio) and (
         update_fields and "processing_complete" in update_fields
     ):
         # Allow indexing Audio instances for which 'processing_complete' is
@@ -666,6 +682,14 @@ class ESSignalProcessor:
     saving, deleting, or modifying instances of related models.
     """
 
+    save_uid_template = "update_related_{}_documents_in_es_index"
+    delete_uid_template = "remove_{}_from_es_index"
+    update_m2m_uid_template = "update_{}_m2m_in_es_index"
+    update_reverse_on_save_uid_template = "update_reverse_related_{}_on_save"
+    update_reverse_on_delete_uid_template = (
+        "update_reverse_related_{}_on_delete"
+    )
+
     def __init__(self, main_model, es_document, documents_model_mapping):
         self.main_model = main_model
         self.es_document = es_document
@@ -689,26 +713,28 @@ class ESSignalProcessor:
         self.connect_signals(
             models_save,
             self.handle_save,
-            {post_save: f"update_related_{main_model}_documents_in_es_index"},
+            {post_save: self.save_uid_template.format(main_model)},
         )
         # Connect signals for deletion
         self.connect_signals(
             models_delete,
             self.handle_delete,
-            {post_delete: f"remove_{main_model}_from_es_index"},
+            {post_delete: self.delete_uid_template.format(main_model)},
         )
         # Connect signals for many-to-many changes
         self.connect_signals(
             models_m2m,
             self.handle_m2m,
-            {m2m_changed: f"update_{main_model}_m2m_in_es_index"},
+            {m2m_changed: self.update_m2m_uid_template.format(main_model)},
         )
         # Connect signals for save on models with reverse foreign keys
         self.connect_signals(
             models_reverse_foreign_key,
             self.handle_reverse_actions,
             {
-                post_save: f"update_reverse_related_{main_model}_on_save",
+                post_save: self.update_reverse_on_save_uid_template.format(
+                    main_model
+                ),
             },
         )
         # Connect signals for delete on models with reverse-delete foreign keys
@@ -716,7 +742,9 @@ class ESSignalProcessor:
             models_reverse_foreign_key_delete,
             self.handle_reverse_actions_delete,
             {
-                post_delete: f"update_reverse_related_{main_model}_on_delete",
+                post_delete: self.update_reverse_on_delete_uid_template.format(
+                    main_model
+                )
             },
         )
 
@@ -753,7 +781,7 @@ class ESSignalProcessor:
         mapping_fields = self.documents_model_mapping["save"][sender]
         if (
             isinstance(instance, Docket)
-            and not instance.source in Docket.RECAP_SOURCES()
+            and instance.source not in Docket.RECAP_SOURCES()
             and mapping_fields.get(
                 "self", None
             )  # Apply only to signals intended to affect the DocketDocument mapping.
@@ -765,7 +793,7 @@ class ESSignalProcessor:
         if (
             created
             and mapping_fields.get("self", None)
-            and type(instance) != Audio
+            and not isinstance(instance, Audio)
         ) or (
             allow_es_audio_indexing(instance, update_fields)
             and mapping_fields.get("self", None)
@@ -779,6 +807,7 @@ class ESSignalProcessor:
                         instance.pk,
                         compose_app_label(instance),
                         self.es_document.__name__,
+                        getattr(instance, "skip_percolator_request", False),
                     ),
                     send_or_schedule_search_alerts.s(),
                     percolator_response_processing.s(),
@@ -836,7 +865,9 @@ class ESSignalProcessor:
         mapping_fields = self.documents_model_mapping["reverse"][sender]
         for query_string, fields_map in mapping_fields.items():
             match instance:
-                case BankruptcyInformation() if self.es_document is DocketDocument:  # type: ignore
+                case BankruptcyInformation() if (
+                    self.es_document is DocketDocument
+                ):  # type: ignore
                     # BankruptcyInformation is a one-to-one relation that can
                     # be re-saved many times without changes. It's better to
                     # check if the indexed fields have changed before

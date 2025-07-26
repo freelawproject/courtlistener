@@ -1,10 +1,10 @@
-from typing import Any, Dict
+from typing import Any
 
 from uvicorn.workers import UvicornWorker as BaseUvicornWorker
 
 
 class UvicornWorker(BaseUvicornWorker):
-    CONFIG_KWARGS: Dict[str, Any] = {
+    CONFIG_KWARGS: dict[str, Any] = {
         "loop": "auto",
         "http": "auto",
         "lifespan": "off",

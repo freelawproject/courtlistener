@@ -721,9 +721,9 @@ def match_court_string(
     :param international: Whether it might be an international court.
     :returns The abbreviation for the court, if possible. Else, returns None
     """
-    assert not (
-        federal_district and bankruptcy
-    ), "federal_district and bankruptcy cannot be used in conjunction"
+    assert not (federal_district and bankruptcy), (
+        "federal_district and bankruptcy cannot be used in conjunction"
+    )
 
     # Generally, we test these from most specific regex to least specific. The
     # order of the tests below should not be changed.

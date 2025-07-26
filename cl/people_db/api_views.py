@@ -4,7 +4,11 @@ from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import TinyAdjustablePagination
-from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
+from cl.api.utils import (
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    RECAPUsersReadOnly,
+)
 from cl.disclosures.models import FinancialDisclosure
 from cl.people_db.api_serializers import (
     ABARatingSerializer,
@@ -306,7 +310,9 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
+class PartyViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = PartySerializer
     filterset_class = PartyFilter
@@ -331,7 +337,9 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
+class AttorneyViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = AttorneySerializer
     filterset_class = AttorneyFilter

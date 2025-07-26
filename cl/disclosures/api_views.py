@@ -2,7 +2,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
 from cl.api.api_permissions import V3APIPermission
-from cl.api.utils import LoggingMixin
+from cl.api.utils import LoggingMixin, NoFilterCacheListMixin
 from cl.disclosures.api_serializers import (
     AgreementSerializer,
     DebtSerializer,
@@ -128,7 +128,9 @@ class GiftViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class InvestmentViewSet(LoggingMixin, viewsets.ModelViewSet):
+class InvestmentViewSet(
+    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+):
     queryset = Investment.objects.all().order_by("-id")
     serializer_class = InvestmentSerializer
     filterset_class = InvestmentFilter

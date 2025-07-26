@@ -69,7 +69,7 @@ def build_base_query(options: dict[str, Any]) -> Search:
             query = Q("bool", should=q_should, minimum_should_match=1)
             query.filter = reduce(operator.iand, filters)
         case _:
-            raise NotImplemented
+            raise NotImplementedError
 
     search_query = search_query.query(query)
     # Limit the search response to only include the "id" field for each

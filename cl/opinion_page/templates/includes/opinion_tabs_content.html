@@ -1,0 +1,413 @@
+{% load humanize %}
+{% load text_filters %}
+
+{% if tab == "authorities" %}
+{# Table of Authorities #}
+    <div class="tab-pane fade in active" id="opinion">
+        <h2 class="opinion-section-title jump-link" id="case-details">Table of Authorities</h2>
+        <hr class="hr-opinion">
+        <div id="authorities">
+            {% for authority in authorities_with_data %}
+                <article>
+                    <h3 class="bottom serif">
+                        <a href="{{ authority.get_absolute_url }}" class="visitable">
+                        {{ authority.caption|safe|v_wrapper }}
+                        </a>
+                    </h3>
+                    <div class="bottom">
+                        <div class="inline-block">
+                            <span class="meta-data-header">Date Filed:</span>
+                            <time class="meta-data-value" datetime="1917-12-20">
+                            {{ authority.date_filed }}
+                            </time>
+                        </div>
+                        <div class="inline-block">
+                            <span class="meta-data-header">Status:</span>
+                            <span class="meta-data-value">{{ authority.precedential_status }}</span>
+                        </div>
+                        <div class="inline-block">
+                            <span class="meta-data-header">Court:</span>
+                            <span class="meta-data-value">{{ authority.docket.court }}</span>
+                        </div>
+                        {% if authority.citation_string %}
+                            <div class="inline-block">
+                                <span class="meta-data-header">Citations: </span>
+                                <span class="meta-data-value">{{ authority.citation_string }}</span>
+                            </div>
+                        {% endif %}
+                        </div>
+                        <div class="bottom">
+                            <div class="inline-block">
+                                <span class="meta-data-value">
+                                This opinion was cited <b>{{ authority.citation_depth }}</b> time{{ authority.citation_depth|pluralize }}.
+                                </span>
+                            </div>
+                        </div>
+                        <div class="bottom"> </div>
+                </article>
+            {% endfor %}
+        </div>
+    </div>
+{% elif tab == "summaries" %}
+    {# Summaries #}
+    <div class="tab-pane fade in active" id="summaries">
+        <h2 class="opinion-section-title jump-link" id="case-details">Summaries</h2>
+        <hr class="hr-opinion">
+        <h3>{{ summaries_count|intcomma }} judge-written summar{{ summaries_count|pluralize:"y,ies" }} of this opinion
+            from other cases.</h3>
+        {% if summaries_count > 0 %}
+            <p>We looked through our complete case law collection for parenthetical summaries of this case and
+                organized them into {{ parenthetical_groups|length }}
+                group{{ parenthetical_groups|length|pluralize }}.</p>
+        {% endif %}
+        <div id="all-summaries">
+            <ul>
+                {% for group in parenthetical_groups %}
+                    {% with representative=group.representative %}
+                        {% with representative_cluster=representative.describing_opinion.cluster %}
+                            <li class="v-offset-below-2">
+                                {{ representative.text|capfirst }}
+                                <br/>
+                                <div class="summary-group-metadata">
+                                    <span class="bullet-tail">{{ representative_cluster.date_filed|date:"F jS, Y" }}</span>
+                                    <span class="bullet-tail">
+                                        <a href="{{ representative_cluster.get_absolute_url }}{% querystring %}">
+                                            {{ representative_cluster|best_case_name|safe }}
+                                        </a>
+                                    </span>
+                                    <span class="bullet-tail">{{ representative_cluster.docket.court }}</span>
+                                    {% if group.size > 1 %}
+                                        <button class="toggle-group-summaries btn btn-link" type="button"
+                                                data-toggle="collapse"
+                                                aria-expanded="false" aria-controls="group-summaries"
+                                                data-target="#group-summaries-{{ representative.pk }}">
+                                            <span class="collapsed">Show all {{ group.size|intcomma }} summaries like this</span>
+                                            <span class="expanded">Hide similar summaries</span>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </li>
+                            <ul class="group-summaries collapse" id="group-summaries-{{ representative.pk }}">
+                                {% for summary in group.parentheticals.all %}
+                                    {% with describing_cluster=summary.describing_opinion.cluster %}
+                                        {# Don't duplicate the representative cluster in the nested group #}
+                                        {% if summary != representative %}
+                                            <li class="v-offset-below-1">
+                                                {{ summary.text|capfirst }}
+                                                <br/>
+                                                <span class="bullet-tail">{{ describing_cluster.date_filed|date:"F jS, Y" }}</span>
+                                                <span class="bullet-tail">
+                                                  <a href="{{ describing_cluster.get_absolute_url }}{% querystring %}">
+                                                      {{ describing_cluster|best_case_name|safe }}
+                                                  </a>
+                                                </span>
+                                                <span class="bullet-tail">{{ describing_cluster.docket.court }}</span>
+                                            </li>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endfor %}
+                            </ul>
+                        {% endwith %}
+                    {% endwith %}
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% elif tab == "cited-by" %}
+    {# Cited By #}
+    <div class="tab-pane fade in active" id="cited-by">
+        <div class="row">
+            <div class="col-xs-6">
+                <h2 class="opinion-section-title jump-link">
+                    <span>
+                        Cited By
+                        <a href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})" rel="nofollow">
+                            <i class="gray fa fa-rss" title="Subscribe to a feed of citations to this case."></i>
+                        </a>
+                    </span>
+                </h2>
+            </div>
+            <div class="col-xs-6 text-right">
+                <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})" rel="nofollow" class="btn btn-default opinion-section-title">
+                    Filter Citing Opinions
+                </a>
+            </div>
+        </div>
+        <hr class="hr-opinion">
+
+        {% if citing_cluster_count > 0 %}
+            {% for citing_cluster in citing_clusters %}
+                <article>
+                    <h3 class="bottom serif">
+                        <a href="{{ citing_cluster.absolute_url }}">
+                            {{ citing_cluster.caseName|safe|truncatewords:12|v_wrapper }}
+                            ({{ citing_cluster.dateFiled|date:"Y" }})
+                        </a>
+                    </h3>
+                    <div class="bottom">
+                        <div class="inline-block">
+                            <span class="meta-data-header">Date Filed:</span>
+                            <time class="meta-data-value">
+                                {{ citing_cluster.dateFiled|date:"F jS, Y" }}
+                            </time>
+                        </div>
+                        <div class="inline-block">
+                            <span class="meta-data-header">Status:</span>
+                            <span class="meta-data-value">{{ citing_cluster.status }}</span>
+                        </div>
+                        {% if citing_cluster.court %}
+                            <div class="inline-block">
+                                <span class="meta-data-header">Court:</span>
+                                <span class="meta-data-value">{{ citing_cluster.court }}</span>
+                            </div>
+                        {% endif %}
+                        {% if citing_cluster.citation %}
+                            <div class="inline-block">
+                                <span class="meta-data-header">Citations:</span>
+                                <span class="meta-data-value">{{ citing_cluster.citation|join:", " }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                </article>
+            {% endfor %}
+        {% else %}
+            <h3>This case has not yet been cited in our system.</h3>
+        {% endif %}
+    </div>
+
+{% elif tab == "related-cases" %}
+    {# Related Cases #}
+    <div class="tab-pane fade in active" id="related">
+    {% url 'show_results' as show_results_url %}
+    {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
+        {% with full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
+            <div class="row">
+                <div class="col-xs-6">
+                    <h2 class="opinion-section-title jump-link">Similar Cases</h2>
+                </div>
+                <div class="col-xs-6 text-right">
+                    <a href="{{ full_list_url }}" class="btn btn-default opinion-section-title">
+                        Filter Similar Cases
+                    </a>
+                </div>
+            </div>
+            <hr class="hr-opinion">
+            {% with clusters=related_clusters %}
+                {% for cluster in related_clusters %}
+                    <article>
+                        <h3 class="bottom serif">
+                            <a href="{{ cluster.absolute_url }}{% querystring %}" class="visitable">
+                                {{ cluster.caseName }}
+                            </a>
+                        </h3>
+                        <div class="bottom">
+                            {% if cluster.dateFiled %}
+                                <div class="inline-block">
+                                    <span class="meta-data-header">Date Filed:</span>
+                                    <time class="meta-data-value">
+                                        {{ cluster.dateFiled|date:"F jS, Y" }}
+                                    </time>
+                                </div>
+                            {% endif %}
+                            {% if cluster.status %}
+                                <div class="inline-block">
+                                    <span class="meta-data-header">Status:</span>
+                                    <span class="meta-data-value">{{ cluster.status }}</span>
+                                </div>
+                            {% endif %}
+                            {% if cluster.court %}
+                                <div class="inline-block">
+                                    <span class="meta-data-header">Court:</span>
+                                    <span class="meta-data-value">{{ cluster.court }}</span>
+                                </div>
+                            {% endif %}
+                            {% if cluster.citation %}
+                                <div class="inline-block">
+                                    <span class="meta-data-header">Citations: </span>
+                                    <span class="meta-data-value">{{ cluster.citation|join:", " }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </article>
+                {% endfor %}
+            {% endwith %}
+        {% endwith %}
+    {% endwith %}
+    </div>
+
+{% elif tab == "pdf" %}
+    {# PDF #}
+    <div class="tab-pane fade in active" id="pdf">
+        <div>
+            <h2 class="opinion-section-title jump-link">
+            {% if pdf_path %}
+                Source: {% if cluster.filepath_pdf_harvard %}Case Law Access Project{% else %}{{ cluster.docket.court }}{% endif %}
+            {% else %}
+                No PDF available
+            {% endif %}
+            </h2>
+        </div>
+        <hr class="hr-opinion">
+        {% if pdf_path %}
+            <div class="embed-responsive embed-responsive-8by11">
+                <object data="{{ pdf_path }}?no-og=true"
+                        type="application/pdf"
+                        width="100%"
+                        height="100%"
+                        class="hidden-xs hidden-sm hidden-md">
+                    <div class="row">
+                        <div class="col-sm-1 col-md-2 col-lg-3"></div>
+                        <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
+                            <p>Oops! Your browser does not support embedded PDF viewing.</p>
+                            <a href="{{ pdf_path }}"
+                               role="button"
+                               class="btn btn-primary">Download PDF&nbsp;<i
+                              class="fa fa-file-pdf-o"></i>
+                            </a>
+                        </div>
+                    </div>
+                </object>
+
+                <div class="visible-xs-block visible-sm-block visible-md-block hidden-lg">
+                    <div class="row">
+                        <div class="col-sm-1 col-md-2 col-lg-3"></div>
+                        <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
+                            <p>Oops! PDF viewing is not supported on mobile devices.</p>
+                            <a href="{{ pdf_path }}"
+                               role="button"
+                               class="btn btn-primary">Download PDF&nbsp;<i
+                              class="fa fa-file-pdf-o"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% else %}
+
+    {# The section of the document I refer to as headmatter goes here #}
+    <div class="tab-pane fade in active" id="opinion">
+        <article>
+            {% with opinion_count=cluster.sub_opinions.all.count %}
+
+                {% if cluster.headmatter %}
+                    <h2 class="opinion-section-title jump-link" id="o">Headmatter</h2>
+                    <hr class="hr-opinion">
+                    <div class="serif-text harvard" id="headmatter">
+                    {{ cluster.headmatter|safe }}
+                    </div>
+                {% else %}
+                    {% if cluster.correction %}
+                        <h2 class="opinion-section-title jump-link" id="correction">Correction</h2>
+                        <hr class="hr-opinion">
+                        <div id="" class="serif-text harvard">
+                        {{ cluster.correction|safe }}
+                        </div>
+                    {% endif %}
+
+                    {% if cluster.attorneys %}
+                        <h2 class="opinion-section-title jump-link" id="attorneys">Attorneys</h2>
+                        <hr class="hr-opinion">
+                        <div  class="serif-text harvard">
+                        <p>{{ cluster.attorneys|safe|linebreaksbr }}</p>
+                        </div>
+                    {% endif %}
+
+                    {% if cluster.headnotes %}
+                        <h2 class="opinion-section-title jump-link" id="headnotes">Headnotes</h2>
+                        <hr class="hr-opinion">
+                        <p class="bottom">{{ cluster.headnotes | safe}}</p>
+                    {% endif %}
+
+                    {% if cluster.syllabus %}
+                        <h2 class="opinion-section-title jump-link" id="syllabus">Syllabus</h2>
+                        <hr class="hr-opinion">
+                        <div id="" class="serif-text harvard">
+                        {{ cluster.syllabus|safe }}
+                        </div>
+                    {% endif %}
+
+                    {% if cluster.summary %}
+                        <h2 class="opinion-section-title jump-link" id="summary">Summary</h2>
+                        <hr class="hr-opinion">
+                        <div id="" class="serif-text harvard">
+                        {{ cluster.summary|safe }}
+                        </div>
+                    {% endif %}
+                    {% if cluster.history %}
+                        <h2 class="opinion-section-title jump-link" id="history">History</h2>
+                        <hr class="hr-opinion">
+                        <div id="" class="serif-text harvard">
+                        {{ cluster.history|safe }}
+                        </div>
+                    {% endif %}
+
+                    {% if cluster.disposition %}
+                        <h2 class="opinion-section-title jump-link" id="disposition">Disposition</h2>
+                        <hr class="hr-opinion">
+                        <div class="serif-text harvard">
+                        {{ cluster.disposition|safe }}
+                        </div>
+                    {% endif %}
+                {% endif %}
+
+                {% for sub_opinion in cluster.ordered_opinions %}
+                    <h3 class="opinion-section-title jump-link" id="o{{ forloop.counter }}">
+                        {{ sub_opinion.get_type_display }}
+                        {% if sub_opinion.author %}
+                            by <a href="{{ sub_opinion.author.get_absolute_url }}">{{ sub_opinion.author.name_full }}</a>
+                        {% elif sub_opinion.author_str %}
+                            by {{ sub_opinion.author_str }}
+                        {% endif %}
+                    </h3>
+                    <hr class="hr-opinion">
+
+                     {% if 'U' in cluster.source %}
+                        <div id="harvard-text" class="v-offset-above-2">
+                     {% elif 'Z' in cluster.source %}
+                        <div id="columbia-text" class="v-offset-above-2">
+                    {% elif 'L' in cluster.source %}
+                        <div id="lawbox-text" class="v-offset-above-2">
+                    {% elif 'R' in cluster.source %}
+                        <div id="resource-org-text" class="v-offset-above-2">
+                    {% else %}
+                        <div id="default-text" class="v-offset-above-2">
+                    {% endif %}
+
+                    <div class="subopinion-content">
+                        {% if sub_opinion.xml_harvard and sub_opinion.html_with_citations %}
+                          <div class="serif-text harvard">{{ sub_opinion.html_with_citations|safe }}</div>
+                         {% elif sub_opinion.xml_harvard  %}
+                              <div class="serif-text harvard">{{ sub_opinion.xml_harvard|safe }}</div>
+                        {% elif sub_opinion.html_with_citations %}
+                          {% if cluster.source == "C" %}
+                        {# It's a PDF with no HTML enrichment#}
+                              {% if sub_opinion.html %}
+                                  {# for scrpaed HTML eg. Colo, Okla we do not want to insert line breaks #}
+                                  <div class="serif-text scraped-html">{{ sub_opinion.html_with_citations|safe }}</div>
+                              {% else %}
+                                  <div class="plaintext">{{ sub_opinion.html_with_citations|safe|linebreaksbr }}</div>
+                              {% endif %}
+                          {% else %}
+                            <div class="serif-text">{{ sub_opinion.html_with_citations|safe }}</div>
+                          {% endif %}
+                        {% elif sub_opinion.html_columbia %}
+                          <div class="serif-text">{{ sub_opinion.html_columbia|safe }}</div>
+                        {% elif sub_opinion.html_lawbox %}
+                          <div class="serif-text">{{ sub_opinion.html_lawbox|safe }}</div>
+                        {% elif sub_opinion.html_anon_2020 %}
+                          <div class="serif-text">{{ sub_opinion.html_anon_2020|safe }}</div>
+                        {% elif sub_opinion.html %}
+                          <div class="serif-text">{{sub_opinion.html|safe}}</div>
+                        {% else %}
+                          <pre>{{sub_opinion.plain_text}}</pre>
+                        {% endif %}
+                    </div>
+
+                {% endfor %}
+            {% endwith %}
+        </article>
+    </div>
+
+{% endif %}

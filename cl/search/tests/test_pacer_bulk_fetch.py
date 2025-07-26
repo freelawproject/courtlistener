@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from requests import HTTPError
 
+from cl.lib.utils import append_value_in_cache
 from cl.recap.factories import PacerFetchQueueFactory
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
 from cl.search.factories import (
@@ -18,7 +19,6 @@ from cl.search.factories import (
 )
 from cl.search.management.commands.pacer_bulk_fetch import (
     Command,
-    append_value_in_cache,
     is_retry_interval_elapsed,
 )
 from cl.search.models import RECAPDocument
@@ -734,7 +734,7 @@ class BulkFetchPacerIntegrationTest(TestCase):
             cls.rds_to_retrieve.append(
                 RECAPDocumentFactory(
                     docket_entry=de,
-                    document_number=i,
+                    document_number=str(i),
                     pacer_doc_id=f"0{i}",
                     is_available=False,
                     page_count=1000 + i,
@@ -743,8 +743,8 @@ class BulkFetchPacerIntegrationTest(TestCase):
 
         RECAPDocumentFactory(
             docket_entry=de_3,
-            document_number=3,
-            pacer_doc_id=f"1234",
+            document_number=str(3),
+            pacer_doc_id="1234",
             is_available=False,
             page_count=100,
         )

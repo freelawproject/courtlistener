@@ -151,7 +151,7 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
             continue
 
         # Ensure we have valid citations to process
-        if isinstance(citation, (FullCaseCitation, FullJournalCitation)):
+        if isinstance(citation, (FullCaseCitation | FullJournalCitation)):
             volume = citation.groups.get("volume")
 
             # Validate the volume
@@ -372,7 +372,6 @@ def process_csv(
 
             # Add any of the citations if possible
             for citation in valid_citations:
-
                 citation["cluster_id"] = matched_cluster.id
                 if Citation.objects.filter(**citation).exists():
                     # We already have the citation
