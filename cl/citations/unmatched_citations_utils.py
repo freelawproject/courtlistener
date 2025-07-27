@@ -128,7 +128,9 @@ def store_unmatched_citations(
         unmatched_citations_to_store.append(citation_object)
 
     if unmatched_citations_to_store:
-        UnmatchedCitation.objects.bulk_create(unmatched_citations_to_store)
+        UnmatchedCitation.objects.bulk_create(
+            unmatched_citations_to_store, ignore_conflicts=True
+        )
 
 
 def handle_unmatched_citations(
