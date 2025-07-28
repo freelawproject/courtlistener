@@ -3,7 +3,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from itertools import batched, chain
-from typing import Any, TypedDict, cast
+from typing import Any, TypedDict
 
 import eyecite
 from dateutil import parser
@@ -1278,16 +1278,17 @@ class RetrieveFilteredFieldsMixin:
         self,
         nested_mapping: defaultdict[str, list[str]] | dict,
         should_defer: Callable,
-    ) -> list[str]:
+    ) -> dict[str, tuple[type[Model], list[str]]]:
         """Method to retrieve nested fields to defer based on a mapping and a
         defer condition.
 
         :param nested_mapping: A nested mapping from fields to defer
         :param should_defer: A function that takes a field name and returns a
          boolean indicating whether to defer the field.
-        :return: A list of nested fields to defer
+        :return: A dict containing the mapping of nested fields to defer.
         """
-        fields_to_defer = []
+
+        nested_defer_map: dict[str, tuple[type[Model], list[str]]] = {}
         for parent, items in nested_mapping.items():
             field = getattr(self, "fields", {}).get(parent)
             if not field:
@@ -1301,22 +1302,28 @@ class RetrieveFilteredFieldsMixin:
             if nested_model is None:
                 continue
 
+            child_names: list[str] = []
             # Filter out nested fields that have a database column associated
             # with them.
             field_names = self._get_concrete_fields_for_model(nested_model)
             # Determine which nested fields to defer
             for name in field_names:
                 if should_defer(name, items):
-                    fields_to_defer.append(f"{parent}__{name}")
+                    child_names.append(name)
 
-        return fields_to_defer
+            if child_names:
+                nested_defer_map[parent] = (nested_model, child_names)
 
-    def _get_disallowed_nested_level_fields_to_defer(self) -> list[str]:
+        return nested_defer_map
+
+    def _get_disallowed_nested_level_fields_to_defer(
+        self,
+    ) -> dict[str, tuple[type[Model], list[str]]]:
         """Determine which top-level model fields should be deferred when an
          explicit fields filter is in use.
         Other model fields not explicitly included in 'fields' are deferred.
 
-        :return: A list of disallowed top field names to defer.
+        :return: A dict containing the mapping of nested fields to defer.
         """
         allow_map = getattr(self, "_nested_allow", {})
         return self._get_nested_level_fields_to_defer(
@@ -1324,24 +1331,29 @@ class RetrieveFilteredFieldsMixin:
             should_defer=lambda name, allow_list: name not in allow_list,
         )
 
-    def _get_omit_nested_level_fields_to_defer(self) -> list[str]:
+    def _get_omit_nested_level_fields_to_defer(
+        self,
+    ) -> dict[str, tuple[type[Model], list[str]]]:
         """
         Determine which nested-model fields should be deferred for each nested
         serializer when an explicit omit filter is in use.
 
-        :return: A list of omit top field names to defer.
+        :return: A dict containing the mapping of nested fields to defer.
         """
         omit_map = getattr(self, "_nested_omit", {})
         return self._get_nested_level_fields_to_defer(
             omit_map, should_defer=lambda name, omit_list: name in omit_list
         )
 
-    def get_deferred_model_fields(self) -> list[str]:
+    def get_deferred_model_fields(
+        self,
+    ) -> tuple[list[str], dict[str, tuple[type[Model], list[str]]]]:
         """
         Returns a flat list of omitted model-fields; top-level and nested.
         Ensures that parsing of "fields"/"omit" has run by accessing ".fields".
 
-        :return: A list of top and nested field names to defer
+        :return: A two tuple of top fields names to defer and a dict containing
+         the mapping of nested fields to defer.
         """
 
         self._flat_allow = set()
@@ -1352,7 +1364,7 @@ class RetrieveFilteredFieldsMixin:
             request = getattr(self, "context", {})["request"]
         except KeyError:
             logger.error("Serializer context does not have access to request.")
-            return []
+            return [], {}
 
         params = request.GET
         try:
@@ -1384,14 +1396,32 @@ class RetrieveFilteredFieldsMixin:
             else:
                 self._flat_omit.add(omitted_field)
 
-        deferred = [
-            *self._get_omit_top_level_fields_to_defer(),
-            *self._get_omit_nested_level_fields_to_defer(),
-            *self._get_disallowed_top_level_fields_to_defer(),
-            *self._get_disallowed_nested_level_fields_to_defer(),
-        ]
-        # Remove any duplicate fields
-        return list(set(deferred))
+        # Top‑level fields to defer
+        omit_top = self._get_omit_top_level_fields_to_defer()
+        disallowed_top = self._get_disallowed_top_level_fields_to_defer()
+        top_fields = list(set(omit_top + disallowed_top))
+
+        # Nested specs to defer
+        defer_omit = self._get_omit_nested_level_fields_to_defer()
+        defer_disallowed = self._get_disallowed_nested_level_fields_to_defer()
+
+        # Merge child lists under each parent
+        nested_to_defer: dict[str, tuple[type[Model], list[str]]] = {}
+        for parent in defer_omit.keys() | defer_disallowed.keys():
+            if parent in defer_omit:
+                model, omit_names = defer_omit[parent]
+            else:
+                model, omit_names = defer_disallowed[parent]
+
+            disallowed_names = (
+                defer_disallowed[parent][1]
+                if parent in defer_disallowed
+                else []
+            )
+            combined = set(omit_names) | set(disallowed_names)
+            nested_to_defer[parent] = (model, list(combined))
+
+        return top_fields, nested_to_defer
 
 
 class DeferredFieldsMixin:
@@ -1401,27 +1431,6 @@ class DeferredFieldsMixin:
     - builds a Prefetch for each nested relation to defer its columns,
     merging cleanly with any existing prefetches in the right order.
     """
-
-    @staticmethod
-    def _split_deferred_fields(
-        fields: list[str],
-    ) -> tuple[list[str], defaultdict[str, list[str]]]:
-        """Split deferred fields into top‐level fields and nested relations.
-
-        :param fields: A list of field names to defer
-        :return: A two tuple, a list of fields names to defer and a dict
-        mapping parent and child fields to defer.
-        """
-
-        parent: list[str] = []
-        nested: defaultdict[str, list[str]] = defaultdict(list)
-        for field in fields:
-            if "__" in field:
-                parent_field, child_field = field.split("__", 1)
-                nested[parent_field].append(child_field)
-            else:
-                parent.append(field)
-        return parent, nested
 
     def get_queryset(self) -> QuerySet:
         qs = super().get_queryset()  # type: ignore[misc]
@@ -1438,8 +1447,7 @@ class DeferredFieldsMixin:
             context=self.get_serializer_context()  # type: ignore[attr-defined]
         )
 
-        all_fields = serializer.get_deferred_model_fields()
-        parent_fields, nested_map = self._split_deferred_fields(all_fields)
+        parent_fields, nested_map = serializer.get_deferred_model_fields()
         # Remove select_related fields from the top-level deferred fields.
         # Add the original deferred fields.
         parent_defer_to_keep = (
@@ -1450,14 +1458,8 @@ class DeferredFieldsMixin:
         # Prepare to rebuild prefetch_related in correct order
         nested_prefetches = []
         existing_simple_lookups = list(qs._prefetch_related_lookups)
-        for parent_field, child_fields in nested_map.items():
-            field = serializer.fields.get(parent_field)
-            child_serializer = getattr(field, "child", field)
-            child_model = cast(
-                type[Model], getattr(child_serializer.Meta, "model")
-            )
-            parent_model = serializer.Meta.model
-
+        parent_model = serializer.Meta.model
+        for parent_field, (child_model, child_fields) in nested_map.items():
             # Look for FKs in the child serializer linked to the parent model.
             # f.many_to_one is True for ForeignKey fields
             # and f.remote_field.model is the parent model.
