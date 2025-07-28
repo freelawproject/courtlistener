@@ -45,7 +45,7 @@
                         {% if perms.search.change_opinion %}
                             {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                                 <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
-                                   class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion</a>
+                                   class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion{% if sub_opinion.main_version %} [version] {% endif %}</a>
                             {% endfor %}
                         {% endif %}
                         {% if request.user.is_superuser %}
@@ -236,7 +236,7 @@
                             None known
                           {% endif %}
                         </li>
-                        {% if cluster.case_name_full != cluster|best_case_name %}
+                        {% if cluster.case_name_full != cluster|best_case_name  and cluster.case_name_full %}
                         <li><strong>Full Case Name:</strong>
                           <span class="select-all">{{ cluster.case_name_full }}</span>
                         </li>
@@ -286,7 +286,7 @@
                             <li><strong>Nature of Suit:</strong> {{ cluster.nature_of_suit }}</li>
                         {% endif %}
 
-                        {% if cluster.nature_of_suit %}
+                        {% if cluster.posture %}
                             <li><strong>Posture:</strong> {{ cluster.posture }}</li>
                         {% endif %}
 

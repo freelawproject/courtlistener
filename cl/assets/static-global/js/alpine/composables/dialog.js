@@ -10,5 +10,14 @@ document.addEventListener('alpine:init', () => {
     toggle() {
       this.isOpen = !this.isOpen;
     },
+    get dialogElement() {
+      return document.getElementById(this.dialogId);
+    },
+    get dialogId() {
+      return this.$id('dialog');
+    },
+    get dialogIdGroup() {
+      return ['dialog'];
+    },
   }));
 });

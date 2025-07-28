@@ -122,7 +122,7 @@
     x-transition:leave-end="opacity-0"
   >
     <template x-for="option in options" :key="option.href">
-      <li class="relative cursor-default py-[1px] px-1.5 select-none" role="none">
+      <li class="w-full relative cursor-default py-[1px] px-1.5 select-none" role="none">
         <a
           x-on:click="closeMenu"
           x-bind:href="option.href"
@@ -139,13 +139,14 @@
         >
           <ul class="flex flex-col w-full list-none pl-0" role="menu">
             <template x-for="subItem in option.children">
-              <li class="w-full pl-7.5 py-1.5 font-normal text-sm text-greyscale-600" role="none">
+              <li class="hover:bg-greyscale-100 rounded-md flex w-full pl-7.5 py-1.5 font-normal text-sm text-greyscale-600" role="none">
                 <a
                   x-on:click="closeMenu"
                   x-bind:href="subItem.href"
                   x-bind:data-intersect-target="subItem.href"
                   x-text="subItem.text"
                   role="menuitem"
+                  class="w-full"
                 ></a>
               </li>
             </template>
