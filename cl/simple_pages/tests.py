@@ -218,6 +218,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
             # Monitoring pages
+            {"viewname": "celery_queue_lengths"},
             {"viewname": "heartbeat"},
             {"viewname": "health_check"},
             {"viewname": "check_redis_writes"},
@@ -240,7 +241,8 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         reverse_params = [
             {"viewname": "view_settings"},
             {"viewname": "profile_notes"},
-            {"viewname": "profile_alerts"},
+            {"viewname": "profile_search_alerts"},
+            {"viewname": "profile_docket_alerts"},
             {"viewname": "view_visualizations"},
             {"viewname": "view_deleted_visualizations"},
             {"viewname": "password_change"},

@@ -1,0 +1,11 @@
+<c-vars optional></c-vars>
+
+<div class="flex flex-col md:flex-row border-b last:border-none border-greyscale-200 max-w-full">
+  <span class="p-2.5 max-md:pb-0 md:w-60 md:min-w-60 max-md:font-medium">
+    {{ label }}
+    {% if optional %}<br><span class="font-normal text-xs">(optional)</span>{% endif %}
+  </span>
+  <span class="p-2.5 max-md:max-w-full [overflow-wrap:anywhere]">
+    {{ description }}
+  </span>
+</div>

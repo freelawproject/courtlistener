@@ -99,7 +99,7 @@ class CreateAlertForm(ModelForm):
                 # exclude the alert being edited from the count
                 alerts_count = alerts_count.exclude(pk=self.instance.pk)
             used = alerts_count.count()
-            profile_url = reverse("profile_alerts")
+            profile_url = reverse("profile_search_alerts")
 
             if used + 1 > allowed:
                 if is_member:

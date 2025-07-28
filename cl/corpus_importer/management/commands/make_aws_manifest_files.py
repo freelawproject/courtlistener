@@ -72,7 +72,7 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
                 "SELECT count(*) AS exact_count FROM search_recapdocument"
             )
             filter_clause = """
-            WHERE is_available=True AND page_count>0 AND ocr_status!=1
+            WHERE is_available=True AND page_count>0
             """
         case SEARCH_TYPES.OPINION:
             base_query = (
@@ -151,9 +151,7 @@ def get_custom_query(
     match type:
         case SEARCH_TYPES.RECAP_DOCUMENT:
             base_query = "SELECT id from search_recapdocument"
-            filter_clause = (
-                "WHERE is_available=True AND page_count>0 AND ocr_status!=1"
-            )
+            filter_clause = "WHERE is_available=True AND page_count>0"
         case SEARCH_TYPES.OPINION:
             base_query = (
                 "SELECT O.id "
@@ -726,6 +724,10 @@ def compute_monthly_export(
     upload_list_of_records_for_users(
         record_type, options["bucket_name"], record_ids
     )
+    # If no records are found, there's no need to schedule a batch job.
+    if not record_ids:
+        return
+
     create_and_execute_batch_job(
         record_type,
         options["bucket_name"],

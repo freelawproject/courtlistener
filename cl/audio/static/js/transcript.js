@@ -83,17 +83,13 @@ $(document).ready(function() {
         }
 
         if ($newSegment) {
-            // Don't apply current-segment if it's also the current search match
-            if (!$newSegment.hasClass('transcript-search-current-match')) {
-                $newSegment.addClass('transcript-current-segment');
-            }
+            $newSegment.addClass('transcript-current-segment');
 
             // Check if element is in view using our map
             const isInView = segmentInViewMap.get($newSegment[0]) || false;
 
-            // Don't autoscroll if there's search text or element is already in view
-            const hasSearchText = $('#transcript-search').val().trim().length > 0;
-            if (!hasSearchText && !isInView) {
+            // Don't autoscroll if element is already in view
+            if (!isInView) {
                 scrollToElement($newSegment);
             }
         }
@@ -165,8 +161,6 @@ $(document).ready(function() {
             transcriptTextEl.find('.transcript-segment').each(function() {
                 segmentObserver.observe(this);
             });
-        } else {
-            $('#transcript-search').prop('disabled', true).attr('placeholder', 'Transcript unavailable');
         }
     }
 
@@ -196,101 +190,8 @@ $(document).ready(function() {
         });
     }
 
-    function initTranscriptSearch(transcriptTextEl, segmentObserver, scrollToElement, updateSegmentHighlighting) {
-        const $searchInput = $('#transcript-search');
-        const $searchCount = $('#search-count');
-        const $searchPrev = $('#search-prev');
-        const $searchNext = $('#search-next');
-        let searchMatches = [];
-        let currentMatchIndex = -1;
 
-        function updateSearch() {
-            const searchTerm = $searchInput.val().toLowerCase().trim();
-            const $segments = transcriptTextEl.find('.transcript-segment'); // Target segment divs
-
-            // Clear previous search highlights and state
-            $segments.removeClass('transcript-search-match transcript-search-current-match');
-            searchMatches = [];
-            currentMatchIndex = -1;
-            $searchCount.text('');
-            $searchPrev.prop('disabled', true);
-            $searchNext.prop('disabled', true);
-
-            if (searchTerm.length >= 2) { // Only search if term is long enough
-                $segments.each(function(index) {
-                    const $segmentDiv = $(this);
-                    // IMPORTANT: Search only within the text span, not the timestamp
-                    const segmentText = $segmentDiv.find('.transcript-segment-text').text().toLowerCase();
-                    if (segmentText.includes(searchTerm)) {
-                        $segmentDiv.addClass('transcript-search-match');
-                        searchMatches.push($segmentDiv); // Store the jQuery object
-                    }
-                });
-
-                if (searchMatches.length > 0) {
-                    currentMatchIndex = 0; // Start at the first match
-                    highlightCurrentMatch();
-                    updateNavButtons();
-                    $searchCount.text(`${searchMatches.length} found`);
-                } else {
-                    $searchCount.text('0 found');
-                }
-            } else {
-                // When search is cleared or too short, reapply highlighting to current segment
-                if (currentSegmentDiv) {
-                    currentSegmentDiv.addClass('transcript-current-segment');
-                    // If not in view, scroll to it
-                    const isInView = segmentInViewMap.get(currentSegmentDiv[0]) || false;
-
-                    if (!isInView) {
-                        scrollToElement(currentSegmentDiv);
-                    }
-                }
-            }
-        }
-
-        function highlightCurrentMatch() {
-            $('.transcript-search-current-match').removeClass('transcript-search-current-match');
-            if (currentMatchIndex >= 0 && currentMatchIndex < searchMatches.length) {
-                const $currentMatch = searchMatches[currentMatchIndex];
-                $currentMatch.addClass('transcript-search-current-match');
-                // Remove karaoke highlight only from this specific element
-                $currentMatch.removeClass('transcript-current-segment');
-
-                // Scroll the current match into view
-                scrollToElement($currentMatch);
-            }
-        }
-
-        function updateNavButtons() {
-            $searchPrev.prop('disabled', currentMatchIndex <= 0);
-            $searchNext.prop('disabled', currentMatchIndex >= searchMatches.length - 1);
-        }
-
-        // Debounce the search input to avoid jank on long transcripts
-        let searchDebounceTimer;
-        $searchInput.on('input', function() {
-            clearTimeout(searchDebounceTimer);
-            searchDebounceTimer = setTimeout(updateSearch, 200);
-        });
-
-        $searchPrev.on('click', function() {
-            if (currentMatchIndex > 0) {
-                currentMatchIndex--;
-                highlightCurrentMatch();
-                updateNavButtons();
-            }
-        });
-        $searchNext.on('click', function() {
-            if (currentMatchIndex < searchMatches.length - 1) {
-                currentMatchIndex++;
-                highlightCurrentMatch();
-                updateNavButtons();
-            }
-        });
-    }
 
     initTranscriptRendering(transcriptContainer, transcriptTextEl, transcriptSegments, segmentObserver);
     initKaraokeHighlighting($player, findSegmentAtTime, updateSegmentHighlighting);
-    initTranscriptSearch(transcriptTextEl, segmentObserver, scrollToElement, updateSegmentHighlighting);
 });

@@ -22,7 +22,7 @@
   <p>The following will be deleted:</p>
   <ul>
     {% if request.user.alerts.count > 0 %}
-      <li>All of <a href="{% url "profile_alerts" %}">your search alerts</a> ({{ request.user.alerts.count }}).</li>
+      <li>All of <a href="{% url "profile_search_alerts" %}">your search alerts</a> ({{ request.user.alerts.count }}).</li>
     {% endif %}
     {% if request.user.docket_alerts.subscriptions.count %}
       <li>All of <a href="{% url "profile_docket_alerts" %}">your docket alerts</a> ({{ request.user.docket_alerts.subscriptions.count }}).</li>

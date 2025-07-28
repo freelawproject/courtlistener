@@ -15,7 +15,12 @@ from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import connection
-from django.test import AsyncRequestFactory, RequestFactory, override_settings
+from django.test import (
+    AsyncRequestFactory,
+    RequestFactory,
+    SimpleTestCase,
+    override_settings,
+)
 from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -67,7 +72,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
@@ -84,7 +89,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
-from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -572,7 +577,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -587,7 +592,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="3",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -602,7 +607,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -617,7 +622,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -650,7 +655,7 @@ class CitationRedirectorTest(TestCase):
             reporter="U.S.",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="scotus")
@@ -701,7 +706,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="40M",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=df,
                 case_name="People v. Davis",
@@ -767,6 +772,87 @@ class CitationRedirectorTest(TestCase):
 
         self.assertIn("No Citations Detected", r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+    async def test_disambiguated_reporter_variants_redirect_properly(self):
+        """Can we resolve correctly some reporter variants with collisions to slug?"""
+
+        test_pairs = [
+            ("Vr.", "vroom"),
+            ("V.R.", "vt"),
+            ("Black Rep.", "black"),
+            ("Black. Rep.", "blackf"),
+            ("Cal. App. 2d Supp", "cal-app-2d"),
+            ("Cal. App. 2d Supp.", "cal-app-supp-2d"),
+            ("CLR", "conn-l-rptr"),
+            ("Cl.R.", "cl-ch"),
+            ("Dec. Commr. Pat.", "dec-com-pat"),
+            ("Dec. Comm'r Pat.", "dec-commr-pat"),
+            ("Hayw. & H.", "hayw-hdc"),
+            ("Hayw.& H.", "hay-haz"),
+            ("Johns.(N.Y.)", "johns-ch"),
+            ("Johns.N.Y.", "johns"),
+            ("Mt.", "mont"),
+            ("mt", "mt"),
+            ("Pa.C.", "pa-commw"),
+            ("Pac.", "p"),
+            ("Sc.", "scam"),
+        ]
+
+        for variation, expected_slug in test_pairs:
+            with self.subTest(variation=variation):
+                r = await self.async_client.get(
+                    reverse(
+                        "citation_redirector",
+                        kwargs={"reporter": variation},
+                    ),
+                    follow=True,
+                )
+                if r.redirect_chain:
+                    # Get path from the redirection from string to slug reporter
+                    path = r.redirect_chain[-1][0]
+                else:
+                    # No redirect, mt is a variation but matches its slug
+                    path = r.asgi_request.path
+                expected_path = f"/c/{expected_slug}/"
+                self.assertEqual(
+                    expected_path,
+                    path,
+                    msg=f"Expected path: {expected_path} is different from the obtained path: {path}",
+                )
+
+    async def test_too_ambiguous_reporter_variations(self):
+        """Some abbreviations are too ambiguous to resolve safely"""
+
+        test_pairs = [
+            ("B.R.", "br"),
+            ("BR", "br"),
+            ("Wash.", "wash"),
+            ("WASH", "wash"),
+            ("HOW", "how"),
+            ("How.", "how"),
+            ("OKla.", "okla"),
+            ("Okla.", "okla"),
+            ("S.C.", "sc"),
+        ]
+
+        for variation, expected_slug in test_pairs:
+            with self.subTest(variation=variation):
+                r = await self.async_client.get(
+                    reverse(
+                        "citation_redirector",
+                        kwargs={"reporter": variation},
+                    ),
+                    follow=True,
+                )
+                # Get path from the redirection from string to slug reporter
+                path = r.redirect_chain[-1][0] if r.redirect_chain else None
+
+                expected_path = f"/c/{expected_slug}/"
+                self.assertEqual(
+                    expected_path,
+                    path,
+                    msg=f"Expected path: {expected_path} is different from the obtained path: {path}",
+                )
 
 
 class ViewRecapDocketTest(TestCase):
@@ -1577,7 +1663,7 @@ class TestBlockSearchItemAjax(TestCase):
         # Courts
         court_ca2 = CourtFactory(id="ca2")
         # cluster
-        cls.cluster = OpinionClusterFactoryWithChildrenAndParents(
+        cls.cluster = OpinionClusterWithChildrenAndParentsFactory(
             docket=DocketFactory(court=court_ca2),
             case_name="Fisher v. SD Protection Inc.",
             date_filed=date(2020, 1, 1),

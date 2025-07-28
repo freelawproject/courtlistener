@@ -31,6 +31,7 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     store_search_query,
 )
+from cl.lib.string_utils import trunc
 from cl.lib.types import AuthenticatedHttpRequest
 from cl.search.documents import OpinionClusterDocument
 from cl.search.forms import SearchForm, _clean_form
@@ -197,7 +198,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             f"Your alert was {action} successfully.",
         )
         # and redirect to the alerts page
-        return HttpResponseRedirect(reverse("profile_alerts"))
+        return HttpResponseRedirect(reverse("profile_search_alerts"))
 
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
@@ -301,10 +302,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
     render_dict.update(search_results)
     store_search_query(request, search_results)
 
-    # Set the value to the query as a convenience
-    alert_form.fields["name"].widget.attrs["value"] = render_dict[
-        "search_summary_str"
-    ]
+    # Set the value to the query as a convenience.
+    # Truncate alert name up to 75 chars.
+    alert_form.fields["name"].widget.attrs["value"] = trunc(
+        render_dict["search_summary_str"], 75, ellipsis="..."
+    )
     render_dict.update(
         {"alert_form": alert_form, "alerts_context": alerts_context}
     )

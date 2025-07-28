@@ -1,0 +1,35 @@
+{% load svg_tags %}
+
+<c-vars request></c-vars>
+
+<div class="md:hidden">
+  <c-dialog panel_class="absolute pt-0 pb-4 px-3" only>
+    <c-slot name="button_content">
+      {% svg "magnifier" class="text-greyscale-400 w-5 h-5" %}
+    </c-slot>
+
+    <c-slot name="panel">
+      <div x-dialog:title class="font-medium text-gray-800 py-3 flex flex-row justify-between">
+        <div class="w-[226px] lg:min-w-[226px] flex justify-start" aria-label="Go to homepage">
+          <div class="md:h-21 md:w-45 h-12 ml-1 w-[106px]">
+            {% svg "logos/courtlistener" %}
+          </div>
+        </div>
+        <div class="pt-1.5">
+          <button
+            type="button"
+            x-on:click.stop="close"
+            class="btn-outline p-2 rounded-[10px]"
+            aria-label="Close modal"
+          >
+            {% svg "cross" class="text-greyscale-400" %}
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        {{ slot }}
+      </div>
+    </c-slot>
+  </c-dialog>
+</div>

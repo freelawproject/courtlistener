@@ -83,6 +83,7 @@ class BaseSeleniumTest(
         cls.browser.implicitly_wait(5)
 
     def setUp(self) -> None:
+        super().setUp()
         self.reset_browser()
         self.rebuild_index("audio.Audio")
         self.delete_index("search.OpinionCluster")
@@ -99,11 +100,12 @@ class BaseSeleniumTest(
             )
             print(f"\nSaving screenshot in docker image at: /tmp/{filename}")
             self.browser.save_screenshot(f"/tmp/{filename}")
+        super().tearDown()
 
     @classmethod
     def tearDownClass(cls) -> None:
-        super().tearDownClass()
         cls.browser.quit()
+        super().tearDownClass()
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
     def assert_text_in_node(self, text: str, tag_name: str) -> None:
