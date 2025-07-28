@@ -16,6 +16,11 @@
     inside the button.
     - emoji (optional): An HTML entity code (e.g., &#128077;) to insert an
     emoji next to the banner message.
+    - variant (optional): Changes the color of the banner. Accepted values:
+      - `warning` (yellow)
+      - `info` (blue)
+      - `success` (green)
+      - `danger` (red, DEFAULT)
 
   It's advisable to wrap this template within an if tag and use the parent element to add
   extra conditions to handle the visibility of the banner. The current template only checks
