@@ -479,7 +479,7 @@ v4_meta_keys = {
     "timestamp": lambda x: x["result"]
     .date_created.isoformat()
     .replace("+00:00", "Z"),
-    "score": lambda x: {"bm25": None},
+    "score": lambda x: {"bm25": None, "semantic": None},
 }
 
 v4_recap_meta_keys = v4_meta_keys.copy()
