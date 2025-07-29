@@ -243,14 +243,13 @@ class OpinionClusterViewSet(
         "citations",
     ).order_by("-id")
 
-    def retrieve(self, request, pk=None, version=None):
+    def retrieve(self, request, *args, **kwargs):
         try:
             # First, try to get the object normally
-            instance = self.get_object()
-            serializer = self.get_serializer(instance)
-            return Response(serializer.data)
+            return super().retrieve(request, *args, **kwargs)
         except Http404 as exc:
             try:
+                pk = kwargs.get("pk")
                 redirection = ClusterRedirection.objects.get(
                     deleted_cluster_id=pk
                 )
@@ -264,9 +263,11 @@ class OpinionClusterViewSet(
                 return Response({"detail": message}, status=HTTPStatus.GONE)
 
             cluster_id = redirection.cluster_id
+            redirect_kwargs = kwargs.copy()
+            redirect_kwargs["pk"] = cluster_id
             redirection_url = reverse(
                 "opinioncluster-detail",
-                kwargs={"version": version, "pk": cluster_id},
+                kwargs=redirect_kwargs,
             )
             absolute_new_url = request.build_absolute_uri(redirection_url)
 
