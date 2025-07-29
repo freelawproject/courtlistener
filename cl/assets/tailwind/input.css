@@ -60,7 +60,7 @@
     @apply focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-primary-600/60; /* focus */
     @apply disabled:border-greyscale-300 disabled:bg-greyscale-100 disabled:checked:bg-greyscale-100 forced-colors:appearance-auto; /* disabled and a11y */
     @apply before:absolute before:inset-0 before:m-auto before:w-4 before:h-4 before:bg-white; /* check icon container */
-    @apply checked:before:scale-100 before:scale-0 before:transform before:duration-100 transition-colors; /* animate check icon */
+    @apply checked:before:scale-100 before:scale-0 before:transform before:duration-200 transition-colors; /* animate check icon */
   }
   input[type="checkbox"]::before {
     mask: url("/static/svg/check_thick.svg") no-repeat center/contain;
