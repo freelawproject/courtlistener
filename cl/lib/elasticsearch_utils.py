@@ -2733,6 +2733,7 @@ def build_semantic_query(
             build_fulltext_query(fields, keyword_query, only_queries=True)
         )
 
+    inner_hits = {"size": 1, "_source": False, "fields": ["embeddings.chunk"]}
     # Add the semantic vector-based query using KNN with pre-filtering
     semantic_query.append(
         Q(
@@ -2747,6 +2748,7 @@ def build_semantic_query(
                 similarity=settings.KNN_SIMILARITY,
                 boost=settings.KNN_SEARCH_BOOST,
             ),
+            inner_hits=inner_hits,
         )
     )
     return keyword_query, semantic_query
