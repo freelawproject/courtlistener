@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    --mobile-breakpoint: theme(screens.md);
     --nav-menu-width: 222px;
     --profile-menu-width: 228px;
     --mobile-main-padding: theme(spacing.4);
