@@ -22,7 +22,7 @@ from django.core.files.base import ContentFile
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
-from django.utils.timezone import now
+from django.utils.timezone import localtime, now
 from eyecite.tokenizers import HyperscanTokenizer
 from httpx import (
     HTTPStatusError,
@@ -1589,42 +1589,57 @@ def probe_or_scrape_iquery_pages(
         return None
 
     if not reports_data:
-        logger.info(
-            "No cases were found during this probe for court %s - case IDs from %s to %s.",
-            court_id,
-            str(highest_known_pacer_case_id),
-            str(pacer_case_id_to_lookup),
-        )
-        court_empty_probe_attempts = r.incr(
-            f"iquery:court_empty_probe_attempts:{court_id}"
-        )
-        # Compute the duration of empty probes in hours based on the number of
-        # court_empty_probe_attempts and the current IQUERY_PROBE_WAIT interval
-        empty_probes_hours = (
-            court_empty_probe_attempts * settings.IQUERY_PROBE_WAIT
-        ) / 3600
-        court_empty_probe_limit_hours = (
-            settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS.get(
-                court_id, settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS["default"]
-            )
-        )
-        if empty_probes_hours >= court_empty_probe_limit_hours:
-            logger.error(
-                "Court %s has accumulated many probe attempts over "
-                "approximately %s hours. It appears the probe may be stuck; "
-                "manual intervention may be required.",
+        today = localtime().weekday()
+        # Only increment court_empty_probe_attempts if today is not
+        # Saturday (5) or Sunday (6). Courts usually don't publish on weekends,
+        # so this prevents logging courts as stuck due to this expected behavior.
+        if today in [5, 6]:
+            logger.info(
+                "Ignoring empty probe over the weekend for court %s - case IDs from %s to %s.",
                 court_id,
-                court_empty_probe_limit_hours,
+                str(highest_known_pacer_case_id),
+                str(pacer_case_id_to_lookup),
             )
-            # Restart court_blocked_attempts to avoid continue logging the
-            # error on next iterations.
-            r.set(f"iquery:court_empty_probe_attempts:{court_id}", 0)
-            # Add a court wait time of one hour so the problem can be manually handled.
-            r.set(
-                f"iquery:court_wait:{court_id}",
-                3600,
-                ex=3600,
+        else:
+            logger.info(
+                "No cases were found during this probe for court %s - case IDs from %s to %s.",
+                court_id,
+                str(highest_known_pacer_case_id),
+                str(pacer_case_id_to_lookup),
             )
+            court_empty_probe_attempts = r.incr(
+                f"iquery:court_empty_probe_attempts:{court_id}"
+            )
+            # Compute the duration of empty probes in hours based on the number
+            # of court_empty_probe_attempts and the current IQUERY_PROBE_WAIT
+            # interval
+            empty_probes_hours = (
+                court_empty_probe_attempts * settings.IQUERY_PROBE_WAIT
+            ) / 3600
+            court_empty_probe_limit_hours = (
+                settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS.get(
+                    court_id,
+                    settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS["default"],
+                )
+            )
+            if empty_probes_hours >= court_empty_probe_limit_hours:
+                logger.error(
+                    "Court %s has accumulated many probe attempts over "
+                    "approximately %s hours. It appears the probe may be stuck; "
+                    "manual intervention may be required.",
+                    court_id,
+                    court_empty_probe_limit_hours,
+                )
+                # Restart court_blocked_attempts to avoid continue logging the
+                # error on next iterations.
+                r.set(f"iquery:court_empty_probe_attempts:{court_id}", 0)
+                # Add a court wait time of one hour so the problem can be
+                # manually handled.
+                r.set(
+                    f"iquery:court_wait:{court_id}",
+                    3600,
+                    ex=3600,
+                )
 
     # Process all the reports retrieved during the probing.
     # Avoid triggering the iQuery sweep signal except for the latest hit.
@@ -2328,6 +2343,7 @@ def update_rd_metadata(
     pacer_doc_id: str,
     document_number: str,
     attachment_number: int,
+    omit_page_count: bool = False,
 ) -> tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
 
@@ -2342,6 +2358,7 @@ def update_rd_metadata(
     :param document_number: The docket entry number for use in file names.
     :param attachment_number: The attachment number (if applicable) for use in
     file names.
+    :param omit_page_count: If true, omit requesting the page_count from doctor.
     :return: A two-tuple of a boolean indicating success and a corresponding
     error/success message string.
     """
@@ -2373,19 +2390,19 @@ def update_rd_metadata(
     rd.is_available = True  # We've got the PDF.
     rd.date_upload = rd.date_upload or now()
 
-    # request.content is sometimes a str, sometimes unicode, so
-    # force it all to be bytes, pleasing hashlib.
-    rd.sha1 = sha1(pdf_bytes)
-    response = async_to_sync(microservice)(
-        service="page-count",
-        item=rd,
-    )
-    if response.is_success:
-        rd.page_count = int(response.text)
-
-    assert isinstance(rd.page_count, (int | type(None))), (
-        "page_count must be an int or None."
-    )
+    if not omit_page_count:
+        # request.content is sometimes a str, sometimes unicode, so
+        # force it all to be bytes, pleasing hashlib.
+        rd.sha1 = sha1(pdf_bytes)
+        response = async_to_sync(microservice)(
+            service="page-count",
+            item=rd,
+        )
+        if response.is_success:
+            rd.page_count = int(response.text)
+        assert isinstance(rd.page_count, (int | type(None))), (
+            "page_count must be an int or None."
+        )
 
     # Save and extract, skipping OCR.
     rd.save()
