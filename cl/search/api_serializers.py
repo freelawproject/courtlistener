@@ -420,9 +420,10 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
         if not request:
             return ScoreDataSerializer(obj).data
 
+        semantic = request.GET.get("semantic", False)
         serializer_class = (
             SemanticSearchScoreSerializer
-            if flag_is_active(request, "enable_semantic_search")
+            if flag_is_active(request, "enable_semantic_search") and semantic
             else ScoreDataSerializer
         )
         return serializer_class(obj).data
