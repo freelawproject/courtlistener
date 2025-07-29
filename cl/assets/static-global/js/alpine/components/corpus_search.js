@@ -143,6 +143,7 @@ document.addEventListener('alpine:init', () => {
       const updateFieldset = (scope) => {
         const fieldsetId = this.$id(scope.fieldset);
         const fieldsetEl = document.getElementById(fieldsetId);
+        if (!fieldsetEl) return;
         if (newSelected === scope.label) fieldsetEl.removeAttribute('disabled');
         else fieldsetEl.setAttribute('disabled', 'disabled');
       };
