@@ -19,7 +19,7 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, Docket
+from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
@@ -329,6 +329,19 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self.assertIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
         self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
 
+        # Check that the snippet does not default to the start of the plain
+        # text, but instead uses the semantically relevant chunk
+        for cluster in r.data["results"]:
+            with self.subTest(
+                cluster_id=cluster["cluster_id"], msg="Snippet content test."
+            ):
+                for opinion in cluster["opinions"]:
+                    record = Opinion.objects.get(id=opinion["id"])
+                    self.assertNotEqual(
+                        opinion["snippet"],
+                        record.plain_text[: settings.NO_MATCH_HL_SIZE],
+                    )
+
         # Ensure that other clusters are not erroneously included
         self.assertNotIn(f'"cluster_id":{self.opinion_4.cluster.id}', content)
         self.assertNotIn(f'"cluster_id":{self.opinion_5.cluster.id}', content)
@@ -443,3 +456,23 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
 
         # Should also include the keyword-only match (no embeddings)
         self.assertIn(f'"cluster_id":{opinion_5.cluster.id}', content)
+
+        # Verify snippet behavior:
+        # - For keyword-only matches, snippet should default to plain text
+        # - For semantic matches, snippet should come from the relevant chunk
+        for cluster in r.data["results"]:
+            with self.subTest(
+                cluster_id=cluster["cluster_id"], msg="Snippet content test."
+            ):
+                for opinion in cluster["opinions"]:
+                    record = Opinion.objects.get(id=opinion["id"])
+                    if record.id == opinion_5.id:
+                        self.assertEqual(
+                            opinion["snippet"],
+                            record.plain_text[: settings.NO_MATCH_HL_SIZE],
+                        )
+                    else:
+                        self.assertNotEqual(
+                            opinion["snippet"],
+                            record.plain_text[: settings.NO_MATCH_HL_SIZE],
+                        )
