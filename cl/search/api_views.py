@@ -1,10 +1,13 @@
 from http import HTTPStatus
 
 from django.db.models import Prefetch
+from django.http.response import Http404
+from django.urls import reverse
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.response import Response
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
@@ -55,6 +58,7 @@ from cl.search.filters import (
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
+    ClusterRedirection,
     Court,
     Docket,
     DocketEntry,
@@ -238,6 +242,38 @@ class OpinionClusterViewSet(
         "non_participating_judges",
         "citations",
     ).order_by("-id")
+
+    def retrieve(self, request, pk=None, version=None):
+        try:
+            # First, try to get the object normally
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except Http404 as exc:
+            try:
+                redirection = ClusterRedirection.objects.get(
+                    deleted_cluster_id=pk
+                )
+            except ClusterRedirection.DoesNotExist:
+                raise exc
+
+            if redirection.reason == ClusterRedirection.SEALED:
+                message = dict(ClusterRedirection.REDIRECTION_REASON)[
+                    ClusterRedirection.SEALED
+                ]
+                return Response({"detail": message}, status=HTTPStatus.GONE)
+
+            cluster_id = redirection.cluster_id
+            redirection_url = reverse(
+                "opinioncluster-detail",
+                kwargs={"version": version, "pk": cluster_id},
+            )
+            absolute_new_url = request.build_absolute_uri(redirection_url)
+
+            return Response(
+                status=HTTPStatus.MOVED_PERMANENTLY,
+                headers={"Location": absolute_new_url},
+            )
 
 
 class OpinionViewSet(
