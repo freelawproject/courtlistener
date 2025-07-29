@@ -1,10 +1,13 @@
 from http import HTTPStatus
 
 from django.db.models import Prefetch
+from django.http.response import Http404
+from django.urls import reverse
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.response import Response
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
@@ -56,6 +59,7 @@ from cl.search.filters import (
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
+    ClusterRedirection,
     Court,
     Docket,
     DocketEntry,
@@ -254,6 +258,39 @@ class OpinionClusterViewSet(
         "citations",
     ).order_by("-id")
 
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            # First, try to get the object normally
+            return super().retrieve(request, *args, **kwargs)
+        except Http404 as exc:
+            try:
+                pk = kwargs.get("pk")
+                redirection = ClusterRedirection.objects.get(
+                    deleted_cluster_id=pk
+                )
+            except ClusterRedirection.DoesNotExist:
+                raise exc
+
+            if redirection.reason == ClusterRedirection.SEALED:
+                message = dict(ClusterRedirection.REDIRECTION_REASON)[
+                    ClusterRedirection.SEALED
+                ]
+                return Response({"detail": message}, status=HTTPStatus.GONE)
+
+            cluster_id = redirection.cluster_id
+            redirect_kwargs = kwargs.copy()
+            redirect_kwargs["pk"] = cluster_id
+            redirection_url = reverse(
+                "opinioncluster-detail",
+                kwargs=redirect_kwargs,
+            )
+            absolute_new_url = request.build_absolute_uri(redirection_url)
+
+            return Response(
+                status=HTTPStatus.MOVED_PERMANENTLY,
+                headers={"Location": absolute_new_url},
+            )
+
 
 class OpinionViewSet(
     LoggingMixin,
@@ -437,7 +474,9 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             )
 
             serializer_class = supported_search_type["serializer_class"]
-            serializer = serializer_class(results_page, many=True)
+            serializer = serializer_class(
+                results_page, many=True, context={"request": request}
+            )
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(

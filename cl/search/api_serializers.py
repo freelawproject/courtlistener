@@ -3,6 +3,7 @@ from datetime import UTC
 from drf_dynamic_fields import DynamicFieldsMixin, NestedDynamicFieldsMixin
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
+from waffle import flag_is_active
 
 from cl.api.utils import (
     HyperlinkedModelSerializerWithId,
@@ -416,6 +417,11 @@ class ScoreDataSerializer(serializers.Serializer):
     bm25 = serializers.FloatField(read_only=True, source="bm25_score")
 
 
+class SemanticSearchScoreSerializer(serializers.Serializer):
+    bm25 = serializers.FloatField(read_only=True, source="bm25_score")
+    semantic = serializers.FloatField(read_only=True, source="semantic_score")
+
+
 class BaseMetaDataSerializer(serializers.Serializer):
     """The metadata serializer V4 Search API."""
 
@@ -428,7 +434,28 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
     Includes the score field.
     """
 
-    score = ScoreDataSerializer(source="*", read_only=True)
+    score = serializers.SerializerMethodField(source="*", read_only=True)
+
+    def get_score(self, obj):
+        """
+        Returns the appropriate score serialization for a given result object.
+
+        If the `enable_semantic_search` flag is active, this method uses
+        `SemanticSearchScoreSerializer`, which includes both semantic and BM25
+        scores. Otherwise, it defaults to `ScoreDataSerializer`. If the request
+        context is not available, it also falls back to `ScoreDataSerializer`.
+        """
+        request = self.context.get("request", None)
+        if not request:
+            return ScoreDataSerializer(obj).data
+
+        semantic = request.GET.get("semantic", False)
+        serializer_class = (
+            SemanticSearchScoreSerializer
+            if flag_is_active(request, "enable_semantic_search") and semantic
+            else ScoreDataSerializer
+        )
+        return serializer_class(obj).data
 
 
 class RECAPMetaDataSerializer(MainDocumentMetaDataSerializer):

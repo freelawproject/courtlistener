@@ -105,11 +105,13 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterWithChildrenAndParentsFactory,
     RECAPDocumentFactory,
+    OpinionClusterWithParentsFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     SOURCES,
+    ClusterRedirection,
     Court,
     Docket,
     DocketEntry,
@@ -4030,3 +4032,73 @@ class DynamicNestedFieldsMixinTests(TestCase):
         self.assertEqual(len(prefetches), 3)
         self.assertIn("recap_documents__tags", prefetches)
         self.assertIn("tags", prefetches)
+
+
+class ClusterRedirectionTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.deleted_cluster_id = 999999
+        cls.redirect_to_cluster = OpinionClusterWithParentsFactory.create()
+        ClusterRedirection.objects.create(
+            deleted_cluster_id=cls.deleted_cluster_id,
+            cluster=cls.redirect_to_cluster,
+            reason=ClusterRedirection.VERSION,
+        )
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="a-user",
+            user__password=make_password("password"),
+        )
+        cls.sealed_cluster_id = 6666666
+        ClusterRedirection.objects.create(
+            reason=ClusterRedirection.SEALED,
+            deleted_cluster_id=cls.sealed_cluster_id,
+            cluster=None,
+        )
+
+    async def test_opinion_cluster_redirection(self):
+        """Test that a deleted cluster redirects to an existing cluster"""
+        url = reverse(
+            "opinioncluster-detail",
+            kwargs={
+                "version": "v4",
+                "pk": self.deleted_cluster_id,
+                "format": "json",
+            },
+        )
+        api_client = await sync_to_async(make_client)(self.user.user.pk)
+        response = await api_client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
+        redirect_url = response.headers["Location"]
+
+        # Check that extra kwargs are passed
+        self.assertTrue(
+            "v4" in redirect_url,
+            "'version' extra kwarg not passed in redirection",
+        )
+        self.assertTrue(
+            ".json" in redirect_url,
+            "'format' extra kwarg not passed in redirection",
+        )
+
+        redirect_response = await api_client.get(redirect_url)
+        data = json.loads(redirect_response.content)
+        self.assertEqual(data["id"], self.redirect_to_cluster.id)
+
+        # Check that we don't get false redirections for non-existent record
+        url = reverse(
+            "opinioncluster-detail", kwargs={"version": "v4", "pk": 777777}
+        )
+        response = await api_client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
+        # Check that a sealed record returns proper code and message
+        message = dict(ClusterRedirection.REDIRECTION_REASON)[
+            ClusterRedirection.SEALED
+        ]
+        url = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v4", "pk": self.sealed_cluster_id},
+        )
+        response = await api_client.get(url)
+        self.assertEqual(response.json()["detail"], message)
+        self.assertEqual(response.status_code, HTTPStatus.GONE)
