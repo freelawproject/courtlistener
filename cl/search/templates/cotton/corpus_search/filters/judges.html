@@ -21,24 +21,14 @@
 
   <div class="grid grid-cols-2 gap-2 items-end">
     <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-      <div
-        class="text-ellipsis overflow-hidden text-nowrap"
-        title="{{ search_form.born_after.label }}"
-      >
-        {{ search_form.born_after.label_tag }}
-      </div>
+      {{ search_form.born_after.label_tag }}
       <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
         {% svg "calendar" class="w-5 h-5" %}
         {{ search_form.born_after }}
       </div>
     </div>
     <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-      <div
-        class="text-ellipsis overflow-hidden text-nowrap"
-        title="{{ search_form.born_before.label }}"
-      >
-        {{ search_form.born_before.label_tag }}
-      </div>
+      {{ search_form.born_before.label_tag }}
       <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
         {% svg "calendar" class="w-5 h-5" %}
         {{ search_form.born_before }}
