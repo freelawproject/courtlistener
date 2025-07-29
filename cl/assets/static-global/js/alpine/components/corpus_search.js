@@ -104,6 +104,11 @@ document.addEventListener('alpine:init', () => {
       return document.getElementById(this.triggerButtonId);
     },
     get scopeTabClass() {
+      const baseClass =
+        'min-w-41 h-[58px] text-sm font-normal rounded-t-2xl text-greyscale-600 flex justify-center items-center';
+      return this.isActiveScope ? `${baseClass} bg-white` : `${baseClass} bg-greyscale-50`;
+    },
+    get scopeTabTitleClass() {
       return this.isActiveScope ? 'font-semibold text-greyscale-900' : 'font-medium text-greyscale-700';
     },
     get advancedFiltersCollapsed() {

@@ -29,12 +29,12 @@
         x-bind:aria-selected="isActiveScope"
         type="button"
         role="tab"
-        class="bg-white px-8 min-w-41 h-[58px] text-sm font-normal rounded-t-2xl text-greyscale-600 flex justify-center items-center"
+        x-bind:class="scopeTabClass"
       >
         <span class="flex flex-col items-start">
           <span
             x-bind:data-scope="scope.label"
-            x-bind:class="scopeTabClass"
+            x-bind:class="scopeTabTitleClass"
             x-text="scope.label"
             class=""
           ></span>
