@@ -3804,13 +3804,28 @@ class ClusterRedirectionTest(TestCase):
         """Test that a deleted cluster redirects to an existing cluster"""
         url = reverse(
             "opinioncluster-detail",
-            kwargs={"version": "v4", "pk": self.deleted_cluster_id},
+            kwargs={
+                "version": "v4",
+                "pk": self.deleted_cluster_id,
+                "format": "json",
+            },
         )
         api_client = await sync_to_async(make_client)(self.user.user.pk)
         response = await api_client.get(url)
         self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
+        redirect_url = response.headers["Location"]
 
-        redirect_response = await api_client.get(response.headers["Location"])
+        # Check that extra kwargs are passed
+        self.assertTrue(
+            "v4" in redirect_url,
+            "'version' extra kwarg not passed in redirection",
+        )
+        self.assertTrue(
+            ".json" in redirect_url,
+            "'format' extra kwarg not passed in redirection",
+        )
+
+        redirect_response = await api_client.get(redirect_url)
         data = json.loads(redirect_response.content)
         self.assertEqual(data["id"], self.redirect_to_cluster.id)
 
