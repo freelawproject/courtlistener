@@ -49,11 +49,18 @@
             <c-corpus-search.filters :request="request" :search_form="search_form"/>
           </div>
         </div>
-        <div class="p-4">
+        <div class="p-4 flex flex-col gap-4">
           <c-corpus-search.button class="w-full max-md:btn-xl flex items-center justify-center">
             {% svg "magnifier" class="text-white w-5 h-5 mr-1.5" aria_hidden="true" %}
             Search
           </c-corpus-search.button>
+          <a
+            href="{% url "coverage" %}"
+            class="flex items-center justify-center text-sm text-greyscale-600 gap-1 hover:text-greyscale-500"
+          >
+            {% svg "circle_question_mark" class="text-greyscale-400 hover:text-greyscale-300 h-4 w-4" %}
+            About This Data
+          </a>
         </div>
       </div>
     </c-slot>

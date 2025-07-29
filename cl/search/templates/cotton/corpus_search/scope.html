@@ -47,6 +47,10 @@
         </span>
       </button>
     </template>
+    <a href="{% url "coverage" %}" class="ml-auto flex items-center text-sm text-greyscale-600 gap-1 hover:text-greyscale-500">
+      {% svg "circle_question_mark" class="text-greyscale-400 hover:text-greyscale-300 h-4 w-4 [@media(max-width:893px)]:h-6 [@media(max-width:893px)]:w-6" %}
+      <span class="[@media(max-width:893px)]:hidden">About This Data</span>
+    </a>
   </div>
 
 {% else %}
