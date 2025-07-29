@@ -69,6 +69,7 @@ from cl.search.models import (
     SEARCH_TYPES,
     SOURCES,
     Citation,
+    ClusterRedirection,
     Court,
     Docket,
     Opinion,
@@ -1110,6 +1111,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             other_dates=other_dates,
             summary="",
         )
+        cluster2_id = cluster2.id
         cluster3 = OpinionClusterFactory.create(
             docket=version_docket, other_dates="", summary=summary
         )
@@ -1273,6 +1275,17 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             self.fail("`cluster3` should had been deleted")
         except OpinionCluster.DoesNotExist:
             pass
+
+        redirection = ClusterRedirection.objects.filter(
+            deleted_cluster_id=cluster2_id,
+            cluster=main_cluster,
+            reason=ClusterRedirection.VERSION,
+        ).exists()
+        self.assertTrue(
+            redirection,
+            "ClusterRedirection object from `cluster2` to `main_cluster` was not created",
+        )
+
         self.assertEqual(
             main_cluster.other_dates,
             other_dates,

@@ -23,6 +23,7 @@ from cl.search.models import (
     SOURCES,
     BankruptcyInformation,
     Claim,
+    ClusterRedirection,
     Docket,
     DocketEntry,
     DocketPanel,
@@ -484,6 +485,15 @@ def merge_opinion_versions(
             ES_CHILD_ID(version_opinion.id).OPINION,
             version_cluster.id,
         )
+
+        if not ClusterRedirection.objects.filter(
+            deleted_cluster_id=version_cluster.id
+        ).exists():
+            ClusterRedirection.objects.create(
+                deleted_cluster_id=version_cluster.id,
+                cluster=main_opinion.cluster,
+                reason=ClusterRedirection.VERSION,
+            )
 
         # Both Opinion and Citation have a ForeignKey to OpinionCluster, with
         # on_delete=models.CASCADE. Also, there are signals (see
