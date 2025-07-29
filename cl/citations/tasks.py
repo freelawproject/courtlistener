@@ -232,13 +232,8 @@ def store_opinion_citations_and_update_parentheticals(
     :param disable_parenthetical_groups: Skip creating ParentheticalGroups
     :return: None
     """
-    # Extract the citations from the opinion's text
-    # If the source has marked up text, pass it so it can be used to find
-    # ReferenceCitations. This is handled by `make_get_citations_kwargs`
-    get_citations_kwargs = make_get_citations_kwargs(opinion)
-
-    # Failed extractions should be skipped and logged
-    if not get_citations_kwargs.get("plain_text", "markup_text"):
+    segments, attribute = make_get_citations_kwargs(opinion)
+    if not segments:
         logger.error(
             "Opinion has no content id: '%s'",
             opinion.id,
@@ -248,25 +243,43 @@ def store_opinion_citations_and_update_parentheticals(
         )
         return
 
-    # Extract citations
-    logger.debug("Extracting citations for opinion %s", opinion.pk)
-    citations: list[CitationBase] = get_citations(
-        tokenizer=HYPERSCAN_TOKENIZER,
-        **get_citations_kwargs,
-    )
+    html_segments = []
+    citation_resolutions = {}
+    for kwarg_segment in segments:
+        # Extract citations
+        logger.debug("Extracting citations for opinion %s", opinion.pk)
+        citations: list[CitationBase] = get_citations(
+            tokenizer=HYPERSCAN_TOKENIZER,
+            **kwarg_segment,
+        )
 
-    logger.debug("Resolving citations %s", opinion.pk)
-    # Resolve all those different citation objects to Opinion objects,
-    # using a variety of heuristics.
-    citation_resolutions: dict[
-        MatchedResourceType, list[SupportedCitationType]
-    ] = do_resolve_citations(citations, opinion)
+        logger.debug("Resolving citations %s", opinion.pk)
+        # Resolve all those different citation objects to Opinion objects,
+        # using a variety of heuristics.
+        citation_segment_resolutions: dict[
+            MatchedResourceType, list[SupportedCitationType]
+        ] = do_resolve_citations(citations, opinion)
 
-    logger.debug("Creating HTML with Citations %s", opinion.pk)
-    # Generate the citing opinion's new HTML with inline citation links
-    opinion.html_with_citations = create_cited_html(
-        citation_resolutions, get_citations_kwargs
-    )
+        for (
+            resource_type,
+            citations_list,
+        ) in citation_segment_resolutions.items():
+            if resource_type not in citation_resolutions:
+                citation_resolutions[resource_type] = []
+            citation_resolutions[resource_type].extend(citations_list)
+
+        logger.debug("Creating HTML with Citations %s", opinion.pk)
+
+        # Generate the citing opinion's new HTML with inline citation links
+        cited_html = create_cited_html(citation_resolutions, kwarg_segment)
+        html_segments.append(cited_html)
+
+    created_html = "".join(html_segments)
+    if attribute == "plain_text":
+        # wrap plain text in a pre tag
+        created_html = f'<pre class="inline">{created_html}</pre>'
+    opinion.html_with_citations = created_html
+
     if not citation_resolutions:
         # there was nothing to annotate, just save the `html_with_citations`
         logger.debug("No annotations: Saving %s", opinion.pk)

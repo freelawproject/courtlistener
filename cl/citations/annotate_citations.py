@@ -125,7 +125,7 @@ def create_cited_html(
                 [a[0], f"</pre>{a[1]}", f'{a[2]}<pre class="inline">']
                 for a in generate_annotations(citation_resolutions)
             ],
-            source_text=f'<pre class="inline">{html.escape(document.source_text)}</pre>',
+            source_text=html.escape(document.source_text),
         )
 
     # Return the newly-annotated text

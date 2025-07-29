@@ -194,39 +194,61 @@ def filter_out_non_case_law_and_non_valid_citations(
     ]
 
 
-def make_get_citations_kwargs(document) -> dict:
-    """Prepare markup kwargs for `get_citations`
+def chunk_text(text, chunk_size=100000):
+    """Chunk text with overlapping chunks to avoid misses
+
+    :param text: Text to chunk
+    :param chunk_size: The chunk size
+    :return: Chunks of text
+    """
+    if len(text) <= chunk_size:
+        yield text
+        return
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        if end >= len(text):
+            yield text[start:]
+            break
+        yield text[start:end]
+        start += chunk_size
+
+
+def make_get_citations_kwargs(document) -> tuple[list[dict], str]:
+    """Prepare markup kwargs for `get_citations` - chunked
 
     This is done outside `get_citations` because it uses specific Opinion
     attributes used are set in Courtlistener, not in eyecite.
 
     :param document: The Opinion or RECAPDocument whose text should be parsed
-
-    :return: a dictionary with kwargs for `get_citations`
+    :return: a dictionary with kwargs for `get_citations` and the attr used
     """
-    kwargs = {}
-    # We prefer CAP data (xml_harvard) first.
+    segments = []
     for attr in [
         "xml_harvard",
         "html_anon_2020",
         "html_columbia",
         "html_lawbox",
         "html",
+        "plain_text",
     ]:
         text = getattr(document, attr, None)
-        if text:
-            kwargs = {
-                "markup_text": text,
-                "clean_steps": ["xml", "html", "all_whitespace"],
-            }
-            break
-    else:
-        kwargs = {
-            "plain_text": getattr(document, "plain_text"),
-            "clean_steps": ["all_whitespace"],
-        }
-
-    return kwargs
+        if not text:
+            continue
+        for chunk in chunk_text(text, chunk_size=200000):
+            if attr == "plain_text":
+                kwargs = {
+                    "plain_text": chunk,
+                    "clean_steps": ["all_whitespace"],
+                }
+            else:
+                kwargs = {
+                    "markup_text": chunk,
+                    "clean_steps": ["xml", "html", "all_whitespace"],
+                }
+            segments.append(kwargs)
+        break
+    return segments, attr
 
 
 def get_cited_clusters_ids_to_update(
