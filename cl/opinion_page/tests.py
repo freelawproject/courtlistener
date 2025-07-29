@@ -82,6 +82,7 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
+    ClusterRedirection,
     Docket,
     DocketEntry,
     Opinion,
@@ -1962,3 +1963,38 @@ class CachePageIgnoreParamsTest(TestCase):
         self.assertEqual(response.headers["Cache-Control"], "max-age=300")
         self.assertIn("Expires", response.headers)
         self.assertIn(self.docket.case_name, response.content.decode())
+
+
+class ClusterRedirectionTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.deleted_cluster_id = 99999999
+        cls.redirected_cluster = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=1,
+            date_filed=datetime.date.today(),
+        )
+        ClusterRedirection.objects.create(
+            cluster=cls.redirected_cluster,
+            deleted_cluster_id=cls.deleted_cluster_id,
+            reason=ClusterRedirection.DUPLICATE,
+        )
+
+    def test_cluster_redirection(self):
+        """Can we permanently redirect a deleted cluster to an existing one?"""
+        deleted_cluster_url = reverse(
+            "view_case", kwargs={"pk": self.deleted_cluster_id, "_": "test"}
+        )
+
+        response = self.client.get(deleted_cluster_url)
+
+        expected_redirect_url = reverse(
+            "view_case",
+            kwargs={"pk": self.redirected_cluster.pk, "_": "test"},
+        )
+
+        self.assertRedirects(
+            response,
+            expected_redirect_url,
+            status_code=301,
+        )
