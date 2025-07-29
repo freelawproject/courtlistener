@@ -4,7 +4,7 @@ from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 from django.conf import settings
 from django.http import HttpRequest, HttpResponseBase
 from django.template import TemplateDoesNotExist
-from django.template.loader import select_template
+from django.template.loader import get_template
 from django.template.response import TemplateResponse
 from waffle import flag_is_active
 
@@ -100,7 +100,7 @@ class IncrementalNewTemplateMiddleware:
 
                 try:
                     # verify the new template actually exists
-                    select_template([new_template_name])
+                    get_template(new_template_name)
                 except TemplateDoesNotExist:
                     return response
 
