@@ -517,6 +517,7 @@ def merge_versions_by_download_url(
 
     qs = (
         Opinion.objects.filter(query)
+        .filter(cluster__source=SOURCES.COURT_WEBSITE)
         .exclude(Q(download_url="") | Q(download_url__isnull=True))
         .values("download_url")
         .annotate(
