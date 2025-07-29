@@ -453,7 +453,9 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             )
 
             serializer_class = supported_search_type["serializer_class"]
-            serializer = serializer_class(results_page, many=True)
+            serializer = serializer_class(
+                results_page, many=True, context={"request": request}
+            )
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(
