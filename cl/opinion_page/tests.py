@@ -774,6 +774,87 @@ class CitationRedirectorTest(TestCase):
         self.assertIn("No Citations Detected", r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
+    async def test_disambiguated_reporter_variants_redirect_properly(self):
+        """Can we resolve correctly some reporter variants with collisions to slug?"""
+
+        test_pairs = [
+            ("Vr.", "vroom"),
+            ("V.R.", "vt"),
+            ("Black Rep.", "black"),
+            ("Black. Rep.", "blackf"),
+            ("Cal. App. 2d Supp", "cal-app-2d"),
+            ("Cal. App. 2d Supp.", "cal-app-supp-2d"),
+            ("CLR", "conn-l-rptr"),
+            ("Cl.R.", "cl-ch"),
+            ("Dec. Commr. Pat.", "dec-com-pat"),
+            ("Dec. Comm'r Pat.", "dec-commr-pat"),
+            ("Hayw. & H.", "hayw-hdc"),
+            ("Hayw.& H.", "hay-haz"),
+            ("Johns.(N.Y.)", "johns-ch"),
+            ("Johns.N.Y.", "johns"),
+            ("Mt.", "mont"),
+            ("mt", "mt"),
+            ("Pa.C.", "pa-commw"),
+            ("Pac.", "p"),
+            ("Sc.", "scam"),
+        ]
+
+        for variation, expected_slug in test_pairs:
+            with self.subTest(variation=variation):
+                r = await self.async_client.get(
+                    reverse(
+                        "citation_redirector",
+                        kwargs={"reporter": variation},
+                    ),
+                    follow=True,
+                )
+                if r.redirect_chain:
+                    # Get path from the redirection from string to slug reporter
+                    path = r.redirect_chain[-1][0]
+                else:
+                    # No redirect, mt is a variation but matches its slug
+                    path = r.asgi_request.path
+                expected_path = f"/c/{expected_slug}/"
+                self.assertEqual(
+                    expected_path,
+                    path,
+                    msg=f"Expected path: {expected_path} is different from the obtained path: {path}",
+                )
+
+    async def test_too_ambiguous_reporter_variations(self):
+        """Some abbreviations are too ambiguous to resolve safely"""
+
+        test_pairs = [
+            ("B.R.", "br"),
+            ("BR", "br"),
+            ("Wash.", "wash"),
+            ("WASH", "wash"),
+            ("HOW", "how"),
+            ("How.", "how"),
+            ("OKla.", "okla"),
+            ("Okla.", "okla"),
+            ("S.C.", "sc"),
+        ]
+
+        for variation, expected_slug in test_pairs:
+            with self.subTest(variation=variation):
+                r = await self.async_client.get(
+                    reverse(
+                        "citation_redirector",
+                        kwargs={"reporter": variation},
+                    ),
+                    follow=True,
+                )
+                # Get path from the redirection from string to slug reporter
+                path = r.redirect_chain[-1][0] if r.redirect_chain else None
+
+                expected_path = f"/c/{expected_slug}/"
+                self.assertEqual(
+                    expected_path,
+                    path,
+                    msg=f"Expected path: {expected_path} is different from the obtained path: {path}",
+                )
+
 
 class ViewRecapDocketTest(TestCase):
     @classmethod
