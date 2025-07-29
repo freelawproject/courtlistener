@@ -3585,6 +3585,26 @@ def simplify_estimated_count(search_count: int) -> int:
     return search_count
 
 
+def get_max_score_for_knn_search(child_docs: list[Hit]) -> float:
+    """
+    Retrieves the maximum score from the k-NN search results of the first child
+    document.
+
+    This function checks if the input list of child documents is non-empty and
+    whether the first document contains k-NN `inner_hits` under the "embeddings"
+    key. If so, it returns the `max_score` from the search hits. Otherwise, it
+    returns 0.0.
+
+    :param child_docs: A list of child documents that may contain kNN metadata.
+    :return: The maximum score from the inner hits, or 0.0 if unavailable.
+    """
+    return (
+        child_docs[0].inner_hits["embeddings"]["hits"]["max_score"]
+        if len(child_docs) and hasattr(child_docs[0], "inner_hits")
+        else 0.0
+    )
+
+
 def set_child_docs_and_score(
     results: list[Hit] | list[dict[str, Any]] | Response,
     merge_highlights: bool = False,
@@ -3606,7 +3626,8 @@ def set_child_docs_and_score(
         if result_is_dict:
             # If the result is a dictionary, do nothing, or assign [] to
             # child_docs if it is not present.
-            result["child_docs"] = result.get("child_docs", [])
+            child_docs = result.get("child_docs", [])
+            result["child_docs"] = child_docs
         else:
             # Process child hits if the result is an ES AttrDict instance,
             # so they can be properly serialized.
@@ -3616,6 +3637,7 @@ def set_child_docs_and_score(
                 for doc in child_docs
             ]
 
+        semantic_score = get_max_score_for_knn_search(child_docs)
         # Optionally merges highlights. Used for integrating percolator
         # highlights into the percolated document.
         if merge_highlights and result_is_dict:
@@ -3625,6 +3647,7 @@ def set_child_docs_and_score(
         # Optionally merges the BM25 score for display in the API.
         if merge_score and isinstance(result, AttrDict):
             result["bm25_score"] = result.meta.score
+            result["semantic_score"] = semantic_score
 
 
 def get_court_opinions_counts(
