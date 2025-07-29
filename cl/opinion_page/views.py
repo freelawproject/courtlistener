@@ -58,7 +58,9 @@ from cl.favorites.utils import (
 )
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
-from cl.lib.decorators import cache_page_ignore_params
+from cl.lib.decorators import (
+    cache_page_ignore_params,
+)
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -67,6 +69,7 @@ from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
+from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -975,6 +978,7 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
 
 
 @never_cache
+@handle_cluster_redirection
 async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """View Opinions
 
@@ -989,6 +993,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     return await render_opinion_view(request, cluster, "opinions")
 
 
+@handle_cluster_redirection
 async def view_opinion_pdf(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1005,6 +1010,7 @@ async def view_opinion_pdf(
     return await render_opinion_view(request, cluster, "pdf")
 
 
+@handle_cluster_redirection
 async def view_opinion_authorities(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1027,6 +1033,7 @@ async def view_opinion_authorities(
     )
 
 
+@handle_cluster_redirection
 async def view_opinion_cited_by(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1050,6 +1057,7 @@ async def view_opinion_cited_by(
     )
 
 
+@handle_cluster_redirection
 async def view_opinion_summaries(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1088,6 +1096,7 @@ async def view_opinion_summaries(
     )
 
 
+@handle_cluster_redirection
 async def view_opinion_related_cases(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block privacy %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block title %}Gone (410) – CourtListener.com{% endblock %}
+
+{% block content %}
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+  <div class="col-xs-12 col-sm-8 col-md-6" id="reason">
+    <h1>The opinion you're looking for has been permanently removed.</h1>
+    <h3 class="caps gray">Record Sealed by Court Order</h3><br>
+        <p>You can normally find unsealed records in the <a href="{% url "advanced_o" %}">Case Law database</a>, <a href="{% url "advanced_r" %}">RECAP Archive</a>, <a href="{% url "advanced_oa" %}">Oral Arguments database</a>, or <a href="{% url "advanced_p" %}">Judge database</a>.</p>
+        <p>We make decisions about the privacy of documents on a case by case basis. To learn more, please see our <a href="{% url "terms" %}#removal">removal policy</a>.</p>
+  </div>
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+{% endblock %}
