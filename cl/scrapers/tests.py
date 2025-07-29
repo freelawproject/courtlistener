@@ -1090,7 +1090,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         # Create related objects to the version docket so we can update their
         # references on merging
         version_docket_another_cluster = OpinionClusterFactory.create(
-            docket=version_docket
+            docket=version_docket, source=SOURCES.COURT_WEBSITE
         )
         version_audio = AudioWithParentsFactory.create(docket=version_docket)
 
@@ -1102,19 +1102,30 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         other_dates = "Argued on March 10 2025"
         summary = "Something..."
         main_cluster = OpinionClusterFactory.create(
-            docket=main_docket, other_dates="", summary=""
+            docket=main_docket,
+            other_dates="",
+            summary="",
+            source=SOURCES.COURT_WEBSITE,
         )
         cluster2 = OpinionClusterFactory.create(
             docket=main_docket,
             # other_dates should overwrite the empty field in the main cluster
             other_dates=other_dates,
             summary="",
+            source=SOURCES.COURT_WEBSITE,
         )
         cluster3 = OpinionClusterFactory.create(
-            docket=version_docket, other_dates="", summary=summary
+            docket=version_docket,
+            other_dates="",
+            summary=summary,
+            source=SOURCES.COURT_WEBSITE,
         )
-        cluster4 = OpinionClusterFactory.create(docket=DocketFactory.create())
-        cluster5 = OpinionClusterFactory.create(docket=not_comparable_docket)
+        cluster4 = OpinionClusterFactory.create(
+            docket=DocketFactory.create(), source=SOURCES.COURT_WEBSITE
+        )
+        cluster5 = OpinionClusterFactory.create(
+            docket=not_comparable_docket, source=SOURCES.COURT_WEBSITE
+        )
 
         main_citation = CitationWithParentsFactory.create(
             cluster=main_cluster, volume=10000, reporter="U.S.", page="1"
@@ -1333,19 +1344,25 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         plain_text = "Something ..."
         docket = DocketFactory(docket_number="111")
         previous_main = OpinionFactory.create(
-            cluster=OpinionClusterFactory.create(docket=docket),
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_WEBSITE
+            ),
             download_url=download_url,
             plain_text=plain_text,
             main_version=None,
         )
         a_version = OpinionFactory.create(
-            cluster=OpinionClusterFactory.create(docket=docket),
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_WEBSITE
+            ),
             download_url=download_url,
             plain_text=plain_text,
             main_version=previous_main,
         )
         main = OpinionFactory.create(
-            cluster=OpinionClusterFactory.create(docket=docket),
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_WEBSITE
+            ),
             download_url=download_url,
             plain_text=plain_text,
             main_version=None,
