@@ -3637,11 +3637,14 @@ def get_max_score_for_knn_search(child_docs: list[Hit]) -> float:
     :param child_docs: A list of child documents that may contain kNN metadata.
     :return: The maximum score from the inner hits, or 0.0 if unavailable.
     """
-    return (
-        child_docs[0].inner_hits["embeddings"]["hits"]["max_score"]
-        if len(child_docs) and hasattr(child_docs[0], "inner_hits")
-        else 0.0
-    )
+    if not len(child_docs) or not hasattr(child_docs[0], "inner_hits"):
+        return 0.0
+
+    knn_score = child_docs[0].inner_hits["embeddings"]["hits"]["max_score"]
+    if not knn_score:
+        return 0.0
+
+    return knn_score
 
 
 def set_child_docs_and_score(

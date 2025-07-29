@@ -422,6 +422,53 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             " ordered by ascending citeCount.",
         )
 
+    def test_is_semantic_score_standarized(self, inception_mock) -> None:
+        """Ensure that semantic scores are consistently returned as floats"""
+        inception_mock.return_value = self._get_mock_for_inception(
+            self.situational_query_vectors
+        )
+
+        # Create opinions that will only match via keyword (no embeddings).
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            OpinionFactory(
+                plain_text="the apartment has remained in uninhabitable condition",
+                cluster=OpinionClusterFactory(
+                    docket=DocketFactory(
+                        source=Docket.SCRAPER,
+                    ),
+                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                ),
+            )
+            OpinionClusterFactory(
+                docket=DocketFactory(
+                    source=Docket.SCRAPER,
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                case_name="Uninhabitable Conditions Corp v. Washington.",
+                case_name_full="Uninhabitable Conditions Corp v. Washington.",
+            )
+
+        search_params = {"q": self.hybrid_query, "semantic": True}
+        r = self._test_api_results_count(
+            search_params, 4, "hybrid semantic search query"
+        )
+
+        # Validate semantic scores:
+        # - Should be 0.0 for keyword-only matches
+        # - Should be > 0.0 for clusters matched semantically
+        for cluster in r.data["results"]:
+            with self.subTest(
+                cluster_id=cluster["cluster_id"], msg="Semantic score test."
+            ):
+                semantic_score = cluster["meta"]["score"]["semantic"]
+                if cluster["cluster_id"] in [
+                    self.opinion_2.cluster_id,
+                    self.opinion_3.cluster_id,
+                ]:
+                    self.assertNotEqual(semantic_score, 0.0)
+                else:
+                    self.assertEqual(semantic_score, 0.0)
+
     def test_can_do_hybrid_search_query(self, inception_mock) -> None:
         """Can we combine semantic and keyword matches in hybrid search?"""
         inception_mock.return_value = self._get_mock_for_inception(
