@@ -1935,6 +1935,45 @@ def fill_position_mapping(
     return position_db_mapping
 
 
+def merge_semantic_relevant_chunks(results: Page | Response) -> None:
+    """
+    Updates each child document in the given results with the most semantically
+    relevant chunk of text.
+
+    This function iterates over a list of result objects, each of which may
+    contain child documents with semantic search results in the `inner_hits`
+    field. For each child document, it extracts the top-ranked chunk from the
+    `embeddings` inner hit and assigns its text to the child document's
+    `_source["text"]` field.
+
+    :param results: The Page or Response object containing search results.
+    :return: None, the function updates the results in place.
+    """
+    results_list = results
+    if isinstance(results, Page):
+        results_list = results.object_list
+
+    for result in results_list:
+        if not hasattr(result, "child_docs"):
+            continue
+
+        for child_doc in result.child_docs:
+            # Skip if the child document does not have semantic inner hits
+            if not hasattr(child_doc, "inner_hits"):
+                continue
+
+            # Access the list of semantic hits under the "embeddings" inner hit
+            inner_hits = child_doc.inner_hits["embeddings"]["hits"]["hits"]
+            if not inner_hits:
+                # Skip if there are no hits
+                continue
+
+            text = inner_hits[0]["fields"]["embeddings"][0]["chunk"]
+            if not text:
+                continue
+            child_doc["_source"]["text"] = text
+
+
 def merge_unavailable_fields_on_parent_document(
     results: Page | dict | Response,
     search_type: str,
