@@ -113,8 +113,9 @@ $(document).ready(function(){
           {% if perms.people_db.change_person %}
             <p class="float-right">
               <a href="{% url 'admin:people_db_person_change' person.id %}"
-                 class="btn btn-primary btn-xs">Edit&nbsp;Person&nbsp;<i
-                   class="fa fa-pencil"></i>
+                 class="btn btn-primary btn-xs">Edit&nbsp;Person&nbsp;
+                 (<span id="event_count"><i class="fa fa-spinner fa-spin"></i></span> views)&nbsp;
+                 <i class="fa fa-pencil"></i>
               </a>
             </p>
           {% endif %}
