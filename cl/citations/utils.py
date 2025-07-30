@@ -194,7 +194,7 @@ def filter_out_non_case_law_and_non_valid_citations(
     ]
 
 
-def chunk_text(text, chunk_size=100000):
+def chunk_text(text: str, chunk_size: int):
     """Chunk text with overlapping chunks to avoid misses
 
     :param text: Text to chunk
@@ -214,14 +214,14 @@ def chunk_text(text, chunk_size=100000):
         start += chunk_size
 
 
-def make_get_citations_kwargs(document) -> tuple[list[dict], str]:
+def make_get_citations_kwargs(document, chunk_size=200_000) -> list[dict]:
     """Prepare markup kwargs for `get_citations` - chunked
 
     This is done outside `get_citations` because it uses specific Opinion
     attributes used are set in Courtlistener, not in eyecite.
 
     :param document: The Opinion or RECAPDocument whose text should be parsed
-    :return: a dictionary with kwargs for `get_citations` and the attr used
+    :return: a list dict kwargs for `get_citations`
     """
     segments = []
     for attr in [
@@ -235,7 +235,7 @@ def make_get_citations_kwargs(document) -> tuple[list[dict], str]:
         text = getattr(document, attr, None)
         if not text:
             continue
-        for chunk in chunk_text(text, chunk_size=200000):
+        for chunk in chunk_text(text, chunk_size=chunk_size):
             if attr == "plain_text":
                 kwargs = {
                     "plain_text": chunk,
@@ -248,7 +248,7 @@ def make_get_citations_kwargs(document) -> tuple[list[dict], str]:
                 }
             segments.append(kwargs)
         break
-    return segments, attr
+    return segments
 
 
 def get_cited_clusters_ids_to_update(

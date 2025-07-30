@@ -232,7 +232,7 @@ def store_opinion_citations_and_update_parentheticals(
     :param disable_parenthetical_groups: Skip creating ParentheticalGroups
     :return: None
     """
-    segments, attribute = make_get_citations_kwargs(opinion)
+    segments = make_get_citations_kwargs(opinion)
     if not segments:
         logger.error(
             "Opinion has no content id: '%s'",
@@ -245,6 +245,7 @@ def store_opinion_citations_and_update_parentheticals(
 
     html_segments = []
     citation_resolutions = {}
+    is_single_doc = True if len(segments) == 1 else False
     for kwarg_segment in segments:
         # Extract citations
         logger.debug("Extracting citations for opinion %s", opinion.pk)
@@ -271,11 +272,13 @@ def store_opinion_citations_and_update_parentheticals(
         logger.debug("Creating HTML with Citations %s", opinion.pk)
 
         # Generate the citing opinion's new HTML with inline citation links
-        cited_html = create_cited_html(citation_resolutions, kwarg_segment)
+        cited_html = create_cited_html(
+            citation_segment_resolutions, kwarg_segment, is_single_doc
+        )
         html_segments.append(cited_html)
 
     created_html = "".join(html_segments)
-    if attribute == "plain_text":
+    if segments[0].get("plain_text", False) and not is_single_doc:
         # wrap plain text in a pre tag
         created_html = f'<pre class="inline">{created_html}</pre>'
     opinion.html_with_citations = created_html
