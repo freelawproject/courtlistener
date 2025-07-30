@@ -153,9 +153,9 @@ def es_search_db_for_full_citation(
         full_citation.citing_opinion = None
     search_query = OpinionDocument.search()
     filters = [
-        Q(
-            "term", **{"status.raw": "Published"}
-        ),  # Non-precedential documents aren't cited
+        # Q(
+        #     "term", **{"status.raw": "Published"}
+        # ),  # Non-precedential documents aren't cited
         Q("match", cluster_child="opinion"),
     ]
 
