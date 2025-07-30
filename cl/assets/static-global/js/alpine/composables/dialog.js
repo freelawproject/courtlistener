@@ -19,5 +19,16 @@ document.addEventListener('alpine:init', () => {
     get dialogIdGroup() {
       return ['dialog'];
     },
+    init() {
+      const mobileBreakpoint = getComputedStyle(document.documentElement)
+        .getPropertyValue('--mobile-breakpoint')
+        .trim();
+      const mediaQuery = window.matchMedia(`(min-width: ${mobileBreakpoint})`);
+      mediaQuery.addEventListener('change', (e) => {
+        if (e.matches && this.isOpen) {
+          this.close();
+        }
+      });
+    },
   }));
 });

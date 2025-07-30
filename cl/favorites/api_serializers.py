@@ -2,11 +2,11 @@ import re
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
-from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import ModelSerializer
 
+from cl.api.utils import DynamicFieldsMixin
 from cl.favorites.models import DocketTag, Prayer, UserTag
 from cl.favorites.utils import prayer_eligible
 from cl.search.models import Docket
