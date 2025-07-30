@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static extras humanize %}
 
-{% block title %}REST API, v4.1 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v4.2 &ndash; CourtListener.com{% endblock %}
 {% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 {% block og_description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 
@@ -24,7 +24,7 @@
     {% include "includes/toc_sidebar.html" %}
   </div>
   <div class="col-xs-12 col-md-8 col-lg-6">
-    <h1 id="about">REST API &ndash; v4.1</h1>
+    <h1 id="about">REST API &ndash; v4.2</h1>
 
     <p class="lead">APIs for developers and researchers that need granular legal data.
     </p>
@@ -350,6 +350,7 @@
     <h3 id="field-selection">Field Selection</h3>
     <p>To save bandwidth and increase serialization performance, fields can be limited by using the <code>fields</code> parameter with a comma-separated list of fields.
     </p>
+    <p>This is an important optimization, particularly for resources with large fields.</p>
     <p>For example, to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
     </p>
     <pre class="scrollable">curl "{% get_full_host %}{% url "person-list" version="v4" %}?fields=educations,date_modified"
@@ -378,8 +379,13 @@
   "date_modified": "2023-03-31T07:15:28.409594-07:00"
 },
 ...</pre>
-    <p>You can also exclude fields using <code>omit=educations,date_modified</code>. Unfortunately, this cannot currently be used for nested resources.
+    <p>You can also exclude top-level fields fields using <code>omit=educations,date_modified</code>.
     </p>
+    <p>Support for filtering and omitting nested resource fields is available, using a double-underscore <code>__</code> notation.</p>
+    <p>For example, to include only the <code>date_modified</code> field within each education entry:</p>
+    <p><code>curl "{% get_full_host %}{% url "person-list" version="v4" %}?fields=educations__date_modified"</code></p>
+    <p>And to exclude the <code>degree_detail</code> field within each education entry:</p>
+    <p><code>curl "{% get_full_host %}{% url "person-list" version="v4" %}?omit=educations__degree_detail"</code></p>
 
     <h3 id="pagination">Pagination</h3>
     <p>Most APIs can be paginated by using the <code>page</code> GET parameter, but that will be limited to 100 pages of results.</p>
@@ -419,6 +425,10 @@
       </li>
       <li>
         <p>When using the <code>search</code> endpoint, smaller result sets are faster. It isn't always possible to tweak your query to return fewer results, but sometimes it is possible to do a more precise query first, thus making a broader query unnecessary. For example, a search for an individual in their expected jurisdiction will be faster than doing it in the entire corpus. This will benefit from profiling in your use case and application.
+        </p>
+      </li>
+      <li>
+        <p>Use <a href="#field-selection">field selection</a> to limit the serialized payload and defer unused fields, reducing both payload size and database load, especially for large fields.
         </p>
       </li>
     </ol>
