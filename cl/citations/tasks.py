@@ -243,11 +243,11 @@ def store_opinion_citations_and_update_parentheticals(
         )
         return
 
-    html_segments = []
+    cited_html_segments = []
     citation_resolutions: dict[
         MatchedResourceType, list[SupportedCitationType]
     ] = {}
-    is_single_doc = True if len(segments) == 1 else False
+    has_single_segment = True if len(segments) == 1 else False
     for kwarg_segment in segments:
         # Extract citations
         logger.debug("Extracting citations for opinion %s", opinion.pk)
@@ -275,12 +275,12 @@ def store_opinion_citations_and_update_parentheticals(
 
         # Generate the citing opinion's new HTML with inline citation links
         cited_html = create_cited_html(
-            citation_segment_resolutions, kwarg_segment, is_single_doc
+            citation_segment_resolutions, kwarg_segment, has_single_segment
         )
-        html_segments.append(cited_html)
+        cited_html_segments.append(cited_html)
 
-    created_html = "".join(html_segments)
-    if segments[0].get("plain_text", False) and not is_single_doc:
+    created_html = "".join(cited_html_segments)
+    if segments[0].get("plain_text", False) and not has_single_segment:
         # wrap plain text in a pre tag
         created_html = f'<pre class="inline">{created_html}</pre>'
     opinion.html_with_citations = created_html

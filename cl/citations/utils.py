@@ -11,6 +11,8 @@ from eyecite.models import CitationBase, FullCaseCitation, ShortCaseCitation
 from eyecite.utils import strip_punct
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 
+from cl.search.models import Opinion, RECAPDocument
+
 QUERY_LENGTH = 10
 NAIVE_SLUGIFIED_EDITIONS = {str(slugify(item)): item for item in EDITIONS}
 
@@ -214,13 +216,16 @@ def chunk_text(text: str, chunk_size: int):
         start += chunk_size
 
 
-def make_get_citations_kwargs(document, chunk_size=200_000) -> list[dict]:
+def make_get_citations_kwargs(
+    document: RECAPDocument | Opinion, chunk_size: int = 200_000
+) -> list[dict]:
     """Prepare markup kwargs for `get_citations` - chunked
 
     This is done outside `get_citations` because it uses specific Opinion
     attributes used are set in Courtlistener, not in eyecite.
 
     :param document: The Opinion or RECAPDocument whose text should be parsed
+    :param chunk_size: The chunk size
     :return: a list dict kwargs for `get_citations`
     """
     segments = []

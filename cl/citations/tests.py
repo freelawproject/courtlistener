@@ -57,7 +57,6 @@ from cl.citations.tasks import (
     store_opinion_citations_and_update_parentheticals,
     store_recap_citations,
 )
-from cl.citations.tasks import make_get_citations_kwargs as _original_mgckw
 from cl.citations.unmatched_citations_utils import (
     handle_unmatched_citations,
     update_unmatched_citations_status,
@@ -267,7 +266,9 @@ class CitationTextTest(TestCase):
         # override default 200_000 with 50 to prove works
         with patch(
             "cl.citations.tasks.make_get_citations_kwargs",
-            side_effect=lambda op: _original_mgckw(op, chunk_size=50),
+            side_effect=lambda op: make_get_citations_kwargs(
+                op, chunk_size=50
+            ),
         ):
             store_opinion_citations_and_update_parentheticals(
                 opinion,
@@ -275,7 +276,7 @@ class CitationTextTest(TestCase):
                 disable_parenthetical_groups=True,
             )
 
-        assert opinion.html_with_citations == expected
+        self.assertEqual(opinion.html_with_citations, expected)
 
     def test_no_citations_found_or_resolved(self) -> None:
         """Ensure that we get `html_with_citations` when no citations are found"""
