@@ -1,11 +1,15 @@
 from datetime import UTC
 
-from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 from waffle import flag_is_active
 
-from cl.api.utils import HyperlinkedModelSerializerWithId
+from cl.api.utils import (
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+    NestedDynamicFieldsMixin,
+    RetrieveFilteredFieldsMixin,
+)
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.extras import get_highlight
 from cl.lib.document_serializer import (
@@ -61,14 +65,20 @@ class PartyTypeSerializer(
 
 
 class OriginalCourtInformationSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     class Meta:
         model = OriginatingCourtInformation
         fields = "__all__"
 
 
-class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class DocketSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     court = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="court-detail",
@@ -118,7 +128,9 @@ class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
 
 class RECAPDocumentSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     tags = serializers.HyperlinkedRelatedField(
         many=True,
@@ -136,7 +148,9 @@ class RECAPDocumentSerializer(
 
 
 class DocketEntrySerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     docket = serializers.HyperlinkedRelatedField(
         many=False,
@@ -155,13 +169,21 @@ class FullDocketSerializer(DocketSerializer):
     docket_entries = DocketEntrySerializer(many=True, read_only=True)
 
 
-class CourtSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class CourtSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     class Meta:
         model = Court
         exclude = ("notes",)
 
 
-class OpinionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class OpinionSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
     )
@@ -192,7 +214,9 @@ class OpinionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
 
 class OpinionsCitedSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     # These attributes seem unnecessary and this endpoint serializes the same
     # data without them, but when they're not here the API does a query that
@@ -225,7 +249,9 @@ class CitationSerializer(ModelSerializer):
 
 
 class OpinionClusterSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
@@ -262,7 +288,11 @@ class OpinionClusterSerializer(
         fields = "__all__"
 
 
-class TagSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class TagSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     class Meta:
         model = Tag
         fields = "__all__"
