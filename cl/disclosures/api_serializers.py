@@ -1,9 +1,10 @@
 from django.conf import settings
-from drf_dynamic_fields import DynamicFieldsMixin, NestedDynamicFieldsMixin
 from rest_framework import serializers
 
 from cl.api.utils import (
+    DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
+    NestedDynamicFieldsMixin,
     RetrieveFilteredFieldsMixin,
 )
 from cl.disclosures.models import (

@@ -104,8 +104,8 @@ from cl.search.factories import (
     DocketEntryFactory,
     DocketFactory,
     OpinionClusterWithChildrenAndParentsFactory,
-    RECAPDocumentFactory,
     OpinionClusterWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,

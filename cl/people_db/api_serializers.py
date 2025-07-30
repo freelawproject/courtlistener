@@ -1,9 +1,10 @@
-from drf_dynamic_fields import DynamicFieldsMixin, NestedDynamicFieldsMixin
 from judge_pics.search import ImageSizes, portrait
 from rest_framework import serializers
 
 from cl.api.utils import (
+    DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
+    NestedDynamicFieldsMixin,
     RetrieveFilteredFieldsMixin,
 )
 from cl.disclosures.utils import make_disclosure_year_range

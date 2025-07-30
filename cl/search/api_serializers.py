@@ -1,12 +1,13 @@
 from datetime import UTC
 
-from drf_dynamic_fields import DynamicFieldsMixin, NestedDynamicFieldsMixin
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 from waffle import flag_is_active
 
 from cl.api.utils import (
+    DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
+    NestedDynamicFieldsMixin,
     RetrieveFilteredFieldsMixin,
 )
 from cl.audio.models import Audio

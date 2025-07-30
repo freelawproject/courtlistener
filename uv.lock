@@ -289,7 +289,6 @@ dependencies = [
     { name = "djangorestframework" },
     { name = "djangorestframework-filters" },
     { name = "djangorestframework-xml" },
-    { name = "drf-dynamic-fields" },
     { name = "eyecite" },
     { name = "factory-boy" },
     { name = "feedparser" },
@@ -401,7 +400,6 @@ requires-dist = [
     { name = "djangorestframework", git = "https://github.com/encode/django-rest-framework.git?rev=cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2" },
     { name = "djangorestframework-filters", specifier = "==1.0.0.dev2" },
     { name = "djangorestframework-xml", specifier = ">=2.0.0" },
-    { name = "drf-dynamic-fields", git = "https://github.com/albertisfu/drf-dynamic-fields?branch=support-filtering-nested-fields" },
     { name = "eyecite" },
     { name = "factory-boy", specifier = ">=3.3.3" },
     { name = "feedparser", specifier = ">=6.0.10" },
@@ -1090,11 +1088,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/45/74/b75939a779fddef1d
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0f/74/65485e0ceae183b9348cd080cc69126e498a95bcd5d37df84a598bf94bbd/djangorestframework_xml-2.0.0-py2.py3-none-any.whl", hash = "sha256:975955fbb0d49ac44a90bdeb33b7923d95b79884d283f983e116c80a936ef4d0", size = 6046, upload-time = "2020-04-12T22:38:43.087Z" },
 ]
-
-[[package]]
-name = "drf-dynamic-fields"
-version = "0.4.0"
-source = { git = "https://github.com/albertisfu/drf-dynamic-fields?branch=support-filtering-nested-fields#18ab2f3706905342009ca203c9a1481d69c4ed64" }
 
 [[package]]
 name = "elastic-transport"

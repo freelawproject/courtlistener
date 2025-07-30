@@ -1,7 +1,7 @@
-from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework.serializers import CharField, HyperlinkedRelatedField
 
 from cl.api.utils import (
+    DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
     RetrieveFilteredFieldsMixin,
 )
