@@ -30,6 +30,7 @@ https://github.com/freelawproject/courtlistener/pull/1941
 """
 
 import re
+from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass
 from math import ceil
@@ -110,6 +111,8 @@ def compute_parenthetical_groups(
     )
 
     parenthetical_groups: list[ComputedParentheticalGroup] = []
+    # start the visited_nodes set here to prevent recomputing components, since
+    # the same component will be found when starting from any of it's nodes
     visited_nodes: set[str] = set()
     for node, neighbors in similarity_graph.items():
         if component := get_graph_component(
@@ -161,19 +164,25 @@ def get_graph_component(
     :param node: The starting node from which to probe the component
     :param graph: A dictionary encoding the graph with key: node and value:
     list of neighbors
-    :param visited: A set containing the nodes already visited in the DFS
+    :param visited: A set containing the nodes already visited in all groups
+        processing
     :return: A list of all nodes in param :node's component
     """
-    current_cluster = []
-    # Perform a depth-first search to find all nodes in the component
-    if node not in visited:
-        visited.add(node)
-        current_cluster.append(node)
-        for neighbor in graph[node]:
-            current_cluster.extend(
-                get_graph_component(neighbor, graph, visited)
-            )
-    return current_cluster
+    if node in visited:
+        return []
+
+    cluster = []
+    queue = deque([node])
+    visited.add(node)
+
+    while queue:
+        current = queue.popleft()
+        cluster.append(current)
+        for nbr in graph.get(current, []):
+            if nbr not in visited:
+                visited.add(nbr)
+                queue.append(nbr)
+    return cluster
 
 
 def get_group_from_component(
