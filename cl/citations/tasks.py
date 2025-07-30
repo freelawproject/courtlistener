@@ -244,7 +244,9 @@ def store_opinion_citations_and_update_parentheticals(
         return
 
     html_segments = []
-    citation_resolutions = {}
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
+    ] = {}
     is_single_doc = True if len(segments) == 1 else False
     for kwarg_segment in segments:
         # Extract citations
