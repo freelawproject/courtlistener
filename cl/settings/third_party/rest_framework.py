@@ -28,7 +28,8 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
-        # Sock puppets
+        # Sock puppets / Disposible email
+        "a29883f4-3958-484b-9f46-aa9796110dd0_IddU": "1/hour",
         "bobjase27": "1/hour",
         "Kejik5": "1/hour",
         "PRpl.Kane": "1/hour",
@@ -45,6 +46,8 @@ REST_FRAMEWORK = {
         "cl_api_1": "1/hour",
         "cl_api_2": "1/hour",
         "cl_api_3": "1/hour",
+        "xinfu.zheng": "10/hour",
+        "fdgbhgope4wuo8049": "10/hour",
         # Multiple accounts
         "court_account_n1": "1/hour",
         "court_account_n2": "1/hour",
@@ -80,7 +83,12 @@ REST_FRAMEWORK = {
         "HomerSimpson": "1/hour",
         "BruceWayne": "1/hour",
         "mibefis809": "1/hour",
+        "manu.jose": "10/hour",
+        "shishir": "10/hour",
+        "shishir.kumar": "10/hour",
         # Unresponsive
+        "htmlaw": "1/hour",
+        "bulpara": "1/hour",
         "atem.jetson": "1/hour",
         "raj@bizcord.com": "1/hour",
         "angelsburger": "1/hour",
@@ -96,37 +104,12 @@ REST_FRAMEWORK = {
         "jmmckinnie": "1/hour",
         "projecttesting": "1/hour",
         "SAGW": "1/hour",
-        # Bounced
-        "riwiko8259": "1/hour",
-        "xicaro7027": "1/hour",
-        "nayibij851": "1/hour",
-        "testname2024": "1/hour",
-        "cadebe2258": "1/hour",
-        # Disposable email
-        "a29883f4-3958-484b-9f46-aa9796110dd0_IddU": "1/hour",
-        # Didn't respond to emails, 2024-10-14
         "ashishjaddu": "10/hour",
-        # Made 1M requests for commercial enterprise
-        "haoren": "10/hour",
-        # Used a fake email address, 2024-10-02
-        "xinfu.zheng": "10/hour",
-        "fdgbhgope4wuo8049": "10/hour",
-        # Didn't respond to emails, 2024-08-12
         "fruitfranky": "10/hour",
-        # Email non-functional; making many requests, 2024-04-23
-        "NicolasMadan": "10/hour",
-        # Didn't respond to emails, 2023-10-02
         "Tylersuard": "10/hour",
-        # Didn't respond to emails, 2023-08-04
         "skalecorn12": "10/hour",
-        # Didn't respond to emails; looks unsavory.
         "donier": "10/hour",
-        # Doing a background check service, we told them we didn't want to work
-        # with them.
-        "elios": "10/hour",
-        # Sent multiple emails, but no response.
         "bchecker": "1/hour",
-        # No response
         "commernet": "1/hour",
         "zealousgalileo": "1/hour",
         "JaneDoe": "1/hour",
@@ -137,12 +120,21 @@ REST_FRAMEWORK = {
         "safetynet": "100/hour",
         "snusbase": "1/hour",
         "gavinjburns": "1/hour",
-        # Send multiple emails, but they haven't responded
         "linkfenzhao": "10/hour",
-        # From fokal.ai, using multiple accounts to dodge limitations
-        "manu.jose": "10/hour",
-        "shishir": "10/hour",
-        "shishir.kumar": "10/hour",
+        # Bounced
+        "riwiko8259": "1/hour",
+        "xicaro7027": "1/hour",
+        "nayibij851": "1/hour",
+        "testname2024": "1/hour",
+        "cadebe2258": "1/hour",
+        "NicolasMadan": "10/hour",
+        # Too difficult
+        "aanshshah": "1/hour",
+        # Made 1M requests for commercial enterprise
+        "haoren": "10/hour",
+        # Doing a background check service, we told them we didn't want to work
+        # with them.
+        "elios": "10/hour",
         # hitting '/api/rest/v4/opinions/' causes counts and high CPU usage
         "arivdc": "10/hour",
         "Mpits003": "1/hour",
