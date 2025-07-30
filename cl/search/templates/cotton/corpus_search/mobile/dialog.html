@@ -1,0 +1,68 @@
+{% load svg_tags %}
+
+<c-vars request class=""></c-vars>
+
+<div class="md:hidden {{ class }}">
+  <c-dialog class="w-full" panel_class="absolute pt-0 flex flex-col max-h-screen overflow-hidden" only>
+    <c-slot name="trigger_button">
+      {{ trigger_button }}
+    </c-slot>
+
+    <c-slot name="panel">
+      <div x-dialog:title class="font-medium text-gray-800 py-3 px-3 flex flex-row justify-between h-[--mobile-dialog-header-height]">
+        <div class="w-[226px] lg:min-w-[226px] flex justify-start" aria-label="Go to homepage">
+          <div class="md:h-21 md:w-45 h-12 ml-1 w-[106px]">
+            {% svg "logos/courtlistener" %}
+          </div>
+        </div>
+        <div class="pt-1.5">
+          <button
+            type="button"
+            x-on:click.stop="close"
+            class="btn-outline p-2 rounded-[10px]"
+            aria-label="Close modal"
+          >
+            {% svg "cross" class="text-greyscale-400" %}
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-col max-h-[--mobile-dialog-panel-height]">
+        <div class="flex flex-col gap-2 px-4">
+          <c-corpus-search.mobile.top-controls :request="request" />
+          <button
+            type="button"
+            x-on:click="toggleAdvancedFilters"
+            x-show="advancedFiltersCollapsed"
+            class="btn-outline w-full justify-center"
+          >
+            {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
+            Filters
+          </button>
+        </div>
+        <div
+          class="flex-shrink overflow-auto border-b border-greyscale-200 border-t-4 mt-4"
+          x-show="advancedFiltersExpanded"
+          x-collapse
+        >
+          <div class="p-4">
+            <c-corpus-search.filters :request="request" :search_form="search_form"/>
+          </div>
+        </div>
+        <div class="p-4 flex flex-col gap-4">
+          <c-corpus-search.button class="w-full max-md:btn-xl flex items-center justify-center">
+            {% svg "magnifier" class="text-white w-5 h-5 mr-1.5" aria_hidden="true" %}
+            Search
+          </c-corpus-search.button>
+          <a
+            href="{% url "coverage" %}"
+            class="flex items-center justify-center text-sm text-greyscale-600 gap-1 hover:text-greyscale-500"
+          >
+            {% svg "circle_question_mark" class="text-greyscale-400 hover:text-greyscale-300 h-4 w-4" %}
+            About This Data
+          </a>
+        </div>
+      </div>
+    </c-slot>
+  </c-dialog>
+</div>

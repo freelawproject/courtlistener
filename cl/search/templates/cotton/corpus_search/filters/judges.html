@@ -1,0 +1,66 @@
+{% load svg_tags %}
+
+<c-vars search_form/>
+
+<fieldset x-bind:id="fieldsetIds.judges" class="contents" x-show="isActiveScope" data-scope="Judges">
+  <legend class="sr-only">Judges filters</legend>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.name.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.name }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.appointer.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.appointer }}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-2 items-end">
+    <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+      {{ search_form.born_after.label_tag }}
+      <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
+        {% svg "calendar" class="w-5 h-5" %}
+        {{ search_form.born_after }}
+      </div>
+    </div>
+    <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+      {{ search_form.born_before.label_tag }}
+      <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
+        {% svg "calendar" class="w-5 h-5" %}
+        {{ search_form.born_before }}
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.dob_city.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.dob_city }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.dob_state.label_tag }}
+    <div class="focus-container rounded-lg">
+      {{ search_form.dob_state }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.school.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.school }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.political_affiliation.label_tag }}
+    <div class="focus-container rounded-lg">
+      {{ search_form.political_affiliation }}
+    </div>
+  </div>
+</fieldset>
