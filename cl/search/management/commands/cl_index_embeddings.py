@@ -1,10 +1,10 @@
 import csv
-import io
 import re
+import time
+from pathlib import Path
 
-import boto3
-from botocore.config import Config
 from celery import chain
+from django.conf import settings
 from django.core.management import CommandError
 
 from cl.lib.celery_utils import CeleryThrottle
@@ -33,6 +33,7 @@ class Command(VerboseCommand):
         self.retrieval_queue = None
         self.indexing_queue = None
         self.batch_size = None
+        self.delay = None
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -78,15 +79,9 @@ class Command(VerboseCommand):
             help="The celery throttle min items.",
         )
         parser.add_argument(
-            "--s3-bucket",
+            "--inventory-file",
             type=str,
-            help="The related inventory S3 bucket.",
-            default="com-courtlistener-storage",
-        )
-        parser.add_argument(
-            "--inventory",
-            type=str,
-            help="The inventory file to process embeddings.",
+            help="Path to the inventory CSV relative to MEDIA_ROOT.",
         )
         parser.add_argument(
             "--inventory-rows",
@@ -94,10 +89,10 @@ class Command(VerboseCommand):
             help="The number of rows in the inventory file.",
         )
         parser.add_argument(
-            "--boto-timeout",
-            type=int,
-            default=600,
-            help="The boto3 connection timeout.",
+            "--delay",
+            type=float,
+            default=1.0,
+            help="How long to wait between scheduled tasks.",
         )
 
     def maybe_schedule_chunk(
@@ -122,6 +117,7 @@ class Command(VerboseCommand):
                 index_embeddings.s().set(queue=self.indexing_queue),
             ).apply_async()
             chunk.clear()
+            time.sleep(self.delay)
 
     @staticmethod
     def maybe_log_progress(processed_count: int, opinion_id: int, total: int):
@@ -147,18 +143,17 @@ class Command(VerboseCommand):
         self.retrieval_queue = options["retrieval_queue"]
         self.indexing_queue = options["indexing_queue"]
         self.batch_size = options["batch_size"]
+        self.delay = options["delay"]
         count = options["count"]
-        boto_timeout = options["boto_timeout"]
         auto_resume = options["auto_resume"]
         start_id = options["start_id"]
         throttle_min_items = options["throttle_min_items"]
-        s3_bucket = options["s3_bucket"]
-        inventory_key = options.get("inventory")
+        inventory_file = options.get("inventory_file")
         inventory_rows = options.get("inventory_rows")
 
-        if inventory_key and not inventory_rows:
+        if inventory_file and not inventory_rows:
             raise CommandError(
-                "--inventory-rows is required for --inventory processing."
+                "--inventory-rows is required when using --inventory-file."
             )
 
         self.throttle = CeleryThrottle(
@@ -174,35 +169,26 @@ class Command(VerboseCommand):
 
         chunk: list[int] = []
         processed_count = 0
-        if inventory_key:
-            # Process opinions from the inventory file.
-            # Set the count based on the remaining rows to process if auto-resume is enabled
+        if inventory_file:
             count = (
                 inventory_rows - start_id if auto_resume else inventory_rows
             )
             id_pattern = re.compile(r"/(\d+)\.json$")
-            s3 = boto3.client(
-                "s3",
-                config=Config(
-                    connect_timeout=60,
-                    read_timeout=boto_timeout,  # default 10 minutes
-                    retries={"max_attempts": 5, "mode": "standard"},
-                ),
-            )
-            response = s3.get_object(Bucket=s3_bucket, Key=inventory_key)
-            body_stream = response["Body"]
-            text_stream = io.TextIOWrapper(body_stream, encoding="utf-8")
-            reader = csv.reader(text_stream)
-            for idx, row in enumerate(reader):
-                if auto_resume and idx < start_id:
-                    # Skip row if auto-resume is enabled
-                    continue
-                opinion_id_match = id_pattern.search(row[1])
-                opinion_id = int(opinion_id_match.group(1))
-                chunk.append(opinion_id)
-                processed_count += 1
-                self.maybe_schedule_chunk(chunk, processed_count, count)
-                self.maybe_log_progress(processed_count, idx, count)
+            media_path = Path(settings.MEDIA_ROOT) / inventory_file
+            if not media_path.exists():
+                raise CommandError(f"CSV file not found: {media_path}")
+            with media_path.open(newline="", encoding="utf-8") as csvfile:
+                reader = csv.reader(csvfile)
+                for idx, row in enumerate(reader):
+                    if auto_resume and idx < start_id:
+                        # Skip row if auto-resume is enabled
+                        continue
+                    opinion_id_match = id_pattern.search(row[1])
+                    opinion_id = int(opinion_id_match.group(1))
+                    chunk.append(opinion_id)
+                    processed_count += 1
+                    self.maybe_schedule_chunk(chunk, processed_count, count)
+                    self.maybe_log_progress(processed_count, idx, count)
         else:
             # Process opinions from DB.
             opinions = Opinion.objects.filter(id__gte=start_id).order_by("pk")

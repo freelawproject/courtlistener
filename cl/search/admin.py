@@ -43,6 +43,7 @@ class OpinionAdmin(CursorPaginatorAdmin):
         "html_columbia",
     )
     readonly_fields = (
+        "main_version",
         "date_created",
         "date_modified",
     )

@@ -49,6 +49,7 @@ from cl.citations.utils import (
     slugify_reporter,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.favorites.decorators import track_view_counter
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
 from cl.favorites.utils import (
@@ -57,7 +58,9 @@ from cl.favorites.utils import (
 )
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
-from cl.lib.decorators import cache_page_ignore_params
+from cl.lib.decorators import (
+    cache_page_ignore_params,
+)
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -66,6 +69,7 @@ from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
+from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -336,6 +340,7 @@ async def fetch_docket_entries(docket):
     return de_list
 
 
+@track_view_counter(tracks="docket", label_format="d.%s:view")
 async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
@@ -362,17 +367,11 @@ async def view_docket(
                 "-recap_sequence_number", "-entry_number"
             )
 
-    page = request.GET.get("page", 1)
+    page = request.GET.get("page", "1")
 
     @sync_to_async
     def paginate_docket_entries(docket_entries, docket_page):
-        paginator = Paginator(docket_entries, 200, orphans=10)
-        try:
-            return paginator.page(docket_page)
-        except PageNotAnInteger:
-            return paginator.page(1)
-        except EmptyPage:
-            return paginator.page(paginator.num_pages)
+        return Paginator(docket_entries, 200, orphans=10).get_page(docket_page)
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
@@ -979,6 +978,7 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
 
 
 @never_cache
+@handle_cluster_redirection
 async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """View Opinions
 
@@ -993,6 +993,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     return await render_opinion_view(request, cluster, "opinions")
 
 
+@handle_cluster_redirection
 async def view_opinion_pdf(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1009,6 +1010,7 @@ async def view_opinion_pdf(
     return await render_opinion_view(request, cluster, "pdf")
 
 
+@handle_cluster_redirection
 async def view_opinion_authorities(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1031,6 +1033,7 @@ async def view_opinion_authorities(
     )
 
 
+@handle_cluster_redirection
 async def view_opinion_cited_by(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1054,6 +1057,7 @@ async def view_opinion_cited_by(
     )
 
 
+@handle_cluster_redirection
 async def view_opinion_summaries(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1092,6 +1096,7 @@ async def view_opinion_summaries(
     )
 
 
+@handle_cluster_redirection
 async def view_opinion_related_cases(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
