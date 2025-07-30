@@ -1,4 +1,5 @@
 from datetime import date
+from typing import TYPE_CHECKING
 
 from django.apps import (  # Must use apps.get_model() to avoid circular import issue
     apps,
@@ -11,7 +12,8 @@ from eyecite.models import CitationBase, FullCaseCitation, ShortCaseCitation
 from eyecite.utils import strip_punct
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 
-from cl.search.models import Opinion, RECAPDocument
+if TYPE_CHECKING:
+    from cl.search.models import Opinion, RECAPDocument
 
 QUERY_LENGTH = 10
 NAIVE_SLUGIFIED_EDITIONS = {str(slugify(item)): item for item in EDITIONS}
@@ -217,7 +219,7 @@ def chunk_text(text: str, chunk_size: int):
 
 
 def make_get_citations_kwargs(
-    document: RECAPDocument | Opinion, chunk_size: int = 200_000
+    document: "RECAPDocument | Opinion", chunk_size: int = 200_000
 ) -> list[dict]:
     """Prepare markup kwargs for `get_citations` - chunked
 
