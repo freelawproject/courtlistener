@@ -3057,6 +3057,24 @@ class CitationLookUpApiTest(
             expected_time = test_date + timedelta(minutes=3)
             self.assertEqual(data["wait_until"], expected_time.isoformat())
 
+    async def test_can_filter_out_citation_with_string_volume(
+        self, cache_key_mock
+    ):
+        """Can we filter using a citation with a character in the volume?"""
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": ("71A A.F.T.R.2d (RIA) 4660")},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(
+            first_citation["citation"], "71A A.F.T.R.2d (RIA) 4660"
+        )
+
 
 class UnmatchedCitationTest(TransactionTestCase):
     """Test UnmatchedCitation model and related logic"""
