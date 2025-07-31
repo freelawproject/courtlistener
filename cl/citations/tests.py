@@ -1585,6 +1585,25 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             "citation_count was update even when update was disabled",
         )
 
+    def test_citation_string_volume(self) -> None:
+        """Can we store volume numbers with letters or additional characters?"""
+
+        self.alphanumeric_citation = CitationWithParentsFactory.create(
+            volume="71A",
+            reporter="A.F.T.R.2d (RIA)",
+            page="3011",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=self.court_scotus),
+                case_name="Foo v. Bar",
+                date_filed=date(2025, 7, 31),
+            ),
+        )
+
+        self.assertEqual(self.alphanumeric_citation.volume, "71A")
+        self.assertEqual(
+            str(self.alphanumeric_citation), "71A A.F.T.R.2d (RIA) 3011"
+        )
+
 
 class CitationFeedTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
@@ -3185,6 +3204,28 @@ class UnmatchedCitationTest(TransactionTestCase):
             len(unmatched_citations),
             1,
             "Incorrect number of citations saved",
+        )
+
+    def test_saving_volume_string(self) -> None:
+        """Can we save volume numbers with letters or additional characters?"""
+
+        cluster = OpinionClusterWithChildrenAndParentsFactory()
+        eyecite_citations = get_citations(
+            """71A A.F.T.R.2d (RIA) 3011""",
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
+        opinion = cluster.sub_opinions.first()
+        handle_unmatched_citations(opinion, eyecite_citations, {})
+        unmatched_citations = list(
+            UnmatchedCitation.objects.filter(citing_opinion=opinion).all()
+        )
+        self.assertEqual(
+            len(unmatched_citations),
+            1,
+            "Incorrect number of citations saved",
+        )
+        self.assertEqual(
+            str(unmatched_citations[0]), "71A A.F.T.R.2d (RIA) 3011"
         )
 
 
