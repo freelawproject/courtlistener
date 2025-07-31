@@ -1,3 +1,4 @@
+import re
 from datetime import UTC
 
 from rest_framework import serializers
@@ -45,6 +46,9 @@ from cl.search.models import (
     RECAPDocument,
     Tag,
 )
+
+# Disallowed chars in XML that should be removed
+DISALLOWED_XML_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 
 inverted_o_type_index_map = {
     value: key for key, value in o_type_index_map.items()
@@ -211,6 +215,19 @@ class OpinionSerializer(
     class Meta:
         model = Opinion
         fields = "__all__"
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        return self._clean(data)
+
+    def _clean(self, value):
+        if isinstance(value, str):
+            return DISALLOWED_XML_CHARS.sub("", value)
+        elif isinstance(value, list):
+            return [self._clean(v) for v in value]
+        elif isinstance(value, dict):
+            return {k: self._clean(v) for k, v in value.items()}
+        return value
 
 
 class OpinionsCitedSerializer(
