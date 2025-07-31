@@ -97,6 +97,7 @@ from cl.search.models import (
     Court,
     Docket,
     DocketEntry,
+    Opinion,
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
@@ -974,6 +975,43 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
 
     return await sync_to_async(render)(
         request, "includes/opinion_tabs.html", context
+    )
+
+
+async def view_opinion_version(
+    request: HttpRequest, pk: int, _: str, opinion_id: int
+):
+    """View Opinion version
+
+    :param request: HTTP request
+    :param pk: The cluster PK
+    :param _: url slug
+    :param opinion_id: the opinion id of the version
+    :return: partial rendered or blank if not htmx request
+    """
+
+    if "HX-Request" not in request.headers:
+        return HttpResponse("")
+
+    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, id=pk)
+
+    opinion_found = None
+    try:
+        # Fetch the opinion directly by its id
+        # Ensure it also belongs to the specified cluster for data integrity
+        opinion_found = await Opinion.objects.aget(
+            id=opinion_id, cluster=cluster
+        )
+    except Opinion.DoesNotExist:
+        pass
+    context = {
+        "cluster": cluster,
+        "sub_opinion": opinion_found,
+        "version": True,
+    }
+
+    return await sync_to_async(render)(
+        request, "includes/single_opinion_content.html", context
     )
 
 
