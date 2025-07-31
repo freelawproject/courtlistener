@@ -35,9 +35,10 @@ async def view_audio_file(
     )(request, "transcript_feature")
     if transcript_active:
         try:
-            metadata_obj = await AudioTranscriptionMetadata.objects.aget(
+            metadata_qs = AudioTranscriptionMetadata.objects.filter(
                 audio=af
-            )
+            ).order_by("-id")
+            metadata_obj = await metadata_qs.afirst()
             # Extract the 'segments' list instead of 'words'
             segments_list = metadata_obj.metadata.get("segments", [])
             # Validate if segments_list is actually a list
