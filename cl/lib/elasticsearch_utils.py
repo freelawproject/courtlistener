@@ -2785,6 +2785,7 @@ def build_semantic_query(
                 query_vector=vectors,
                 filter=filters,
                 similarity=settings.KNN_SIMILARITY,
+                rescore_vector={"oversample": settings.KNN_OVERSAMPLE},
                 boost=settings.KNN_SEARCH_BOOST,
             ),
             inner_hits=inner_hits,

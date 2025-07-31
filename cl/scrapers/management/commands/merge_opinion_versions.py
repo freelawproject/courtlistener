@@ -522,6 +522,7 @@ def merge_versions_by_download_url(
 
     qs = (
         Opinion.objects.filter(query)
+        .filter(cluster__source=SOURCES.COURT_WEBSITE)
         .exclude(Q(download_url="") | Q(download_url__isnull=True))
         .values("download_url")
         .annotate(
@@ -557,6 +558,7 @@ def merge_versions_by_download_url(
         # transitively
         main, *versions = (
             Opinion.objects.filter(query)
+            .filter(cluster__source=SOURCES.COURT_WEBSITE)
             .exclude(main_version__isnull=False)
             .select_related("cluster", "cluster__docket")
             .order_by("-date_created")

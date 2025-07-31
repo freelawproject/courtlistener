@@ -84,8 +84,10 @@ class EventCountSerializer(serializers.Serializer):
         # Define a list of allowed regex patterns for valid labels
         # Currently supports:
         # - 'd.<id>:view' format, e.g., 'd.123:view' for docket views
+        # - 'p.<id>:view' format, e.g., 'p.123:view' for judge views
+        # - 'o.<id>:view' format, e.g., 'o.123:view' for opinion views
         valid_pattern = [
-            r"^d\.(\d{1,10}):view$",
+            r"^[dpo]\.(\d{1,10}):view$",
         ]
         # Check if the label matches any of the allowed patterns
         pattern_checks = [
