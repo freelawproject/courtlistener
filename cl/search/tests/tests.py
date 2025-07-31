@@ -110,7 +110,7 @@ class ModelTest(TestCase):
         self.o = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
         self.c = Citation.objects.create(
             cluster=self.oc,
-            volume=22,
+            volume="22",
             reporter="U.S.",
             page=44,
             type=Citation.FEDERAL,
@@ -2171,7 +2171,7 @@ class CaptionTest(TestCase):
         await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.FEDERAL,
-            volume=22,
+            volume="22",
             reporter="F.2d",
             page="44",
         )
@@ -2191,7 +2191,7 @@ class CaptionTest(TestCase):
         await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.FEDERAL,
-            volume=22,
+            volume="22",
             reporter="U.S.",
             page="44",
         )
@@ -2208,7 +2208,7 @@ class CaptionTest(TestCase):
         await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.NEUTRAL,
-            volume=22,
+            volume="22",
             reporter="IL",
             page="44",
         )
@@ -2218,16 +2218,19 @@ class CaptionTest(TestCase):
         # A list of citations ordered properly
         cs = [
             Citation(
-                volume=22, reporter="IL", page="44", type=Citation.NEUTRAL
+                volume="22", reporter="IL", page="44", type=Citation.NEUTRAL
             ),
             Citation(
-                volume=22, reporter="U.S.", page="44", type=Citation.FEDERAL
+                volume="22", reporter="U.S.", page="44", type=Citation.FEDERAL
             ),
             Citation(
-                volume=22, reporter="S. Ct.", page="33", type=Citation.FEDERAL
+                volume="22",
+                reporter="S. Ct.",
+                page="33",
+                type=Citation.FEDERAL,
             ),
             Citation(
-                volume=22,
+                volume="22",
                 reporter="Alt.",
                 page="44",
                 type=Citation.STATE_REGIONAL,

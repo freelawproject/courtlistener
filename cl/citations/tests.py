@@ -931,7 +931,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_1_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=307,
+                volume="307",
                 reporter="Ill. Dec.",
                 page=312,
                 type=Citation.STATE,
@@ -940,7 +940,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_2_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=203,
+                volume="203",
                 reporter="N.J.",
                 page=92,
                 type=Citation.STATE,
@@ -949,7 +949,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_3_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=172,
+                volume="172",
                 reporter="A.3d",
                 page=459,
                 type=Citation.STATE_REGIONAL,
@@ -2566,9 +2566,9 @@ class CitationLookUpApiTest(
     ) -> None:
         handy_citation = await sync_to_async(
             CitationWithParentsFactory.create
-        )(volume=1, reporter="Handy", page="150", type=1)
+        )(volume="1", reporter="Handy", page="150", type=1)
         haw_citation = await sync_to_async(CitationWithParentsFactory.create)(
-            volume=1, reporter="Haw.", page="150", type=1
+            volume="1", reporter="Haw.", page="150", type=1
         )
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -2785,7 +2785,7 @@ class CitationLookUpApiTest(
     ) -> None:
         la_rue_citation = await sync_to_async(
             CitationWithParentsFactory.create
-        )(volume=139, reporter="U.S.", page="601", type=1)
+        )(volume="139", reporter="U.S.", page="601", type=1)
 
         text_citation = (
             "the majority of the court was of opinion that the transfer of the "

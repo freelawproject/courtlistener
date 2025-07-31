@@ -750,7 +750,7 @@ class CitationRedirectorTest(TestCase):
 
     async def test_can_filter_out_non_case_law_citation(self):
         chests_of_tea = await sync_to_async(CitationWithParentsFactory.create)(
-            volume=22, reporter="U.S.", page="444", type=1
+            volume="22", reporter="U.S.", page="444", type=1
         )
         r = await self.async_client.post(
             reverse("citation_homepage"),

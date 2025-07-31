@@ -1167,7 +1167,7 @@ class OpinionV4APISearchTest(
             )
             opinion_cluster.panel.add(person)
             citation_1 = CitationWithParentsFactory.create(
-                volume=33,
+                volume="33",
                 reporter="state",
                 page="1",
                 type=1,
@@ -2104,7 +2104,7 @@ class OpinionsESSearchTest(
             OpinionFactory.create(cluster=cluster, plain_text="")
             OpinionFactory.create(cluster=cluster, plain_text="")
             CitationWithParentsFactory.create(
-                volume=31,
+                volume="31",
                 reporter="Pa. D. & C.",
                 page="445",
                 type=2,
@@ -2135,7 +2135,7 @@ class OpinionsESSearchTest(
             )
             OpinionFactory.create(cluster=cluster_2, plain_text="")
             CitationWithParentsFactory.create(
-                volume=31,
+                volume="31",
                 reporter="Pa. D. & C.",
                 page="445",
                 type=2,
@@ -2173,7 +2173,7 @@ class OpinionsESSearchTest(
                 date_filed=datetime.date(2024, 8, 23),
             )
             CitationWithParentsFactory.create(
-                volume=31,
+                volume="31",
                 reporter="Pa. D. & C.",
                 page="445",
                 type=2,
@@ -3932,7 +3932,7 @@ class EsOpinionsIndexingTest(
 
         # Add lexis citation to the cluster
         lexis_citation = CitationWithParentsFactory.create(
-            volume=10,
+            volume="10",
             reporter="Yeates",
             page="4",
             type=6,
@@ -3955,7 +3955,7 @@ class EsOpinionsIndexingTest(
 
         # Add neutral citation to the cluster
         neutral_citation = CitationWithParentsFactory.create(
-            volume=16,
+            volume="16",
             reporter="Yeates",
             page="58",
             type=8,

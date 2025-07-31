@@ -11,8 +11,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import IntegerField, Prefetch, QuerySet
-from django.db.models.functions import Cast
+from django.db.models import Prefetch, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponseRedirect,
@@ -69,6 +68,7 @@ from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
+from cl.lib.utils import human_sort
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
@@ -1144,17 +1144,20 @@ async def get_prev_next_volumes(
     :return Tuple of the volume number we have prior to the selected one, and
     of the volume number after it.
     """
-    volumes = [
+    raw_volumes = [
         vol
         async for vol in Citation.objects.filter(reporter=reporter)
-        .annotate(as_integer=Cast("volume", IntegerField()))
-        .values_list("as_integer", flat=True)
+        .values_list("volume", flat=True)
         .distinct()
-        .order_by("as_integer")
     ]
-    index = volumes.index(int(volume))
-    volume_previous = volumes[index - 1] if index > 0 else None
-    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+
+    # Use human sort for volume strings, e.g. 77, 78, 78a, 78b, 79
+    sorted_volumes = human_sort(raw_volumes)
+    index = sorted_volumes.index(volume)
+    volume_previous = sorted_volumes[index - 1] if index > 0 else None
+    volume_next = (
+        sorted_volumes[index + 1] if index + 1 < len(sorted_volumes) else None
+    )
     return volume_next, volume_previous
 
 
@@ -1187,14 +1190,17 @@ async def reporter_or_volume_handler(
 
     if volume is None:
         # Show all the volumes for the case
-        volumes_in_reporter = (
-            Citation.objects.filter(reporter=reporter)
-            .order_by("reporter", "volume")
+        raw_volumes = [
+            vol
+            async for vol in Citation.objects.filter(reporter=reporter)
             .values_list("volume", flat=True)
             .distinct()
-        )
+        ]
 
-        if not await volumes_in_reporter.aexists():
+        # Human sort the volumes found for a given reporter
+        volumes_in_reporter = human_sort(raw_volumes)
+
+        if not volumes_in_reporter:
             return await throw_404(
                 request,
                 {
