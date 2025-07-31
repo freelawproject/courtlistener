@@ -150,7 +150,9 @@ class Command(VerboseCommand):
             )
 
         # Use query chaining to build the query
-        query = Opinion.objects.all().order_by("pk")
+        query = Opinion.objects.filter(main_version__isnull=True).order_by(
+            "pk"
+        )
         if options.get("state"):
             court_ids = Courthouse.objects.filter(
                 state=options["state"]
@@ -181,7 +183,7 @@ class Command(VerboseCommand):
         if options.get("no_html_with_citations"):
             query = query.filter(html_with_citations="")
         if options.get("all"):
-            query = Opinion.objects.all()
+            query = Opinion.objects.filter(main_version__isnull=True)
             # force disconnection for batch jobs
             disable_parenthetical_groups = True
             disable_citation_count_update = True
