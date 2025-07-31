@@ -63,6 +63,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketFactory,
     OpinionClusterFactory,
+    OpinionClusterWithParentsFactory,
     OpinionFactory,
 )
 from cl.search.models import (
@@ -1439,3 +1440,28 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         ]
         for str1, str2, expected_result in cases:
             self.assertEqual(merge_judge_names(str1, str2), expected_result)
+
+    def test_transitive_redirection(self):
+        """Can we keep existing ClusterRedirections when its target cluster is
+        versioned?"""
+        to_keep = OpinionClusterWithParentsFactory.create(id=99999)
+        to_delete = OpinionClusterWithParentsFactory.create(id=888888)
+        existing_redirection_id = 77777
+        ClusterRedirection.objects.create(
+            deleted_cluster_id=existing_redirection_id,
+            cluster=to_delete,
+            reason=ClusterRedirection.DUPLICATE,
+        )
+
+        ClusterRedirection.create_from_clusters(
+            to_keep, to_delete, ClusterRedirection.VERSION
+        )
+
+        self.assertTrue(
+            ClusterRedirection.objects.filter(
+                deleted_cluster_id=existing_redirection_id,
+                cluster=to_keep,
+                reason=ClusterRedirection.DUPLICATE,
+            ).exists(),
+            "Existing re-direction was not re-assigned to new cluster",
+        )

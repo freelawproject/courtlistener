@@ -486,14 +486,9 @@ def merge_opinion_versions(
             version_cluster.id,
         )
 
-        if not ClusterRedirection.objects.filter(
-            deleted_cluster_id=version_cluster.id
-        ).exists():
-            ClusterRedirection.objects.create(
-                deleted_cluster_id=version_cluster.id,
-                cluster=main_opinion.cluster,
-                reason=ClusterRedirection.VERSION,
-            )
+        ClusterRedirection.create_from_clusters(
+            main_opinion.cluster, version_cluster, ClusterRedirection.VERSION
+        )
 
         # Both Opinion and Citation have a ForeignKey to OpinionCluster, with
         # on_delete=models.CASCADE. Also, there are signals (see
