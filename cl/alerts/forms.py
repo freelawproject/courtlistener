@@ -64,22 +64,27 @@ class CreateAlertForm(ModelForm):
         )
         quotas = RECAP_ALERT_QUOTAS[quotas_key]
         is_member = self.user.profile.is_member
+        has_unlimited_alerts = self.user.profile.unlimited_docket_alerts
         if is_member:
             level_key = self.user.membership.level
         else:
             level_key = "free"
 
         flp_membership = "https://donate.free.law/forms/membership"
-        # Only members can create RT alerts
-        if rate == Alert.REAL_TIME and not is_member:
+        # Only members or user with unlimited alerts can create RT alerts
+        if rate == Alert.REAL_TIME and not (is_member or has_unlimited_alerts):
             msg = format_html(
                 "You must be a <a href='{}' target='_blank'>member</a> to create Real Time alerts.",
                 flp_membership,
             )
             raise ValidationError(msg)
 
-        # Only check quotas for RECAP or DOCKETS alerts
-        if self.current_type in {SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS}:
+        # If the user doesn't have unlimited alerts, only check quotas for
+        # RECAP or DOCKETS alert types
+        if not has_unlimited_alerts and self.current_type in {
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+        }:
             allowed = quotas.get(level_key, quotas.get("free", 0))
 
             query_params = {"user": self.user}

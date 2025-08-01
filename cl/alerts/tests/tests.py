@@ -208,6 +208,42 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
             self.assertEqual(alert_created.rate, Alert.REAL_TIME)
         await self.async_client.alogout()
 
+    async def test_non_recap_rt_alert_succeeds_with_unlimited_flag(
+        self,
+    ) -> None:
+        """Allows non recap real-time alert creation for non-member with unlimited flag."""
+        # Grant the user the ability to create unlimited alerts
+        self.user_no_member.unlimited_docket_alerts = True
+        await self.user_no_member.asave()
+
+        # Login as the non-member user with the unlimited flag
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.user_no_member.user.username, password="password"
+            )
+        )
+
+        # Prepare the real-time alert parameters
+        rt_alert_params = self.alert_params.copy()
+        rt_alert_params["rate"] = Alert.REAL_TIME
+
+        # Attempt to create the alert
+        r = await self.async_client.post(
+            reverse("show_results"), rt_alert_params, follow=True
+        )
+        self.assertEqual(r.redirect_chain[0][1], 302)
+
+        # Confirm success message is present in response
+        self.assertIn("successfully", r.content.decode())
+
+        alert_user = Alert.objects.filter(user=self.user_no_member.user)
+        self.assertEqual(await alert_user.acount(), 1)
+        alert_created = await alert_user.afirst()
+        if alert_created:
+            self.assertEqual(alert_created.alert_type, SEARCH_TYPES.OPINION)
+            self.assertEqual(alert_created.rate, Alert.REAL_TIME)
+        await self.async_client.alogout()
+
     async def test_fail_non_recap_rt_alert_for_no_member(self) -> None:
         """Confirm that RT alert creation for non-RECAP alerts displays the
         regular limitation message for non-members.
@@ -337,6 +373,61 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
 
         # no new alert should be created
         self.assertEqual(await alert_user.acount(), 5)
+        await self.async_client.alogout()
+
+    async def test_recap_rt_alert_with_unlimited_flag(self) -> None:
+        """Allows RECAP real-time alert creation for non-member with unlimited flag."""
+        # Grant the user the ability to create unlimited alerts
+        self.user_no_member.unlimited_docket_alerts = True
+        await self.user_no_member.asave()
+
+        # Login as the non-member user with the unlimited flag
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.user_no_member.user.username, password="password"
+            )
+        )
+
+        # Prepare RECAP real-time alert parameters
+        rt_alert_params = self.alert_params.copy()
+        rt_alert_params["rate"] = Alert.REAL_TIME
+        rt_alert_params["alert_type"] = SEARCH_TYPES.RECAP
+
+        # Submit the alert creation request
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, rt_alert_params, follow=True)
+        self.assertEqual(r.redirect_chain[0][1], 302)
+
+        # Confirm success message is present in response
+        self.assertIn("successfully", r.content.decode())
+
+        # Verify the alert was created and has correct attributes
+        alert_user = Alert.objects.filter(
+            user=self.user_no_member.user,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        self.assertEqual(await alert_user.acount(), 1)
+        alert_created = await alert_user.afirst()
+        if alert_created:
+            self.assertEqual(alert_created.alert_type, SEARCH_TYPES.RECAP)
+            self.assertEqual(alert_created.rate, Alert.REAL_TIME)
+
+        # Add 4 more rt alerts.
+        await sync_to_async(AlertFactory.create_batch)(
+            4,
+            user=self.user_no_member.user,
+            rate=Alert.REAL_TIME,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+
+        # Submit a new alert creation request
+        url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
+        r = await self.async_client.post(url, rt_alert_params, follow=True)
+        self.assertEqual(r.redirect_chain[0][1], 302)
+
+        # Confirm success message is present in response
+        self.assertIn("successfully", r.content.decode())
+
         await self.async_client.alogout()
 
     async def test_legacy_member_recap_rt_alert_fails_when_over_quota(self):

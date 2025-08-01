@@ -147,6 +147,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
         alerts_context = {
             "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
+            "hasUnlimitedAlerts": user.profile.unlimited_docket_alerts,
             "level": level,
             "neon_id": neon_id,
             "counts": counts,
