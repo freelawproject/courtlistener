@@ -3074,7 +3074,11 @@ def open_and_validate_email_notification(
         data == {}
         or len(data["dockets"]) == 0
         or len(data["dockets"][0]["docket_entries"]) == 0
-        or data["dockets"][0]["docket_entries"][0]["pacer_case_id"] is None
+        or (
+            not data["acms"]
+            and data["dockets"][0]["docket_entries"][0]["pacer_case_id"]
+            is None
+        )
     ):
         msg = "Not a valid notification email. No message content."
         async_to_sync(mark_pq_status)(
@@ -3255,8 +3259,10 @@ def get_acms_pacer_case_id(
     :param docket_number: The docket_number to query.
     :return: The PACER case ID as a string if found, otherwise None.
     """
-
-    acms_search = AcmsCaseSearch(court_id=court_id, pacer_session=session_data)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
+    acms_search = AcmsCaseSearch(court_id=court_id, pacer_session=s)
     acms_search.query(docket_number)
     return acms_search.data["pcx_caseid"] if acms_search.data else None
 
