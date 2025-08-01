@@ -34,19 +34,19 @@ async def view_audio_file(
         waffle.flag_is_active, thread_sensitive=True
     )(request, "transcript_feature")
     if transcript_active:
-        try:
-            metadata_qs = AudioTranscriptionMetadata.objects.filter(
-                audio=af
-            ).order_by("-id")
-            metadata_obj = await metadata_qs.afirst()
+        # Get the latest metadata. There can be many metadata rows for a single
+        # audio, if the transcription failed as hallucinated and was retried
+        metadata_qs = AudioTranscriptionMetadata.objects.filter(
+            audio=af
+        ).order_by("-id")
+        metadata_obj = await metadata_qs.afirst()
+
+        if metadata_obj:
             # Extract the 'segments' list instead of 'words'
             segments_list = metadata_obj.metadata.get("segments", [])
             # Validate if segments_list is actually a list
             if not isinstance(segments_list, list):
                 segments_list = []  # Reset to empty list if format is unexpected
-
-        except AudioTranscriptionMetadata.DoesNotExist:
-            pass
 
     # --- End transcript metadata fetch ---
 
