@@ -2769,7 +2769,15 @@ def build_semantic_query(
     # This enables hybrid search by combining keyword and semantic results
     if keyword_query:
         semantic_query.extend(
-            build_fulltext_query(fields, keyword_query, only_queries=True)
+            [
+                Q(
+                    "query_string",
+                    fields=["text"],
+                    query=keyword_query,
+                    quote_field_suffix=".exact",
+                    default_operator="AND",
+                )
+            ]
         )
 
     inner_hits = {"size": 1, "_source": False, "fields": ["embeddings.chunk"]}
@@ -3020,7 +3028,7 @@ def build_full_join_es_queries(
                 )
         should_append_parent_query = (
             parent_query and not mlt_query and not has_valid_semantic_query
-        ) or keyword_text_query
+        )
         if should_append_parent_query:
             q_should.append(parent_query)
 
