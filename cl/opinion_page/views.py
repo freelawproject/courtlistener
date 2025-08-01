@@ -1136,7 +1136,7 @@ async def throw_404(request: HttpRequest, context: dict) -> HttpResponse:
 
 async def get_prev_next_volumes(
     reporter: str, volume: str
-) -> tuple[int | None, int | None]:
+) -> tuple[str | None, str | None]:
     """Get the volume before and after the current one.
 
     :param reporter: The reporter where the volume is found
