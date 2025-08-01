@@ -236,11 +236,6 @@
                             None known
                           {% endif %}
                         </li>
-                        {% if cluster.case_name_full != cluster|best_case_name  and cluster.case_name_full %}
-                        <li><strong>Full Case Name:</strong>
-                          <span class="select-all">{{ cluster.case_name_full }}</span>
-                        </li>
-                        {% endif %}
 
                         {% if cluster.docket.court_id != "olc" %}
                             <li><strong>Docket Number:</strong> {{ cluster.docket.docket_number|default:"Unknown" }}</li>
