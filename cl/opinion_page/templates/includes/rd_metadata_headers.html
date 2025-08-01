@@ -19,18 +19,17 @@
         <span class="caret"></span>
       </button>
 
-      <ul class="dropdown-menu">
+      <ul class="dropdown-menu medium">
         {% for doc in attachments %}
           <li {% if doc.attachment_number == rd.attachment_number or not doc.url %}class="disabled"{% endif %}>
             {% if not doc.url %}
-              <span style="font-size:21px; font-weight:500; padding:3px 18px;">{{ doc.description }}</span>
+              {{ doc.description }}
             {% else %}
               <a
                 href="{% if doc.attachment_number != rd.attachment_number %}{{ doc.url }}{% else %}#{% endif %}"
-                style="font-size:21px; font-weight:500; padding:3px 18px;"
                 title="{% if doc.description %}{{ doc.description }}{% elif doc.attachment_number%}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ rd.document_number }}{% endif %}"
               >
-                {% if doc.attachment_number %}#{{ doc.attachment_number }}{% else %}Document #{{ rd.document_number }}{% endif %}
+                {% if doc.attachment_number %}Att. {{ doc.attachment_number }}{% else %}Entry {{ rd.document_number }}{% endif %}
                 {% if doc.description %}
                   <span class="gray">&mdash;</span>
                   {{ doc.description }}
