@@ -2,11 +2,11 @@ import re
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
-from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import ModelSerializer
 
+from cl.api.utils import DynamicFieldsMixin
 from cl.favorites.models import DocketTag, Prayer, UserTag
 from cl.favorites.utils import prayer_eligible
 from cl.search.models import Docket
@@ -84,8 +84,10 @@ class EventCountSerializer(serializers.Serializer):
         # Define a list of allowed regex patterns for valid labels
         # Currently supports:
         # - 'd.<id>:view' format, e.g., 'd.123:view' for docket views
+        # - 'p.<id>:view' format, e.g., 'p.123:view' for judge views
+        # - 'o.<id>:view' format, e.g., 'o.123:view' for opinion views
         valid_pattern = [
-            r"^d\.(\d{1,10}):view$",
+            r"^[dpo]\.(\d{1,10}):view$",
         ]
         # Check if the label matches any of the allowed patterns
         pattern_checks = [

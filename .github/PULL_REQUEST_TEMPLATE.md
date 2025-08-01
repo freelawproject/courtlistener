@@ -13,6 +13,8 @@ This PR...
 **This PR should:**
 <!-- The following labels control the deployment of this PR if they’re applied. -->
 <!-- Please put an "X" in the box on ones that apply. -->
+<!-- For more details on what pods are affected by each label, see the wiki -->
+<!-- https://github.com/freelawproject/courtlistener/wiki/Pull-requests-%60skip%E2%80%90%7Btype%7D%E2%80%90deploy%60-labels -->
 
 <!-- Check here if the entire deployment can be skipped -->
 <!-- This might be the case for a small fix, a tweak to documentation or something like that. -->

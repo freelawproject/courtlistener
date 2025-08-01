@@ -71,8 +71,10 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
+    OpinionClusterFactory,
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithMultipleOpinionsFactory,
+    OpinionFactory,
     OpinionWithChildrenFactory,
     RECAPDocumentFactory,
 )
@@ -218,7 +220,9 @@ class CitationTextTest(TestCase):
                 with mock.patch(
                     "eyecite.find.find_reference_citations_from_markup"
                 ) as mock_func:
-                    get_citations_kwargs = make_get_citations_kwargs(opinion)
+                    get_citations_kwargs = make_get_citations_kwargs(opinion)[
+                        0
+                    ]
                     citations = get_citations(
                         tokenizer=HYPERSCAN_TOKENIZER,
                         **get_citations_kwargs,
@@ -239,6 +243,40 @@ class CitationTextTest(TestCase):
                     expected_html,
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
+
+    def test_create_html_with_citations_if_chunked(self):
+        """Test create html split over chunks"""
+        opinion = OpinionWithChildrenFactory(
+            html="<html>Something something 1 U.S. 1 something something 1 U.S. 1 something something</html>",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=CourtFactory(id="ca")),
+                case_name="Foo v. Bar",
+                date_filed=date(2025, 4, 25),
+            ),
+        )
+
+        expected = (
+            "<html>Something something "
+            '<span class="citation no-link">1 U.S. 1</span> '
+            "something something "
+            '<span class="citation no-link">1 U.S. 1</span> '
+            "something something</html>"
+        )
+
+        # override default 200_000 with 50 to prove works
+        with patch(
+            "cl.citations.tasks.make_get_citations_kwargs",
+            side_effect=lambda op: make_get_citations_kwargs(
+                op, chunk_size=50
+            ),
+        ):
+            store_opinion_citations_and_update_parentheticals(
+                opinion,
+                update_citation_count=False,
+                disable_parenthetical_groups=True,
+            )
+
+        self.assertEqual(opinion.html_with_citations, expected)
 
     def test_no_citations_found_or_resolved(self) -> None:
         """Ensure that we get `html_with_citations` when no citations are found"""
@@ -320,7 +358,7 @@ class CitationTextTest(TestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(html=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -396,7 +434,7 @@ class CitationTextTest(TestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(html=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -448,7 +486,7 @@ class CitationTextTest(TestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(xml_harvard=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -506,7 +544,7 @@ class CitationTextTest(TestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(plain_text=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -560,7 +598,7 @@ class CitationTextTest(TestCase):
                 pk="MATCH_ID",
                 cluster=Mock(OpinionCluster(id=1234), case_name=case_name),
             )
-            get_citations_kwargs = make_get_citations_kwargs(opinion)
+            get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
             citations = get_citations(
                 tokenizer=HYPERSCAN_TOKENIZER,
                 **get_citations_kwargs,
@@ -1300,7 +1338,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
 
         # Verify if the annotated citation is correct
         opinion = self.citation8.cluster.sub_opinions.all().first()
-        get_citations_kwargs = make_get_citations_kwargs(opinion)
+        get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
         citations = get_citations(
             tokenizer=HYPERSCAN_TOKENIZER, **get_citations_kwargs
         )
@@ -1315,7 +1353,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # Verify if we can annotate multiple citations that can't be
         # disambiguated
         opinion = self.citation11.cluster.sub_opinions.all().first()
-        get_citations_kwargs = make_get_citations_kwargs(opinion)
+        get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
         citations = get_citations(
             tokenizer=HYPERSCAN_TOKENIZER, **get_citations_kwargs
         )
@@ -1527,7 +1565,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # have Parentheticals for
         opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
         find_citations_and_parentheticals_for_opinion_by_pks(
-            opinion_pks=[opinion5.pk], disconnect_pg_signals=True
+            opinion_pks=[opinion5.pk], disable_parenthetical_groups=True
         )
         self.assertEqual(
             post_save.receivers[-1][0][0],
@@ -3295,3 +3333,68 @@ class TasksTest(TestCase):
             {self.opinion_2.id, self.opinion_3.id},
             "Should retry only failed opinion IDs",
         )
+
+
+class CountCitationsTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        court = CourtFactory(id="illappct")
+        docket = DocketFactory.create(court=court)
+
+        # 1 cluster with 0 citations to it
+        cls.cluster1 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cluster1_opinion = OpinionFactory(cluster=cls.cluster1)
+
+        # 1 cluster with 2 subopinions, each with one citation to it
+        cls.cluster2 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cluster2_opinion1 = OpinionFactory(cluster=cls.cluster2)
+        cluster2_opinion2 = OpinionFactory(cluster=cls.cluster2)
+
+        OpinionsCited.objects.create(
+            citing_opinion=cluster1_opinion,
+            cited_opinion=cluster2_opinion1,
+            depth=1,
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=cluster1_opinion,
+            cited_opinion=cluster2_opinion2,
+            depth=1,
+        )
+
+        # 1 cluster with 1 sub opinion, and 3 citations to it
+        cls.cluster3 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cluster3_opinion = OpinionFactory(cluster=cls.cluster3)
+
+        OpinionsCited.objects.create(
+            citing_opinion=cluster1_opinion,
+            cited_opinion=cluster3_opinion,
+            depth=1,
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=cluster2_opinion1,
+            cited_opinion=cluster3_opinion,
+            depth=1,
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=cluster2_opinion2,
+            cited_opinion=cluster3_opinion,
+            depth=1,
+        )
+
+    def test_count_citations_from_opinions_cited(self):
+        """Can we compute OpinionCluster.citation_count using OpinionsCited?"""
+        call_command(
+            "count_citations",
+            count_from_opinions_cited=True,
+        )
+        self.cluster1.refresh_from_db()
+        self.cluster2.refresh_from_db()
+        self.cluster3.refresh_from_db()
+        self.assertEqual(self.cluster1.citation_count, 0, "Count should be 0")
+        self.assertEqual(
+            self.cluster2.citation_count,
+            2,
+            "Count should be 2, 1 per each subopinion",
+        )
+        self.assertEqual(self.cluster3.citation_count, 3, "Count should be 3")

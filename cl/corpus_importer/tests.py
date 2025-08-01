@@ -130,7 +130,6 @@ from cl.search.models import (
     SEARCH_TYPES,
     SOURCES,
     Citation,
-    Court,
     Docket,
     Opinion,
     OpinionCluster,
@@ -627,6 +626,7 @@ class HarvardTests(TestCase):
         Each one can be used or turned off.  See the teardown for more.
         :return:
         """
+        super().setUp()
         self.make_filepath_patch = patch(
             "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
         )
@@ -659,8 +659,8 @@ class HarvardTests(TestCase):
         self.make_filepath_patch.stop()
         self.read_json_patch.stop()
         self.find_court_patch.stop()
-        Docket.objects.all().delete()
-        Court.objects.all().delete()
+        self.get_fix_list_patch.stop()
+        super().tearDown()
 
     def _get_cite(self, case_law) -> Citation:
         """Fetch first citation added to case
@@ -2091,7 +2091,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        Court.objects.all().delete()
+        super().setUpTestData()
         cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FB")
         cls.court_txed = CourtFactory(id="txed", jurisdiction="FB")
@@ -2105,6 +2105,7 @@ class ScrapeIqueryPagesTest(TestCase):
         cls.court_mowd = CourtFactory(id="mowd", jurisdiction="FB")
 
     def setUp(self) -> None:
+        super().setUp()
         self.r = get_redis_interface("CACHE")
         keys_to_clean = [
             "iquery:highest_known_pacer_case_id",

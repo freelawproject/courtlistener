@@ -289,7 +289,6 @@ dependencies = [
     { name = "djangorestframework" },
     { name = "djangorestframework-filters" },
     { name = "djangorestframework-xml" },
-    { name = "drf-dynamic-fields" },
     { name = "eyecite" },
     { name = "factory-boy" },
     { name = "feedparser" },
@@ -401,7 +400,6 @@ requires-dist = [
     { name = "djangorestframework", git = "https://github.com/encode/django-rest-framework.git?rev=cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2" },
     { name = "djangorestframework-filters", specifier = "==1.0.0.dev2" },
     { name = "djangorestframework-xml", specifier = ">=2.0.0" },
-    { name = "drf-dynamic-fields", specifier = ">=0.4.0" },
     { name = "eyecite" },
     { name = "factory-boy", specifier = ">=3.3.3" },
     { name = "feedparser", specifier = ">=6.0.10" },
@@ -414,7 +412,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.0.2" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", git = "https://github.com/freelawproject/juriscraper?branch=add-support-to-download-acms-pdfs-from-magic-link" },
+    { name = "juriscraper", specifier = ">=2.6.68" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=5.3.1" },
     { name = "markdown2", specifier = ">=2.5.0" },
@@ -1092,15 +1090,6 @@ wheels = [
 ]
 
 [[package]]
-name = "drf-dynamic-fields"
-version = "0.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d2/7f/1c17e0791b8d028b47908be78ac8041c544bd07a59afd8556304a0f0d355/drf_dynamic_fields-0.4.0.tar.gz", hash = "sha256:f20a5ec27d003db7595c9315db22217493dcaed575f3811d3e12f264c791c20c", size = 4864, upload-time = "2022-04-05T20:48:34.091Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2d/18/4b02bda9ae5a7ac52bfcb4f1740fb4a0aa12d220881695471b700bb3f00e/drf_dynamic_fields-0.4.0-py2.py3-none-any.whl", hash = "sha256:48b879fe899905bc18593a61bca43e3b595dc3431b3b4ee499a9fd6c9a53f98c", size = 5451, upload-time = "2022-04-05T20:48:32.452Z" },
-]
-
-[[package]]
 name = "elastic-transport"
 version = "8.17.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1596,8 +1585,8 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.80"
-source = { git = "https://github.com/freelawproject/juriscraper?branch=add-support-to-download-acms-pdfs-from-magic-link#8027a22dbeeb23a3b1927db9dea9c70ed1d69386" }
+version = "2.6.82"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
     { name = "chardet" },
@@ -1613,6 +1602,10 @@ dependencies = [
     { name = "requests" },
     { name = "selenium" },
     { name = "tldextract" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6c/c3/6822e8fc313a02851695fd12389c2ab02747c99bb5eb1666a45077f24377/juriscraper-2.6.82.tar.gz", hash = "sha256:72c25a9e6a3c389e80576310e676809b1678544c62ad0071f05f0bc13d5df76f", size = 310675, upload-time = "2025-07-31T15:54:39.371Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/14/31/26058220cdb64809f461511e88002c379719d62cae4e0929d32359abc03e/juriscraper-2.6.82-py3-none-any.whl", hash = "sha256:978c00a2c49aa7fbd8c43073ab49198b1f565e69f8d8929e4bbfe8019b470c9e", size = 513924, upload-time = "2025-07-31T15:54:37.588Z" },
 ]
 
 [[package]]
@@ -2410,11 +2403,11 @@ wheels = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.56"
+version = "3.2.57"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ae/33/bf38156d0091fb4db12fe6e58addfcddefbd0ee49c883bcd3dfb5e635fe2/reporters_db-3.2.56.tar.gz", hash = "sha256:47ee6b66e026840709a5df13d2dd785925f3d27374e8976938b0bfdd89ba5f10", size = 171415, upload-time = "2025-05-23T14:23:47.956Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/bb/0d8cc0fb97035bca8ee29d085d28f77bd1f31e0d27a6b5d94c47ef373396/reporters_db-3.2.57.tar.gz", hash = "sha256:ba201be89f3aa4c6f153b1d2915fa0cec845218a9cbb7ecb4b82c8f1cc8a1c16", size = 171444, upload-time = "2025-07-27T14:19:02.494Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/7f/a01b331745f809b8e68f51d79760e5ef5d747ddcd9de1eb2191dbdbf9b91/reporters_db-3.2.56-py3-none-any.whl", hash = "sha256:991a5c6fcfee47f77f2c33b9b649aa5d997e879d3612d1bd8dbbb1739b5f3fd6", size = 171461, upload-time = "2025-05-23T14:23:46.661Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/dc/2395ea5de3883d3f4064b1d3c45de216897b2604c9dc7724e8cb360e9b0b/reporters_db-3.2.57-py3-none-any.whl", hash = "sha256:d2987e9db50a01ab5747a80eb26d0c387dff82ca7e4dae925e96a13863882594", size = 171491, upload-time = "2025-07-27T14:19:01.319Z" },
 ]
 
 [[package]]
