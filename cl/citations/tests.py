@@ -220,7 +220,9 @@ class CitationTextTest(TestCase):
                 with mock.patch(
                     "eyecite.find.find_reference_citations_from_markup"
                 ) as mock_func:
-                    get_citations_kwargs = make_get_citations_kwargs(opinion)
+                    get_citations_kwargs = make_get_citations_kwargs(opinion)[
+                        0
+                    ]
                     citations = get_citations(
                         tokenizer=HYPERSCAN_TOKENIZER,
                         **get_citations_kwargs,
@@ -241,6 +243,40 @@ class CitationTextTest(TestCase):
                     expected_html,
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
+
+    def test_create_html_with_citations_if_chunked(self):
+        """Test create html split over chunks"""
+        opinion = OpinionWithChildrenFactory(
+            html="<html>Something something 1 U.S. 1 something something 1 U.S. 1 something something</html>",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=CourtFactory(id="ca")),
+                case_name="Foo v. Bar",
+                date_filed=date(2025, 4, 25),
+            ),
+        )
+
+        expected = (
+            "<html>Something something "
+            '<span class="citation no-link">1 U.S. 1</span> '
+            "something something "
+            '<span class="citation no-link">1 U.S. 1</span> '
+            "something something</html>"
+        )
+
+        # override default 200_000 with 50 to prove works
+        with patch(
+            "cl.citations.tasks.make_get_citations_kwargs",
+            side_effect=lambda op: make_get_citations_kwargs(
+                op, chunk_size=50
+            ),
+        ):
+            store_opinion_citations_and_update_parentheticals(
+                opinion,
+                update_citation_count=False,
+                disable_parenthetical_groups=True,
+            )
+
+        self.assertEqual(opinion.html_with_citations, expected)
 
     def test_no_citations_found_or_resolved(self) -> None:
         """Ensure that we get `html_with_citations` when no citations are found"""
@@ -322,7 +358,7 @@ class CitationTextTest(TestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(html=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -398,7 +434,7 @@ class CitationTextTest(TestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(html=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -450,7 +486,7 @@ class CitationTextTest(TestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(xml_harvard=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -508,7 +544,7 @@ class CitationTextTest(TestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(plain_text=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -562,7 +598,7 @@ class CitationTextTest(TestCase):
                 pk="MATCH_ID",
                 cluster=Mock(OpinionCluster(id=1234), case_name=case_name),
             )
-            get_citations_kwargs = make_get_citations_kwargs(opinion)
+            get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
             citations = get_citations(
                 tokenizer=HYPERSCAN_TOKENIZER,
                 **get_citations_kwargs,
@@ -1302,7 +1338,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
 
         # Verify if the annotated citation is correct
         opinion = self.citation8.cluster.sub_opinions.all().first()
-        get_citations_kwargs = make_get_citations_kwargs(opinion)
+        get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
         citations = get_citations(
             tokenizer=HYPERSCAN_TOKENIZER, **get_citations_kwargs
         )
@@ -1317,7 +1353,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # Verify if we can annotate multiple citations that can't be
         # disambiguated
         opinion = self.citation11.cluster.sub_opinions.all().first()
-        get_citations_kwargs = make_get_citations_kwargs(opinion)
+        get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
         citations = get_citations(
             tokenizer=HYPERSCAN_TOKENIZER, **get_citations_kwargs
         )
