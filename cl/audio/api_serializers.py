@@ -1,13 +1,20 @@
-from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework.serializers import CharField, HyperlinkedRelatedField
 
-from cl.api.utils import HyperlinkedModelSerializerWithId
+from cl.api.utils import (
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+    RetrieveFilteredFieldsMixin,
+)
 from cl.audio import models as audio_models
 from cl.people_db.models import Person
 from cl.search.models import Docket
 
 
-class AudioSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class AudioSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     absolute_url = CharField(source="get_absolute_url", read_only=True)
     panel: HyperlinkedRelatedField = HyperlinkedRelatedField(
         many=True,

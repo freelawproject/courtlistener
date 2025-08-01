@@ -1,10 +1,14 @@
 import json
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.conf import settings
 from django.core.management import call_command
+from django.test import TestCase, override_settings
+from django.urls import reverse
 from elasticsearch_dsl import Document
 
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
@@ -15,7 +19,7 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, Docket
+from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
@@ -184,3 +188,338 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
                     id=ES_CHILD_ID(opinion.pk).OPINION
                 ).embeddings
             )
+
+
+@override_settings(KNN_SIMILARITY=0.3)
+@override_settings(KNN_SEARCH_ENABLED=True)
+@mock.patch("cl.lib.elasticsearch_utils.microservice")
+class SemanticSearchTests(ESIndexTestCase, TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        """Set up test index and test data."""
+        cls.rebuild_index("search.OpinionCluster")
+        cls.ohio_court = CourtFactory(
+            id="ohioctapp",
+            jurisdiction="SA",
+            full_name="Ohio Court of Appeals",
+        )
+        cls.vermont_court = CourtFactory(
+            id="vt", jurisdiction="S", full_name="Supreme Court of Vermont"
+        )
+        cls.situational_query = (
+            "Can a tenant break a lease due to uninhabitable conditions?"
+        )
+        cls.hybrid_query = (
+            'Can a tenant break a lease due to "uninhabitable conditions"?'
+        )
+
+        # Create opinions and clusters
+        with cls.captureOnCommitCallbacks(execute=True) as callbacks:
+            cls.opinion_2 = OpinionFactory(
+                cluster=OpinionClusterFactory(
+                    docket=DocketFactory(
+                        court=cls.ohio_court,
+                        docket_number="30274",
+                        source=Docket.SCRAPER,
+                    ),
+                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                    citation_count=5,
+                )
+            )
+
+            cls.opinion_3 = OpinionFactory(
+                cluster=OpinionClusterFactory(
+                    docket=DocketFactory(
+                        court=cls.vermont_court,
+                        docket_number="24-AP-118",
+                        source=Docket.SCRAPER,
+                    ),
+                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                    citation_count=1,
+                )
+            )
+            cls.opinion_4 = OpinionFactory(
+                cluster=OpinionClusterFactory(
+                    docket=DocketFactory(),
+                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                )
+            )
+            cls.opinion_5 = OpinionFactory(
+                cluster=OpinionClusterFactory(
+                    docket=DocketFactory(),
+                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                )
+            )
+
+        # Fetch Elasticsearch document representations
+        es_opinions = {
+            "opinion_2": OpinionDocument.get(
+                id=ES_CHILD_ID(cls.opinion_2.pk).OPINION
+            ),
+            "opinion_3": OpinionDocument.get(
+                id=ES_CHILD_ID(cls.opinion_3.pk).OPINION
+            ),
+            "opinion_4": OpinionDocument.get(
+                id=ES_CHILD_ID(cls.opinion_4.pk).OPINION
+            ),
+            "opinion_5": OpinionDocument.get(
+                id=ES_CHILD_ID(cls.opinion_5.pk).OPINION
+            ),
+        }
+
+        cls.test_dir = (
+            Path(settings.INSTALL_ROOT) / "cl" / "search" / "test_assets"
+        )
+        # Load embeddings for query
+        with open(
+            cls.test_dir / "situational_query_embeddings.json",
+            encoding="utf-8",
+        ) as f:
+            cls.situational_query_vectors = json.load(f)
+
+        # Update documents with precomputed embeddings
+        for key, opinion in es_opinions.items():
+            filename = f"{key}_embeddings.json"
+            with open(cls.test_dir / filename, encoding="utf-8") as f:
+                embeddings = json.load(f)
+                Document.update(
+                    opinion,
+                    **{"embeddings": embeddings["embeddings"]},
+                    refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+                )
+
+    def _get_mock_for_inception(self, vectors: dict[str, Any] | None = None):
+        """Return a mocked Inception response with the given vectors."""
+        inception_response = MagicMock()
+        inception_response.json.return_value = vectors
+        return inception_response
+
+    def _test_api_results_count(self, params, expected_count, field_name):
+        """Get the result count in a API query response"""
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg=f"Did not get the right number of search results in API with {field_name} "
+            "filter applied.\n"
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
+        )
+        return r
+
+    def test_can_perform_a_regular_semantic_query(
+        self, inception_mock
+    ) -> None:
+        """Can we perform a semantic search using the API?"""
+
+        inception_mock.return_value = self._get_mock_for_inception(
+            self.situational_query_vectors
+        )
+
+        # Perform search and check that exactly two results are returned
+        search_params = {"q": self.situational_query, "semantic": True}
+        r = self._test_api_results_count(search_params, 2, "semantic query")
+
+        content = r.content.decode()
+        # Check that the expected clusters appear in the results
+        self.assertIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
+        self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
+
+        # Check that the snippet does not default to the start of the plain
+        # text, but instead uses the semantically relevant chunk
+        for cluster in r.data["results"]:
+            with self.subTest(
+                cluster_id=cluster["cluster_id"], msg="Snippet content test."
+            ):
+                for opinion in cluster["opinions"]:
+                    record = Opinion.objects.get(id=opinion["id"])
+                    self.assertNotEqual(
+                        opinion["snippet"],
+                        record.plain_text[: settings.NO_MATCH_HL_SIZE],
+                    )
+
+        # Ensure that other clusters are not erroneously included
+        self.assertNotIn(f'"cluster_id":{self.opinion_4.cluster.id}', content)
+        self.assertNotIn(f'"cluster_id":{self.opinion_5.cluster.id}', content)
+
+    def test_can_apply_filter_to_semantic_query(self, inception_mock) -> None:
+        """Can we apply filtering to semantic search results?"""
+        inception_mock.return_value = self._get_mock_for_inception(
+            self.situational_query_vectors
+        )
+
+        # Filter by court ID
+        search_params = {
+            "q": self.situational_query,
+            "semantic": True,
+            "court": self.ohio_court.id,
+        }
+
+        # Should return only the opinion from the Ohio court
+        r = self._test_api_results_count(
+            search_params, 1, "semantic query with court filter"
+        )
+        content = r.content.decode()
+        self.assertIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
+        self.assertNotIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
+
+        # Filter by docket number
+        search_params = {
+            "q": self.situational_query,
+            "semantic": True,
+            "docket_number": "24-AP-118",
+        }
+
+        # Should return only the result matching the docket number
+        r = self._test_api_results_count(
+            search_params, 1, "semantic query with docket number filter"
+        )
+        content = r.content.decode()
+        self.assertNotIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
+        self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
+
+    def test_can_sort_semantic_search_results(self, inception_mock) -> None:
+        """Can we sort semantic search results by cite count?"""
+        inception_mock.return_value = self._get_mock_for_inception(
+            self.situational_query_vectors
+        )
+
+        # Sort by citation count descending
+        search_params = {
+            "q": self.situational_query,
+            "semantic": True,
+            "order_by": "citeCount desc",
+        }
+        r = self._test_api_results_count(search_params, 2, "citeCount desc")
+        content = r.content.decode()
+
+        # Opinion with higher cite count should appear first
+        self.assertTrue(
+            content.index(f'"cluster_id":{self.opinion_2.cluster_id}')
+            < content.index(f'"cluster_id":{self.opinion_3.cluster_id}'),
+            msg=f"'{self.opinion_2}' should come BEFORE '{self.opinion_3}' when"
+            " ordered by descending citeCount.",
+        )
+
+        # Sort by citation count ascending
+        search_params = {
+            "q": self.situational_query,
+            "semantic": True,
+            "order_by": "citeCount asc",
+        }
+        r = self._test_api_results_count(search_params, 2, "citeCount asc")
+        content = r.content.decode()
+
+        # Opinion with lower cite count should appear first
+        self.assertTrue(
+            content.index(f'"cluster_id":{self.opinion_3.cluster_id}')
+            < content.index(f'"cluster_id":{self.opinion_2.cluster_id}'),
+            msg=f"'{self.opinion_3}' should come BEFORE '{self.opinion_2}' when"
+            " ordered by ascending citeCount.",
+        )
+
+    def test_is_semantic_score_standarized(self, inception_mock) -> None:
+        """Ensure that semantic scores are consistently returned as floats"""
+        inception_mock.return_value = self._get_mock_for_inception(
+            self.situational_query_vectors
+        )
+
+        # Create opinions that will only match via keyword (no embeddings).
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            OpinionFactory(
+                plain_text="the apartment has remained in uninhabitable condition",
+                cluster=OpinionClusterFactory(
+                    docket=DocketFactory(
+                        source=Docket.SCRAPER,
+                    ),
+                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                ),
+            )
+            OpinionClusterFactory(
+                docket=DocketFactory(
+                    source=Docket.SCRAPER,
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                case_name="Uninhabitable Conditions Corp v. Washington.",
+                case_name_full="Uninhabitable Conditions Corp v. Washington.",
+            )
+
+        search_params = {"q": self.hybrid_query, "semantic": True}
+        r = self._test_api_results_count(
+            search_params, 4, "hybrid semantic search query"
+        )
+
+        # Validate semantic scores:
+        # - Should be 0.0 for keyword-only matches
+        # - Should be > 0.0 for clusters matched semantically
+        for cluster in r.data["results"]:
+            with self.subTest(
+                cluster_id=cluster["cluster_id"], msg="Semantic score test."
+            ):
+                semantic_score = cluster["meta"]["score"]["semantic"]
+                if cluster["cluster_id"] in [
+                    self.opinion_2.cluster_id,
+                    self.opinion_3.cluster_id,
+                ]:
+                    self.assertNotEqual(semantic_score, 0.0)
+                else:
+                    self.assertEqual(semantic_score, 0.0)
+
+    def test_can_do_hybrid_search_query(self, inception_mock) -> None:
+        """Can we combine semantic and keyword matches in hybrid search?"""
+        inception_mock.return_value = self._get_mock_for_inception(
+            self.situational_query_vectors
+        )
+
+        # Create a new opinion that should match by keyword only (no embeddings)
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            opinion_5 = OpinionFactory(
+                cluster=OpinionClusterFactory(
+                    docket=DocketFactory(
+                        court=self.ohio_court,
+                        docket_number="30274",
+                        source=Docket.SCRAPER,
+                    ),
+                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                    case_name="Uninhabitable Conditions Corp v. Washington.",
+                    case_name_full="Uninhabitable Conditions Corp v. Washington.",
+                )
+            )
+
+        # Hybrid query should return semantic and keyword matches (3 total)
+        search_params = {"q": self.hybrid_query, "semantic": True}
+        r = self._test_api_results_count(
+            search_params, 3, "hybrid semantic search query"
+        )
+        content = r.content.decode()
+
+        # Should include the two opinions with embeddings
+        self.assertIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
+        self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
+
+        # Should also include the keyword-only match (no embeddings)
+        self.assertIn(f'"cluster_id":{opinion_5.cluster.id}', content)
+
+        # Verify snippet behavior:
+        # - For keyword-only matches, snippet should default to plain text
+        # - For semantic matches, snippet should come from the relevant chunk
+        for cluster in r.data["results"]:
+            with self.subTest(
+                cluster_id=cluster["cluster_id"], msg="Snippet content test."
+            ):
+                for opinion in cluster["opinions"]:
+                    record = Opinion.objects.get(id=opinion["id"])
+                    if record.id == opinion_5.id:
+                        self.assertEqual(
+                            opinion["snippet"],
+                            record.plain_text[: settings.NO_MATCH_HL_SIZE],
+                        )
+                    else:
+                        self.assertNotEqual(
+                            opinion["snippet"],
+                            record.plain_text[: settings.NO_MATCH_HL_SIZE],
+                        )
