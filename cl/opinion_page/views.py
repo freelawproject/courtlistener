@@ -2,7 +2,7 @@ import datetime
 from collections import OrderedDict, defaultdict
 from datetime import timedelta
 from http import HTTPStatus
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlencode
 
 import eyecite
@@ -1153,7 +1153,7 @@ async def get_prev_next_volumes(
     ]
 
     # Use human sort for volume strings, e.g. 77, 78, 78a, 78b, 79
-    sorted_volumes = human_sort(raw_volumes)
+    sorted_volumes = cast(list[str], human_sort(raw_volumes))
     index = sorted_volumes.index(volume)
     volume_previous = sorted_volumes[index - 1] if index > 0 else None
     volume_next = (
