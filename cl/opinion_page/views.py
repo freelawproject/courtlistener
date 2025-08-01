@@ -979,6 +979,7 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
 
 @never_cache
 @handle_cluster_redirection
+@track_view_counter(tracks="cluster", label_format="o.%s:view")
 async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """View Opinions
 
