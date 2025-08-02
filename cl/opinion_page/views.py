@@ -625,8 +625,8 @@ async def view_recap_authorities(
         is_og_bot,
         "recap_authorities.html",
     )
-    if isinstance(response, SimpleTemplateResponse):
-        c = response.context  # type: ignore[attr-defined]
+    if isinstance(response, SimpleTemplateResponse) and response.context_data:
+        c = response.context_data
         c["authorities"] = c["rd"].authorities_with_data
     return response
 
