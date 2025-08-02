@@ -6352,7 +6352,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     async def test_update_webhook_after_http_error(
         self,
@@ -6424,7 +6424,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     async def test_update_webhook_after_network_error(
         self,
@@ -6495,7 +6495,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     async def test_success_webhook_delivery(
         self,
@@ -6561,7 +6561,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     async def test_retry_webhooks_integration(
         self,
