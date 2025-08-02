@@ -244,11 +244,22 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
                     precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 )
             )
+            # Opinion without embeddings; should match keyword-only queries.
             cls.opinion_5 = OpinionFactory(
+                plain_text="...which the then owner maintained in an uninhabitable conditions",
                 cluster=OpinionClusterFactory(
                     docket=DocketFactory(),
                     precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-                )
+                ),
+            )
+            # Cluster with no opinions; should not match any queries.
+            cls.cluster = OpinionClusterFactory(
+                docket=DocketFactory(
+                    source=Docket.SCRAPER,
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                case_name="Uninhabitable Conditions Corp v. Washington.",
+                case_name_full="Uninhabitable Conditions Corp v. Washington.",
             )
 
         # Fetch Elasticsearch document representations
@@ -428,29 +439,9 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             self.situational_query_vectors
         )
 
-        # Create opinions that will only match via keyword (no embeddings).
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            OpinionFactory(
-                plain_text="the apartment has remained in uninhabitable condition",
-                cluster=OpinionClusterFactory(
-                    docket=DocketFactory(
-                        source=Docket.SCRAPER,
-                    ),
-                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-                ),
-            )
-            OpinionClusterFactory(
-                docket=DocketFactory(
-                    source=Docket.SCRAPER,
-                ),
-                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-                case_name="Uninhabitable Conditions Corp v. Washington.",
-                case_name_full="Uninhabitable Conditions Corp v. Washington.",
-            )
-
         search_params = {"q": self.hybrid_query, "semantic": True}
         r = self._test_api_results_count(
-            search_params, 4, "hybrid semantic search query"
+            search_params, 3, "hybrid semantic search query"
         )
 
         # Validate semantic scores:
@@ -475,21 +466,6 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             self.situational_query_vectors
         )
 
-        # Create a new opinion that should match by keyword only (no embeddings)
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            opinion_5 = OpinionFactory(
-                cluster=OpinionClusterFactory(
-                    docket=DocketFactory(
-                        court=self.ohio_court,
-                        docket_number="30274",
-                        source=Docket.SCRAPER,
-                    ),
-                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-                    case_name="Uninhabitable Conditions Corp v. Washington.",
-                    case_name_full="Uninhabitable Conditions Corp v. Washington.",
-                )
-            )
-
         # Hybrid query should return semantic and keyword matches (3 total)
         search_params = {"q": self.hybrid_query, "semantic": True}
         r = self._test_api_results_count(
@@ -502,7 +478,10 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
 
         # Should also include the keyword-only match (no embeddings)
-        self.assertIn(f'"cluster_id":{opinion_5.cluster.id}', content)
+        self.assertIn(f'"cluster_id":{self.opinion_5.cluster.id}', content)
+
+        # Verify the cluster with no opinion is not included.
+        self.assertNotIn(f'"cluster_id":{self.cluster.id}', content)
 
         # Verify snippet behavior:
         # - For keyword-only matches, snippet should default to plain text
@@ -513,7 +492,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             ):
                 for opinion in cluster["opinions"]:
                     record = Opinion.objects.get(id=opinion["id"])
-                    if record.id == opinion_5.id:
+                    if record.id == self.opinion_5.id:
                         self.assertEqual(
                             opinion["snippet"],
                             record.plain_text[: settings.NO_MATCH_HL_SIZE],
