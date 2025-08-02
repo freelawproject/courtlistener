@@ -2725,7 +2725,7 @@ def apply_custom_score_to_main_query(
 
 
 def build_semantic_query(
-    text_query: str, fields: list[str], filters: list[QueryString | Range]
+    text_query: str, filters: list[QueryString | Range]
 ) -> tuple[str, list[Query]]:
     """
     Build a hybrid Elasticsearch query using both exact keyword matching and
@@ -2733,7 +2733,6 @@ def build_semantic_query(
 
     :param text_query: The raw user query string, which may include quoted
         phrases for exact matching.
-    :param fields: A list of fields to target with the full-text keyword query.
     :param filters: A list of filter clauses to apply as pre-filtering to the
         semantic KNN search query.
     :return: A two-tuple:
@@ -2902,7 +2901,6 @@ def build_full_join_es_queries(
             if has_valid_semantic_query:
                 keyword_text_query, child_text_query = build_semantic_query(
                     string_query,
-                    child_fields,
                     child_filters,
                 )
                 if not keyword_text_query:
