@@ -1,11 +1,46 @@
-{% load tz %}
-<h3>
+{% load tz %}{% load waffle_tags %}
+<h3 style="margin-top: 10px; margin-left:0px;">
   {% if rd.description %}{{ rd.description }}
     <span class="gray">&mdash;</span>
   {% endif %}
-    Document <a href="{{ rd.docket_entry.docket.get_absolute_url }}?entry_gte={{ rd.document_number }}#entry-{{ rd.document_number }}">#{{ rd.document_number }}
-  </a>
-  {% if rd.document_type == rd.ATTACHMENT %}, Attachment #{{ rd.attachment_number }}{% endif %}
+  Document
+  <a href="{{ rd.docket_entry.docket.get_absolute_url }}?entry_gte={{ rd.document_number }}#entry-{{ rd.document_number }}">
+    #{{ rd.document_number }}</a>{% if rd.document_type == rd.ATTACHMENT %},
+    Attachment #{{ rd.attachment_number }}{% endif %}
+    {% if attachments %}
+      <div class="btn-group">
+        <button
+          class="btn btn-default btn-lg dropdown-toggle"
+          type="button"
+          data-toggle="dropdown"
+          aria-expanded="false"
+          style="vertical-align:bottom; padding:1px 10px; border-radius:3px;"
+        >
+          <span class="caret"></span>
+        </button>
+
+        <ul class="dropdown-menu pull-right medium">
+          {% for doc in attachments %}
+            <li {% if doc.attachment_number == rd.attachment_number or not doc.url %}class="disabled"{% endif %}>
+              {% if not doc.url %}
+                {{ doc.description }}
+              {% else %}
+                <a
+                  href="{% if doc.attachment_number != rd.attachment_number %}{{ doc.url }}{% else %}#{% endif %}"
+                  title="{% if doc.description %}{{ doc.description }}{% elif doc.attachment_number%}Attachment #{{ doc.attachment_number }}{% else %}Document #{{ rd.document_number }}{% endif %}"
+                >
+                  {% if doc.attachment_number %}Att. {{ doc.attachment_number }}{% else %}Entry {{ rd.document_number }}{% endif %}
+                  {% if doc.description %}
+                    <span class="gray">&mdash;</span>
+                    {{ doc.description }}
+                  {% endif %}
+                </a>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
 </h3>
 <h4>{{ rd.docket_entry.docket.court }}</h4>
 <p class="bottom">
