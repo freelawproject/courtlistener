@@ -22,6 +22,7 @@ from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
+from django.utils.xmlutils import UnserializableContentError
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import NotFound
@@ -29,6 +30,7 @@ from rest_framework.pagination import Cursor, CursorPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
+from rest_framework_xml.renderers import XMLRenderer
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
@@ -105,6 +107,7 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
+    OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import (
@@ -4102,3 +4105,51 @@ class ClusterRedirectionTest(TestCase):
         response = await api_client.get(url)
         self.assertEqual(response.json()["detail"], message)
         self.assertEqual(response.status_code, HTTPStatus.GONE)
+
+
+class TestOpinionViewsetXMLRendering(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="a-user",
+            user__password=make_password("password"),
+        )
+        cls.op_id = 5555555
+        cls.op = OpinionWithParentsFactory.create(
+            plain_text="\x0cAn invalid character", id=cls.op_id
+        )
+        cls.good_xml_op_id = 444444
+        cls.good_xml_op = OpinionWithParentsFactory.create(
+            plain_text="No invalid characters", id=cls.good_xml_op_id
+        )
+
+    async def test_xml_rendering(self):
+        """Can we handle invalid characters when XML is requested?"""
+        url = reverse(
+            "opinion-detail",
+            kwargs={"version": "v4", "pk": self.op_id, "format": "xml"},
+        )
+
+        try:
+            XMLRenderer().render({"plain_text": self.op.plain_text})
+            self.fail("XMLRenderer.render should fail")
+        except UnserializableContentError:
+            pass
+
+        api_client = await sync_to_async(make_client)(self.user.user.pk)
+        response = await api_client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        # Check that we don't call the cleaning function when XML is valid
+        url = reverse(
+            "opinion-detail",
+            kwargs={
+                "version": "v4",
+                "pk": self.good_xml_op_id,
+                "format": "xml",
+            },
+        )
+        with mock.patch("cl.search.api_renderers.clean_xml_data") as patched:
+            api_client = await sync_to_async(make_client)(self.user.user.pk)
+            response = await api_client.get(url)
+            patched.assert_not_called()
