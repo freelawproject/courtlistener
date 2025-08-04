@@ -34,7 +34,7 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_versions_by_text_similarity,
 )
 from cl.scrapers.utils import citation_is_duplicated, make_citation
-from cl.search.models import Docket, Opinion, RECAPDocument
+from cl.search.models import SOURCES, Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +248,7 @@ def find_and_merge_versions(self, pk: int) -> None:
     query = get_query_from_url(recently_scraped_opinion.download_url, "exact")
     versions = (
         Opinion.objects.filter(query)
+        .filter(cluster__source=SOURCES.COURT_WEBSITE)
         .exclude(id=pk)
         .exclude(main_version__isnull=False)
         .order_by("-date_created")

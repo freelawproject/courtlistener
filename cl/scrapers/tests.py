@@ -1095,7 +1095,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         # Create related objects to the version docket so we can update their
         # references on merging
         version_docket_another_cluster = OpinionClusterFactory.create(
-            docket=version_docket
+            docket=version_docket, source=SOURCES.COURT_WEBSITE
         )
         version_audio = AudioWithParentsFactory.create(docket=version_docket)
 
@@ -1107,19 +1107,30 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         other_dates = "Argued on March 10 2025"
         summary = "Something..."
         main_cluster = OpinionClusterFactory.create(
-            docket=main_docket, other_dates="", summary=""
+            docket=main_docket,
+            other_dates="",
+            summary="",
+            source=SOURCES.COURT_WEBSITE,
         )
         cluster2 = OpinionClusterFactory.create(
             docket=main_docket,
             # other_dates should overwrite the empty field in the main cluster
             other_dates=other_dates,
             summary="",
+            source=SOURCES.COURT_WEBSITE,
         )
         cluster3 = OpinionClusterFactory.create(
-            docket=version_docket, other_dates="", summary=summary
+            docket=version_docket,
+            other_dates="",
+            summary=summary,
+            source=SOURCES.COURT_WEBSITE,
         )
-        cluster4 = OpinionClusterFactory.create(docket=DocketFactory.create())
-        cluster5 = OpinionClusterFactory.create(docket=not_comparable_docket)
+        cluster4 = OpinionClusterFactory.create(
+            docket=DocketFactory.create(), source=SOURCES.COURT_WEBSITE
+        )
+        cluster5 = OpinionClusterFactory.create(
+            docket=not_comparable_docket, source=SOURCES.COURT_WEBSITE
+        )
 
         main_citation = CitationWithParentsFactory.create(
             cluster=main_cluster, volume=10000, reporter="U.S.", page="1"
@@ -1152,6 +1163,16 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         download_url = "http://caseinfo.nvsupreme/111.pdf"
         author_str = "A Judge"
 
+        should_ignore_version = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(
+                docket=version_docket, source=SOURCES.COURT_M_HARVARD
+            ),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=None,
+            sha1="xxxx",
+            html="",
+        )
         # Creation order matters, since we can't override date_created
         # the opinion we intend to be the main version must be created last
         version = OpinionFactory.create(
@@ -1249,6 +1270,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
 
         # Time to test
+        should_ignore_version.refresh_from_db()
         version.refresh_from_db()
         main_opinion.refresh_from_db()
         main_cluster.refresh_from_db()
@@ -1261,6 +1283,11 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         not_a_version_in_version_cluster.refresh_from_db()
 
         # Opinions
+        self.assertEqual(
+            should_ignore_version.main_version,
+            None,
+            "Opinion.main_version should not be updated for a non COURT_WEBSITE source cluster",
+        )
         self.assertEqual(
             version.main_version,
             main_opinion,
@@ -1383,20 +1410,35 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         download_url = "https://something.com/1"
         plain_text = "Something ..."
         docket = DocketFactory(docket_number="111")
+
+        should_ignore = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_M_HARVARD
+            ),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=None,
+        )
         previous_main = OpinionFactory.create(
-            cluster=OpinionClusterFactory.create(docket=docket),
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_WEBSITE
+            ),
             download_url=download_url,
             plain_text=plain_text,
             main_version=None,
         )
         a_version = OpinionFactory.create(
-            cluster=OpinionClusterFactory.create(docket=docket),
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_WEBSITE
+            ),
             download_url=download_url,
             plain_text=plain_text,
             main_version=previous_main,
         )
         main = OpinionFactory.create(
-            cluster=OpinionClusterFactory.create(docket=docket),
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_WEBSITE
+            ),
             download_url=download_url,
             plain_text=plain_text,
             main_version=None,
@@ -1405,10 +1447,14 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         find_and_merge_versions(pk=main.id)
         a_version.refresh_from_db()
         previous_main.refresh_from_db()
+        should_ignore.refresh_from_db()
 
         self.assertEqual(previous_main.main_version.id, main.id)
         # test transitive main_version update
         self.assertEqual(a_version.main_version.id, main.id)
+
+        # should ignore due to OpinionCluster.source
+        self.assertEqual(should_ignore.main_version, None)
 
     def test_source_merging(self):
         """Can we merge both Docket and Cluster sources?"""
