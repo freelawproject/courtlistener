@@ -3,9 +3,58 @@
 {% require_script "js/alpine/composables/focus.js" %}
 {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 
-<c-vars class="" menu_class="" item_class=""></c-vars>
+<c-vars class="" menu_class="" item_class="" variant="menu"></c-vars>
 
 <div class="relative">
+
+{% if variant == "tabs" %}
+
+  <div
+    data-title="{{ title }}"
+    role="tablist"
+    aria-label="Select the scope of your search"
+    class="w-full gap-1 items-stretch {{ class }}"
+    x-data="focus"
+    x-bind:aria-activedescendant="selectedScope"
+    x-on:keydown.left="focusPrevious"
+    x-on:keydown.right="focusNext"
+    x-on:keydown.home.prevent="focusFirst"
+    x-on:keydown.end.prevent="focusLast"
+  >
+    <template x-for="scope in searchScopes">
+      <button
+        x-on:click="selectScope"
+        x-bind:data-scope="scope.label"
+        x-bind:id="scope.label"
+        x-bind:aria-selected="isActiveScope"
+        type="button"
+        role="tab"
+        x-bind:class="scopeTabClass"
+      >
+        <span class="flex flex-col items-start">
+          <span
+            x-bind:data-scope="scope.label"
+            x-bind:class="scopeTabTitleClass"
+            x-text="scope.label"
+            class=""
+          ></span>
+          <span
+            x-show="isActiveScope"
+            x-bind:data-scope="scope.label"
+            x-text="scope.shortDescription"
+            class="text-xs text-greyscale-500"
+          ></span>
+        </span>
+      </button>
+    </template>
+    <a href="{% url "coverage" %}" class="ml-auto flex items-center text-sm text-greyscale-600 gap-1 hover:text-greyscale-500">
+      {% svg "circle_question_mark" class="text-greyscale-400 hover:text-greyscale-300 h-4 w-4 [@media(max-width:893px)]:h-6 [@media(max-width:893px)]:w-6" %}
+      <span class="[@media(max-width:893px)]:hidden">About This Data</span>
+    </a>
+  </div>
+
+{% else %}
+
   {#  scope selector  #}
   <button
     type="button"
@@ -72,4 +121,6 @@
       </li>
     </template>
   </menu>
+
+{% endif %}
 </div>
