@@ -41,7 +41,7 @@
       {% endif %}
       <div>
       {% if request.user.is_authenticated %}
-        {% if not user.profile.is_member and alert.rate == 'rt' %}
+        {% if not user.profile.is_member and not user.profile.unlimited_docket_alerts and alert.rate == 'rt' %}
           <p class="bottom inline ml-1"
             title="Please become a member to enable Real Time alerts.">
             <a class="btn btn-primary btn-xs disabled">
