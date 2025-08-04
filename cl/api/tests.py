@@ -90,6 +90,7 @@ from cl.recap.views import (
     PacerFetchRequestViewSet,
     PacerProcessingQueueViewSet,
 )
+from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_views import (
     CourtViewSet,
     DocketEntryViewSet,
@@ -4153,3 +4154,10 @@ class TestOpinionViewsetXMLRendering(TestCase):
             api_client = await sync_to_async(make_client)(self.user.user.pk)
             response = await api_client.get(url)
             patched.assert_not_called()
+
+        # Check that Redis set is populated
+        r = get_redis_interface("STATS")
+        problematic_set = r.smembers(SafeXMLRenderer.redis_set_name)
+        # int ids were converted to strings
+        self.assertTrue(str(self.op_id) in problematic_set)
+        self.assertFalse(str(self.good_xml_op_id) in problematic_set)

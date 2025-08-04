@@ -4,6 +4,8 @@ from typing import Any
 from django.utils.xmlutils import UnserializableContentError
 from rest_framework_xml.renderers import XMLRenderer
 
+from cl.lib.redis_utils import get_redis_interface
+
 # Regex for invalid XML characters
 INVALID_XML_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
@@ -31,6 +33,8 @@ class SafeXMLRenderer(XMLRenderer):
     and tries again.
     """
 
+    redis_set_name = "api:invalid_xml_chars:opinion_ids"
+
     def render(self, data, accepted_media_type=None, renderer_context=None):
         if data is None:
             return b""
@@ -38,8 +42,22 @@ class SafeXMLRenderer(XMLRenderer):
         try:
             return super().render(data, accepted_media_type, renderer_context)
         except UnserializableContentError:
-            cleaned_data = clean_xml_data(data)
+            # Save problematic IDs to Redis for future correction
+            r = get_redis_interface("STATS")
 
+            if isinstance(data, list):
+                ids = [i.get("id") for i in data]
+            elif isinstance(data, dict):
+                ids = [data.get("id")]
+            else:
+                ids = []
+
+            for object_id in ids:
+                if object_id:
+                    r.sadd(self.redis_set_name, object_id)
+
+            # clean XML invalid chars and try again
+            cleaned_data = clean_xml_data(data)
             return super().render(
                 cleaned_data, accepted_media_type, renderer_context
             )
