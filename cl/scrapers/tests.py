@@ -18,6 +18,7 @@ from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
+from cl.citations.models import UnmatchedCitation
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.test_helpers import generate_docket_target_sources
@@ -65,6 +66,8 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
+    OpinionsCitedWithParentsFactory,
+    ParentheticalFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -75,6 +78,8 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
+    OpinionsCited,
+    Parenthetical,
 )
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import (
@@ -1182,6 +1187,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             # This field should be updated
             author_str=author_str,
             sha1="22222",
+            html_with_citations="something...",
         )
         # the version cluster may have other opinions linked to it that are
         # not versions. Ensure we migrate them to the main cluster after this
@@ -1216,6 +1222,27 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             html="",
             author_str="",
             sha1="11111",
+        )
+
+        # test cleanup of objects related to citation annotation
+        version_parenthetical = ParentheticalFactory.create(
+            describing_opinion=version, described_opinion=unrelated_opinion
+        )
+        version_opinions_cited = OpinionsCitedWithParentsFactory.create(
+            citing_opinion=version, cited_opinion=unrelated_opinion
+        )
+        version_opinions_cited_cluster = unrelated_opinion.cluster
+        version_opinions_cited_cluster.citation_count = 10
+        version_opinions_cited_cluster.save()
+        version_unmatched_citation = UnmatchedCitation.objects.create(
+            citing_opinion=version,
+            status=1,
+            citation_string="",
+            court_id="",
+            volume="1",
+            reporter="Nev",
+            page="1",
+            type=1,
         )
 
         # Check that elasticsearch docs exist before the merging
@@ -1345,7 +1372,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(
             version_audio.docket_id,
             main_docket.id,
-            "The docket entry assigned to `version_docket` should be assigned to `main_docket`",
+            "The audio assigned to `version_docket` should be assigned to `main_docket`",
         )
 
         # Citations
@@ -1360,6 +1387,30 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             main_cluster.id,
             "new_citation.cluster_id was not updated",
         )
+
+        # test cleanup of objects related to citation annotation
+        self.assertEqual(version.html_with_citations, "")
+
+        try:
+            version_parenthetical.refresh_from_db()
+            self.fail("version's parenthetical should be deleted")
+        except Parenthetical.DoesNotExist:
+            pass
+
+        try:
+            version_opinions_cited.refresh_from_db()
+            self.fail("version's OpinionsCited should be deleted")
+        except OpinionsCited.DoesNotExist:
+            pass
+
+        version_opinions_cited_cluster.refresh_from_db()
+        self.assertEqual(version_opinions_cited_cluster.citation_count, 9)
+
+        try:
+            version_unmatched_citation.refresh_from_db()
+            self.fail("version's UnmatchedCitation should be deleted")
+        except UnmatchedCitation.DoesNotExist:
+            pass
 
         # Check that the new citation was indexed in the OpinionClusterDocument
         ocd = OpinionClusterDocument.get(id=main_cluster.id)
