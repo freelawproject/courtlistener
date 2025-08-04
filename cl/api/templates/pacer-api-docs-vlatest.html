@@ -95,6 +95,7 @@
   "{% get_full_host %}{% url "docketentry-list" version=version %}?docket=4214664"</pre>
   <p>Such a request will return up to 20 docket entries per page. Each docket entry returned can contain a number of nested documents in the <code>recap_document</code> key, including their full extracted text (see details in the next section below). As a result, this response can be quite large.
   </p>
+  <p>If you don’t need the <code>plain_text</code> content, consider using  <a href="{% url "rest_docs" version=version %}#field-selection">Field Selection</a> to omit or filter out the document <code>plain_text</code> field for a much smaller and faster response.</p>
   <p>You can also order the results using specific fields. To order results, use the <code>order_by</code> query parameter. For example, to order docket entries by their filing date in ascending order:
   </p>
   <pre class="pre-scrollable">curl -v \
@@ -174,6 +175,7 @@
         </p>
         <p>To see whether OCR was used, check the <code>ocr_status</code> field.
         </p>
+        <p>If you don’t need this content, omit it via <a href="{% url "rest_docs" version=version %}#field-selection">Field Selection</a> to significantly reduce response times and payload size.</p>
       </td>
     </tr>
     <tr>

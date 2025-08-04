@@ -1935,6 +1935,45 @@ def fill_position_mapping(
     return position_db_mapping
 
 
+def merge_semantic_relevant_chunks(results: Page | Response) -> None:
+    """
+    Updates each child document in the given results with the most semantically
+    relevant chunk of text.
+
+    This function iterates over a list of result objects, each of which may
+    contain child documents with semantic search results in the `inner_hits`
+    field. For each child document, it extracts the top-ranked chunk from the
+    `embeddings` inner hit and assigns its text to the child document's
+    `_source["text"]` field.
+
+    :param results: The Page or Response object containing search results.
+    :return: None, the function updates the results in place.
+    """
+    results_list = results
+    if isinstance(results, Page):
+        results_list = results.object_list
+
+    for result in results_list:
+        if not hasattr(result, "child_docs"):
+            continue
+
+        for child_doc in result.child_docs:
+            # Skip if the child document does not have semantic inner hits
+            if not hasattr(child_doc, "inner_hits"):
+                continue
+
+            # Access the list of semantic hits under the "embeddings" inner hit
+            inner_hits = child_doc.inner_hits["embeddings"]["hits"]["hits"]
+            if not inner_hits:
+                # Skip if there are no hits
+                continue
+
+            text = inner_hits[0]["fields"]["embeddings"][0]["chunk"]
+            if not text:
+                continue
+            child_doc["_source"]["text"] = text
+
+
 def merge_unavailable_fields_on_parent_document(
     results: Page | dict | Response,
     search_type: str,
@@ -2733,6 +2772,7 @@ def build_semantic_query(
             build_fulltext_query(fields, keyword_query, only_queries=True)
         )
 
+    inner_hits = {"size": 1, "_source": False, "fields": ["embeddings.chunk"]}
     # Add the semantic vector-based query using KNN with pre-filtering
     semantic_query.append(
         Q(
@@ -2745,8 +2785,10 @@ def build_semantic_query(
                 query_vector=vectors,
                 filter=filters,
                 similarity=settings.KNN_SIMILARITY,
+                rescore_vector={"oversample": settings.KNN_OVERSAMPLE},
                 boost=settings.KNN_SEARCH_BOOST,
             ),
+            inner_hits=inner_hits,
         )
     )
     return keyword_query, semantic_query
@@ -3583,6 +3625,29 @@ def simplify_estimated_count(search_count: int) -> int:
     return search_count
 
 
+def get_max_score_for_knn_search(child_docs: list[Hit]) -> float:
+    """
+    Retrieves the maximum score from the k-NN search results of the first child
+    document.
+
+    This function checks if the input list of child documents is non-empty and
+    whether the first document contains k-NN `inner_hits` under the "embeddings"
+    key. If so, it returns the `max_score` from the search hits. Otherwise, it
+    returns 0.0.
+
+    :param child_docs: A list of child documents that may contain kNN metadata.
+    :return: The maximum score from the inner hits, or 0.0 if unavailable.
+    """
+    if not len(child_docs) or not hasattr(child_docs[0], "inner_hits"):
+        return 0.0
+
+    knn_score = child_docs[0].inner_hits["embeddings"]["hits"]["max_score"]
+    if not knn_score:
+        return 0.0
+
+    return knn_score
+
+
 def set_child_docs_and_score(
     results: list[Hit] | list[dict[str, Any]] | Response,
     merge_highlights: bool = False,
@@ -3604,7 +3669,8 @@ def set_child_docs_and_score(
         if result_is_dict:
             # If the result is a dictionary, do nothing, or assign [] to
             # child_docs if it is not present.
-            result["child_docs"] = result.get("child_docs", [])
+            child_docs = result.get("child_docs", [])
+            result["child_docs"] = child_docs
         else:
             # Process child hits if the result is an ES AttrDict instance,
             # so they can be properly serialized.
@@ -3614,6 +3680,7 @@ def set_child_docs_and_score(
                 for doc in child_docs
             ]
 
+        semantic_score = get_max_score_for_knn_search(child_docs)
         # Optionally merges highlights. Used for integrating percolator
         # highlights into the percolated document.
         if merge_highlights and result_is_dict:
@@ -3623,6 +3690,7 @@ def set_child_docs_and_score(
         # Optionally merges the BM25 score for display in the API.
         if merge_score and isinstance(result, AttrDict):
             result["bm25_score"] = result.meta.score
+            result["semantic_score"] = semantic_score
 
 
 def get_court_opinions_counts(
