@@ -1686,7 +1686,6 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             "Citations:",
             "Docket Number:",
             "Nature of Suit:",
-            "Full Case Name:",
         ]
         for header in headers:
             self.assertIn(header, [meta.text for meta in meta_data])

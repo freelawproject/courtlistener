@@ -24,6 +24,7 @@ from cl.search.models import (
     SOURCES,
     BankruptcyInformation,
     Claim,
+    ClusterRedirection,
     Docket,
     DocketEntry,
     DocketPanel,
@@ -530,6 +531,10 @@ def merge_opinion_versions(
             OpinionDocument.__name__,
             ES_CHILD_ID(version_opinion.id).OPINION,
             version_cluster.id,
+        )
+
+        ClusterRedirection.create_from_clusters(
+            main_opinion.cluster, version_cluster, ClusterRedirection.VERSION
         )
 
         # Both Opinion and Citation have a ForeignKey to OpinionCluster, with
