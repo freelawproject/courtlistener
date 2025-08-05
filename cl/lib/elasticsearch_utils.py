@@ -2725,7 +2725,7 @@ def apply_custom_score_to_main_query(
 
 
 def build_semantic_query(
-    text_query: str, fields: list[str], filters: list[QueryString | Range]
+    text_query: str, filters: list[QueryString | Range]
 ) -> tuple[str, list[Query]]:
     """
     Build a hybrid Elasticsearch query using both exact keyword matching and
@@ -2733,7 +2733,6 @@ def build_semantic_query(
 
     :param text_query: The raw user query string, which may include quoted
         phrases for exact matching.
-    :param fields: A list of fields to target with the full-text keyword query.
     :param filters: A list of filter clauses to apply as pre-filtering to the
         semantic KNN search query.
     :return: A two-tuple:
@@ -2769,7 +2768,15 @@ def build_semantic_query(
     # This enables hybrid search by combining keyword and semantic results
     if keyword_query:
         semantic_query.extend(
-            build_fulltext_query(fields, keyword_query, only_queries=True)
+            [
+                Q(
+                    "query_string",
+                    fields=["text"],
+                    query=keyword_query,
+                    quote_field_suffix=".exact",
+                    default_operator="AND",
+                )
+            ]
         )
 
     inner_hits = {"size": 1, "_source": False, "fields": ["embeddings.chunk"]}
@@ -2894,7 +2901,6 @@ def build_full_join_es_queries(
             if has_valid_semantic_query:
                 keyword_text_query, child_text_query = build_semantic_query(
                     string_query,
-                    child_fields,
                     child_filters,
                 )
                 if not keyword_text_query:
@@ -3020,7 +3026,7 @@ def build_full_join_es_queries(
                 )
         should_append_parent_query = (
             parent_query and not mlt_query and not has_valid_semantic_query
-        ) or keyword_text_query
+        )
         if should_append_parent_query:
             q_should.append(parent_query)
 

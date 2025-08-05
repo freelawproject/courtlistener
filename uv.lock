@@ -412,7 +412,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.0.2" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", git = "https://github.com/freelawproject/juriscraper?branch=add-support-to-download-acms-pdfs-from-magic-link" },
+    { name = "juriscraper", specifier = ">=2.6.68" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=5.3.1" },
     { name = "markdown2", specifier = ">=2.5.0" },
@@ -1585,8 +1585,8 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.80"
-source = { git = "https://github.com/freelawproject/juriscraper?branch=add-support-to-download-acms-pdfs-from-magic-link#8aa238c5de3721599e34244208ea0ce2bbf63d03" }
+version = "2.6.83"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
     { name = "chardet" },
@@ -1602,6 +1602,10 @@ dependencies = [
     { name = "requests" },
     { name = "selenium" },
     { name = "tldextract" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b4/8d/5677094135a3dcf817d17a8bbc86c8bc7ad8d343bd87e9c06b6a5fa3c68c/juriscraper-2.6.83.tar.gz", hash = "sha256:f88ce00471e95b1eb42caab5eb2f3640f6ae4589e49676514bf5c6f380a1fc30", size = 311135, upload-time = "2025-08-05T16:13:35.342Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/31/c9/23938d2d7fbfcdd0b65736ff1c14c2f784d5c66c43e4a6c7147676542f13/juriscraper-2.6.83-py3-none-any.whl", hash = "sha256:e76018bbd2409878de8f055f7302bb6e11f2a66899ffb1534aa419a9e633a915", size = 514821, upload-time = "2025-08-05T16:13:33.374Z" },
 ]
 
 [[package]]
