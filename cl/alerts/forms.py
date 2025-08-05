@@ -72,7 +72,9 @@ class CreateAlertForm(ModelForm):
 
         flp_membership = "https://donate.free.law/forms/membership"
         # Only members or user with unlimited alerts can create RT alerts
-        if rate == Alert.REAL_TIME and not (is_member or has_unlimited_alerts):
+        if rate == Alert.REAL_TIME and not (
+            self.user.profile.is_eligible_for_rt_search_alerts
+        ):
             msg = format_html(
                 "You must be a <a href='{}' target='_blank'>member</a> to create Real Time alerts.",
                 flp_membership,

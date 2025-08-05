@@ -643,10 +643,10 @@ def query_and_send_alerts(
     total_alerts_sent_count = 0
     sent_time = datetime.datetime.now() if not custom_date else query_date
     for user in alert_users:
-        should_send_rt_alert = (
-            user.profile.is_member or user.profile.unlimited_docket_alerts
-        )
-        if rate == Alert.REAL_TIME and not should_send_rt_alert:
+        if (
+            rate == Alert.REAL_TIME
+            and not user.profile.is_eligible_for_rt_search_alerts
+        ):
             continue
         alerts = user.alerts.filter(
             rate=rate,
