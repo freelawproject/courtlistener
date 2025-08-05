@@ -64,6 +64,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketFactory,
     OpinionClusterFactory,
+    OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
     ParentheticalFactory,
@@ -72,6 +73,7 @@ from cl.search.models import (
     SEARCH_TYPES,
     SOURCES,
     Citation,
+    ClusterRedirection,
     Court,
     Docket,
     Opinion,
@@ -1119,6 +1121,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             summary="",
             source=SOURCES.COURT_WEBSITE,
         )
+        cluster2_id = cluster2.id
         cluster3 = OpinionClusterFactory.create(
             docket=version_docket,
             other_dates="",
@@ -1327,6 +1330,17 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             self.fail("`cluster3` should had been deleted")
         except OpinionCluster.DoesNotExist:
             pass
+
+        redirection = ClusterRedirection.objects.filter(
+            deleted_cluster_id=cluster2_id,
+            cluster=main_cluster,
+            reason=ClusterRedirection.VERSION,
+        ).exists()
+        self.assertTrue(
+            redirection,
+            "ClusterRedirection object from `cluster2` to `main_cluster` was not created",
+        )
+
         self.assertEqual(
             main_cluster.other_dates,
             other_dates,
@@ -1523,3 +1537,28 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         ]
         for str1, str2, expected_result in cases:
             self.assertEqual(merge_judge_names(str1, str2), expected_result)
+
+    def test_transitive_redirection(self):
+        """Can we keep existing ClusterRedirections when its target cluster is
+        versioned?"""
+        to_keep = OpinionClusterWithParentsFactory.create(id=99999)
+        to_delete = OpinionClusterWithParentsFactory.create(id=888888)
+        existing_redirection_id = 77777
+        ClusterRedirection.objects.create(
+            deleted_cluster_id=existing_redirection_id,
+            cluster=to_delete,
+            reason=ClusterRedirection.DUPLICATE,
+        )
+
+        ClusterRedirection.create_from_clusters(
+            to_keep, to_delete, ClusterRedirection.VERSION
+        )
+
+        self.assertTrue(
+            ClusterRedirection.objects.filter(
+                deleted_cluster_id=existing_redirection_id,
+                cluster=to_keep,
+                reason=ClusterRedirection.DUPLICATE,
+            ).exists(),
+            "Existing re-direction was not re-assigned to new cluster",
+        )
