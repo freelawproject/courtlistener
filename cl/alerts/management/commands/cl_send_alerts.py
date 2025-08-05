@@ -283,7 +283,11 @@ class Command(VerboseCommand):
                 webhook.version for webhook in user_webhooks
             }
             if rate == Alert.REAL_TIME:
-                if not user.profile.is_member:
+                should_send_rt_alert = (
+                    user.profile.is_member
+                    or user.profile.unlimited_docket_alerts
+                )
+                if not should_send_rt_alert:
                     continue
 
             hits = []
