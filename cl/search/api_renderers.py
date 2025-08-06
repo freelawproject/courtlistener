@@ -43,7 +43,7 @@ class SafeXMLRenderer(XMLRenderer):
             return super().render(data, accepted_media_type, renderer_context)
         except UnserializableContentError:
             # Save problematic IDs to Redis for future correction
-            r = get_redis_interface("STATS")
+            r = get_redis_interface("CACHE")
 
             if isinstance(data, list):
                 ids = [i.get("id") for i in data]

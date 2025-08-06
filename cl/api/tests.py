@@ -4156,7 +4156,7 @@ class TestOpinionViewsetXMLRendering(TestCase):
             patched.assert_not_called()
 
         # Check that Redis set is populated
-        r = get_redis_interface("STATS")
+        r = get_redis_interface("CACHE")
         problematic_set = r.smembers(SafeXMLRenderer.redis_set_name)
         # int ids were converted to strings
         self.assertTrue(str(self.op_id) in problematic_set)
