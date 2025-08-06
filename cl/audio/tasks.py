@@ -106,8 +106,6 @@ def downsize_audio_file(audio: Audio) -> Response:
     bind=True,
     max_retries=3,
     retry_backoff=1 * 60,
-    retry_backoff_max=10 * 60,
-    retry_jitter=True,
 )
 # Rate limit transcription requests to prevent overloading transcription API
 # and getting errors. See #6123
