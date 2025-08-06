@@ -120,7 +120,7 @@ def import_tn_corpus(
                 op.cluster.case_name,
             )
 
-        docket, opinion, cluster, citations = make_objects(
+        docket, opinion, cluster, citations, _ = make_objects(
             make_item(case),
             courts[case["court"]],
             sha1_hash,
