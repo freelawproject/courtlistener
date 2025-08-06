@@ -386,7 +386,6 @@ async def extract_recap_pdf_base(
     autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
     max_retries=3,
     retry_backoff=10,
-    retry_jitter=True,
 )
 @throttle_task("1/3m")
 def process_audio_file(self, pk) -> None:
