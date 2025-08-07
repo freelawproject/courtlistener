@@ -7,6 +7,7 @@ from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 
 from cl.api.api_permissions import V3APIPermission
@@ -19,6 +20,7 @@ from cl.api.utils import (
 )
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
+from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_serializers import (
     CourtSerializer,
     DocketEntrySerializer,
@@ -304,6 +306,9 @@ class OpinionViewSet(
         DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
+    # keep the order as in `settings.rest_framework.DEFAULT_RENDERER_CLASSES`
+    # but using `SafeXMLRenderer` to handle invalid characters
+    renderer_classes = [JSONRenderer, BrowsableAPIRenderer, SafeXMLRenderer]
     ordering_fields = (
         "id",
         "date_created",
