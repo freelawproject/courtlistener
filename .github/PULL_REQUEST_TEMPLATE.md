@@ -18,19 +18,19 @@ This PR...
 
 <!-- Check here if the entire deployment can be skipped -->
 <!-- This might be the case for a small fix, a tweak to documentation or something like that. -->
-- [ ] `skip-deploy`
-<!-- Check here if the web tier can be skipped -->
-<!-- This is the case if you're working on code that doesn't affect the front end, like management commands, tasks, or documentation. -->
-- [ ] `skip-web-deploy`
-<!-- Check here if the deployment to celery can be skipped -->
-<!--This is the case if you make no changes to tasks.py or the code that tasks rely on. -->
-- [ ] `skip-celery-deploy`
-<!-- check this if deployment to cron jobs can be skipped -->
-<!-- This is the case if no changes are made that affect cronjobs. -->
-- [ ] `skip-cronjob-deploy`
-<!-- Deployment of daemons can be skipped -->
-<!-- This is the case if you haven't updated daemons or the code they depend on. -->
-- [ ] `skip-daemon-deploy`
+- [ ] `skip-deploy` (skips everything below)
+    <!-- Check here if the web tier can be skipped -->
+    <!-- This is the case if you're working on code that doesn't affect the front end, like management commands, tasks, or documentation. -->
+    - [ ] `skip-web-deploy`
+    <!-- Check here if the deployment to celery can be skipped -->
+    <!--This is the case if you make no changes to tasks.py or the code that tasks rely on. -->
+    - [ ] `skip-celery-deploy`
+    <!-- check this if deployment to cron jobs can be skipped -->
+    <!-- This is the case if no changes are made that affect cronjobs. -->
+    - [ ] `skip-cronjob-deploy`
+    <!-- Deployment of daemons can be skipped -->
+    <!-- This is the case if you haven't updated daemons or the code they depend on. -->
+    - [ ] `skip-daemon-deploy`
 
 <!-- **If deployment is required:** -->
 <!-- What extra steps are needed to deploy this beyond the standard deploy? -->
