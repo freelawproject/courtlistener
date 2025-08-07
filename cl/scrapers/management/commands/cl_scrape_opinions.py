@@ -103,7 +103,9 @@ def make_objects(
         appeal_from_id=item.get("lower_court_ids", ""),
     )
     originating_court_info = update_or_create_originating_court_information(
-        docket, item.get("lower_court_numbers"), item.get("lower_court_judges")
+        docket,
+        item.get("lower_court_numbers", ""),
+        item.get("lower_court_judges", ""),
     )
 
     # Note that if opinion.author_str has no value, and cluster.judges find

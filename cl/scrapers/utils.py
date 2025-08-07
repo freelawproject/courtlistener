@@ -620,21 +620,21 @@ def check_duplicate_ingestion(local_path_name: str) -> None:
 def update_or_create_originating_court_information(
     docket: Docket, lower_court_number: str, lower_court_judge: str
 ) -> OriginatingCourtInformation | None:
-    """
+    """Update or create an OriginatingCourtInformation given the scraped values
 
-    :param docket:
-    :param lower_court_number:
-    :param lower_court_judge:
+    :param docket: the docket to which the OCI will be linked
+    :param lower_court_number: will go into OCI.docket_number
+    :param lower_court_judge: will go into OCI.assigned_to_str
     """
     if not (lower_court_judge or lower_court_number):
         return
 
     if existing_oci := docket.originating_court_information:
         update = False
-        if not existing_oci.docket_number:
+        if not existing_oci.docket_number and lower_court_number:
             existing_oci.docket_number = lower_court_number
             update = True
-        if not existing_oci.assigned_to_str:
+        if not existing_oci.assigned_to_str and lower_court_judge:
             existing_oci.assigned_to_str = lower_court_judge
             update = True
 
@@ -645,5 +645,6 @@ def update_or_create_originating_court_information(
         return
 
     return OriginatingCourtInformation(
-        docket_number=lower_court_number, assigned_to_str=lower_court_judge
+        docket_number=lower_court_number or "",
+        assigned_to_str=lower_court_judge or "",
     )
