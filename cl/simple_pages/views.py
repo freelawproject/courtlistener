@@ -47,6 +47,7 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+from cl.search.selectors import get_available_documents_estimate_count
 from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
 
@@ -67,6 +68,9 @@ async def faq(request: HttpRequest) -> HttpResponse:
             "scraped_court_count": await Court.objects.filter(
                 in_use=True, has_opinion_scraper=True
             ).acount(),
+            "total_recap_count": await sync_to_async(
+                get_available_documents_estimate_count
+            )(),
             "total_oa_minutes": (
                 (await Audio.objects.aaggregate(Sum("duration")))[
                     "duration__sum"
