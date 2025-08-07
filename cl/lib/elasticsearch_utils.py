@@ -907,6 +907,19 @@ def build_highlights_dict(
     return highlight_options, fields_to_exclude
 
 
+def get_ms_current_time(default_current_date: datetime.date) -> int:
+    """Convert a date to a timestamp in milliseconds at midnight.
+
+    :param default_current_date: The date object to convert.
+    :return: The corresponding timestamp in milliseconds for midnight of the
+    given date.
+    """
+    midnight_current_date = datetime.datetime.combine(
+        default_current_date, datetime.time()
+    )
+    return int(midnight_current_date.timestamp() * 1000)
+
+
 def build_custom_function_score_for_date(
     query: QueryString | str,
     order_by: tuple[str, str],
@@ -939,13 +952,11 @@ def build_custom_function_score_for_date(
     :return: The modified QueryString object with applied function score.
     """
 
-    default_current_time = None
-    if default_current_date:
-        midnight_current_date = datetime.datetime.combine(
-            default_current_date, datetime.time()
-        )
-        default_current_time = int(midnight_current_date.timestamp() * 1000)
-
+    default_current_time = (
+        get_ms_current_time(default_current_date)
+        if default_current_date
+        else None
+    )
     sort_field, order = order_by
     query = Q(
         "function_score",
@@ -1007,6 +1018,7 @@ def build_decay_relevance_score(
     default_missing_date: str = "1600-01-01T00:00:00Z",
     boost_mode: str = "multiply",
     min_score: float = 0.0,
+    default_current_date: datetime.date | None = None,
 ) -> QueryString:
     """
     Build a decay relevance score query for Elasticsearch that adjusts the
@@ -1021,18 +1033,30 @@ def build_decay_relevance_score(
     :param boost_mode: The mode to combine the decay score with the query's
     original relevance score.
     :param min_score: The minimum score where the decay function stabilizes.
+    :param default_current_date: The default current date to use for computing
+     a stable decay relevance score across pagination in the V4 Search API.
     :return:  The modified QueryString object with applied function score.
     """
 
+    default_current_time = (
+        get_ms_current_time(default_current_date)
+        if default_current_date
+        else None
+    )
     query = Q(
         "function_score",
         query=query,
         script_score={
             "script": {
                 "source": f"""
+                    long now;
+                    if (params.default_current_time != null) {{
+                            now = params.default_current_time;  // Use 'default_current_time' if provided
+                        }} else {{
+                           now = new Date().getTime();
+                        }}
                     def default_missing_date = Instant.parse(params.default_missing_date).toEpochMilli();
                     def decay = (double)params.decay;
-                    def now = new Date().getTime();
                     def min_score = (double)params.min_score;
 
                     // Convert scale parameter into milliseconds.
@@ -1059,6 +1083,7 @@ def build_decay_relevance_score(
                     "scale": scale,  # Years
                     "decay": decay,
                     "min_score": min_score,
+                    "default_current_time": default_current_time,
                 },
             },
         },
@@ -2708,6 +2733,7 @@ def apply_custom_score_to_main_query(
         main_order_by == "score desc"
         and cd["type"] in valid_decay_relevance_types
     ):
+        default_current_date = cd.get("request_date")
         decay_settings = valid_decay_relevance_types[cd["type"]]
         date_field = str(decay_settings["field"])
         scale = int(decay_settings["scale"])
@@ -2720,6 +2746,7 @@ def apply_custom_score_to_main_query(
             decay=decay,
             boost_mode=boost_mode,
             min_score=min_score,
+            default_current_date=default_current_date,
         )
     return query
 

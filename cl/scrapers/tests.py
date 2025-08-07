@@ -300,10 +300,15 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         site = test_oral_arg_scraper.Site()
         site.method = "LOCAL"
         parsed_site = site.parse()
+
         with self.captureOnCommitCallbacks(execute=True):
-            cl_scrape_oral_arguments.Command().scrape_court(
-                parsed_site, full_crawl=True
-            )
+            with mock.patch(
+                "cl.lib.celery_utils.get_task_wait"
+            ) as patched_wait:
+                patched_wait.return_value = 0
+                cl_scrape_oral_arguments.Command().scrape_court(
+                    parsed_site, full_crawl=True
+                )
 
         # There should now be two items in the database.
         audio_files = Audio.objects.all()
@@ -665,7 +670,10 @@ class AudioFileTaskTest(TestCase):
     def test_process_audio_file(self) -> None:
         af = Audio.objects.get(pk=self.audio1.id)
         expected_duration = 1.0
-        process_audio_file(pk=self.audio1.id)
+        with mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait:
+            patched_wait.return_value = 0
+            process_audio_file(pk=self.audio1.id)
+
         af.refresh_from_db()
         measured_duration: float = af.duration  # type: ignore
         # Use almost equal because measuring MP3's is wonky.
