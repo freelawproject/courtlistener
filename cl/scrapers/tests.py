@@ -79,6 +79,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OriginatingCourtInformation,
     Parenthetical,
 )
 from cl.settings import MEDIA_ROOT
@@ -110,6 +111,10 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                 query="type=oa",
                 alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
             )
+        cls.existing_oci_id = 111111
+        cls.oci = OriginatingCourtInformation.objects.create(
+            docket_number="09-1111", id=cls.existing_oci_id
+        )
 
     def test_extension(self):
         r = async_to_sync(microservice)(
@@ -120,13 +125,13 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
 
     def test_ingest_opinions_from_scraper(self) -> None:
         """Can we successfully ingest opinions at a high level?"""
-
         d_1 = DocketFactory(
             case_name="Tarrant Regional Water District v. Herrmann",
             docket_number="11-889",
             court=self.court,
             source=Docket.RECAP,
             pacer_case_id=None,
+            originating_court_information=self.oci,
         )
 
         d_2 = DocketFactory(
@@ -178,6 +183,34 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         self.assertEqual(d_2.case_name, "State of Indiana v. Charles Barker")
         self.assertEqual(
             d_3.case_name, "Intl Fidlty Ins Co v. Ideal Elec Sec Co"
+        )
+
+        oci = Docket.objects.get(
+            case_name="In Re Motion for Consent to Disclosure of Court Records"
+        ).originating_court_information
+        self.assertEqual(
+            oci.docket_number, "09-2222", "New OCI.docket_number was not saved"
+        )
+        self.assertEqual(
+            oci.assigned_to_str,
+            "another jalal",
+            "New OCI.assigned_to_str was not saved",
+        )
+
+        self.assertEqual(
+            d_1.originating_court_information.docket_number,
+            "09-1111",
+            "Existing OCI.docket_number number changed",
+        )
+        self.assertEqual(
+            d_1.originating_court_information.assigned_to_str,
+            "another david",
+            "Existing OCI.assigned_to_str was not updated",
+        )
+        self.assertEqual(
+            d_1.originating_court_information.id,
+            self.existing_oci_id,
+            "Existing OCI id should not change",
         )
 
     def test_opinion_dockets_source_assigment(self) -> None:
