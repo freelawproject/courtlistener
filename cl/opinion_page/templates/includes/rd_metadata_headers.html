@@ -24,7 +24,7 @@
       {% for doc in attachments %}
         <li {% if doc.attachment_number == rd.attachment_number or not doc.url %}class="disabled"{% endif %}>
           {% if not doc.url %}
-            {{ doc.description }}
+            <span class="gray" style="padding: 3px 20px">{{ doc.description }}</span>
           {% else %}
             <a
               href="{% if doc.attachment_number != rd.attachment_number %}{{ doc.url }}{% else %}#{% endif %}"
