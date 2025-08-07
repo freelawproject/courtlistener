@@ -102,7 +102,7 @@
     <ul>
       <li>More than <a href="{% url "coverage_opinions" %}">10 million</a> legal opinions from federal, state, and specialty courts.</li>
       <li>Approximately {{ total_recap_count|intword }} documents from the Federal PACER system.</li>
-      <li>{{ total_oa_minutes|floatformat:2|intcomma }} minutes of oral argument recordings.</li>
+      <li>{{ total_oa_minutes|floatformat:0|intcomma }} minutes of oral argument recordings.</li>
       <li>A database of {{ total_judge_count|intcomma }} judges.</li>
     </ul>
     <p>CourtListener is operated by the non-profit <a href="https://free.law">Free Law Project</a>. Free Law Project seeks to provide free access to primary legal materials, develop legal research tools, and support academic research on legal corpora. CourtListener embodies all of these efforts, as a repository of <a href="{% url "advanced_o" %}">case law</a>, <a href="{% url "advanced_r" %}">federal filings</a>, <a href="{% url "advanced_oa" %}">oral argument recordings</a>, and <a href="{% url "advanced_fd" %}">financial disclosures</a>; as the platform on which we deploy legal research tools; and as the source of <a href="{% url "bulk_data_index" %}">bulk downloads</a> and <a href="{% url "api_index" %}">APIs</a> researchers use to study our collection.
