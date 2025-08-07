@@ -101,7 +101,7 @@
     <p>CourtListener is a legal research website and data provider currently containing:</p>
     <ul>
       <li>More than <a href="{% url "coverage_opinions" %}">10 million</a> legal opinions from federal, state, and specialty courts.</li>
-      <li>More than 14 million documents from the Federal PACER system.</li>
+      <li>More than {{ total_recap_count|intcomma }} documents from the Federal PACER system.</li>
       <li>{{ total_oa_minutes|intcomma }} minutes of oral argument recordings.</li>
       <li>A database of {{ total_judge_count|intcomma }} judges.</li>
     </ul>
