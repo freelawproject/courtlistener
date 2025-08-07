@@ -448,8 +448,7 @@ def update_or_create_docket(
     }
     if not appeal_from_id:
         docket_fields.pop("appeal_from_id", "")
-
-    if not Court.objects.filter(id=appeal_from_id).exists():
+    elif not Court.objects.filter(id=appeal_from_id).exists():
         docket_fields.pop("appeal_from_id", "")
         logger.error(
             "Docket.appeal_from_id has non existing Court.id '%s' as value",
