@@ -31,7 +31,13 @@ from cl.scrapers.exceptions import (
     NoDownloadUrlError,
     UnexpectedContentTypeError,
 )
-from cl.search.models import Citation, Court, Docket, OpinionCluster
+from cl.search.models import (
+    Citation,
+    Court,
+    Docket,
+    OpinionCluster,
+    OriginatingCourtInformation,
+)
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -406,6 +412,7 @@ def update_or_create_docket(
     date_argued: date | None = None,
     ia_needs_upload: bool | None = None,
     appeal_from_str: str = "",
+    appeal_from_id: str = "",
 ) -> Docket:
     """Look for an existing Docket and update it or create a new one if it's
     not found.
@@ -425,6 +432,7 @@ def update_or_create_docket(
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
     :param appeal_from_str: Name (not standardized id) of the lower level court.
+    :param appeal_from_id: Lower court id.
     :return: The docket.
     """
     docket_fields = {
@@ -434,9 +442,19 @@ def update_or_create_docket(
         "blocked": blocked,
         "ia_needs_upload": ia_needs_upload,
         "appeal_from_str": appeal_from_str,
+        "appeal_from_id": appeal_from_id,
         "date_blocked": date_blocked,
         "date_argued": date_argued,
     }
+    if not appeal_from_id:
+        docket_fields.pop("appeal_from_id", "")
+
+    if not Court.objects.filter(id=appeal_from_id).exists():
+        docket_fields.pop("appeal_from_id", "")
+        logger.error(
+            "Docket.appeal_from_id has non existing Court.id '%s' as value",
+            appeal_from_id,
+        )
 
     court_id = court.pk
     uses_docket_number_core = court.jurisdiction in Court.FEDERAL_JURISDICTIONS
@@ -597,3 +615,36 @@ def check_duplicate_ingestion(local_path_name: str) -> None:
             repeated_count,
             base_file_name,
         )
+
+
+def update_or_create_originating_court_information(
+    docket: Docket, lower_court_number: str, lower_court_judge: str
+) -> OriginatingCourtInformation | None:
+    """Update or create an OriginatingCourtInformation given the scraped values
+
+    :param docket: the docket to which the OCI will be linked
+    :param lower_court_number: will go into OCI.docket_number
+    :param lower_court_judge: will go into OCI.assigned_to_str
+    """
+    if not (lower_court_judge or lower_court_number):
+        return
+
+    if existing_oci := docket.originating_court_information:
+        update = False
+        if not existing_oci.docket_number and lower_court_number:
+            existing_oci.docket_number = lower_court_number
+            update = True
+        if not existing_oci.assigned_to_str and lower_court_judge:
+            existing_oci.assigned_to_str = lower_court_judge
+            update = True
+
+        if update:
+            existing_oci.save()
+
+        # If the docket already had a OriginatingCourtInformation, just return
+        return
+
+    return OriginatingCourtInformation(
+        docket_number=lower_court_number or "",
+        assigned_to_str=lower_court_judge or "",
+    )
