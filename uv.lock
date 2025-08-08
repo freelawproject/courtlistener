@@ -412,7 +412,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.0.2" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", git = "https://github.com/freelawproject/juriscraper?rev=1496-add-rate_limit-base-method" },
+    { name = "juriscraper", git = "https://github.com/freelawproject/juriscraper.git?rev=1535-add-download-content-method-to-abstractsite" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=5.3.1" },
     { name = "markdown2", specifier = ">=2.5.0" },
@@ -1585,8 +1585,8 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.79"
-source = { git = "https://github.com/freelawproject/juriscraper?rev=1496-add-rate_limit-base-method#d3e7f5714e6a8705ba315a252ae5b803dc34aa31" }
+version = "2.6.84"
+source = { git = "https://github.com/freelawproject/juriscraper.git?rev=1535-add-download-content-method-to-abstractsite#ae4e2a87cfc9492652bcd94c01a175961837bcbd" }
 dependencies = [
     { name = "certifi" },
     { name = "chardet" },
