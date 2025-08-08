@@ -228,18 +228,6 @@ class Command(ScraperCommand):
             help="Disable duplicate aborting.",
         )
 
-        parser.add_argument(
-            "--max_wait",
-            dest="max_wait",
-            type=int,
-            default=30,
-            help=(
-                "The maximum number of minutes to wait for a site to"
-                " return results. If the site has a method "
-                "`get_allowed_requests_in_minutes`, it will be used to "
-            ),
-        )
-
     def scrape_court(
         self,
         site,
@@ -253,35 +241,18 @@ class Command(ScraperCommand):
         court_str = site.court_id.split(".")[-1].split("_")[0]
         court = Court.objects.get(pk=court_str)
 
-        cache_key = f"{site.court_id}_cases"
-        cases = cache.get(cache_key)
+        dup_checker = DupChecker(court, full_crawl=full_crawl)
+        if dup_checker.abort_by_url_hash(site.url, site.hash):
+            logger.debug("Aborting by url hash.")
+            return
 
-        if not cases:
-            dup_checker = DupChecker(court, full_crawl=full_crawl)
-            if dup_checker.abort_by_url_hash(site.url, site.hash):
-                logger.debug("Aborting by url hash.")
-                return
+        if site.cookies:
+            logger.info("Using cookies: %s", site.cookies)
 
-            if site.cookies:
-                logger.info("Using cookies: %s", site.cookies)
-
-            logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
-            cases = list(enumerate(site))
-
-        if hasattr(site, "get_allowed_requests_in_minutes"):
-            max_cases = site.get_allowed_requests_in_minutes(max_wait)
-            if max_cases:
-                logger.info(
-                    "Limiting to %s cases in the next %s minutes.",
-                    max_cases,
-                    max_wait,
-                )
-                cases = list(cases)
-                cache.set(cache_key, cases[max_cases:])
-                cases = cases[:max_cases]
+        logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
 
         added = 0
-        for i, item in cases:
+        for i, item in enumerate(site):
             try:
                 next_date = site[i + 1]["case_dates"]
             except IndexError:
