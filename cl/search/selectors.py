@@ -1,7 +1,33 @@
 import natsort
+from django.db import connection
 from django.db.models import Q, QuerySet
 
 from cl.search.models import Citation, OpinionCluster
+
+
+def get_available_documents_estimate_count() -> int:
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            WITH stats AS (
+              SELECT
+                most_common_vals,
+                most_common_freqs,
+                array_position(most_common_vals::text::text[], 't') AS index
+              FROM pg_stats
+              WHERE tablename = 'search_recapdocument' AND attname = 'is_available'
+            ),
+            doc_estimate AS (
+              SELECT reltuples::bigint AS estimate
+              FROM pg_class
+              WHERE oid = 'public.search_recapdocument'::regclass
+            )
+            SELECT
+              (most_common_freqs[index] * estimate)::bigint AS estimated_true_count
+            FROM stats, doc_estimate
+            WHERE index IS NOT NULL;
+        """)
+        result = cursor.fetchone()
+        return result[0] if result else None
 
 
 async def get_clusters_from_citation_str(

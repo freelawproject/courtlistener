@@ -76,7 +76,7 @@ async def delete_prayer(user: User, recap_document: RECAPDocument) -> bool:
 
 async def get_prayer_counts_in_bulk(
     recap_documents: list[RECAPDocument],
-) -> dict[str, int]:
+) -> dict[int, int]:
     """Retrieve the count of prayers with a status of "WAITING" for a list of recap documents.
 
     :param recap_documents: A list of RECAPDocument instances to filter prayers.

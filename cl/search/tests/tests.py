@@ -1559,6 +1559,20 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
             r.data["detail"], "The query contains unbalanced parentheses."
         )
 
+    @override_settings(KNN_SEARCH_ENABLED=True)
+    async def test_handle_long_semantic_input(self) -> None:
+        """Can we properly handle the InputTooLongError exception?"""
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "This is a test" * 100,
+            "semantic": True,
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("The input is too long to process.", r.data["detail"])
+
 
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
@@ -1672,7 +1686,6 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             "Citations:",
             "Docket Number:",
             "Nature of Suit:",
-            "Full Case Name:",
         ]
         for header in headers:
             self.assertIn(header, [meta.text for meta in meta_data])

@@ -258,7 +258,67 @@ class RECAPDocumentFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=750)
     docket_entry = SubFactory(DocketEntryFactory)
     document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
+    pacer_doc_id = Faker("numerify", text="%#####")
+
+    @classmethod
+    def _generate(cls, strategy, params):
+        """
+        If document_number is specified, also set the DocketEntry's
+        entry_number.
+        """
+        if params.get("document_number", ""):
+            params["docket_entry__entry_number"] = params["document_number"]
+        return super()._generate(strategy, params)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        obj = model_class(*args, **kwargs)
+        cls._fixup(obj)
+        obj.save()
+        return obj
+
+    @classmethod
+    def _fixup(cls, obj):
+        """
+        If the document has a DocketEntry that is part of a Docket and it
+        doesn't have an entry_number, set it to the highest entry in the docket
+        and then set the document_number to match.
+        """
+        if (
+            not obj.document_number
+            and (de := obj.docket_entry)
+            and (d := de.docket)
+        ):
+            if not de.entry_number:
+                de.entry_number = 1
+                if d.docket_entries.exclude(entry_number=None).exists():
+                    de.entry_number += (
+                        d.docket_entries.exclude(entry_number=None)
+                        .order_by("-entry_number")
+                        .values_list("entry_number")[0][0]
+                    )
+                de.save()
+            obj.document_number = str(de.entry_number)
+
+
+class RECAPAttachmentFactory(RECAPDocumentFactory):
+    document_type = RECAPDocument.ATTACHMENT
+
+    @classmethod
+    def _fixup(cls, obj):
+        """
+        If an attachment_number wasn't specificed, then set it to the highest
+        for the docket entry.
+        """
+        super()._fixup(obj)
+        if not obj.attachment_number and (de := obj.docket_entry):
+            obj.attachment_number = 1
+            if de.recap_documents.exclude(attachment_number=None).exists():
+                obj.attachment_number += (
+                    de.recap_documents.exclude(attachment_number=None)
+                    .order_by("-attachment_number")
+                    .values_list("attachment_number")[0][0]
+                )
 
 
 class DocketEntryForDocketFactory(DjangoModelFactory):

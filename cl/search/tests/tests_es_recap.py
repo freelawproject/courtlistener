@@ -4308,26 +4308,26 @@ class RECAPSearchAPIV3Test(
 
 class DocketESResultSerializerTest(DocketESResultSerializer):
     """The serializer class for testing DOCKETS search type results. Includes a
-    date_score field for testing purposes.
+    test_score field for testing purposes.
     """
 
-    date_score = CharField(read_only=True)
+    test_score = CharField(read_only=True)
 
 
 class RECAPDocumentESResultSerializerTest(RECAPDocumentESResultSerializer):
     """The serializer class for testing RECAP_DOCUMENT search type results.
-    Includes a date_score field for testing purposes.
+    Includes a test_score field for testing purposes.
     """
 
-    date_score = CharField(read_only=True)
+    test_score = CharField(read_only=True)
 
 
 class RECAPESResultSerializerTest(RECAPESResultSerializer):
     """The serializer class for resting RECAP search type results. Includes a
-    date_score field for testing purposes.
+    test_score field for testing purposes.
     """
 
-    date_score = CharField(read_only=True)
+    test_score = CharField(read_only=True)
 
 
 class RECAPSearchAPIV4Test(
@@ -4370,12 +4370,12 @@ class RECAPSearchAPIV4Test(
     @staticmethod
     def mock_set_results_highlights(results, search_type):
         """Intercepts set_results_highlights as a helper to append the
-        date_score for testing purposes.
+        test_score for testing purposes.
         """
         set_results_highlights(results, search_type)
         for result in results:
             if hasattr(result.meta, "sort"):
-                result["date_score"] = result.meta.sort[0]
+                result["test_score"] = result.meta.sort[0]
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -4857,14 +4857,14 @@ class RECAPSearchAPIV4Test(
                     reverse("search-list", kwargs={"version": "v4"}),
                     search_params,
                 )
-                date_score_1 = r.data["results"][0]["date_score"]
+                date_score_1 = r.data["results"][0]["test_score"]
 
                 traveler.shift(datetime.timedelta(minutes=1))
                 r = self.client.get(
                     reverse("search-list", kwargs={"version": "v4"}),
                     search_params,
                 )
-                date_score_2 = r.data["results"][0]["date_score"]
+                date_score_2 = r.data["results"][0]["test_score"]
                 self.assertEqual(date_score_1, date_score_2)
 
                 # Two first-page requests (no cursor) made on different days
@@ -4875,14 +4875,14 @@ class RECAPSearchAPIV4Test(
                     reverse("search-list", kwargs={"version": "v4"}),
                     search_params,
                 )
-                date_score_1 = r.data["results"][0]["date_score"]
+                date_score_1 = r.data["results"][0]["test_score"]
 
                 traveler.shift(datetime.timedelta(days=1))
                 r = self.client.get(
                     reverse("search-list", kwargs={"version": "v4"}),
                     search_params,
                 )
-                date_score_2 = r.data["results"][0]["date_score"]
+                date_score_2 = r.data["results"][0]["test_score"]
 
                 self.assertNotEqual(date_score_2, date_score_1)
 
@@ -4892,14 +4892,14 @@ class RECAPSearchAPIV4Test(
                 next_page = r.data["next"]
                 traveler.shift(datetime.timedelta(days=1))
                 r = self.client.get(next_page)
-                date_score_next_1 = r.data["results"][0]["date_score"]
+                date_score_next_1 = r.data["results"][0]["test_score"]
 
                 # Two next_page requests preserve the same scores even though
                 # they are executed on different days. Since scores are computed
                 # based on the cursor context date.
                 traveler.shift(datetime.timedelta(days=1))
                 r = self.client.get(next_page)
-                date_score_next_2 = r.data["results"][0]["date_score"]
+                date_score_next_2 = r.data["results"][0]["test_score"]
                 previous_page = r.data["previous"]
                 self.assertEqual(date_score_next_1, date_score_next_2)
 
@@ -4907,8 +4907,142 @@ class RECAPSearchAPIV4Test(
                 # as the first request that showed the document.
                 traveler.shift(datetime.timedelta(days=1))
                 r = self.client.get(previous_page)
-                date_score_previous_2 = r.data["results"][0]["date_score"]
+                date_score_previous_2 = r.data["results"][0]["test_score"]
                 self.assertEqual(date_score_2, date_score_previous_2)
+
+    @override_settings(SEARCH_API_PAGE_SIZE=1)
+    @mock.patch.object(
+        SearchV4ViewSet,
+        "supported_search_types",
+        {
+            SEARCH_TYPES.RECAP: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.RECAP
+                ]["document_class"],
+                "serializer_class": RECAPESResultSerializerTest,
+            },
+            SEARCH_TYPES.DOCKETS: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.DOCKETS
+                ]["document_class"],
+                "serializer_class": DocketESResultSerializerTest,
+            },
+            SEARCH_TYPES.RECAP_DOCUMENT: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.RECAP_DOCUMENT
+                ]["document_class"],
+                "serializer_class": RECAPDocumentESResultSerializerTest,
+            },
+        },
+    )
+    @mock.patch(
+        "cl.search.api_utils.set_results_highlights",
+        side_effect=mock_set_results_highlights,
+    )
+    def test_stable_results_decay_relevance_score_sorting(
+        self, mock_set_results_highlights
+    ) -> None:
+        """Test whether result scores remain stable across pagination when
+        using the custom decay relevance function, avoiding the impact of time
+        on the scores.
+        """
+
+        # Query string, order by score desc
+        search_params = {
+            "q": "SUBPOENAS SERVED",
+            "order_by": "score desc",
+            "highlight": False,
+        }
+
+        # string query score asc
+        score_asc_string_query = search_params
+        # match_all query score asc
+        score_asc_match_all = search_params.copy()
+        del score_asc_match_all["q"]
+
+        tests_params = [
+            score_asc_string_query,
+            score_asc_match_all,
+        ]
+        # Generate tests for all the search types.
+        all_tests = []
+        for test_param in tests_params:
+            for search_type in [
+                SEARCH_TYPES.RECAP,
+                SEARCH_TYPES.DOCKETS,
+                SEARCH_TYPES.RECAP_DOCUMENT,
+            ]:
+                test_param_copy = test_param.copy()
+                test_param_copy["type"] = search_type
+                all_tests.append(test_param_copy)
+
+        original_datetime = now().replace(day=1, hour=5, minute=0)
+        for search_params in all_tests:
+            with (
+                self.subTest(
+                    search_params=search_params, msg="Test stable scores."
+                ),
+                time_machine.travel(original_datetime, tick=False) as traveler,
+            ):
+                # Two first-page requests (no cursor) made on the same day will
+                # now have consistent scores because scores are now computed
+                # based on the same day's date.
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                bm25_score_1 = r.data["results"][0]["test_score"]
+
+                traveler.shift(datetime.timedelta(minutes=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                bm25_score_2 = r.data["results"][0]["test_score"]
+                self.assertEqual(bm25_score_1, bm25_score_2)
+
+                # Two first-page requests (no cursor) made on different days
+                # will present scores variations, due to it being a different
+                # day.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                bm25_score_1 = r.data["results"][0]["test_score"]
+
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                bm25_score_2 = r.data["results"][0]["test_score"]
+
+                self.assertNotEqual(bm25_score_2, bm25_score_1)
+
+                # Two next_page requests preserve the same scores even thought
+                # they are executed on different days. Since scores are computed
+                # base on the cursor context date.
+                next_page = r.data["next"]
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(next_page)
+                bm25_score_next_1 = r.data["results"][0]["test_score"]
+
+                # Two next_page requests preserve the same scores even though
+                # they are executed on different days. Since scores are computed
+                # based on the cursor context date.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(next_page)
+                bm25_score_next_2 = r.data["results"][0]["test_score"]
+                previous_page = r.data["previous"]
+                self.assertEqual(bm25_score_next_1, bm25_score_next_2)
+
+                # Now, going to the previous page, the score should be the same
+                # as the first request that showed the document.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(previous_page)
+                bm25_score_previous_2 = r.data["results"][0]["test_score"]
+                self.assertEqual(bm25_score_2, bm25_score_previous_2)
 
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_cursor_api_pagination_for_r_type(self) -> None:

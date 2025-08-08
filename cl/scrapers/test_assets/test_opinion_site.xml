@@ -13,6 +13,8 @@
         <federal_cite></federal_cite>
         <west_state_cite></west_state_cite>
         <nature_of_suit></nature_of_suit>
+        <lower_court_number></lower_court_number>
+        <lower_court_judge></lower_court_judge>
     </opinion>
     -->
 
@@ -28,6 +30,8 @@
         <west_state_cite>4 Neb. 33</west_state_cite>
         <nature_of_suit>copyright</nature_of_suit>
         <judge>david</judge>
+        <lower_court_number>09-1111</lower_court_number>
+        <lower_court_judge>another david</lower_court_judge>
     </opinion>
     <opinion>
         <!-- A PDF requiring OCR -->
@@ -40,6 +44,8 @@
         <federal_cite>2 F.2d 4</federal_cite>
         <nature_of_suit>social welfare</nature_of_suit>
         <judge>Jalal</judge>
+        <lower_court_number>09-2222</lower_court_number>
+        <lower_court_judge>another jalal</lower_court_judge>
     </opinion>
     <opinion>
         <!-- A MS Word doc -->
@@ -52,6 +58,8 @@
         <federal_cite>23 F.2d 449</federal_cite>
         <nature_of_suit>family relations</nature_of_suit>
         <judge>gaby</judge>
+        <lower_court_number></lower_court_number>
+        <lower_court_judge></lower_court_judge>
     </opinion>
     <opinion>
         <!-- An HTML doc from Resource.org, with a real West Cite-->
@@ -64,6 +72,8 @@
         <federal_cite>138 U.S. 109</federal_cite>
         <nature_of_suit>applesauce</nature_of_suit>
         <judge>namir</judge>
+        <lower_court_number></lower_court_number>
+        <lower_court_judge></lower_court_judge>
     </opinion>
     <opinion>
         <!-- A WPD doc -->
@@ -76,6 +86,8 @@
         <federal_cite>445 U.S. 332</federal_cite>
         <nature_of_suit>grape jelly</nature_of_suit>
         <judge>Khaled</judge>
+        <lower_court_number></lower_court_number>
+        <lower_court_judge></lower_court_judge>
     </opinion>
     <opinion>
         <!-- A txt doc -->
@@ -88,5 +100,7 @@
         <federal_cite>23 F.2d 398</federal_cite>
         <nature_of_suit>gay marriage</nature_of_suit>
         <judge>Steph</judge>
+        <lower_court_number></lower_court_number>
+        <lower_court_judge></lower_court_judge>
     </opinion>
 </court>

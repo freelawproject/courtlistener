@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import operator
 import re
@@ -33,6 +34,7 @@ from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.date_time import midnight_pt
+from cl.lib.microservice_utils import microservice
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
     ApiPositionMapping,
@@ -82,6 +84,7 @@ from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
     ElasticBadRequestError,
+    InputTooLongError,
     InvalidRelativeDateSyntax,
     QueryType,
     UnbalancedParenthesesQuery,
@@ -904,6 +907,19 @@ def build_highlights_dict(
     return highlight_options, fields_to_exclude
 
 
+def get_ms_current_time(default_current_date: datetime.date) -> int:
+    """Convert a date to a timestamp in milliseconds at midnight.
+
+    :param default_current_date: The date object to convert.
+    :return: The corresponding timestamp in milliseconds for midnight of the
+    given date.
+    """
+    midnight_current_date = datetime.datetime.combine(
+        default_current_date, datetime.time()
+    )
+    return int(midnight_current_date.timestamp() * 1000)
+
+
 def build_custom_function_score_for_date(
     query: QueryString | str,
     order_by: tuple[str, str],
@@ -936,13 +952,11 @@ def build_custom_function_score_for_date(
     :return: The modified QueryString object with applied function score.
     """
 
-    default_current_time = None
-    if default_current_date:
-        midnight_current_date = datetime.datetime.combine(
-            default_current_date, datetime.time()
-        )
-        default_current_time = int(midnight_current_date.timestamp() * 1000)
-
+    default_current_time = (
+        get_ms_current_time(default_current_date)
+        if default_current_date
+        else None
+    )
     sort_field, order = order_by
     query = Q(
         "function_score",
@@ -1004,6 +1018,7 @@ def build_decay_relevance_score(
     default_missing_date: str = "1600-01-01T00:00:00Z",
     boost_mode: str = "multiply",
     min_score: float = 0.0,
+    default_current_date: datetime.date | None = None,
 ) -> QueryString:
     """
     Build a decay relevance score query for Elasticsearch that adjusts the
@@ -1018,18 +1033,30 @@ def build_decay_relevance_score(
     :param boost_mode: The mode to combine the decay score with the query's
     original relevance score.
     :param min_score: The minimum score where the decay function stabilizes.
+    :param default_current_date: The default current date to use for computing
+     a stable decay relevance score across pagination in the V4 Search API.
     :return:  The modified QueryString object with applied function score.
     """
 
+    default_current_time = (
+        get_ms_current_time(default_current_date)
+        if default_current_date
+        else None
+    )
     query = Q(
         "function_score",
         query=query,
         script_score={
             "script": {
                 "source": f"""
+                    long now;
+                    if (params.default_current_time != null) {{
+                            now = params.default_current_time;  // Use 'default_current_time' if provided
+                        }} else {{
+                           now = new Date().getTime();
+                        }}
                     def default_missing_date = Instant.parse(params.default_missing_date).toEpochMilli();
                     def decay = (double)params.decay;
-                    def now = new Date().getTime();
                     def min_score = (double)params.min_score;
 
                     // Convert scale parameter into milliseconds.
@@ -1056,6 +1083,7 @@ def build_decay_relevance_score(
                     "scale": scale,  # Years
                     "decay": decay,
                     "min_score": min_score,
+                    "default_current_time": default_current_time,
                 },
             },
         },
@@ -1106,6 +1134,9 @@ def build_has_child_query(
     highlight_options, fields_to_exclude = build_highlights_dict(
         highlighting_fields, hl_tag, child_highlighting
     )
+
+    if child_type == "opinion":
+        fields_to_exclude.append("embeddings")
 
     inner_hits = {
         "name": f"filter_query_inner_{child_type}",
@@ -1929,6 +1960,45 @@ def fill_position_mapping(
     return position_db_mapping
 
 
+def merge_semantic_relevant_chunks(results: Page | Response) -> None:
+    """
+    Updates each child document in the given results with the most semantically
+    relevant chunk of text.
+
+    This function iterates over a list of result objects, each of which may
+    contain child documents with semantic search results in the `inner_hits`
+    field. For each child document, it extracts the top-ranked chunk from the
+    `embeddings` inner hit and assigns its text to the child document's
+    `_source["text"]` field.
+
+    :param results: The Page or Response object containing search results.
+    :return: None, the function updates the results in place.
+    """
+    results_list = results
+    if isinstance(results, Page):
+        results_list = results.object_list
+
+    for result in results_list:
+        if not hasattr(result, "child_docs"):
+            continue
+
+        for child_doc in result.child_docs:
+            # Skip if the child document does not have semantic inner hits
+            if not hasattr(child_doc, "inner_hits"):
+                continue
+
+            # Access the list of semantic hits under the "embeddings" inner hit
+            inner_hits = child_doc.inner_hits["embeddings"]["hits"]["hits"]
+            if not inner_hits:
+                # Skip if there are no hits
+                continue
+
+            text = inner_hits[0]["fields"]["embeddings"][0]["chunk"]
+            if not text:
+                continue
+            child_doc["_source"]["text"] = text
+
+
 def merge_unavailable_fields_on_parent_document(
     results: Page | dict | Response,
     search_type: str,
@@ -2663,6 +2733,7 @@ def apply_custom_score_to_main_query(
         main_order_by == "score desc"
         and cd["type"] in valid_decay_relevance_types
     ):
+        default_current_date = cd.get("request_date")
         decay_settings = valid_decay_relevance_types[cd["type"]]
         date_field = str(decay_settings["field"])
         scale = int(decay_settings["scale"])
@@ -2675,8 +2746,86 @@ def apply_custom_score_to_main_query(
             decay=decay,
             boost_mode=boost_mode,
             min_score=min_score,
+            default_current_date=default_current_date,
         )
     return query
+
+
+def build_semantic_query(
+    text_query: str, filters: list[QueryString | Range]
+) -> tuple[str, list[Query]]:
+    """
+    Build a hybrid Elasticsearch query using both exact keyword matching and
+    semantic vector search.
+
+    :param text_query: The raw user query string, which may include quoted
+        phrases for exact matching.
+    :param filters: A list of filter clauses to apply as pre-filtering to the
+        semantic KNN search query.
+    :return: A two-tuple:
+        - keyword_query: A string representing the AND-joined quoted phrases, if any.
+        - semantic_query: A list of Elasticsearch Q objects, including the KNN vector search
+          and optionally a keyword-based full-text query.
+    :raises InputTooLongError: If the cleaned query string exceeds the maximum allowed length
+        for generating embeddings.
+    """
+    semantic_query: list[Query] = []
+    # Extract quoted phrases from the input string (for exact keyword matching)
+    exact_keywords = re.findall(r'"([^"]*)"', text_query)
+
+    # Join extracted phrases to form a keyword query string
+    keyword_query = " ".join([f'"{s}"' for s in exact_keywords])
+
+    # Remove quotes from the query to prepare for embedding
+    cleaned_text_query = text_query.replace('"', "")
+
+    # Enforce character limit to avoid exceeding embedding constraints
+    if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
+        raise InputTooLongError(QueryType.QUERY_STRING)
+
+    # Generate embedding vector using external microservice
+    embedding_request = async_to_sync(microservice)(
+        service="inception-query",
+        data=json.dumps({"text": cleaned_text_query}),
+    )
+    embedding_request.raise_for_status()
+    vectors = embedding_request.json()["embedding"]
+
+    # If exact keyword query exists, build and add full-text query to results
+    # This enables hybrid search by combining keyword and semantic results
+    if keyword_query:
+        semantic_query.extend(
+            [
+                Q(
+                    "query_string",
+                    fields=["text"],
+                    query=keyword_query,
+                    quote_field_suffix=".exact",
+                    default_operator="AND",
+                )
+            ]
+        )
+
+    inner_hits = {"size": 1, "_source": False, "fields": ["embeddings.chunk"]}
+    # Add the semantic vector-based query using KNN with pre-filtering
+    semantic_query.append(
+        Q(
+            "nested",
+            path="embeddings",
+            query=Q(
+                "knn",
+                field="embeddings.embedding",
+                k=settings.KNN_SEARCH_K,
+                query_vector=vectors,
+                filter=filters,
+                similarity=settings.KNN_SIMILARITY,
+                rescore_vector={"oversample": settings.KNN_OVERSAMPLE},
+                boost=settings.KNN_SEARCH_BOOST,
+            ),
+            inner_hits=inner_hits,
+        )
+    )
+    return keyword_query, semantic_query
 
 
 def build_full_join_es_queries(
@@ -2704,6 +2853,16 @@ def build_full_join_es_queries(
 
     q_should = []
     has_text_query = False
+    # True if the user explicitly enabled semantic search and the search type
+    # supports it
+    semantic_search_enabled = cd.get("semantic", False) and cd["type"] in [
+        SEARCH_TYPES.OPINION
+    ]
+
+    # True if semantic search is enabled and the query has content to generate
+    # an embedding
+    has_valid_semantic_query = semantic_search_enabled and cd.get("q", "")
+    keyword_text_query = ""
     match cd["type"]:
         case (
             SEARCH_TYPES.RECAP
@@ -2733,13 +2892,6 @@ def build_full_join_es_queries(
         # Build child text query.
         child_fields = child_query_fields[child_type]
 
-        if mlt_query:
-            child_text_query = [mlt_query]
-        else:
-            child_text_query = build_fulltext_query(
-                child_fields, cd.get("q", ""), only_queries=True
-            )
-
         # Build parent filters.
         parent_filters = build_join_es_filters(cd)
         parties_filters = [
@@ -2768,6 +2920,22 @@ def build_full_join_es_queries(
                 # with the party filters included to match only child documents
                 # whose parents match the party filters.
                 child_filters.append(has_parent_parties_filter)
+
+        if mlt_query:
+            child_text_query = [mlt_query]
+        else:
+            string_query = cd.get("q", "")
+            if has_valid_semantic_query:
+                keyword_text_query, child_text_query = build_semantic_query(
+                    string_query,
+                    child_filters,
+                )
+                if not keyword_text_query:
+                    child_filters = []
+            else:
+                child_text_query = build_fulltext_query(
+                    child_fields, string_query, only_queries=True
+                )
 
         # Build the child query based on child_filters and child child_text_query
         match child_filters, child_text_query:
@@ -2831,9 +2999,15 @@ def build_full_join_es_queries(
 
         # Build the parent filter and text queries.
         string_query = build_fulltext_query(
-            parent_query_fields, cd.get("q", ""), only_queries=True
+            parent_query_fields,
+            keyword_text_query
+            if has_valid_semantic_query
+            else cd.get("q", ""),
+            only_queries=True,
         )
-        has_text_query = True if string_query else False
+        has_text_query = (
+            True if string_query or has_valid_semantic_query else False
+        )
 
         # If child filters are set, add a has_child query as a filter to the
         # parent query to exclude results without matching children.
@@ -2877,7 +3051,10 @@ def build_full_join_es_queries(
                     should=string_query,
                     minimum_should_match=1,
                 )
-        if parent_query and not mlt_query:
+        should_append_parent_query = (
+            parent_query and not mlt_query and not has_valid_semantic_query
+        )
+        if should_append_parent_query:
             q_should.append(parent_query)
 
     if not q_should:
@@ -3107,6 +3284,7 @@ def do_es_api_query(
         BadProximityQuery,
         DisallowedWildcardPattern,
         InvalidRelativeDateSyntax,
+        InputTooLongError,
     ) as e:
         raise ElasticBadRequestError(detail=e.message)
 
@@ -3480,6 +3658,29 @@ def simplify_estimated_count(search_count: int) -> int:
     return search_count
 
 
+def get_max_score_for_knn_search(child_docs: list[Hit]) -> float:
+    """
+    Retrieves the maximum score from the k-NN search results of the first child
+    document.
+
+    This function checks if the input list of child documents is non-empty and
+    whether the first document contains k-NN `inner_hits` under the "embeddings"
+    key. If so, it returns the `max_score` from the search hits. Otherwise, it
+    returns 0.0.
+
+    :param child_docs: A list of child documents that may contain kNN metadata.
+    :return: The maximum score from the inner hits, or 0.0 if unavailable.
+    """
+    if not len(child_docs) or not hasattr(child_docs[0], "inner_hits"):
+        return 0.0
+
+    knn_score = child_docs[0].inner_hits["embeddings"]["hits"]["max_score"]
+    if not knn_score:
+        return 0.0
+
+    return knn_score
+
+
 def set_child_docs_and_score(
     results: list[Hit] | list[dict[str, Any]] | Response,
     merge_highlights: bool = False,
@@ -3501,7 +3702,8 @@ def set_child_docs_and_score(
         if result_is_dict:
             # If the result is a dictionary, do nothing, or assign [] to
             # child_docs if it is not present.
-            result["child_docs"] = result.get("child_docs", [])
+            child_docs = result.get("child_docs", [])
+            result["child_docs"] = child_docs
         else:
             # Process child hits if the result is an ES AttrDict instance,
             # so they can be properly serialized.
@@ -3511,6 +3713,7 @@ def set_child_docs_and_score(
                 for doc in child_docs
             ]
 
+        semantic_score = get_max_score_for_knn_search(child_docs)
         # Optionally merges highlights. Used for integrating percolator
         # highlights into the percolated document.
         if merge_highlights and result_is_dict:
@@ -3520,6 +3723,7 @@ def set_child_docs_and_score(
         # Optionally merges the BM25 score for display in the API.
         if merge_score and isinstance(result, AttrDict):
             result["bm25_score"] = result.meta.score
+            result["semantic_score"] = semantic_score
 
 
 def get_court_opinions_counts(
