@@ -217,7 +217,7 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(await query.acount(), 0)
 
     @patch(
-        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+        "cl.lib.neon_utils.NeonClient.get_account_by_id",
     )
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
@@ -251,7 +251,7 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(await query.acount(), 1)
 
     @patch(
-        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+        "cl.lib.neon_utils.NeonClient.get_account_by_id",
     )
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
@@ -312,7 +312,7 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(membership.user.profile.neon_account_id, "9524")
 
     @patch(
-        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+        "cl.lib.neon_utils.NeonClient.get_account_by_id",
     )
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
@@ -359,7 +359,7 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(membership.user.profile.neon_account_id, "9524")
 
     @patch(
-        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+        "cl.lib.neon_utils.NeonClient.get_account_by_id",
     )
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None

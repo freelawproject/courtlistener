@@ -114,7 +114,7 @@ class MembershipWebhookViewSet(
             )
         except User.DoesNotExist:
             client = NeonClient()
-            neon_account = client.get_acount_by_id(account_id)
+            neon_account = client.get_account_by_id(account_id)
             contact_data = neon_account["primaryContact"]
             users = User.objects.filter(
                 email__iexact=contact_data["email1"]

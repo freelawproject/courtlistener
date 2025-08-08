@@ -35,7 +35,7 @@ class NeonClient:
             settings.NEON_ORG_ID, settings.NEON_API_KEY
         )
 
-    def get_acount_by_id(self, account_id: int):
+    def get_account_by_id(self, account_id: int):
         """
         Retrieves account data using the Neon API and the provided account ID.
 
