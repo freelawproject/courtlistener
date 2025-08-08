@@ -50,11 +50,28 @@ class NeonClient:
         response.raise_for_status()
         json_data = response.json()
 
-        return (
+        account_data = (
             json_data["individualAccount"]
             if json_data["individualAccount"]
             else json_data["companyAccount"]
         )
+
+        if not account_data["accountCustomFields"]:
+            return account_data
+
+        # The 'accountCustomFields' field contains a list of dictionaries,
+        # each with a 'name' and a 'value'. The following logic flattens
+        # this list into a single dictionary so we can:
+        #   1. Easily check for field existence using the 'in' operator.
+        #   2. Simplify downstream operations.
+        # Field names are normalized to lowercase and spaces are replaced
+        # with underscores.
+        custom_fields = {
+            "_".join(field["name"].lower().split()): field["value"]
+            for field in account_data["accountCustomFields"]
+        }
+        account_data["accountCustomFields"] = custom_fields
+        return account_data
 
     def search_account_by_email(self, email: str) -> list[dict[str, str]]:
         """
