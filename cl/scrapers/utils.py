@@ -22,7 +22,13 @@ from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.lib.storage import S3GlacierInstantRetrievalStorage
 from cl.recap.mergers import find_docket_object
-from cl.search.models import Citation, Court, Docket, OpinionCluster, OriginatingCourtInformation
+from cl.search.models import (
+    Citation,
+    Court,
+    Docket,
+    OpinionCluster,
+    OriginatingCourtInformation,
+)
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 

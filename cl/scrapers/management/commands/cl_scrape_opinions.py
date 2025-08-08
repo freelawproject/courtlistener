@@ -6,7 +6,6 @@ from datetime import date
 from typing import Any
 
 from asgiref.sync import async_to_sync
-from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
