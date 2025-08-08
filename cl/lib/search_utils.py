@@ -463,6 +463,7 @@ def fetch_and_paginate_results(
     results_dict = {
         "hits": hits,
         "main_total": main_total,
+        "child_total": child_total,
     }
     if cache_key is not None:
         # Cache only ES hits for displaying insights on the Home Page.
@@ -470,7 +471,6 @@ def fetch_and_paginate_results(
         cache.set(cache_key, serialized_data, settings.QUERY_RESULTS_CACHE)
     elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
         # Cache ES hits and counts for all other search requests.
-        results_dict["child_total"] = child_total
         serialized_data = pickle.dumps(results_dict)
         cache.set(
             micro_cache_key,
