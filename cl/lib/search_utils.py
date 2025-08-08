@@ -304,7 +304,6 @@ def store_search_api_query(
 
 
 class CachedESSearchResults(TypedDict):
-    results: Page | list  # Deprecated. See #5562
     hits: Response | list
     main_total: int | None
     child_total: int | None
@@ -403,36 +402,25 @@ def fetch_and_paginate_results(
     if cache_key is not None:
         cache_data = cache.get(cache_key)
         if cache_data is not None:
-            if type(cache_data) is Page:
-                # Handle existing cache entries that still contain the Page object
-                results = cache_data
-
-            elif type(cache_data) is Response:
-                # Create Django paginator for insights as ES metadata is not stored
-                paginator = Paginator(cache_data, rows_per_page)
-                results = get_results_from_paginator(paginator, page)
-                enrich_search_results(results, search_type, get_params)
-
+            # Create Django paginator for insights as ES metadata is not stored
+            paginator = Paginator(cache_data, rows_per_page)
+            results = get_results_from_paginator(paginator, page)
+            enrich_search_results(results, search_type, get_params)
             return results, 0, False, None, None
 
     # Check micro-cache for all other search requests.
     results_dict, micro_cache_key = retrieve_cached_search_results(get_params)
     if results_dict:
-        if "hits" in results_dict:
-            # Create paginator from ES hits
-            paginator = ESPaginator(
-                results_dict["main_total"], results_dict["hits"], rows_per_page
-            )
+        # Create paginator from ES hits
+        paginator = ESPaginator(
+            results_dict["main_total"], results_dict["hits"], rows_per_page
+        )
 
-            # Get appropriate page
-            results = get_results_from_paginator(paginator, page)
+        # Get appropriate page
+        results = get_results_from_paginator(paginator, page)
 
-            # Enrich results
-            enrich_search_results(results, search_type, get_params)
-
-        # Handle existing cache entries that still contain the Page object
-        elif "results" in results_dict:
-            results = results_dict["results"]
+        # Enrich results
+        enrich_search_results(results, search_type, get_params)
 
         # Return results and counts. Set query time to 1ms.
         return (
@@ -468,7 +456,6 @@ def fetch_and_paginate_results(
     elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
         # Cache ES hits and counts for all other search requests.
         results_dict = {
-            "results": [],
             "hits": hits,
             "main_total": main_total,
             "child_total": child_total,
