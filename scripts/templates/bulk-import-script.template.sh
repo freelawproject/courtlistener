@@ -229,7 +229,21 @@ import_table_single() {
         # Extract the base name without date and extension for pattern matching
         local base_pattern=$(echo "$csv_filename" | sed 's/-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.csv$//')
         compressed_file=$(ls "$BULK_DIR/${base_pattern}"*".csv.bz2" 2>/dev/null | head -n 1)
-        uncompressed_file=$(ls "$BULK_DIR/${base_pattern}"*".csv" 2>/dev/null | head -n 1)
+    local compressed_file
+    local uncompressed_file
+    compressed_file=("$BULK_DIR/$csv_filename.bz2")
+    uncompressed_file=("$BULK_DIR/$csv_filename")
+    compressed_file="${compressed_file[0]}"
+    uncompressed_file="${uncompressed_file[0]}"
+    
+    # If exact match fails, try pattern matching (handles pluralization issues)
+    if [[ -z "$compressed_file" && -z "$uncompressed_file" ]]; then
+        # Extract the base name without date and extension for pattern matching
+        local base_pattern=$(echo "$csv_filename" | sed 's/-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.csv$//')
+        compressed_file=("$BULK_DIR/${base_pattern}"*.csv.bz2)
+        uncompressed_file=("$BULK_DIR/${base_pattern}"*.csv)
+        compressed_file="${compressed_file[0]}"
+        uncompressed_file="${uncompressed_file[0]}"
     fi
 
     local import_file=""
