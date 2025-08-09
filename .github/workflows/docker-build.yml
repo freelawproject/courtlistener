@@ -16,10 +16,10 @@ jobs:
     outputs:
       labels: ${{ steps.find_pr.outputs.labels }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Find merged PR by merge_commit_sha
         id: find_pr
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
