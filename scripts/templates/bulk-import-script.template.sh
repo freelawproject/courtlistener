@@ -236,7 +236,7 @@ import_table_single() {
     uncompressed_file=("$BULK_DIR/$csv_filename")
     compressed_file="${compressed_file[0]}"
     uncompressed_file="${uncompressed_file[0]}"
-    
+
     # If exact match fails, try pattern matching (handles pluralization issues)
     if [[ -z "$compressed_file" && -z "$uncompressed_file" ]]; then
         # Extract the base name without date and extension for pattern matching
