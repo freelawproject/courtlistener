@@ -223,7 +223,7 @@ import_table_single() {
     # Try exact match first, then fall back to pattern matching
     local compressed_file=$(ls "$BULK_DIR/$csv_filename.bz2" 2>/dev/null | head -n 1)
     local uncompressed_file=$(ls "$BULK_DIR/$csv_filename" 2>/dev/null | head -n 1)
-    
+
     # If exact match fails, try pattern matching (handles pluralization issues)
     if [[ -z "$compressed_file" && -z "$uncompressed_file" ]]; then
         # Extract the base name without date and extension for pattern matching
@@ -231,7 +231,7 @@ import_table_single() {
         compressed_file=$(ls "$BULK_DIR/${base_pattern}"*".csv.bz2" 2>/dev/null | head -n 1)
         uncompressed_file=$(ls "$BULK_DIR/${base_pattern}"*".csv" 2>/dev/null | head -n 1)
     fi
-    
+
     local import_file=""
     local cleanup_file=""
 
@@ -239,22 +239,22 @@ import_table_single() {
         # File is compressed, decompress it on-demand
         import_file="${compressed_file%.bz2}"
         cleanup_file="$import_file"
-        
+
         if [[ $DEBUG_MODE -eq 1 ]]; then
             echo "DEBUG: Decompressing $compressed_file to $import_file using lbzip2 with 4 workers"
         fi
         echo "INFO: Decompressing $compressed_file for $table_name import..." | tee -a "$IMPORT_LOG"
-        
+
         # Use lbzip2 with 4 workers for efficient decompression
         if ! lbzip2 -d -k -n 4 "$compressed_file"; then
             echo "ERROR: Failed to decompress $compressed_file" | tee -a "$IMPORT_LOG"
             return 1
         fi
-        
+
     elif [[ -n "$uncompressed_file" && -f "$uncompressed_file" ]]; then
         # File is already uncompressed
         import_file="$uncompressed_file"
-        
+
     else
         echo "ERROR: No matching file for $csv_filename (tried both .csv and .csv.bz2) in $BULK_DIR" | tee -a "$IMPORT_LOG"
         return 1
@@ -265,7 +265,7 @@ import_table_single() {
         echo "DEBUG: Database connection: --host $BULK_DB_HOST --port $PGPORT --username $BULK_DB_USER --dbname $BULK_DB_NAME"
     fi
     echo "INFO: Import command for $table_name: \\COPY public.$table_name FROM '$import_file'" | tee -a "$IMPORT_LOG"
-    
+
     # Import the table
     local import_result=0
     psql --host "$BULK_DB_HOST" --port "$PGPORT" --username "$BULK_DB_USER" --dbname "$BULK_DB_NAME" 2>&1 <<EOF | tee -a "$IMPORT_LOG"
@@ -322,9 +322,9 @@ echo "Running data integrity checks..." | tee -a "$INCONSISTENCY_LOG"
 # Basic table row counts
 echo "=== TABLE ROW COUNTS ===" >> "$INCONSISTENCY_LOG"
 psql --host "$BULK_DB_HOST" --username "$BULK_DB_USER" --dbname "$BULK_DB_NAME" --command "
-SELECT schemaname, tablename, n_tup_ins as estimated_rows 
-FROM pg_stat_user_tables 
-WHERE schemaname = 'public' 
+SELECT schemaname, tablename, n_tup_ins as estimated_rows
+FROM pg_stat_user_tables
+WHERE schemaname = 'public'
 ORDER BY tablename;
 " >> "$INCONSISTENCY_LOG" 2>&1
 
@@ -336,32 +336,32 @@ echo "=== FOREIGN KEY VIOLATIONS ===" >> "$INCONSISTENCY_LOG"
 echo "Checking orphaned positions..." >> "$INCONSISTENCY_LOG"
 psql --host "$BULK_DB_HOST" --username "$BULK_DB_USER" --dbname "$BULK_DB_NAME" --command "
 SELECT 'people_db_position.person_id orphans' as check_type, count(*) as violations
-FROM people_db_position p 
-WHERE p.person_id IS NOT NULL 
+FROM people_db_position p
+WHERE p.person_id IS NOT NULL
   AND p.person_id NOT IN (SELECT id FROM people_db_person);
 " >> "$INCONSISTENCY_LOG" 2>&1
 
 echo "Checking orphaned dockets..." >> "$INCONSISTENCY_LOG"
 psql --host "$BULK_DB_HOST" --username "$BULK_DB_USER" --dbname "$BULK_DB_NAME" --command "
 SELECT 'search_docket.originating_court_information_id orphans' as check_type, count(*) as violations
-FROM search_docket d 
-WHERE d.originating_court_information_id IS NOT NULL 
+FROM search_docket d
+WHERE d.originating_court_information_id IS NOT NULL
   AND d.originating_court_information_id NOT IN (SELECT id FROM search_originatingcourtinformation);
 " >> "$INCONSISTENCY_LOG" 2>&1
 
 echo "Checking orphaned opinions..." >> "$INCONSISTENCY_LOG"
 psql --host "$BULK_DB_HOST" --username "$BULK_DB_USER" --dbname "$BULK_DB_NAME" --command "
 SELECT 'search_opinion.cluster_id orphans' as check_type, count(*) as violations
-FROM search_opinion o 
-WHERE o.cluster_id IS NOT NULL 
+FROM search_opinion o
+WHERE o.cluster_id IS NOT NULL
   AND o.cluster_id NOT IN (SELECT id FROM search_opinioncluster);
 " >> "$INCONSISTENCY_LOG" 2>&1
 
 echo "Checking orphaned citations..." >> "$INCONSISTENCY_LOG"
 psql --host "$BULK_DB_HOST" --username "$BULK_DB_USER" --dbname "$BULK_DB_NAME" --command "
 SELECT 'search_citation.cluster_id orphans' as check_type, count(*) as violations
-FROM search_citation c 
-WHERE c.cluster_id IS NOT NULL 
+FROM search_citation c
+WHERE c.cluster_id IS NOT NULL
   AND c.cluster_id NOT IN (SELECT id FROM search_opinioncluster);
 " >> "$INCONSISTENCY_LOG" 2>&1
 
@@ -382,12 +382,12 @@ echo "Inconsistency detection complete. Results in: $INCONSISTENCY_LOG"
 if [[ "$SKIP_REMEDIATION" != "1" ]]; then
     echo ""
     echo "PHASE 4: Data remediation..."
-    
+
     # Show inconsistency summary
     echo "Inconsistency Summary:"
     echo "====================="
     grep -E "(violations|duplicate_ids)" "$INCONSISTENCY_LOG" | grep -v " 0$" || echo "No major inconsistencies detected."
-    
+
     # Automatic remediation options
     case "$AUTO_REMEDIATE" in
         delete_orphans)
