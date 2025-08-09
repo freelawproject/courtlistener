@@ -223,7 +223,8 @@ import_table_single() {
     # Try exact match first, then fall back to pattern matching
     local compressed_file=$(ls "$BULK_DIR/$csv_filename.bz2" 2>/dev/null | head -n 1)
     local uncompressed_file=$(ls "$BULK_DIR/$csv_filename" 2>/dev/null | head -n 1)
-
+    local uncompressed_file=("$BULK_DIR/$csv_filename")
+    uncompressed_file="${uncompressed_file[0]}"
     # If exact match fails, try pattern matching (handles pluralization issues)
     if [[ -z "$compressed_file" && -z "$uncompressed_file" ]]; then
         # Extract the base name without date and extension for pattern matching
