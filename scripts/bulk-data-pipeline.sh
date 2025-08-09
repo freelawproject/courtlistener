@@ -161,7 +161,7 @@ main() {
     log "INFO" "Using temp directory: $TEMP_DIR"
 
     # Setup cleanup
-    # trap cleanup EXIT  # Commented out for debugging - prevents cleanup of temp files
+    trap cleanup EXIT  # Enables cleanup of temp files on script exit
 
     # Generate metadata and run pipeline
     generate_table_metadata
