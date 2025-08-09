@@ -156,7 +156,7 @@ export_worker() {
     local filename=$(echo "$line" | cut -d'|' -f3)
 
     # Debug output
-    echo "DEBUG: Processing table: $table_name, filename: $filename" >&2
+    log "DEBUG" "Processing table: $table_name, filename: $filename"
 
     export_table "$table_name" "$filename" "$EXPORT_DIR" "$LBZIP2_THREADS"
 }
