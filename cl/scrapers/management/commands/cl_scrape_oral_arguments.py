@@ -21,7 +21,6 @@ from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.tasks import process_audio_file
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
-    get_binary_content,
     get_extension,
     update_or_create_docket,
 )
@@ -121,7 +120,7 @@ class Command(cl_scrape_opinions.Command):
         court: Court,
         backscrape: bool = False,
     ):
-        content = get_binary_content(item["download_urls"], site)
+        content = site.download_content(item["download_urls"])
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         sha1_hash = sha1(force_bytes(content))

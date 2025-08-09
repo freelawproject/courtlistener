@@ -29,7 +29,6 @@ from cl.scrapers.exceptions import (
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
-    get_binary_content,
     get_child_court,
     get_extension,
     make_citation,
@@ -256,6 +255,7 @@ class Command(ScraperCommand):
         full_crawl: bool = False,
         ocr_available: bool = True,
         backscrape: bool = False,
+        max_wait: int = 30,
     ):
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
@@ -317,7 +317,7 @@ class Command(ScraperCommand):
         if item.get("content"):
             content = item.pop("content")
         else:
-            content = get_binary_content(item["download_urls"], site)
+            content = site.download_content(item["download_urls"])
 
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
@@ -384,7 +384,9 @@ class Command(ScraperCommand):
 
     def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site(save_response_fn=save_response).parse()
-        self.scrape_court(site, options["full_crawl"])
+        self.scrape_court(
+            site, options["full_crawl"], max_wait=options["max_wait"]
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
