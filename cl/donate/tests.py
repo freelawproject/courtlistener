@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import timedelta
 from http import HTTPStatus
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import time_machine
 from asgiref.sync import sync_to_async
@@ -349,6 +349,62 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(await query.acount(), 1)
 
         # Check the new membership is linked to the expected user
+        membership = await query.afirst()
+        self.assertEqual(membership.user_id, self.user_profile.user_id)
+
+        # Confirm the user's email address remains unchanged
+        self.assertEqual(membership.user.email, "test_3@email.com")
+
+        # Check the neon_account_id was updated properly
+        self.assertEqual(membership.user.profile.neon_account_id, "9524")
+
+    @patch(
+        "cl.lib.neon_utils.requests.get",
+    )
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_uses_cl_id_from_neon_to_match_users(
+        self, mock_store_webhook, mock_get
+    ):
+        # Mock the Neon API response
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "individualAccount": {
+                "accountId": "9524",
+                "primaryContact": {
+                    "firstName": "test",
+                    "lastName": "test",
+                },
+                "accountCustomFields": [
+                    {"name": "CL User Id", "value": self.user_profile.user_id}
+                ],
+            }
+        }
+        mock_get.return_value = mock_response
+
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["accountId"] = "9524"
+        # Assert the existing user's Neon account ID is different than "9524"
+        self.assertNotEqual(self.user_profile.neon_account_id, "9524")
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        query = NeonMembership.objects.select_related(
+            "user", "user__profile"
+        ).filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        # Verify the new membership is linked to the expected user
+        # The match should be based on the "CL User Id" custom field, since
+        # the mocked response does not include a matching email or Neon ID.
         membership = await query.afirst()
         self.assertEqual(membership.user_id, self.user_profile.user_id)
 
