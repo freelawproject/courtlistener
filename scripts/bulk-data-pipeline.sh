@@ -167,7 +167,7 @@ main() {
     generate_table_metadata
     local total_duration
     total_duration=$(run_pipeline "$WORKERS" "$SKIP_PHASES")
-    echo "DEBUG: run_pipeline returned: '$total_duration'" >&2
+    log "DEBUG" "run_pipeline returned: '$total_duration'"
     if ! [[ "$total_duration" =~ ^[0-9]+$ ]]; then
         log "ERROR" "run_pipeline did not return a numeric duration: '$total_duration'"
         total_duration=0
