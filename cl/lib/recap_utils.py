@@ -4,6 +4,9 @@ from django.conf import settings
 
 BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 
+dist_d_num_regex = r"(?:\d:)?(\d\d)-..-(\d+)"
+appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
+
 
 def get_bucket_name(court, pacer_case_id):
     bucketlist = ["gov", "uscourts", court, str(pacer_case_id)]
@@ -121,14 +124,20 @@ def needs_ocr(content):
         "Appeal",
         "Case",
         "Desc",
+        "Document",
+        "Entered",
         "Main Document",
         "Page",
         "Received:",
         "USCA",
     )
     pagination_re = re.compile(r"Page\s+\d+\s+of\s+\d+")
-    doc_filed_re = re.compile(r"Doc\s+\d+\s+Filed")
-    case_num_re = re.compile(r"^\d+:\d+-CV-\d+$")
+    doc_filed_re = re.compile(r"Filed")
+    district_case_num_re = re.compile(dist_d_num_regex)
+    appellate_case_num_re = re.compile(appellate_bankr_d_num_regex)
+    date_re = re.compile(r"\d{2}/\d{2}/\d{2}")
+    time_re = re.compile(r"\d{2}:\d{2}:\d{2}")
+    received_re = re.compile(r"Received: ?\d{2}/\d{2}/\d{2}(?:\d{2})?")
 
     for line in content.splitlines():
         line = line.strip()
@@ -142,7 +151,15 @@ def needs_ocr(content):
             continue
         if doc_filed_re.search(line):
             continue
-        if case_num_re.match(line):
+        if district_case_num_re.search(line):
+            continue
+        if appellate_case_num_re.search(line):
+            continue
+        if received_re.search(line):
+            continue
+        if date_re.search(line):
+            continue
+        if time_re.search(line):
             continue
 
         # if we get here, we have found a line that is not a "bad" line, meaning we do NOT need OCR.

@@ -1558,13 +1558,9 @@ class TestRecapUtils(SimpleTestCase):
         as non-content lines and return True (needs OCR).
         """
         cacb_text = """
-Case 2:12-bk-17500-TD
+Case 2:12-bk-17500-TD   Doc 1 Filed 03/01/12 Entered 03/01/12 12:14:26   Desc
 
-Doc 1 Filed 03/01/12 Entered 03/01/12 12:14:26
-Main Document
-Page 1 of 58
-
-Desc
+Main Document Page 1 of 58
 
 
 Case 2:12-bk-17500-TD
@@ -1581,6 +1577,63 @@ Desc
             needs_ocr(cacb_text), msg="cacb example should need OCR"
         )
 
+    def test_needs_ocr_cacd_example(self):
+        """Test needs_ocr function with multi-line headers from cacd example provided in issue #598
+
+        This text contains headers like 'Case...', 'Doc...Filed...',
+        'Main Document', and 'Desc'. The function should recognize these
+        as non-content lines and return True (needs OCR).
+        """
+        cacd_text = """
+Case
+ Case9:13-bk-10313-RR
+      2:14-cv-01681-DOCDoc
+                         Document
+                           138 Filed
+                                  9 04/10/14
+                                     Filed 04/10/14
+                                                Entered
+                                                     Page
+                                                        04/10/14
+                                                          1 of 22 15:07:33
+                                                                   Page ID #:32
+                                                                            Desc
+                        Main Document     Page 1 of 22
+Case
+ Case9:13-bk-10313-RR
+      2:14-cv-01681-DOCDoc
+                         Document
+                           138 Filed
+                                  9 04/10/14
+                                     Filed 04/10/14
+                                                Entered
+                                                     Page
+                                                        04/10/14
+                                                          2 of 22 15:07:33
+                                                                   Page ID #:33
+                                                                            Desc
+                        Main Document     Page 2 of 22
+"""
+        self.assertTrue(
+            needs_ocr(cacd_text), msg="cacd example should need OCR"
+        )
+
+    def test_needs_ocr_mnsd_example(self):
+        """Test needs_ocr function with multi-line headers from mnsd example provided in issue #598
+
+        This text contains headers like 'Case...', 'Doc...Filed...',
+        'Main Document', and 'Desc'. The function should recognize these
+        as non-content lines and return True (needs OCR).
+        """
+        mnsd_text = """
+Case: 3:24-cv-00304-MPM-JMV Doc #: 1 Filed: 09/25/24 1 of 7 PageID #: 1
+Case: 3:24-cv-00304-MPM-JMV Doc #: 1 Filed: 09/25/24 2 of 7 PageID #: 2
+
+"""
+        self.assertTrue(
+            needs_ocr(mnsd_text), msg="mnsd example should need OCR"
+        )
+
     def test_needs_ocr_wvnd_example(self):
         """Test needs_ocr with specific case number format from wvnd example.
 
@@ -1588,13 +1641,7 @@ Desc
         'Received:' line. The function should recognize these as
         non-content lines and return True (needs OCR).
         """
-        wvnd_text = """
-1:16-CV-107
-
-Received: 06/03/2016
-
-
-"""
+        wvnd_text = """ 1:16-CV-107 Received: 06/03/2016 """
         self.assertTrue(
             needs_ocr(wvnd_text), msg="wvnd example should need OCR"
         )
