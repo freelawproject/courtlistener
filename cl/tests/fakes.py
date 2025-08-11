@@ -45,11 +45,74 @@ class FakeDocketReport:
 
 
 class FakeAppellateDocketReport(FakeDocketReport):
-
     @property
     def data(self):
         data = super(FakeAppellateDocketReport, self).data
         data["court_id"] = "ca1"
+        return data
+
+
+class FakeNewAppellateCaseDocketReport(FakeDocketReport):
+    @property
+    def data(self):
+        data = super(FakeNewAppellateCaseDocketReport, self).data
+        data["court_id"] = "ca1"
+        data["docket_number"] = "10-1081"
+        data["case_name"] = "United States v. Brown"
+        data["pacer_case_id"] = "49959"
+        return data
+
+
+class FakeEmptyAcmsCaseSearch(FakeDocketReport):
+    @property
+    def data(self):
+        return {}
+
+
+class FakeAcmsCaseSearch(FakeDocketReport):
+    @property
+    def data(self):
+        return {"pcx_caseid": "e85b4453-6c94-4c68-93ed-4e2e0018e842"}
+
+
+class FakeAcmsDocketReport(FakeDocketReport):
+    @property
+    def data(self):
+        return {
+            "court_id": "ca9",
+            "pacer_case_id": "e85b4453-6c94-4c68-93ed-4e2e0018e842",
+            "docket_number": "25-4097",
+            "case_name": "Wortman, et al. v. All Nippon Airways",
+            "date_filed": date(2025, 7, 1),
+            "appeal_from": "San Francisco, Northern California",
+            "fee_status": "Paid",
+            "originating_court_information": {
+                "name": "San Francisco, Northern California"
+            },
+            "case_type_information": "Civil, Private",
+            "parties": [],
+            "docket_entries": [
+                {
+                    "document_number": 2,
+                    "description_html": "<p>fake docket entry</p>",
+                    "description": "fake docket entry",
+                    "date_entered": "2025-07-01 16:42:00",
+                    "date_filed": date(2025, 7, 1),
+                    "pacer_doc_id": "acc416ff-d456-f011-877b-001dd80bcf93",
+                    "page_count": 6,
+                }
+            ],
+        }
+
+
+class FakeAcmsDocketReportToUpdate(FakeAcmsDocketReport):
+    @property
+    def data(self):
+        data = super(FakeAcmsDocketReportToUpdate, self).data
+        data["court_id"] = "ca2"
+        data["docket_number"] = "25-1671"
+        data["case_name"] = "G.F.F. v. Trump"
+        data["pacer_case_id"] = "2f1af701-d529-410e-a653-376e1fdc4034"
         return data
 
 
@@ -107,6 +170,54 @@ class FakeAppellateAttachmentPage:
         }
 
 
+class FakeAcmsAttachmentPage(FakeAppellateAttachmentPage):
+    @property
+    def data(self, *args, **kwargs):
+        return {
+            "pacer_doc_id": "4e108d6c-ad5b-f011-bec2-001dd80b194b",
+            "pacer_case_id": "5d8e355d-b229-4b16-b00f-7552d2f79d4f",
+            "entry_number": 9,
+            "description": "MOTION [Entered: 07/07/2025 08:41 PM]",
+            "date_filed": date(2025, 7, 8),
+            "date_end": date(2025, 7, 7),
+            "attachments": [
+                {
+                    "attachment_number": 1,
+                    "description": "Motion",
+                    "page_count": 30,
+                    "pacer_doc_id": "4e108d6c-ad5b-f011-bec2-001dd80b194b",
+                    "acms_document_guid": "d1358903-ad5b-f011-a2da-001dd80b00cb",
+                    "cost": 3.0,
+                    "date_filed": date(2025, 7, 8),
+                    "permission": "Public",
+                    "file_size": 864.0,
+                },
+                {
+                    "attachment_number": 2,
+                    "description": "Declaration",
+                    "page_count": 4,
+                    "pacer_doc_id": "4e108d6c-ad5b-f011-bec2-001dd80b194b",
+                    "acms_document_guid": "2f373c0f-ad5b-f011-a2da-001dd80b00cb",
+                    "cost": 0.4,
+                    "date_filed": date(2025, 7, 8),
+                    "permission": "Public",
+                    "file_size": 288.0,
+                },
+                {
+                    "attachment_number": 3,
+                    "description": "Declaration",
+                    "page_count": 30,
+                    "pacer_doc_id": "4e108d6c-ad5b-f011-bec2-001dd80b194b",
+                    "acms_document_guid": "c6aae921-ad5b-f011-a2da-001dd80b00cb",
+                    "cost": 3.0,
+                    "date_filed": date(2025, 7, 8),
+                    "permission": "Public",
+                    "file_size": 11264.0,
+                },
+            ],
+        }
+
+
 class FakeFreeOpinionReport:
     def __init__(self, *args, **kwargs):
         pass
@@ -127,7 +238,6 @@ class FakeFreeOpinionReport:
 
 
 class FakeConfirmationPage:
-
     def __init__(self, *args, **kwargs):
         pass
 
@@ -144,7 +254,6 @@ class FakeConfirmationPage:
 
 
 class FakeAvailableConfirmationPage(FakeConfirmationPage):
-
     @property
     def data(self, *args, **kwargs):
         return {
@@ -256,7 +365,6 @@ class FakeCaseQueryResponse:
 
 
 class FakeCaseQueryReport:
-
     def __init__(self, court_id, pacer_session=None):
         self.pacer_case_id = None
         self.court_id = court_id

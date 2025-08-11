@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, Dict, Tuple, Union
+from typing import Any
 
 from asgiref.sync import async_to_sync
 from celery.canvas import chain
@@ -20,6 +20,7 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.tasks import process_audio_file
 from cl.scrapers.utils import (
+    check_duplicate_ingestion,
     get_binary_content,
     get_extension,
     update_or_create_docket,
@@ -31,7 +32,7 @@ cnt = CaseNameTweaker()
 
 @transaction.atomic
 def save_everything(
-    items: Dict[str, Union[Docket, Audio]],
+    items: dict[str, Docket | Audio],
     backscrape: bool = False,
 ) -> None:
     docket, af = items["docket"], items["audio_file"]
@@ -57,11 +58,11 @@ def save_everything(
 
 @transaction.atomic
 def make_objects(
-    item: Dict[str, Any],
+    item: dict[str, Any],
     court: Court,
     sha1_hash: str,
     content: bytes,
-) -> Tuple[Docket, Audio]:
+) -> tuple[Docket, Audio]:
     blocked = item["blocked_statuses"]
     if blocked:
         date_blocked = date.today()
@@ -102,7 +103,7 @@ def make_objects(
     file_name = trunc(item["case_names"].lower(), 75) + extension
     audio_file.file_with_date = docket.date_argued
     audio_file.local_path_original_file.save(file_name, cf, save=False)
-
+    check_duplicate_ingestion(audio_file.local_path_original_file.name)
     return docket, audio_file
 
 

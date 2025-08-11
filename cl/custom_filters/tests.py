@@ -1,7 +1,7 @@
 import datetime
 
 from django.template import Context
-from django.test import RequestFactory
+from django.test import RequestFactory, SimpleTestCase
 
 from cl.custom_filters.templatetags.extras import (
     get_canonical_element,
@@ -18,7 +18,6 @@ from cl.people_db.models import (
     GRANULARITY_MONTH,
     GRANULARITY_YEAR,
 )
-from cl.tests.cases import SimpleTestCase
 
 
 class TestOxfordJoinFilter(SimpleTestCase):
@@ -82,9 +81,9 @@ class TestNaturalDuration(SimpleTestCase):
             self.assertEqual(
                 actual_result,
                 expected_result,
-                msg="Could not convert %s to dict.\n"
-                "  Got:      %s\n"
-                "  Expected: %s" % (test, actual_result, expected_result),
+                msg=f"Could not convert {test} to dict.\n"
+                f"  Got:      {actual_result}\n"
+                f"  Expected: {expected_result}",
             )
 
     def test_weird_values(self) -> None:
@@ -98,9 +97,9 @@ class TestNaturalDuration(SimpleTestCase):
             self.assertEqual(
                 actual_result,
                 expected_result,
-                msg="Error with weird value: %s.\n"
-                "  Got:      %s\n"
-                "  Expected: %s" % (test, actual_result, expected_result),
+                msg=f"Error with weird value: {test}.\n"
+                f"  Got:      {actual_result}\n"
+                f"  Expected: {expected_result}",
             )
 
 

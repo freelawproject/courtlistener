@@ -41,8 +41,9 @@ class RssFeedStatus(AbstractDateTimeModel):
         blank=True,
     )
     status = models.SmallIntegerField(
-        help_text="The current status of this feed. Possible values are: %s"
-        % ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUSES),
+        help_text="The current status of this feed. Possible values are: {}".format(
+            ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUSES)
+        ),
         choices=PROCESSING_STATUSES,
     )
     is_sweep = models.BooleanField(

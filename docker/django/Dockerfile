@@ -1,65 +1,66 @@
-FROM python:3.13-slim AS build-base
+FROM python:3.13 AS build-base
 
-RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
+# Install apt dependencies
+# caching: https://docs.docker.com/build/cache/optimize/#use-cache-mounts
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update --quiet=2 && \
     apt-get install \
     --no-install-recommends \
     --assume-yes \
     --quiet=2 \
-    # So we can use Python-slim
-    build-essential gcc python3-dev\
     # So postgres can compile and users can use dbshell
     libpq-dev postgresql-client \
     # So we can use webpack to compile assets
     nodejs npm \
-    # For installing poetry and git-based deps
+    # For installing git-based deps
     curl git \
     # For maintenance tasks \
     screen redis-tools vim \
     # Other dependencies
     libffi-dev libxml2-dev libxslt-dev procps cmake
 
-# Set PGSSLCERT at a dummy location ro avoid a SSL error connection.
-# https://github.com/freelawproject/courtlistener/issues/2827
-ENV PGSSLCERT=/tmp/postgresql.crt
+# Install uv
+# https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
+COPY --from=ghcr.io/astral-sh/uv:0.7 /uv /uvx /bin/
 
-# poetry
-# https://python-poetry.org/docs/configuration/#using-environment-variables
-ENV POETRY_VERSION=2.1.1 \
-    # make poetry install to this location
-    POETRY_HOME="/opt/poetry" \
-    # Don't build a virtualenv to save space
-    POETRY_VIRTUALENVS_CREATE=false \
-    # do not ask any interactive question
-    POETRY_NO_INTERACTION=1
-
-ENV PYTHONUNBUFFERED=1 \
-    # this is where our requirements are copied to
-    PYSETUP_PATH="/opt/pysetup"
-
-RUN python -m venv $POETRY_HOME && \
-    $POETRY_HOME/bin/pip install poetry==$POETRY_VERSION --quiet --upgrade && \
-    ln -s $POETRY_HOME/bin/poetry "$(dirname $(which python))/poetry"  # make accessible via $PATH
+ENV \
+    # Set PGSSLCERT at a dummy location ro avoid a SSL error connection.
+    # https://github.com/freelawproject/courtlistener/issues/2827
+    PGSSLCERT=/tmp/postgresql.crt \
+    # Unbuffer Python output for instant logging
+    PYTHONUNBUFFERED=1
 
 ARG BUILD_ENV=prod
 FROM build-base AS python-base
 
-WORKDIR $PYSETUP_PATH
+WORKDIR /opt/courtlistener
 
-COPY poetry.lock pyproject.toml ./
-RUN poetry install --no-root $(test "$BUILD_ENV" != "dev" && echo "--without dev")
+# uv install dependencies
+COPY pyproject.toml uv.lock .
+# https://docs.astral.sh/uv/guides/integration/docker/#caching
+ENV \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync \
+    $(test "$BUILD_ENV" != "dev" && echo "--no-dev")
 
-COPY . /opt/courtlistener
+# npm install dependencies
+COPY cl/package.json cl/package-lock.json ./cl/
+RUN cd cl && \
+    npm ci
 
+COPY . .
 
-# Collect compiled assets from webpack-build stage.
+# Run Node.js build tasks
 # Note: Always produce production code and never produce source-maps
 # (run the devMiddleware for legible output)
-WORKDIR /opt/courtlistener/cl
-RUN npm install
-RUN npx webpack --mode=production --no-devtool
-RUN npm run build --no-input
-
-WORKDIR /opt
+RUN cd cl && \
+    npx webpack --mode=production --no-devtool && \
+    npm run build --no-input
 
 # We log to stdout by default, but we have a config for logging here. Even if
 # we don't use this logger, we need to have the file or else Python is unhappy.
@@ -68,11 +69,6 @@ RUN mkdir /var/log/courtlistener \
     && mkdir /var/log/juriscraper \
     && chown -R www-data:www-data /var/log/juriscraper/ \
     && mkdir -p /opt/courtlistener/cl/assets/static/
-
-WORKDIR /opt/courtlistener
-
-
-ENV PYTHONPATH="/opt/courtlistener"
 
 USER root
 ## Creates a directory for Hyperscan db

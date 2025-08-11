@@ -6,4 +6,4 @@ class CorpusImporterConfig(AppConfig):
 
     def ready(self):
         # Implicitly connect a signal handlers decorated with @receiver.
-        from cl.corpus_importer import signals
+        from cl.corpus_importer import signals  # noqa: F401

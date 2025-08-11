@@ -1,3 +1,5 @@
+import re
+
 from django.db import models
 from eyecite.models import FullCaseCitation
 
@@ -95,13 +97,14 @@ class UnmatchedCitation(BaseCitation):
         :return: a UnmatchedCitation object
         """
         cite_type_str = eyecite_citation.all_editions[0].reporter.cite_type
-        year = eyecite_citation.metadata.year
+        year = eyecite_citation.metadata.year or ""
+        year_int = int(year) if re.fullmatch(r"\d{4}", year) else None
         unmatched_citation = cls(
             citing_opinion=citing_opinion,
             status=cls.UNMATCHED,
             citation_string=eyecite_citation.matched_text(),
             court_id=eyecite_citation.metadata.court or "",
-            year=int(year) if year else None,
+            year=year_int,
             volume=eyecite_citation.groups["volume"],
             reporter=eyecite_citation.corrected_reporter(),
             page=eyecite_citation.corrected_page(),

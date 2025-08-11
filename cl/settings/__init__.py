@@ -8,6 +8,7 @@ from .project.microservices import *
 from .project.money import *
 from .project.search import *
 from .project.security import *
+from .project.sitemaps import *
 from .project.testing import *
 from .project.users import *
 from .third_party.aws import *

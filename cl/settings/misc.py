@@ -3,8 +3,6 @@ from datetime import date
 
 import environ
 
-from .django import INSTALL_ROOT
-
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 

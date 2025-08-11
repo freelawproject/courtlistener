@@ -7,6 +7,7 @@ from django.conf import settings
 from django.http import QueryDict
 from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
+from elasticsearch_dsl import DenseVector
 from elasticsearch_dsl import Document as DSLDocument
 
 from cl.alerts.models import Alert
@@ -726,11 +727,9 @@ class PositionDocument(PersonBaseDocument):
         fields={"raw": fields.KeywordField()},
     )
     appointer = fields.TextField(
-        attr="appointer.person.name_full_reverse",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="appointer.person.name_full_reverse",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
             ),
@@ -806,6 +805,18 @@ class PositionDocument(PersonBaseDocument):
     class Django:
         model = Position
         ignore_signals = True
+
+    def prepare_appointer(self, instance):
+        if instance.appointer:
+            return instance.appointer.person.name_full_reverse
+
+    def prepare_predecessor(self, instance):
+        if instance.predecessor:
+            return instance.predecessor.name_full_reverse
+
+    def prepare_supervisor(self, instance):
+        if instance.supervisor:
+            return instance.supervisor.name_full_reverse
 
     def prepare_position_type(self, instance):
         return instance.get_position_type_display()
@@ -892,9 +903,7 @@ class PositionDocument(PersonBaseDocument):
 
 @people_db_index.document
 class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
-    name_reverse = fields.KeywordField(
-        attr="name_full_reverse",
-    )
+    name_reverse = fields.KeywordField()
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
     absolute_url = fields.KeywordField()
@@ -963,6 +972,9 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
             DATE_GRANULARITIES
         ).get(x, x)
         return transformations
+
+    def prepare_name_reverse(self, instance):
+        return instance.name_full_reverse
 
     def prepare_person_child(self, instance):
         return "person"
@@ -1221,7 +1233,6 @@ class ESRECAPBaseDocument(DSLDocument):
 class ESRECAPDocument(
     CSVSerializableDocumentMixin, RECAPBaseDocument, ESRECAPBaseDocument
 ):
-
     class Django:
         model = RECAPDocument
         ignore_signals = True
@@ -1448,7 +1459,6 @@ class DocketBaseDocument(DSLDocument):
 class DocketDocument(
     CSVSerializableDocumentMixin, DocketBaseDocument, RECAPBaseDocument
 ):
-
     @classmethod
     def get_csv_headers(cls) -> list[str]:
         return [
@@ -1938,6 +1948,28 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
         fields.IntegerField(multi=True),
     )
     ordering_key = fields.IntegerField(attr="ordering_key")
+    embeddings = fields.Nested(
+        properties={
+            "chunk_number": fields.IntegerField(),
+            "chunk": fields.TextField(
+                analyzer="text_en_splitting_cl",
+                term_vector="with_positions_offsets",
+                fields={
+                    "exact": fields.TextField(
+                        analyzer="english_exact",
+                        search_analyzer="search_analyzer_exact",
+                        term_vector="with_positions_offsets",
+                    ),
+                },
+                search_analyzer="search_analyzer",
+            ),
+            "embedding": DenseVector(
+                dims=768,
+                index=True,
+                similarity="dot_product",
+            ),
+        }
+    )
 
     class Django:
         model = Opinion
@@ -2252,7 +2284,6 @@ class RECAPSweepDocument(DocketDocument, ESRECAPDocument):
 
 
 class ESRECAPSweepDocument(ESRECAPBaseDocument):
-
     class Index:
         name = "recap_document_sweep"
         settings = {
@@ -2371,7 +2402,7 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
     percolator_query = PercolatorField()
 
     class Index:
-        name = "recap_percolator"
+        name = "recap_percolator_index"
         settings = {
             "number_of_shards": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_SHARDS,
             "number_of_replicas": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_REPLICAS,
@@ -2398,4 +2429,4 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
 
         cd = search_form.cleaned_data
         query = build_plain_percolator_query(cd)
-        return query.to_dict()
+        return query.to_dict() if query else None

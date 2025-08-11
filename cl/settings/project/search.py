@@ -1,5 +1,3 @@
-import os
-
 import environ
 
 env = environ.FileAwareEnv()
@@ -48,3 +46,23 @@ NLP_EMBEDDING_MODEL = env(
     "NLP_EMBEDDING_MODEL_NAME",
     default="freelawproject/modernbert-embed-base_finetune_512",
 )
+
+#################
+# SEARCH ALERTS #
+#################
+REAL_TIME_ALERTS_SENDING_RATE = env(
+    "REAL_TIME_ALERTS_SENDING_RATE", default=300
+)
+PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES = env(
+    "PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES", default=4
+)
+
+#################
+# VECTOR SEARCH #
+#################
+MAX_EMBEDDING_CHAR_LENGTH = env("MAX_EMBEDDING_CHAR_LENGTH", default=1000)
+KNN_SEARCH_ENABLED = env("KNN_SEARCH_ENABLED", default=False)
+KNN_SEARCH_BOOST = env("KNN_SEARCH_BOOST", default=150)
+KNN_SEARCH_K = env("KNN_SEARCH_K", default=5)
+KNN_SIMILARITY = env("KNN_SIMILARITY", default=0.8)
+KNN_OVERSAMPLE = env.float("KNN_OVERSAMPLE", default=3.0)

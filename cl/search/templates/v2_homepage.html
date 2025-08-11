@@ -1,0 +1,209 @@
+{% extends "new_base.html" %}
+{% load svg_tags component_tags %}
+
+{% block head %}
+  {% require_script "js/alpine/components/homepage.js" %}
+  {% require_script "js/alpine/components/corpus_search.js" %}
+  {% require_script "js/alpine/composables/focus.js" %}
+  {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+{% endblock %}
+
+{% block title %}Non-Profit Free Legal Search Engine and Alert System – CourtListener.com{% endblock %}
+
+{% block header %}
+  <c-header
+    :request="request"
+    variant="homepage"
+    class="bg-greyscale-100"
+    only
+  ></c-header>
+{% endblock %}
+
+{% block content_wrapper %}
+<div x-data="homepage">
+  <div class="w-full flex flex-col bg-greyscale-100">
+    {#  HERO  #}
+    <div class="flex flex-col justify-center items-center gap-6 p-5">
+      {# CourtListener logo #}
+      <div class="md:w-[310px] md:h-35 h-20 w-44">
+        {% svg "logos/courtlistener" class="bg-greyscale-800" %}
+      </div>
+      {# Tagline #}
+      <h1 class="w-full text-center lg:text-display-sm-cooper text-xl" x-text="tagline"></h1>
+    </div>
+
+    {#  SEARCH TABS  #}
+    <div class="p-10 max-md:px-4">
+      {#   MOBILE SEARCH   #}
+      <div class="md:hidden bg-white rounded-2xl flex flex-col">
+        <c-corpus-search class="p-4 w-full !flex-col" only>
+          <c-corpus-search.mobile.top-controls :request="request" only />
+          <c-corpus-search.mobile.dialog class="w-full mt-2" :request="request" :search_form="search_form" only>
+            <c-slot name="trigger_button">
+              <button
+                x-on:click="open"
+                x-bind:aria-controls="dialogId"
+                x-bind:aria-expanded="isOpen"
+                x-init="openAdvancedFilters"
+                aria-haspopup="dialog"
+                type="button"
+                class="w-full btn-outline bg-white h-12 justify-center text-md text-greyscale-600 gap-2"
+              >
+                {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
+                Filters
+              </button>
+            </c-slot>
+          </c-corpus-search.mobile.dialog>
+          <div class="md:hidden w-full py-4">
+            <c-corpus-search.button class="w-full justify-center h-12 text-md gap-2">
+              {% svg "magnifier" class="text-white" aria_hidden="true" %} Search
+            </c-corpus-search.button>
+          </div>
+          <a href="{% url "coverage" %}" class="w-full flex items-center justify-center text-sm text-greyscale-600 gap-1 hover:text-greyscale-500">
+            {% svg "circle_question_mark" class="text-greyscale-400 hover:text-greyscale-300 h-4 w-4" %}
+            About This Data
+          </a>
+        </c-corpus-search>
+      </div>
+
+      {#   DESKTOP SEARCH   #}
+      <c-corpus-search class="max-w-screen-2xl mx-auto max-md:hidden !flex-col" only>
+        {# Scope selector tabs #}
+        <c-corpus-search.scope
+          class="text-greyscale-600 hidden md:flex"
+          variant="tabs"
+          only
+        />
+
+        {# Search panel with advanced filters #}
+        <section class="bg-white flex flex-col rounded-b-2xl rounded-tr-2xl">
+          <div class="p-4 flex flex-row flex-nowrap">
+            <c-corpus-search.input class="rounded-l-xl" :request="request" only/>
+            <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
+              {% svg "magnifier" class="text-white" aria_hidden="true" %}
+            </c-corpus-search.button>
+          </div>
+          <div class="px-4">
+            <c-corpus-search.filters/>
+          </div>
+        </section>
+      </c-corpus-search>
+    </div>
+  </div>
+
+  {# ACTION BUTTONS #}
+  <div class="relative w-full flex flex-row max-w-[1400px] mx-auto">
+    {#  Left arrow button  #}
+    <button
+      type="button"
+      tabindex="-1"
+      x-on:click="scrollPrev"
+      x-bind:disabled="atStart"
+      aria-label="Scroll actions left"
+      class="z-10 absolute flex justify-center items-center w-11 h-11 left-4 top-1/2 -translate-y-1/2 rounded-full bg-white hover:bg-greyscale-50 border border-greyscale-200 shadow disabled:hidden"
+    >
+      {% svg "chevron" class="w-6 h-6 text-greyscale-500 transform rotate-90" %}
+    </button>
+
+    {#  Scrollable area  #}
+    <div
+      x-ref="container"
+      x-on:scroll="updateButtons"
+      x-on:keydown.home.stop.prevent="focusFirst"
+      x-on:keydown.end.stop.prevent="focusLast"
+      x-on:resize.window="updateButtons"
+      role="toolbar"
+      aria-label="Homepage actions"
+      tabindex="-1"
+      style="scrollbar-color: #B5362D #FFFFFF"
+      class="relative w-full flex flex-row gap-2 max-w-[1400px] mx-auto overflow-auto justify-between md:p-10 px-4 py-11"
+    >
+      <p class="sr-only">
+        Use left and right arrow keys to scroll through the actions.
+      </p>
+
+      <c-icon-link
+        x-on:focus="scrollIntoView"
+        href="https://free.law/about"
+        target="_blank"
+        aria-label="Learn about Free Law Project (opens in new tab)"
+        icon="logos/flp_tiny"
+      >
+        About Free<br>Law Project
+      </c-icon-link>
+
+      <c-icon-link
+        x-on:focus="scrollIntoView"
+        href="https://free.law/recap/"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Learn about the RECAP Suite (opens in new tab)"
+        icon="logos/recap_tiny"
+      >
+        About<br>RECAP
+      </c-icon-link>
+
+      <c-icon-link
+        x-on:focus="scrollIntoView"
+        href="https://donate.free.law/forms/membership"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Become a member and donate to Free Law Project (opens in new tab)"
+        icon="money_hand"
+      >
+        Become a Member
+      </c-icon-link>
+
+      <c-icon-link
+        x-on:focus="scrollIntoView"
+        href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Subscribe to the Free Law Project newsletter (opens in new tab)"
+        icon="newspaper"
+      >
+        Get Our Newsletter
+      </c-icon-link>
+
+      <c-icon-link
+        x-on:focus="scrollIntoView"
+        href="{% url "alert_help" %}"
+        aria-label="Learn about creating alerts in CourtListener"
+        icon="bell"
+      >
+        Learn About Alerts
+      </c-icon-link>
+
+      <c-icon-link
+        x-on:focus="scrollIntoView"
+        href="{% url "citation_homepage" %}"
+        aria-label="Use our Citation Lookup Tool"
+        icon="court"
+      >
+        Find a<br>Citation
+      </c-icon-link>
+
+      <c-icon-link
+        x-on:focus="scrollIntoView"
+        href="{% url "podcasts" %}"
+        aria-label="Subscribe to our oral argument podcasts or create your own"
+        icon="microphone"
+      >
+        Oral Argument Podcasts
+      </c-icon-link>
+    </div>
+
+    {#  Right arrow button  #}
+    <button
+      type="button"
+      tabindex="-1"
+      x-on:click="scrollNext"
+      x-bind:disabled="atEnd"
+      aria-label="Scroll actions right"
+      class="absolute flex justify-center items-center w-11 h-11 right-4 top-1/2 -translate-y-1/2 rounded-full bg-white hover:bg-greyscale-50 border border-greyscale-200 shadow disabled:hidden"
+    >
+      {% svg "chevron" class="w-6 h-6 text-greyscale-500 -rotate-90" %}
+    </button>
+  </div>
+</div>
+{% endblock %}

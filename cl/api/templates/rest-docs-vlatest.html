@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static extras humanize %}
 
-{% block title %}REST API, v4.1 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v4.2 &ndash; CourtListener.com{% endblock %}
 {% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 {% block og_description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 
@@ -24,7 +24,7 @@
     {% include "includes/toc_sidebar.html" %}
   </div>
   <div class="col-xs-12 col-md-8 col-lg-6">
-    <h1 id="about">REST API &ndash; v4.1</h1>
+    <h1 id="about">REST API &ndash; v4.2</h1>
 
     <p class="lead">APIs for developers and researchers that need granular legal data.
     </p>
@@ -348,13 +348,32 @@
     <p>You can follow this URL to get the total count of items matching your query.</p>
 
     <h3 id="field-selection">Field Selection</h3>
-    <p>To save bandwidth and increase serialization performance, fields can be limited by using the <code>fields</code> parameter with a comma-separated list of fields.
+    <p>To save bandwidth, increase serialization performance, and optimize our backend queries, fields can be limited by using the <code>fields</code> parameter to select only the fields you want and the <code>omit</code> parameter to omit fields you do not. Each parameter accepts a comma-separated list of fields. Double-underscore <code>__</code> notation is used to choose or omit nested fields.
     </p>
-    <p>For example, to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
+    <p>This is an important optimization, particularly for resources with large fields.</p>
+    <p>For example, to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do:
     </p>
     <pre class="scrollable">curl "{% get_full_host %}{% url "person-list" version="v4" %}?fields=educations,date_modified"
 {
   "educations": [
+    ...nested values here...
+  ],
+  "date_modified": "2023-03-31T07:15:28.409594-07:00"
+},
+...</pre>
+    <p>Or, to include only the <code>date_modified</code> and <code>id</code> fields within each education entry (note the use of the double-underscore):</p>
+    <pre class="scrollable">curl "{% get_full_host %}{% url "person-list" version="v4" %}?fields=educations__date_modified,educations__id"
+{
+  "educations": [
+    {
+      "id": 12856,
+      "date_modified": "2023-03-31T07:15:28.556222-07:00",
+    }
+  ]
+},
+...</pre>
+    <p>And to exclude the nested <code>degree_detail</code> field within each education entry:</p>
+    <pre class="scrollable">curl "{% get_full_host %}{% url "person-list" version="v4" %}?omit=educations__degree_detail"
     {
       "resource_uri": "https://www.courtlistener.com/api/rest/v4/educations/12856/",
       "id": 12856,
@@ -371,17 +390,10 @@
       "date_created": "2023-03-31T07:15:28.556198-07:00",
       "date_modified": "2023-03-31T07:15:28.556222-07:00",
       "degree_level": "jd",
-      "degree_detail": "",
       "degree_year": 1979
     }
-  ],
-  "date_modified": "2023-03-31T07:15:28.409594-07:00"
-},
 ...</pre>
-    <p>You can also exclude fields using <code>fields!=educations,date_modified</code>.
-    </p>
-    <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/wimglenn/djangorestframework-queryfields/issues/8" target="_blank">there is an open issue tracking this</a>.
-    </p>
+    <p>We highly recommend using this feature to optimize your requests.</p>
 
     <h3 id="pagination">Pagination</h3>
     <p>Most APIs can be paginated by using the <code>page</code> GET parameter, but that will be limited to 100 pages of results.</p>
@@ -394,7 +406,7 @@
     </ol>
 
     <h3 id="rates">Rate Limits</h3>
-    <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation.
+    <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation. Creating more than one account per project, person, or organization is forbidden. If you are in doubt, please contact us before creating multiple accounts.
     </p>
     <p>To debug throttling issues:</p>
     <ol>
@@ -413,11 +425,11 @@
     <p>A few things to consider that may increase your performance:</p>
     <ol>
       <li>
-        <p>Avoid doing queries like <code>court__id=xyz</code> when you can instead do <code>court=xyz</code>. Doing queries with the extra <code>__id</code> introduces a join that can be expensive.</p>
+        <p>Use <a href="#field-selection">field selection</a> to limit the serialized payload and defer unused fields, reducing both payload size and database load, especially for large fields.
+        </p>
       </li>
       <li>
-        <p>In general, less data is easier and faster to get than more. Could you use a field to filter your result set down to something smaller?
-        </p>
+        <p>Avoid doing queries like <code>court__id=xyz</code> when you can instead do <code>court=xyz</code>. Doing queries with the extra <code>__id</code> introduces a join that can be expensive.</p>
       </li>
       <li>
         <p>When using the <code>search</code> endpoint, smaller result sets are faster. It isn't always possible to tweak your query to return fewer results, but sometimes it is possible to do a more precise query first, thus making a broader query unnecessary. For example, a search for an individual in their expected jurisdiction will be faster than doing it in the entire corpus. This will benefit from profiling in your use case and application.

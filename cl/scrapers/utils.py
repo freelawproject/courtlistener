@@ -1,7 +1,7 @@
 import json
 import os
+import re
 from datetime import date, datetime
-from typing import Optional, Tuple
 from urllib.parse import urljoin
 
 import httpx
@@ -31,14 +31,20 @@ from cl.scrapers.exceptions import (
     NoDownloadUrlError,
     UnexpectedContentTypeError,
 )
-from cl.search.models import Citation, Court, Docket, OpinionCluster
+from cl.search.models import (
+    Citation,
+    Court,
+    Docket,
+    OpinionCluster,
+    OriginatingCourtInformation,
+)
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 def make_citation(
     cite_str: str, cluster: OpinionCluster, court_id: str
-) -> Optional[Citation]:
+) -> Citation | None:
     """Create and return a citation object for the input values."""
     citation_objs = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
     if not citation_objs:
@@ -105,7 +111,7 @@ def citation_is_duplicated(citation_candidate: Citation, cite: str) -> bool:
     return False
 
 
-def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
+def get_child_court(child_court_name: str, court_id: str) -> Court | None:
     """Get Court object from "child_courts" scraped string
 
     Ensure that the Court object found has the same parent court id has the
@@ -170,7 +176,7 @@ def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
     backoff=2,
     logger=logger,
 )
-def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
+def test_for_meta_redirections(r: Response) -> tuple[bool, str | None]:
     """Test for meta data redirections
 
     :param r: A response object
@@ -406,6 +412,7 @@ def update_or_create_docket(
     date_argued: date | None = None,
     ia_needs_upload: bool | None = None,
     appeal_from_str: str = "",
+    appeal_from_id: str = "",
 ) -> Docket:
     """Look for an existing Docket and update it or create a new one if it's
     not found.
@@ -425,6 +432,7 @@ def update_or_create_docket(
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
     :param appeal_from_str: Name (not standardized id) of the lower level court.
+    :param appeal_from_id: Lower court id.
     :return: The docket.
     """
     docket_fields = {
@@ -434,9 +442,18 @@ def update_or_create_docket(
         "blocked": blocked,
         "ia_needs_upload": ia_needs_upload,
         "appeal_from_str": appeal_from_str,
+        "appeal_from_id": appeal_from_id,
         "date_blocked": date_blocked,
         "date_argued": date_argued,
     }
+    if not appeal_from_id:
+        docket_fields.pop("appeal_from_id", "")
+    elif not Court.objects.filter(id=appeal_from_id).exists():
+        docket_fields.pop("appeal_from_id", "")
+        logger.error(
+            "Docket.appeal_from_id has non existing Court.id '%s' as value",
+            appeal_from_id,
+        )
 
     court_id = court.pk
     uses_docket_number_core = court.jurisdiction in Court.FEDERAL_JURISDICTIONS
@@ -556,3 +573,77 @@ def save_response(site: AbstractSite) -> None:
 
     content_name = f"{base_name}.{extension}"
     storage.save(content_name, ContentFile(content))
+
+
+def check_duplicate_ingestion(local_path_name: str) -> None:
+    """
+    Send an error log to Sentry if a filename has a high repetition count
+
+    S3 filenames / filepaths for opinions and oral arguments are created using
+    created via `cl.lib.storage.get_name_by_incrementing`. The name is composed
+    of the document's filed date or argued date, the case name and the file
+    extension. `get_name_by_incrementing` adds a counter if the name already
+    existed
+
+    For example, this file name means there are 2 documents for that case name,
+    date and extension combination
+    'pdf/2025/06/05/state_v._walsh_1.pdf'
+
+    Need to consider an acceptable repetition threshold, since we may get the
+    same file path for:
+    - a cluster of opinions, which are actually different documents for the
+        same date and case
+    - a common case name in the same date, for example, "State v. Doe"
+    - opinion versions
+
+    :param local_path_name: filepath of the file in S3
+    :return None
+    """
+    # Trigger error log for repetitions beyond this count
+    SUSPECT_DUPLICATES_THRESHOLD = 4
+
+    match = re.search(r"_(?P<repeated_count>\d+)\.\w+$", local_path_name or "")
+    if not match:
+        return
+
+    repeated_count = int(match.group("repeated_count"))
+    if repeated_count > SUSPECT_DUPLICATES_THRESHOLD:
+        base_file_name = f"{local_path_name[: match.start()]}.{local_path_name.split('.')[-1]}"
+        logger.error(
+            "Probable ongoing duplicate ingestion: %s files with name '%s'",
+            repeated_count,
+            base_file_name,
+        )
+
+
+def update_or_create_originating_court_information(
+    docket: Docket, lower_court_number: str, lower_court_judge: str
+) -> OriginatingCourtInformation | None:
+    """Update or create an OriginatingCourtInformation given the scraped values
+
+    :param docket: the docket to which the OCI will be linked
+    :param lower_court_number: will go into OCI.docket_number
+    :param lower_court_judge: will go into OCI.assigned_to_str
+    """
+    if not (lower_court_judge or lower_court_number):
+        return
+
+    if existing_oci := docket.originating_court_information:
+        update = False
+        if not existing_oci.docket_number and lower_court_number:
+            existing_oci.docket_number = lower_court_number
+            update = True
+        if not existing_oci.assigned_to_str and lower_court_judge:
+            existing_oci.assigned_to_str = lower_court_judge
+            update = True
+
+        if update:
+            existing_oci.save()
+
+        # If the docket already had a OriginatingCourtInformation, just return
+        return
+
+    return OriginatingCourtInformation(
+        docket_number=lower_court_number or "",
+        assigned_to_str=lower_court_judge or "",
+    )

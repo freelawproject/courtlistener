@@ -11,6 +11,7 @@ from django.contrib.auth.forms import (
     UserCreationForm,
 )
 from django.contrib.auth.models import User
+from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.forms import ModelForm
@@ -91,7 +92,6 @@ class ProfileForm(ModelForm):
 
 
 class CleanEmailMixin:
-
     def clean_email(self):
         email = self.cleaned_data.get("email")
         user_part, domain_part = email.rsplit("@", 1)
@@ -146,6 +146,8 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Protect against homoglyph attacks
+        self.fields["username"].validators = [ASCIIUsernameValidator()]
 
         self.fields["username"].label = "User Name*"
         self.fields["email"].label = "Email Address*"

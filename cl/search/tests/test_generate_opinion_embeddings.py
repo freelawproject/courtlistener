@@ -39,7 +39,7 @@ def inception_batch_request_mock(opinions_to_vectorize):
             "embeddings": [
                 {
                     "chunk_number": 1,
-                    "chunk": f"search_document: {opinion_data["text"]}",
+                    "chunk": f"search_document: {opinion_data['text']}",
                     "embedding": [0.03163226321339607],
                 },
             ],

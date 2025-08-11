@@ -22,7 +22,8 @@ Buy Docket on PACER: {{ docket.pacer_url }}{% endif %}
 
 {% for de in new_des %}{% for rd in de.recap_documents.all %}Document Number: {{ de.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
 Date Filed: {% if de.datetime_filed %}{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}{% else %}{{ de.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}
-{% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}{% if rd.document_number %}{% if rd.filepath_local %}
+{% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}
+View Document in CourtListener: https://www.courtlistener.com{% if rd.get_absolute_url %}{{ rd.get_absolute_url }}{% else %}{{ docket.get_absolute_url }}#minute-entry-{{ de.pk}}{% endif %}{% if rd.document_number %}{% if rd.filepath_local %}
 Download PDF from RECAP: {{ rd.filepath_local.url }}{% elif rd.is_sealed %}
 Unavailable on PACER{% else %}
 Download PDF from RECAP with PACER fallback: https://www.courtlistener.com{{ rd.get_absolute_url }}?redirect_to_download=True{% endif %}{% endif %}
@@ -42,11 +43,17 @@ This alert was sent because you subscribed to this docket with your account on C
 To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'unsubscribe' docket_alert_secret_key %}
 {% endif %}
 ************************
+{% if recap_alerts_banner %}
+📣 The Wait is Over! You can now get alerts for keywords in the RECAP Archive.
+Set daily or real-time email alerts when PACER cases or filings match your saved search.
+Follow topics, people, organizations, and more.
+Learn more: https://free.law/2025/06/18/recap-search-alerts-for-pacer/
+{% endif %}
+
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
 
  - Blog: https://free.law
  - BlueSky: https://bsky.app/profile/free.law
- - X: https://x.com/freelawproject
  - Donate: https://donate.free.law/forms/supportflp
  - Become a Member: https://donate.free.law/forms/membership
 

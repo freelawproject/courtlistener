@@ -30,6 +30,12 @@ Some of the highlights of CourtListener and RECAP are:
 
        https://www.courtlistener.com{% url "advanced_oa" %}
 
+ - Email alerts for new filings in federal cases, and search alerts for
+   case law, court transcripts, and PACER data:
+
+       https://www.courtlistener.com{% url "alert_help" %}
+
+
 As a non-profit, everything we do here is open source, and we always do our
 best to share everything we can with the public. If you like our work, we would
 love your support in the form of a donation:

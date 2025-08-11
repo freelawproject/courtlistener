@@ -119,12 +119,16 @@ class Command(VerboseCommand):
                 f"Auto-resume enabled starting embedding from ID: {start_id}."
             )
 
-        opinions = Opinion.objects.using(database).filter(id__gte=start_id)
+        opinions = (
+            Opinion.objects.using(database)
+            .filter(id__gte=start_id)
+            .order_by("pk")
+        )
         # Limit opinions to retrieve if count was provided.
         opinions_to_process = (
             opinions[:count] if count is not None else opinions
         )
-        opinions_with_best_text = opinions.order_by("pk").with_best_text()
+        opinions_with_best_text = opinions.with_best_text()
         opinions_with_best_text = (
             opinions_with_best_text[:count] if count is not None else opinions
         )
@@ -150,7 +154,6 @@ class Command(VerboseCommand):
                 continue
             # Check if adding this opinion would exceed the batch size.
             if current_batch_size + token_count > token_count_limit:
-
                 # Send the current batch since adding this opinion would break the limit.
                 self.send_batch(
                     current_batch, embedding_queue, upload_queue, database

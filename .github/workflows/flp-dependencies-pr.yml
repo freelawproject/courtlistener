@@ -15,13 +15,19 @@ jobs:
         with:
           python-version: '>= 3.13'
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          version: "0.7.x"
 
       - name: Update FLP dependencies
         run: |
-          poetry update courts-db eyecite juriscraper reporters-db
+          uv sync \
+          --upgrade-package courts-db \
+          --upgrade-package eyecite \
+          --upgrade-package juriscraper \
+          --upgrade-package reporters-db
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7

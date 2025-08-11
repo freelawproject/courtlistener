@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from django.db import connection
 
@@ -71,7 +71,7 @@ def log_db_connection_info(model_name: str, instance_id: int) -> None:
         logger.warning("Error retrieving connection details: %s", e)
 
     # Log the connection details and current UTC time
-    current_time = datetime.now(timezone.utc)
+    current_time = datetime.now(UTC)
     logger.info(
         "Connection details: PID=%s, state=%s, backend_start=%s, xact_start=%s logged_at=%s , instance: %s:%s",
         pid,

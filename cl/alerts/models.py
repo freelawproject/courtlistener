@@ -8,19 +8,41 @@ from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils.crypto import get_random_string
+from model_utils import FieldTracker
 
 from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import SEARCH_TYPES, Docket
 
 
-def validate_alert_type(value):
+def check_valid_alert_type_or_raise_error(
+    value: str, valid_types: dict
+) -> None:
+    """Validate the alert type against allowed values.
+
+    :param value: The alert type to validate.
+    :param valid_types: A Dict containing the allowed alert types.
+    :return: None. Raises a ValidationError if the alert type is not supported.
+    """
+    if value not in valid_types:
+        raise ValidationError(f"Unsupported alert type: {value}")
+
+
+def validate_alert_type(value: str) -> None:
     """Validate if the provided alert type is supported.
     :param value: The alert type to validate.
     :return: None.
     """
     valid_types = dict(SEARCH_TYPES.SUPPORTED_ALERT_TYPES)
-    if value not in valid_types:
-        raise ValidationError(f"Unsupported alert type: {value}")
+    check_valid_alert_type_or_raise_error(value, valid_types)
+
+
+def validate_recap_alert_type(value: str) -> None:
+    """Validate if the provided alert type is supported RECAP type.
+    :param value: The alert type to validate.
+    :return: None.
+    """
+    valid_types = dict(SEARCH_TYPES.RECAP_ALERT_TYPES)
+    check_valid_alert_type_or_raise_error(value, valid_types)
 
 
 @pghistory.track()
@@ -57,9 +79,10 @@ class Alert(AbstractDateTimeModel):
         max_length=10,
     )
     alert_type = models.CharField(
-        help_text="The type of search alert this is, one of: %s"
-        % ", ".join(
-            f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.SUPPORTED_ALERT_TYPES
+        help_text="The type of search alert this is, one of: {}".format(
+            ", ".join(
+                f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.SUPPORTED_ALERT_TYPES
+            )
         ),
         max_length=3,
         validators=[validate_alert_type],
@@ -71,6 +94,7 @@ class Alert(AbstractDateTimeModel):
         "purposes.",
         max_length=40,
     )
+    tracker = FieldTracker(fields=["alert_type"])
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
@@ -83,6 +107,29 @@ class Alert(AbstractDateTimeModel):
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
         super().save(*args, **kwargs)
+
+    def validate_alert_type_change(self) -> None:
+        """Check if alert_type has changed in an allowed way.
+
+        Raises ValidationError: If alert_type was changed from or to a non-RECAP
+         or non-DOCKET type. This prevents alerts from being indexed into an
+         incompatible percolator index while still remaining in the old one.
+        :return: None if alert_type hasn't changed or change is allowed.
+        """
+        if self.pk is None or not self.tracker.has_changed("alert_type"):
+            return
+        old = self.tracker.previous("alert_type")
+        new = self.alert_type
+        allowed = {SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS}
+        if not {old, new}.issubset(allowed):
+            raise ValidationError(
+                {
+                    "alert_type": (
+                        "You cannot change alert_type once set, "
+                        "unless switching between RECAP 'r' and 'd' types."
+                    )
+                }
+            )
 
 
 class DocketAlertManager(models.Manager):
@@ -158,8 +205,9 @@ class RealTimeQueue(models.Model):
         db_index=True,
     )
     item_type = models.CharField(
-        help_text="the type of item this is, one of: %s"
-        % ", ".join(f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.NAMES),
+        help_text="the type of item this is, one of: {}".format(
+            ", ".join(f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.NAMES)
+        ),
         max_length=3,
         choices=SEARCH_TYPES.NAMES,
         db_index=True,

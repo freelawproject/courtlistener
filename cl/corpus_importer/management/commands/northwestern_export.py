@@ -81,6 +81,7 @@ class Command(VerboseCommand):
             do_bulk_export(options)
         else:
             raise NotImplementedError(
-                "Unknown task: %s. Valid tasks are: %s"
-                % (options["task"], ", ".join(self.tasks))
+                "Unknown task: {}. Valid tasks are: {}".format(
+                    options["task"], ", ".join(self.tasks)
+                )
             )

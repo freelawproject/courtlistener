@@ -14,6 +14,7 @@ from cl.api.pagination import BigPagination
 from cl.api.utils import (
     EmailProcessingQueueAPIUsers,
     LoggingMixin,
+    NoFilterCacheListMixin,
     RECAPUploaders,
     RECAPUsersReadOnly,
 )
@@ -178,7 +179,9 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         return super().list(request, *args, **kwargs)
 
 
-class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
+class FjcIntegratedDatabaseViewSet(
+    LoggingMixin, NoFilterCacheListMixin, ModelViewSet
+):
     queryset = FjcIntegratedDatabase.objects.all().order_by("-id")
     serializer_class = FjcIntegratedDatabaseSerializer
     filterset_class = FjcIntegratedDatabaseFilter

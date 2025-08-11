@@ -10,8 +10,10 @@
         Case Law
       {% elif alert.alert_type == SEARCH_TYPES.ORAL_ARGUMENT %}
         Oral Argument
-      {% elif alert.alert_type == SEARCH_TYPES.RECAP or alert.type == SEARCH_TYPES.DOCKETS %}
+      {% elif alert.alert_type == SEARCH_TYPES.RECAP %}
         RECAP
+      {% elif alert.alert_type == SEARCH_TYPES.DOCKETS %}
+        RECAP Cases Only
       {% endif %}
     </p>
   </td>
@@ -39,7 +41,7 @@
       {% endif %}
       <div>
       {% if request.user.is_authenticated %}
-        {% if not user.profile.is_member and alert.rate == 'rt' %}
+        {% if not user.profile.is_eligible_for_rt_search_alerts and alert.rate == 'rt' %}
           <p class="bottom inline ml-1"
             title="Please become a member to enable Real Time alerts.">
             <a class="btn btn-primary btn-xs disabled">

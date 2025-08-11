@@ -1,10 +1,9 @@
 import datetime
 import io
 import re
-from datetime import date
 from http import HTTPStatus
 from unittest import mock
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote_plus
 
 import pytz
 import time_machine
@@ -26,14 +25,16 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
-from cl.lib.elasticsearch_utils import simplify_estimated_count
+from cl.lib.elasticsearch_utils import (
+    build_daterange_query,
+    simplify_estimated_count,
+)
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import AudioTestCase, CourtTestCase, PeopleTestCase
+from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -53,12 +54,13 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.exception import InvalidRelativeDateSyntax
 from cl.search.factories import (
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
@@ -101,7 +103,9 @@ class ModelTest(TestCase):
             case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         self.oc = OpinionCluster.objects.create(
-            case_name="Blah", docket=self.docket, date_filed=date(2010, 1, 1)
+            case_name="Blah",
+            docket=self.docket,
+            date_filed=datetime.date(2010, 1, 1),
         )
         self.o = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
         self.c = Citation.objects.create(
@@ -128,12 +132,12 @@ class ModelTest(TestCase):
             case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         docket.save()
-        self.oc.date_filed = date(1899, 1, 1)
+        self.oc.date_filed = datetime.date(1899, 1, 1)
         self.oc.save()
 
         try:
             cf = ContentFile(io.BytesIO(b"blah").read())
-            self.o.file_with_date = date(1899, 1, 1)
+            self.o.file_with_date = datetime.date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
             self.o.save()
         except ValueError:
@@ -198,7 +202,7 @@ class ModelTest(TestCase):
             docket=DocketFactory(
                 court=court,
             ),
-            date_filed=date(1978, 3, 10),
+            date_filed=datetime.date(1978, 3, 10),
             source="U",
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
@@ -334,7 +338,7 @@ class DocketValidationTest(TestCase):
 class RECAPDocumentValidationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.docket_entry = DocketEntryWithParentsFactory()
+        cls.docket_entry = DocketEntryFactory()
 
     def test_attachment_with_attachment_number(self):
         """Attachments with attachment_number should not raise ValidationError."""
@@ -418,7 +422,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             id="ga_child_l1_1", jurisdiction="FB", parent_court=cls.court_gand
         )
 
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
             docket=DocketFactory(
@@ -427,12 +431,12 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                html_columbia="<p>Code, &#167; 1-815 </p>",
+                html_columbia="<p>Code, &#167; 1-815 Lorem §247 $247 %247 ¶247</p>",
                 plain_text="",
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             docket=DocketFactory(court=cls.court, docket_number="123456"),
@@ -443,7 +447,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 plain_text="Motion",
             ),
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="America vs Bank",
             case_name_full="America vs Bank",
             docket=DocketFactory(
@@ -453,10 +457,10 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                plain_text="Strickland Motion",
+                plain_text="Strickland Motion 247",
             ),
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Johnson v. National",
             case_name_full="Johnson v. National",
             docket=DocketFactory(
@@ -471,7 +475,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             ),
         )
 
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="California v. Nevada",
             case_name_full="California v. Nevada",
             docket=DocketFactory(
@@ -883,6 +887,61 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
+    async def test_avoid_splitting_terms_on_special_chars(
+        self, court_cache_key_mock
+    ) -> None:
+        """Can we avoid splitting words in queries such as §247 and phrases
+        like "§247"?
+        """
+
+        special_chars_exceptions = ["§", "$", "%", "¶"]
+        # A search for phrase "§247" shouldn't match "247"
+        for special_char in special_chars_exceptions:
+            with self.subTest(
+                special_char=special_char, msg="Phrase query and special char."
+            ):
+                r = await self.async_client.get(
+                    reverse("show_results"), {"q": f'"{special_char}247"'}
+                )
+                actual = self.get_article_count(r)
+                self.assertEqual(
+                    actual, 1, msg="Didn't get the right number of results"
+                )
+                self.assertIn("1:21-cv-1234", r.content.decode())
+
+        # A search for phrase "247" shouldn't match "§247"
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": '"247"'}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(
+            actual, 1, msg="Didn't get the right number of results"
+        )
+        self.assertIn("34-2535", r.content.decode())
+
+        # A search for §247 shouldn't match 247
+        for special_char in special_chars_exceptions:
+            with self.subTest(
+                special_char=special_char,
+                msg="Non-phrase query and special char.",
+            ):
+                r = await self.async_client.get(
+                    reverse("show_results"), {"q": f"{special_char}247"}
+                )
+                actual = self.get_article_count(r)
+                self.assertEqual(
+                    actual, 1, msg="Didn't get the right number of results"
+                )
+                self.assertIn("1:21-cv-1234", r.content.decode())
+
+        # A search for 247 shouldn't match §247
+        r = await self.async_client.get(reverse("show_results"), {"q": "247"})
+        actual = self.get_article_count(r)
+        self.assertEqual(
+            actual, 1, msg="Didn't get the right number of results"
+        )
+        self.assertIn("34-2535", r.content.decode())
+
     def test_query_cleanup_function(self, court_cache_key_mock) -> None:
         # Send string of search_query to the function and expect it
         # to be encoded properly
@@ -1002,6 +1061,10 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 'docketNumber:"docket number 2"',
                 'docketNumber:"docket number 2"',
             ),
+            ("§242", "§242"),
+            ("$242", "$242"),
+            ("%242", "%242"),
+            ("¶242", "¶242"),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
@@ -1333,6 +1396,103 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     msg="Failed for V3",
                 )
 
+    def test_absolute_dates_filter(self, court_cache_key_mock):
+        """Confirm that passing absolute dates returns the expected absolute
+        filter in ISO format.
+        """
+        filed_before = datetime.date(2025, 5, 1)
+        filed_after = datetime.date(2025, 5, 18)
+        qs = build_daterange_query(
+            "dateFiled", before=filed_before, after=filed_after
+        )
+        # Assert the filters.
+        body = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(body["gte"], "2025-05-18T00:00:00Z")
+        self.assertEqual(body["lte"], "2025-05-01T23:59:59Z")
+        self.assertNotIn("time_zone", body)
+
+    def test_all_relative_syntaxes(self, court_cache_key_mock):
+        """Confirms that build_daterange_query is able to parse and convert
+        the different allowed relative date syntaxes into an ES-compatible date
+         math expression.
+        """
+        cases = {
+            # days
+            "1d ago": "now-1d/d",
+            "7d ago": "now-7d/d",
+            "5 days ago": "now-5d/d",
+            "-10d": "now-10d/d",
+            "-10d ago": "now-10d/d",
+            "10d": False,  # Invalid syntax
+            "10 days": False,  # Invalid syntax
+            "past 3 days": "now-3d/d",
+            # months (30d each)
+            "1m ago": "now-30d/d",
+            "2M ago": "now-60d/d",
+            "2m": False,  # Invalid syntax
+            "3 months ago": "now-90d/d",
+            "-4m": "now-120d/d",
+            "4 months": False,  # Invalid syntax
+            "-5 months ago": "now-150d/d",
+            "past 6 months": "now-180d/d",
+            # years (365d each)
+            "1y ago": "now-365d/d",
+            "2Y ago": "now-730d/d",
+            "2y": False,  # Invalid syntax
+            "3 years ago": "now-1095d/d",
+            "4 years": False,  # Invalid syntax
+            "-1y": "now-365d/d",
+            "-2 years": "now-730d/d",
+            "past 1 year": "now-365d/d",
+            "invalid 3 syntax": False,  # Invalid syntax
+        }
+
+        for user_input, expected_math in cases.items():
+            with self.subTest(user_input=user_input):
+                if not expected_math:
+                    # Assert invalid syntaxes.
+                    with self.assertRaises(InvalidRelativeDateSyntax):
+                        build_daterange_query(
+                            "dateFiled", before="", after=user_input
+                        )
+                else:
+                    qs = build_daterange_query(
+                        "dateFiled", before="", after=user_input
+                    )
+                    # Assert the validity of the relative range filter.
+                    self.assertEqual(len(qs), 1)
+                    query_dict = qs[0].to_dict()["range"]["dateFiled"]
+                    self.assertEqual(query_dict.get("gte"), expected_math)
+                    self.assertNotIn("lte", query_dict)
+
+    def test_before_and_after_relative(self, court_cache_key_mock):
+        """Confirm that both values, before and after are compatible with the
+        relative date syntaxes.
+        """
+        qs = build_daterange_query(
+            "dateFiled",
+            before="7 days ago",
+            after="1d ago",
+        )
+        self.assertEqual(len(qs), 1)
+        query_dict = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(query_dict["gte"], "now-1d/d")
+        self.assertEqual(query_dict["lte"], "now-7d/d")
+
+    def test_mixed_absolute_and_relative(self, court_cache_key_mock):
+        """Confirm that the range filter is compatible with mixed requests,
+        where one value may be absolute and the other relative,
+        as might occur in API calls.
+        """
+        qs = build_daterange_query(
+            "dateFiled", before=datetime.date(2025, 5, 10), after="2 days ago"
+        )
+        self.assertEqual(len(qs), 1)
+
+        body = qs[0].to_dict()["range"]["dateFiled"]
+        self.assertEqual(body["gte"], "now-2d/d")
+        self.assertEqual(body["lte"], "2025-05-10T23:59:59Z")
+
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
     """Common tests for the Search API V4 endpoints."""
@@ -1399,8 +1559,22 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
             r.data["detail"], "The query contains unbalanced parentheses."
         )
 
+    @override_settings(KNN_SEARCH_ENABLED=True)
+    async def test_handle_long_semantic_input(self) -> None:
+        """Can we properly handle the InputTooLongError exception?"""
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "This is a test" * 100,
+            "semantic": True,
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("The input is too long to process.", r.data["detail"])
 
-class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
+
+class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
     These tests should exercise all aspects of using the search box and SERP.
@@ -1414,11 +1588,11 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
+        super().setUp()
         self.pandora_profile = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUp()
 
     def _perform_wildcard_search(self):
         searchbox = self.browser.find_element(By.ID, "id_q")
@@ -1512,8 +1686,6 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
             "Citations:",
             "Docket Number:",
             "Nature of Suit:",
-            "Posture:",
-            "Full Case Name:",
         ]
         for header in headers:
             self.assertIn(header, [meta.text for meta in meta_data])
@@ -1673,7 +1845,8 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         # Dora remembers this Lissner guy and wonders if he's been involved
         # in any litigation. She types his name into the search box and hits
         # Enter
-        search_box.send_keys("lissner")
+        test_query_box = 'lissner OR "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce rutrumd"'
+        search_box.send_keys(test_query_box)
         search_box.submit()
 
         # The browser brings her to a search engine result page with some
@@ -1683,7 +1856,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
 
         self.assertIn("1 Opinion", result_count.text)
         search_box = get_with_wait(wait, (By.ID, "id_q"))
-        self.assertEqual("lissner", search_box.get_attribute("value"))
+        self.assertEqual(test_query_box, search_box.get_attribute("value"))
 
         facet_sidebar = get_with_wait(wait, (By.ID, "extra-search-fields"))
         self.assertIn("Precedential Status", facet_sidebar.text)
@@ -1711,14 +1884,16 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         btn.click()
 
         # After logging in, she goes to the homepage. From there, she goes back
-        # to where she was, which still has "lissner" in the search box.
+        # to where she was, which still has
+        # 'lissner OR "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce rutrumd"'
+        # in the search box.
         self.browser.get(results_url)
         page_text = get_with_wait(wait, (By.TAG_NAME, "body")).text
         self.assertNotIn(
             "Please enter a correct username and password.", page_text
         )
         search_box = get_with_wait(wait, (By.ID, "id_q"))
-        self.assertEqual("lissner", search_box.get_attribute("value"))
+        self.assertEqual(test_query_box, search_box.get_attribute("value"))
 
         # She now opens the modal for the form for creating an alert
         alert_bell = get_with_wait(
@@ -1735,7 +1910,14 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
         self.assertIn("How often should we notify you?", page_text)
-        get_with_wait(wait, (By.ID, "id_name"))
+        alert_name = get_with_wait(wait, (By.ID, "id_name"))
+        # Confirm the Alert name is truncated to 75 chars.
+        self.assertEqual(
+            len(alert_name.get_attribute("value")),
+            75,
+            "The Alert name doesn't match its size.",
+        )
+
         get_with_wait(wait, (By.ID, "id_rate"))
         btn = get_with_wait(wait, (By.ID, "alertSave"))
         self.assertEqual("Create Alert", btn.text)
@@ -1779,7 +1961,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         # We are taking advantage of the queries done with authenticated and
         # anonymous user to see if SearchQuery collection is working
         lookup = {
-            "get_params": "q=lissner",
+            "get_params": f"q={quote_plus(test_query_box)}",
             "user": None,
             "query_time_ms__gte": 0,
         }
@@ -1892,7 +2074,7 @@ class SaveSearchQueryTest(TestCase):
     def test_search_api_v4_query_saving(self) -> None:
         """Do we save queries on all V4 Search endpoints"""
         for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+            url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
             self.client.get(url)
             # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
@@ -1917,7 +2099,7 @@ class SaveSearchQueryTest(TestCase):
     def test_failed_es_search_v4_api_queries(self) -> None:
         """Do we flag failed v4 API queries properly?"""
         query = "type=r&q=contains/sproximity token"
-        url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+        url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 400)
         last_query = SearchQuery.objects.last()
@@ -1934,7 +2116,7 @@ class SaveSearchQueryTest(TestCase):
     def test_search_es_api_v3_query_saving(self) -> None:
         """Do we save queries on all V3 Search endpoints"""
         for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+            url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
             self.client.get(url)
             # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
@@ -1959,7 +2141,7 @@ class SaveSearchQueryTest(TestCase):
     def test_failed_es_search_v3_api_queries(self) -> None:
         """Do we flag failed ES v3 API queries properly?"""
         query = "type=r&q=contains/sproximity token"
-        url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+        url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 500)
         last_query = SearchQuery.objects.last()
@@ -1983,7 +2165,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -2003,7 +2185,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -2020,7 +2202,7 @@ class CaptionTest(TestCase):
         )
         d = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
+            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -2448,7 +2630,7 @@ class ESIndexingTasksUtils(TestCase):
             how_selected="e_part",
             nomination_process="fed_senate",
         )
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 docket_number="12-09876",
@@ -2608,7 +2790,7 @@ class SweepIndexerCommandTest(
     def setUpTestData(cls):
         super().setUpTestData()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 date_filed=datetime.date(2015, 8, 16),
@@ -2629,7 +2811,7 @@ class SweepIndexerCommandTest(
             attachment_number=2,
             document_type=RECAPDocument.ATTACHMENT,
         )
-        cls.de_1 = DocketEntryWithParentsFactory(
+        cls.de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 date_filed=datetime.date(2016, 8, 16),

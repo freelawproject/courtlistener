@@ -1,5 +1,5 @@
+from collections.abc import Iterable
 from datetime import date, datetime
-from typing import Iterable
 
 from django.conf import settings
 
@@ -175,12 +175,7 @@ class Command(VerboseCommand):
                 ).set(queue=queue).apply_async()
                 chunk = []
                 self.stdout.write(
-                    "\rProcessed {}/{}, ({:.0%}), last PK {}".format(
-                        processed_count,
-                        count,
-                        processed_count * 1.0 / count,
-                        item_id,
-                    )
+                    f"\rProcessed {processed_count}/{count}, ({processed_count * 1.0 / count:.0%}), last PK {item_id}"
                 )
                 if not processed_count % 1000:
                     # Log every 1000 parent documents processed.

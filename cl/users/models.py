@@ -1,7 +1,6 @@
 import re
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict
 
 import pghistory
 from django.conf import settings
@@ -10,7 +9,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError, ObjectDoesNotExist
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import models
-from django.db.models import Q, Sum, UniqueConstraint
+from django.db.models import Q, UniqueConstraint
 from django.utils.timezone import now
 from localflavor.us.models import USStateField
 
@@ -157,6 +156,17 @@ class UserProfile(models.Model):
             return False
 
     @property
+    def is_eligible_for_rt_search_alerts(self) -> bool:
+        """
+        Determine whether the user is eligible to receive real-time search
+        alerts.
+
+        :return bool: True if the user is either an active member or has the
+        unlimited docket alerts flag enabled.
+        """
+        return self.is_member or self.unlimited_docket_alerts
+
+    @property
     def email_grants_unlimited_docket_alerts(self) -> bool:
         """Does the user's email grant them unlimited docket alerts?
 
@@ -194,7 +204,7 @@ class UserProfile(models.Model):
         return False
 
     @property
-    def recent_api_usage(self) -> Dict[str, int]:
+    def recent_api_usage(self) -> dict[str, int]:
         """Get stats about API usage for the user for the past 14 days
 
         :return: A dict of date-count pairs indicating the amount of times the

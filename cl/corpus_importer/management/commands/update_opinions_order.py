@@ -1,7 +1,7 @@
 import argparse
 import re
 import time
-from typing import Any, List
+from typing import Any
 
 from bs4 import BeautifulSoup
 from django.db import transaction
@@ -88,7 +88,7 @@ def fetch_cleaned_columbia_text(filepath: str) -> str:
     :param filepath: the filepath
     :return: the opinion text cleaned up
     """
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         content = f.read()
 
     columbia_xml = BeautifulSoup(content, "html.parser")
@@ -97,7 +97,7 @@ def fetch_cleaned_columbia_text(filepath: str) -> str:
     return clean_columbia_text
 
 
-def generate_ngrams(words: List[str]) -> List[List[str]]:
+def generate_ngrams(words: list[str]) -> list[list[str]]:
     """Generate n-grams based on the length of the word list.
 
     Pass in a list of words in an opinion and divide it up into n-grams based on the
@@ -116,7 +116,7 @@ def generate_ngrams(words: List[str]) -> List[List[str]]:
     return [words[i : i + width] for i in range(len(words) - (width - 1))]
 
 
-def match_text(opinions: List[Any], xml_dir: str) -> List[List[Any]]:
+def match_text(opinions: list[Any], xml_dir: str) -> list[list[Any]]:
     """Identify a unique set of text in opinions to identify order of opinions
 
     In a small subset of opinions, duplicate text or bad data fails and assign the
@@ -187,7 +187,7 @@ def sort_columbia_opinions(options: dict) -> None:
         op_types = [op[1] for op in opinions]
         if len(opinions) < 2:
             # Only one opinion is shown, no need to order
-            logger.info(f"Skipping opinion cluster with only one opinion.")
+            logger.info("Skipping opinion cluster with only one opinion.")
             continue
         elif (
             len(op_types) == 2
@@ -195,11 +195,11 @@ def sort_columbia_opinions(options: dict) -> None:
             and len(set(op_types)) == 2
         ):
             # If only two opinions and one is the lead - assign it to the number 1
-            logger.info(f"Sorting opinions with 1 Lead Opinion.")
+            logger.info("Sorting opinions with 1 Lead Opinion.")
             opinions = [op[:2] for op in opinions]
             ordered_opinions = sorted(opinions, key=lambda fields: fields[1])
         else:
-            logger.info(f"Sorting order by location.")
+            logger.info("Sorting order by location.")
             ordered_opinions = match_text(opinions, xml_dir)
 
         ordering_key = 1
@@ -210,7 +210,7 @@ def sort_columbia_opinions(options: dict) -> None:
             ordering_key += 1
 
         completed += 1
-        logger.info(f"Opinion Cluster completed.")
+        logger.info("Opinion Cluster completed.")
 
         # Wait between each processed cluster to avoid issues with redis memory
         time.sleep(options["delay"])
@@ -227,8 +227,9 @@ class Command(VerboseCommand):
     def valid_actions(self, s):
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
-                "Unable to parse action. Valid actions are: %s"
-                % (", ".join(self.VALID_ACTIONS.keys()))
+                "Unable to parse action. Valid actions are: {}".format(
+                    ", ".join(self.VALID_ACTIONS.keys())
+                )
             )
 
         return self.VALID_ACTIONS[s]
@@ -250,8 +251,9 @@ class Command(VerboseCommand):
             "--action",
             type=self.valid_actions,
             required=True,
-            help="The action you wish to take. Valid choices are: %s"
-            % (", ".join(self.VALID_ACTIONS.keys())),
+            help="The action you wish to take. Valid choices are: {}".format(
+                ", ".join(self.VALID_ACTIONS.keys())
+            ),
         )
         parser.add_argument(
             "--delay",

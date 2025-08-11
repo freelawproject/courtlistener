@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Help with Relative Date Queries – CourtListener.com{% endblock %}
+{% block og_title %}Help with Relative Date Queries – CourtListener.com{% endblock %}
+
+{% block description %}Learn how to use relative dates queries in CourtListener to make your searches and alerts more dynamic and up-to-date.{% endblock %}
+{% block og_description %}Learn how to use relative dates queries in CourtListener to make your searches and alerts more dynamic and up-to-date.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "help_home" %}">Back to Help</a>
+  </h4>
+</div>
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "help_home" %}">Back to Help</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#relative-dates">Relative Date Queries</a></li>
+      <li><a href="#syntax">Allowed Syntax</a></li>
+      <li><a href="#notes">Technical Notes</a></li>
+    </ul>
+  </div>
+</div>
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="relative-dates">Help with Relative Date Queries</h1>
+  <p class="lead">Use relative dates in your queries to keep your searches and alerts dynamically up to date.</p>
+  <p>When placing a search query into CourtListener, you can use either "Calendar" date queries or "Relative" date queries:</p>
+  <ul>
+    <li>Calendar date queries let you filter before or after a given date.</li>
+    <li>Relative dates filter results dynamically based on the date the query is made by a user or system. Instead of specifying a calendar date, such a "January 1, 2025", you can use relative time periods like <code>1 day ago</code>, <code>Past 1 month</code>, or <code>-14d</code>.</li>
+  </ul>
+
+  <p>Relative date queries are useful for saved or bookmarked queries, so that your query always filters to recent content.
+    They are also valuable when creating alerts. Imagine you want to receive an alert whenever a recent document — filed in the past week — is made available in the  <a href="{% url "advanced_r" %}">RECAP Archive</a>.
+    With relative dates, your date range is rolling, and the "Past Week" changes in sync with the date the alert is triggered.
+  </p>
+
+  <h2 id="syntax">Allowed Syntax</h2>
+  <p>You can use the following syntax:</p>
+  <ul>
+    <li><code>Xd ago</code></li>
+    <li><code>X days ago</code></li>
+    <li><code>-Xd</code></li>
+    <li><code>-Xd ago</code></li>
+    <li><code>-X days</code></li>
+    <li><code>Past X days</code></li>
+  </ul>
+
+  <p>To filter to months or years, substitute <code>m</code>, <code>months</code>, <code>y</code>, or <code>years</code> instead of <code>d</code> or <code>days</code>.</p>
+  <p>When using the <a href="{% url "search_api_help" %}">Search API</a>, relative dates are accepted on all date filters, even if they are not supported by the website.</p>
+
+  <h2 id="notes">Notes</h2>
+  <ul>
+    <li>
+      The past day (d) begins at 12:00am UTC the previous day and continues up to the time of the query.
+      <br>
+      <strong>Example:</strong> Suppose today is Monday the 26th.
+      <ul>
+        <li>If you run a "Past 1 day" query at <strong>20:00 local</strong> time in New York (Eastern Time, UTC–4, which is <strong>00:00 UTC on Tuesday the 27th</strong>), you’ll get filings from <strong>00:00 UTC Monday</strong> through <strong>00:00 UTC Tuesday</strong>.</li>
+        <li>If you run the same query at <strong>19:59 local time</strong> (which is 23:59 UTC Monday), you'll get filings from <strong>00:00 UTC Sunday</strong> through <strong>23:59 UTC Monday</strong>.</li>
+      </ul>
+    </li>
+    <li>Similarly, the past X days begin at 12:00am UTC X days before the current day, and continue up to the current time.</li>
+    <li>One month (m) is equal to 30 days, so 12m is equal to 360 days, not 365 days.</li>
+    <li>One year (y) is equal to 365 days regardless of leap years.</li>
+  </ul>
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

@@ -1,8 +1,8 @@
 import environ
 
-env = environ.FileAwareEnv()
-
 from ..django import TESTING
+
+env = environ.FileAwareEnv()
 
 if TESTING:
     ELASTICSEARCH_DISABLED = True
@@ -125,6 +125,12 @@ ELASTICSEARCH_DSL = {
         "filter": {
             "custom_word_delimiter_filter": {
                 "type": "word_delimiter",
+                "type_table": [
+                    "§ => ALPHANUM",
+                    "$ => ALPHANUM",
+                    "% => ALPHANUM",
+                    "¶ => ALPHANUM",
+                ],
                 "split_on_numerics": False,
                 "preserve_original": True,
             },

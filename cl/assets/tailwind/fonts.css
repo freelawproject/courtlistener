@@ -60,3 +60,14 @@
   font-style: normal;
   font-display: swap;
 }
+
+@font-face {
+  font-family: 'DM Mono';
+  src: url('../../static/fonts/DM-mono/DMMono-Medium.woff2') format('woff2'),
+       url('../../static/fonts/DM-mono/DMMono-Medium.woff') format('woff'),
+       url('../../static/fonts/DM-mono/DMMono-Medium.otf') format('otf'),
+       url('../../static/fonts/DM-mono/DMMono-Medium.ttf') format('ttf');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}

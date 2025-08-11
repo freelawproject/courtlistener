@@ -1,6 +1,6 @@
+from collections.abc import Iterable
 from datetime import date
 from itertools import batched
-from typing import Iterable
 
 from django.conf import settings
 from django.db.models import QuerySet
@@ -206,11 +206,7 @@ def get_documents_to_update_or_remove(
 
         processed_count += len(event_ids_list)
         logger.info(
-            "\rChecking documents to update:  {}/{} ({:.0%})".format(
-                processed_count,
-                event_ids_count,
-                processed_count / event_ids_count,
-            )
+            f"\rChecking documents to update:  {processed_count}/{event_ids_count} ({processed_count / event_ids_count:.0%})"
         )
     return (
         main_documents_to_update,

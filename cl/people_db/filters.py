@@ -1,5 +1,3 @@
-from typing import Any
-
 import rest_framework_filters as filters
 from django.db.models import Prefetch, QuerySet
 
@@ -315,7 +313,7 @@ class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
         prefetch_roles = Prefetch(
             name,
             queryset=Role.objects.filter(**filters),
-            to_attr=f"filtered_roles",
+            to_attr="filtered_roles",
         )
         prefetch_party_types = Prefetch(
             name,
@@ -326,7 +324,7 @@ class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
                     if key.startswith("docket")
                 }
             ),
-            to_attr=f"filtered_party_types",
+            to_attr="filtered_party_types",
         )
         return qs.prefetch_related(prefetch_roles, prefetch_party_types)
 
@@ -390,6 +388,6 @@ class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
         prefetch = Prefetch(
             name,
             queryset=Role.objects.filter(**role_filters),
-            to_attr=f"filtered_roles",
+            to_attr="filtered_roles",
         )
         return qs.prefetch_related(prefetch)

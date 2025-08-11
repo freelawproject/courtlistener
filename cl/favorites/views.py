@@ -30,37 +30,34 @@ from cl.favorites.utils import (
     prayer_eligible,
 )
 from cl.lib.http import is_ajax
-from cl.lib.view_utils import increment_view_count
 from cl.search.models import RECAPDocument
 from cl.users.models import UserProfile
 
 
-async def get_note(request: HttpRequest) -> HttpResponse:
+def get_note(request: HttpRequest) -> HttpResponse:
     audio_pk = request.POST.get("audio_id")
     cluster_pk = request.POST.get("cluster_id")
     docket_pk = request.POST.get("docket_id")
     recap_doc_pk = request.POST.get("recap_doc_id")
-    user = await request.auser()
+    user = request.user
     if audio_pk and audio_pk != "undefined":
         try:
-            note = await Note.objects.aget(audio_id=audio_pk, user=user)
+            note = Note.objects.get(audio_id=audio_pk, user=user)
         except ObjectDoesNotExist:
             note = Note()
     elif cluster_pk and cluster_pk != "undefined":
         try:
-            note = await Note.objects.aget(cluster_id=cluster_pk, user=user)
+            note = Note.objects.get(cluster_id=cluster_pk, user=user)
         except ObjectDoesNotExist:
             note = Note()
     elif docket_pk and docket_pk != "undefined":
         try:
-            note = await Note.objects.aget(docket_id=docket_pk, user=user)
+            note = Note.objects.get(docket_id=docket_pk, user=user)
         except ObjectDoesNotExist:
             note = Note()
     elif recap_doc_pk and recap_doc_pk != "undefined":
         try:
-            note = await Note.objects.aget(
-                recap_doc_id=recap_doc_pk, user=user
-            )
+            note = Note.objects.get(recap_doc_id=recap_doc_pk, user=user)
         except ObjectDoesNotExist:
             note = Note()
     else:
@@ -69,7 +66,7 @@ async def get_note(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-async def save_or_update_note(request: HttpRequest) -> HttpResponse:
+def save_or_update_note(request: HttpRequest) -> HttpResponse:
     """Uses ajax to save or update a note.
 
     Receives a request as an argument, and then uses that plus POST data to
@@ -78,18 +75,18 @@ async def save_or_update_note(request: HttpRequest) -> HttpResponse:
     new information. If not, it creates a new note.
     """
     if is_ajax(request):
-        note = await get_note(request)
+        note = get_note(request)
         if note is None:
             return HttpResponseServerError(
                 "Unknown document, audio, docket or recap document id."
             )
 
         f = NoteForm(request.POST, instance=note)
-        if await sync_to_async(f.is_valid)():
-            new_note = await sync_to_async(f.save)(commit=False)
-            new_note.user = await request.auser()
+        if f.is_valid():
+            new_note = f.save(commit=False)
+            new_note.user = request.user
             try:
-                await sync_to_async(new_note.save)()
+                new_note.save()
             except IntegrityError:
                 # User already has this note.
                 return HttpResponse("It worked")
@@ -105,18 +102,18 @@ async def save_or_update_note(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-async def delete_note(request: HttpRequest) -> HttpResponse:
+def delete_note(request: HttpRequest) -> HttpResponse:
     """Delete a user's note
 
     Deletes a note for a user using an ajax call and post data.
     """
     if is_ajax(request):
-        note = await get_note(request)
+        note = get_note(request)
         if note is None:
             return HttpResponseServerError(
                 "Unknown document, audio, docket, or recap document id."
             )
-        await note.adelete()
+        note.delete()
 
         try:
             if request.POST["message"] == "True":
@@ -142,7 +139,6 @@ async def view_tag(request, username, tag_name):
     tag = await aget_object_or_404(
         UserTag, name=tag_name, user__username=username
     )
-    await increment_view_count(tag, request)
 
     if tag.published is False:
         if await User.objects.aget(pk=tag.user_id) != await request.auser():

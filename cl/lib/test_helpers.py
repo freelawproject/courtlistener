@@ -1,8 +1,11 @@
 import datetime
 import unittest
+from collections.abc import Sized
 from functools import wraps
-from typing import Sized, cast
+from typing import cast
 
+from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.testcases import SerializeMixin
@@ -24,14 +27,14 @@ from cl.people_db.factories import (
     PositionFactory,
     SchoolFactory,
 )
-from cl.people_db.models import Person, Race
+from cl.people_db.models import Race
 from cl.search.constants import o_type_index_map
 from cl.search.docket_sources import DocketSources
 from cl.search.documents import DocketDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
     OpinionFactory,
@@ -44,7 +47,7 @@ from cl.search.models import (
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
 )
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
@@ -112,7 +115,9 @@ opinion_cluster_v3_v4_common_fields = {
     "panel_ids": lambda x: (
         list(x["result"].cluster.panel.all().values_list("id", flat=True))
         if x["result"].cluster.panel.all()
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "dateArgued": lambda x: (
         (
@@ -169,14 +174,18 @@ opinion_document_v3_v4_common_fields = {
         if x["result"]
         .cited_opinions.all()
         .values_list("cited_opinion_id", flat=True)
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "download_url": lambda x: x["result"].download_url,
     "id": lambda x: x["result"].pk,
     "joined_by_ids": lambda x: (
         list(x["result"].joined_by.all().values_list("id", flat=True))
         if x["result"].joined_by.all()
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "type": lambda x: (
         o_type_index_map.get(x["result"].type)
@@ -731,7 +740,9 @@ audio_common_fields = {
     "judge": lambda x: (
         x["judge"]
         if x.get("judge")
-        else x["result"].judges if x["result"].judges else ""
+        else x["result"].judges
+        if x["result"].judges
+        else ""
     ),
     "local_path": lambda x: (
         deepgetattr(x["result"], "local_path_mp3.name", None)
@@ -742,14 +753,18 @@ audio_common_fields = {
     "panel_ids": lambda x: (
         list(x["result"].panel.all().values_list("id", flat=True))
         if x["result"].panel.all()
-        else [] if x.get("V4") else None
+        else []
+        if x.get("V4")
+        else None
     ),
     "sha1": lambda x: x["result"].sha1,
     "source": lambda x: x["result"].source,
     "snippet": lambda x: (
         x["snippet"]
         if x.get("snippet")
-        else x["result"].transcript if x["result"].stt_transcript else ""
+        else x["result"].transcript
+        if x["result"].stt_transcript
+        else ""
     ),
 }
 
@@ -827,7 +842,7 @@ class PrayAndPayTestCase(TestCase):
         super().setUpTestData()
 
 
-class CourtTestCase(SimpleTestCase):
+class CourtTestCase(TestCase):
     """Court test case factories"""
 
     @classmethod
@@ -849,7 +864,7 @@ class CourtTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class PeopleTestCase(SimpleTestCase):
+class PeopleTestCase(TestCase):
     """People test case factories"""
 
     @classmethod
@@ -995,7 +1010,7 @@ class PeopleTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class SearchTestCase(SimpleTestCase):
+class SearchTestCase(TestCase):
     """Search test case factories"""
 
     @classmethod
@@ -1206,7 +1221,7 @@ class SearchTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class RECAPSearchTestCase(SimpleTestCase):
+class RECAPSearchTestCase(TestCase):
     """RECAP Search test case factories"""
 
     @classmethod
@@ -1219,7 +1234,7 @@ class RECAPSearchTestCase(SimpleTestCase):
         cls.judge_2 = PersonFactory.create(
             name_first="Persephone", name_last="Sinclair"
         )
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 case_name="SUBPOENAS SERVED ON",
@@ -1292,7 +1307,7 @@ class RECAPSearchTestCase(SimpleTestCase):
         cls.judge_4 = PersonFactory.create(
             name_first="Leopold", name_last="Featherstone"
         )
-        cls.de_1 = DocketEntryWithParentsFactory(
+        cls.de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 docket_number="12-1235",
                 court=cls.court_2,
@@ -1326,16 +1341,25 @@ class SerializeLockFileTestMixin(SerializeMixin):
 class SimpleUserDataMixin:
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()  # type: ignore
         UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUpTestData()  # type: ignore
 
 
 class SitemapTest(TestCase):
     sitemap_url: str
     expected_item_count: int
+
+    def setUpSiteDomain(self) -> None:
+        # set the domain name in the Sites framework to match the test domain name, set http url schema
+        domain = "testserver"
+        SiteModel = apps.get_model("sites", "Site")
+
+        SiteModel.objects.update_or_create(
+            pk=settings.SITE_ID, defaults={"domain": domain, "name": domain}
+        )
 
     def assert_sitemap_has_content(self) -> None:
         """Does content get into the sitemap?"""
@@ -1369,11 +1393,12 @@ class SitemapTest(TestCase):
         )
 
 
-class AudioTestCase(SimpleTestCase):
+class AudioTestCase(TestCase):
     """Audio test case factories"""
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.audio_1 = AudioFactory.create(
             docket_id=1,
             duration=420,
@@ -1409,7 +1434,7 @@ class AudioTestCase(SimpleTestCase):
         super().tearDownClass()
 
 
-class AudioESTestCase(SimpleTestCase):
+class AudioESTestCase(TestCase):
     """Audio test case factories for ES"""
 
     fixtures = [
@@ -1420,6 +1445,7 @@ class AudioESTestCase(SimpleTestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.court_1 = CourtFactory(
             id="cabc",
             full_name="Testing Supreme Court",

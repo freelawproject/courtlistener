@@ -1,7 +1,33 @@
 import natsort
-from django.db.models import F, Prefetch, Q, QuerySet
+from django.db import connection
+from django.db.models import Q, QuerySet
 
-from cl.search.models import OpinionCluster
+from cl.search.models import Citation, OpinionCluster
+
+
+def get_available_documents_estimate_count() -> int:
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            WITH stats AS (
+              SELECT
+                most_common_vals,
+                most_common_freqs,
+                array_position(most_common_vals::text::text[], 't') AS index
+              FROM pg_stats
+              WHERE tablename = 'search_recapdocument' AND attname = 'is_available'
+            ),
+            doc_estimate AS (
+              SELECT reltuples::bigint AS estimate
+              FROM pg_class
+              WHERE oid = 'public.search_recapdocument'::regclass
+            )
+            SELECT
+              (most_common_freqs[index] * estimate)::bigint AS estimated_true_count
+            FROM stats, doc_estimate
+            WHERE index IS NOT NULL;
+        """)
+        result = cursor.fetchone()
+        return result[0] if result else None
 
 
 async def get_clusters_from_citation_str(
@@ -50,12 +76,10 @@ async def get_clusters_from_citation_str(
         # Create a list of the closest opinion clusters id and page to the
         # input citation
         closest_opinion_clusters = [
-            opinion
-            async for opinion in OpinionCluster.objects.filter(
-                citations__reporter=reporter, citations__volume=volume
-            )
-            .annotate(cite_page=(F("citations__page")))
-            .values_list("id", "cite_page")
+            c
+            async for c in Citation.objects.filter(
+                reporter=reporter, volume=volume
+            ).values_list("cluster_id", "page")
         ]
 
         # Create a temporal item and add it to the values list

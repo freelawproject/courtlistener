@@ -16,7 +16,6 @@ from cl.users.factories import UserProfileWithParentsFactory
 
 
 class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
-
     errors = [
         ("Unbalance Quotes", 'q="test&type=o'),
         ("Unbalance Parentheses", "q=Leave)&type=o"),
@@ -66,9 +65,10 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # This query should match all 5 judges indexed for this test
         query = "q=gender:Female&type=p"
         for i in range(6):
-            with self.subTest(
-                f"try to fetch only {i+1} results"
-            ), self.settings(MAX_SEARCH_RESULTS_EXPORTED=i + 1):
+            with (
+                self.subTest(f"try to fetch only {i + 1} results"),
+                self.settings(MAX_SEARCH_RESULTS_EXPORTED=i + 1),
+            ):
                 results, _ = fetch_es_results_for_csv(
                     QueryDict(query.encode(), mutable=True),
                     SEARCH_TYPES.PEOPLE,

@@ -1,0 +1,119 @@
+{% extends 'new_base.html' %}
+{% load static humanize %}
+
+{% block title %}Financial Disclosure Coverage – CourtListener.com{% endblock %}
+
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="overview"
+  :nav_items="[
+      {'href': '#overview', 'text': 'Overview'},
+      {'href': '#totals', 'text': 'Yearly Totals'},
+      {'href': '#enhancements', 'text': 'Our Enhancements'},
+      {'href': '#gaps', 'text': 'Data Gaps'},
+  ]"
+>
+  <c-layout-with-navigation.section id="overview">
+    <h1 class="text-display-xs">Data Coverage &mdash; What Financial Disclosures Does CourtListener Have?</h1>
+    <p>The <a class="underline" href="https://www.govinfo.gov/content/pkg/USCODE-2010-title5/pdf/USCODE-2010-title5-app-ethicsing.pdf">Ethics in Government Act of 1978</a> requires that senior government officials file annual disclosures listing their personal financial interests. In the Judicial Branch, this law applies to certain judicial employees and all judges. Once filed, these disclosures are generally available to the public for six years. After that time has elapsed the statute generally <a class="underline" href="https://www.govinfo.gov/app/details/USCODE-2021-title5/USCODE-2021-title5-app-ethicsing-sec105" target="_blank" rel="noopener noreferrer">requires that disclosures be "destroyed."</a>
+    </p>
+    <p>Historically, these disclosures were not collected systematically because it was too difficult to do so. Each disclosure had to be requested individually by fax, and had to be paid for by check. A big change to this policy came in the <a class="underline" href="https://www.uscourts.gov/sites/default/files/2017-03_0.pdf#page=12">March, 2017 meeting of the Judicial Conference</a>, where they created a new policy that allowed the disclosures to be released on "electronic storage devices…at no cost to the requestor."
+    </p>
+    <p>This was a monumental change in policy, and since that time, <strong>Free Law Project has requested all of the judicial disclosures that are legally available</strong>. The Ethics in Government Act also requires certain judicial personnel to complete financial disclosures. We have requested these as well, but asked that the request be fulfilled as a lower priority than the judicial disclosures.
+    </p>
+    <p>At this time, we have received over <a class="underline" href="https://x.com/FreeLawProject/status/1301921783151341568" target="_blank" rel="noopener noreferrer">a dozen thumb drives from the Financial Disclosures Office</a>.
+    </p>
+    <img src="{% static "jpeg/disclosure-thumb-drives.jpeg" %}"
+         width="992"
+         height="309"
+         class="img-responsive img-rounded"
+         alt="Picture of thumb drives"
+    >
+    <p>Additionally, judicial nominees file financial disclosures with the Senate Judiciary Committee during the nomination process. Free Law Project <a class="underline" href="https://www.github.com/freelawproject/nomination-extractor/" target="_blank" rel="noopener noreferrer">built a machine learning model and tool</a> that could identify financial disclosures and used it to scan hundreds of thousands of pages of Senate records.
+    </p>
+    <p><a class="underline" href="https://www.judicialwatch.org/" target="_blank" rel="noopener noreferrer nofollow">One other organization</a> has systematically placed disclosures online, and we have gathered their corpus as well, as described below. A news organization called ABPNews also gathered them in the late nineties, but after going out of business in 2000, <a class="underline" href="https://x.com/FreeLawProject/status/1093612415185350656" target="_blank" rel="noopener noreferrer">their records were lost to water damage</a>. If you know of other sources, <a class="text-primary-600" href="{% url "contact" %}">please get in touch</a>.
+    </p>
+    <p>In 2023, ProPublica utilized our dataset for an ambitious investigation into the Supreme Court, which led to their winning the prestigious public service Pulitzer Prize in 2024. The Pulitzer committee <a class="underline" href="https://www.propublica.org/article/pulitzer-prize-announcement-propublica-supreme-court" target="_blank" rel="noopener noreferrer">praised</a> ProPublica's "groundbreaking and ambitious reporting that pierced the thick wall of secrecy surrounding the Supreme Court." This recognition underscores the critical importance of judicial transparency and the impact of our database in supporting investigative journalism.
+    </p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="totals">
+    <h2>Yearly Totals</h2>
+    <c-data-table
+      safe
+      :columns="[
+        {'label': 'Source', 'field': 'source'},
+        {'label': 'Year', 'field': 'year'},
+        {'label': 'File Count*', 'field': 'count'},
+        {'label': 'File Size (GB)*', 'field': 'size'},
+        {'label': 'Notes', 'field': 'notes'},
+      ]"
+      :rows="[
+        {'source': 'Senate Records', 'year': '1987-2013', 'count': '874', 'size': '394.7 MB', 'notes': '<a class=underline href=https://free.law/2021/12/22/nomination-disclosures target=_blank>Extracted from Senate Records</a>'},
+        {'source': 'Judicial Watch', 'year': '2003-2010', 'count': '9,157', 'size': '7.6', 'notes': 'Gathered from their website'},
+        {'source': 'U.S. Courts', 'year': '2011', 'count': '3,515', 'size': '46.8', 'notes': 'Complete'},
+        {'source': 'U.S. Courts', 'year': '2012', 'count': '2,763', 'size': '49.8', 'notes': 'Complete'},
+        {'source': 'U.S. Courts', 'year': '2013', 'count': '3,238', 'size': '50.1', 'notes': 'Complete'},
+        {'source': 'U.S. Courts', 'year': '2014', 'count': '2,951', 'size': '51.1', 'notes': 'Complete'},
+        {'source': 'U.S. Courts', 'year': '2015', 'count': '2,737', 'size': '52.4', 'notes': 'Complete'},
+        {'source': 'U.S. Courts', 'year': '2016', 'count': '2,764', 'size': '49.1', 'notes': 'Complete'},
+        {'source': 'U.S. Courts', 'year': '2017', 'count': '2,467', 'size': '49.5', 'notes': 'Complete'},
+        {'source': 'U.S. Courts', 'year': '2018', 'count': '2,361', 'size': '50.4', 'notes': 'Complete'},
+        {'source': 'U.S. Courts', 'year': '2019', 'count': '2246', 'size': '191.6 MB', 'notes': 'Requested 1/1/2020<br>Received partial set of 2019 disclosures. Disclosures received as PDFs.'},
+        {'source': 'U.S. Courts', 'year': '2020', 'count': '1188', 'size': '153.3 MB', 'notes': 'Requested 1/1/2021.<br>Only received ~1200 disclosures.'},
+        {'source': 'U.S. Courts', 'year': '2021', 'count': '0', 'size': '-', 'notes': 'Requested 1/1/2022.<br>None received.'},
+      ]"
+      :footer="[
+        {'source': 'TOTAL', 'year': '34 YEARS', 'count': '35k', 'size': '407GB', 'notes': ''},
+      ]"
+    ></c-data-table>
+
+    <p class="text-sm font-normal text-greyscale-600">* Differences in these columns are due to disclosures frequently being broken into multiple files.
+    </p>
+    <p>If you know of other disclosures not already in our collection, we would <a class="text-primary-600" href="{% url "contact" %}">love to hear from you</a>. We need your help to complete this collection.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="enhancements">
+    <h2>Our Enhancements</h2>
+    <p>We have dedicated considerable energy to develop <a class="underline" href="https://github.com/freelawproject/disclosure-extractor" target="_blank" rel="noopener noreferrer">a parsing system</a> for these disclosures. This system takes the disclosure, whether it’s a single-page TIFF, multi-page TIFF or PDF, scanned document or text, and converts it into machine-readable JSON data. When we first ran this system, it took weeks for our servers to parse the information from the disclosures.
+    </p>
+    <p>Additionally, we developed a <a class="underline" href="https://github.com/freelawproject/nomination-extractor/" target="_blank" rel="noopener noreferrer">machine learning model</a> that extracted 843 Financial Disclosure from over 250k pages of Senate hearing documents.</p>
+    <p>Once the parsing was completed, we converted all the disclosures into good PDF files and ingested the data into our database, where it is <a class="text-primary-600" href="{%  url "api_index" %}">available via our APIs and website</a>. As of this moment, there are <strong>{{ disclosures|intcomma }}</strong> disclosures documenting:
+    </p>
+
+    <ul>
+      <li><strong>{{ investments|intcomma }}</strong> investments</li>
+      <li><strong>{{ positions|intcomma }}</strong> positions held outside of the judiciary</li>
+      <li><strong>{{ agreements|intcomma }}</strong> legal agreements</li>
+      <li><strong>{{ non_investment_income|intcomma }}</strong> sources of non-investment income</li>
+      <li><strong>{{ spousal_income|intcomma }}</strong> sources of spousal income</li>
+      <li><strong>{{ reimbursements|intcomma }}</strong> reimbursements</li>
+      <li><strong>{{ gifts|intcomma }}</strong> gifts to judges and judicial employees</li>
+      <li><strong>{{ debts|intcomma }}</strong> debts</li>
+    </ul>
+
+    <p>When combined with our detailed database of judges, this creates a one-of-a-kind resource for understanding the conflicts, resources, and entanglements of federal judges. We believe this brings our country closer to finally realizing the goals set out by the 1978 Ethics in Government Act.
+    </p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="gaps">
+    <h2>What's Missing</h2>
+    <p>We have worked hard to parse all of the disclosures that we have collected, but there are a few places where we were unable to make meaningful progress:
+    </p>
+    <div class="pl-5">
+      <ol>
+        <li>We have a basic parser for documents from Judicial Watch, but due to their age the disclosures in this collection vary considerably. We were able to parse many of them, but some were too difficult.</li>
+        <li>Some disclosures were scanned incorrectly. <a class="underline" href="https://storage.courtlistener.com/us/federal/judicial/financial-disclosures/823/michael-james-davis-disclosure.2011.pdf" target="_blank" rel="noopener noreferrer">Here's a representative example</a>.</li>
+        <li>Some disclosures had scanned and embedded spreadsheets, <a class="underline" href="https://storage.courtlistener.com/us/federal/judicial/financial-disclosures/9641/david-e-jones-disclosure.2014.pdf" target="_blank" rel="noopener noreferrer">like this one</a>. These were too challenging to automate.</li>
+        <li>A few disclosures were handwritten. We were unable to parse those.</li>
+        <li>Many disclosures we lack &mdash; particularly older ones &mdash; <a class="underline" href="https://github.com/freelawproject/courtlistener/issues/1644" target="_blank" rel="noopener noreferrer">are available as part of judicial nomination proceedings</a>. We are looking for a funder to help us add them to the collection.</li>
+      </ol>
+    </div>
+    <p>Whenever possible, we work with the Office of Financial Disclosures to remedy badly processed disclosures and get them into our system, but this can be an overwhelming administrative effort for our small organization. As with everything we do, your support helps makes this project possible.
+    </p>
+  </c-layout-with-navigation.section>
+
+  <c-support-plea-banner></c-support-plea-banner>
+</c-layout-with-navigation>
+{% endblock %}

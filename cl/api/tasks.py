@@ -108,7 +108,7 @@ def send_search_alert_webhook_es(
             serialized_results = V3OAESResultSerializer(
                 es_results, many=True
             ).data
-        case SEARCH_TYPES.RECAP:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             set_child_docs_and_score(results, merge_highlights=True)
             serialized_results = RECAPESWebhookResultSerializer(
                 results, many=True

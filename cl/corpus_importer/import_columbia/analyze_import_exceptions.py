@@ -1,5 +1,3 @@
-import re
-
 """
 Created on Thu Jun 16 14:31:21 2016
 
@@ -7,6 +5,7 @@ Created on Thu Jun 16 14:31:21 2016
 """
 
 import os
+import re
 from collections import Counter, defaultdict
 
 os.chdir("/home/elliott/freelawmachine/flp/columbia_data/logs/2")
@@ -26,7 +25,7 @@ for line in open("import_columbia_output_stage_2.log"):
     if "Exception:" in line:
         if "date" not in line:
             print(line)
-        print(f"{line}\n", end="", file=open("unknown.txt", "at"))
+        print(f"{line}\n", end="", file=open("unknown.txt", "a"))
         # file_lists[line].append(currfile)
         # print(line)
 

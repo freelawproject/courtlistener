@@ -1,5 +1,5 @@
-from datetime import date, datetime
-from typing import Iterable
+from collections.abc import Iterable
+from datetime import datetime
 
 from django.conf import settings
 
@@ -18,7 +18,7 @@ def compose_redis_key() -> str:
     """Compose a Redis key based on the search type for indexing log.
     :return: A Redis key as a string.
     """
-    return f"es_re_index_rd_sealed:log"
+    return "es_re_index_rd_sealed:log"
 
 
 class Command(VerboseCommand):
@@ -134,12 +134,7 @@ class Command(VerboseCommand):
                 chunk = []
 
                 self.stdout.write(
-                    "\rProcessed {}/{}, ({:.0%}), last PK indexed: {},".format(
-                        processed_count,
-                        count,
-                        processed_count * 1.0 / count,
-                        item_id,
-                    )
+                    f"\rProcessed {processed_count}/{count}, ({processed_count * 1.0 / count:.0%}), last PK indexed: {item_id},"
                 )
                 if not processed_count % 1000:
                     # Log every 1000 parent documents processed.

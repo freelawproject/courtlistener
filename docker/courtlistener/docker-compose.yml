@@ -1,6 +1,4 @@
 # Run using `docker compose up`
-version: "3.7"
-
 networks:
   cl_net_overlay:
     driver: bridge
@@ -81,6 +79,8 @@ services:
         - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
         - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
         - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+        - AWS_DEV_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_DEV_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
   cl-tailwind-reload:
     container_name: cl-tailwind-reload
@@ -127,6 +127,8 @@ services:
         - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
         - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
         - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+        - AWS_DEV_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_DEV_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
   cl-selenium:
     container_name: cl-selenium
@@ -160,7 +162,7 @@ services:
 
   cl-es:
     container_name: cl-es
-    image: elasticsearch:8.8.1
+    image: elastic/elasticsearch:9.0.1
     environment:
       - discovery.type=single-node
       - cluster.name=courtlistener-cluster

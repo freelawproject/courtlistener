@@ -1,7 +1,7 @@
 import json
-import logging
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from itertools import product
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock, patch
@@ -28,7 +28,11 @@ from django_ses import signals
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.alerts.factories import DocketAlertFactory
+from cl.alerts.factories import (
+    AlertFactory,
+    DocketAlertFactory,
+    DocketAlertWithParentsFactory,
+)
 from cl.alerts.models import DocketAlert, DocketAlertEvent
 from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import (
@@ -103,8 +107,8 @@ class UserTest(LiveServerTestCase):
             self.assertEqual(
                 r.status_code,
                 HTTPStatus.OK,
-                msg="Got wrong status code for page at: {path}. "
-                "Status Code: {code}".format(path=path, code=r.status_code),
+                msg=f"Got wrong status code for page at: {path}. "
+                f"Status Code: {r.status_code}",
             )
 
     @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
@@ -165,17 +169,15 @@ class UserTest(LiveServerTestCase):
                     self.assertNotIn(
                         next_param,
                         response.content.decode(),
-                        msg="'%s' found in HTML of response. This suggests it was "
-                        "not cleaned by the sanitize_redirection function."
-                        % next_param,
+                        msg=f"'{next_param}' found in HTML of response. This suggests it was "
+                        "not cleaned by the sanitize_redirection function.",
                     )
                 else:
                     self.assertIn(
                         next_param,
                         response.content.decode(),
-                        msg="'%s' not found in HTML of response. This suggests it "
-                        "was sanitized when it should not have been."
-                        % next_param,
+                        msg=f"'{next_param}' not found in HTML of response. This suggests it "
+                        "was sanitized when it should not have been.",
                     )
 
     async def test_prevent_text_injection_in_success_registration(self):
@@ -203,18 +205,17 @@ class UserTest(LiveServerTestCase):
                     self.assertNotIn(
                         email,
                         response.content.decode(),
-                        msg="'%s' found in HTML of response. This indicates a "
+                        msg=f"'{email}' found in HTML of response. This indicates a "
                         "potential security vulnerability. The view likely "
-                        "failed to properly validate it." % email,
+                        "failed to properly validate it.",
                     )
                 else:
                     self.assertIn(
                         email,
                         response.content.decode(),
-                        msg="'%s' not found in HTML of response. This suggests a "
+                        msg=f"'{email}' not found in HTML of response. This suggests a "
                         "a potential issue with the validation logic. The email "
-                        "address may have been incorrectly identified as invalid"
-                        % email,
+                        "address may have been incorrectly identified as invalid",
                     )
 
     async def test_login_redirects(self) -> None:
@@ -253,17 +254,15 @@ class UserTest(LiveServerTestCase):
                     self.assertNotIn(
                         f'value="{next_param}"',
                         response.content.decode(),
-                        msg="'%s' found in HTML of response. This suggests it was "
-                        "not cleaned by the sanitize_redirection function."
-                        % next_param,
+                        msg=f"'{next_param}' found in HTML of response. This suggests it was "
+                        "not cleaned by the sanitize_redirection function.",
                     )
                 else:
                     self.assertIn(
                         f'value="{next_param}"',
                         response.content.decode(),
-                        msg="'%s' not found in HTML of response. This suggests it "
-                        "was sanitized when it should not have been."
-                        % next_param,
+                        msg=f"'{next_param}' not found in HTML of response. This suggests it "
+                        "was sanitized when it should not have been.",
                     )
 
 
@@ -340,7 +339,7 @@ class UserDataTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
         self.assertIn(
             "has been confirmed",
@@ -371,7 +370,7 @@ class UserDataTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
         ups = UserProfile.objects.filter(pk__in=[up.pk for up in ups])
         async for up in ups:
@@ -564,6 +563,164 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(user_tag_events_first.name, "tag_1_user_2")
         docket_tag_events_first = await docket_tag_events.afirst()
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
+
+    async def test_redirect_to_search_alerts_if_no_alerts(self):
+        """Tests redirection to search alerts when a user has no alerts"""
+        # Create a user profile with no associated alerts
+        user_with_no_alert = await sync_to_async(
+            UserProfileWithParentsFactory
+        )()
+        # Log in the created user
+        await self.async_client.alogin(
+            username=user_with_no_alert.user.username, password="password"
+        )
+        # Load the 'profile_alerts' URL and follow redirects
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert that the request was redirected to 'profile_search_alerts'.
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_search_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+    async def test_redirect_to_docket_alerts_if_no_search_alerts(self):
+        """Tests redirection to docket alerts page when a user has no search alerts."""
+        # Create a user profile
+        user_with_docket_alert = await sync_to_async(
+            UserProfileWithParentsFactory
+        )()
+        # Create a docket and a docket alert associated with the user
+        docket = await sync_to_async(DocketFactory)()
+        await sync_to_async(DocketAlertFactory)(
+            docket=docket, user=user_with_docket_alert.user
+        )
+        # Log in the created user
+        await self.async_client.alogin(
+            username=user_with_docket_alert.user, password="password"
+        )
+        # Load the 'profile_alerts' URL and follow redirects
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert that the request was redirected to 'profile_docket_alerts'
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_docket_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+    async def test_redirect_to_search_alerts_if_has_search_alerts(self):
+        """Tests redirection to search alerts page when a user has search alerts, regardless of docket alerts."""
+        # Create a user profile
+        user_with_search_alert = await sync_to_async(
+            UserProfileWithParentsFactory
+        )()
+        await self.async_client.alogin(
+            username=user_with_search_alert.user.username, password="password"
+        )
+        # Create a search alert for the user.
+        await sync_to_async(AlertFactory)(user=user_with_search_alert.user)
+        # Loads the 'profile_alerts' page and follow redirects.
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert redirection to the 'profile_search_alerts' page.
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_search_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+        # Create a docket and a docket alert for the same user.
+        docket = await sync_to_async(DocketFactory)()
+        await sync_to_async(DocketAlertFactory)(
+            docket=docket, user=user_with_search_alert.user
+        )
+        # Loads the 'profile_alerts' page and follow redirects.
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert that it still redirects to 'profile_search_alerts' because a
+        # search alert exists
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_search_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+    async def test_docket_alerts_sorting(self):
+        """Tests docket ordering on the docket alerts page."""
+        # Create a user profile
+        up = await sync_to_async(UserProfileWithParentsFactory)()
+        user_with_docket_alerts = up.user
+        # Create some dockets and docket alerts associated with the user
+        das = []
+        das.append(
+            await sync_to_async(DocketAlertWithParentsFactory)(
+                user=user_with_docket_alerts,
+                date_last_hit=now() - timedelta(days=2),
+                docket__date_filed=now().date() - timedelta(days=2),
+            )
+        )
+        das.append(
+            await sync_to_async(DocketAlertWithParentsFactory)(
+                user=user_with_docket_alerts,
+                date_last_hit=now() - timedelta(days=1),
+                docket__date_filed=now().date() - timedelta(days=1),
+            )
+        )
+        das.append(
+            await sync_to_async(DocketAlertWithParentsFactory)(
+                user=user_with_docket_alerts,
+                date_last_hit=now(),
+                docket__date_filed=now().date(),
+            )
+        )
+        # Log in the created user
+        await self.async_client.alogin(
+            username=user_with_docket_alerts, password="password"
+        )
+
+        tests = (
+            ("", lambda x: x.date_last_hit),
+            ("invalid", lambda x: x.date_last_hit),
+            ("hit", lambda x: x.date_last_hit),
+            ("name", lambda x: x.docket.case_name),
+            ("court", lambda x: x.docket.court.short_name),
+            ("date_filed", lambda x: x.docket.date_filed),
+            ("docket_number", lambda x: x.docket.docket_number),
+        )
+
+        # Create ascending/descending tests for each test case in the form:
+        # ("hit", lambda, "-"), etc.
+        tests = ((*x, y) for x, y in product(tests, ["", "-"]))
+
+        for order_name, sorter, direction in tests:
+            with self.subTest(
+                "Checking docket alert sorting",
+                order_by=f"{direction}{order_name}",
+            ):
+                r = await self.async_client.get(
+                    reverse("profile_docket_alerts"),
+                    query_params={"order_by": f"{direction}{order_name}"},
+                )
+                c = r.context
+                if order_name in ("", "invalid"):
+                    direction = "-"
+                    order_name = "hit"
+                das.sort(key=sorter, reverse=True if direction else False)
+                self.assertEqual(
+                    list(c["docket_alerts"]),
+                    das,
+                    f"\nExpected {order_name}: {[sorter(x) for x in das]}\n"
+                    f"Got      {order_name}: {[sorter(x) for x in c['docket_alerts']]}",
+                )
+
+                sorting_fields = c["sorting_fields"]
+                for col, vals in sorting_fields.items():
+                    # Test url_param
+                    if order_name == col and direction == "":
+                        self.assertEqual(vals["url_param"], f"-{order_name}")
+                    else:
+                        self.assertEqual(vals["url_param"], col)
+                    # Test direction
+                    if order_name == col and direction == "-":
+                        self.assertEqual(vals["direction"], "down")
+                    else:
+                        self.assertEqual(vals["direction"], "up")
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
@@ -790,10 +947,11 @@ class SNSWebhookTest(TestCase):
             signals.bounce_received,
         )
         # Check if warning is logged
-        warning_part_one = "Unexpected ContentRejected soft bounce for "
-        warning_part_two = "bounce@simulator.amazonses.com, message_id: "
         mock_logging.warning.assert_called_with(
-            f"{warning_part_one}{warning_part_two}"
+            "Unexpected %s soft bounce for %s, message_id: %s",
+            "ContentRejected",
+            "bounce@simulator.amazonses.com",
+            "",
         )
 
     def test_handle_soft_bounce_create_back_off(self) -> None:
@@ -1060,10 +1218,10 @@ class SNSWebhookTest(TestCase):
             signals.bounce_received,
         )
         # Check if a warning is logged
-        warning_part_one = "Unexpected Suppressed hard bounce for "
-        warning_part_two = "bounce@simulator.amazonses.com"
         mock_logging.warning.assert_called_with(
-            f"{warning_part_one}{warning_part_two}"
+            "Unexpected %s hard bounce for %s",
+            "Suppressed",
+            "bounce@simulator.amazonses.com",
         )
         email_ban_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
@@ -2440,8 +2598,8 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Check if warning is logged
         mock_logging.warning.assert_called_with(
-            "The message: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0 can't be "
-            "enqueued because it doesn't exist anymore."
+            "The message: %s can't be enqueued because it doesn't exist anymore.",
+            "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0",
         )
 
     def test_compose_message_from_db_retrieve_user_email(self) -> None:
@@ -3442,6 +3600,54 @@ class WebhooksHTMXTests(APITestCase):
         # Webhook failure count shouldn't be increased by a webhook test event
         self.assertEqual(webhook_event_last.webhook.failure_count, 0)
 
+    async def test_send_webhook_test_all_types(self) -> None:
+        """Can we send a webhook test event for all webhook types?"""
+
+        test_cases = {
+            f"{event_type.label} - {version.label}": {
+                "event_type": event_type,
+                "version": version,
+            }
+            for event_type, version in product(
+                WebhookEventType, WebhookVersions
+            )
+        }
+
+        for label, params in test_cases.items():
+            with self.subTest(label=label):
+                await Webhook.objects.all().adelete()
+                await WebhookEvent.objects.all().adelete()
+                await self.make_a_webhook(
+                    self.client,
+                    event_type=params["event_type"],
+                    version=params["version"],
+                )
+                webhooks = Webhook.objects.all()
+                self.assertEqual(await webhooks.acount(), 1)
+
+                webhooks_first = await webhooks.afirst()
+                webhook_1_path_test = reverse(
+                    "webhooks-test-webhook",
+                    kwargs={"pk": webhooks_first.pk, "format": "json"},
+                )
+                with mock.patch(
+                    "cl.api.webhooks.requests.post",
+                    side_effect=lambda *args, **kwargs: MockPostResponse(
+                        200, mock_raw=True
+                    ),
+                ):
+                    response = await self.client.post(webhook_1_path_test, {})
+                # Compare the test webhook event data.
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                webhook_event = WebhookEvent.objects.all().order_by(
+                    "date_created"
+                )
+                webhook_event_first = await webhook_event.afirst()
+                self.assertEqual(
+                    webhook_event_first.status_code, HTTPStatus.OK
+                )
+                self.assertEqual(webhook_event_first.debug, True)
+
     async def test_list_webhook_events(self) -> None:
         """Can we list the user's webhook events?"""
 
@@ -3555,7 +3761,6 @@ class WebhooksHTMXTests(APITestCase):
 @override_settings(DEVELOPMENT=False)
 @patch("cl.users.tasks.NeonClient")
 class NeonAccountCreationTest(TestCase):
-
     async def test_can_send_email_for_multiple_neon_accounts(
         self, mock_neon_client
     ) -> None:
@@ -3580,7 +3785,7 @@ class NeonAccountCreationTest(TestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
 
         self.assertIn("[Action Needed]:", mail.outbox[-1].subject)
@@ -3620,7 +3825,7 @@ class NeonAccountCreationTest(TestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
 
         await up.arefresh_from_db()
@@ -3649,7 +3854,7 @@ class NeonAccountCreationTest(TestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+            f"Instead got {r.status_code}",
         )
 
         await up.arefresh_from_db()
@@ -3660,7 +3865,6 @@ class NeonAccountCreationTest(TestCase):
 @patch("cl.users.views.create_neon_account")
 @patch("cl.users.views.update_neon_account")
 class NeonAccountUpdateTest(TestCase):
-
     def setUp(self) -> None:
         self.client = AsyncClient()
         self.up = UserProfileWithParentsFactory.create(
@@ -3708,3 +3912,58 @@ class NeonAccountUpdateTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         create_account_mock.delay.assert_called_once_with(self.up.user.pk)
         update_account_mock.delay.assert_not_called()
+
+
+@patch("cl.users.views.OptInConsentForm.is_valid", new=lambda self: True)
+@patch(
+    "cl.custom_filters.decorators.verify_honeypot_value",
+    new=lambda request, field_name: None,
+)
+class RegisterViewTest(TestCase):
+    async def test_register_with_valid_ascii_username(self) -> None:
+        """Register a user with a valid username."""
+        data = {
+            "username": "admin1",
+            "email": "admin1@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertTrue(await User.objects.filter(username="admin1").aexists())
+
+    async def test_register_rejects_homoglyph_username(self) -> None:
+        """Register a user with an invalid username containing a homoglyph.
+        It must be rejected:
+        """
+
+        invalid_username = "adm" + "\u0456" + "n2"
+        data = {
+            "username": invalid_username,
+            "email": "admin2@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # The user must not be registered.
+        self.assertFalse(
+            await User.objects.filter(username=invalid_username).aexists()
+        )
+
+        form = response.context.get("form")
+        self.assertIsNotNone(form, "Expected 'form' in template context")
+        # The username field should display an error.
+        self.assertIn("username", form.errors)

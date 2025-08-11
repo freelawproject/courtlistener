@@ -1,7 +1,7 @@
 import logging
 import random
 import traceback
-from typing import List, Optional, Tuple, Union
+from collections import defaultdict
 
 import httpx
 import requests
@@ -29,12 +29,16 @@ from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
+from cl.scrapers.management.commands.merge_opinion_versions import (
+    get_query_from_url,
+    merge_versions_by_text_similarity,
+)
 from cl.scrapers.utils import citation_is_duplicated, make_citation
-from cl.search.models import Docket, Opinion, RECAPDocument
+from cl.search.models import SOURCES, Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
-ExtractProcessResult = Tuple[str, Optional[str]]
+ExtractProcessResult = tuple[str, str | None]
 
 
 def update_document_from_text(
@@ -148,7 +152,8 @@ def extract_doc_content(
     )
     if not response.is_success:
         logger.error(
-            f"Error from document-extract microservice: {response.status_code}",
+            "Error from document-extract microservice: %s",
+            response.status_code,
             extra=dict(
                 opinion_id=opinion.id,
                 url=opinion.download_url,
@@ -185,16 +190,19 @@ def extract_doc_content(
     if data["page_count"]:
         opinion.page_count = data["page_count"]
 
-    assert isinstance(
-        content, str
-    ), f"content must be of type str, not {type(content)}"
+    assert isinstance(content, str), (
+        f"content must be of type str, not {type(content)}"
+    )
 
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion, juriscraper_module)
 
     if data["err"]:
         logger.error(
-            f"****Error: {data['err']}, extracting text from {extension}: {opinion}****"
+            "****Error: %s, extracting text from %s: %s****",
+            data["err"],
+            extension,
+            opinion,
         )
         return
 
@@ -212,10 +220,50 @@ def extract_doc_content(
         )
         return
 
+    find_and_merge_versions.delay(pk=opinion.id)
+
     # Identify and link citations within the document content
     find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
         ([opinion.pk],), countdown=random.randint(0, 3600)
     )
+
+
+@app.task(bind=True)
+def find_and_merge_versions(self, pk: int) -> None:
+    """Find versions of the `pk` opinion, and try to merge them
+
+    Since this relies on text similarity, we are calling it from
+    `extract_doc_content`
+
+    Currently only checks for exact `download_url` match, update this when
+    different strategies are implemented
+
+    :param self: the celery task
+    :param pk: opinion primary key
+    :return None:
+    """
+    recently_scraped_opinion = Opinion.objects.get(id=pk)
+    if not recently_scraped_opinion.download_url:
+        return
+    query = get_query_from_url(recently_scraped_opinion.download_url, "exact")
+    versions = (
+        Opinion.objects.filter(query)
+        .filter(cluster__source=SOURCES.COURT_WEBSITE)
+        .exclude(id=pk)
+        .exclude(main_version__isnull=False)
+        .order_by("-date_created")
+    )
+
+    # versions are ordered in descending date_created, we keep the latest
+    # creation as the main version, since we expect it to be freshest
+    # from the court's server. Since this task is called on a scrape, we assume
+    # that is the most recent
+    if versions.exists():
+        stats = defaultdict(lambda: 0)
+        merge_versions_by_text_similarity(
+            recently_scraped_opinion, versions, stats
+        )
+        logger.debug(stats)
 
 
 @app.task(
@@ -230,10 +278,10 @@ def extract_doc_content(
 )
 def extract_recap_pdf(
     self,
-    pks: Union[int, List[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> List[int]:
+) -> list[int]:
     """Celery task wrapper for extract_recap_pdf_base
     Extract the contents from a RECAP PDF if necessary.
 
@@ -265,10 +313,10 @@ def extract_recap_pdf(
 
 
 async def extract_recap_pdf_base(
-    pks: Union[int, List[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> List[int]:
+) -> list[int]:
     """Extract the contents from a RECAP PDF if necessary.
 
     :param pks: The RECAPDocument pk or list of pks to work on.
@@ -282,7 +330,7 @@ async def extract_recap_pdf_base(
     if not is_iter(pks):
         pks = [pks]
 
-    processed: List[int] = []
+    processed: list[int] = []
     for pk in pks:
         rd = await RECAPDocument.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
@@ -339,6 +387,7 @@ async def extract_recap_pdf_base(
     max_retries=3,
     retry_backoff=10,
 )
+@throttle_task("1/3m")
 def process_audio_file(self, pk) -> None:
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.

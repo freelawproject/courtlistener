@@ -2,7 +2,7 @@ import json
 import os
 import time
 from datetime import date
-from typing import List, TypedDict
+from typing import TypedDict
 
 from django.conf import settings
 from django.core.management import CommandParser  # type: ignore
@@ -24,7 +24,7 @@ from cl.search.tasks import index_dockets_in_bulk
 
 class OptionsType(TypedDict):
     queue: str
-    courts: List[str]
+    courts: list[str]
     court_type: str
     iterations: int
     iteration_delay: float
@@ -61,12 +61,7 @@ def confirm_es_indexing(options):
             ).set(queue=queue).apply_async()
             chunk = []
             logger.info(
-                "\rProcessed {}/{}, ({:.0%}) Dockets, last PK indexed: {},".format(
-                    processed_count,
-                    count,
-                    processed_count * 1.0 / count,
-                    d_id,
-                )
+                f"\rProcessed {processed_count}/{count}, ({processed_count * 1.0 / count:.0%}) Dockets, last PK indexed: {d_id},"
             )
         if not processed_count % 1000:
             # Log every 1000 dockets indexed.

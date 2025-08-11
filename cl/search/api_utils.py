@@ -17,6 +17,7 @@ from cl.lib.elasticsearch_utils import (
     do_count_query,
     do_es_api_query,
     limit_inner_hits,
+    merge_semantic_relevant_chunks,
     merge_unavailable_fields_on_parent_document,
     set_child_docs_and_score,
     set_results_highlights,
@@ -227,7 +228,6 @@ class CursorESList:
         self.reverse = False
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
-
         self.cursor = cursor
         if self.cursor is not None:
             self.reverse = self.cursor.reverse
@@ -350,6 +350,11 @@ class CursorESList:
             "v4",
             self.clean_data["highlight"],
         )
+        if (
+            self.clean_data["type"] == SEARCH_TYPES.OPINION
+            and self.clean_data["semantic"]
+        ):
+            merge_semantic_relevant_chunks(results)
         set_child_docs_and_score(results, merge_score=True)
 
         if self.reverse:

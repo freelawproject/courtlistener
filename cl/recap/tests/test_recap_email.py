@@ -17,6 +17,7 @@ from cl.alerts.models import DocketAlert
 from cl.api.factories import WEBHOOK_EVENT_STATUS, WebhookFactory
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.api.utils import get_webhook_deprecation_date
+from cl.lib.pacer_session import SessionData
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
@@ -44,7 +45,8 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import Docket, DocketEntry, RECAPDocument
-from cl.tests.cases import TestCase
+from cl.tests.cases import SearchAlertsAssertions, TestCase
+from cl.tests.fakes import FakeAcmsCaseSearch
 from cl.tests.utils import AsyncAPIClient, MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -115,8 +117,16 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         "cl.recap.tasks.is_docket_entry_sealed",
         return_value=False,
     )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
+    )
     async def test_email_processing_queue_create(
-        self, mock_is_docket_entry_sealed, mock_bucket_open, mock_cookies
+        self,
+        mock_download_pacer_pdf_by_rd,
+        mock_is_docket_entry_sealed,
+        mock_bucket_open,
+        mock_cookies,
     ):
         self.assertEqual(await EmailProcessingQueue.objects.acount(), 0)
         await self.async_client.post(self.path, self.data, format="json")
@@ -130,7 +140,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: (None, None),
+    side_effect=lambda x, y, z: SessionData(None, None),
 )
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -140,7 +150,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
     "cl.recap.tasks.is_docket_entry_sealed",
     return_value=False,
 )
-class RecapEmailDocketAlerts(TestCase):
+class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
     """Test recap email docket alerts"""
 
     @classmethod
@@ -284,6 +294,27 @@ class RecapEmailDocketAlerts(TestCase):
             ],
         )
 
+        cls.acms_email_data = RECAPEmailNotificationDataFactory(
+            acms=True,
+            contains_attachments=False,
+            appellate=True,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id=None,
+                            document_number=None,
+                            pacer_seq_no=None,
+                            pacer_case_id=None,
+                            magic_number="387d07d4-4f3c-f011-b4cc-001dd80ba017",
+                            document_url="https://ca9-showdoc.azurewebsites.us/NDA/387d07d4-4f3c-f011-b4cc-001dd80ba017",
+                        )
+                    ],
+                    docket_number="25-2120",
+                )
+            ],
+        )
+
     def setUp(self) -> None:
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
@@ -311,7 +342,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -386,7 +417,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -526,7 +557,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -589,7 +620,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -680,7 +711,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(
                 200,
                 mock_bucket_open("nda_document.pdf", "rb", True),
@@ -727,7 +758,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -883,7 +914,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -953,7 +984,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -1047,7 +1078,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -1125,6 +1156,14 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertIn("[Sign-Up Needed]:", message_sent.subject)
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 
+        # Assert that the document page URL is present in the HTML email.
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(recap_document_first.get_absolute_url(), html_content)
+
+        # Assert that the document page URL is present in the TXT email.
+        txt_content = mail.outbox[0].body
+        self.assertIn(recap_document_first.get_absolute_url(), txt_content)
+
         webhook_triggered = WebhookEvent.objects.all()
         # No webhook should be triggered.
         self.assertEqual(await webhook_triggered.acount(), 0)
@@ -1198,7 +1237,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -1284,7 +1323,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -1372,6 +1411,25 @@ class RecapEmailDocketAlerts(TestCase):
         message_sent = mail.outbox[0]
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 
+        # Assert that the Main document page URL is present in the HTML email.
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(recap_document_first.get_absolute_url(), html_content)
+        # Assert that the Main document page URL is present in the TXT email.
+        txt_content = mail.outbox[0].body
+        self.assertIn(recap_document_first.get_absolute_url(), txt_content)
+
+        recap_document_attachment = await recap_document.filter(
+            attachment_number__isnull=False
+        ).afirst()
+        # Assert that an Attachment document page URL is present in the HTML email.
+        self.assertIn(
+            recap_document_attachment.get_absolute_url(), html_content
+        )
+        # Assert that an Attachment page URL is present in the TXT email.
+        self.assertIn(
+            recap_document_attachment.get_absolute_url(), txt_content
+        )
+
         # Webhook should be triggered
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
         # Does the webhook was triggered?
@@ -1441,7 +1499,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -1487,7 +1545,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -1542,7 +1600,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -1614,7 +1672,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -1685,7 +1743,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b"Hello World"),
             "OK",
         ),
@@ -1856,7 +1914,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -1942,7 +2000,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             None,
             "Document not available from magic link.",
         ),
@@ -1990,7 +2048,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -2128,6 +2186,15 @@ class RecapEmailDocketAlerts(TestCase):
 
         # A DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 1)
+
+        # Assert that the minute entry URL is present in the HTML email.
+        minute_entry_url = f"{docket.get_absolute_url()}#minute-entry-{recap_document_first.docket_entry.pk}"
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(minute_entry_url, html_content)
+
+        # Assert that the minute entry URL is present in the TXT email.
+        txt_content = mail.outbox[0].body
+        self.assertIn(minute_entry_url, txt_content)
 
         # We can't set the seal status of a minute entry.
         self.assertEqual(recap_document_first.is_sealed, None)
@@ -2482,7 +2549,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -2622,6 +2689,212 @@ class RecapEmailDocketAlerts(TestCase):
         fqs = PacerFetchQueue.objects.all()
         self.assertEqual(await fqs.acount(), 0)
 
+    @mock.patch("cl.recap.tasks.AcmsCaseSearch", new=FakeAcmsCaseSearch)
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    async def test_recap_email_process_acms_nda(
+        self,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
+        mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
+    ):
+        """Can we properly merge an ACMS NDA notification and retrieve the
+        missing metadata, such pacer_case_id from AcmsCaseSearch
+        """
+
+        email_data = email_data = self.acms_email_data.copy()
+        email_data["dockets"][0]["docket_entries"][0]["document_number"] = "10"
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (
+                email_data,
+                "HTML",
+            ),
+        ):
+            # Trigger a new ACMS recap.email notification from ca9
+            await self.async_client.post(self.path, self.data_5, format="json")
+
+        # Confirm entries were properly merged.
+        dockets = Docket.objects.all()
+        self.assertEqual(await dockets.acount(), 1)
+
+        docket = await dockets.afirst()
+        self.assertEqual(
+            docket.pacer_case_id, "e85b4453-6c94-4c68-93ed-4e2e0018e842"
+        )
+        docket_entries = DocketEntry.objects.all()
+        # Two docket entries should be merged. One for each docket.
+        self.assertEqual(await docket_entries.acount(), 1)
+        recap_documents = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        # There are 1 RECAP documents, one for each docket.
+        self.assertEqual(await recap_documents.acount(), 1)
+        async for rd in recap_documents:
+            # The RD shouldn't be sealed. Since the retrieval is aborted for this document.
+            self.assertEqual(
+                rd.is_sealed, None, msg="Document shouldn't be sealed."
+            )
+            # The pacer_doc_id is empty from ACMS NDA notifications.
+            self.assertEqual(rd.pacer_doc_id, "")
+            # The remaining metadata should be in place.
+            self.assertEqual(rd.document_number, "10")
+            self.assertEqual(rd.docket_entry.entry_number, 10)
+
+        # DocketAlerts should trigger normally.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Wrong number of alerts triggered."
+        )
+
+    @mock.patch("cl.recap.tasks.AcmsCaseSearch", new=FakeAcmsCaseSearch)
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (
+            MockResponse(
+                200,
+                mock_bucket_open("acms_test.pdf", "rb", True),
+            ),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    async def test_recap_email_process_acms_nda_get_doc_num_from_pdf(
+        self,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
+        mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
+    ):
+        """Can we properly merge an ACMS NDA notification and retrieve the
+        missing metadata, such as the document_number and pacer_case_id from
+        the PDF and the AcmsCaseSearch.
+        """
+
+        email_data = self.acms_email_data.copy()
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (
+                email_data,
+                "HTML",
+            ),
+        ):
+            # Trigger a new ACMS nda recap.email notification from ca9
+            await self.async_client.post(self.path, self.data_5, format="json")
+
+        # Confirm entries were properly merged.
+        dockets = Docket.objects.all()
+        self.assertEqual(await dockets.acount(), 1)
+
+        docket = await dockets.afirst()
+        self.assertEqual(
+            docket.pacer_case_id, "e85b4453-6c94-4c68-93ed-4e2e0018e842"
+        )
+        docket_entries = DocketEntry.objects.all()
+        # Two docket entries should be merged. One for each docket.
+        self.assertEqual(await docket_entries.acount(), 1)
+        recap_documents = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        # There are 1 RECAP documents, one for each docket.
+        self.assertEqual(await recap_documents.acount(), 1)
+        async for rd in recap_documents:
+            # The RD shouldn't be sealed. Since the retrieval is aborted for this document.
+            self.assertEqual(
+                rd.is_sealed, None, msg="Document shouldn't be sealed."
+            )
+            # The pacer_doc_id is empty from ACMS NDA notifications.
+            self.assertEqual(rd.pacer_doc_id, "")
+            # The remaining metadata should be in place.
+            self.assertEqual(rd.document_number, "28")
+            self.assertEqual(rd.docket_entry.entry_number, 28)
+
+        # DocketAlerts should trigger normally.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Wrong number of alerts triggered."
+        )
+
+    @mock.patch("cl.recap.tasks.AcmsCaseSearch", new=FakeAcmsCaseSearch)
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (None, ""),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    async def test_recap_email_process_acms_nda_no_doc_num_no_pdf(
+        self,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
+        mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
+    ):
+        """Can we properly merge an ACMS NDA notification that doesn't include
+        a document_number, either in the notification or the PDF?
+        """
+
+        email_data = email_data = self.acms_email_data.copy()
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (
+                email_data,
+                "HTML",
+            ),
+        ):
+            # Trigger a new ACMS recap.email notification from ca9
+            await self.async_client.post(self.path, self.data_5, format="json")
+
+        # Confirm entries were properly merged.
+        dockets = Docket.objects.all()
+        self.assertEqual(await dockets.acount(), 1)
+
+        docket = await dockets.afirst()
+        self.assertEqual(
+            docket.pacer_case_id, "e85b4453-6c94-4c68-93ed-4e2e0018e842"
+        )
+        docket_entries = DocketEntry.objects.all()
+        # Two docket entries should be merged. One for each docket.
+        self.assertEqual(await docket_entries.acount(), 1)
+        recap_documents = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        # There are 1 RECAP documents, one for each docket.
+        self.assertEqual(await recap_documents.acount(), 1)
+        async for rd in recap_documents:
+            # The RD shouldn't be sealed. Since the retrieval is aborted for this document.
+            self.assertEqual(
+                rd.is_sealed, None, msg="Document shouldn't be sealed."
+            )
+            # The pacer_doc_id is empty from ACMS NDA notifications.
+            self.assertEqual(rd.pacer_doc_id, "")
+            # The remaining metadata should be in place.
+            self.assertEqual(rd.document_number, "")
+            self.assertEqual(rd.docket_entry.entry_number, None)
+
+        # DocketAlerts should trigger normally.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Wrong number of alerts triggered."
+        )
+
 
 class GetAndCopyRecapAttachments(TestCase):
     """Test the get_and_copy_recap_attachment_docs method"""
@@ -2739,7 +3012,7 @@ class GetAndCopyRecapAttachments(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b"Hello World from magic"),
             "OK",
         ),
@@ -2797,7 +3070,7 @@ class GetAndCopyRecapAttachments(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: ("Cookie", settings.EGRESS_PROXY_HOSTS[0]),
+    side_effect=lambda x, y, z: SessionData(None, None),
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
@@ -2866,7 +3139,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(
                 200,
                 mock_bucket_open("nda_document.pdf", "rb", True),
@@ -2904,7 +3177,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -2951,7 +3224,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -2997,7 +3270,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -3036,7 +3309,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -3086,7 +3359,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             None,
             "Document not available from magic link.",
         ),
@@ -3140,7 +3413,7 @@ def mock_method_set_rd_sealed_status(
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: (None, None),
+    side_effect=lambda x, y, z: SessionData(None, None),
 )
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -3220,7 +3493,7 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b"Hello World"),
             "OK",
         ),
@@ -3366,7 +3639,7 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b"Hello World"),
             "OK",
         ),
@@ -3570,7 +3843,7 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b"Hello World"),
             "OK",
         ),
@@ -3724,7 +3997,7 @@ class RecapEmailContentReplication(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b"Hello World"),
             "OK",
         ),
@@ -3981,7 +4254,7 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e: (
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b"Hello World"),
             "OK",
         ),

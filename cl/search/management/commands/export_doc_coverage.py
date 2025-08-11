@@ -143,7 +143,6 @@ class Command(BaseCommand):
         )
 
     def handle_es(self, year: int, month: int, options: dict):
-
         def get_composite_query(after=None):
             next_month = month + 1
             next_year = year

@@ -35,6 +35,8 @@
         Did you forget to close one or more quotes?
       {% elif error_message == "disallowed_wildcard_pattern" %}
          The query contains a <a href="{% url "advanced_search" %}#disallowed-wildcards">disallowed wildcard</a> pattern.
+      {% elif error_message == "invalid_relative_date_syntax" %}
+         The date entered has an invalid format.
       {% endif %}
     {% else %}
       encountered an error.
@@ -51,6 +53,8 @@
       <div class="flex">
         <h4 class="text-danger" >Did you mean:&nbsp;<a href="{% url 'show_results' %}{% querystring q=suggested_query %}">{{suggested_query}}</a></h4>
       </div>
+    {% elif error_message == "invalid_relative_date_syntax" %}
+      <p><a href="{% url "relative_dates" %}">See Relative Date Queries documentation for help.</a></p>
     {% endif %}
 
     <p>Search tips:</p>

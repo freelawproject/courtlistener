@@ -1,7 +1,7 @@
 import random
 import re
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import waffle
 from django import template
@@ -9,10 +9,11 @@ from django.core.exceptions import ValidationError
 from django.template import Context
 from django.template.context import RequestContext
 from django.template.defaultfilters import date as date_filter
+from django.utils.dateparse import parse_datetime
 from django.utils.formats import date_format
 from django.utils.html import format_html
-from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
+from django.utils.timezone import make_aware
 from elasticsearch_dsl import AttrDict, AttrList
 
 from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
@@ -157,33 +158,6 @@ def get_es_doc_content(
         return ""
 
 
-# sourced from: https://stackoverflow.com/questions/2272370/sortable-table-columns-in-django
-@register.simple_tag
-def url_replace(request, value):
-    field = "order_by"
-    dict_ = request.GET.copy()
-    if field in dict_.keys():
-        if dict_[field].startswith("-") and dict_[field].lstrip("-") == value:
-            dict_[field] = value  # desc to asc
-        elif dict_[field] == value:
-            dict_[field] = f"-{value}"
-        else:  # order_by for different column
-            dict_[field] = value
-    else:  # No order_by
-        dict_[field] = value
-    return urlencode(sorted(dict_.items()))
-
-
-@register.simple_tag
-def sort_caret(request, value) -> SafeString:
-    current = request.GET.get("order_by", "*UP*")
-    caret = '&nbsp;<i class="gray fa fa-angle-up"></i>'
-    if current == value or current == f"-{value}":
-        if current.startswith("-"):
-            caret = '&nbsp;<i class="gray fa fa-angle-down"></i>'
-    return mark_safe(caret)
-
-
 @register.simple_tag
 def citation(obj) -> SafeString:
     if isinstance(obj, Docket):
@@ -239,7 +213,7 @@ def render_string_or_list(value: any) -> any:
     :param value: The value to be rendered.
     :return: The original value or comma-separated values.
     """
-    if isinstance(value, (list, AttrList)):
+    if isinstance(value, (list | AttrList)):
         return ", ".join(str(item) for item in value)
     return value
 
@@ -338,6 +312,26 @@ def format_date(date_str: str) -> str:
 
 
 @register.filter
+def parse_utc_date(datetime_object: str | datetime) -> datetime:
+    """Parse an ISO-8601 UTC datetime string or a naive datetime UTC object
+    and return a timezone-aware datetime in UTC.
+
+    :param datetime_object: A string representing a UTC datetime in ISO 8601
+    format or a naive UTC datetime object.
+    :return: A timezone-aware datetime object with UTC as the timezone.
+    """
+
+    return make_aware(
+        (
+            parse_datetime(datetime_object)
+            if isinstance(datetime_object, str)
+            else datetime_object
+        ),
+        UTC,
+    )
+
+
+@register.filter
 def datetime_in_utc(date_obj) -> str:
     """Formats a datetime object in UTC with timezone displayed.
     For example: 'Nov. 25, 2024, 01:28 p.m. UTC'"""
@@ -345,7 +339,7 @@ def datetime_in_utc(date_obj) -> str:
         return ""
     try:
         return date_filter(
-            date_obj.astimezone(timezone.utc),
+            date_obj.astimezone(UTC),
             "M. j, Y, h:i a T",
         )
     except (ValueError, TypeError):
@@ -410,3 +404,21 @@ def humanize_number(value):
         formatted = str(num)
 
     return f"{formatted}{abbreviation}"
+
+
+@register.filter
+def has_attr(obj, attr_name):
+    """Return True if obj has attribute attr_name."""
+    return hasattr(obj, attr_name)
+
+
+@register.filter
+def get_attr(obj, attr_name):
+    """Return the value of the attribute attr_name."""
+    return getattr(obj, attr_name, "")
+
+
+@register.simple_tag
+def get_request_value(request_get, field_name):
+    """Simple tag to get value from request.GET given a field name"""
+    return request_get.get(field_name, "")

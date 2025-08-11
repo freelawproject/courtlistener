@@ -179,21 +179,6 @@ $(document).ready(function () {
     $('#modal-court-picker .tab-pane.active input').prop('checked', false);
   });
 
-
-  ////////////
-  // Alerts //
-  ////////////
-  $('#id_rate').on("change", function () {
-    if ($(this).val() === 'rt' && !isMember) {
-      $('#donate-for-rt').removeClass('hidden');
-      $('#alertSave').prop("disabled", true);
-    } else {
-      // Reset the button, if needed.
-      $('#donate-for-rt').addClass('hidden');
-      $('#alertSave').prop("disabled", false);
-    }
-  });
-
   ///////////////////////////
   // TOC Collapse Controls //
   ///////////////////////////

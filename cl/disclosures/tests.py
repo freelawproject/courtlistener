@@ -63,7 +63,7 @@ class DisclosureIngestionTest(TestCase):
     def test_financial_disclosure_ingestion(self) -> None:
         """Can we successfully ingest disclosures at a high level?"""
 
-        with open(self.test_file, "r") as f:
+        with open(self.test_file) as f:
             extracted_data = json.load(f)
         Investment.objects.all().delete()
 

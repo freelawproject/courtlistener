@@ -2,7 +2,6 @@ import copy
 from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
-from typing import List
 from urllib.parse import urlencode
 
 from asgiref.sync import async_to_sync
@@ -16,6 +15,7 @@ from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
+from waffle import switch_is_active
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
@@ -46,7 +46,7 @@ from cl.lib.redis_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import Docket, DocketEntry
+from cl.search.models import SEARCH_TYPES, Docket, DocketEntry, RECAPDocument
 from cl.search.types import (
     ESDocumentNameType,
     SaveESDocumentReturn,
@@ -226,6 +226,7 @@ def make_alert_messages(
         "docket": d,
         "docket_alert_secret_key": None,
         "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
+        "recap_alerts_banner": switch_is_active("recap-alerts-email-banner"),
     }
     messages = []
     for recipient in da_recipients:
@@ -369,7 +370,7 @@ def send_alert_and_webhook(
 
 
 @app.task(ignore_result=True)
-def send_alerts_and_webhooks(data: list[tuple[int, datetime]]) -> List[int]:
+def send_alerts_and_webhooks(data: list[tuple[int, datetime]]) -> list[int]:
     """Send many docket alerts at one time without making numerous calls
     to the send_alert_and_webhook function.
 
@@ -499,6 +500,9 @@ def send_search_alert_emails(
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
             "scheduled_alert": scheduled_alert,
+            "recap_alerts_banner": switch_is_active(
+                "recap-alerts-email-banner"
+            ),
         }
         headers = {}
         query_string = ""
@@ -570,6 +574,19 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         if not alert_triggered:
             continue
 
+        alert_triggered_id = alert_triggered.pk
+        case_only_alert = (
+            True
+            if alert_triggered.alert_type == SEARCH_TYPES.DOCKETS
+            else False
+        )
+        if case_only_alert and has_document_alert_hit_been_triggered(
+            r, alert_triggered_id, "co", document_content_copy["docket_id"]
+        ):
+            # The RECAP case-only alert has already been triggered by this case.
+            # Ignore it.
+            continue
+
         alert_user: UserProfile.user = alert_triggered.user
         # Set highlight if available in response.
         match app_label_model:
@@ -577,36 +594,44 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 # Filter out RECAPDocuments and set the document id to the
                 # Redis RECAPDocument alert hits set.
                 if not include_recap_document_hit(
-                    alert_triggered.pk, recap_document_hits, docket_hits
+                    alert_triggered_id, recap_document_hits, docket_hits
                 ) or has_document_alert_hit_been_triggered(
-                    r, alert_triggered.pk, "r", document_content_copy["id"]
+                    r, alert_triggered_id, "r", document_content_copy["id"]
                 ):
                     continue
                 transform_percolator_child_document(
                     document_content_copy, hit.meta
                 )
                 add_document_hit_to_alert_set(
-                    r, alert_triggered.pk, "r", document_content_copy["id"]
+                    r, alert_triggered_id, "r", document_content_copy["id"]
                 )
                 object_id = document_content_copy["docket_id"]
+                # Mark case-only alert as triggered.
+                add_document_hit_to_alert_set(
+                    r, alert_triggered_id, "co", object_id
+                )
                 child_document = True
             case "search.Docket":
                 # Filter out Dockets and set the document id to the
                 # Redis Docket alert hits set.
                 if has_document_alert_hit_been_triggered(
                     r,
-                    alert_triggered.pk,
+                    alert_triggered_id,
                     "d",
                     document_content_copy["docket_id"],
                 ):
                     continue
                 add_document_hit_to_alert_set(
                     r,
-                    alert_triggered.pk,
+                    alert_triggered_id,
                     "d",
                     document_content_copy["docket_id"],
                 )
                 object_id = document_content_copy["docket_id"]
+                # Mark case-only alert as triggered.
+                add_document_hit_to_alert_set(
+                    r, alert_triggered_id, "co", object_id
+                )
                 child_document = False
             case "audio.Audio":
                 object_id = document_content_copy["id"]
@@ -619,9 +644,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
 
         if hasattr(hit.meta, "highlight"):
             document_content_copy["meta"] = {}
-            document_content_copy["meta"][
-                "highlight"
-            ] = hit.meta.highlight.to_dict()
+            document_content_copy["meta"]["highlight"] = (
+                hit.meta.highlight.to_dict()
+            )
 
         # Override order_by to show the latest items when clicking the
         # "View Full Results" button.
@@ -640,16 +665,15 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         # Send real time Webhooks for all users regardless of alert rate and
         # user's donations.
         send_webhook_alert_hits(alert_user, hits)
-
         if (
             alert_triggered.rate == Alert.REAL_TIME
-            and not alert_user.profile.is_member
+            and not alert_user.profile.is_eligible_for_rt_search_alerts
         ):
             # Omit scheduling an RT alert if the user is not a member.
             continue
         # Schedule RT, DAILY, WEEKLY and MONTHLY Alerts
         if scheduled_alert_hits_limit_reached(
-            alert_triggered.pk,
+            alert_triggered_id,
             alert_triggered.user.pk,
             instance_content_type,
             object_id,
@@ -722,9 +746,26 @@ def send_or_schedule_search_alerts(
     document_content = response.document_content
 
     # Perform an initial percolator query and process its response.
-    percolator_index, es_document_index, documents_to_percolate = (
-        prepare_percolator_content(app_label, document_id)
-    )
+    try:
+        percolator_index, es_document_index, documents_to_percolate = (
+            prepare_percolator_content(app_label, document_id)
+        )
+    except RECAPDocument.DoesNotExist as exc:
+        if (
+            self.request.retries
+            >= settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES
+        ):
+            logger.warning(
+                "RECAPDocument %s missing during alert trigger.", document_id
+            )
+            self.request.chain = None
+            return None
+        raise self.retry(
+            exc=exc,
+            countdown=0.5,
+            max_retries=settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES,
+        )
+
     if documents_to_percolate:
         # If documents_to_percolate is returned by prepare_percolator_content,
         # use the main document as the content to render in alerts.
@@ -778,6 +819,7 @@ def es_save_alert_document(
     self: Task,
     alert_id: int,
     es_document_name: ESDocumentNameType,
+    custom_index_name: str | None = None,
 ) -> None:
     """Helper method to prepare and index an Alert object into Elasticsearch.
 
@@ -786,6 +828,7 @@ def es_save_alert_document(
     :param es_document_name: The Elasticsearch document percolator name used
     for indexing.
     the Alert instance.
+    :param custom_index_name: Optional custom index name to use.
     :return: Bool, True if document was properly indexed, otherwise None.
     """
 
@@ -800,9 +843,14 @@ def es_save_alert_document(
         "percolator_query": document.prepare_percolator_query(alert),
     }
     if not alert_doc["percolator_query"]:
+        logger.warning("Skipping invalid query for Alert ID: %s", alert.pk)
         return None
-    doc_indexed = es_document(meta={"id": alert.pk}, **alert_doc).save(
+
+    meta: dict[str, int | str] = {"id": alert.pk}
+    if custom_index_name:
+        meta["index"] = custom_index_name
+    doc_indexed = es_document(meta=meta, **alert_doc).save(
         skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
     )
     if doc_indexed not in ["created", "updated"]:
-        logger.warning(f"Error indexing Alert ID: {alert.pk}")
+        logger.warning("Error indexing Alert ID %s:", alert.pk)

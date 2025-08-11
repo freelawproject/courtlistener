@@ -1,16 +1,26 @@
 from http import HTTPStatus
 
 from django.db.models import Prefetch
+from django.http.response import Http404
+from django.urls import reverse
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
+from rest_framework.response import Response
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
-from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
+from cl.api.utils import (
+    DeferredFieldsMixin,
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    RECAPUsersReadOnly,
+)
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
+from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_serializers import (
     CourtSerializer,
     DocketEntrySerializer,
@@ -51,6 +61,7 @@ from cl.search.filters import (
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
+    ClusterRedirection,
     Court,
     Docket,
     DocketEntry,
@@ -63,7 +74,9 @@ from cl.search.models import (
 )
 
 
-class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
+class OriginatingCourtInformationViewSet(
+    DeferredFieldsMixin, viewsets.ModelViewSet
+):
     serializer_class = OriginalCourtInformationSerializer
     permission_classes = [
         DjangoModelPermissionsOrAnonReadOnly,
@@ -80,7 +93,12 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
     queryset = OriginatingCourtInformation.objects.all().order_by("-id")
 
 
-class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
+class DocketViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
+):
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
     permission_classes = [
@@ -117,7 +135,12 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
 
 
-class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
+class DocketEntryViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
+):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = DocketEntrySerializer
     filterset_class = DocketEntryFilter
@@ -151,7 +174,10 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class RECAPDocumentViewSet(
-    LoggingMixin, CacheListMixin, viewsets.ModelViewSet
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
 ):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = RECAPDocumentSerializer
@@ -174,7 +200,7 @@ class RECAPDocumentViewSet(
     )
 
 
-class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
+class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     serializer_class = CourtSerializer
     filterset_class = CourtFilter
     permission_classes = [
@@ -197,7 +223,12 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     pagination_class = PageNumberPagination
 
 
-class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
+class OpinionClusterViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
+):
     serializer_class = OpinionClusterSerializer
     filterset_class = OpinionClusterFilter
     permission_classes = [
@@ -229,14 +260,55 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
         "citations",
     ).order_by("-id")
 
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            # First, try to get the object normally
+            return super().retrieve(request, *args, **kwargs)
+        except Http404 as exc:
+            try:
+                pk = kwargs.get("pk")
+                redirection = ClusterRedirection.objects.get(
+                    deleted_cluster_id=pk
+                )
+            except ClusterRedirection.DoesNotExist:
+                raise exc
 
-class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
+            if redirection.reason == ClusterRedirection.SEALED:
+                message = dict(ClusterRedirection.REDIRECTION_REASON)[
+                    ClusterRedirection.SEALED
+                ]
+                return Response({"detail": message}, status=HTTPStatus.GONE)
+
+            cluster_id = redirection.cluster_id
+            redirect_kwargs = kwargs.copy()
+            redirect_kwargs["pk"] = cluster_id
+            redirection_url = reverse(
+                "opinioncluster-detail",
+                kwargs=redirect_kwargs,
+            )
+            absolute_new_url = request.build_absolute_uri(redirection_url)
+
+            return Response(
+                status=HTTPStatus.MOVED_PERMANENTLY,
+                headers={"Location": absolute_new_url},
+            )
+
+
+class OpinionViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
+):
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
     permission_classes = [
         DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
+    # keep the order as in `settings.rest_framework.DEFAULT_RENDERER_CLASSES`
+    # but using `SafeXMLRenderer` to handle invalid characters
+    renderer_classes = [JSONRenderer, BrowsableAPIRenderer, SafeXMLRenderer]
     ordering_fields = (
         "id",
         "date_created",
@@ -252,12 +324,20 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
     queryset = (
         Opinion.objects.select_related("cluster", "author")
-        .prefetch_related("opinions_cited", "joined_by")
+        .prefetch_related(
+            "joined_by",
+            Prefetch("opinions_cited", queryset=Opinion.objects.only("id")),
+        )
         .order_by("-id")
     )
 
 
-class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
+class OpinionsCitedViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
+):
     serializer_class = OpinionsCitedSerializer
     filterset_class = OpinionsCitedFilter
     permission_classes = [
@@ -271,7 +351,7 @@ class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = OpinionsCited.objects.all().order_by("-id")
 
 
-class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
+class TagViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = TagSerializer
     # Default cursor ordering key
@@ -359,7 +439,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
     }
 
     def list(self, request, *args, **kwargs):
-        search_form = SearchForm(request.GET)
+        search_form = SearchForm(request.GET, request=request)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]
@@ -399,7 +479,9 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             )
 
             serializer_class = supported_search_type["serializer_class"]
-            serializer = serializer_class(results_page, many=True)
+            serializer = serializer_class(
+                results_page, many=True, context={"request": request}
+            )
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(

@@ -1,4 +1,4 @@
-{% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
+{% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}{% load svg_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -86,7 +86,10 @@
     {% if FUNDRAISING_MODE %}
       {% include 'includes/dismissible_nav_banner.html' with link="https://donate.free.law/forms/supportflp" cookie_name="eoy_banner" button_text="Make your DONATION TODAY" button_emoji='<i class="fa fa-heart-o"></i>' text="Your support has grown CourtListener to over 10 million opinions, with improved search and API functionality. Help us continue expanding and enhancing access to the law. Donate before the end of 2024 to power free and open legal information for everyone" %}
     {% endif %}
-
+    <!-- Oral Arguments Transcript Banner -->
+    {% flag "transcript_feature" %}
+      {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2025/07/31/oral-argument-transcripts/" cookie_name="oa_transcripts_banner" button_text="Learn more here!" variant="info" text="📣 Transcripts for Oral Arguments are now live!<br><br><strong>Search and set alerts for anything said in court</strong> right here in CourtListener &mdash; we've got the largest collection of Oral Arguments audio on the internet! Transcripts are available just minutes after courts share audio." %}
+    {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
@@ -441,32 +444,33 @@
 
 {% block social %}
 <div class="text-center hidden-print" id="social-container">
-  <a href="https://free.law/"
-     class="fa-stack fa-lg"
-     tabindex="12000">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-link fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://x.com/freelawproject"
-     rel="noreferrer"
-     class="fa-stack fa-lg"
-     tabindex="12001">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-twitter fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9"
-     class="fa-stack fa-lg"
-     tabindex="12002">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-newspaper-o fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://github.com/freelawproject/courtlistener"
-     rel="noreferrer"
-     class="fa-stack fa-lg"
-     tabindex="12003">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
-  </a>
+  <a
+    aria-label="LinkedIn - Free Law Project (opens in a new tab)"
+    target="_blank"
+    class="gray"
+    rel="noopener noreferrer"
+    href="https://www.linkedin.com/company/free-law-project/"
+  >{% svg "logos/linkedin" width="24" height="24" aria_hidden="true" %}</a>
+  <a
+    aria-label="Bluesky - Free Law Project (opens in a new tab)"
+    target="_blank"
+    class="gray"
+    rel="noopener noreferrer"
+    href="https://bsky.app/profile/free.law"
+  >{% svg "logos/bluesky" width="24" height="24" aria_hidden="true" %}</a>
+  <a
+    aria-label="GitHub repository (opens in a new tab)"
+    target="_blank"
+    class="gray"
+    rel="noopener noreferrer"
+    href="https://github.com/freelawproject/courtlistener"
+  >{% svg "logos/github" width="24" height="24" aria_hidden="true" %}</a>
+  <a
+    aria-label="Subscribe to the Free Law Project newsletter (opens in a new tab)"
+    target="_blank"
+    class="gray"
+    href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9"
+  >{% svg "newspaper" width="24" height="24" aria_hidden="true" %}</a>
 </div>
 {% endblock %}
 
@@ -493,6 +497,12 @@
       recapBonusAlerts = {{ DOCKET_ALERT_RECAP_BONUS|default:0 }};
 
 </script>
+
+{% if track_events %}
+<input id="event_label" type="hidden" value="{{ event_label }}">
+<script type="text/javascript" src="{% static "js/event-utils.js" %}"></script>
+{% endif %}
+
 
 {# Allows your own scripts in the footer. #}
 {% block footer-scripts %}{% endblock %}

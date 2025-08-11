@@ -7,6 +7,7 @@ from unittest import TestCase, mock
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.test import SimpleTestCase
 from django.test.utils import override_settings
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
@@ -17,6 +18,7 @@ from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
+from cl.citations.models import UnmatchedCitation
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.test_helpers import generate_docket_target_sources
@@ -32,32 +34,60 @@ from cl.scrapers.management.commands import (
     cl_scrape_oral_arguments,
     update_from_text,
 )
+from cl.scrapers.management.commands.merge_opinion_versions import (
+    merge_judge_names,
+    merge_versions_by_download_url,
+)
 from cl.scrapers.models import UrlHash
-from cl.scrapers.tasks import extract_doc_content, process_audio_file
+from cl.scrapers.tasks import (
+    extract_doc_content,
+    find_and_merge_versions,
+    process_audio_file,
+)
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
     case_names_are_too_different,
+    check_duplicate_ingestion,
     get_binary_content,
     get_existing_docket,
     get_extension,
     update_or_create_docket,
 )
+from cl.search.documents import (
+    ES_CHILD_ID,
+    DocketDocument,
+    OpinionClusterDocument,
+    OpinionDocument,
+)
 from cl.search.factories import (
+    CitationWithParentsFactory,
     CourtFactory,
     DocketFactory,
     OpinionClusterFactory,
+    OpinionClusterWithParentsFactory,
     OpinionFactory,
+    OpinionsCitedWithParentsFactory,
+    ParentheticalFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
     SOURCES,
     Citation,
+    ClusterRedirection,
     Court,
     Docket,
     Opinion,
+    OpinionCluster,
+    OpinionsCited,
+    OriginatingCourtInformation,
+    Parenthetical,
 )
 from cl.settings import MEDIA_ROOT
-from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.tests.cases import (
+    ESIndexTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -73,12 +103,17 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             url="https://example.com/",
             enabled=True,
         )
-        cls.search_alert_oa = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert OA",
-            query="type=oa",
-            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+        with cls.captureOnCommitCallbacks(execute=True):
+            cls.search_alert_oa = AlertFactory(
+                user=cls.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Alert OA",
+                query="type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+            )
+        cls.existing_oci_id = 111111
+        cls.oci = OriginatingCourtInformation.objects.create(
+            docket_number="09-1111", id=cls.existing_oci_id
         )
 
     def test_extension(self):
@@ -90,13 +125,13 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
 
     def test_ingest_opinions_from_scraper(self) -> None:
         """Can we successfully ingest opinions at a high level?"""
-
         d_1 = DocketFactory(
             case_name="Tarrant Regional Water District v. Herrmann",
             docket_number="11-889",
             court=self.court,
             source=Docket.RECAP,
             pacer_case_id=None,
+            originating_court_information=self.oci,
         )
 
         d_2 = DocketFactory(
@@ -148,6 +183,34 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         self.assertEqual(d_2.case_name, "State of Indiana v. Charles Barker")
         self.assertEqual(
             d_3.case_name, "Intl Fidlty Ins Co v. Ideal Elec Sec Co"
+        )
+
+        oci = Docket.objects.get(
+            case_name="In Re Motion for Consent to Disclosure of Court Records"
+        ).originating_court_information
+        self.assertEqual(
+            oci.docket_number, "09-2222", "New OCI.docket_number was not saved"
+        )
+        self.assertEqual(
+            oci.assigned_to_str,
+            "another jalal",
+            "New OCI.assigned_to_str was not saved",
+        )
+
+        self.assertEqual(
+            d_1.originating_court_information.docket_number,
+            "09-1111",
+            "Existing OCI.docket_number number changed",
+        )
+        self.assertEqual(
+            d_1.originating_court_information.assigned_to_str,
+            "another david",
+            "Existing OCI.assigned_to_str was not updated",
+        )
+        self.assertEqual(
+            d_1.originating_court_information.id,
+            self.existing_oci_id,
+            "Existing OCI id should not change",
         )
 
     def test_opinion_dockets_source_assigment(self) -> None:
@@ -237,10 +300,15 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         site = test_oral_arg_scraper.Site()
         site.method = "LOCAL"
         parsed_site = site.parse()
+
         with self.captureOnCommitCallbacks(execute=True):
-            cl_scrape_oral_arguments.Command().scrape_court(
-                parsed_site, full_crawl=True
-            )
+            with mock.patch(
+                "cl.lib.celery_utils.get_task_wait"
+            ) as patched_wait:
+                patched_wait.return_value = 0
+                cl_scrape_oral_arguments.Command().scrape_court(
+                    parsed_site, full_crawl=True
+                )
 
         # There should now be two items in the database.
         audio_files = Audio.objects.all()
@@ -351,6 +419,16 @@ class IngestionTest(TestCase):
         extract_doc_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("ideal", txt_opinion.plain_text.lower())
+
+    def test_duplicate_ingestion_warnings(self) -> None:
+        """Can we detect duplicate ingestion"""
+        with mock.patch.object(logger, "error") as error_mock:
+            check_duplicate_ingestion("pdf/2025/06/05/state_v._walsh_1.pdf")
+            error_mock.assert_not_called()
+            check_duplicate_ingestion(
+                "html/2025/04/25/zelka_h.v.a.c._maintenance_solutions_inc._v._g.m._crisalli__assoc._inc._12.html"
+            )
+            error_mock.assert_called()
 
 
 class ExtensionIdentificationTest(SimpleTestCase):
@@ -592,7 +670,10 @@ class AudioFileTaskTest(TestCase):
     def test_process_audio_file(self) -> None:
         af = Audio.objects.get(pk=self.audio1.id)
         expected_duration = 1.0
-        process_audio_file(pk=self.audio1.id)
+        with mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait:
+            patched_wait.return_value = 0
+            process_audio_file(pk=self.audio1.id)
+
         af.refresh_from_db()
         measured_duration: float = af.duration  # type: ignore
         # Use almost equal because measuring MP3's is wonky.
@@ -600,8 +681,8 @@ class AudioFileTaskTest(TestCase):
             measured_duration,
             expected_duration,
             delta=5,
-            msg="We should end up with the proper duration of about %s. "
-            "Instead we got %s." % (expected_duration, measured_duration),
+            msg=f"We should end up with the proper duration of about {expected_duration}. "
+            f"Instead we got {measured_duration}.",
         )
 
     def test_audio_conversion(self) -> None:
@@ -724,8 +805,11 @@ class ScrapeCitationsTest(TestCase):
     def test_citation_scraper(self):
         """Test if citation scraper creates a citation or ignores duplicates"""
         cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
-        with mock.patch(f"{cmd}.sha1", side_effect=self.hashes), mock.patch(
-            f"{cmd}.get_binary_content", return_value="placeholder"
+        with (
+            mock.patch(f"{cmd}.sha1", side_effect=self.hashes),
+            mock.patch(
+                f"{cmd}.get_binary_content", return_value="placeholder"
+            ),
         ):
             cl_back_scrape_citations.Command().scrape_court(self.mock_site)
 
@@ -1017,4 +1101,505 @@ class CommandInputTest(TestCase):
         self.assertEqual(
             "juriscraper.oral_args.united_states.federal_appellate.ca1",
             get_module_by_court_id("ca1", "oral_args"),
+        )
+
+
+class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.rebuild_index("search.OpinionCluster")
+        cls.rebuild_index("search.Docket")
+
+    def test_merge_versions_by_download_url(self):
+        """Can we merge opinion versions and delete ES documents correctly?
+
+        This a end to end test. It's testing
+        - Docket deletion, metadata merging and related objects updating
+        - Cluster deletion and metadata merging
+        - Opinion.main_version population
+        - ElasticSearch deletion
+        """
+        court_id = "nev"
+        court = CourtFactory.create(id=court_id)
+        docket_number = "2020-11111"
+        appeal_from = "Some lower court"
+        main_docket = DocketFactory.create(
+            court=court, docket_number=docket_number, appeal_from_str=""
+        )
+        # Will help to see if we can match this docket and update its
+        # related objects
+        version_docket = DocketFactory.create(
+            court=court,
+            docket_number=docket_number,
+            appeal_from_str=appeal_from,
+        )
+
+        # Create related objects to the version docket so we can update their
+        # references on merging
+        version_docket_another_cluster = OpinionClusterFactory.create(
+            docket=version_docket, source=SOURCES.COURT_WEBSITE
+        )
+        version_audio = AudioWithParentsFactory.create(docket=version_docket)
+
+        # Opinions will have the same URL, but it has a different docket number
+        not_comparable_docket = DocketFactory.create(
+            court=court, docket_number="2021-11111"
+        )
+
+        other_dates = "Argued on March 10 2025"
+        summary = "Something..."
+        main_cluster = OpinionClusterFactory.create(
+            docket=main_docket,
+            other_dates="",
+            summary="",
+            source=SOURCES.COURT_WEBSITE,
+        )
+        cluster2 = OpinionClusterFactory.create(
+            docket=main_docket,
+            # other_dates should overwrite the empty field in the main cluster
+            other_dates=other_dates,
+            summary="",
+            source=SOURCES.COURT_WEBSITE,
+        )
+        cluster2_id = cluster2.id
+        cluster3 = OpinionClusterFactory.create(
+            docket=version_docket,
+            other_dates="",
+            summary=summary,
+            source=SOURCES.COURT_WEBSITE,
+        )
+        cluster4 = OpinionClusterFactory.create(
+            docket=DocketFactory.create(), source=SOURCES.COURT_WEBSITE
+        )
+        cluster5 = OpinionClusterFactory.create(
+            docket=not_comparable_docket, source=SOURCES.COURT_WEBSITE
+        )
+
+        main_citation = CitationWithParentsFactory.create(
+            cluster=main_cluster, volume=10000, reporter="U.S.", page="1"
+        )
+        repeated_citation = CitationWithParentsFactory.create(
+            cluster=cluster2, volume=10000, reporter="U.S.", page="1"
+        )
+        new_citation = CitationWithParentsFactory.create(
+            cluster=cluster2,
+            volume=20,
+            reporter="Nev.",
+            page="20",
+            type=Citation.STATE,
+        )
+
+        plain_text = (
+            """Lorem ipsum dolor sit amet, consectetur adipiscing
+        elit, sed do eiusmod tempor incididunt ut labore et dolore magna
+        aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco
+        laboris nisi ut aliquip ex ea commodo consequat.
+        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
+        dolore eu fugiat nulla pariatur...
+        """
+            * 3
+        )
+        # simulate an updated text
+        # Note that similarity(text1, text2) is around 0.6 for this test
+        # while similarity(text2, text1) is greater than 0.9
+        updated_plain_text = f"100 Nev 2\n{plain_text}\n"
+        download_url = "http://caseinfo.nvsupreme/111.pdf"
+        author_str = "A Judge"
+
+        should_ignore_version = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(
+                docket=version_docket, source=SOURCES.COURT_M_HARVARD
+            ),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=None,
+            sha1="xxxx",
+            html="",
+        )
+        # Creation order matters, since we can't override date_created
+        # the opinion we intend to be the main version must be created last
+        version = OpinionFactory.create(
+            cluster=cluster2,
+            # see if we can pick up opinions with different protocols
+            download_url=download_url.replace("http", "https"),
+            plain_text=plain_text,
+            html="",
+            # This field should be updated
+            author_str=author_str,
+            sha1="22222",
+            html_with_citations="something...",
+        )
+        # the version cluster may have other opinions linked to it that are
+        # not versions. Ensure we migrate them to the main cluster after this
+        # version cluster is deleted
+        not_a_version_in_version_cluster = OpinionFactory.create(
+            cluster=cluster2,
+            sha1="123456",
+        )
+        version2 = OpinionFactory.create(
+            cluster=cluster3,
+            download_url=download_url,
+            plain_text=plain_text,
+            html="",
+            author_str="",
+            sha1="33333",
+        )
+        unrelated_opinion = OpinionFactory.create(
+            cluster=cluster4,
+            download_url=download_url.replace("111", "222"),
+            sha1="44444",
+        )
+        same_url_different_docket_number = OpinionFactory.create(
+            cluster=cluster5,
+            download_url=download_url,
+            plain_text=plain_text,
+            sha1="5555",
+        )
+        main_opinion = OpinionFactory.create(
+            cluster=main_cluster,
+            download_url=download_url,
+            plain_text=updated_plain_text,
+            html="",
+            author_str="",
+            sha1="11111",
+        )
+
+        # test cleanup of objects related to citation annotation
+        version_parenthetical = ParentheticalFactory.create(
+            describing_opinion=version, described_opinion=unrelated_opinion
+        )
+        version_opinions_cited = OpinionsCitedWithParentsFactory.create(
+            citing_opinion=version, cited_opinion=unrelated_opinion
+        )
+        version_opinions_cited_cluster = unrelated_opinion.cluster
+        version_opinions_cited_cluster.citation_count = 10
+        version_opinions_cited_cluster.save()
+        version_unmatched_citation = UnmatchedCitation.objects.create(
+            citing_opinion=version,
+            status=1,
+            citation_string="",
+            court_id="",
+            volume="1",
+            reporter="Nev",
+            page="1",
+            type=1,
+        )
+
+        # Check that elasticsearch docs exist before the merging
+        self.assertTrue(
+            OpinionClusterDocument.exists(id=cluster2.id),
+            "OpinionClusterDocument does not exist",
+        )
+        self.assertTrue(
+            OpinionDocument.exists(id=ES_CHILD_ID(version.id).OPINION),
+            "OpinionDocument does not exist",
+        )
+
+        # Function to test
+        merge_versions_by_download_url(download_url.rsplit("/", 1)[0])
+
+        # Check elasticsearch deletions
+        self.assertFalse(
+            OpinionClusterDocument.exists(id=cluster2.id),
+            "OpinionClusterDocument was not deleted",
+        )
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(version.id).OPINION),
+            "OpinionDocument was not deleted",
+        )
+        self.assertFalse(
+            DocketDocument.exists(id=version_docket.id),
+            "Docket document was not deleted",
+        )
+
+        # Time to test
+        should_ignore_version.refresh_from_db()
+        version.refresh_from_db()
+        main_opinion.refresh_from_db()
+        main_cluster.refresh_from_db()
+        new_citation.refresh_from_db()
+        unrelated_opinion.refresh_from_db()
+        version2.refresh_from_db()
+        same_url_different_docket_number.refresh_from_db()
+        version_docket_another_cluster.refresh_from_db()
+        version_audio.refresh_from_db()
+        not_a_version_in_version_cluster.refresh_from_db()
+
+        # Opinions
+        self.assertEqual(
+            should_ignore_version.main_version,
+            None,
+            "Opinion.main_version should not be updated for a non COURT_WEBSITE source cluster",
+        )
+        self.assertEqual(
+            version.main_version,
+            main_opinion,
+            "Opinion.main_version was not updated",
+        )
+        self.assertEqual(
+            version2.main_version,
+            main_opinion,
+            "version2 Opinion.main_version was not updated",
+        )
+        self.assertEqual(
+            main_opinion.author_str,
+            author_str,
+            "Opinion.author_str was not updated in the main object",
+        )
+        self.assertEqual(
+            unrelated_opinion.main_version_id,
+            None,
+            "`unrelated_opinion` should not be updated",
+        )
+        self.assertEqual(
+            same_url_different_docket_number.main_version_id,
+            None,
+            "`same_url_different_docket_number` should not have it's version updated",
+        )
+        self.assertEqual(
+            not_a_version_in_version_cluster.cluster_id,
+            main_cluster.id,
+            "non version opinion in the version cluster should be migrated to the main version cluster",
+        )
+
+        # Clusters
+        try:
+            cluster2.refresh_from_db()
+            self.fail("`cluster2` should had been deleted")
+            cluster3.refresh_from_db()
+            self.fail("`cluster3` should had been deleted")
+        except OpinionCluster.DoesNotExist:
+            pass
+
+        redirection = ClusterRedirection.objects.filter(
+            deleted_cluster_id=cluster2_id,
+            cluster=main_cluster,
+            reason=ClusterRedirection.VERSION,
+        ).exists()
+        self.assertTrue(
+            redirection,
+            "ClusterRedirection object from `cluster2` to `main_cluster` was not created",
+        )
+
+        self.assertEqual(
+            main_cluster.other_dates,
+            other_dates,
+            "main_cluster.other_dates was not updated on merge",
+        )
+        self.assertEqual(
+            main_cluster.summary,
+            summary,
+            "main_cluster.summary was not updated on merge",
+        )
+
+        # Docket
+        main_docket.refresh_from_db()
+        self.assertEqual(
+            main_docket.appeal_from_str,
+            appeal_from,
+            "Docket.appeal_from_str should be updated",
+        )
+        try:
+            version_docket.refresh_from_db()
+            self.fail("Version docket should be deleted")
+        except Docket.DoesNotExist:
+            pass
+        self.assertEqual(
+            version_docket_another_cluster.docket_id,
+            main_docket.id,
+            "The cluster assigned to `version_docket` should be assigned to `main_docket`",
+        )
+        self.assertEqual(
+            version_audio.docket_id,
+            main_docket.id,
+            "The audio assigned to `version_docket` should be assigned to `main_docket`",
+        )
+
+        # Citations
+        try:
+            repeated_citation.refresh_from_db()
+            self.fail("`repeated_citation` should had been deleted")
+        except Citation.DoesNotExist:
+            pass
+
+        self.assertEqual(
+            new_citation.cluster_id,
+            main_cluster.id,
+            "new_citation.cluster_id was not updated",
+        )
+
+        # test cleanup of objects related to citation annotation
+        self.assertEqual(version.html_with_citations, "")
+
+        try:
+            version_parenthetical.refresh_from_db()
+            self.fail("version's parenthetical should be deleted")
+        except Parenthetical.DoesNotExist:
+            pass
+
+        try:
+            version_opinions_cited.refresh_from_db()
+            self.fail("version's OpinionsCited should be deleted")
+        except OpinionsCited.DoesNotExist:
+            pass
+
+        version_opinions_cited_cluster.refresh_from_db()
+        self.assertEqual(version_opinions_cited_cluster.citation_count, 9)
+
+        try:
+            version_unmatched_citation.refresh_from_db()
+            self.fail("version's UnmatchedCitation should be deleted")
+        except UnmatchedCitation.DoesNotExist:
+            pass
+
+        # Check that the new citation was indexed in the OpinionClusterDocument
+        ocd = OpinionClusterDocument.get(id=main_cluster.id)
+        self.assertTrue(
+            str(new_citation) in ocd.citation,
+            f"{str(new_citation)} not in {ocd.citation}",
+        )
+
+    def test_find_and_merge_versions_task(self):
+        """Does the scraper versioning task work?"""
+        download_url = "https://something.com/1"
+        plain_text = "Something ..."
+        docket = DocketFactory(docket_number="111")
+
+        should_ignore = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_M_HARVARD
+            ),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=None,
+        )
+        previous_main = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=None,
+        )
+        a_version = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=previous_main,
+        )
+        main = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(
+                docket=docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text=plain_text,
+            main_version=None,
+        )
+
+        find_and_merge_versions(pk=main.id)
+        a_version.refresh_from_db()
+        previous_main.refresh_from_db()
+        should_ignore.refresh_from_db()
+
+        self.assertEqual(previous_main.main_version.id, main.id)
+        # test transitive main_version update
+        self.assertEqual(a_version.main_version.id, main.id)
+
+        # should ignore due to OpinionCluster.source
+        self.assertEqual(should_ignore.main_version, None)
+
+    def test_source_merging(self):
+        """Can we merge both Docket and Cluster sources?"""
+        self.assertEqual(
+            Docket.merge_sources(Docket.SCRAPER, Docket.SCRAPER_AND_HARVARD),
+            Docket.SCRAPER_AND_HARVARD,
+        )
+        self.assertEqual(
+            Docket.merge_sources(Docket.SCRAPER, Docket.DIRECT_INPUT),
+            Docket.SCRAPER + Docket.DIRECT_INPUT,
+        )
+
+        self.assertEqual(
+            SOURCES.merge_sources(
+                SOURCES.COURT_WEBSITE, SOURCES.COURT_WEBSITE
+            ),
+            SOURCES.COURT_WEBSITE,
+        )
+        self.assertEqual(
+            SOURCES.merge_sources(
+                SOURCES.COURT_WEBSITE,
+                SOURCES.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            ),
+            SOURCES.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+        )
+        self.assertEqual(
+            SOURCES.merge_sources(
+                SOURCES.COURT_WEBSITE, SOURCES.PUBLIC_RESOURCE
+            ),
+            SOURCES.COURT_M_RESOURCE,
+        )
+        self.assertEqual(
+            SOURCES.merge_sources(
+                SOURCES.HARVARD_CASELAW, SOURCES.COLUMBIA_M_COURT
+            ),
+            SOURCES.COLUMBIA_M_COURT_M_HARVARD,
+        )
+
+    def test_string_merging(self):
+        """Can we merge strings while reducing repetition?"""
+        cases = [
+            ("Bender", "Bender, P.J.E.", "Bender, P.J.E."),
+            ("Mundy, Sallie", "Justice Sallie Mundy", "Justice Sallie Mundy"),
+            (
+                "Per Curiam",
+                "Breckenridge, Stith, Draper, Russell, Wilson, Fischer",
+                "Per Curiam Breckenridge, Stith, Draper, Russell, Wilson, Fischer",
+            ),
+            (
+                "Ishee, Lee, Irving, Griffis, Barnes, Carlton, Maxwell, Fair, James, Wilson",
+                "Irving, Ishee, Carlton, Lee, Griffis, Barnes, Roberts, Maxwell, Fair, James",
+                "Ishee; Lee; Irving; Griffis; Barnes; Carlton; Maxwell; Fair; James; Wilson; Roberts",
+            ),
+            (
+                "Ishee, Lee, Irving, Griffis, Barnes, Carlton, Maxwell, Fair, James, Wilson".replace(
+                    ",", ";"
+                ),
+                "Irving, Ishee, Carlton, Lee, Griffis, Barnes, Roberts, Maxwell, Fair, James",
+                "Ishee; Lee; Irving; Griffis; Barnes; Carlton; Maxwell; Fair; James; Wilson; Roberts",
+            ),
+            (
+                "Simpson, Wojcik, Pellegrini",
+                "Simpson, J.",
+                "Simpson, Wojcik, Pellegrini",
+            ),
+        ]
+        for str1, str2, expected_result in cases:
+            self.assertEqual(merge_judge_names(str1, str2), expected_result)
+
+    def test_transitive_redirection(self):
+        """Can we keep existing ClusterRedirections when its target cluster is
+        versioned?"""
+        to_keep = OpinionClusterWithParentsFactory.create(id=99999)
+        to_delete = OpinionClusterWithParentsFactory.create(id=888888)
+        existing_redirection_id = 77777
+        ClusterRedirection.objects.create(
+            deleted_cluster_id=existing_redirection_id,
+            cluster=to_delete,
+            reason=ClusterRedirection.DUPLICATE,
+        )
+
+        ClusterRedirection.create_from_clusters(
+            to_keep, to_delete, ClusterRedirection.VERSION
+        )
+
+        self.assertTrue(
+            ClusterRedirection.objects.filter(
+                deleted_cluster_id=existing_redirection_id,
+                cluster=to_keep,
+                reason=ClusterRedirection.DUPLICATE,
+            ).exists(),
+            "Existing re-direction was not re-assigned to new cluster",
         )

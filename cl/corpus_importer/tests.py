@@ -10,7 +10,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
@@ -87,6 +87,7 @@ from cl.corpus_importer.utils import (
     merge_strings,
     winnow_case_name,
 )
+from cl.favorites.models import PrayerAvailability
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import (
@@ -104,36 +105,38 @@ from cl.people_db.lookup_utils import (
     find_just_name,
 )
 from cl.people_db.models import Attorney, AttorneyOrganization, Party, Position
-from cl.recap.management.commands.pacer_iquery_scraper import (
+from cl.recap.management.commands.nightly_pacer_updates import (
     get_docket_ids_docket_alerts,
     get_docket_ids_missing_info,
     get_docket_ids_week_ago_no_case_name,
+    get_recap_documents_pray_and_pay,
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.factories import (
     CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionClusterFactoryMultipleOpinions,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
+    OpinionClusterWithMultipleOpinionsFactory,
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
     SOURCES,
     Citation,
-    Court,
     Docket,
     Opinion,
     OpinionCluster,
     RECAPDocument,
 )
 from cl.settings import MEDIA_ROOT
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -375,8 +378,8 @@ class CourtMatchingTest(SimpleTestCase):
             self.assertEqual(
                 got,
                 d["answer"],
-                msg="\nDid not get court we expected: '%s'.\n"
-                "               Instead we got: '%s'" % (d["answer"], got),
+                msg="\nDid not get court we expected: '{}'.\n"
+                "               Instead we got: '{}'".format(d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -584,12 +587,7 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-            "Got %s, expected %s: \n%s"
-            % (
-                actual_num_attorneys,
-                expected_num_attorneys,
-                first_party_attorneys,
-            ),
+            f"Got {actual_num_attorneys}, expected {expected_num_attorneys}: \n{first_party_attorneys}",
         )
 
         first_attorney = first_party_attorneys[0]
@@ -600,7 +598,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+            f"Got {actual_num_roles}, expected {expected_num_roles}",
         )
 
     def test_num_queries_ok(self) -> None:
@@ -628,6 +626,7 @@ class HarvardTests(TestCase):
         Each one can be used or turned off.  See the teardown for more.
         :return:
         """
+        super().setUp()
         self.make_filepath_patch = patch(
             "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
         )
@@ -660,8 +659,8 @@ class HarvardTests(TestCase):
         self.make_filepath_patch.stop()
         self.read_json_patch.stop()
         self.find_court_patch.stop()
-        Docket.objects.all().delete()
-        Court.objects.all().delete()
+        self.get_fix_list_patch.stop()
+        super().tearDown()
 
     def _get_cite(self, case_law) -> Citation:
         """Fetch first citation added to case
@@ -1072,7 +1071,7 @@ class CorpusImporterManagementCommmandsTests(TestCase):
 
         # Create opinion cluster with opinion and docket
         cluster = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Foo v. Bar",
@@ -1149,7 +1148,7 @@ class CleanUpMisMatchedDockets(TestCase):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         # Opinion cluster with mis matched docket.
         cls.cluster = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=cls.court,
                     source=Docket.HARVARD,
@@ -1167,7 +1166,7 @@ class CleanUpMisMatchedDockets(TestCase):
 
         # Opinion cluster with correct docket
         cluster_2 = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=cls.court,
                     source=Docket.HARVARD,
@@ -1253,7 +1252,7 @@ class HarvardMergerTests(TestCase):
             (<cross_reference><span class="citation no-link">137 S.E. 791</span></cross_reference>), and cit.; <em>Kuck</em> v. <em>State,</em> <cross_reference><span class="citation" data-id="5582722"><a href="/opinion/5732248/kuck-v-state/">149 Ga. 191</a></span></cross_reference>
             (<cross_reference><span class="citation no-link">99 S.E. 622</span></cross_reference>). I concur in the reversal for this additional reason.</p>"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -1314,7 +1313,7 @@ class HarvardMergerTests(TestCase):
         }
         self.read_json_func.return_value = case_data
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(),
             attorneys="B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
         )
@@ -1331,7 +1330,7 @@ class HarvardMergerTests(TestCase):
         )
 
         # Test that we can ignore matching fields
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(),
             attorneys="B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
         )
@@ -1430,7 +1429,7 @@ class HarvardMergerTests(TestCase):
     def test_add_opinions_without_authors_in_cl(self):
         """Can we add opinion and update authors"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -1496,7 +1495,7 @@ class HarvardMergerTests(TestCase):
         """Can we update an opinion and leave author_str alone if already
         assigned"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -1924,7 +1923,7 @@ class HarvardMergerTests(TestCase):
         all_data = fetch_non_harvard_data(case_data)
 
         self.assertEqual(
-            all_data.get("syllabus"), "<p> This is a syllabus " "example.</p>"
+            all_data.get("syllabus"), "<p> This is a syllabus example.</p>"
         )
         self.assertEqual(all_data.get("judges"), "Broyles, Gardner, MacIntyre")
         self.assertEqual(
@@ -2010,7 +2009,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
         )
 
         # Factory create cluster, data from cluster id: 1589121
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             case_name="Mendoza v. State",
             case_name_full="Pioquinto MENDOZA, III, Appellant, v. the STATE of Texas, "
             "Appellee",
@@ -2092,7 +2091,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        Court.objects.all().delete()
+        super().setUpTestData()
         cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FB")
         cls.court_txed = CourtFactory(id="txed", jurisdiction="FB")
@@ -2106,6 +2105,7 @@ class ScrapeIqueryPagesTest(TestCase):
         cls.court_mowd = CourtFactory(id="mowd", jurisdiction="FB")
 
     def setUp(self) -> None:
+        super().setUp()
         self.r = get_redis_interface("CACHE")
         keys_to_clean = [
             "iquery:highest_known_pacer_case_id",
@@ -2480,9 +2480,9 @@ class ScrapeIqueryPagesTest(TestCase):
             "The court %s website is probably down. Aborting the probe task.",
             self.court_hib.pk,
         )
-        assert (
-            expected_call in mock_logger.warning.mock_calls
-        ), "Expected Timeout warning call was not triggered."
+        assert expected_call in mock_logger.warning.mock_calls, (
+            "Expected Timeout warning call was not triggered."
+        )
 
     @patch(
         "cl.corpus_importer.tasks.CaseQuery",
@@ -2515,15 +2515,16 @@ class ScrapeIqueryPagesTest(TestCase):
             ### Create a Docket with a pacer_case_id bigger than highest_known_pacer_case_id
             # IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED is False. So no signal should
             # be processed.
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
-            ), patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 DocketFactory(
                     court=self.court_gand,
@@ -2551,13 +2552,15 @@ class ScrapeIqueryPagesTest(TestCase):
             )
 
             ### Create a Docket with a pacer_case_id smaller than highest_known_pacer_case_id
-            with patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 DocketFactory(
                     court=self.court_gand,
@@ -2588,13 +2591,15 @@ class ScrapeIqueryPagesTest(TestCase):
 
             ### Create a Docket with a pacer_case_id bigger than highest_known_pacer_case_id
             r.hset("iquery:pacer_case_id_current", self.court_gand.pk, 5)
-            with patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 DocketFactory(
                     court=self.court_gand,
@@ -2623,13 +2628,15 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(int(highest_known_pacer_case_id), 8)
 
             ### Create an appellate RECAP docket, it should be ignored
-            with patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 DocketFactory(
                     court=self.court_ca1,
@@ -2655,15 +2662,16 @@ class ScrapeIqueryPagesTest(TestCase):
             # Simulate a highest_known_pacer_case_id  = 8
             r.hset("iquery:highest_known_pacer_case_id", self.court_cand.pk, 8)
             r.hset("iquery:pacer_case_id_current", self.court_cand.pk, 8)
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
-            ), patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True),
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 # Execute the probing task
                 probe_or_scrape_iquery_pages.delay(
@@ -2713,15 +2721,16 @@ class ScrapeIqueryPagesTest(TestCase):
             # Simulate a highest_known_pacer_case_id  = 8
             r.hset("iquery:highest_known_pacer_case_id", self.court_txed.pk, 8)
             r.hset("iquery:pacer_case_id_current", self.court_txed.pk, 8)
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
-            ), patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 # Execute the probing task
                 probe_or_scrape_iquery_pages.delay(
@@ -2890,10 +2899,17 @@ class ScrapeIqueryPagesTest(TestCase):
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
         self.assertEqual(court_wait_cacd, None)
 
+        monday = datetime(2025, 7, 21)
+        monday_local = timezone.make_aware(
+            monday, timezone.get_default_timezone()
+        )
         for test in range(1, 5):
             with self.subTest(test=test):
                 r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with (
+                    time_machine.travel(monday_local, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -2914,7 +2930,10 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with (
+            time_machine.travel(monday_local, tick=False),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -2971,10 +2990,17 @@ class ScrapeIqueryPagesTest(TestCase):
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_vib.pk}")
         self.assertEqual(court_wait_cacd, None)
 
+        monday = datetime(2025, 7, 21)
+        monday_local = timezone.make_aware(
+            monday, timezone.get_default_timezone()
+        )
         for test in range(1, 30):
             with self.subTest(test=test):
                 r.delete(f"iquery:court_wait:{self.court_vib.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with (
+                    time_machine.travel(monday_local, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -2991,7 +3017,10 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_vib.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with (
+            time_machine.travel(monday_local, tick=False),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -3010,6 +3039,80 @@ class ScrapeIqueryPagesTest(TestCase):
             f"iquery:court_empty_probe_attempts:{self.court_vib.pk}"
         )
         self.assertEqual(int(court_empty_attempts), 0)
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    @patch("cl.corpus_importer.tasks.logger")
+    @patch(
+        "cl.corpus_importer.management.commands.probe_iquery_pages_daemon.logger"
+    )
+    @override_settings(
+        IQUERY_EMPTY_PROBES_LIMIT_HOURS={
+            "default": 0.41,
+        },
+        IQUERY_PROBE_WAIT=300,
+    )
+    def test_probe_iquery_pages_daemon_ignores_empty_probes_on_weekends(
+        self, mock_logger_daemon, mock_logger, mock_cookies
+    ):
+        """Test probe_iquery_pages_daemon ignores empty probes on weekends.
+        Courts typically do not publish new cases on weekends.
+        """
+
+        r = get_redis_interface("CACHE")
+        r.hset("iquery:highest_known_pacer_case_id", self.court_cacd.pk, 0)
+
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 100, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
+
+        court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
+        self.assertEqual(court_wait_cacd, None)
+
+        saturday = datetime(2025, 7, 19)
+        saturday_local = timezone.make_aware(
+            saturday, timezone.get_default_timezone()
+        )
+        sunday = datetime(2025, 7, 20)
+        sunday_local = timezone.make_aware(
+            sunday, timezone.get_default_timezone()
+        )
+        for test in range(1, 6):
+            with self.subTest(test=test):
+                r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
+                weekend_day = sunday_local if test % 2 == 0 else saturday_local
+                with (
+                    time_machine.travel(weekend_day, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
+                    call_command(
+                        "probe_iquery_pages_daemon",
+                        testing_iterations=1,
+                    )
+
+                # court_empty_probe_attempts for court 'cacd' shouldn't be
+                # incremented, since all empty probes are occurring over the
+                # weekend.
+                empty_probe_attempts = r.get(
+                    f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
+                )
+                self.assertEqual(empty_probe_attempts, None)
+                mock_logger.info.assert_called_with(
+                    "Ignoring empty probe over the weekend for court %s - case IDs from %s to %s.",
+                    self.court_cacd.pk,
+                    str(0),
+                    str(416),
+                )
 
     @patch(
         "cl.scrapers.tasks.CaseQuery",
@@ -3054,17 +3157,17 @@ class ScrapeIqueryPagesTest(TestCase):
             r = get_redis_interface("CACHE")
             r.hset("iquery:highest_known_pacer_case_id", self.court_gand.pk, 5)
             # Test case with IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
-            ), patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
-            ), patch(
-                "cl.scrapers.tasks.get_or_cache_pacer_cookies"
+            with (
+                override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
+                patch("cl.scrapers.tasks.get_or_cache_pacer_cookies"),
             ):
                 update_docket_info_iquery.apply_async(
                     args=(docket_gand.pk, docket_gand.court_id)
@@ -3074,17 +3177,17 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(mock_iquery_sweep.call_count, 0)
 
             # Test case with IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
-            ), patch(
-                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                    *args, **kwargs
-                ),
-            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
-                execute=True
-            ), patch(
-                "cl.scrapers.tasks.get_or_cache_pacer_cookies"
+            with (
+                override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True),
+                patch(
+                    "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                    side_effect=lambda *args,
+                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                        *args, **kwargs
+                    ),
+                ) as mock_iquery_sweep,
+                self.captureOnCommitCallbacks(execute=True),
+                patch("cl.scrapers.tasks.get_or_cache_pacer_cookies"),
             ):
                 update_docket_info_iquery.apply_async(
                     args=(docket_cand.pk, docket_cand.court_id)
@@ -3100,8 +3203,8 @@ class ScrapeIqueryPagesTest(TestCase):
                 dispatch_uid=test_dispatch_uid,
             )
 
-    def test_pacer_iquery_scraper_queries(self, mock_cookies):
-        """Test pacer_iquery_scraper command queries."""
+    def test_nightly_pacer_updates_queries(self, mock_cookies):
+        """Test nightly_pacer_updates command queries."""
 
         d_1 = DocketFactory(
             source=Docket.RECAP,
@@ -3166,6 +3269,69 @@ class ScrapeIqueryPagesTest(TestCase):
             {d_1.pk, d_2.pk},
             msg="Wrong IDs returned by get_docket_ids_week_ago_no_case_name",
         )
+
+    def test_can_retrieve_old_prayers_to_check(self, mock_cookies):
+        """Verifies retrieval of old, unchecked RECAP documents for 'pray and pay'."""
+        mock_date = now().replace(day=1, hour=5)
+        # Create DocketEntry instances with different filing dates
+        ten_days_old_entry = DocketEntryFactory(
+            date_filed=mock_date - timedelta(days=10)
+        )
+        ninety_one_days_old_entry = DocketEntryFactory(
+            date_filed=mock_date - timedelta(days=91)
+        )
+        ninety_five_days_old_entry = DocketEntryFactory(
+            date_filed=mock_date - timedelta(days=95)
+        )
+
+        # Create RECAPDocument instances associated with the DocketEntry instances
+        rd_1 = RECAPDocumentFactory(docket_entry=ten_days_old_entry)
+        rd_2 = RECAPDocumentFactory(
+            docket_entry=ninety_one_days_old_entry,
+        )
+        rd_3 = RECAPDocumentFactory(
+            docket_entry=ninety_one_days_old_entry,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+        rd_4 = RECAPDocumentFactory(
+            docket_entry=ninety_five_days_old_entry,
+        )
+        rd_5 = RECAPDocumentFactory(
+            docket_entry=ninety_five_days_old_entry,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+
+        # Simulate PrayerAvailability records with different last_checked dates
+        PrayerAvailability.objects.create(
+            recap_document=rd_1, last_checked=mock_date - timedelta(days=3)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_2, last_checked=mock_date - timedelta(days=3)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_3, last_checked=mock_date - timedelta(days=1)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_4, last_checked=mock_date - timedelta(days=7)
+        )
+        PrayerAvailability.objects.create(
+            recap_document=rd_5, last_checked=mock_date - timedelta(days=2)
+        )
+
+        # Retrieve the RECAP documents that should be checked
+        with time_machine.travel(mock_date, tick=False):
+            recap_documents = get_recap_documents_pray_and_pay()
+
+        self.assertIn(rd_2, recap_documents)
+        self.assertIn(rd_4, recap_documents)
+        # Not old enough
+        self.assertNotIn(rd_1, recap_documents)
+        # Not expected: Last Checked on the same day it should have been unsealed
+        self.assertNotIn(rd_3, recap_documents)
+        # Not expected: Checked after it should have been unsealed
+        self.assertNotIn(rd_5, recap_documents)
 
     def test_get_latest_pacer_case_id_for_courts(self, mock_cookies):
         """Test get_latest_pacer_case_id_for_courts helper."""
@@ -3271,11 +3437,16 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
 
-        with override_settings(
-            IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
-        ), patch("cl.lib.decorators.time.sleep") as mock_sleep, patch(
-            "cl.corpus_importer.tasks.query_iquery_page", return_value=({}, "")
-        ) as mock_query_iquery_page:
+        with (
+            override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
+            ),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch(
+                "cl.corpus_importer.tasks.query_iquery_page",
+                return_value=({}, ""),
+            ) as mock_query_iquery_page,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -3302,11 +3473,16 @@ class ScrapeIqueryPagesTest(TestCase):
             dockets.count(), 1, msg="Docket number doesn't match."
         )
 
-        with override_settings(
-            IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
-        ), patch("cl.lib.decorators.time.sleep") as mock_sleep, patch(
-            "cl.corpus_importer.tasks.query_iquery_page", return_value=({}, "")
-        ) as mock_query_iquery_page:
+        with (
+            override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
+            ),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch(
+                "cl.corpus_importer.tasks.query_iquery_page",
+                return_value=({}, ""),
+            ) as mock_query_iquery_page,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -3335,12 +3511,13 @@ class ScrapeIqueryPagesTest(TestCase):
             dispatch_uid=test_dispatch_uid,
         )
         try:
-            with override_settings(
-                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
-            ), patch(
-                "cl.lib.decorators.time.sleep"
-            ) as mock_sleep, self.captureOnCommitCallbacks(
-                execute=True
+            with (
+                override_settings(
+                    IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
+                    IQUERY_FIXED_SWEEP=10,
+                ),
+                patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                self.captureOnCommitCallbacks(execute=True),
             ):
                 call_command(
                     "probe_iquery_pages_daemon",
@@ -3446,7 +3623,6 @@ class CaseNamesTest(SimpleTestCase):
 
 
 class AWSManifestTest(TestCase):
-
     def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
 

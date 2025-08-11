@@ -1,8 +1,8 @@
 from datetime import date
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 
 class RoleType(TypedDict, total=False):
-    role: Optional[int]
-    date_action: Optional[date]
+    role: int | None
+    date_action: date | None
     role_raw: str

@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from cl.favorites.models import (
     DocketTag,
+    GenericCount,
     Note,
     Prayer,
     PrayerAvailability,
@@ -19,6 +20,12 @@ class NoteInline(admin.TabularInline):
         "docket_id",
         "recap_doc_id",
     )
+
+
+class PrayerInline(admin.TabularInline):
+    model = Prayer
+    raw_id_fields = ("recap_document",)
+    extra = 1
 
 
 @admin.register(Note)
@@ -76,3 +83,8 @@ class PrayerAvailabilityAdmin(admin.ModelAdmin):
         "recap_document",
         "last_checked",
     )
+
+
+@admin.register(GenericCount)
+class GenericCountAdmin(admin.ModelAdmin):
+    search_fields = ("label__startswith",)

@@ -3,7 +3,7 @@ import sys
 import time
 import traceback
 from datetime import date
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
 
 from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
@@ -28,6 +28,7 @@ from cl.scrapers.exceptions import (
 )
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
+    check_duplicate_ingestion,
     get_binary_content,
     get_child_court,
     get_extension,
@@ -35,6 +36,7 @@ from cl.scrapers.utils import (
     save_response,
     signal_handler,
     update_or_create_docket,
+    update_or_create_originating_court_information,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -44,6 +46,7 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
 )
 
 # for use in catching the SIGINT (Ctrl+4)
@@ -53,11 +56,17 @@ cnt = CaseNameTweaker()
 
 @transaction.atomic
 def make_objects(
-    item: Dict[str, Union[str, Any]],
+    item: dict[str, str | Any],
     court: Court,
     sha1_hash: str,
     content: bytes,
-) -> Tuple[Docket, Opinion, OpinionCluster, List[Citation]]:
+) -> tuple[
+    Docket,
+    Opinion,
+    OpinionCluster,
+    list[Citation],
+    OriginatingCourtInformation,
+]:
     """Takes the meta data from the scraper and associates it with objects.
 
     The keys returned by juriscraper scrapers are defined by `self._all_attrs`
@@ -91,6 +100,12 @@ def make_objects(
         blocked=blocked,
         date_blocked=date_blocked,
         appeal_from_str=item.get("lower_courts", ""),
+        appeal_from_id=item.get("lower_court_ids", ""),
+    )
+    originating_court_info = update_or_create_originating_court_information(
+        docket,
+        item.get("lower_court_numbers", ""),
+        item.get("lower_court_judges", ""),
     )
 
     # Note that if opinion.author_str has no value, and cluster.judges find
@@ -141,18 +156,27 @@ def make_objects(
     file_name = trunc(item["case_names"].lower(), 75) + extension
     opinion.file_with_date = cluster.date_filed
     opinion.local_path.save(file_name, cf, save=False)
+    check_duplicate_ingestion(opinion.local_path.name)
 
-    return docket, opinion, cluster, citations
+    return docket, opinion, cluster, citations, originating_court_info
 
 
 @transaction.atomic
 def save_everything(
-    items: Dict[str, Any],
+    items: dict[str, Any],
     backscrape: bool = False,
 ) -> None:
     """Saves all the sub items and associates them as appropriate."""
     docket, cluster = items["docket"], items["cluster"]
     opinion, citations = items["opinion"], items["citations"]
+    originating_court_info = items.get("originating_court_information")
+
+    # if the docket already had a related `originating_court_information`
+    # the update was saved in the `make_objects` call
+    if originating_court_info and not docket.originating_court_information:
+        originating_court_info.save()
+        docket.originating_court_information = originating_court_info
+
     docket.save()
     cluster.docket = docket
     cluster.save()
@@ -332,8 +356,8 @@ class Command(ScraperCommand):
 
         child_court = get_child_court(item.get("child_courts", ""), court.id)
 
-        docket, opinion, cluster, citations = make_objects(
-            item, child_court or court, sha1_hash, content
+        docket, opinion, cluster, citations, originating_court_info = (
+            make_objects(item, child_court or court, sha1_hash, content)
         )
 
         save_everything(
@@ -342,6 +366,7 @@ class Command(ScraperCommand):
                 "opinion": opinion,
                 "cluster": cluster,
                 "citations": citations,
+                "originating_court_information": originating_court_info,
             }
         )
         extract_doc_content.delay(

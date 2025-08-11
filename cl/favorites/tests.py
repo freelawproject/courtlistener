@@ -1,8 +1,7 @@
-import math
 import time
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import time_machine
 from asgiref.sync import sync_to_async
@@ -10,13 +9,12 @@ from django.contrib.auth.hashers import make_password
 from django.core import mail
 from django.core.cache import cache
 from django.template.defaultfilters import date as template_date
-from django.test import AsyncClient, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.donate.models import NeonMembership
@@ -30,6 +28,7 @@ from cl.favorites.models import (
 )
 from cl.favorites.tasks import check_prayer_pacer
 from cl.favorites.utils import (
+    compute_prayer_total_cost,
     create_prayer,
     delete_prayer,
     get_existing_prayers_in_bulk,
@@ -55,55 +54,53 @@ from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
-class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
+class NoteTest(SimpleUserDataMixin, AudioTestCase):
     fixtures = [
         "test_court.json",
         "test_objects_search.json",
         "judge_judy.json",
     ]
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
         # Set up some handy variables
-        self.async_client = AsyncClient()
-        self.note_cluster_params = {
+        cls.note_cluster_params = {
             "cluster_id": 1,
             "name": "foo",
             "notes": "testing notes",
         }
-        self.note_audio_params = {
-            "audio_id": self.audio_1.pk,
+        cls.note_audio_params = {
+            "audio_id": cls.audio_1.pk,
             "name": "foo",
             "notes": "testing notes",
         }
 
-    async def test_create_note(self) -> None:
+    def test_create_note(self) -> None:
         """Can we create a note by sending a post?"""
         self.assertTrue(
-            await self.async_client.alogin(
-                username="pandora", password="password"
-            )
+            self.client.login(username="pandora", password="password")
         )
         for params in [self.note_cluster_params, self.note_audio_params]:
-            r = await self.async_client.post(
+            r = self.client.post(
                 reverse("save_or_update_note"),
                 params,
                 follow=True,
-                X_REQUESTED_WITH="XMLHttpRequest",
+                headers={"x-requested-with": "XMLHttpRequest"},
             )
             self.assertEqual(r.status_code, 200)
             self.assertIn("It worked", r.content.decode())
 
         # And can we delete them?
         for params in [self.note_cluster_params, self.note_audio_params]:
-            r = await self.async_client.post(
+            r = self.client.post(
                 reverse("delete_note"),
                 params,
                 follow=True,
-                X_REQUESTED_WITH="XMLHttpRequest",
+                headers={"x-requested-with": "XMLHttpRequest"},
             )
         self.assertEqual(r.status_code, 200)
         self.assertIn("It worked", r.content.decode())
-        await self.async_client.alogout()
 
 
 class UserNotesTest(BaseSeleniumTest):
@@ -119,12 +116,12 @@ class UserNotesTest(BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
+        super().setUp()
         get_homepage_stats.invalidate()
         self.f = NoteFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(
@@ -428,6 +425,7 @@ class APITests(APITestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.pandora = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
@@ -439,14 +437,16 @@ class APITests(APITestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.tag_path = reverse("UserTag-list", kwargs={"version": "v3"})
         self.docket_path = reverse("DocketTag-list", kwargs={"version": "v3"})
         self.client = make_client(self.pandora.user.pk)
         self.client2 = make_client(self.unconfirmed.user.pk)
 
-    def tearDown(cls):
+    def tearDown(self):
         UserTag.objects.all().delete()
         DocketTag.objects.all().delete()
+        super().tearDown()
 
     async def make_a_good_tag(self, client, tag_name="taggy-tag"):
         data = {
@@ -663,8 +663,8 @@ class APITests(APITestCase):
         self.assertEqual(response.json()["count"], 1)
 
 
+@patch("cl.favorites.signals.check_prayer_pacer.delay", new=MagicMock)
 class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
-
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
         """Does the prayer_eligible method work properly?"""
@@ -1278,6 +1278,38 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             msg="The top prayer didn't match.",
         )
 
+    async def test_granting_prayers_clears_availability_checks(self) -> None:
+        """Tests that granting a prayer deletes prior PrayerAvailability records"""
+        # Create a PrayerAvailability record to simulate a recent availability
+        # check for this document 4.
+        await PrayerAvailability.objects.acreate(recap_document=self.rd_4)
+        self.rd_4.is_sealed = True
+        await self.rd_4.asave()
+
+        # Trigger the creation of a prayer for the same document.
+        await create_prayer(self.user, self.rd_4)
+
+        # Simulate the document becoming available (prayer granted).
+        self.rd_4.is_available = True
+        await self.rd_4.asave()
+
+        # Verify that one prayer has been granted.
+        granted_prays = Prayer.objects.filter(status=Prayer.GRANTED)
+        self.assertEqual(
+            await granted_prays.acount(),
+            1,
+            msg="Wrong number of granted prayers",
+        )
+
+        # Assert that no PrayerAvailability records remain for the now-available document.
+        prayer_availability_query = PrayerAvailability.objects.filter(
+            recap_document_id=self.rd_4.pk
+        )
+        self.assertEqual(await prayer_availability_query.acount(), 0)
+
+        await self.rd_4.arefresh_from_db()
+        self.assertEqual(self.rd_4.is_sealed, False)
+
     async def test_can_we_load_the_top_prayers_page(self) -> None:
         """Does the 'top prayers' page return a successful response?"""
         r = await self.async_client.get(reverse("top_prayers"))
@@ -1360,11 +1392,50 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             target_status_code=HTTPStatus.OK,
         )
 
+    async def test_total_prayer_cost_is_rounded(self) -> None:
+        """Verifies that the total prayer cost is rounded to one decimal place."""
+        # Ensure relevant documents have their page_count set to 0 or None
+        # initially
+        self.rd_2.page_count = 0
+        await self.rd_2.asave()
+        self.rd_3.page_count = 0
+        await self.rd_3.asave()
+        self.rd_4.page_count = 0
+        await self.rd_4.asave()
+        self.rd_5.page_count = None
+        await self.rd_5.asave()
+
+        # Create prayer requests, ensuring a mix of users and documents
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_3)
+        await create_prayer(self.user_2, self.rd_4)
+        await create_prayer(self.user, self.rd_5)
+
+        # All 4 documents with prayers currently fall back to the default cost
+        # of 0.91. Total expected cost: 4 * 0.91 = 3.64, rounded to 3.6
+        total_cost = await compute_prayer_total_cost(
+            Prayer.objects.filter(status=Prayer.WAITING).all()
+        )
+        self.assertEqual(total_cost, 3.6)
+
+        # Update page count for rd_2
+        # New cost for rd_2: 5 pages * 0.1 per page = 0.50
+        self.rd_2.page_count = 5
+        await self.rd_2.asave()
+
+        # Recalculate expected cost:
+        #   - rd_2: 5 pages * 0.1/page = 0.50
+        #   - rd_3, rd_4, rd_5: 3 * 0.91 (default cost) = 2.73
+        # Total: 0.5 + 2.73 = 3.23. Rounded to 1 decimal place: 3.2
+        total_cost = await compute_prayer_total_cost(
+            Prayer.objects.filter(status=Prayer.WAITING).all()
+        )
+        self.assertEqual(total_cost, 3.2)
+
 
 @patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
 @patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPaySignalTests(PrayAndPayTestCase):
-
     @patch("cl.favorites.signals.check_prayer_pacer")
     async def test_create_prayer_no_pacer_doc_id(
         self,
@@ -1492,7 +1563,6 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
 @patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
 @patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
-
     @patch(
         "cl.favorites.tasks.DownloadConfirmationPage", new=FakeConfirmationPage
     )
@@ -1633,10 +1703,12 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         mock_check_prayer_pacer.delay.assert_called_once()
 
 
+@patch("cl.favorites.signals.check_prayer_pacer.delay", new=MagicMock)
 class PrayerAPITests(PrayAndPayTestCase):
     """Check that Prayer API operations work as expected."""
 
     def setUp(self) -> None:
+        super().setUp()
         self.prayer_path = reverse("prayer-list", kwargs={"version": "v4"})
         self.client = make_client(self.user.pk)
         self.client_2 = make_client(self.user_2.pk)

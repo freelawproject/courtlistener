@@ -1,18 +1,17 @@
 import datetime
 import pickle
-from typing import Tuple, TypedDict, cast
+from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
 from django.core.cache import cache
 from django.core.files.base import ContentFile
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from requests.cookies import RequestsCookieJar
 
 from cl.lib.courts import (
     get_active_court_from_cache,
-    get_cache_key_for_court_list,
     get_minimal_list_of_courts,
     lookup_child_courts_cache,
 )
@@ -62,10 +61,10 @@ from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
-    OpinionClusterFactoryMultipleOpinions,
+    OpinionClusterWithMultipleOpinionsFactory,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 
 
 class TestPacerUtils(TestCase):
@@ -85,8 +84,7 @@ class TestPacerUtils(TestCase):
         )
         self.assertFalse(
             blocked,
-            msg="Bankruptcy dockets with many entries "
-            "should not be blocked",
+            msg="Bankruptcy dockets with many entries should not be blocked",
         )
         # This should stay blocked even though it's a big bankruptcy docket.
         d.blocked = True
@@ -95,8 +93,7 @@ class TestPacerUtils(TestCase):
         )
         self.assertTrue(
             blocked,
-            msg="Bankruptcy dockets that start blocked "
-            "should stay blocked.",
+            msg="Bankruptcy dockets that start blocked should stay blocked.",
         )
 
 
@@ -105,7 +102,6 @@ class TestPacerUtils(TestCase):
     return_value="lib_test:minimal-court-list",
 )
 class TestCachedCourtUtils(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.parent_court = CourtFactory(id="parent_court")
@@ -197,7 +193,6 @@ class TestCachedCourtUtils(TestCase):
     EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
 )
 class TestPacerSessionUtils(TestCase):
-
     def setUp(self) -> None:
         r = get_redis_interface("CACHE", decode_responses=False)
         # Clear cached session keys to prevent data inconsistencies.
@@ -284,7 +279,7 @@ class TestStringUtils(SimpleTestCase):
             ellipsis: str
 
         s = "Henry wants apple."
-        tests: Tuple[TestType, ...] = (
+        tests: tuple[TestType, ...] = (
             # Simple case
             {"length": 13, "result": "Henry wants"},
             # Off by one cases
@@ -311,14 +306,15 @@ class TestStringUtils(SimpleTestCase):
             self.assertEqual(
                 result,
                 test_dict["result"],
-                msg="Failed with dict: %s.\n"
-                "%s != %s" % (test_dict, result, test_dict["result"]),
+                msg="Failed with dict: {}.\n{} != {}".format(
+                    test_dict, result, test_dict["result"]
+                ),
             )
             self.assertTrue(
                 len(result) <= test_dict["length"],
-                msg="Failed with dict: %s.\n"
-                "%s is longer than %s"
-                % (test_dict, result, test_dict["length"]),
+                msg="Failed with dict: {}.\n{} is longer than {}".format(
+                    test_dict, result, test_dict["length"]
+                ),
             )
 
     def test_anonymize(self) -> None:
@@ -408,6 +404,11 @@ class TestModelHelpers(TestCase):
 
         # Do we automatically zero-pad short docket numbers?
         self.assertEqual(make_docket_number_core("12-cv-1032"), expected)
+
+        # Case type up to 5 letters.
+        self.assertEqual(
+            make_docket_number_core("4:25-crcor-00029"), "2500029"
+        )
 
         # bankruptcy numbers
         self.assertEqual(make_docket_number_core("12-33112"), "12033112")
@@ -1044,7 +1045,7 @@ class TestFactoriesClasses(TestCase):
         court_scotus = CourtFactory(id="scotus")
 
         # Create 3 opinions by default
-        cluster_1 = OpinionClusterFactoryMultipleOpinions(
+        cluster_1 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=court_scotus,
                 case_name="Foo v. Bar",
@@ -1058,7 +1059,7 @@ class TestFactoriesClasses(TestCase):
         self.assertEqual(cluster_1.sub_opinions.all().count(), 3)
 
         # Create 3 opinions specifying type for each one
-        cluster_2 = OpinionClusterFactoryMultipleOpinions(
+        cluster_2 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=court_scotus,
                 case_name="Lorem v. Ipsum",
@@ -1203,9 +1204,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_for_proximity_tokens(
-                test["input_str"]  # type: ignore
-            )
+            output = check_for_proximity_tokens(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         # Check for Unbalanced parentheses.
@@ -1242,15 +1241,11 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = check_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
 
         # Check for Unbalanced quotes.
@@ -1301,9 +1296,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_quotes(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_quotes(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
 
     def test_can_get_parties_from_bankruptcy_case_name(self) -> None:
