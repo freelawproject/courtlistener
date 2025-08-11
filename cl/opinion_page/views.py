@@ -9,6 +9,7 @@ import eyecite
 import waffle
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Exists, IntegerField, OuterRef, Prefetch, QuerySet
@@ -563,6 +564,7 @@ def make_rd_title(rd: RECAPDocument) -> str:
 
 
 @ratelimiter_all_10_per_h
+@login_required
 def download_docket_entries_csv(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
@@ -577,7 +579,7 @@ def download_docket_entries_csv(
     filename = f"{case_name}.{court_id}.{docket_id}.{date_str}.csv"
 
     # TODO check if for large files we'll cache or send file by email
-    csv_content = generate_docket_entries_csv_data(de_list)
+    csv_content = generate_docket_entries_csv_data(de_list) if de_list else b""
     response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response

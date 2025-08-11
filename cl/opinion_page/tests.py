@@ -51,7 +51,6 @@ from cl.opinion_page.utils import (
     make_docket_title,
 )
 from cl.opinion_page.views import (
-    download_docket_entries_csv,
     fetch_docket_entries,
     get_prev_next_volumes,
     view_recap_document,
@@ -2059,10 +2058,24 @@ class DocketEntryFileDownload(TestCase):
                 "private": True,
             },
         )
-        response = download_docket_entries_csv(
-            self.request, self.mocked_docket.id
+
+        self.client.login(username=self.user.username, password="password")
+
+        response = self.client.get(
+            reverse(
+                "view_download_docket",
+                kwargs={"docket_id": self.mocked_docket.id},
+            )
         )
         self.assertEqual(response["Content-Type"], "text/csv")
+
+    def test_redirect_anonymous_users(self):
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.mocked_docket.id}
+        )
+        redirect_path = f"{reverse('sign-in')}?next={download_path}"
+        response = self.client.get(download_path)
+        self.assertRedirects(response, redirect_path)
 
 
 class CachePageIgnoreParamsTest(TestCase):
