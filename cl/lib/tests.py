@@ -1651,8 +1651,11 @@ Case 1:23-cv-00123 Document 1 Filed 01/01/2023 Page 1 of 5
 
 This is the first line of actual content.
 Here is another line.
+Here is another line.
 
 Page 2 of 5
+Some more content here.
+Some more content here.
 Some more content here.
 """
         self.assertFalse(
@@ -1671,6 +1674,78 @@ Page 1 of 1
 
 Case 2:06-cv-00376-SRW Document 1-2 Filed 04/25/2006 Page 2 of 2
 Page 2 of 2
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_page_of_no_content(self):
+        """Test needs_ocr returns True for pages with no content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page X of Y' lines are present and no good content between pages lines.
+        Should return True (needs OCR).
+        """
+        header_text = """
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 1 of 9
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 2 of 9
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 3 of 9
+
+                                 April 3, 2024
+
+                                             Person Name
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 4 of 9
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_good_content_page_colon(self):
+        """Test needs_ocr returns False for pages with good content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page:Y' lines are present and good content between pages lines is present.
+        Should return False (doesn't need OCR).
+        """
+        header_text = """
+Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Line 3
+Case: 08-9007   Document: 00115928542   Page: 2   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Line 3
+Case: 08-9007   Document: 00115928542   Page: 3   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Line 3
+"""
+        self.assertFalse(
+            needs_ocr(header_text),
+            msg="Should not need OCR with good content",
+        )
+
+    def test_needs_ocr_under_threshold_page_colon(self):
+        """Test needs_ocr returns True for text with for pages with no good
+        content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page: Y' lines are present and good content between pages lines is
+        present. Should return True (needs OCR).
+        """
+        header_text = """
+Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Case: 08-9007   Document: 00115928542   Page: 2   Date Filed: 07/30/2009   Entry ID: 5364336
+Case: 08-9007   Document: 00115928542   Page: 3   Date Filed: 07/30/2009   Entry ID: 5364336
 """
         self.assertTrue(
             needs_ocr(header_text),

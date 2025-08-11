@@ -7,12 +7,11 @@ from django.utils.text import get_valid_filename, slugify
 from django.utils.timezone import now
 
 from cl.custom_filters.templatetags.text_filters import oxford_join
-from cl.lib.recap_utils import (
-    appellate_bankr_d_num_regex,
-    dist_d_num_regex,
-    get_bucket_name,
-)
+from cl.lib.recap_utils import get_bucket_name
 from cl.lib.string_utils import normalize_dashes, trunc
+
+dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
+appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
 
 
 def is_docket_number(value: str) -> bool:

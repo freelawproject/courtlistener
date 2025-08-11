@@ -4,9 +4,6 @@ from django.conf import settings
 
 BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 
-dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
-appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
-
 
 def get_bucket_name(court, pacer_case_id):
     bucketlist = ["gov", "uscourts", court, str(pacer_case_id)]
@@ -83,6 +80,61 @@ def get_document_filename(
     )
 
 
+PAGINATION_OF_RE = re.compile(r"\bPage\s+\d+\s+of\s+\d+\b", re.I)
+PAGINATION_COLON_RE = re.compile(r"\bPage:\s*\d+\b", re.I)
+
+
+def is_page_line(line: str) -> bool:
+    """Detect if a line is a page-number marker.
+
+    :param line: A single textual line extracted from a PDF.
+    :return: True if the line matches "Page X of Y" or "Page: X"; False otherwise.
+    """
+    return bool(
+        PAGINATION_OF_RE.search(line) or PAGINATION_COLON_RE.search(line)
+    )
+
+
+def is_doc_common_header(line: str) -> bool:
+    """Identify common header/footer lines that should be ignored.
+
+    :param line: A line extracted from a PDF.
+    :return: True if the line is empty, begins with common header starters, or
+    matches pagination, filing, date/time, or "Received" patterns. False otherwise.
+    """
+    bad_starters = (
+        "Appellate",
+        "Appeal",
+        "Case",
+        "Desc",
+        "Document",
+        "Entered",
+        "Main Document",
+        "Page",
+        "Received:",
+        "USCA",
+    )
+    doc_filed_re = re.compile(r"\b(Filed|Date Filed)\b")
+    date_re = re.compile(r"\b\d{2}/\d{2}/\d{2}\b")
+    time_re = re.compile(r"\b\d{2}:\d{2}:\d{2}\b")
+    received_re = re.compile(r"\bReceived:\s*\d{2}/\d{2}/\d{2}(?:\d{2})?\b")
+
+    if not line:
+        return True
+    if line.startswith(bad_starters):
+        return True
+    if (
+        PAGINATION_OF_RE.search(line)
+        or PAGINATION_COLON_RE.search(line)
+        or doc_filed_re.search(line)
+        or date_re.search(line)
+        or time_re.search(line)
+        or received_re.search(line)
+    ):
+        return True
+    return False
+
+
 def needs_ocr(content):
     """Determines if OCR is needed for a PACER PDF.
 
@@ -114,51 +166,42 @@ def needs_ocr(content):
     :param content: The content of a PDF.
     :return: boolean indicating if OCR is needed.
     """
-    bad_starters = (
-        "Appellate",
-        "Appeal",
-        "Case",
-        "Desc",
-        "Document",
-        "Entered",
-        "Main Document",
-        "Page",
-        "Received:",
-        "USCA",
-    )
-    pagination_re = re.compile(r"Page\s+\d+\s+of\s+\d+")
-    doc_filed_re = re.compile(r"Filed")
-    district_case_num_re = re.compile(dist_d_num_regex)
-    appellate_case_num_re = re.compile(appellate_bankr_d_num_regex)
-    date_re = re.compile(r"\d{2}/\d{2}/\d{2}")
-    time_re = re.compile(r"\d{2}:\d{2}:\d{2}")
-    received_re = re.compile(r"Received: ?\d{2}/\d{2}/\d{2}(?:\d{2})?")
+    # Minimum number of valid lines between common headers to consider that the page
+    # does not need OCR.
+    line_count_threshold = 3
+    lines = (ln.strip() for ln in content.splitlines())
 
-    for line in content.splitlines():
-        line = line.strip()
-        if not line:
-            # skip empty lines
+    in_page = False
+    other_content_count = 0
+    saw_any_page = False
+    for line in lines:
+        if is_page_line(line):
+            if in_page:
+                if other_content_count < line_count_threshold:
+                    return True
+            in_page = True
+            saw_any_page = True
+            other_content_count = 0
             continue
 
-        if line.startswith(bad_starters):
-            continue
-        if pagination_re.search(line):
-            continue
-        if doc_filed_re.search(line):
-            continue
-        if district_case_num_re.search(line):
-            continue
-        if appellate_case_num_re.search(line):
-            continue
-        if received_re.search(line):
-            continue
-        if date_re.search(line):
-            continue
-        if time_re.search(line):
+        if not in_page:
             continue
 
-        # if we get here, we have found a line that is not a "bad" line, meaning we do NOT need OCR.
-        return False
+        # inside a page, count only non-common header lines
+        if not is_doc_common_header(line):
+            other_content_count += 1
 
-    # We arrive here if no line was found containing good content.
-    return True
+    # end of document, close the trailing page
+    if in_page:
+        if other_content_count < line_count_threshold:
+            return True
+
+    # If no pages were found, fall back to the regular behavior of checking whether
+    # any content remains after removing common headers.
+    if not saw_any_page:
+        for line in lines:
+            if not is_doc_common_header(line.strip()):
+                return False
+        return True
+
+    return False
