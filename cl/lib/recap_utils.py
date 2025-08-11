@@ -4,7 +4,7 @@ from django.conf import settings
 
 BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 
-dist_d_num_regex = r"(?:\d:)?(\d\d)-..-(\d+)"
+dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
 
 
