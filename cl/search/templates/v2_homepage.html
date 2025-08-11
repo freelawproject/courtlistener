@@ -67,7 +67,7 @@
       </div>
 
       {#   DESKTOP SEARCH   #}
-      <c-corpus-search class="max-w-screen-2xl mx-auto max-md:hidden !flex-col" only>
+      <c-corpus-search class="capped-width max-md:hidden !flex-col" only>
         {# Scope selector tabs #}
         <c-corpus-search.scope
           class="text-greyscale-600 hidden md:flex"
@@ -92,7 +92,7 @@
   </div>
 
   {# ACTION BUTTONS #}
-  <div class="relative w-full flex flex-row max-w-[1400px] mx-auto">
+  <div class="relative flex flex-row capped-width">
     {#  Left arrow button  #}
     <button
       type="button"
@@ -116,7 +116,7 @@
       aria-label="Homepage actions"
       tabindex="-1"
       style="scrollbar-color: #B5362D #FFFFFF"
-      class="relative w-full flex flex-row gap-2 max-w-[1400px] mx-auto overflow-auto justify-between md:p-10 px-4 py-11"
+      class="relative w-full flex flex-row gap-2 overflow-auto justify-between md:p-10 px-4 py-11"
     >
       <p class="sr-only">
         Use left and right arrow keys to scroll through the actions.
