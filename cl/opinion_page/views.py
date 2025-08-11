@@ -9,6 +9,7 @@ import eyecite
 import waffle
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Exists, IntegerField, OuterRef, Prefetch, QuerySet
@@ -563,6 +564,7 @@ def make_rd_title(rd: RECAPDocument) -> str:
 
 
 @ratelimiter_all_10_per_h
+@login_required
 def download_docket_entries_csv(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
