@@ -289,7 +289,6 @@ dependencies = [
     { name = "djangorestframework" },
     { name = "djangorestframework-filters" },
     { name = "djangorestframework-xml" },
-    { name = "drf-dynamic-fields" },
     { name = "eyecite" },
     { name = "factory-boy" },
     { name = "feedparser" },
@@ -401,7 +400,6 @@ requires-dist = [
     { name = "djangorestframework", git = "https://github.com/encode/django-rest-framework.git?rev=cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2" },
     { name = "djangorestframework-filters", specifier = "==1.0.0.dev2" },
     { name = "djangorestframework-xml", specifier = ">=2.0.0" },
-    { name = "drf-dynamic-fields", specifier = ">=0.4.0" },
     { name = "eyecite" },
     { name = "factory-boy", specifier = ">=3.3.3" },
     { name = "feedparser", specifier = ">=6.0.10" },
@@ -1092,15 +1090,6 @@ wheels = [
 ]
 
 [[package]]
-name = "drf-dynamic-fields"
-version = "0.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d2/7f/1c17e0791b8d028b47908be78ac8041c544bd07a59afd8556304a0f0d355/drf_dynamic_fields-0.4.0.tar.gz", hash = "sha256:f20a5ec27d003db7595c9315db22217493dcaed575f3811d3e12f264c791c20c", size = 4864, upload-time = "2022-04-05T20:48:34.091Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2d/18/4b02bda9ae5a7ac52bfcb4f1740fb4a0aa12d220881695471b700bb3f00e/drf_dynamic_fields-0.4.0-py2.py3-none-any.whl", hash = "sha256:48b879fe899905bc18593a61bca43e3b595dc3431b3b4ee499a9fd6c9a53f98c", size = 5451, upload-time = "2022-04-05T20:48:32.452Z" },
-]
-
-[[package]]
 name = "elastic-transport"
 version = "8.17.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1596,7 +1585,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.81"
+version = "2.6.84"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1614,9 +1603,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/64/9b/21a0ee262d1344891a0c1eb4aba926202f38cce0ee767330f490a496c63c/juriscraper-2.6.81.tar.gz", hash = "sha256:e800e3d6acde2181d7187c5afd75404b89ff90afebf3ba8e6d99b9efb886212f", size = 317568, upload-time = "2025-07-28T16:06:21.988Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/71/80/153099ca435630dd63fb4325d97a6a716190691618c006212c2fca95dd2a/juriscraper-2.6.84.tar.gz", hash = "sha256:5078ce01447d9a4ccbb0727505a98ed89f22e0abdf5438a5f0e6ce6daf7d729b", size = 311703, upload-time = "2025-08-07T19:42:18.21Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/ad/55772a1b65ef0b7663b0f5ba46a92bb8adaf68db96028f12ab9f7685c9fb/juriscraper-2.6.81-py3-none-any.whl", hash = "sha256:ad88896cf87b9bb6b0d33547e440bcff1c16a728f3299436035821e7cd96edf3", size = 517515, upload-time = "2025-07-28T16:06:20.089Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/71/b152a83dde4f0c2d6bccd2deddb77525d63482b55278f5bcb20c244e4c19/juriscraper-2.6.84-py3-none-any.whl", hash = "sha256:19aa8787d4c6798bfa757a19096cb5bca704e8edff5bdcd9a9f64b5c61b6a91c", size = 516162, upload-time = "2025-08-07T19:42:16.188Z" },
 ]
 
 [[package]]

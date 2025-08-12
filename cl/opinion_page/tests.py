@@ -7,11 +7,12 @@ from datetime import date
 from http import HTTPStatus
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from urllib.parse import urlencode
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import AnonymousUser, Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import connection
@@ -50,9 +51,9 @@ from cl.opinion_page.utils import (
     make_docket_title,
 )
 from cl.opinion_page.views import (
-    download_docket_entries_csv,
     fetch_docket_entries,
     get_prev_next_volumes,
+    view_recap_document,
 )
 from cl.people_db.factories import (
     PersonFactory,
@@ -76,6 +77,7 @@ from cl.search.factories import (
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
+    RECAPAttachmentFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import (
@@ -221,19 +223,188 @@ class OpinionPageLoadTest(
         self.assertEqual(count, len(expected_clusters))
 
 
-class DocumentPageRedirection(TestCase):
+class ViewRecapDocumentTest(TestCase):
     """
-    Test to make sure the document page of appellate entries redirect users
-    to the attachment page if the main document got converted into an attachment
+    Tests for view_recap_document
     """
 
     @classmethod
     def setUpTestData(cls):
-        cls.court = CourtFactory(id="ca1", jurisdiction="F")
-        cls.docket = DocketFactory(
-            court=cls.court, source=Docket.RECAP, pacer_case_id="104490"
+        cls.docket = DocketFactory()
+
+    async def get(self, follow=False, params=None, **kwargs):
+        kwargs["slug"] = ""
+        if "att_num" in kwargs:
+            path = reverse(
+                "view_recap_attachment",
+                kwargs=kwargs,
+            )
+        else:
+            path = reverse(
+                "view_recap_document",
+                kwargs=kwargs,
+            )
+        if params:
+            path += f"?{urlencode(params)}"
+
+        return await self.async_client.get(path, follow=follow)
+
+    async def test_invalid_docket(self) -> None:
+        r = await self.get(docket_id=0, doc_num=0)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_invalid_document(self) -> None:
+        r = await self.get(docket_id=self.docket.id, doc_num=0)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_valid_document(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
         )
-        cls.de_data = DocketEntriesDataFactory(
+        r = await self.get(
+            docket_id=self.docket.id, doc_num=rd.document_number
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(rd, c["rd"])
+        self.assertIsNotNone(c["title"])
+        self.assertIsNone(c["og_file_path"])
+        self.assertIsNotNone(c["note_form"])
+        self.assertTrue(c["private"])
+        self.assertIsNotNone(c["timezone"])
+        self.assertFalse(c["redirect_to_pacer_modal"])
+        self.assertFalse(c["authorities"])
+        self.assertFalse(c["attachments"])
+
+    async def test_invalid_attachment(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        r = await self.get(
+            docket_id=self.docket.id, doc_num=rd.document_number, att_num=1
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_attachment(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        ra = await sync_to_async(RECAPAttachmentFactory)(
+            docket_entry=rd.docket_entry
+        )
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=ra.document_number,
+            att_num=ra.attachment_number,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(ra, c["rd"])
+        self.assertEqual(
+            set([rd.attachment_number, ra.attachment_number]),
+            {x["attachment_number"] for x in c["attachments"]},
+        )
+        self.assertEqual(
+            set([rd.description, ra.description]),
+            {x["description"] for x in c["attachments"]},
+        )
+        self.assertEqual(
+            set([rd.get_absolute_url(), ra.get_absolute_url()]),
+            {x["url"] for x in c["attachments"]},
+        )
+
+    async def test_redirect_to_attachment(self) -> None:
+        # Check redirect if main doc converted to attachment
+        ra_nodoc = await sync_to_async(RECAPAttachmentFactory)(
+            attachment_number=1, docket_entry__docket=self.docket
+        )
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=ra_nodoc.document_number,
+            follow=True,
+        )
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(ra_nodoc, c["rd"])
+
+    async def test_download_redirect(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        rd.is_available = True
+        rd.filepath_local = "/tmp/test.pdf"
+        await sync_to_async(rd.save)()
+        with self.subTest("Check download_redirect download"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_to_download": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.FOUND)
+            self.assertEqual(r["Location"], rd.filepath_local.url)
+
+        with self.subTest("Check redirect_or_modal download"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_or_modal": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.FOUND)
+            self.assertEqual(r["Location"], rd.filepath_local.url)
+
+        rd.is_available = False
+        await sync_to_async(rd.save)()
+        with self.subTest("Check download_redirect to PACER"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_to_download": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.FOUND)
+            self.assertEqual(r["Location"], rd.pacer_url)
+
+        with self.subTest("Check redirect_or_modal flag"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_or_modal": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            c = r.context
+            self.assertEqual(rd, c["rd"])
+            self.assertTrue(c["redirect_to_pacer_modal"])
+
+    async def test_og_override(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        req = AsyncRequestFactory().get(
+            reverse(
+                "view_recap_document",
+                kwargs={"docket_id": 1, "doc_num": 1, "slug": ""},
+            )
+        )
+        req.user = AnonymousUser()
+        req.auser = AsyncMock(return_value=req.user)
+        r = await view_recap_document(
+            req, self.docket.id, rd.document_number, is_og_bot=True
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context_data
+        self.assertEqual(rd, c["rd"])
+        self.assertIsNotNone(c["og_file_path"])
+
+    async def test_appellate_redirect_to_attachment_page(self) -> None:
+        """
+        Test to make sure the document page of appellate entries redirect users
+        to the attachment page if the main document got converted into an attachment
+        """
+        court = await sync_to_async(CourtFactory)(id="ca1", jurisdiction="F")
+        docket = await sync_to_async(DocketFactory)(
+            court=court, source=Docket.RECAP, pacer_case_id="104490"
+        )
+        de_data = await sync_to_async(DocketEntriesDataFactory)(
             docket_entries=[
                 DocketEntryDataFactory(
                     pacer_doc_id="288651",
@@ -241,11 +412,9 @@ class DocumentPageRedirection(TestCase):
                 )
             ],
         )
-        async_to_sync(add_docket_entries)(
-            cls.docket, cls.de_data["docket_entries"]
-        )
+        await add_docket_entries(docket, de_data["docket_entries"])
 
-        cls.att_data = AppellateAttachmentPageFactory(
+        att_data = await sync_to_async(AppellateAttachmentPageFactory)(
             attachments=[
                 AppellateAttachmentFactory(
                     attachment_number=1, pacer_doc_id="288651"
@@ -255,26 +424,18 @@ class DocumentPageRedirection(TestCase):
             pacer_doc_id="288651",
             pacer_case_id="104490",
         )
-        async_to_sync(merge_attachment_page_data)(
-            cls.court,
-            cls.att_data["pacer_case_id"],
-            cls.att_data["pacer_doc_id"],
+        await merge_attachment_page_data(
+            court,
+            att_data["pacer_case_id"],
+            att_data["pacer_doc_id"],
             None,
             "",
-            cls.att_data["attachments"],
+            att_data["attachments"],
         )
 
-    async def test_redirect_to_attachment_page(self) -> None:
-        """Does the page redirect to the attachment page?"""
-        path = reverse(
-            "view_recap_document",
-            kwargs={
-                "docket_id": self.docket.pk,
-                "doc_num": 1,
-                "slug": self.docket.slug,
-            },
+        r = await self.get(
+            docket_id=docket.pk, doc_num=1, slug=docket.slug, follow=True
         )
-        r = await self.async_client.get(path, follow=True)
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
@@ -1897,10 +2058,24 @@ class DocketEntryFileDownload(TestCase):
                 "private": True,
             },
         )
-        response = download_docket_entries_csv(
-            self.request, self.mocked_docket.id
+
+        self.client.login(username=self.user.username, password="password")
+
+        response = self.client.get(
+            reverse(
+                "view_download_docket",
+                kwargs={"docket_id": self.mocked_docket.id},
+            )
         )
         self.assertEqual(response["Content-Type"], "text/csv")
+
+    def test_redirect_anonymous_users(self):
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.mocked_docket.id}
+        )
+        redirect_path = f"{reverse('sign-in')}?next={download_path}"
+        response = self.client.get(download_path)
+        self.assertRedirects(response, redirect_path)
 
 
 class CachePageIgnoreParamsTest(TestCase):

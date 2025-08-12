@@ -474,9 +474,13 @@ class TranscriptionTest(TestCase):
         """Is Audio object updated and AudioTranscriptMetadata created correctly?"""
         audio = self.audio_1
 
-        with mock.patch(
-            "openai.resources.audio.transcriptions.Transcriptions.create"
-        ) as patched_transcription:
+        with (
+            mock.patch(
+                "openai.resources.audio.transcriptions.Transcriptions.create"
+            ) as patched_transcription,
+            mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait,
+        ):
+            patched_wait.return_value = 0
             patched_transcription.return_value = (
                 self.OpenAITranscriptionClass()
             )
@@ -527,9 +531,12 @@ class TranscriptionTest(TestCase):
         """Is Audio.stt_status updated correctly on failure?"""
         audio = self.audio_1
 
-        with mock.patch(
-            "openai.resources.audio.transcriptions.Transcriptions.create"
-        ) as patched_transcription:
+        with (
+            mock.patch(
+                "openai.resources.audio.transcriptions.Transcriptions.create"
+            ) as patched_transcription,
+            mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait,
+        ):
             mock_response = MockResponse(422, content="")
             setattr(mock_response, "request", {})
             setattr(mock_response, "headers", {"x-request-id": "1"})
@@ -540,6 +547,7 @@ class TranscriptionTest(TestCase):
                     body="",
                 )
             )
+            patched_wait.return_value = 0
             transcribe_from_open_ai_api(audio_pk=audio.pk)
 
         audio.refresh_from_db()

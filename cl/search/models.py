@@ -1546,9 +1546,8 @@ class RECAPDocument(
                         "and we are unable to fix it automatically for "
                         f"rd: {self.pk}"
                     )
-                else:
-                    # Only one duplicate. Attempt auto-resolution.
-                    other = others[0]
+                # Only one duplicate. Attempt auto-resolution.
+                other = others[0]
                 if other.pacer_doc_id == self.pacer_doc_id:
                     # Delete "other"; the new one probably has better data.
                     # Lots of code could be written here to merge "other" into
@@ -3827,3 +3826,36 @@ class ClusterRedirection(models.Model):
         help_text="The reason why the old cluster was deleted",
         choices=REDIRECTION_REASON,
     )
+
+    @classmethod
+    def create_from_clusters(
+        cls,
+        cluster_to_keep: OpinionCluster,
+        cluster_to_delete: OpinionCluster,
+        reason: int,
+    ):
+        """Create a ClusterRedirection entry from two OpinionCluster objects
+
+        Accounts for redirections pointing to the cluster to delete
+        Deletion of the `cluster_to_delete` is left to the caller
+
+        :param cluster_to_keep: the redirection will point to this cluster
+        :param cluster_to_delete: this id will go into deleted_cluster_id
+        :param reason: one of ClusterRedirection.REDIRECTION_REASON
+        """
+        if reason not in [i[0] for i in cls.REDIRECTION_REASON]:
+            raise ValueError("Invalid value for `ClusterRedirection.reason`")
+
+        with transaction.atomic():
+            # the cluster to delete has ClusterRedirection entries pointing to
+            # it, make them point to the new cluster to keep
+            if cluster_to_delete.merged_clusters.exists():
+                cluster_to_delete.merged_clusters.update(
+                    cluster=cluster_to_keep
+                )
+
+            ClusterRedirection.objects.get_or_create(
+                deleted_cluster_id=cluster_to_delete.id,
+                cluster=cluster_to_keep,
+                reason=reason,
+            )

@@ -55,6 +55,14 @@ class Site(OpinionSite):
         path = "//judge/text()"
         return list(self.html.xpath(path))
 
+    def _get_lower_court_numbers(self):
+        path = "//lower_court_number"
+        return [i.text for i in self.html.xpath(path)]
+
+    def _get_lower_court_judges(self):
+        path = "//lower_court_judge"
+        return [i.text for i in self.html.xpath(path)]
+
     def extract_from_text(self, scraped_text):
         metadata = {}
         docket_regex = r"Docket Number: (?P<docket>\d+-\d+)"
