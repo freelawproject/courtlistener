@@ -5,6 +5,17 @@ from django.db.models import Q, QuerySet
 from cl.search.models import Citation, OpinionCluster
 
 
+def get_total_estimate_count(table_name: str) -> int:
+    with connection.cursor() as cursor:
+        cursor.execute(f"""
+            SELECT reltuples::bigint AS estimated_total
+            FROM pg_class
+            WHERE oid = 'public.{table_name}'::regclass;
+        """)
+        result = cursor.fetchone()
+        return result[0] if result else None
+
+
 def get_available_documents_estimate_count() -> int:
     with connection.cursor() as cursor:
         cursor.execute("""
