@@ -268,8 +268,8 @@ emails: dict[str, EmailType] = {
         "That said, we’d still love to have you as part of our community. You "
         "can sign up for a regular membership here: https://donate.free.law/forms/membership.\n\n"
         "------------------\n\n"
-        "If you have any questions or believe this decision was made in error, please "
-        "our contact page, https://www.courtlistener.com/contact/",
+        "If you have any questions or believe this decision was made in error, "
+        "please see our contact page, https://www.courtlistener.com/contact/",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
 }
