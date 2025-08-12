@@ -37,7 +37,7 @@ def extract_unextracted_rds(queue: str) -> None:
     processed_count = 0
     for chunk in batched(rd_needs_extraction.iterator(), chunk_size):
         throttle.maybe_wait()
-        processed_count += 1
+        processed_count += len(chunk)
         extract_recap_pdf.si(list(chunk)).set(queue=queue).apply_async()
         sys.stdout.write(
             f"\rProcessed {processed_count}/{count} ({processed_count * 1.0 / count:.0%})"
