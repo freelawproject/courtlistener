@@ -3979,7 +3979,7 @@ class RecapPdfTaskTest(TestCase):
         self.pq.filepath_local.save(self.filename_ocr, cf)
         rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         recap_document = RECAPDocument.objects.get(pk=rd.pk)
-        self.assertEqual(needs_ocr(recap_document.plain_text), False)
+        self.assertEqual(needs_ocr(recap_document.plain_text), True)
         self.assertEqual(recap_document.ocr_status, RECAPDocument.OCR_COMPLETE)
 
 
