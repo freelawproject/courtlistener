@@ -1542,6 +1542,7 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                 )
 
 
+@override_settings(LINE_THRESHOLD_OCR_PER_PAGE=3)
 class TestRecapUtils(SimpleTestCase):
     def test_needs_ocr_cacb_example(self):
         """Test needs_ocr function with multi-line headers from cacb example provided in issue #598
@@ -1700,6 +1701,28 @@ Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc M
                                              Person Name
 Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
                               Document      Page 4 of 9
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_pg_of_no_content(self):
+        """Test needs_ocr returns True for pages with no content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Pg X of Y' lines are present and no good content between pages lines.
+        Should return True (needs OCR).
+        """
+        header_text = """
+22-10964-mg   Doc 78-3   Filed 07/21/22 Entered 07/21/22 09:17:08   Attachment 3
+                                     Pg 1 of 2
+                                     Bad line 1
+                                     Bad line 2
+22-10964-mg   Doc 78-3   Filed 07/21/22 Entered 07/21/22 09:17:08   Attachment 3
+                                     Pg 2 of 2
+                                     Bad line 1
+                                     Bad line 2
 """
         self.assertTrue(
             needs_ocr(header_text),

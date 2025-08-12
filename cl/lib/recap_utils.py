@@ -81,6 +81,7 @@ def get_document_filename(
 
 
 PAGINATION_OF_RE = re.compile(r"\bPage\s+\d+\s+of\s+\d+\b", re.I)
+PAGINATION_PG_OF_RE = re.compile(r"\bPg\s+\d+\s+of\s+\d+\b", re.I)
 PAGINATION_COLON_RE = re.compile(r"\bPage:\s*\d+\b", re.I)
 
 
@@ -91,7 +92,9 @@ def is_page_line(line: str) -> bool:
     :return: True if the line matches "Page X of Y" or "Page: X"; False otherwise.
     """
     return bool(
-        PAGINATION_OF_RE.search(line) or PAGINATION_COLON_RE.search(line)
+        PAGINATION_OF_RE.search(line)
+        or PAGINATION_COLON_RE.search(line)
+        or PAGINATION_PG_OF_RE.search(line)
     )
 
 
@@ -160,24 +163,35 @@ def needs_ocr(content):
         A - RLF Invoices Page 1 of 83
         Final Distribution Report Page 1 of 5
 
-    This function removes these lines so that if no text remains, we can be sure
-    that the PDF needs OCR.
+    This function first checks for valid content lines between pages. If there
+    is no content, or it’s too short, we can say that at least that page
+    requires OCR, so this method returns True.
+
+    For example, with a line_count_threshold of 3, the following document will
+    return True.
+
+    Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
+    Line 1
+    Case: 08-9007   Document: 00115928542   Page: 2   Date Filed: 07/30/2009   Entry ID: 5364336
+    Line 1
+
+
+    As a fallback it removes these common headers so that if no text remains,
+    we can be sure that the PDF needs OCR.
 
     :param content: The content of a PDF.
     :return: boolean indicating if OCR is needed.
     """
     # Minimum number of valid lines between common headers to consider that the page
     # does not need OCR.
-    line_count_threshold = 3
     lines = (ln.strip() for ln in content.splitlines())
-
     in_page = False
     other_content_count = 0
     saw_any_page = False
     for line in lines:
         if is_page_line(line):
             if in_page:
-                if other_content_count < line_count_threshold:
+                if other_content_count < settings.LINE_THRESHOLD_OCR_PER_PAGE:
                     return True
             in_page = True
             saw_any_page = True
@@ -193,13 +207,13 @@ def needs_ocr(content):
 
     # end of document, close the trailing page
     if in_page:
-        if other_content_count < line_count_threshold:
+        if other_content_count < settings.LINE_THRESHOLD_OCR_PER_PAGE:
             return True
 
     # If no pages were found, fall back to the regular behavior of checking whether
     # any content remains after removing common headers.
     if not saw_any_page:
-        for line in lines:
+        for line in content.splitlines():
             if not is_doc_common_header(line.strip()):
                 return False
         return True
