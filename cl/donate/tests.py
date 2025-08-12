@@ -219,6 +219,9 @@ class MembershipWebhookTest(TestCase):
         query = NeonMembership.objects.filter(neon_id="12345")
         self.assertEqual(await query.acount(), 1)
 
+        membership = await query.afirst()
+        self.assertEqual(membership.level, membership.EDU)
+
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
     )
