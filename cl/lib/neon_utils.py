@@ -56,7 +56,7 @@ class NeonClient:
             else json_data["companyAccount"]
         )
 
-        if not account_data["accountCustomFields"]:
+        if not account_data.get("accountCustomFields"):
             return account_data
 
         # The 'accountCustomFields' field contains a list of dictionaries,
