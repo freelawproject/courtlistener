@@ -12,8 +12,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Exists, IntegerField, OuterRef, Prefetch, QuerySet
-from django.db.models.functions import Cast
+from django.db.models import Exists, OuterRef, Prefetch, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponseRedirect,
