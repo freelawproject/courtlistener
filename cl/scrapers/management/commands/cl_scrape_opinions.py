@@ -255,7 +255,6 @@ class Command(ScraperCommand):
         full_crawl: bool = False,
         ocr_available: bool = True,
         backscrape: bool = False,
-        max_wait: int = 30,
     ):
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
@@ -385,7 +384,7 @@ class Command(ScraperCommand):
     def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site(save_response_fn=save_response).parse()
         self.scrape_court(
-            site, options["full_crawl"], max_wait=options["max_wait"]
+            site, options["full_crawl"]
         )
 
     def handle(self, *args, **options):
