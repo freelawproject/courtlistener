@@ -8,6 +8,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser
+from django.core.cache import cache
 from django.core.management import call_command
 from django.db.models import F
 from django.http import HttpRequest
@@ -1430,6 +1431,57 @@ class OpinionsESSearchTest(
             response.content.decode(),
             msg="Wrong number of Jurisdictions shown in Homepage",
         )
+
+    def test_last_opinions_home_page(self) -> None:
+        """Test last opinions in home page"""
+        cache.delete("homepage-data-o-es")
+        with self.captureOnCommitCallbacks(execute=True):
+            o_1 = OpinionClusterWithChildrenAndParentsFactory(
+                date_filed=datetime.date(2020, 8, 15),
+                docket=DocketFactory(
+                    court=self.court_1,
+                    docket_number="123457",
+                    source=Docket.HARVARD,
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                ),
+            )
+            o_2 = OpinionClusterWithChildrenAndParentsFactory(
+                date_filed=datetime.date(2020, 8, 15),
+                docket=DocketFactory(
+                    court=self.court_1,
+                    docket_number="123457",
+                    source=Docket.HARVARD,
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                ),
+            )
+        r = self.client.get(
+            reverse("show_results"),
+        )
+
+        html_content = r.content.decode()
+        self.assertIn("Latest Opinions", html_content)
+        self.assertIn("Strickland v. Washington", html_content)
+        self.assertIn("Strickland v. Lorem", html_content)
+        clusters_count = OpinionCluster.objects.filter(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED
+        ).count()
+        tree = html.fromstring(html_content)
+        # Extract the precedential-opinions count.
+        opinions_count = tree.xpath(
+            '//span[@id="stat-num-precedential-opinions"]/text()'
+        )[0]
+        self.assertEqual(int(opinions_count), clusters_count)
+
+        o_1.delete()
+        o_2.delete()
 
     async def test_fail_gracefully(self) -> None:
         """Do we fail gracefully when an invalid search is created?"""

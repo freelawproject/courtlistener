@@ -1,0 +1,127 @@
+{% load svg_tags %}
+
+<c-vars search_form/>
+
+<fieldset x-bind:id="fieldsetIds.recap" class="contents" x-show="isActiveScope" data-scope="RECAP Archive">
+  <legend class="sr-only">RECAP Archive filters</legend>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.case_name.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.case_name }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.docket_number.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.docket_number }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.nature_of_suit.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.nature_of_suit }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.cause.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.cause }}
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    <label id="recap_entry_date">Docket Date</label>
+    <div class="grid grid-cols-2 gap-2 items-end">
+      {# DOCKET DATE pickers #}
+      <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+        <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
+          {% svg "calendar" class="w-5 h-5" %}
+          {{ search_form.filed_after }}
+        </div>
+      </div>
+      <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+        <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
+          {% svg "calendar" class="w-5 h-5" %}
+          {{ search_form.filed_after }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    <label id="recap_entry_date">Entry Date</label>
+    <div class="grid grid-cols-2 gap-2 items-end">
+      {# ENTRY DATE pickers #}
+      <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+        <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
+          {% svg "calendar" class="w-5 h-5" %}
+          {{ search_form.entry_date_filed_after }}
+        </div>
+      </div>
+      <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+        <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
+          {% svg "calendar" class="w-5 h-5" %}
+          {{ search_form.entry_date_filed_before }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.assigned_to.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.assigned_to }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.referred_to.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.referred_to }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.description.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.description }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.document_number.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.document_number }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.attachment_number.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.attachment_number }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.party_name.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.party_name }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.atty_name.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.atty_name }}
+    </div>
+  </div>
+
+  <div class="flex h-full items-center gap-2 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    <input type="checkbox">
+    <span class="text-sm font-medium text-greyscale-600">Only show results with PDFs</span>
+  </div>
+</fieldset>

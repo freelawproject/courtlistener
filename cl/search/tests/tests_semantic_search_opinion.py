@@ -19,7 +19,7 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, Docket
+from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
@@ -244,11 +244,22 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
                     precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 )
             )
+            # Opinion without embeddings; should match keyword-only queries.
             cls.opinion_5 = OpinionFactory(
+                plain_text="...which the then owner maintained in an uninhabitable conditions",
                 cluster=OpinionClusterFactory(
                     docket=DocketFactory(),
                     precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-                )
+                ),
+            )
+            # Cluster with no opinions; should not match any queries.
+            cls.cluster = OpinionClusterFactory(
+                docket=DocketFactory(
+                    source=Docket.SCRAPER,
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                case_name="Uninhabitable Conditions Corp v. Washington.",
+                case_name_full="Uninhabitable Conditions Corp v. Washington.",
             )
 
         # Fetch Elasticsearch document representations
@@ -328,6 +339,19 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         # Check that the expected clusters appear in the results
         self.assertIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
         self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
+
+        # Check that the snippet does not default to the start of the plain
+        # text, but instead uses the semantically relevant chunk
+        for cluster in r.data["results"]:
+            with self.subTest(
+                cluster_id=cluster["cluster_id"], msg="Snippet content test."
+            ):
+                for opinion in cluster["opinions"]:
+                    record = Opinion.objects.get(id=opinion["id"])
+                    self.assertNotEqual(
+                        opinion["snippet"],
+                        record.plain_text[: settings.NO_MATCH_HL_SIZE],
+                    )
 
         # Ensure that other clusters are not erroneously included
         self.assertNotIn(f'"cluster_id":{self.opinion_4.cluster.id}', content)
@@ -409,26 +433,38 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             " ordered by ascending citeCount.",
         )
 
+    def test_is_semantic_score_standarized(self, inception_mock) -> None:
+        """Ensure that semantic scores are consistently returned as floats"""
+        inception_mock.return_value = self._get_mock_for_inception(
+            self.situational_query_vectors
+        )
+
+        search_params = {"q": self.hybrid_query, "semantic": True}
+        r = self._test_api_results_count(
+            search_params, 3, "hybrid semantic search query"
+        )
+
+        # Validate semantic scores:
+        # - Should be 0.0 for keyword-only matches
+        # - Should be > 0.0 for clusters matched semantically
+        for cluster in r.data["results"]:
+            with self.subTest(
+                cluster_id=cluster["cluster_id"], msg="Semantic score test."
+            ):
+                semantic_score = cluster["meta"]["score"]["semantic"]
+                if cluster["cluster_id"] in [
+                    self.opinion_2.cluster_id,
+                    self.opinion_3.cluster_id,
+                ]:
+                    self.assertNotEqual(semantic_score, 0.0)
+                else:
+                    self.assertEqual(semantic_score, 0.0)
+
     def test_can_do_hybrid_search_query(self, inception_mock) -> None:
         """Can we combine semantic and keyword matches in hybrid search?"""
         inception_mock.return_value = self._get_mock_for_inception(
             self.situational_query_vectors
         )
-
-        # Create a new opinion that should match by keyword only (no embeddings)
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            opinion_5 = OpinionFactory(
-                cluster=OpinionClusterFactory(
-                    docket=DocketFactory(
-                        court=self.ohio_court,
-                        docket_number="30274",
-                        source=Docket.SCRAPER,
-                    ),
-                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-                    case_name="Uninhabitable Conditions Corp v. Washington.",
-                    case_name_full="Uninhabitable Conditions Corp v. Washington.",
-                )
-            )
 
         # Hybrid query should return semantic and keyword matches (3 total)
         search_params = {"q": self.hybrid_query, "semantic": True}
@@ -442,4 +478,27 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
 
         # Should also include the keyword-only match (no embeddings)
-        self.assertIn(f'"cluster_id":{opinion_5.cluster.id}', content)
+        self.assertIn(f'"cluster_id":{self.opinion_5.cluster.id}', content)
+
+        # Verify the cluster with no opinion is not included.
+        self.assertNotIn(f'"cluster_id":{self.cluster.id}', content)
+
+        # Verify snippet behavior:
+        # - For keyword-only matches, snippet should default to plain text
+        # - For semantic matches, snippet should come from the relevant chunk
+        for cluster in r.data["results"]:
+            with self.subTest(
+                cluster_id=cluster["cluster_id"], msg="Snippet content test."
+            ):
+                for opinion in cluster["opinions"]:
+                    record = Opinion.objects.get(id=opinion["id"])
+                    if record.id == self.opinion_5.id:
+                        self.assertEqual(
+                            opinion["snippet"],
+                            record.plain_text[: settings.NO_MATCH_HL_SIZE],
+                        )
+                    else:
+                        self.assertNotEqual(
+                            opinion["snippet"],
+                            record.plain_text[: settings.NO_MATCH_HL_SIZE],
+                        )

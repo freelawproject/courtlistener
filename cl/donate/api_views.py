@@ -3,6 +3,7 @@ from http import HTTPStatus
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F
 from django.http import HttpResponse
@@ -13,7 +14,11 @@ from rest_framework.response import Response
 from cl.donate.api_permissions import AllowNeonWebhook
 from cl.donate.models import NeonMembership, NeonWebhookEvent
 from cl.lib.neon_utils import NeonClient
-from cl.users.utils import create_stub_account
+from cl.lib.types import EmailType
+from cl.users.utils import (
+    create_stub_account,
+    emails,
+)
 
 
 class NeonMembershipWebhookSerializer(serializers.Serializer):
@@ -96,11 +101,18 @@ class MembershipWebhookViewSet(
 
         1. first tries to directly query the database for a user whose
         `neon_account_id` field matches the provided `account_id`.
-        2. If no matching user is found in the database, it fetches the
-        account email address from the Neon API using the `account_id`.
-        It then tries to find a user whose email address matches the
-        retrieved Neon account email. If this attempt fails, this helper
-        will create a stub profile using the available data.
+
+        2. If no matching user is found in the database:
+            - Fetch the account from the Neon API.
+            - If the account contains a `cl_user_id` in its custom fields,
+              attempt to match by that user ID.
+            - Otherwise, attempt to match by the account's primary email
+              address, prioritizing the most recently active account.
+           If no user is found by either method, create a stub user profile
+           using the data returned by Neon..
+
+        In all cases, if a user is found or created, their profile is updated
+        with the Neon account ID.
 
         Args:
             account_id (str): Unique identifier assigned by Neon to an account
@@ -114,11 +126,18 @@ class MembershipWebhookViewSet(
             )
         except User.DoesNotExist:
             client = NeonClient()
-            neon_account = client.get_acount_by_id(account_id)
-            contact_data = neon_account["primaryContact"]
-            users = User.objects.filter(
-                email__iexact=contact_data["email1"]
-            ).order_by(F("last_login").desc(nulls_last=True))
+            neon_account = client.get_account_by_id(account_id)
+            if (
+                "accountCustomFields" in neon_account
+                and "cl_user_id" in neon_account["accountCustomFields"]
+            ):
+                user_id = neon_account["accountCustomFields"]["cl_user_id"]
+                users = User.objects.filter(id=user_id)
+            else:
+                contact_data = neon_account["primaryContact"]
+                users = User.objects.filter(
+                    email__iexact=contact_data["email1"]
+                ).order_by(F("last_login").desc(nulls_last=True))
             if not users.exists():
                 address = self._get_address_from_neon_response(
                     contact_data["addresses"]
@@ -231,6 +250,24 @@ class MembershipWebhookViewSet(
         if membership_data["status"] not in ["succeeded", "succeed"]:
             return None
         user = self._get_member_record(membership_data["accountId"])
+        membership_level = NeonMembership.TYPES_INVERTED[
+            membership_data["membershipName"]
+        ]
+
+        if membership_level == NeonMembership.EDU:
+            is_valid_edu_account = (
+                user.profile.email_confirmed and user.email.endswith(".edu")
+            )
+            if not is_valid_edu_account:
+                email: EmailType = emails["not_valid_edu_account"]
+                send_mail(
+                    email["subject"],
+                    email["body"] % (user.username),
+                    email["from_email"],
+                    [user.email],
+                )
+                return None
+
         try:
             neon_membership = user.membership
         except ObjectDoesNotExist:
@@ -260,9 +297,7 @@ class MembershipWebhookViewSet(
                 #
                 # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
                 return None
-            neon_membership.level = NeonMembership.TYPES_INVERTED[
-                membership_data["membershipName"]
-            ]
+            neon_membership.level = membership_level
             neon_membership.termination_date = membership_data["termEndDate"]
             neon_membership.save()
 

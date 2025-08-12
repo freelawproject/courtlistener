@@ -3,6 +3,7 @@
 
 {% block head %}
   {% require_script "js/alpine/components/homepage.js" %}
+  {% require_script "js/alpine/components/corpus_search.js" %}
   {% require_script "js/alpine/composables/focus.js" %}
   {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 {% endblock %}
@@ -21,12 +22,72 @@
 {% block content_wrapper %}
 <div x-data="homepage">
   <div class="w-full flex flex-col bg-greyscale-100">
+    {#  HERO  #}
     <div class="flex flex-col justify-center items-center gap-6 p-5">
       {# CourtListener logo #}
       <div class="md:w-[310px] md:h-35 h-20 w-44">
         {% svg "logos/courtlistener" class="bg-greyscale-800" %}
       </div>
-      <h1 class="w-full text-center lg:text-display-sm-cooper text-xl">Search millions of opinions across hundreds of jurisdictions</h1>
+      {# Tagline #}
+      <h1 class="w-full text-center lg:text-display-sm-cooper text-xl" x-text="tagline"></h1>
+    </div>
+
+    {#  SEARCH TABS  #}
+    <div class="p-10 max-md:px-4">
+      {#   MOBILE SEARCH   #}
+      <div class="md:hidden bg-white rounded-2xl flex flex-col">
+        <c-corpus-search class="p-4 w-full !flex-col" only>
+          <c-corpus-search.mobile.top-controls :request="request" only />
+          <c-corpus-search.mobile.dialog class="w-full mt-2" :request="request" :search_form="search_form" only>
+            <c-slot name="trigger_button">
+              <button
+                x-on:click="open"
+                x-bind:aria-controls="dialogId"
+                x-bind:aria-expanded="isOpen"
+                x-init="openAdvancedFilters"
+                aria-haspopup="dialog"
+                type="button"
+                class="w-full btn-outline bg-white h-12 justify-center text-md text-greyscale-600 gap-2"
+              >
+                {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
+                Filters
+              </button>
+            </c-slot>
+          </c-corpus-search.mobile.dialog>
+          <div class="md:hidden w-full py-4">
+            <c-corpus-search.button class="w-full justify-center h-12 text-md gap-2">
+              {% svg "magnifier" class="text-white" aria_hidden="true" %} Search
+            </c-corpus-search.button>
+          </div>
+          <a href="{% url "coverage" %}" class="w-full flex items-center justify-center text-sm text-greyscale-600 gap-1 hover:text-greyscale-500">
+            {% svg "circle_question_mark" class="text-greyscale-400 hover:text-greyscale-300 h-4 w-4" %}
+            About This Data
+          </a>
+        </c-corpus-search>
+      </div>
+
+      {#   DESKTOP SEARCH   #}
+      <c-corpus-search class="max-w-screen-2xl mx-auto max-md:hidden !flex-col" only>
+        {# Scope selector tabs #}
+        <c-corpus-search.scope
+          class="text-greyscale-600 hidden md:flex"
+          variant="tabs"
+          only
+        />
+
+        {# Search panel with advanced filters #}
+        <section class="bg-white flex flex-col rounded-b-2xl rounded-tr-2xl">
+          <div class="p-4 flex flex-row flex-nowrap">
+            <c-corpus-search.input class="rounded-l-xl" :request="request" only/>
+            <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
+              {% svg "magnifier" class="text-white" aria_hidden="true" %}
+            </c-corpus-search.button>
+          </div>
+          <div class="px-4">
+            <c-corpus-search.filters/>
+          </div>
+        </section>
+      </c-corpus-search>
     </div>
   </div>
 

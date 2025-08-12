@@ -1,7 +1,6 @@
-from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
-from cl.api.utils import HyperlinkedModelSerializerWithId
+from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 from cl.search.models import OpinionCluster
 from cl.visualizations.models import JSONVersion, SCOTUSMap
 
