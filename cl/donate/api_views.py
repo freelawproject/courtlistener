@@ -101,11 +101,18 @@ class MembershipWebhookViewSet(
 
         1. first tries to directly query the database for a user whose
         `neon_account_id` field matches the provided `account_id`.
-        2. If no matching user is found in the database, it fetches the
-        account email address from the Neon API using the `account_id`.
-        It then tries to find a user whose email address matches the
-        retrieved Neon account email. If this attempt fails, this helper
-        will create a stub profile using the available data.
+
+        2. If no matching user is found in the database:
+            - Fetch the account from the Neon API.
+            - If the account contains a `cl_user_id` in its custom fields,
+              attempt to match by that user ID.
+            - Otherwise, attempt to match by the account's primary email
+              address, prioritizing the most recently active account.
+           If no user is found by either method, create a stub user profile
+           using the data returned by Neon..
+
+        In all cases, if a user is found or created, their profile is updated
+        with the Neon account ID.
 
         Args:
             account_id (str): Unique identifier assigned by Neon to an account
@@ -119,11 +126,18 @@ class MembershipWebhookViewSet(
             )
         except User.DoesNotExist:
             client = NeonClient()
-            neon_account = client.get_acount_by_id(account_id)
-            contact_data = neon_account["primaryContact"]
-            users = User.objects.filter(
-                email__iexact=contact_data["email1"]
-            ).order_by(F("last_login").desc(nulls_last=True))
+            neon_account = client.get_account_by_id(account_id)
+            if (
+                "accountCustomFields" in neon_account
+                and "cl_user_id" in neon_account["accountCustomFields"]
+            ):
+                user_id = neon_account["accountCustomFields"]["cl_user_id"]
+                users = User.objects.filter(id=user_id)
+            else:
+                contact_data = neon_account["primaryContact"]
+                users = User.objects.filter(
+                    email__iexact=contact_data["email1"]
+                ).order_by(F("last_login").desc(nulls_last=True))
             if not users.exists():
                 address = self._get_address_from_neon_response(
                     contact_data["addresses"]
