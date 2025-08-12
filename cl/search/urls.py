@@ -10,12 +10,12 @@ from cl.search.views import (
     advanced,
     es_search,
     export_search_results,
-    show_results,
+    home_router,
 )
 
 urlpatterns = [
     # Search pages
-    path("", show_results, name="show_results"),
+    path("", home_router, name="show_results"),
     path(
         "search/export/", export_search_results, name="export_search_results"
     ),

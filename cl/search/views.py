@@ -2,6 +2,7 @@ from datetime import date
 from urllib.parse import quote
 
 from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
@@ -11,6 +12,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
+from waffle import flag_is_active
 from waffle.decorators import waffle_flag
 
 from cl.alerts.constants import RECAP_ALERT_QUOTAS
@@ -31,8 +33,32 @@ from cl.search.documents import OpinionClusterDocument
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
-from cl.search.utils import get_homepage_stats
+from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
 from cl.stats.utils import tally_stat
+
+
+@never_cache
+def new_homepage(request: HttpRequest) -> HttpResponse:
+    render_dict = {**get_v2_homepage_stats()}
+    return TemplateResponse(request, "homepage.html", render_dict)
+
+
+@never_cache
+def home_router(request: HttpRequest) -> HttpResponse:
+    """
+    This is a router view to determine which view to use for a given request depending
+    on the waffle flag `use_new_design`.
+
+    - When the flag is inactive, we use the legacy `show_results` view as-is.
+    - When the flag is active, we determine the view based on request params/method.
+    """
+    if settings.TESTING or not flag_is_active(request, "use_new_design"):
+        return show_results(request)
+
+    if request.method == "GET" and len(request.GET) == 0:
+        return new_homepage(request)
+
+    return show_results(request)
 
 
 @never_cache
