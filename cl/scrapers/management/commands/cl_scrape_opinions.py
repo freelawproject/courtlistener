@@ -383,9 +383,7 @@ class Command(ScraperCommand):
 
     def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site(save_response_fn=save_response).parse()
-        self.scrape_court(
-            site, options["full_crawl"]
-        )
+        self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
