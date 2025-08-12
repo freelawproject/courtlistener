@@ -402,8 +402,18 @@ def fetch_and_paginate_results(
     if cache_key is not None:
         cache_data = cache.get(cache_key)
         if cache_data is not None:
-            # Create Django paginator for insights as ES metadata is not stored
-            paginator = Paginator(cache_data, rows_per_page)
+            if type(cache_data) is Response:
+                # Deprecated. TODO: Remove after homepage-data-o-es cache expires
+                paginator = Paginator(cache_data, rows_per_page)
+            else:
+                cached_data = pickle.loads(cache_data)
+                # Create ESPaginator that contains the total results count.
+                paginator = ESPaginator(
+                    cached_data["main_total"],
+                    cached_data["hits"],
+                    rows_per_page,
+                )
+
             results = get_results_from_paginator(paginator, page)
             enrich_search_results(results, search_type, get_params)
             return results, 0, False, None, None
@@ -450,16 +460,17 @@ def fetch_and_paginate_results(
     # Enrich results
     enrich_search_results(results, search_type, get_params)
 
+    results_dict = {
+        "hits": hits,
+        "main_total": main_total,
+        "child_total": child_total,
+    }
     if cache_key is not None:
         # Cache only ES hits for displaying insights on the Home Page.
-        cache.set(cache_key, hits, settings.QUERY_RESULTS_CACHE)
+        serialized_data = pickle.dumps(results_dict)
+        cache.set(cache_key, serialized_data, settings.QUERY_RESULTS_CACHE)
     elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
         # Cache ES hits and counts for all other search requests.
-        results_dict = {
-            "hits": hits,
-            "main_total": main_total,
-            "child_total": child_total,
-        }
         serialized_data = pickle.dumps(results_dict)
         cache.set(
             micro_cache_key,
