@@ -487,7 +487,7 @@ class BaseCourtUploadForm(forms.Form):
         sha1_hash = sha1(force_bytes(self.cleaned_data.get("pdf_upload")))
         court = Court.objects.get(pk=self.cleaned_data.get("court_str"))
 
-        docket, opinion, cluster, citations = make_objects(
+        docket, opinion, cluster, citations, _ = make_objects(
             self.cleaned_data.get("item"),
             court,
             sha1_hash,

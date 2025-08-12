@@ -40,6 +40,9 @@
   {% if search_alerts %}
     <div class="col-xs-12">
       <h2>Search Alerts for Case Law, RECAP and Oral Arguments</h2>
+      {% if user.profile.unlimited_docket_alerts %}
+        <h3 class="gray caps">🎉 Your account has unlimited search alerts</h3>
+      {% endif %}
     </div>
     <div class="col-xs-12">
       <div class="table-responsive responsive-table-wrapper">

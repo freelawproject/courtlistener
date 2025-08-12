@@ -107,6 +107,9 @@ class RECAPAlertsSweepIndexTest(
                 level=NeonMembership.LEGACY, user=cls.user_profile_2.user
             )
             cls.user_profile_no_member = UserProfileWithParentsFactory()
+            cls.user_profile_unlimited_alerts = UserProfileWithParentsFactory(
+                unlimited_docket_alerts=True
+            )
             cls.webhook_enabled = WebhookFactory(
                 user=cls.user_profile.user,
                 event_type=WebhookEventType.SEARCH_ALERT,
@@ -125,13 +128,21 @@ class RECAPAlertsSweepIndexTest(
         """Test filter RECAP alerts that met the conditions to be sent:
         - RECAP type alert.
         - RT or DLY rate
-        - For RT rate the user must have an active membership.
+        - RT alerts require the user to have an active membership or the
+        unlimited search alerts flag.
         """
 
         rt_recap_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test RT RECAP Alert",
+            query="docket_number=1:21-bk-1234&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        rt_recap_alert_unlimited_flag = AlertFactory(
+            user=self.user_profile_unlimited_alerts.user,
+            rate=Alert.REAL_TIME,
+            name="Unlimited Search - Test RT RECAP Alert",
             query="docket_number=1:21-bk-1234&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
@@ -162,9 +173,9 @@ class RECAPAlertsSweepIndexTest(
             call_command("cl_send_recap_alerts", testing_mode=True)
             alerts_runtime_naive = datetime.datetime.now()
 
-        # Only the RECAP RT alert for a member and the RECAP DLY alert are sent.
+        # Validate that 3 emails were sent: one for each valid alert above.
         self.assertEqual(
-            len(mail.outbox), 2, msg="Outgoing emails don't match."
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
         )
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(rt_recap_alert.name, html_content)
@@ -187,6 +198,9 @@ class RECAPAlertsSweepIndexTest(
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
+        self.assertIn(rt_recap_alert_unlimited_flag.name, html_content)
+
+        html_content = self.get_html_content_from_email(mail.outbox[-1])
         # Confirm that query overridden in the 'View Full Results' URL to
         # include a filter by timestamp.
         self._assert_timestamp_filter(
