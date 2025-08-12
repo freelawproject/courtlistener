@@ -1,6 +1,6 @@
 import sys
+from itertools import batched
 
-from celery.canvas import chain
 from django.db import IntegrityError
 from django.db.models import Q
 from lxml.etree import XMLSyntaxError
@@ -19,36 +19,30 @@ def extract_unextracted_rds(queue: str) -> None:
     :return: None
     """
 
-    rd_needs_extraction = [
-        x.pk
-        for x in RECAPDocument.objects.filter(
-            (Q(ocr_status=None) | Q(ocr_status=RECAPDocument.OCR_NEEDED))
-            & Q(is_available=True)
-            & ~Q(filepath_local="")
-        ).only("pk")
-    ]
-    count = len(rd_needs_extraction)
-
+    rd_needs_extraction = (
+        RECAPDocument.objects.filter(
+            Q(ocr_status__isnull=True)
+            | Q(ocr_status=RECAPDocument.OCR_NEEDED),
+            is_available=True,
+        )
+        .exclude(filepath_local="")
+        .values_list("pk", flat=True)
+        .order_by()
+    )
+    count = rd_needs_extraction.count()
     # The count to send in a single Celery task
     chunk_size = 100
     # Set low throttle. Higher values risk crashing Redis.
     throttle = CeleryThrottle(queue_name=queue)
     processed_count = 0
-    chunk = []
-    for item in rd_needs_extraction:
+    for chunk in batched(rd_needs_extraction.iterator(), chunk_size):
+        throttle.maybe_wait()
         processed_count += 1
-        last_item = count == processed_count
-        chunk.append(item)
-        if processed_count % chunk_size == 0 or last_item:
-            throttle.maybe_wait()
-            chain(
-                extract_recap_pdf.si(chunk).set(queue=queue),
-            ).apply_async()
-            chunk = []
-            sys.stdout.write(
-                f"\rProcessed {processed_count}/{count} ({processed_count * 1.0 / count:.0%})"
-            )
-            sys.stdout.flush()
+        extract_recap_pdf.si(list(chunk)).set(queue=queue).apply_async()
+        sys.stdout.write(
+            f"\rProcessed {processed_count}/{count} ({processed_count * 1.0 / count:.0%})"
+        )
+        sys.stdout.flush()
     sys.stdout.write("\n")
 
 
