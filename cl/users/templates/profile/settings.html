@@ -1,8 +1,14 @@
 {% extends "profile/nav.html" %}
+{% load static %}
+{% load svg_tags %}
 
 {% block title %}Account Settings – CourtListener.com{% endblock %}
 
 {% block nav-account %}active{% endblock %}
+
+{% block footer-scripts %}
+  <script src="{% static "js/copy-id-to-clipboard.js" %}"></script>
+{% endblock %}
 
 {% block content %}
   {# Navigation Tabs #}
@@ -19,6 +25,21 @@
     <div class="col-sm-3"></div>
     <div class="col-xs-12 col-sm-6">
         <form action="" method="post">{% csrf_token %}
+            <div class="form-group">
+              <label for="user_id">CourtListener ID</label>
+              <div class="copy-input-wrapper">
+                <input id="user_id" name="user_id" type="text" class="form-control bg-secondary text-light border-0" readonly
+                  value="{{ user_id }}">
+                <button type="button" id="copyBtn" class="copy-btn text-light">
+                  <div id="defaultIcon" class="flex align-items-center">
+                    {% svg "clipboard" aria_hidden="true" %}&nbsp;<span>Copy</span>
+                  </div>
+                  <div id="successIcon" class="hidden align-items-center">
+                    {% svg "check" aria_hidden="true" %}&nbsp;<span>Copied</span>
+                  </div>
+                </button>
+              </div>
+            </div>
             <div class="row">
                 <div class="col-sm-6">
                     <div class="form-group">
