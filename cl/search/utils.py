@@ -15,49 +15,47 @@ from cl.visualizations.models import SCOTUSMap
 
 
 @cache_memoize(5 * 60)
-def get_base_homepage_stats():
-    r = get_redis_interface("STATS")
+def get_v2_homepage_stats():
+    """
+    Get all stats displayed in the new homepage and return them as a dict.
+    """
     ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
     last_ten_days = [
         f"api:v3.d:{(date.today() - timedelta(days=x)).isoformat()}.count"
         for x in range(0, 10)
     ]
-    homepage_data = {
-        "alerts_in_last_ten": Stat.objects.filter(
-            name__contains="alerts.sent", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"],
-        "queries_in_last_ten": Stat.objects.filter(
-            name="search.results", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"],
-        "api_in_last_ten": sum(
-            [
-                int(result)
-                for result in r.mget(*last_ten_days)
-                if result is not None
-            ]
-        ),
-        "minutes_of_oa": Audio.objects.aggregate(Sum("duration"))[
-            "duration__sum"
+
+    alerts_in_last_ten = Stat.objects.filter(
+        name__contains="alerts.sent", date_logged__gte=ten_days_ago
+    ).aggregate(Sum("count"))["count__sum"]
+
+    queries_in_last_ten = Stat.objects.filter(
+        name="search.results", date_logged__gte=ten_days_ago
+    ).aggregate(Sum("count"))["count__sum"]
+
+    r = get_redis_interface("STATS")
+    api_in_last_ten = sum(
+        [
+            int(result)
+            for result in r.mget(*last_ten_days)
+            if result is not None
         ]
-        // 60,
+    )
+
+    minutes_of_oa = (
+        Audio.objects.aggregate(Sum("duration"))["duration__sum"] // 60
+    )
+
+    homepage_stats = {
+        "alerts_in_last_ten": alerts_in_last_ten,
+        "queries_in_last_ten": queries_in_last_ten,
+        "api_in_last_ten": api_in_last_ten,
+        "minutes_of_oa": minutes_of_oa,
+        "opinion_count": get_total_estimate_count("search_opinion"),
+        "docket_count": get_total_estimate_count("search_docket"),
+        "recap_doc_count": get_total_estimate_count("search_recapdocument"),
         "private": False,  # VERY IMPORTANT!
     }
-    return homepage_data
-
-
-@cache_memoize(5 * 60)
-def get_v2_homepage_stats():
-    """Get any stats that are displayed on the homepage and return them as a
-    dict
-    """
-    homepage_stats = get_base_homepage_stats()
-    homepage_stats["opinion_count"] = get_total_estimate_count(
-        "search_opinion"
-    )
-    homepage_stats["docket_count"] = get_total_estimate_count("search_docket")
-    homepage_stats["recap_doc_count"] = get_total_estimate_count(
-        "search_recapdocument"
-    )
     return homepage_stats
 
 
