@@ -65,7 +65,11 @@ from cl.citations.utils import (
     make_get_citations_kwargs,
 )
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
-from cl.search.documents import ParentheticalGroupDocument
+from cl.search.documents import (
+    ES_CHILD_ID,
+    OpinionClusterDocument,
+    ParentheticalGroupDocument,
+)
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -89,6 +93,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
+from cl.search.tasks import index_parent_and_child_docs
 from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
@@ -3406,3 +3411,64 @@ class CountCitationsTest(TestCase):
             "Count should be 2, 1 per each subopinion",
         )
         self.assertEqual(self.cluster3.citation_count, 3, "Count should be 3")
+
+
+class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.rebuild_index("search.OpinionCluster")
+
+    def test_cite_count_reindex(self):
+        """Can we update OpinionClusterDocument.citeCount?"""
+        cite_count = 10
+        cluster = OpinionClusterWithChildrenAndParentsFactory.create(
+            citation_count=cite_count
+        )
+        index_parent_and_child_docs([cluster.id], SEARCH_TYPES.OPINION)
+        doc = OpinionClusterDocument.get(id=cluster.id)
+        self.assertEqual(doc.citeCount, cite_count)
+
+        # make a change that won't be catched by signals
+        OpinionCluster.objects.filter(id=cluster.id).update(
+            citation_count=cite_count + 1
+        )
+
+        call_command(
+            "reindex_es_cite_fields",
+            reindex_target="citeCount",
+            start_id=cluster.id - 10,
+            end_id=cluster.id + 10,
+        )
+
+        doc = OpinionClusterDocument.get(id=cluster.id)
+        self.assertEqual(doc.citeCount, cite_count + 1)
+
+    def test_cites_reindex(self):
+        """Can we update the OpinionDocument.cites field?"""
+        cluster = OpinionClusterWithChildrenAndParentsFactory.create()
+        opinion = cluster.sub_opinions.first()
+        index_parent_and_child_docs([cluster.id], SEARCH_TYPES.OPINION)
+
+        another_cluster = OpinionClusterWithChildrenAndParentsFactory.create()
+        another_opinion = another_cluster.sub_opinions.first()
+
+        # prevent triggering the signal using a straightforward .create
+        created = OpinionsCited.objects.create(
+            citing_opinion=another_opinion, cited_opinion=another_opinion
+        )
+        OpinionsCited.objects.filter(id=created.id).update(
+            citing_opinion=opinion
+        )
+
+        doc = OpinionClusterDocument.get(id=ES_CHILD_ID(opinion.id).OPINION)
+        self.assertFalse(another_opinion.id in doc["cites"])
+
+        call_command(
+            "reindex_es_cite_fields",
+            reindex_target="cites",
+            start_id=opinion.id - 10,
+            end_id=opinion.id + 10,
+        )
+        doc = OpinionClusterDocument.get(id=ES_CHILD_ID(opinion.id).OPINION)
+        self.assertTrue(another_opinion.id in doc["cites"])

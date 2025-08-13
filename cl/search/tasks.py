@@ -1422,6 +1422,71 @@ def percolate_document(
     ).apply_async()
 
 
+def build_cite_count_update(cluster_ids_to_update: list[int]) -> list[dict]:
+    """Create update documents for OpinionClusterDocument.citeCount
+
+    :param cluster_ids_to_update: the cluster ids to update
+    :return: the dicts / documents defining the updates
+    """
+
+    # Query all clusters to update and retrieve only their sub_opinions
+    # with the necessary fields.
+    prefetch = Prefetch("sub_opinions", queryset=Opinion.objects.only("pk"))
+    clusters_with_sub_opinions = (
+        OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
+        .only("pk", "citation_count")
+        .prefetch_related(prefetch)
+    )
+
+    documents_to_update = []
+    base_doc = {
+        "_op_type": "update",
+        "_index": OpinionClusterDocument._index._name,
+    }
+    for cluster in clusters_with_sub_opinions:
+        if not OpinionClusterDocument.exists(id=cluster.pk):
+            # If the OpinionClusterDocument does not exist, it might
+            # not be indexed yet. Raise a NotFoundError to retry the
+            # task; hopefully, it will be indexed soon.
+            raise NotFoundError(
+                f"The OpinionCluster {cluster.pk} is not indexed.",
+                "",
+                {"id": cluster.pk},
+            )
+
+        # Build the OpinionCluster dicts for updating the citeCount.
+        doc_to_update = {
+            "_id": cluster.pk,
+            "doc": {"citeCount": cluster.citation_count},
+        }
+        doc_to_update.update(base_doc)
+        documents_to_update.append(doc_to_update)
+
+        for opinion in cluster.sub_opinions.all():
+            if not OpinionClusterDocument.exists(
+                id=ES_CHILD_ID(opinion.pk).OPINION, routing=cluster.pk
+            ):
+                # If the OpinionDocument does not exist, it might
+                # not be indexed yet. Raise a NotFoundError to retry the
+                # task; hopefully, it will be indexed soon.
+                raise NotFoundError(
+                    f"The Opinion {opinion.pk} is not indexed.",
+                    "",
+                    {"id": opinion.pk},
+                )
+
+            # Build the Opinion dicts for updating the citeCount.
+            doc_to_update = {
+                "_id": ES_CHILD_ID(opinion.pk).OPINION,
+                "_routing": cluster.pk,
+                "doc": {"citeCount": cluster.citation_count},
+            }
+            doc_to_update.update(base_doc)
+            documents_to_update.append(doc_to_update)
+
+    return documents_to_update
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -1451,7 +1516,6 @@ def index_related_cites_fields(
     should be updated.
     :return: None.
     """
-
     documents_to_update = []
     cites_doc_to_update = {}
     base_doc = {}
@@ -1459,61 +1523,13 @@ def index_related_cites_fields(
     es_child_doc_class = None
     match model_name:
         case OpinionsCited.__name__:
-            # Query all clusters to update and retrieve only their sub_opinions
-            # with the necessary fields.
-            prefetch = Prefetch(
-                "sub_opinions", queryset=Opinion.objects.only("pk")
-            )
-            clusters_with_sub_opinions = (
-                OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
-                .only("pk", "citation_count")
-                .prefetch_related(prefetch)
-            )
-
             base_doc = {
                 "_op_type": "update",
                 "_index": OpinionClusterDocument._index._name,
             }
-            for cluster in clusters_with_sub_opinions:
-                if not OpinionClusterDocument.exists(id=cluster.pk):
-                    # If the OpinionClusterDocument does not exist, it might
-                    # not be indexed yet. Raise a NotFoundError to retry the
-                    # task; hopefully, it will be indexed soon.
-                    raise NotFoundError(
-                        f"The OpinionCluster {cluster.pk} is not indexed.",
-                        "",
-                        {"id": cluster.pk},
-                    )
-
-                # Build the OpinionCluster dicts for updating the citeCount.
-                doc_to_update = {
-                    "_id": cluster.pk,
-                    "doc": {"citeCount": cluster.citation_count},
-                }
-                doc_to_update.update(base_doc)
-                documents_to_update.append(doc_to_update)
-
-                for opinion in cluster.sub_opinions.all():
-                    if not OpinionClusterDocument.exists(
-                        id=ES_CHILD_ID(opinion.pk).OPINION, routing=cluster.pk
-                    ):
-                        # If the OpinionDocument does not exist, it might
-                        # not be indexed yet. Raise a NotFoundError to retry the
-                        # task; hopefully, it will be indexed soon.
-                        raise NotFoundError(
-                            f"The Opinion {opinion.pk} is not indexed.",
-                            "",
-                            {"id": opinion.pk},
-                        )
-
-                    # Build the Opinion dicts for updating the citeCount.
-                    doc_to_update = {
-                        "_id": ES_CHILD_ID(opinion.pk).OPINION,
-                        "_routing": cluster.pk,
-                        "doc": {"citeCount": cluster.citation_count},
-                    }
-                    doc_to_update.update(base_doc)
-                    documents_to_update.append(doc_to_update)
+            documents_to_update.extend(
+                build_cite_count_update(cluster_ids_to_update)
+            )
 
             # Finally build the Opinion dict for updating the cites.
             child_doc_model = Opinion
