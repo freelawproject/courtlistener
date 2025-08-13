@@ -398,6 +398,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         "profile/settings.html",
         {
             "profile_form": profile_form,
+            "user_id": user.pk,
             "user_form": user_form,
             "page": "profile_settings",
             "private": True,
