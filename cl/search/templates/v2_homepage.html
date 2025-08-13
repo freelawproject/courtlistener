@@ -1,5 +1,5 @@
 {% extends "new_base.html" %}
-{% load svg_tags component_tags %}
+{% load svg_tags component_tags humanize %}
 
 {% block head %}
   {% require_script "js/alpine/components/homepage.js" %}
@@ -205,5 +205,60 @@
       {% svg "chevron" class="w-6 h-6 text-greyscale-500 -rotate-90" %}
     </button>
   </div>
+
+  {# PRODUCT STATS #}
+  <section
+    aria-labelledby="stats-title"
+    class="flex flex-row flex-wrap gap-5 capped-width px-4 py-11 justify-center"
+  >
+    <h2 id="stats-title" class="sr-only">CourtListener Statistics</h2>
+    <dl class="flex flex-col gap-5 md:flex-row">
+      <div class="rounded-[20px] border border-greyscale-200 py-7 px-8 gap-6 flex flex-col md:max-w-96">
+        {% svg "page_search" aria_hidden="true" class="text-greyscale-500" %}
+        <dt class="text-md text-greyscale-600">Number of precedential decisions in our system</dt>
+        <dd>
+          <data class="text-display-md font-cooper font-semibold" value="{{ opinion_count }}">{{ opinion_count|intword }}</data>
+        </dd>
+      </div>
+      <div class="grid gap-2.5 md:grid-cols-3 sm:grid-cols-2 grid-cols-1">
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600">Number of federal cases in the RECAP Archive</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ docket_count }}">{{ docket_count|intword }}</data>
+          </dd>
+        </div>
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600">Number of federal filings in the RECAP Archive</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ recap_doc_count }}">{{ recap_doc_count|intword }}</data>
+          </dd>
+        </div>
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600">Days of oral argument recordings in our system</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ days_of_oa }}">{{ days_of_oa|intcomma }}</data>
+          </dd>
+        </div>
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600">Number of searches conducted in the last ten days</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ queries_in_last_ten }}">{{ queries_in_last_ten|intcomma }}</data>
+          </dd>
+        </div>
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600">Number of alert emails sent over the last ten days</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ alerts_in_last_ten }}">{{ alerts_in_last_ten|intcomma }}</data>
+          </dd>
+        </div>
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600">Number of API calls made in the last ten days</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ api_in_last_ten }}">{{ api_in_last_ten|intcomma }}</data>
+          </dd>
+        </div>
+      </div>
+    </dl>
+  </section>
 </div>
 {% endblock %}
