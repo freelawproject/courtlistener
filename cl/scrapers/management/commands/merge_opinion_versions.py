@@ -18,6 +18,7 @@ from cl.people_db.models import (
     Role,
 )
 from cl.recap.models import PacerFetchQueue, ProcessingQueue
+from cl.scrapers.exceptions import MergingError
 from cl.scrapers.models import PACERMobilePageData
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
@@ -33,6 +34,7 @@ from cl.search.models import (
     OpinionCluster,
     OpinionClusterNonParticipatingJudges,
     OpinionClusterPanel,
+    OpinionJoinedBy,
     OpinionsCited,
     Parenthetical,
 )
@@ -200,6 +202,8 @@ docket_fields_to_merge = [
     "referred_to",
     "referred_to_str",
     "panel_str",
+    # panel and non_participating_judges taken care of via
+    # `update_referencing_objects`
     "date_last_index",
     "date_cert_granted",
     "date_cert_denied",
@@ -363,11 +367,14 @@ def update_referencing_objects(
 def merge_metadata(
     main_object: Opinion | OpinionCluster | Docket,
     version_object: Opinion | OpinionCluster | Docket,
+    error_on_diff: bool = False,
 ) -> bool:
     """Merge `fields_to_merge` from `version_object` into `main_object`
 
     :param main_object: the main OpinionCluster or Opinion or Docket
     :param version_object: the secondary version Opinion, or its OpinionCluster
+    :param error_on_diff: raise an exception if there is an unexpected difference
+
     :return: True if the main object was updated and needs to be saved
     """
     if main_object.id == version_object.id:
@@ -378,7 +385,6 @@ def merge_metadata(
             ("author_str", merge_judge_names),
             "author",
             "per_curiam",
-            "joined_by",
             ("joined_by_str", merge_judge_names),
             "html_lawbox",
             "html_columbia",
@@ -414,8 +420,10 @@ def merge_metadata(
                 changed = True
                 continue
 
-            logger.warning(
-                "Unexpected difference in %s: '%s' '%s'. %s: %s, %s",
+            warning_template = (
+                "Unexpected difference in %s: '%s' '%s'. %s: %s, %s"
+            )
+            warning_values = (
                 field,
                 main_value,
                 version_value,
@@ -423,6 +431,10 @@ def merge_metadata(
                 main_object.id,
                 version_object.id,
             )
+            if error_on_diff:
+                raise MergingError(warning_template % warning_values)
+
+            logger.warning(warning_template, *warning_values)
         elif version_value:
             setattr(main_object, field, version_value)
             changed = True
@@ -499,6 +511,12 @@ def merge_opinion_versions(
 
     main_citations = {str(c) for c in main_opinion.cluster.citations.all()}
 
+    joined_by_qs = OpinionJoinedBy.objects.filter(opinion=version_opinion)
+    if update_joined_by := joined_by_qs.exists():
+        exclude_existing_persons = OpinionJoinedBy.objects.filter(
+            opinion=main_opinion
+        ).values_list("person_id", flat=True)
+
     with transaction.atomic():
         if update_main_opinion:
             main_opinion.save()
@@ -510,6 +528,11 @@ def merge_opinion_versions(
         update_referencing_objects(main_opinion.cluster, version_cluster)
         if not is_same_docket:
             update_referencing_objects(main_docket, version_docket)
+
+        if update_joined_by:
+            joined_by_qs.exclude(
+                person_id__in=exclude_existing_persons
+            ).update(opinion=main_opinion)
 
         # update the cluster_id to prevent the version cluster deletion cascade
         for version_citation in version_cluster.citations.all():

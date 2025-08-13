@@ -79,3 +79,9 @@ class EmptyFileError(BadContentError):
     """Occurs when the content of the response has lenght 0"""
 
     logging_level = logging.ERROR
+
+
+class MergingError(AutoLoggingException):
+    """Raised when metadata merging finds different values"""
+
+    logging_level = logging.ERROR
