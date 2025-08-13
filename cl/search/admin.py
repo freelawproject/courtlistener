@@ -355,6 +355,7 @@ class SearchQueryAdmin(CursorPaginatorAdmin):
 
 @admin.register(ClusterRedirection)
 class ClusterRedirectionAdmin(admin.ModelAdmin):
+    raw_id_fields = ("cluster",)
     list_display = (
         "pk",
         "deleted_cluster_id",
