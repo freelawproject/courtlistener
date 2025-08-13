@@ -14,6 +14,7 @@ from cl.search.models import (
     Citation,
     Claim,
     ClaimHistory,
+    ClusterRedirection,
     Court,
     Courthouse,
     Docket,
@@ -350,3 +351,13 @@ class SearchQueryAdmin(CursorPaginatorAdmin):
     list_display = ("__str__", "engine", "source")
     list_filter = ("engine", "source")
     search_fields = ("user__username",)
+
+
+@admin.register(ClusterRedirection)
+class ClusterRedirectionAdmin(admin.ModelAdmin):
+    list_display = (
+        "pk",
+        "deleted_cluster_id",
+        "cluster",
+    )
+    list_filter = ("reason",)
