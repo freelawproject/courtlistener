@@ -36,10 +36,10 @@ def get_base_homepage_stats():
                 if result is not None
             ]
         ),
-        "days_of_oa": naturalduration(
-            Audio.objects.aggregate(Sum("duration"))["duration__sum"],
-            as_dict=True,
-        )["d"],
+        "minutes_of_oa": Audio.objects.aggregate(Sum("duration"))[
+            "duration__sum"
+        ]
+        // 60,
         "private": False,  # VERY IMPORTANT!
     }
     return homepage_data
