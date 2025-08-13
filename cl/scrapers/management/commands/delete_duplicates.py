@@ -30,10 +30,10 @@ def delete_duplicate_opinion(
     :return None
     """
     # merge all metadata
-    updated_opinion = merge_metadata(
+    opinion_needs_update = merge_metadata(
         opinion_to_keep, opinion_to_delete, strict_merging
     )
-    updated_cluster = merge_metadata(
+    cluster_needs_update = merge_metadata(
         opinion_to_keep.cluster, opinion_to_delete.cluster, strict_merging
     )
     is_same_docket = (
@@ -42,10 +42,10 @@ def delete_duplicate_opinion(
     )
 
     if is_same_docket:
-        updated_docket = False
+        docket_needs_update = False
         stats["same docket"] += 1
     else:
-        updated_docket = merge_metadata(
+        docket_needs_update = merge_metadata(
             opinion_to_keep.cluster.docket,
             opinion_to_delete.cluster.docket,
             strict_merging,
@@ -79,15 +79,15 @@ def delete_duplicate_opinion(
         stats["deleted docket"] += 1
         docket_to_delete.delete()
 
-    if updated_opinion:
+    if opinion_needs_update:
         logger.info("Updating opinion %s", opinion_to_keep.id)
         opinion_to_keep.save()
 
-    if updated_cluster:
+    if cluster_needs_update:
         logger.info("Updating cluster %s", opinion_to_keep.cluster.id)
         opinion_to_keep.cluster.save()
 
-    if updated_docket:
+    if docket_needs_update:
         logger.info("Updating docket %s", opinion_to_keep.cluster.docket.id)
         opinion_to_keep.cluster.docket.save()
 
