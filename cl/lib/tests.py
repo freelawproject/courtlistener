@@ -1550,6 +1550,8 @@ class TestRecapUtils(SimpleTestCase):
         This text contains headers like 'Case...', 'Doc...Filed...',
         'Main Document', and 'Desc'. The function should recognize these
         as non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.cacb.1466705.1.0.pdf
         """
         cacb_text = """
 Case 2:12-bk-17500-TD   Doc 1 Filed 03/01/12 Entered 03/01/12 12:14:26   Desc
@@ -1577,6 +1579,8 @@ Desc
         This text contains headers like 'Case...', 'Doc...Filed...',
         'Main Document', and 'Desc'. The function should recognize these
         as non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.cacd.584625.9.0.pdf
         """
         cacd_text = """
 Case
@@ -1612,20 +1616,23 @@ Case
             needs_ocr(cacd_text), msg="cacd example should need OCR"
         )
 
-    def test_needs_ocr_mnsd_example(self):
-        """Test needs_ocr function with multi-line headers from mnsd example provided in issue #598
+    def test_needs_ocr_msnd_example(self):
+        """Test needs_ocr function with multi-line headers from msnd example
+        provided in issue #598
 
         This text contains headers like 'Case...', 'Doc...Filed...',
         'Main Document', and 'Desc'. The function should recognize these
         as non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.msnd.49844/gov.uscourts.msnd.49844.2.0_1.pdf
         """
-        mnsd_text = """
+        msnd_text = """
 Case: 3:24-cv-00304-MPM-JMV Doc #: 1 Filed: 09/25/24 1 of 7 PageID #: 1
 Case: 3:24-cv-00304-MPM-JMV Doc #: 1 Filed: 09/25/24 2 of 7 PageID #: 2
-
+3:24-cv-304-MPM-JMV
 """
         self.assertTrue(
-            needs_ocr(mnsd_text), msg="mnsd example should need OCR"
+            needs_ocr(msnd_text), msg="msnd example should need OCR"
         )
 
     def test_needs_ocr_wvnd_example(self):
@@ -1634,6 +1641,8 @@ Case: 3:24-cv-00304-MPM-JMV Doc #: 1 Filed: 09/25/24 2 of 7 PageID #: 2
         This text contains a case number line ('1:16-CV-107') and a
         'Received:' line. The function should recognize these as
         non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.wvnd.38975/gov.uscourts.wvnd.38975.1.3_1.pdf
         """
         wvnd_text = """ 1:16-CV-107 Received: 06/03/2016 """
         self.assertTrue(
@@ -1646,15 +1655,17 @@ Case: 3:24-cv-00304-MPM-JMV Doc #: 1 Filed: 09/25/24 2 of 7 PageID #: 2
         This text includes standard headers but also lines like
         'This is the first line of actual content.', which should cause
         the function to return False (doesn't need OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.flnd.526212/gov.uscourts.flnd.526212.13.0.pdf
         """
         good_text = """
-Case 1:23-cv-00123 Document 1 Filed 01/01/2023 Page 1 of 5
+Case 3:24-cv-00304-MCR-ZCB Document 13 Filed 01/27/25 Page 1 of 2
 
 This is the first line of actual content.
 Here is another line.
 Here is another line.
 
-Page 2 of 5
+Case 3:24-cv-00304-MCR-ZCB Document 13 Filed 01/27/25 Page 2 of 2
 Some more content here.
 Some more content here.
 Some more content here.
@@ -1668,13 +1679,15 @@ Some more content here.
 
         This tests the original scenario where only 'Case...' lines and
         'Page X of Y' lines are present. Should return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.mdb.775852/gov.uscourts.mdb.775852..0.pdf
         """
         header_text = """
-Case 2:06-cv-00376-SRW Document 1-2 Filed 04/25/2006 Page 1 of 1
-Page 1 of 1
-
-Case 2:06-cv-00376-SRW Document 1-2 Filed 04/25/2006 Page 2 of 2
-Page 2 of 2
+Case 23-15304   Doc   Filed 07/25/24   Page 1 of 8
+Case 23-15304   Doc   Filed 07/25/24   Page 2 of 8
+ 0123ÿ567ÿ5859
+Case 23-15304   Doc   Filed 07/25/24   Page 4 of 8
+Case 23-15304   Doc   Filed 07/25/24   Page 5 of 8
 """
         self.assertTrue(
             needs_ocr(header_text),
@@ -1687,6 +1700,7 @@ Page 2 of 2
         This tests the original scenario where only 'Case...' lines and
         'Page X of Y' lines are present and no good content between pages lines.
         Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.cacb.1850012/gov.uscourts.cacb.1850012..0.pdf
         """
         header_text = """
 Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
@@ -1713,6 +1727,7 @@ Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc M
         This tests the original scenario where only 'Case...' lines and
         'Pg X of Y' lines are present and no good content between pages lines.
         Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.nysb.312902/gov.uscourts.nysb.312902.78.3.pdf
         """
         header_text = """
 22-10964-mg   Doc 78-3   Filed 07/21/22 Entered 07/21/22 09:17:08   Attachment 3
@@ -1735,6 +1750,7 @@ Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc M
         This tests the original scenario where only 'Case...' lines and
         'Page:Y' lines are present and good content between pages lines is present.
         Should return False (doesn't need OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
         """
         header_text = """
 Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
@@ -1762,6 +1778,7 @@ Line 3
         This tests the original scenario where only 'Case...' lines and
         'Page: Y' lines are present and good content between pages lines is
         present. Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
         """
         header_text = """
 Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336

@@ -11,11 +11,12 @@ from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Docket, RECAPDocument
 
 
-def extract_unextracted_rds(queue: str) -> None:
+def extract_unextracted_rds(queue: str, chunk_size: int) -> None:
     """Performs content extraction for all recap documents that need to be
     extracted.
 
     :param queue: The celery queue to use
+    :param chunk_size: The number of items to extract in a single celery task.
     :return: None
     """
 
@@ -31,7 +32,6 @@ def extract_unextracted_rds(queue: str) -> None:
     )
     count = rd_needs_extraction.count()
     # The count to send in a single Celery task
-    chunk_size = 100
     # Set low throttle. Higher values risk crashing Redis.
     throttle = CeleryThrottle(queue_name=queue)
     processed_count = 0
@@ -57,29 +57,34 @@ class Command(VerboseCommand):
             help="Skip any primary keys lower than this value. (Useful for "
             "restarts.)",
         )
-
         parser.add_argument(
             "--queue",
             type=str,
             default="celery",
             help="The celery queue where the tasks should be processed.",
         )
-
         parser.add_argument(
             "--extract-unextracted-rds",
             action="store_true",
             default=False,
             help="Extract all recap documents that need to be extracted.",
         )
+        parser.add_argument(
+            "--chunk-size",
+            type=int,
+            default="10",
+            help="The number of PDFs to extract in a single celery task.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
         if options["extract_unextracted_rds"]:
             queue = options["queue"]
+            chunk_size = options["chunk_size"]
             sys.stdout.write(
                 "Extracting all recap documents that need extraction. \n"
             )
-            extract_unextracted_rds(queue)
+            extract_unextracted_rds(queue, chunk_size)
             return
 
         ds = (

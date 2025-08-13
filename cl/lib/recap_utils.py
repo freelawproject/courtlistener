@@ -83,6 +83,7 @@ def get_document_filename(
 PAGINATION_OF_RE = re.compile(r"\bPage\s+\d+\s+of\s+\d+\b", re.I)
 PAGINATION_PG_OF_RE = re.compile(r"\bPg\s+\d+\s+of\s+\d+\b", re.I)
 PAGINATION_COLON_RE = re.compile(r"\bPage:\s*\d+\b", re.I)
+PAGINATION_PAGE_ID_RE = re.compile(r"\bPageID\s+#:\s*\d+\b", re.I)
 
 
 def is_page_line(line: str) -> bool:
@@ -95,6 +96,7 @@ def is_page_line(line: str) -> bool:
         PAGINATION_OF_RE.search(line)
         or PAGINATION_COLON_RE.search(line)
         or PAGINATION_PG_OF_RE.search(line)
+        or PAGINATION_PAGE_ID_RE.search(line)
     )
 
 
