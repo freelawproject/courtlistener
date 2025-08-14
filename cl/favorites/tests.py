@@ -46,7 +46,7 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
 )
 from cl.search.factories import RECAPDocumentFactory
-from cl.search.views import get_homepage_stats
+from cl.search.utils import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.fakes import FakeAvailableConfirmationPage, FakeConfirmationPage

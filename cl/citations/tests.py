@@ -3343,11 +3343,15 @@ class CountCitationsTest(TestCase):
         docket = DocketFactory.create(court=court)
 
         # 1 cluster with 0 citations to it
-        cls.cluster1 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cls.cluster1 = OpinionClusterFactory(
+            docket=docket, citation_count=0, id=1_000_000
+        )
         cluster1_opinion = OpinionFactory(cluster=cls.cluster1)
 
         # 1 cluster with 2 subopinions, each with one citation to it
-        cls.cluster2 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cls.cluster2 = OpinionClusterFactory(
+            docket=docket, citation_count=0, id=1_000_001
+        )
         cluster2_opinion1 = OpinionFactory(cluster=cls.cluster2)
         cluster2_opinion2 = OpinionFactory(cluster=cls.cluster2)
 
@@ -3363,7 +3367,9 @@ class CountCitationsTest(TestCase):
         )
 
         # 1 cluster with 1 sub opinion, and 3 citations to it
-        cls.cluster3 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cls.cluster3 = OpinionClusterFactory(
+            docket=docket, citation_count=0, id=1_000_002
+        )
         cluster3_opinion = OpinionFactory(cluster=cls.cluster3)
 
         OpinionsCited.objects.create(
@@ -3387,6 +3393,8 @@ class CountCitationsTest(TestCase):
         call_command(
             "count_citations",
             count_from_opinions_cited=True,
+            start_cluster_id=1_000_000,
+            end_cluster_id=1_001_000,
         )
         self.cluster1.refresh_from_db()
         self.cluster2.refresh_from_db()
