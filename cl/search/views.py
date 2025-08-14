@@ -39,7 +39,10 @@ from cl.stats.utils import tally_stat
 
 @never_cache
 def new_homepage(request: HttpRequest) -> HttpResponse:
-    render_dict = {**get_v2_homepage_stats()}
+    render_dict = {
+        **get_v2_homepage_stats(),
+        "private": False,  # VERY IMPORTANT!
+    }
     return TemplateResponse(request, "homepage.html", render_dict)
 
 

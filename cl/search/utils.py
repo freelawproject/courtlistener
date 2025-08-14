@@ -54,7 +54,6 @@ def get_v2_homepage_stats():
         "opinion_count": get_total_estimate_count("search_opinion"),
         "docket_count": get_total_estimate_count("search_docket"),
         "recap_doc_count": get_total_estimate_count("search_recapdocument"),
-        "private": False,  # VERY IMPORTANT!
     }
     return homepage_stats
 
