@@ -12,6 +12,7 @@
     --corpus-search-height: theme(spacing.12);
     --mobile-dialog-header-height: theme(spacing.18);
     --mobile-dialog-panel-height: calc(100vh - var(--mobile-dialog-header-height));
+    --content-max-width: 1400px;
   }
   code {
     @apply font-sans text-sm bg-brand-100 text-brand-600 border border-brand-300 rounded-[2px] px-1;
@@ -125,5 +126,8 @@
   }
   .focus-container {
     @apply [&:has(input:focus)]:outline [&:has(input:focus)]:outline-2 [&:has(input:focus)]:outline-primary-600 flex;
+  }
+  .capped-width {
+    @apply w-full max-w-[--content-max-width] mx-auto;
   }
 }
