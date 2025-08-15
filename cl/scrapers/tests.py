@@ -741,13 +741,13 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = ["application/pdf"]
 
         with mock.patch.object(self.logger, "error") as error_mock:
-            _ = self.site.download_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/")
 
             self.mock_response.headers = {
                 "Content-Type": "application/pdf;charset=utf-8"
             }
             mock_get.return_value = self.mock_response
-            _ = self.site.download_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/")
             error_mock.assert_not_called()
 
     @mock.patch("requests.Session.get")
@@ -757,7 +757,7 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = None
 
         with mock.patch.object(self.logger, "error") as error_mock:
-            _ = self.site.download_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/")
             error_mock.assert_not_called()
 
 
