@@ -89,7 +89,8 @@ class Command(VerboseCommand):
                 end_id,
             )
             self.update_cluster_citation_count_from_opinions_cited(
-                options["start_cluster_id"], options["end_cluster_id"]
+                start_id,
+                end_id,
             )
             logger.info("Finished citation_count update")
 
