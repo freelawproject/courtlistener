@@ -12,7 +12,7 @@ from django.test import SimpleTestCase
 from django.test.utils import override_settings
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
-
+from juriscraper.lib.exceptions import UnexpectedContentTypeError
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
 from cl.api.factories import WebhookFactory
@@ -733,8 +733,7 @@ class ScraperContentTypeTest(TestCase):
         self.assertRaises(
             UnexpectedContentTypeError,
             self.site.download_content,
-            "/dummy/url/",
-            self.site,
+            "/dummy/url/"
         )
 
     @mock.patch("requests.Session.get")
@@ -808,9 +807,7 @@ class ScrapeCitationsTest(TestCase):
         cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
         with (
             mock.patch(f"{cmd}.sha1", side_effect=self.hashes),
-            mock.patch(
-                f"{cmd}.get_binary_content", return_value="placeholder"
-            ),
+            mock.patch.object(self.mock_site, "download_content", return_value="placeholder"),
         ):
             cl_back_scrape_citations.Command().scrape_court(self.mock_site)
 
