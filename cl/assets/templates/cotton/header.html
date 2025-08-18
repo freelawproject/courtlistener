@@ -19,7 +19,7 @@
         <button
           type="button"
           x-on:click="toggleSupportMenu"
-          class="btn-primary z-10"
+          class="btn-primary z-10 hover:shadow-md"
           aria-controls="header-support-menu"
           aria-haspopup="menu"
           x-bind:aria-expanded="supportMenuExpanded"
@@ -50,7 +50,7 @@
           x-transition:leave="transition ease-in duration-100"
           x-transition:leave-start="opacity-100"
           x-transition:leave-end="opacity-0"
-          class="z-20 absolute left-0 top-14 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+          class="z-20 absolute left-0 top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
           role="menu"
         >
           <li
@@ -85,7 +85,7 @@
     <c-corpus-search class="w-full h-12 hidden md:flex" only>
       <c-corpus-search.scope
         class="!rounded-r-none text-greyscale-600"
-        menu_class="left-0 top-14 w-55 text-md font-cooper text-greyscale-800"
+        menu_class="left-0 top-12 w-55 text-md font-cooper text-greyscale-800"
         item_class="py-1.5"
         only
       />
@@ -117,7 +117,7 @@
         <button
           id="header-profile-trigger"
           x-on:click="openProfileMenu"
-          class="bg-white btn-outline text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
+          class="bg-white btn-outline hover:shadow-md hover:border-greyscale-300 hover:bg-greyscale-50 text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
           type="button"
           aria-haspopup="menu"
           aria-controls="header-profile-menu"
