@@ -2017,34 +2017,3 @@ rect.series-segment {
 .toggle-disable{
   opacity: 0.65;
 }
-
-.copy-input-wrapper {
-  position: relative;
-}
-
-/* The copy button inside the input */
-.copy-btn {
-  position: absolute;
-  top: 50%;
-  right: 0.5rem;
-  transform: translateY(-50%);
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  background-color: transparent;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #9ca3af;
-}
-
-.copy-btn:hover {
-  background-color: #1f2937;
-}
-
-/* Icon sizes */
-.copy-btn svg {
-  width: 14px;
-  height: 16px;
-}
