@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
@@ -22,6 +23,7 @@ from cl.citations.models import UnmatchedCitation
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.test_helpers import generate_docket_target_sources
+from cl.people_db.factories import PersonFactory
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
@@ -32,6 +34,7 @@ from cl.scrapers.management.commands import (
     cl_back_scrape_citations,
     cl_scrape_opinions,
     cl_scrape_oral_arguments,
+    delete_duplicates,
     update_from_text,
 )
 from cl.scrapers.management.commands.merge_opinion_versions import (
@@ -1286,6 +1289,13 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             type=1,
         )
 
+        # Test Opinion.joined_by merging
+        person1 = PersonFactory()
+        person2 = PersonFactory()
+        main_opinion.joined_by.add(person1)
+        version.joined_by.add(person1)
+        version.joined_by.add(person2)
+
         # Check that elasticsearch docs exist before the merging
         self.assertTrue(
             OpinionClusterDocument.exists(id=cluster2.id),
@@ -1347,6 +1357,12 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             author_str,
             "Opinion.author_str was not updated in the main object",
         )
+        self.assertEqual(
+            main_opinion.joined_by.count(),
+            2,
+            "Opinion.joined_by was not updated",
+        )
+
         self.assertEqual(
             unrelated_opinion.main_version_id,
             None,
@@ -1603,3 +1619,89 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             ).exists(),
             "Existing re-direction was not re-assigned to new cluster",
         )
+
+
+class DeleteDuplicatesTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        nev = CourtFactory.create(id="nev")
+        docket_number = "11111"
+        docket = DocketFactory.create(court=nev, docket_number=docket_number)
+        docket2 = DocketFactory.create(court=nev, docket_number=docket_number)
+        same_cluster_fields = {
+            "docket": docket,
+            "source": SOURCES.COURT_WEBSITE,
+            "case_name": "something",
+            "case_name_full": "something full",
+            "precedential_status": "Precedential",
+            "date_filed": "2019-01-01",
+        }
+        same_opinion_fields = {
+            "author": None,
+            "plain_text": "Something....",
+            "sha1": "xxxxxxxx",
+            "download_url": "https://something.com/a_pdf.pdf",
+        }
+        cls.author = "Some author"  # to check metadata propagation
+
+        cls.cluster_to_delete_id = 976123
+        cluster_to_delete = OpinionClusterFactory.create(
+            id=cls.cluster_to_delete_id, **same_cluster_fields
+        )
+        cls.should_delete = OpinionFactory.create(
+            cluster=cluster_to_delete,
+            author_str=cls.author,
+            **same_opinion_fields,
+        )
+
+        # the factories will create different values which will stop the merge
+        cls.should_not_merge = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(
+                docket=docket2, source=SOURCES.COURT_WEBSITE
+            ),
+            **same_opinion_fields,
+        )
+
+        cls.cluster_to_keep = OpinionClusterFactory.create(
+            **same_cluster_fields
+        )
+        cls.op_to_keep = OpinionFactory.create(
+            cluster=cls.cluster_to_keep, **same_opinion_fields
+        )
+
+    def test_same_hash_duplicate_deletion(self):
+        """Test that we can delete same hash duplicates
+
+        - confirm deletion
+        - confirm ClusterDuplication is created, with proper values
+        - abort deletion if something doesn't match
+        """
+        stats = defaultdict(lambda: 0)
+        delete_duplicates.delete_same_hash_duplicates(stats)
+
+        try:
+            self.should_delete.refresh_from_db()
+            self.fail("`should_delete` should be deleted as a duplicate")
+        except Opinion.DoesNotExist:
+            pass
+
+        self.op_to_keep.refresh_from_db()
+        self.assertEqual(
+            self.op_to_keep.author_str,
+            self.author,
+            "metadata was not propagated",
+        )
+
+        self.assertTrue(
+            ClusterRedirection.objects.filter(
+                deleted_cluster_id=self.cluster_to_delete_id,
+                cluster=self.cluster_to_keep,
+                reason=ClusterRedirection.DUPLICATE,
+            ).exists(),
+            "ClusterRedirection with proper values was not created",
+        )
+
+        try:
+            self.should_not_merge.refresh_from_db()
+        except Opinion.DoesNotExist:
+            self.fail("`should_not_merge` should still exist")
