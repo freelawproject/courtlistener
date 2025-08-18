@@ -406,6 +406,16 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
+@login_required
+def view_user_id(request: AuthenticatedHttpRequest) -> HttpResponse:
+    user = request.user
+    return TemplateResponse(
+        request,
+        "profile/cl_id.html",
+        {"user_id": user.pk, "private": True},
+    )
+
+
 @sensitive_post_parameters("password")
 @login_required
 @ratelimiter_unsafe_10_per_m
