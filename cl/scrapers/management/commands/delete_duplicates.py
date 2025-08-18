@@ -33,14 +33,24 @@ def delete_duplicate_opinion(
     opinion_needs_update = merge_metadata(
         opinion_to_keep, opinion_to_delete, strict_merging
     )
-    cluster_needs_update = merge_metadata(
-        opinion_to_keep.cluster, opinion_to_delete.cluster, strict_merging
+
+    # Can happen due to duplicates already being grouped in the same cluster
+    # by versioning
+    is_same_cluster = (
+        opinion_to_keep.cluster.id == opinion_to_delete.cluster.id
     )
+    if is_same_cluster:
+        cluster_needs_update = False
+        stats["same cluster"] += 1
+    else:
+        cluster_needs_update = merge_metadata(
+            opinion_to_keep.cluster, opinion_to_delete.cluster, strict_merging
+        )
+
     is_same_docket = (
         opinion_to_keep.cluster.docket.id
         == opinion_to_delete.cluster.docket.id
     )
-
     if is_same_docket:
         docket_needs_update = False
         stats["same docket"] += 1
@@ -51,33 +61,35 @@ def delete_duplicate_opinion(
             strict_merging,
         )
 
-    update_referencing_objects(
-        opinion_to_keep.cluster, opinion_to_delete.cluster
-    )
+    if not is_same_cluster:
+        update_referencing_objects(
+            opinion_to_keep.cluster, opinion_to_delete.cluster
+        )
     if not is_same_docket:
         update_referencing_objects(
             opinion_to_keep.cluster.docket, opinion_to_delete.cluster.docket
         )
 
-    # delete opinion
     cluster_to_delete = opinion_to_delete.cluster
+
+    # delete opinion
     opinion_to_delete.delete()
+    stats["deleted opinion"] += 1
 
     # delete cluster
-    docket_to_delete = opinion_to_delete.cluster.docket
-    ClusterRedirection.create_from_clusters(
-        opinion_to_keep.cluster,
-        cluster_to_delete,
-        ClusterRedirection.DUPLICATE,
-    )
-    cluster_to_delete.delete()
-
-    stats["deleted opinion"] += 1
-    stats["deleted cluster"] += 1
+    docket_to_delete = cluster_to_delete.docket
+    if not is_same_cluster:
+        ClusterRedirection.create_from_clusters(
+            opinion_to_keep.cluster,
+            cluster_to_delete,
+            ClusterRedirection.DUPLICATE,
+        )
+        cluster_to_delete.delete()
+        stats["deleted cluster"] += 1
 
     if not is_same_docket:
-        stats["deleted docket"] += 1
         docket_to_delete.delete()
+        stats["deleted docket"] += 1
 
     if opinion_needs_update:
         logger.info("Updating opinion %s", opinion_to_keep.id)
