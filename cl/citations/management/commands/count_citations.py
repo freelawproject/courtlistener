@@ -27,7 +27,6 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--start-cluster-id",
             type=int,
-            nargs="*",
             default=None,
             help="An OpinionCluster.id to start the batch updates from",
         )
@@ -35,7 +34,6 @@ class Command(VerboseCommand):
             "--end-cluster-id",
             type=int,
             default=None,
-            nargs="*",
             help="An OpinionCluster.id where the batch updates end",
         )
         parser.add_argument(
@@ -91,7 +89,8 @@ class Command(VerboseCommand):
                 end_id,
             )
             self.update_cluster_citation_count_from_opinions_cited(
-                options["start_cluster_id"], options["end_cluster_id"]
+                start_id,
+                end_id,
             )
             logger.info("Finished citation_count update")
 
