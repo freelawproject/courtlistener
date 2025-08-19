@@ -8,6 +8,7 @@ from django.db import transaction
 from django.utils.encoding import force_bytes
 from juriscraper.lib.string_utils import CaseNameTweaker
 
+from cl import settings
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
 from cl.audio.tasks import transcribe_from_open_ai_api
@@ -120,7 +121,8 @@ class Command(cl_scrape_opinions.Command):
         court: Court,
         backscrape: bool = False,
     ):
-        content = site.download_content(item["download_urls"])
+        media_root = settings.MEDIA_ROOT
+        content = site.download_content(item["download_urls"], media_root=media_root)
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         sha1_hash = sha1(force_bytes(content))
