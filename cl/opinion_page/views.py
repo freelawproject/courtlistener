@@ -95,7 +95,6 @@ from cl.search.models import (
     Citation,
     Court,
     Docket,
-    DocketEntry,
     Opinion,
     OpinionCluster,
     OpinionsCitedByRECAPDocument,
