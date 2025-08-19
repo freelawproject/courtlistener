@@ -1,6 +1,7 @@
 import sys
 from itertools import batched
 
+from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import Q
 from lxml.etree import XMLSyntaxError
@@ -11,17 +12,21 @@ from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Docket, RECAPDocument
 
 
-def extract_unextracted_rds(queue: str, chunk_size: int) -> None:
+def extract_unextracted_rds(
+    queue: str, chunk_size: int, db_connection: str = "default"
+) -> None:
     """Performs content extraction for all recap documents that need to be
     extracted.
 
     :param queue: The celery queue to use
     :param chunk_size: The number of items to extract in a single celery task.
+    :param db_connection: The database connection to use.
     :return: None
     """
 
     rd_needs_extraction = (
-        RECAPDocument.objects.filter(
+        RECAPDocument.objects.using(db_connection)
+        .filter(
             Q(ocr_status__isnull=True)
             | Q(ocr_status=RECAPDocument.OCR_NEEDED),
             is_available=True,
@@ -74,16 +79,27 @@ class Command(VerboseCommand):
             default="10",
             help="The number of PDFs to extract in a single celery task.",
         )
+        parser.add_argument(
+            "--use-replica",
+            action="store_true",
+            default=False,
+            help="Use this flag to run the queries in the replica db",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
+        db_connection = (
+            "replica"
+            if options.get("use_replica") and "replica" in settings.DATABASES
+            else "default"
+        )
         if options["extract_unextracted_rds"]:
             queue = options["queue"]
             chunk_size = options["chunk_size"]
             sys.stdout.write(
                 "Extracting all recap documents that need extraction. \n"
             )
-            extract_unextracted_rds(queue, chunk_size)
+            extract_unextracted_rds(queue, chunk_size, db_connection)
             return
 
         ds = (
