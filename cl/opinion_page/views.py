@@ -58,6 +58,7 @@ from cl.favorites.utils import (
     get_prayer_counts_in_bulk,
 )
 from cl.lib.auth import group_required
+from cl.lib.bot_detector import is_bot
 from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
@@ -997,6 +998,11 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
 
     if "HX-Request" not in request.headers:
         return HttpResponse("")
+
+    if is_bot(request):
+        return await sync_to_async(render)(
+            request, "includes/opinion_tabs.html", {"cluster": None}
+        )
 
     cluster = await OpinionCluster.objects.filter(pk=pk).afirst()
     if not cluster:

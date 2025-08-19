@@ -66,3 +66,8 @@ CAP_R2_BUCKET_NAME = env("CAP_R2_BUCKET_NAME", default="cap-static")
 WEBHOOK_V1_DEPRECATION_DATE = env(
     "WEBHOOK_V1_DEPRECATION_DATE", default="2024-11-18"
 )
+
+# OCR extraction
+# Minimum number of valid lines between common headers to consider that the page
+# does not need OCR.
+LINE_THRESHOLD_OCR_PER_PAGE = env.int("LINE_THRESHOLD_OCR_PER_PAGE", default=5)
