@@ -318,7 +318,9 @@ class Command(ScraperCommand):
             content = item.pop("content")
         else:
             media_root = settings.MEDIA_ROOT
-            content = site.download_content(item["download_urls"], media_root=media_root)
+            content = site.download_content(
+                item["download_urls"], media_root=media_root
+            )
 
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
