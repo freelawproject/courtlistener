@@ -412,7 +412,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.0.2" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", git = "https://github.com/freelawproject/juriscraper?rev=1535-add-download-content-method-to-abstractsite" },
+    { name = "juriscraper", git = "https://github.com/freelawproject/juriscraper.git?rev=1535-add-download-content-method-to-abstractsite" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=5.3.1" },
     { name = "markdown2", specifier = ">=2.5.0" },
@@ -1586,7 +1586,7 @@ wheels = [
 [[package]]
 name = "juriscraper"
 version = "2.6.84"
-source = { git = "https://github.com/freelawproject/juriscraper?rev=1535-add-download-content-method-to-abstractsite#a80f198898d5365d5c645c545eb8c017c1904544" }
+source = { git = "https://github.com/freelawproject/juriscraper.git?rev=1535-add-download-content-method-to-abstractsite#5cde4967599eea46deb832bf54a08a9bf5bd59ff" }
 dependencies = [
     { name = "certifi" },
     { name = "chardet" },
