@@ -41,6 +41,7 @@ from cl.lib.pacer_session import (
 )
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
+from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import (
     acquire_redis_lock,
     get_redis_interface,
@@ -1539,3 +1540,269 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                     expected_output,
                     f"Got incorrect result from clean_parenthetical_text for text: {agency, docket_number}",
                 )
+
+
+@override_settings(LINE_THRESHOLD_OCR_PER_PAGE=3)
+class TestRecapUtils(SimpleTestCase):
+    def test_needs_ocr_cacb_example(self):
+        """Test needs_ocr function with multi-line headers from cacb example provided in issue #598
+
+        This text contains headers like 'Case...', 'Doc...Filed...',
+        'Main Document', and 'Desc'. The function should recognize these
+        as non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.cacb.1466705.1.0.pdf
+        """
+        cacb_text = """
+Case 2:12-bk-17500-TD   Doc 1 Filed 03/01/12 Entered 03/01/12 12:14:26   Desc
+
+Main Document Page 1 of 58
+
+
+Case 2:12-bk-17500-TD
+
+Doc 1 Filed 03/01/12 Entered 03/01/12 12:14:26
+Main Document
+Page 58 of 58
+
+Desc
+
+
+"""
+        self.assertTrue(
+            needs_ocr(cacb_text), msg="cacb example should need OCR"
+        )
+
+    def test_needs_ocr_cacd_example(self):
+        """Test needs_ocr function with multi-line headers from cacd example provided in issue #598
+
+        This text contains headers like 'Case...', 'Doc...Filed...',
+        'Main Document', and 'Desc'. The function should recognize these
+        as non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.cacd.584625.9.0.pdf
+        """
+        cacd_text = """
+Case
+ Case9:13-bk-10313-RR
+      2:14-cv-01681-DOCDoc
+                         Document
+                           138 Filed
+                                  9 04/10/14
+                                     Filed 04/10/14
+                                                Entered
+                                                     Page
+                                                        04/10/14
+                                                          1 of 22 15:07:33
+                                                                   Page ID #:32
+                                                                            Desc
+                        Main Document     Page 1 of 22
+Case
+ Case9:13-bk-10313-RR
+      2:14-cv-01681-DOCDoc
+                         Document
+                           138 Filed
+                                  9 04/10/14
+                                     Filed 04/10/14
+                                                Entered
+                                                     Page
+                                                        04/10/14
+                                                          2 of 22 15:07:33
+                                                                   Page ID #:33
+                                                                            Desc
+                        Main Document     Page 2 of 22
+"""
+        self.assertTrue(
+            needs_ocr(cacd_text), msg="cacd example should need OCR"
+        )
+
+    def test_needs_ocr_msnd_example(self):
+        """Test needs_ocr function with multi-line headers from msnd example
+        provided in issue #598
+
+        This text contains headers like 'Case...', 'Doc...Filed...',
+        'Main Document', and 'Desc'. The function should recognize these
+        as non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.msnd.49844/gov.uscourts.msnd.49844.2.0_1.pdf
+        """
+        msnd_text = """
+Case: 3:24-cv-00304-MPM-JMV Doc #: 1 Filed: 09/25/24 1 of 7 PageID #: 1
+Case: 3:24-cv-00304-MPM-JMV Doc #: 1 Filed: 09/25/24 2 of 7 PageID #: 2
+3:24-cv-304-MPM-JMV
+"""
+        self.assertTrue(
+            needs_ocr(msnd_text), msg="msnd example should need OCR"
+        )
+
+    def test_needs_ocr_wvnd_example(self):
+        """Test needs_ocr with specific case number format from wvnd example.
+
+        This text contains a case number line ('1:16-CV-107') and a
+        'Received:' line. The function should recognize these as
+        non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.wvnd.38975/gov.uscourts.wvnd.38975.1.3_1.pdf
+        """
+        wvnd_text = """ 1:16-CV-107 Received: 06/03/2016 """
+        self.assertTrue(
+            needs_ocr(wvnd_text), msg="wvnd example should need OCR"
+        )
+
+    def test_needs_ocr_with_good_content(self):
+        """Test needs_ocr returns False when substantive content is present.
+
+        This text includes standard headers but also lines like
+        'This is the first line of actual content.', which should cause
+        the function to return False (doesn't need OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.flnd.526212/gov.uscourts.flnd.526212.13.0.pdf
+        """
+        good_text = """
+Case 3:24-cv-00304-MCR-ZCB Document 13 Filed 01/27/25 Page 1 of 2
+
+This is the first line of actual content.
+Here is another line.
+Here is another line.
+
+Case 3:24-cv-00304-MCR-ZCB Document 13 Filed 01/27/25 Page 2 of 2
+Some more content here.
+Some more content here.
+Some more content here.
+"""
+        self.assertFalse(
+            needs_ocr(good_text), msg="Should not need OCR with good content"
+        )
+
+    def test_needs_ocr_only_standard_headers(self):
+        """Test needs_ocr returns True for text with only basic headers/pagination.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page X of Y' lines are present. Should return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.mdb.775852/gov.uscourts.mdb.775852..0.pdf
+        """
+        header_text = """
+Case 23-15304   Doc   Filed 07/25/24   Page 1 of 8
+Case 23-15304   Doc   Filed 07/25/24   Page 2 of 8
+ 0123ÿ567ÿ5859
+Case 23-15304   Doc   Filed 07/25/24   Page 4 of 8
+Case 23-15304   Doc   Filed 07/25/24   Page 5 of 8
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_page_of_no_content(self):
+        """Test needs_ocr returns True for pages with no content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page X of Y' lines are present and no good content between pages lines.
+        Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.cacb.1850012/gov.uscourts.cacb.1850012..0.pdf
+        """
+        header_text = """
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 1 of 9
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 2 of 9
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 3 of 9
+
+                                 April 3, 2024
+
+                                             Person Name
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 4 of 9
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_pg_of_no_content(self):
+        """Test needs_ocr returns True for pages with no content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Pg X of Y' lines are present and no good content between pages lines.
+        Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.nysb.312902/gov.uscourts.nysb.312902.78.3.pdf
+        """
+        header_text = """
+22-10964-mg   Doc 78-3   Filed 07/21/22 Entered 07/21/22 09:17:08   Attachment 3
+                                     Pg 1 of 2
+                                     Bad line 1
+                                     Bad line 2
+22-10964-mg   Doc 78-3   Filed 07/21/22 Entered 07/21/22 09:17:08   Attachment 3
+                                     Pg 2 of 2
+                                     Bad line 1
+                                     Bad line 2
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_good_content_page_colon(self):
+        """Test needs_ocr returns False for pages with good content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page:Y' lines are present and good content between pages lines is present.
+        Should return False (doesn't need OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
+        """
+        header_text = """
+Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Line 3
+Case: 08-9007   Document: 00115928542   Page: 2   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Line 3
+Case: 08-9007   Document: 00115928542   Page: 3   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Line 3
+"""
+        self.assertFalse(
+            needs_ocr(header_text),
+            msg="Should not need OCR with good content",
+        )
+
+    def test_needs_ocr_under_threshold_page_colon(self):
+        """Test needs_ocr returns True for text with for pages with no good
+        content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page: Y' lines are present and good content between pages lines is
+        present. Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
+        """
+        header_text = """
+Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Case: 08-9007   Document: 00115928542   Page: 2   Date Filed: 07/30/2009   Entry ID: 5364336
+Case: 08-9007   Document: 00115928542   Page: 3   Date Filed: 07/30/2009   Entry ID: 5364336
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_empty_string(self):
+        """Test needs_ocr returns True when the input content is an empty string."""
+        self.assertTrue(needs_ocr(""), msg="Empty content should need OCR")
+
+    def test_needs_ocr_only_whitespace(self):
+        """Test needs_ocr returns True for content containing only whitespace.
+
+        The function should strip lines, so whitespace-only lines are treated
+        as empty, resulting in True (needs OCR).
+        """
+        self.assertTrue(
+            needs_ocr("  \n\t\n  "),
+            msg="Whitespace-only content should need OCR",
+        )

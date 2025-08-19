@@ -31,6 +31,12 @@
   <h1 id="about">REST API Change Log</h1>
   <ul>
     <li>
+      <p><strong>v4.2</strong> — Enhances support for <a href="{% url "rest_docs" version=version %}#field-selection">Field Selection</a> in nested resources via the <code>fields</code> and <code>omit</code> parameters to reduce payload size and improve response times. Clients can now select nested fields (e.g. <code>fields=educations__date_modified</code>) or
+        exclude them (e.g. <code>omit=recap_documents__plain_text</code>), allowing fine-grained control over serialized nested data.
+      (<a href="https://github.com/freelawproject/courtlistener/issues/5748">Issue #5748</a>, <a
+            href="https://github.com/freelawproject/courtlistener/pull/5973">PR #5973</a>) </p>
+    </li>
+    <li>
       <p><strong>v4.1</strong>&mdash; This release introduces a number of enhancements aimed at improving the efficiency and flexibility of your data retrieval.</p>
       <ul>
         <li><strong>Enhanced Paginated Endpoints:</strong> Introduced the <a href="{% url "rest_docs" %}#counting">count=on</a> query parameter to efficiently retrieve total item counts without fetching actual data

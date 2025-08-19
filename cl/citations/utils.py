@@ -1,4 +1,5 @@
 from datetime import date
+from typing import TYPE_CHECKING
 
 from django.apps import (  # Must use apps.get_model() to avoid circular import issue
     apps,
@@ -10,6 +11,9 @@ from django.utils.safestring import SafeString
 from eyecite.models import CitationBase, FullCaseCitation, ShortCaseCitation
 from eyecite.utils import strip_punct
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
+
+if TYPE_CHECKING:
+    from cl.search.models import Opinion, RECAPDocument
 
 QUERY_LENGTH = 10
 NAIVE_SLUGIFIED_EDITIONS = {str(slugify(item)): item for item in EDITIONS}
@@ -194,39 +198,64 @@ def filter_out_non_case_law_and_non_valid_citations(
     ]
 
 
-def make_get_citations_kwargs(document) -> dict:
-    """Prepare markup kwargs for `get_citations`
+def chunk_text(text: str, chunk_size: int):
+    """Chunk text with overlapping chunks to avoid misses
+
+    :param text: Text to chunk
+    :param chunk_size: The chunk size
+    :return: Chunks of text
+    """
+    if len(text) <= chunk_size:
+        yield text
+        return
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        if end >= len(text):
+            yield text[start:]
+            break
+        yield text[start:end]
+        start += chunk_size
+
+
+def make_get_citations_kwargs(
+    document: "RECAPDocument | Opinion", chunk_size: int = 200_000
+) -> list[dict]:
+    """Prepare markup kwargs for `get_citations` - chunked
 
     This is done outside `get_citations` because it uses specific Opinion
     attributes used are set in Courtlistener, not in eyecite.
 
     :param document: The Opinion or RECAPDocument whose text should be parsed
-
-    :return: a dictionary with kwargs for `get_citations`
+    :param chunk_size: The chunk size
+    :return: a list dict kwargs for `get_citations`
     """
-    kwargs = {}
-    # We prefer CAP data (xml_harvard) first.
+    segments = []
     for attr in [
         "xml_harvard",
         "html_anon_2020",
         "html_columbia",
         "html_lawbox",
         "html",
+        "plain_text",
     ]:
         text = getattr(document, attr, None)
-        if text:
-            kwargs = {
-                "markup_text": text,
-                "clean_steps": ["xml", "html", "all_whitespace"],
-            }
-            break
-    else:
-        kwargs = {
-            "plain_text": getattr(document, "plain_text"),
-            "clean_steps": ["all_whitespace"],
-        }
-
-    return kwargs
+        if not text:
+            continue
+        for chunk in chunk_text(text, chunk_size=chunk_size):
+            if attr == "plain_text":
+                kwargs = {
+                    "plain_text": chunk,
+                    "clean_steps": ["all_whitespace"],
+                }
+            else:
+                kwargs = {
+                    "markup_text": chunk,
+                    "clean_steps": ["xml", "html", "all_whitespace"],
+                }
+            segments.append(kwargs)
+        break
+    return segments
 
 
 def get_cited_clusters_ids_to_update(

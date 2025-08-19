@@ -9,6 +9,7 @@ from elasticsearch_dsl import MultiSearch
 from elasticsearch_dsl.response import Response
 from judge_pics.search import ImageSizes, portrait
 
+from cl.favorites.decorators import track_view_counter
 from cl.people_db.models import Person
 from cl.people_db.utils import (
     build_authored_opinions_query,
@@ -23,6 +24,7 @@ from cl.search.documents import (
 )
 
 
+@track_view_counter(tracks="person", label_format="p.%s:view")
 async def view_person(request, pk, slug):
     queryset = Person.objects.select_related("is_alias_of").prefetch_related(
         "positions__court"

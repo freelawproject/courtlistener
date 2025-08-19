@@ -1,30 +1,26 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date
 from urllib.parse import quote
 
 from asgiref.sync import async_to_sync
-from cache_memoize import cache_memoize
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
+from waffle import flag_is_active
 from waffle.decorators import waffle_flag
 
 from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
-from cl.audio.models import Audio
-from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import get_only_status_facets
 from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
-from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import (
     do_es_search,
     make_get_string,
@@ -35,66 +31,37 @@ from cl.lib.string_utils import trunc
 from cl.lib.types import AuthenticatedHttpRequest
 from cl.search.documents import OpinionClusterDocument
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import SEARCH_TYPES, Court, Opinion
+from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
-from cl.stats.models import Stat
+from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
 from cl.stats.utils import tally_stat
-from cl.visualizations.models import SCOTUSMap
 
 
-@cache_memoize(5 * 60)
-def get_homepage_stats():
-    """Get any stats that are displayed on the homepage and return them as a
-    dict
-    """
-    r = get_redis_interface("STATS")
-    ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
-    last_ten_days = [
-        f"api:v3.d:{(date.today() - timedelta(days=x)).isoformat()}.count"
-        for x in range(0, 10)
-    ]
-    homepage_data = {
-        "alerts_in_last_ten": Stat.objects.filter(
-            name__contains="alerts.sent", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"],
-        "queries_in_last_ten": Stat.objects.filter(
-            name="search.results", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"],
-        "opinions_in_last_ten": Opinion.objects.filter(
-            date_created__gte=ten_days_ago
-        ).count(),
-        "oral_arguments_in_last_ten": Audio.objects.filter(
-            date_created__gte=ten_days_ago
-        ).count(),
-        "api_in_last_ten": sum(
-            [
-                int(result)
-                for result in r.mget(*last_ten_days)
-                if result is not None
-            ]
-        ),
-        "users_in_last_ten": User.objects.filter(
-            date_joined__gte=ten_days_ago
-        ).count(),
-        "days_of_oa": naturalduration(
-            Audio.objects.aggregate(Sum("duration"))["duration__sum"],
-            as_dict=True,
-        )["d"],
-        "viz_in_last_ten": SCOTUSMap.objects.filter(
-            date_published__gte=ten_days_ago, published=True
-        ).count(),
-        "visualizations": SCOTUSMap.objects.filter(
-            published=True, deleted=False
-        )
-        .annotate(Count("clusters"))
-        .filter(
-            # Ensures that we only show good stuff on homepage
-            clusters__count__gt=10,
-        )
-        .order_by("-date_published", "-date_modified", "-date_created")[:1],
+@never_cache
+def new_homepage(request: HttpRequest) -> HttpResponse:
+    render_dict = {
+        **get_v2_homepage_stats(),
         "private": False,  # VERY IMPORTANT!
     }
-    return homepage_data
+    return TemplateResponse(request, "homepage.html", render_dict)
+
+
+@never_cache
+def home_router(request: HttpRequest) -> HttpResponse:
+    """
+    This is a router view to determine which view to use for a given request depending
+    on the waffle flag `use_new_design`.
+
+    - When the flag is inactive, we use the legacy `show_results` view as-is.
+    - When the flag is active, we determine the view based on request params/method.
+    """
+    if settings.TESTING or not flag_is_active(request, "use_new_design"):
+        return show_results(request)
+
+    if request.method == "GET" and len(request.GET) == 0:
+        return new_homepage(request)
+
+    return show_results(request)
 
 
 @never_cache
@@ -147,6 +114,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
         alerts_context = {
             "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
+            "hasUnlimitedAlerts": user.profile.unlimited_docket_alerts,
             "level": level,
             "neon_id": neon_id,
             "counts": counts,

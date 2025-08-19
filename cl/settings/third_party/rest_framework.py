@@ -87,7 +87,7 @@ REST_FRAMEWORK = {
         "shishir": "10/hour",
         "shishir.kumar": "10/hour",
         # Unresponsive
-        "ryxnszn": "1/hour",
+        "faret38643": "1/hour",
         "htmlaw": "1/hour",
         "bulpara": "1/hour",
         "atem.jetson": "1/hour",
