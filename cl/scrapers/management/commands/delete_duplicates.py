@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.exceptions import MergingError
@@ -104,21 +104,27 @@ def delete_duplicate_opinion(
         opinion_to_keep.cluster.docket.save()
 
 
-def delete_same_hash_duplicates(stats: defaultdict) -> None:
+def delete_same_hash_duplicates(
+    stats: defaultdict, sources: list[str]
+) -> None:
     """Delete opinions with the same hash, and their related objects
 
     :param stats: a dictionary to count events
     :return None
     """
     # Group opinions by hash
-    # From scraped sources only
     # Keep the groups with a single hash, and more than 1 row
     # these are same-hash duplicates
+    if len(sources) == 1:
+        source_filter = {"cluster__source": sources[0]}
+    elif len(sources) == len(SOURCES.NAMES):
+        source_filter = {}
+    else:
+        source_filter = {"cluster__source__in": sources}
+
     qs = (
-        Opinion.objects.filter(cluster__source=SOURCES.COURT_WEBSITE)
-        .exclude(
-            Q(download_url="") | Q(download_url__isnull=True) | Q(sha1="")
-        )
+        Opinion.objects.filter(**source_filter)
+        .exclude(sha1="")
         .values("sha1")
         .annotate(
             number_of_rows=Count("sha1"),
@@ -126,7 +132,7 @@ def delete_same_hash_duplicates(stats: defaultdict) -> None:
         .order_by()
         .filter(number_of_rows__gte=2)
     )
-    logger.info("Groups to process %s", qs.count())
+    logger.info("Groups to process %s for sources %s", qs.count(), sources)
 
     # for each group, we will keep a single opinion; let's prefer the latest
     for group in qs:
@@ -134,6 +140,7 @@ def delete_same_hash_duplicates(stats: defaultdict) -> None:
 
         op_to_keep, *to_delete = (
             Opinion.objects.filter(sha1=group["sha1"])
+            .filter(**source_filter)
             .order_by("-date_created")
             .select_related("cluster", "cluster__docket")
         )
@@ -171,6 +178,13 @@ class Command(VerboseCommand):
             help="""Currently we only support deleting same-hash duplicates
             """,
         )
+        parser.add_argument(
+            "--cluster-sources",
+            choices=list(SOURCES.parts_to_source_mapper.values()),
+            default=[SOURCES.COURT_WEBSITE],
+            nargs="*",
+            help="`OpinionCluster.source` values to include when finding duplicate groups",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -178,7 +192,7 @@ class Command(VerboseCommand):
 
         if options["method"] == "same_hash":
             try:
-                delete_same_hash_duplicates(stats)
+                delete_same_hash_duplicates(stats, options["cluster_sources"])
             finally:
                 logger.info(stats)
 
