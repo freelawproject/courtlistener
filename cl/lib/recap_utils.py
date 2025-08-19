@@ -80,8 +80,7 @@ def get_document_filename(
     )
 
 
-PAGINATION_OF_RE = re.compile(r"\bPage\s+\d+\s+of\s+\d+\b", re.I)
-PAGINATION_PG_OF_RE = re.compile(r"\bPg\s+\d+\s+of\s+\d+\b", re.I)
+PAGINATION_RE = re.compile(r"\b(?:Page|Pg)\s+\d+\s+of\s+\d+\b", re.I)
 PAGINATION_COLON_RE = re.compile(r"\bPage:\s*\d+\b", re.I)
 PAGINATION_PAGE_ID_RE = re.compile(r"\bPageID\s+#:\s*\d+\b", re.I)
 
@@ -93,9 +92,8 @@ def is_page_line(line: str) -> bool:
     :return: True if the line matches "Page X of Y" or "Page: X"; False otherwise.
     """
     return bool(
-        PAGINATION_OF_RE.search(line)
+        PAGINATION_RE.search(line)
         or PAGINATION_COLON_RE.search(line)
-        or PAGINATION_PG_OF_RE.search(line)
         or PAGINATION_PAGE_ID_RE.search(line)
     )
 
@@ -129,7 +127,7 @@ def is_doc_common_header(line: str) -> bool:
     if line.startswith(bad_starters):
         return True
     if (
-        PAGINATION_OF_RE.search(line)
+        PAGINATION_RE.search(line)
         or PAGINATION_COLON_RE.search(line)
         or doc_filed_re.search(line)
         or date_re.search(line)
@@ -184,17 +182,17 @@ def needs_ocr(content):
     :param content: The content of a PDF.
     :return: boolean indicating if OCR is needed.
     """
-    # Minimum number of valid lines between common headers to consider that the page
-    # does not need OCR.
     lines = (ln.strip() for ln in content.splitlines())
     in_page = False
     other_content_count = 0
     saw_any_page = False
     for line in lines:
         if is_page_line(line):
-            if in_page:
-                if other_content_count < settings.LINE_THRESHOLD_OCR_PER_PAGE:
-                    return True
+            if (
+                in_page
+                and other_content_count < settings.LINE_THRESHOLD_OCR_PER_PAGE
+            ):
+                return True
             in_page = True
             saw_any_page = True
             other_content_count = 0
@@ -208,9 +206,8 @@ def needs_ocr(content):
             other_content_count += 1
 
     # end of document, close the trailing page
-    if in_page:
-        if other_content_count < settings.LINE_THRESHOLD_OCR_PER_PAGE:
-            return True
+    if in_page and other_content_count < settings.LINE_THRESHOLD_OCR_PER_PAGE:
+        return True
 
     # If no pages were found, fall back to the regular behavior of checking whether
     # any content remains after removing common headers.

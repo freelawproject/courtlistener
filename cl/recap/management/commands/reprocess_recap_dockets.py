@@ -31,7 +31,6 @@ def extract_unextracted_rds(queue: str, chunk_size: int) -> None:
         .order_by()
     )
     count = rd_needs_extraction.count()
-    # The count to send in a single Celery task
     # Set low throttle. Higher values risk crashing Redis.
     throttle = CeleryThrottle(queue_name=queue)
     processed_count = 0
