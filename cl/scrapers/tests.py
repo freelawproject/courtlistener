@@ -1675,7 +1675,9 @@ class DeleteDuplicatesTest(TestCase):
         - abort deletion if something doesn't match
         """
         stats = defaultdict(lambda: 0)
-        delete_duplicates.delete_same_hash_duplicates(stats)
+        delete_duplicates.delete_same_hash_duplicates(
+            stats, [SOURCES.COURT_WEBSITE]
+        )
 
         try:
             self.should_delete.refresh_from_db()
