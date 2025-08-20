@@ -31,10 +31,16 @@
 	{% include "includes/date_picker.html" %}
 	<script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">
-        document.getElementById('court-upload-form').addEventListener('submit', function(e) {
-          const submitButton = this.querySelector('button[type="submit"]');
-          submitButton.disabled = true;
-          submitButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i>&nbsp;Processing...';
+        document.getElementById('court-upload-form').addEventListener('submit', function (e) {
+            const form = this;
+            const submitButton = this.querySelector('button[type="submit"]');
+            if (form.dataset.submitting === 'true') {
+                e.preventDefault();
+                return;
+            }
+            form.dataset.submitting = 'true';
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i>&nbsp;Processing...';
         });
     </script>
 {% endblock %}
