@@ -110,15 +110,18 @@ def delete_same_hash_duplicates(
     """Delete opinions with the same hash, and their related objects
 
     :param stats: a dictionary to count events
+    :param sources: a list of OpinionCluster.source values
+
     :return None
     """
     # Group opinions by hash
     # Keep the groups with a single hash, and more than 1 row
     # these are same-hash duplicates
     if len(sources) == 1:
-        source_filter = {"cluster__source": sources[0]}
-    elif len(sources) == len(SOURCES.NAMES):
-        source_filter = {}
+        if sources[0] == "ALL":
+            source_filter = {}
+        else:
+            source_filter = {"cluster__source": sources[0]}
     else:
         source_filter = {"cluster__source__in": sources}
 
@@ -180,10 +183,11 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--cluster-sources",
-            choices=list(SOURCES.parts_to_source_mapper.values()),
+            choices=list(SOURCES.parts_to_source_mapper.values()) + ["ALL"],
             default=[SOURCES.COURT_WEBSITE],
             nargs="*",
-            help="`OpinionCluster.source` values to include when finding duplicate groups",
+            help="""`OpinionCluster.source` values to include when finding
+            duplicate groups. Pass `ALL` if you want to include all sources.""",
         )
 
     def handle(self, *args, **options):
