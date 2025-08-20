@@ -1734,7 +1734,7 @@ class SearchAlertsWebhooksTest(
                 type=Citation.LEXIS,
                 cluster=cls.dly_opinion.cluster,
             )
-            cls.neutra_citation = CitationWithParentsFactory.create(
+            cls.neutral_citation = CitationWithParentsFactory.create(
                 volume="10",
                 reporter="Neutral",
                 page="4",

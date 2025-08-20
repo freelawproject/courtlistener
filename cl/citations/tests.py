@@ -1635,10 +1635,41 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ),
         )
 
+        self.alphanumeric_citation_2 = CitationWithParentsFactory.create(
+            volume="102-56",
+            reporter="Fulton County D. Rep.",
+            page="16B",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=self.court_scotus),
+                case_name="John v. Doe",
+                date_filed=date(2025, 8, 20),
+            ),
+        )
+
+        self.alphanumeric_citation_3 = CitationWithParentsFactory.create(
+            volume="402A",
+            reporter="Mich",
+            page="117",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=self.court_scotus),
+                case_name="Smith v. Bar",
+                date_filed=date(2025, 8, 20),
+            ),
+        )
+
         self.assertEqual(self.alphanumeric_citation.volume, "71A")
         self.assertEqual(
             str(self.alphanumeric_citation), "71A A.F.T.R.2d (RIA) 3011"
         )
+
+        self.assertEqual(self.alphanumeric_citation_2.volume, "102-56")
+        self.assertEqual(
+            str(self.alphanumeric_citation_2),
+            "102-56 Fulton County D. Rep. 16B",
+        )
+
+        self.assertEqual(self.alphanumeric_citation_3.volume, "402A")
+        self.assertEqual(str(self.alphanumeric_citation_3), "402A Mich 117")
 
 
 class CitationFeedTest(

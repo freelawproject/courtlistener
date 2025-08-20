@@ -1,5 +1,4 @@
 import logging
-import re
 
 from eyecite.models import CitationBase, FullCaseCitation
 
@@ -36,13 +35,6 @@ def unmatched_citation_is_valid(
             citation,
         )
         return False
-
-    # This would raise a DataError, we have seen cases from bad OCR or
-    # citation lookalikes. See #5191
-    if match := re.match(r"^(\d+)", groups["volume"]):
-        vol_num = int(match.group(1))
-        if vol_num >= 32_767:
-            return False
 
     # avoid storing self citations as unmatched; the self citation will
     # usually be found at the beginning of the opinion's text
