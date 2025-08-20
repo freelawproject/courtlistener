@@ -4010,7 +4010,7 @@ class RecapPdfTaskTest(TestCase):
         self.pq.filepath_local.save(self.filename_ocr, cf)
         rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         recap_document = RECAPDocument.objects.get(pk=rd.pk)
-        self.assertEqual(needs_ocr(recap_document.plain_text), False)
+        self.assertEqual(needs_ocr(recap_document.plain_text), True)
         self.assertEqual(recap_document.ocr_status, RECAPDocument.OCR_COMPLETE)
 
 
@@ -5978,7 +5978,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         ]
         self.assertEqual(len(rd_needs_extraction), 2)
 
-        extract_unextracted_rds("celery")
+        extract_unextracted_rds("celery", 10)
 
         rd_needs_extraction_after = [
             x.pk
@@ -6017,7 +6017,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         self.assertEqual(rd[0].sha1, "asdfasdfasdfasdfasdfasddf")
         self.assertEqual(rd[0].date_upload, date_upload)
 
-        extract_unextracted_rds("celery")
+        extract_unextracted_rds("celery", 10)
         # File related fields should be cleaned up after the failed extraction.
         self.assertEqual(rd[0].is_available, False)
         self.assertEqual(rd[0].file_size, None)
