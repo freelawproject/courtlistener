@@ -957,19 +957,17 @@ async def setup_opinion_context(
     return context
 
 
-async def get_opinions_queryset(
-    sub_opinions_prefetch: str | Prefetch,
-) -> QuerySet:
+async def get_opinions_queryset(sub_opinions_prefetch: str) -> QuerySet:
     """Prepare a cluster queryset with common prefetchs to prevent extra
     queries
 
     :param sub_opinions_prefetch: a plain string which identifies a prefetch
-        path. If it has the `no_text_fields`, it will get the sub_opinions
+        path. If it's value is "no_text_fields", it will get the sub_opinions
         without their big text fields, for performance improvements
     :return: the queryset
     """
     if sub_opinions_prefetch == "no_text_fields":
-        sub_opinions_prefetch = Prefetch(
+        prefetch = Prefetch(
             "sub_opinions",
             Opinion.objects.defer(
                 "html_with_citations",
@@ -981,9 +979,11 @@ async def get_opinions_queryset(
                 "html_anon_2020",
             ),
         )
+    else:
+        prefetch = Prefetch(sub_opinions_prefetch)
 
     return OpinionCluster.objects.prefetch_related(
-        sub_opinions_prefetch, "citations"
+        prefetch, "citations"
     ).select_related("docket__court")
 
 
