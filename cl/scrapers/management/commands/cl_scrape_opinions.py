@@ -15,6 +15,7 @@ from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
+from cl import settings
 from cl.alerts.models import RealTimeQueue
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
@@ -29,7 +30,6 @@ from cl.scrapers.exceptions import (
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
-    get_binary_content,
     get_child_court,
     get_extension,
     make_citation,
@@ -317,7 +317,10 @@ class Command(ScraperCommand):
         if item.get("content"):
             content = item.pop("content")
         else:
-            content = get_binary_content(item["download_urls"], site)
+            media_root = settings.MEDIA_ROOT
+            content = site.download_content(
+                item["download_urls"], media_root=media_root
+            )
 
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
