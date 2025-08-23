@@ -1,4 +1,6 @@
 {% load svg_tags component_tags %}
+{% require_script "js/third_party/flatpickr/flatpickr@4.6.13" %}
+{% require_script "js/third_party/flatpickr/plugins/confirmDate@4.6.13" %}
 {% require_script "js/alpine/components/date_selector.js" %}
 {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 
@@ -18,6 +20,16 @@
   class="flex flex-col gap-1.5"
   x-bind:aria-labelledby="labelId"
 >
+  <input
+    x-bind:id="flatpickrAfterInputId"
+    type="hidden"
+    data-date="after"
+  >
+  <input
+    x-bind:id="flatpickrBeforeInputId"
+    type="hidden"
+    data-date="before"
+  >
   {# LABEL + DATE TYPE SELECTOR #}
   <div class="flex flex-row justify-between">
     <div class="flex flex-grow items-center justify-start gap-1">
@@ -32,8 +44,8 @@
       {% endif %}
     </div>
 
+    {#   Date Type Selector: Calendar/Relative   #}
     {% if relative %}
-      {#   Date Type Selector: Calendar/Relative   #}
       <div
         role="radiogroup"
         aria-label="Choose between calendar dates and relative dates"
@@ -71,36 +83,51 @@
     x-show="isSelectedType"
   >
     {#  Date After  #}
-    <div class="flex flex-col justify-start gap-1.5">
-      <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
+    <div data-date="after" x-on:click="openDatePicker" class="focus-container input-text flex justify-stretch items-stretch gap-2">
+      <button
+        type="button"
+        x-on:click="openDatePicker"
+        data-date="after"
+        aria-label="Open date picker"
+      >
         {% svg "calendar" class="w-5 h-5" aria_hidden="true" %}
-        <input
-          type="text"
-          name="{{ date_after_field_name }}"
-          data-type="calendar"
-          x-bind:disabled="disabled"
-          x-bind:id="calendarInputId"
-          placeholder="{{ date_after_placeholder }}"
-          class="focus:ring-0 focus:outline-none w-full"
-          aria-label="Starting date"
-          autocomplete="off">
-      </div>
+      </button>
+      <input
+        type="text"
+        name="{{ date_after_field_name }}"
+        data-type="calendar"
+        data-date="after"
+        x-bind:disabled="disabled"
+        x-bind:id="calendarAfterInputId"
+        x-on:input="closeDatePicker"
+        placeholder="{{ date_after_placeholder }}"
+        class="focus:ring-0 focus:outline-none w-full"
+        aria-label="Starting date in format MM/DD/YYYY"
+        autocomplete="off">
     </div>
 
     {#  Date Before  #}
-    <div class="flex flex-col justify-start gap-1.5">
-      <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
+    <div data-date="before" x-on:click="openDatePicker" class="focus-container input-text flex justify-stretch items-stretch gap-2">
+      <button
+        type="button"
+        x-on:click="openDatePicker"
+        data-date="before"
+        aria-label="Open date picker"
+      >
         {% svg "calendar" class="w-5 h-5" aria_hidden="true" %}
-        <input
-          type="text"
-          name="{{ date_before_field_name }}"
-          data-type="calendar"
-          x-bind:disabled="disabled"
-          placeholder="{{ date_before_placeholder }}"
-          class="focus:ring-0 focus:outline-none w-full"
-          aria-label="Ending date"
-          autocomplete="off">
-      </div>
+      </button>
+      <input
+        type="text"
+        name="{{ date_before_field_name }}"
+        data-type="calendar"
+        data-date="before"
+        x-bind:disabled="disabled"
+        x-bind:id="calendarBeforeInputId"
+        x-on:input="closeDatePicker"
+        placeholder="{{ date_before_placeholder }}"
+        class="focus:ring-0 focus:outline-none w-full"
+        aria-label="Ending date in format MM/DD/YYYY"
+        autocomplete="off">
     </div>
   </div>
 
