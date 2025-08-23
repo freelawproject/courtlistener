@@ -161,7 +161,8 @@
       "page": "1",
       "type": 1,
       "cluster": 1,
-      "date_created": "2025-08-21T23:52:43.497Z"
+      "date_created": "2025-08-21T23:52:43.497Z",
+      "date_modified": "2025-08-21T23:52:43.497Z"
     },
     "model": "search.citation",
     "pk": 1
@@ -173,7 +174,8 @@
       "page": "339",
       "type": 8,
       "cluster": 2,
-      "date_created": "2025-08-21T23:52:43.497Z"
+      "date_created": "2025-08-21T23:52:43.497Z",
+      "date_modified": "2025-08-21T23:52:43.497Z"
     },
     "model": "search.citation",
     "pk": 2
@@ -185,7 +187,8 @@
       "page": "1",
       "type": 1,
       "cluster": 2,
-      "date_created": "2025-08-21T23:52:43.497Z"
+      "date_created": "2025-08-21T23:52:43.497Z",
+      "date_modified": "2025-08-21T23:52:43.497Z"
     },
     "model": "search.citation",
     "pk": 3
@@ -197,7 +200,8 @@
       "page": "1",
       "type": 5,
       "cluster": 2,
-      "date_created": "2025-08-21T23:52:43.497Z"
+      "date_created": "2025-08-21T23:52:43.497Z",
+      "date_modified": "2025-08-21T23:52:43.497Z"
     },
     "model": "search.citation",
     "pk": 4
@@ -209,7 +213,8 @@
       "page": "9",
       "type": 1,
       "cluster": 2,
-      "date_created": "2025-08-21T23:52:43.497Z"
+      "date_created": "2025-08-21T23:52:43.497Z",
+      "date_modified": "2025-08-21T23:52:43.497Z"
     },
     "model": "search.citation",
     "pk": 5
@@ -221,7 +226,8 @@
       "page": "11",
       "type": 1,
       "cluster": 3,
-      "date_created": "2025-08-21T23:52:43.497Z"
+      "date_created": "2025-08-21T23:52:43.497Z",
+      "date_modified": "2025-08-21T23:52:43.497Z"
     },
     "model": "search.citation",
     "pk": 6
