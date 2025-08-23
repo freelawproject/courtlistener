@@ -574,6 +574,7 @@ class TranscriptionTest(TestCase):
             )
         )
 
+
 class TranscriptAPITest(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()

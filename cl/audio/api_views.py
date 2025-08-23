@@ -39,6 +39,7 @@ class AudioViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
         .order_by("-id")
     )
 
+
 class TranscriptViewSet(viewsets.ReadOnlyModelViewSet):
     """
     A viewset for viewing transcripts.
