@@ -2,6 +2,7 @@ import argparse
 import datetime
 import inspect
 import math
+import random
 import time
 from collections.abc import Callable
 from typing import cast
@@ -335,6 +336,7 @@ def get_pdfs(
                 f"before starting the next cycle."
             )
             time.sleep(1)
+
         logger.info(f"Processing row id: {row.id} from {row.court_id}")
         c = chain(
             process_free_opinion_result.si(
@@ -351,8 +353,12 @@ def get_pdfs(
             delete_pacer_row.s(row.pk).set(queue=q),
         )
 
-        c.apply_async()
+        # we accept same hash RecapDocuments; but we don't want duplicates in
+        # Opinions. Introduce some time variability between consecutive tasks
+        # to help the hash checks in `recap_document_into_opinions` work
+        c.apply_async(countdown=random.uniform(5, 30))
         completed += 1
+
         if completed % 1000 == 0:
             logger.info(
                 f"Sent {completed}/{count} tasks to celery for {task_name} so far."
