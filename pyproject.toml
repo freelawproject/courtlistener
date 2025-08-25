@@ -45,6 +45,7 @@ dependencies = [
   "django-storages>=1.14.5",
   "djangorestframework @ git+https://github.com/encode/django-rest-framework.git@cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2",
   "djangorestframework-xml>=2.0.0",
+  "drf-nested-routers>=0.93.4",
   "feedparser>=6.0.10",
   "httplib2>=0.22.0",
   "internetarchive>=5.3.1",
