@@ -135,6 +135,11 @@ document.addEventListener('alpine:init', () => {
     init() {
       const flatpickrConfig = {
         dateFormat: 'm/d/Y',
+        enable: [
+          function (date) {
+            return date <= new Date();
+          },
+        ],
         allowInput: true,
         ariaDateFormat: 'F j, Y',
         locale: { firstDayOfWeek: 1 },
