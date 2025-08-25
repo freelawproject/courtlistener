@@ -5,7 +5,7 @@ from django.db.models import Q, QuerySet
 from cl.search.models import Citation, OpinionCluster
 
 
-def get_total_estimate_count(table_name: str) -> int | None:
+def get_total_estimate_count(table_name: str) -> int:
     full_name = f"public.{table_name}"
     with connection.cursor() as cursor:
         cursor.execute(
@@ -17,7 +17,7 @@ def get_total_estimate_count(table_name: str) -> int | None:
             [full_name],
         )
         result = cursor.fetchone()
-        return result[0] if result else None
+        return result[0] if result and result[0] > 0 else 0
 
 
 def get_available_documents_estimate_count() -> int:
@@ -42,7 +42,7 @@ def get_available_documents_estimate_count() -> int:
             WHERE index IS NOT NULL;
         """)
         result = cursor.fetchone()
-        return result[0] if result else None
+        return result[0] if result and result[0] > 0 else 0
 
 
 async def get_clusters_from_citation_str(
