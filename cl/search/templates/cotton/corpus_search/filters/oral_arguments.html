@@ -1,6 +1,6 @@
 {% load svg_tags %}
 
-<c-vars search_form/>
+<c-vars request search_form/>
 
 <fieldset x-bind:id="fieldsetIds.oralArgs" class="contents" x-show="isActiveScope" data-scope="Oral Arguments">
   <legend class="sr-only">Oral Arguments filters</legend>
@@ -26,18 +26,14 @@
     </div>
   </div>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.argued_after.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.argued_after }}
-    </div>
-  </div>
-
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.argued_before.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.argued_before }}
-    </div>
-  </div>
+  <c-corpus-search.date-selector
+    label="Argument Date"
+    :request="request"
+    date_after_field_name="argued_after"
+    date_before_field_name="argued_after"
+    date_after_placeholder="Argued After"
+    date_before_placeholder="Argued Before"
+    only
+  />
 
 </fieldset>

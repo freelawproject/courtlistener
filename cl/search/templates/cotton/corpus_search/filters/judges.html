@@ -1,6 +1,6 @@
 {% load svg_tags %}
 
-<c-vars search_form/>
+<c-vars request search_form/>
 
 <fieldset x-bind:id="fieldsetIds.judges" class="contents" x-show="isActiveScope" data-scope="Judges">
   <legend class="sr-only">Judges filters</legend>
@@ -19,22 +19,15 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 gap-2 items-end">
-    <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-      {{ search_form.born_after.label_tag }}
-      <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
-        {% svg "calendar" class="w-5 h-5" %}
-        {{ search_form.born_after }}
-      </div>
-    </div>
-    <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-      {{ search_form.born_before.label_tag }}
-      <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
-        {% svg "calendar" class="w-5 h-5" %}
-        {{ search_form.born_before }}
-      </div>
-    </div>
-  </div>
+  <c-corpus-search.date-selector
+    label="Date of Birth"
+    :request="request"
+    date_after_field_name="born_after"
+    date_before_field_name="born_after"
+    date_after_placeholder="Born After"
+    date_before_placeholder="Born Before"
+    only
+  />
 
   <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
     {{ search_form.dob_city.label_tag }}
