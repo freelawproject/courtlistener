@@ -17,15 +17,20 @@ from django.core.cache import caches
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test import override_settings
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
+from django.utils.xmlutils import UnserializableContentError
+from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import Cursor, CursorPagination
 from rest_framework.request import Request
+from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
+from rest_framework_xml.renderers import XMLRenderer
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
@@ -44,11 +49,14 @@ from cl.disclosures.api_views import (
     GiftViewSet,
     InvestmentViewSet,
     NonInvestmentIncomeViewSet,
-    PositionViewSet,
     ReimbursementViewSet,
     SpouseIncomeViewSet,
 )
+from cl.disclosures.api_views import (
+    PositionViewSet as DisclosurePositionViewSet,
+)
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
+from cl.favorites.models import GenericCount
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
@@ -59,10 +67,12 @@ from cl.people_db.api_views import (
     PersonDisclosureViewSet,
     PersonViewSet,
     PoliticalAffiliationViewSet,
-    PositionViewSet,
     RetentionEventViewSet,
     SchoolViewSet,
     SourceViewSet,
+)
+from cl.people_db.api_views import (
+    PositionViewSet as PeoplePositionViewSet,
 )
 from cl.people_db.factories import (
     AttorneyFactory,
@@ -80,6 +90,7 @@ from cl.recap.views import (
     PacerFetchRequestViewSet,
     PacerProcessingQueueViewSet,
 )
+from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_views import (
     CourtViewSet,
     DocketEntryViewSet,
@@ -93,23 +104,28 @@ from cl.search.api_views import (
 )
 from cl.search.factories import (
     CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
+    OpinionClusterWithParentsFactory,
+    OpinionWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     SOURCES,
+    ClusterRedirection,
     Court,
     Docket,
+    DocketEntry,
     Opinion,
+    RECAPDocument,
 )
 from cl.stats.models import Event
 from cl.tests.cases import (
     ESIndexTestCase,
-    SimpleTestCase,
     TestCase,
-    TransactionTestCase,
 )
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -210,7 +226,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
         cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FD")
 
-        cls.c_scotus_1 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_scotus_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             docket=DocketFactory(
                 court=cls.court_scotus, docket_number="123456"
@@ -218,7 +234,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             date_filed=date(2000, 8, 15),
         )
-        cls.c_scotus_2 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_scotus_2 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="America vs Bank",
             docket=DocketFactory(
                 court=cls.court_scotus, docket_number="34-2535"
@@ -226,7 +242,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             precedential_status=PRECEDENTIAL_STATUS.ERRATA,
             date_filed=date(2024, 6, 15),
         )
-        cls.c_cand_1 = OpinionClusterFactoryWithChildrenAndParents(
+        cls.c_cand_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Johnson v. National",
             docket=DocketFactory(
                 court=cls.court_cand, docket_number="36-2000"
@@ -341,7 +357,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
     "cl.api.utils.get_logging_prefix",
     return_value="api:test_counts",
 )
-class ApiQueryCountTests(TransactionTestCase):
+class ApiQueryCountTests(TestCase):
     """Check that the number of queries for an API doesn't explode
 
     I expect these tests to regularly need updating as new features are added
@@ -839,7 +855,7 @@ class DRFOrderingTests(TestCase):
         )
 
 
-class FilteringCountTestCase:
+class FilteringCountTestMixin:
     """Mixin for adding an additional test assertion."""
 
     # noinspection PyPep8Naming
@@ -868,11 +884,10 @@ class FilteringCountTestCase:
         return r
 
 
-class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
-        Court.objects.all().delete()
-
+        super().setUpTestData()
         cls.parent_court = CourtFactory(
             id="parent1",
             full_name="Parent Court",
@@ -881,7 +896,6 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             in_use=True,
             has_opinion_scraper=True,
             has_oral_argument_scraper=False,
-            position=1,
             start_date=date(2000, 1, 1),
             end_date=None,
             jurisdiction=Court.FEDERAL_APPELLATE,
@@ -897,7 +911,6 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             in_use=False,
             has_opinion_scraper=False,
             has_oral_argument_scraper=True,
-            position=2,
             start_date=date(2010, 6, 15),
             end_date=date(2020, 12, 31),
             jurisdiction=Court.STATE_SUPREME,
@@ -912,7 +925,6 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             in_use=True,
             has_opinion_scraper=False,
             has_oral_argument_scraper=False,
-            position=3,
             start_date=date(2015, 5, 20),
             end_date=None,
             jurisdiction=Court.STATE_TRIAL,
@@ -927,16 +939,16 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
             in_use=True,
             has_opinion_scraper=False,
             has_oral_argument_scraper=False,
-            position=4,
             start_date=date(2012, 8, 25),
             end_date=None,
             jurisdiction=Court.FEDERAL_DISTRICT,
             date_modified=datetime(2023, 5, 5, tzinfo=UTC),
         )
+        cls.qs = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
+        cls.path = reverse("court-list", kwargs={"version": "v4"})
 
-    @async_to_sync
-    async def setUp(self):
-        self.path = reverse("court-list", kwargs={"version": "v4"})
+    def setUp(self):
+        super().setUp()
         self.q: dict[str, Any] = {}
 
     async def test_parent_court_filter(self):
@@ -956,7 +968,8 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
     async def test_no_parent_court_filter(self):
         """Do we get all courts when using no filters?"""
         self.q = {}
-        await self.assertCountInResults(4)  # Should return all four courts
+        count = await self.qs.acount()
+        await self.assertCountInResults(count)
 
     async def test_invalid_parent_court_filter(self):
         """Do we handle invalid parent_court values correctly?"""
@@ -972,65 +985,95 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
     async def test_in_use_filter(self):
         """Can we filter courts by in_use field?"""
         self.q = {"in_use": "true"}
-        await self.assertCountInResults(3)  # parent1, child2, orphan
+        in_use_count = await self.qs.filter(in_use=True).acount()
+        await self.assertCountInResults(in_use_count)
         self.q = {"in_use": "false"}
-        await self.assertCountInResults(1)  # child1
+        not_in_use_count = await self.qs.filter(in_use=False).acount()
+        await self.assertCountInResults(not_in_use_count)
 
     async def test_has_opinion_scraper_filter(self):
         """Can we filter courts by has_opinion_scraper field?"""
         self.q = {"has_opinion_scraper": "true"}
-        await self.assertCountInResults(1)  # parent1
+        has_scraper = await self.qs.filter(has_opinion_scraper=True).acount()
+        await self.assertCountInResults(has_scraper)
         self.q = {"has_opinion_scraper": "false"}
-        await self.assertCountInResults(3)  # child1, child2, orphan
+        hasnt_scraper = await self.qs.filter(
+            has_opinion_scraper=False
+        ).acount()
+        await self.assertCountInResults(
+            hasnt_scraper
+        )  # child1, child2, orphan
 
     async def test_has_oral_argument_scraper_filter(self):
         """Can we filter courts by has_oral_argument_scraper field?"""
         self.q = {"has_oral_argument_scraper": "true"}
-        await self.assertCountInResults(1)  # child1
+        has_scraper = await self.qs.filter(
+            has_oral_argument_scraper=True
+        ).acount()
+        await self.assertCountInResults(has_scraper)
         self.q = {"has_oral_argument_scraper": "false"}
-        await self.assertCountInResults(3)  # parent1, child2, orphan
+        hasnt_scraper = await self.qs.filter(
+            has_oral_argument_scraper=False
+        ).acount()
+        await self.assertCountInResults(hasnt_scraper)
 
     async def test_position_filter(self):
         """Can we filter courts by position with integer lookups?"""
-        self.q = {"position__gt": "2"}
-        await self.assertCountInResults(2)  # child2 (3), orphan (4)
-        self.q = {"position__lte": "2"}
-        await self.assertCountInResults(2)  # parent1 (1), child1 (2)
+        self.q = {"position__gt": self.child_court1.position}
+        count = await self.qs.filter(
+            position__gt=self.child_court1.position
+        ).acount()
+        await self.assertCountInResults(count)
+        self.q = {"position__lte": self.child_court1.position}
+        count = await self.qs.filter(
+            position__lte=self.child_court1.position
+        ).acount()
+        await self.assertCountInResults(count)
 
     async def test_start_date_filter(self):
         """Can we filter courts by start_date with date lookups?"""
         self.q = {"start_date__year": "2015"}
-        await self.assertCountInResults(1)  # child2 (2015-05-20)
+        count = await self.qs.filter(start_date__year=2015).acount()
+        await self.assertCountInResults(count)
         self.q = {"start_date__gte": "2010-01-01"}
-        await self.assertCountInResults(3)  # child1, child2, orphan
+        count = await self.qs.filter(start_date__gte="2010-01-01").acount()
+        await self.assertCountInResults(count)
 
     async def test_end_date_filter(self):
         """Can we filter courts by end_date with date lookups?"""
         self.q = {"end_date__day": "31"}
-        await self.assertCountInResults(1)  # parent1, child2, orphan
+        count = await self.qs.filter(end_date__day=31).acount()
+        await self.assertCountInResults(count)
         self.q = {"end_date__year": "2024"}
-        await self.assertCountInResults(0)
+        count = await self.qs.filter(end_date__year=2024).acount()
+        await self.assertCountInResults(count)
 
     async def test_short_name_filter(self):
         """Can we filter courts by short_name with text lookups?"""
         self.q = {"short_name__iexact": "Cc1"}
-        await self.assertCountInResults(1)  # child1
+        count = await self.qs.filter(short_name__iexact="Cc1").acount()
+        await self.assertCountInResults(count)
         self.q = {"short_name__icontains": "cc"}
-        await self.assertCountInResults(2)  # child1, child2
+        count = await self.qs.filter(short_name__icontains="cc").acount()
+        await self.assertCountInResults(count)
 
     async def test_full_name_filter(self):
         """Can we filter courts by full_name with text lookups?"""
         self.q = {"full_name__istartswith": "Child"}
-        await self.assertCountInResults(2)  # child1, child2
+        count = await self.qs.filter(full_name__istartswith="Child").acount()
+        await self.assertCountInResults(count)
         self.q = {"full_name__iendswith": "Court"}
-        await self.assertCountInResults(2)  # parent1, orphan
+        count = await self.qs.filter(full_name__iendswith="Court").acount()
+        await self.assertCountInResults(count)
 
     async def test_citation_string_filter(self):
         """Can we filter courts by citation_string with text lookups?"""
         self.q = {"citation_string": "OC"}
-        await self.assertCountInResults(1)  # orphan
+        count = await self.qs.filter(citation_string="OC").acount()
+        await self.assertCountInResults(count)
         self.q = {"citation_string__icontains": "2"}
-        await self.assertCountInResults(1)  # child2
+        count = await self.qs.filter(citation_string__icontains="2").acount()
+        await self.assertCountInResults(count)
 
     async def test_jurisdiction_filter(self):
         """Can we filter courts by jurisdiction?"""
@@ -1040,20 +1083,28 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
                 Court.FEDERAL_DISTRICT,
             ]
         }
-        await self.assertCountInResults(2)  # parent1 and orphan
+        count = await self.qs.filter(
+            jurisdiction__in=[Court.FEDERAL_APPELLATE, Court.FEDERAL_DISTRICT]
+        ).acount()
+        await self.assertCountInResults(count)  # parent1 and orphan
 
     async def test_combined_filters(self):
         """Can we filter courts with multiple filters applied?"""
         self.q = {
             "in_use": "true",
             "has_opinion_scraper": "false",
-            "position__gt": "2",
+            "position__gt": self.child_court1.position,
         }
-        await self.assertCountInResults(2)  # child2 and orphan
+        count = await self.qs.filter(
+            in_use=True,
+            has_opinion_scraper=False,
+            position__gt=self.child_court1.position,
+        ).acount()
+        await self.assertCountInResults(count)
 
 
 class DRFJudgeApiFilterTests(
-    SimpleUserDataMixin, TestCase, FilteringCountTestCase
+    SimpleUserDataMixin, TestCase, FilteringCountTestMixin
 ):
     """Do the filters work properly?"""
 
@@ -1247,7 +1298,7 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)  # Bill
 
 
-class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
     fixtures = ["recap_docs.json"]
 
     @classmethod
@@ -1404,7 +1455,6 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         await self.assertCountInResults(0)
 
         # Adds extra role to the existing attorney
-        docket = await Docket.objects.afirst()
         attorney = await Attorney.objects.afirst()
         party = await sync_to_async(PartyFactory)(
             docket=self.docket_2,
@@ -1660,7 +1710,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFSearchAppAndAudioAppApiFilterTest(
-    TestCase, AudioTestCase, FilteringCountTestCase
+    AudioTestCase, FilteringCountTestMixin
 ):
     fixtures = [
         "judge_judy.json",
@@ -2519,7 +2569,7 @@ class V4DRFPaginationTest(TestCase):
             default_ordering="-id",
             secondary_cursor_key="date_created",
             non_cursor_key="date_elected",
-            viewset=PositionViewSet,
+            viewset=PeoplePositionViewSet,
         )
 
     async def test_retention_events_endpoint(self):
@@ -2795,7 +2845,7 @@ class V4DRFPaginationTest(TestCase):
             default_ordering="-id",
             secondary_cursor_key="date_modified",
             non_cursor_key="",
-            viewset=PositionViewSet,
+            viewset=DisclosurePositionViewSet,
         )
 
     async def test_reimbursement_endpoint(self):
@@ -3674,3 +3724,440 @@ class CacheListApiResponseTest(TestCase):
 
         # Confirm the cache key still does not exist after the request
         self.assertFalse(self.cache.has_key(fake_cache_key))
+
+
+class EventCountApiTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Get the versioned URL for the increment-event endpoint
+        cls.increment_event_v4 = reverse(
+            "increment-event-list", kwargs={"version": "v4"}
+        )
+
+    def test_can_validate_label_format(self):
+        """Verify invalid event labels are rejected with a 400 response."""
+        invalid_label = "invalid-label-format"
+        response = self.client.post(
+            self.increment_event_v4, {"label": invalid_label}
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+        data = response.data
+        self.assertEqual(data["label"][0], "Invalid label format provided.")
+
+        more_than_10_digit_label = "d.12345678910:view"
+        response = self.client.post(
+            self.increment_event_v4, {"label": more_than_10_digit_label}
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+        data = response.data
+        self.assertEqual(data["label"][0], "Invalid label format provided.")
+
+    def test_can_create_new_events(self):
+        """Verify new events can be created through the API."""
+        label = "d.123:view"
+
+        # Ensure no existing record
+        event_record = GenericCount.objects.filter(label=label)
+        self.assertFalse(event_record.exists())
+
+        # First request — should create the counter with value 0, return it
+        response = self.client.post(self.increment_event_v4, {"label": label})
+        self.assertEqual(response.status_code, HTTPStatus.ACCEPTED)
+
+        data = response.data
+        self.assertEqual(data["label"], label)
+        self.assertEqual(data["value"], 0)
+
+        # Counter should now exist and be 1
+        view_counter = event_record.first()
+        self.assertIsNotNone(view_counter)
+        self.assertEqual(view_counter.value, 1)
+
+    def test_can_increment_exiting_events(self):
+        """Verify existing events can be incremented through the API."""
+        # Create an initial event record
+        label = "d.345:view"
+        event_record = GenericCount.objects.create(label=label, value=3)
+
+        response = self.client.post(self.increment_event_v4, {"label": label})
+        self.assertEqual(response.status_code, HTTPStatus.ACCEPTED)
+
+        # Refresh the event_record object from the database
+        event_record.refresh_from_db()
+        # Assert that the value of the event record has been incremented by 1
+        self.assertEqual(event_record.value, 4)
+
+
+class DeferredDocketEntryTestMixin:
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        deferred_or_only_fields, _ = qs.query.deferred_loading
+        return Response(
+            {
+                "deferred_or_only": set(deferred_or_only_fields),
+                "prefetches": qs._prefetch_related_lookups,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class DeferredDocketEntryViewSet(
+    DeferredDocketEntryTestMixin, DocketEntryViewSet
+):
+    queryset = (
+        DocketEntry.objects.select_related(
+            "docket",
+        )
+        .prefetch_related(
+            "recap_documents__tags",
+            "tags",
+        )
+        .defer("recap_sequence_number")
+        .order_by("-id")
+    )
+
+
+class DeferredDocketEntryOnlyViewSet(
+    DeferredDocketEntryTestMixin, DocketEntryViewSet
+):
+    queryset = (
+        DocketEntry.objects.select_related(
+            "docket",
+        )
+        .prefetch_related(
+            "recap_documents__tags",
+            "tags",
+        )
+        .only("id", "recap_sequence_number")
+        .order_by("-id")
+    )
+
+
+class DynamicNestedFieldsMixinTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.factory = RequestFactory()
+        cls.view = DeferredDocketEntryViewSet.as_view({"get": "list"})
+        cls.view_2 = DeferredDocketEntryOnlyViewSet.as_view({"get": "list"})
+
+        cls.user_1 = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
+        ps = Permission.objects.filter(codename="has_recap_api_access")
+        ps_upload = Permission.objects.filter(
+            codename="has_recap_upload_access"
+        )
+        cls.user_1.user.user_permissions.add(*ps)
+        cls.user_1.user.user_permissions.add(*ps_upload)
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+
+        cls.docket = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.court,
+            docket_number="23-4567",
+            pacer_case_id="104490",
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(
+                docket=cls.docket,
+            ),
+            document_number="1",
+            is_available=True,
+            is_free_on_pacer=True,
+            page_count=17,
+            pacer_doc_id="17711118263",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
+        token, _ = Token.objects.get_or_create(user=cls.user_1.user)
+        cls.token, _ = Token.objects.get_or_create(user=cls.user_1.user)
+
+    async def _api_v4_request(self, endpoint, params):
+        url = reverse(endpoint, kwargs={"version": "v4"})
+        api_client = await sync_to_async(make_client)(self.user_1.user.pk)
+        return await api_client.get(url, params)
+
+    async def test_omit_nested_field(self) -> None:
+        """Confirm that specifying 'omit' for parent or nested fields excludes
+        them from the API response.
+        """
+        response = await self._api_v4_request(
+            "docketentry-list",
+            {"omit": "entry_number,recap_documents__plain_text"},
+        )
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        # Assert top‐level keys exactly match
+        self.assertNotIn("entry_number", set(results[0].keys()))
+
+        # Assert nested fields.
+        self.assertNotIn(
+            "plain_text", set(results[0]["recap_documents"][0].keys())
+        )
+
+    async def test_allowed_nested_field(self) -> None:
+        """Confirm that specifying 'fields' for parent or nested fields filters
+        the API response to include only those fields.
+        """
+        response = await self._api_v4_request(
+            "docketentry-list",
+            {"fields": "entry_number,recap_documents__plain_text"},
+        )
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        # Assert top‐level keys exactly match
+        self.assertEqual(len(results[0].keys()), 2)
+        self.assertIn("entry_number", set(results[0].keys()))
+
+        # Assert nested fields.
+        self.assertEqual(len(results[0]["recap_documents"][0].keys()), 1)
+        self.assertIn(
+            "plain_text", set(results[0]["recap_documents"][0].keys())
+        )
+
+    async def test_fields_all_gone_nested(self):
+        """If no fields are selected, all fields are omitted, including those
+        from the nested serializer.
+        """
+        response = await self._api_v4_request(
+            "docketentry-list",
+            {"fields": ""},
+        )
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        # Assert top‐level keys exactly match
+        self.assertEqual(len(results[0].keys()), 0)
+
+    async def test_nested_omit_and_fields_used(self):
+        """Omit and fields can be used together at the nested field level."""
+        response = await self._api_v4_request(
+            "docketentry-list",
+            {
+                "fields": "id,entry_number,description,recap_documents__plain_text,recap_documents__id",
+                "omit": "description,recap_documents__plain_text",
+            },
+        )
+
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        # Assert top‐level keys exactly match
+        self.assertEqual(len(results[0].keys()), 3)
+        self.assertEqual(
+            set(results[0].keys()), {"id", "entry_number", "recap_documents"}
+        )
+
+        # Assert nested fields.
+        self.assertEqual(len(results[0]["recap_documents"][0].keys()), 1)
+        self.assertEqual(set(results[0]["recap_documents"][0].keys()), {"id"})
+
+    def test_deffer_fields_custom_queryset(self):
+        """Confirms that the deferring fields logic works correctly with a custom
+        queryset that uses select_related and prefetch_related.
+        """
+        request = self.factory.get(
+            "/",
+            {
+                "fields": "id__test,id,entry_number,recap_sequence_number,description,recap_documents__plain_text,recap_documents__id",
+            },
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        response = self.view(request)
+        self.assertEqual(response.status_code, 200)
+
+        deferred_fields = response.data["deferred_or_only"]
+        self.assertEqual(
+            deferred_fields,
+            {
+                "date_filed",
+                "date_created",
+                "date_modified",
+                "pacer_sequence_number",
+                "recap_sequence_number",
+                "time_filed",
+                "tags",
+            },
+        )
+
+        prefetches = response.data["prefetches"]
+        self.assertEqual(len(prefetches), 3)
+        self.assertIn("recap_documents__tags", prefetches)
+        self.assertIn("tags", prefetches)
+
+    def test_deffer_omit_fields_custom_queryset(self):
+        """Confirms that the deferring fields logic works correctly with a custom
+        queryset that uses select_related and prefetch_related.
+        """
+        request = self.factory.get(
+            "/",
+            {
+                "omit": "entry_number,description,recap_documents__plain_text,recap_documents__pacer_doc_id",
+            },
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        response = self.view(request)
+        self.assertEqual(response.status_code, 200)
+
+        deferred_fields = response.data["deferred_or_only"]
+        self.assertEqual(
+            deferred_fields,
+            {"entry_number", "description", "recap_sequence_number"},
+        )
+
+        prefetches = response.data["prefetches"]
+        self.assertEqual(len(prefetches), 3)
+        self.assertIn("recap_documents__tags", prefetches)
+        self.assertIn("tags", prefetches)
+
+    def test_deffer_fields_custom_queryset_with_only(self):
+        """Confirms that the deferring fields logic doesn't modify original
+        only statements in the queryset.
+        """
+        request = self.factory.get(
+            "/",
+            {
+                "fields": "id,entry_number,recap_sequence_number,description,recap_documents__plain_text,recap_documents__id",
+            },
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        response = self.view_2(request)
+        self.assertEqual(response.status_code, 200)
+
+        only_fields = response.data["deferred_or_only"]
+        self.assertEqual(only_fields, {"id", "recap_sequence_number"})
+
+        prefetches = response.data["prefetches"]
+        self.assertEqual(len(prefetches), 3)
+        self.assertIn("recap_documents__tags", prefetches)
+        self.assertIn("tags", prefetches)
+
+
+class ClusterRedirectionTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.deleted_cluster_id = 999999
+        cls.redirect_to_cluster = OpinionClusterWithParentsFactory.create()
+        ClusterRedirection.objects.create(
+            deleted_cluster_id=cls.deleted_cluster_id,
+            cluster=cls.redirect_to_cluster,
+            reason=ClusterRedirection.VERSION,
+        )
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="a-user",
+            user__password=make_password("password"),
+        )
+        cls.sealed_cluster_id = 6666666
+        ClusterRedirection.objects.create(
+            reason=ClusterRedirection.SEALED,
+            deleted_cluster_id=cls.sealed_cluster_id,
+            cluster=None,
+        )
+
+    async def test_opinion_cluster_redirection(self):
+        """Test that a deleted cluster redirects to an existing cluster"""
+        url = reverse(
+            "opinioncluster-detail",
+            kwargs={
+                "version": "v4",
+                "pk": self.deleted_cluster_id,
+                "format": "json",
+            },
+        )
+        api_client = await sync_to_async(make_client)(self.user.user.pk)
+        response = await api_client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
+        redirect_url = response.headers["Location"]
+
+        # Check that extra kwargs are passed
+        self.assertTrue(
+            "v4" in redirect_url,
+            "'version' extra kwarg not passed in redirection",
+        )
+        self.assertTrue(
+            ".json" in redirect_url,
+            "'format' extra kwarg not passed in redirection",
+        )
+
+        redirect_response = await api_client.get(redirect_url)
+        data = json.loads(redirect_response.content)
+        self.assertEqual(data["id"], self.redirect_to_cluster.id)
+
+        # Check that we don't get false redirections for non-existent record
+        url = reverse(
+            "opinioncluster-detail", kwargs={"version": "v4", "pk": 777777}
+        )
+        response = await api_client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
+        # Check that a sealed record returns proper code and message
+        message = dict(ClusterRedirection.REDIRECTION_REASON)[
+            ClusterRedirection.SEALED
+        ]
+        url = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v4", "pk": self.sealed_cluster_id},
+        )
+        response = await api_client.get(url)
+        self.assertEqual(response.json()["detail"], message)
+        self.assertEqual(response.status_code, HTTPStatus.GONE)
+
+
+class TestOpinionViewsetXMLRendering(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="a-user",
+            user__password=make_password("password"),
+        )
+        cls.op_id = 5555555
+        cls.op = OpinionWithParentsFactory.create(
+            plain_text="\x0cAn invalid character", id=cls.op_id
+        )
+        cls.good_xml_op_id = 444444
+        cls.good_xml_op = OpinionWithParentsFactory.create(
+            plain_text="No invalid characters", id=cls.good_xml_op_id
+        )
+
+    async def test_xml_rendering(self):
+        """Can we handle invalid characters when XML is requested?"""
+        url = reverse(
+            "opinion-detail",
+            kwargs={"version": "v4", "pk": self.op_id, "format": "xml"},
+        )
+
+        try:
+            XMLRenderer().render({"plain_text": self.op.plain_text})
+            self.fail("XMLRenderer.render should fail")
+        except UnserializableContentError:
+            pass
+
+        api_client = await sync_to_async(make_client)(self.user.user.pk)
+        response = await api_client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        # Check that we don't call the cleaning function when XML is valid
+        url = reverse(
+            "opinion-detail",
+            kwargs={
+                "version": "v4",
+                "pk": self.good_xml_op_id,
+                "format": "xml",
+            },
+        )
+        with mock.patch("cl.search.api_renderers.clean_xml_data") as patched:
+            api_client = await sync_to_async(make_client)(self.user.user.pk)
+            response = await api_client.get(url)
+            patched.assert_not_called()
+
+        # Check that Redis set is populated
+        r = get_redis_interface("CACHE")
+        problematic_set = r.smembers(SafeXMLRenderer.redis_set_name)
+        # int ids were converted to strings
+        self.assertTrue(str(self.op_id) in problematic_set)
+        self.assertFalse(str(self.good_xml_op_id) in problematic_set)

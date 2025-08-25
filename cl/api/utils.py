@@ -1,5 +1,7 @@
 import logging
+import warnings
 from collections import OrderedDict, defaultdict
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from itertools import batched, chain
 from typing import Any, TypedDict
@@ -12,11 +14,12 @@ from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
-from django.db.models import F
+from django.db.models import F, Model, Prefetch, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
+from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
@@ -1218,3 +1221,465 @@ def handle_webhook_events(results: list[int | float], user: User) -> None:
             f"{intcomma(ordinal(user_count))} webhook event.",
             user=user,
         )
+
+
+class DynamicFieldsMixin:
+    """
+    A serializer mixin that takes an additional `fields` argument that controls
+    which fields should be displayed.
+    """
+
+    @property
+    def prevent_nested_processing(self) -> bool:
+        """True when this serializer is not the root nor a root’s list-child."""
+        return not (
+            self is self.root  # type: ignore[attr-defined]
+            or (
+                self.parent is self.root  # type: ignore[attr-defined]
+                and getattr(self.parent, "many", False)  # type: ignore[attr-defined]
+            )
+        )
+
+    @cached_property
+    def fields(self):
+        """
+        Filters the fields according to the `fields` query parameter.
+
+        A blank `fields` parameter (?fields) will remove all fields. Not
+        passing `fields` will pass all fields individual fields are comma
+        separated (?fields=id,name,url,email).
+
+        """
+        fields = super(DynamicFieldsMixin, self).fields
+
+        if not hasattr(self, "_context"):
+            # We are being called before a request cycle
+            return fields
+
+        if self.prevent_nested_processing:
+            return fields
+
+        try:
+            request = getattr(self, "context", {})["request"]
+        except KeyError:
+            conf = getattr(settings, "DRF_DYNAMIC_FIELDS", {})
+            if conf.get("SUPPRESS_CONTEXT_WARNING", False) is not True:
+                warnings.warn(
+                    "Context does not have access to request. "
+                    "See README for more information."
+                )
+            return fields
+
+        params = request.GET
+        source = get_source_path(self)
+        level = compute_level(self)
+
+        filter_fields = self.get_filter_fields(
+            params.get("fields", None), level, source
+        )
+        omit_fields = self.get_omit_fields(
+            params.get("omit", None), level, source
+        )
+
+        # Drop any fields that are not specified in the `fields` argument.
+        existing = set(fields.keys())
+        if filter_fields is None:
+            # no fields param given, don't filter.
+            allowed = existing
+        else:
+            allowed = set(filter(None, filter_fields))
+
+        # omit fields in the `omit` argument.
+        omitted = set(filter(None, omit_fields))
+
+        for field in existing:
+            if field not in allowed:
+                fields.pop(field, None)
+
+            if field in omitted:
+                fields.pop(field, None)
+
+        return fields
+
+    def get_filter_fields(
+        self, params, level, source, default=None, include_parent=True
+    ):
+        try:
+            return params.split(",")
+        except AttributeError:
+            return default
+
+    def get_omit_fields(self, params, level, source):
+        return self.get_filter_fields(
+            params, level, source, default=[], include_parent=False
+        )
+
+
+class NestedDynamicFieldsMixin(DynamicFieldsMixin):
+    """A serializer mixin that extends DynamicFieldsMixin to allow nested serializers
+    to filter their fields based on the original `fields` query parameter.
+
+    Unlike the base mixin—which only applies filtering at the root serializer,
+    this subclass:
+
+    - Disables the `prevent_nested_processing` guard, allowing each level of nested
+    serializer to apply field filtering independently.
+    - Overrides `get_filter_fields` to slice the raw `fields` string
+    down to exactly those names relevant at this serializer’s
+    current nesting depth (using get_fields_for_level_and_prefix).
+    - `get_filter_fields` first delegates to the super method for splitting
+      the comma‐separated string, then calls a helper that:
+        • Selects only the fields that are nested under this serializer's path in
+          the hierarchy
+        • Returns direct children at depth `level + 1`
+    """
+
+    @property
+    def prevent_nested_processing(self):
+        return False
+
+    def get_filter_fields(
+        self, params, level, source, default=None, include_parent=True
+    ):
+        """
+        Parse the raw `fields` parameter and return the subset of fields
+        that apply at this serializer’s nesting level under the given
+        source prefix.
+        """
+        fields = super().get_filter_fields(
+            params, level, source, default, include_parent
+        )
+        return get_fields_for_level_and_prefix(
+            fields,
+            level,
+            source,
+            default=default,
+            include_parent=include_parent,
+        )
+
+
+def get_source_path(serializer) -> str:
+    """Recursively walks up the serializer tree to build the nested field path."""
+    parent = getattr(serializer, "parent", None)
+    if not parent:
+        return ""
+    parent_path = get_source_path(parent)
+    name = getattr(serializer, "field_name", None)
+    if not name:
+        return parent_path
+    return f"{parent_path}__{name}" if parent_path else name
+
+
+def get_fields_for_level_and_prefix(
+    fields_list, level, source, include_parent, default
+):
+    """Extract the field names relevant to a specific nesting depth
+    from a list of double‑underscore lookup strings.
+    """
+    if not fields_list:
+        return default
+
+    prefix = source.split("__") if source else []
+    allowed = set()
+    for f in fields_list:
+        parts = f.split("__")
+
+        if parts[:level] != prefix:
+            continue
+
+        if len(parts) <= level + 1:
+            allowed.add(parts[-1])
+            continue
+
+        if len(parts) > level + 1 and include_parent:
+            # include parent field to ensure nesting proceeds
+            allowed.add(parts[level])
+            continue
+
+    # If the only allowed fields are exactly the prefix itself,
+    # fall back to default
+    if allowed == set(prefix):
+        return default
+
+    return allowed
+
+
+def compute_level(serializer) -> int:
+    """Recursively count how many ancestors of `serializer` are not
+    ListSerializer instances. Stops when parent is None.
+    """
+    parent = getattr(serializer, "parent", None)
+    if parent is None:
+        # base case, reached the top
+        return 0
+
+    # if this immediate parent is a ListSerializer, don’t count it, otherwise 1
+    this_level = 0 if isinstance(parent, serializers.ListSerializer) else 1
+
+    # recurse on the parent itself
+    return this_level + compute_level(parent)
+
+
+class RetrieveFilteredFieldsMixin:
+    @staticmethod
+    def _get_concrete_fields_for_model(model: type[Model]) -> list[str]:
+        return [
+            f.name
+            for f in model._meta.get_fields()
+            if getattr(f, "concrete", False)
+        ]
+
+    def _filter_top_level_fields_to_defer(
+        self, field_list: set[str] | None, keep_if: Callable
+    ) -> list[str]:
+        """Method to retrieve the top-level fields to defer, given a list of
+        field names (allow or omit) and a condition that determines which
+        fields to defer.
+
+        :param field_list: A list of field names to filter by.
+        :param keep_if: A function that takes a field name and returns a
+         boolean indicating whether to defer the field.
+        :return: A list of top field names to defer
+        """
+        meta = getattr(self, "Meta", None)
+        model = getattr(meta, "model", None)
+        if not field_list or model is None:
+            return []
+
+        all_fields = self._get_concrete_fields_for_model(model)
+        return [name for name in all_fields if keep_if(name, field_list)]
+
+    def _get_disallowed_top_level_fields_to_defer(self) -> list[str]:
+        """Determine which top-level model fields should be deferred when an
+        explicit fields filter is in use.
+        Other model fields not explicitly included in 'fields' are deferred.
+
+        :return: A list of disallowed top field names to defer
+        """
+        allow = getattr(self, "_flat_allow", None)
+        return self._filter_top_level_fields_to_defer(
+            allow, keep_if=lambda name, allow: name not in allow
+        )
+
+    def _get_omit_top_level_fields_to_defer(self) -> list[str]:
+        """
+        Determine which top-level model fields should be deferred when an
+        explicit omit filter is in use. Valid database fields in the omit list
+        will be deferred.
+        :return: A list of omit top field names to defer
+        """
+        omit = getattr(self, "_flat_omit", None)
+        return self._filter_top_level_fields_to_defer(
+            omit, keep_if=lambda name, omit: name in omit
+        )
+
+    def _get_nested_level_fields_to_defer(
+        self,
+        nested_mapping: defaultdict[str, list[str]] | dict,
+        should_defer: Callable,
+    ) -> dict[str, tuple[type[Model], list[str]]]:
+        """Method to retrieve nested fields to defer based on a mapping and a
+        defer condition.
+
+        :param nested_mapping: A nested mapping from fields to defer
+        :param should_defer: A function that takes a field name and returns a
+         boolean indicating whether to defer the field.
+        :return: A dict containing the mapping of nested fields to defer.
+        """
+
+        nested_defer_map: dict[str, tuple[type[Model], list[str]]] = {}
+        for parent, items in nested_mapping.items():
+            field = getattr(self, "fields", {}).get(parent)
+            if not field:
+                continue
+
+            child_serializer = getattr(field, "child", field)
+            meta = getattr(child_serializer, "Meta", None)
+            nested_model = (
+                getattr(meta, "model", None) if meta is not None else None
+            )
+            if nested_model is None:
+                continue
+
+            child_names: list[str] = []
+            # Filter out nested fields that have a database column associated
+            # with them.
+            field_names = self._get_concrete_fields_for_model(nested_model)
+            # Determine which nested fields to defer
+            for name in field_names:
+                if should_defer(name, items):
+                    child_names.append(name)
+
+            if child_names:
+                nested_defer_map[parent] = (nested_model, child_names)
+
+        return nested_defer_map
+
+    def _get_disallowed_nested_level_fields_to_defer(
+        self,
+    ) -> dict[str, tuple[type[Model], list[str]]]:
+        """Determine which top-level model fields should be deferred when an
+         explicit fields filter is in use.
+        Other model fields not explicitly included in 'fields' are deferred.
+
+        :return: A dict containing the mapping of nested fields to defer.
+        """
+        allow_map = getattr(self, "_nested_allow", {})
+        return self._get_nested_level_fields_to_defer(
+            allow_map,
+            should_defer=lambda name, allow_list: name not in allow_list,
+        )
+
+    def _get_omit_nested_level_fields_to_defer(
+        self,
+    ) -> dict[str, tuple[type[Model], list[str]]]:
+        """
+        Determine which nested-model fields should be deferred for each nested
+        serializer when an explicit omit filter is in use.
+
+        :return: A dict containing the mapping of nested fields to defer.
+        """
+        omit_map = getattr(self, "_nested_omit", {})
+        return self._get_nested_level_fields_to_defer(
+            omit_map, should_defer=lambda name, omit_list: name in omit_list
+        )
+
+    def get_deferred_model_fields(
+        self,
+    ) -> tuple[list[str], dict[str, tuple[type[Model], list[str]]]]:
+        """
+        Returns a flat list of omitted model-fields; top-level and nested.
+        Ensures that parsing of "fields"/"omit" has run by accessing ".fields".
+
+        :return: A two tuple of top fields names to defer and a dict containing
+         the mapping of nested fields to defer.
+        """
+
+        self._flat_allow = set()
+        self._flat_omit = set()
+        self._nested_allow = defaultdict(list)
+        self._nested_omit = defaultdict(list)
+        try:
+            request = getattr(self, "context", {})["request"]
+        except KeyError:
+            logger.error("Serializer context does not have access to request.")
+            return [], {}
+
+        params = request.GET
+        try:
+            filter_fields = params.get("fields", None).split(",")
+        except AttributeError:
+            filter_fields = []
+
+        try:
+            omit_fields = params.get("omit", None).split(",")
+        except AttributeError:
+            omit_fields = []
+
+        # store top-level and nested fields specified in the `fields` argument.
+        for filtered_field in filter_fields:
+            if "__" in filtered_field:
+                parent, child = filtered_field.split("__", 1)
+                self._nested_allow[parent].append(child)
+                # If a nested field is allowed the related parent level field
+                # must also be allowed
+                self._flat_allow.add(parent)
+            else:
+                self._flat_allow.add(filtered_field)
+
+        # store top-level and nested fields in the `omit` argument.
+        for omitted_field in omit_fields:
+            if "__" in omitted_field:
+                parent, child = omitted_field.split("__", 1)
+                self._nested_omit[parent].append(child)
+            else:
+                self._flat_omit.add(omitted_field)
+
+        # Top‑level fields to defer
+        omit_top = self._get_omit_top_level_fields_to_defer()
+        disallowed_top = self._get_disallowed_top_level_fields_to_defer()
+        top_fields = list(set(omit_top + disallowed_top))
+
+        # Nested specs to defer
+        defer_omit = self._get_omit_nested_level_fields_to_defer()
+        defer_disallowed = self._get_disallowed_nested_level_fields_to_defer()
+
+        # Merge child lists under each parent
+        nested_to_defer: dict[str, tuple[type[Model], list[str]]] = {}
+        for parent in defer_omit.keys() | defer_disallowed.keys():
+            if parent in defer_omit:
+                model, omit_names = defer_omit[parent]
+            else:
+                model, omit_names = defer_disallowed[parent]
+
+            disallowed_names = (
+                defer_disallowed[parent][1]
+                if parent in defer_disallowed
+                else []
+            )
+            combined = set(omit_names) | set(disallowed_names)
+            nested_to_defer[parent] = (model, list(combined))
+
+        return top_fields, nested_to_defer
+
+
+class DeferredFieldsMixin:
+    """ViewSet Mixin that:
+    - defers top‐level model columns based on omit/fields
+    - omit deferring select related fields
+    - builds a Prefetch for each nested relation to defer its columns,
+    merging cleanly with any existing prefetches in the right order.
+    """
+
+    def get_queryset(self) -> QuerySet:
+        qs = super().get_queryset()  # type: ignore[misc]
+        # Skip for queries that uses values() or annotate()
+        if qs.query.values_select or qs.query.annotations:
+            return qs
+
+        existing_select_related = set(qs.query.select_related or ())
+        original_fields_defer_only, is_defer = qs.query.deferred_loading
+        original_deferred_fields = (
+            set(original_fields_defer_only) if is_defer else set()
+        )
+        serializer = self.get_serializer_class()(  # type: ignore[attr-defined]
+            context=self.get_serializer_context()  # type: ignore[attr-defined]
+        )
+
+        parent_fields, nested_map = serializer.get_deferred_model_fields()
+        # Remove select_related fields from the top-level deferred fields.
+        # Add the original deferred fields.
+        parent_defer_to_keep = (
+            set(parent_fields) - existing_select_related
+        ) | original_deferred_fields
+        qs = qs.defer(*parent_defer_to_keep)
+
+        # Prepare to rebuild prefetch_related in correct order
+        nested_prefetches = []
+        existing_simple_lookups = list(qs._prefetch_related_lookups)
+        parent_model = serializer.Meta.model
+        for parent_field, (child_model, child_fields) in nested_map.items():
+            # Look for FKs in the child serializer linked to the parent model.
+            # f.many_to_one is True for ForeignKey fields
+            # and f.remote_field.model is the parent model.
+            fk_names = {
+                f.name
+                for f in child_model._meta.get_fields()
+                if getattr(f, "many_to_one", False)
+                and getattr(f.remote_field, "model", None) == parent_model
+            }
+            child_fields = [f for f in child_fields if f not in fk_names]
+            if child_fields:
+                nested_prefetches.append(
+                    Prefetch(
+                        parent_field,
+                        queryset=child_model.objects.defer(*child_fields),  # type: ignore[attr-defined]
+                    )
+                )
+
+        new_qs = qs._clone()
+        # Apply prefetches in the correct order to prevent conflicts.
+        new_qs._prefetch_related_lookups = (
+            nested_prefetches + existing_simple_lookups
+        )
+        return new_qs

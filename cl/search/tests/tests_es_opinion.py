@@ -8,6 +8,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser
+from django.core.cache import cache
 from django.core.management import call_command
 from django.db.models import F
 from django.http import HttpRequest
@@ -48,7 +49,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
@@ -98,7 +99,7 @@ class OpinionSearchAPICommonTests(
                 full_name="court of the Medical Worries",
             )
             cls.opinion_cluster_4 = (
-                OpinionClusterFactoryWithChildrenAndParents(
+                OpinionClusterWithChildrenAndParentsFactory(
                     case_name="Strickland v. Washington.",
                     case_name_full="Strickland v. Washington.",
                     docket=DocketFactory(
@@ -125,7 +126,7 @@ class OpinionSearchAPICommonTests(
                 )
             )
             cls.opinion_cluster_5 = (
-                OpinionClusterFactoryWithChildrenAndParents(
+                OpinionClusterWithChildrenAndParentsFactory(
                     case_name="Strickland v. Lorem.",
                     case_name_full="Strickland v. Lorem.",
                     date_filed=datetime.date(2020, 8, 15),
@@ -273,7 +274,9 @@ class OpinionSearchAPICommonTests(
 
         search_params = {"q": "*", "cited_lt": 100, "cited_gt": 80}
 
-        r = self._test_api_results_count(search_params, 0, "citation_count")
+        r = await self._test_api_results_count(
+            search_params, 0, "citation_count"
+        )
 
     @skip_if_common_tests_skipped
     async def test_citation_ordering_by_citation_count(self) -> None:
@@ -799,7 +802,7 @@ class OpinionV4APISearchTest(
         cluster_to_create = 6
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             for _ in range(cluster_to_create):
-                cluster = OpinionClusterFactoryWithChildrenAndParents(
+                cluster = OpinionClusterWithChildrenAndParentsFactory(
                     docket=DocketFactory(
                         court=self.court_1,
                         source=Docket.HARVARD,
@@ -1226,7 +1229,7 @@ class OpinionsESSearchTest(
             jurisdiction="FB",
             full_name="court of the Medical Worries",
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
             docket=DocketFactory(
@@ -1252,7 +1255,7 @@ class OpinionsESSearchTest(
             scdb_votes_minority=3,
             scdb_votes_majority=6,
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
@@ -1428,6 +1431,57 @@ class OpinionsESSearchTest(
             response.content.decode(),
             msg="Wrong number of Jurisdictions shown in Homepage",
         )
+
+    def test_last_opinions_home_page(self) -> None:
+        """Test last opinions in home page"""
+        cache.delete("homepage-data-o-es")
+        with self.captureOnCommitCallbacks(execute=True):
+            o_1 = OpinionClusterWithChildrenAndParentsFactory(
+                date_filed=datetime.date(2020, 8, 15),
+                docket=DocketFactory(
+                    court=self.court_1,
+                    docket_number="123457",
+                    source=Docket.HARVARD,
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                ),
+            )
+            o_2 = OpinionClusterWithChildrenAndParentsFactory(
+                date_filed=datetime.date(2020, 8, 15),
+                docket=DocketFactory(
+                    court=self.court_1,
+                    docket_number="123457",
+                    source=Docket.HARVARD,
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                ),
+            )
+        r = self.client.get(
+            reverse("show_results"),
+        )
+
+        html_content = r.content.decode()
+        self.assertIn("Latest Opinions", html_content)
+        self.assertIn("Strickland v. Washington", html_content)
+        self.assertIn("Strickland v. Lorem", html_content)
+        clusters_count = OpinionCluster.objects.filter(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED
+        ).count()
+        tree = html.fromstring(html_content)
+        # Extract the precedential-opinions count.
+        opinions_count = tree.xpath(
+            '//span[@id="stat-num-precedential-opinions"]/text()'
+        )[0]
+        self.assertEqual(int(opinions_count), clusters_count)
+
+        o_1.delete()
+        o_2.delete()
 
     async def test_fail_gracefully(self) -> None:
         """Do we fail gracefully when an invalid search is created?"""
@@ -4095,7 +4149,7 @@ class OpinionFeedTest(
             jurisdiction="FB",
             full_name="court of the Medical Worries",
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             date_filed=datetime.date(2020, 8, 15),
             docket=DocketFactory(
                 court=court, docket_number="123456", source=Docket.HARVARD
@@ -4329,7 +4383,7 @@ class OpinionFeedTest(
                 id="ca1_test",
                 jurisdiction="FB",
             )
-            o_c = OpinionClusterFactoryWithChildrenAndParents(
+            o_c = OpinionClusterWithChildrenAndParentsFactory(
                 date_filed=datetime.date(2020, 8, 15),
                 docket=DocketFactory(
                     court=court, docket_number="123456", source=Docket.HARVARD

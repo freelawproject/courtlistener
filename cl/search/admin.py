@@ -14,6 +14,7 @@ from cl.search.models import (
     Citation,
     Claim,
     ClaimHistory,
+    ClusterRedirection,
     Court,
     Courthouse,
     Docket,
@@ -43,9 +44,13 @@ class OpinionAdmin(CursorPaginatorAdmin):
         "html_columbia",
     )
     readonly_fields = (
+        "main_version",
         "date_created",
         "date_modified",
     )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("cluster")
 
 
 @admin.register(Citation)
@@ -349,3 +354,14 @@ class SearchQueryAdmin(CursorPaginatorAdmin):
     list_display = ("__str__", "engine", "source")
     list_filter = ("engine", "source")
     search_fields = ("user__username",)
+
+
+@admin.register(ClusterRedirection)
+class ClusterRedirectionAdmin(admin.ModelAdmin):
+    raw_id_fields = ("cluster",)
+    list_display = (
+        "pk",
+        "deleted_cluster_id",
+        "cluster",
+    )
+    list_filter = ("reason",)

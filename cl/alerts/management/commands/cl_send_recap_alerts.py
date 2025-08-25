@@ -89,7 +89,7 @@ def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
         ConnectionError,
         RequestError,
     ) as e:
-        logger.error("Error getting sweep alert index task status: %s", e)
+        logger.warning("Error getting sweep alert index task status: %s", e)
         return {}
 
 
@@ -643,7 +643,10 @@ def query_and_send_alerts(
     total_alerts_sent_count = 0
     sent_time = datetime.datetime.now() if not custom_date else query_date
     for user in alert_users:
-        if rate == Alert.REAL_TIME and not user.profile.is_member:
+        if (
+            rate == Alert.REAL_TIME
+            and not user.profile.is_eligible_for_rt_search_alerts
+        ):
             continue
         alerts = user.alerts.filter(
             rate=rate,

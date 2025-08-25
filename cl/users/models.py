@@ -156,6 +156,17 @@ class UserProfile(models.Model):
             return False
 
     @property
+    def is_eligible_for_rt_search_alerts(self) -> bool:
+        """
+        Determine whether the user is eligible to receive real-time search
+        alerts.
+
+        :return bool: True if the user is either an active member or has the
+        unlimited docket alerts flag enabled.
+        """
+        return self.is_member or self.unlimited_docket_alerts
+
+    @property
     def email_grants_unlimited_docket_alerts(self) -> bool:
         """Does the user's email grant them unlimited docket alerts?
 

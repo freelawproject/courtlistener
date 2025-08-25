@@ -40,12 +40,16 @@
                         {% endif %}
                         {% if perms.search.change_opinioncluster %}
                             <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
-                               class="btn btn-primary btn-xs">Cluster</a>
+                               class="btn btn-primary btn-xs">Cluster
+                              {% if track_events %}
+                              (<span id="event_count"><i class="fa fa-spinner fa-spin"></i></span> views)
+                              {% endif %}
+                            </a>
                         {% endif %}
                         {% if perms.search.change_opinion %}
                             {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                                 <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
-                                   class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion</a>
+                                   class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion{% if sub_opinion.main_version %} [version] {% endif %}</a>
                             {% endfor %}
                         {% endif %}
                         {% if request.user.is_superuser %}
@@ -117,7 +121,7 @@
           </div>
         {% endif %}
 
-        {% if cluster.sub_opinions.all.first.extracted_by_ocr or "U" in cluster.source and tab == "opinions" %}
+        {% if tab == "opinions" and cluster.sub_opinions.all.0.extracted_by_ocr or "U" in cluster.source %}
             <div class="col-sm-12 alert-warning alert v-offset-above-2">
                 <p class="bottom">The text of this document was obtained by analyzing a scanned document and may have typos.
                 </p>
@@ -236,11 +240,6 @@
                             None known
                           {% endif %}
                         </li>
-                        {% if cluster.case_name_full != cluster|best_case_name  and cluster.case_name_full %}
-                        <li><strong>Full Case Name:</strong>
-                          <span class="select-all">{{ cluster.case_name_full }}</span>
-                        </li>
-                        {% endif %}
 
                         {% if cluster.docket.court_id != "olc" %}
                             <li><strong>Docket Number:</strong> {{ cluster.docket.docket_number|default:"Unknown" }}</li>

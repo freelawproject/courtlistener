@@ -3,7 +3,7 @@ from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyChoice
 
 from cl.alerts.models import Alert, DocketAlert
-from cl.search.factories import DocketParentMixin
+from cl.search.factories import DocketFactory
 from cl.users.factories import UserFactory
 
 
@@ -20,10 +20,10 @@ class DocketAlertFactory(DjangoModelFactory):
     )
 
 
-class DocketAlertWithParentsFactory(DocketAlertFactory, DocketParentMixin):
+class DocketAlertWithParentsFactory(DocketAlertFactory):
     """Make an alert on a particular docket"""
 
-    pass
+    docket = SubFactory(DocketFactory)
 
 
 class AlertFactory(DjangoModelFactory):

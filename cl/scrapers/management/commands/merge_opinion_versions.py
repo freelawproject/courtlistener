@@ -4,12 +4,12 @@ from collections import defaultdict
 from difflib import Differ, SequenceMatcher
 
 from django.db import transaction
-from django.db.models import Count, Q, QuerySet
-from elasticsearch import NotFoundError
+from django.db.models import Count, F, Q, QuerySet
 from eyecite import clean_text
 
 from cl.alerts.models import DocketAlert
 from cl.audio.models import Audio
+from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.favorites.models import DocketTag, Note
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.models import (
@@ -18,12 +18,14 @@ from cl.people_db.models import (
     Role,
 )
 from cl.recap.models import PacerFetchQueue, ProcessingQueue
+from cl.scrapers.exceptions import MergingError
 from cl.scrapers.models import PACERMobilePageData
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
     SOURCES,
     BankruptcyInformation,
     Claim,
+    ClusterRedirection,
     Docket,
     DocketEntry,
     DocketPanel,
@@ -32,7 +34,11 @@ from cl.search.models import (
     OpinionCluster,
     OpinionClusterNonParticipatingJudges,
     OpinionClusterPanel,
+    OpinionJoinedBy,
+    OpinionsCited,
+    Parenthetical,
 )
+from cl.search.tasks import remove_document_from_es_index
 
 MIN_SEQUENCE_SIMILARITY = 0.9
 DRY_RUN = False
@@ -196,6 +202,8 @@ docket_fields_to_merge = [
     "referred_to",
     "referred_to_str",
     "panel_str",
+    # panel and non_participating_judges taken care of via
+    # `update_referencing_objects`
     "date_last_index",
     "date_cert_granted",
     "date_cert_denied",
@@ -359,11 +367,14 @@ def update_referencing_objects(
 def merge_metadata(
     main_object: Opinion | OpinionCluster | Docket,
     version_object: Opinion | OpinionCluster | Docket,
+    error_on_diff: bool = False,
 ) -> bool:
     """Merge `fields_to_merge` from `version_object` into `main_object`
 
     :param main_object: the main OpinionCluster or Opinion or Docket
     :param version_object: the secondary version Opinion, or its OpinionCluster
+    :param error_on_diff: raise an exception if there is an unexpected difference
+
     :return: True if the main object was updated and needs to be saved
     """
     if main_object.id == version_object.id:
@@ -374,7 +385,6 @@ def merge_metadata(
             ("author_str", merge_judge_names),
             "author",
             "per_curiam",
-            "joined_by",
             ("joined_by_str", merge_judge_names),
             "html_lawbox",
             "html_columbia",
@@ -410,8 +420,10 @@ def merge_metadata(
                 changed = True
                 continue
 
-            logger.warning(
-                "Unexpected difference in %s: '%s' '%s'. %s: %s, %s",
+            warning_template = (
+                "Unexpected difference in %s: '%s' '%s'. %s: %s, %s"
+            )
+            warning_values = (
                 field,
                 main_value,
                 version_value,
@@ -419,11 +431,57 @@ def merge_metadata(
                 main_object.id,
                 version_object.id,
             )
+            if error_on_diff:
+                raise MergingError(warning_template % warning_values)
+
+            logger.warning(warning_template, *warning_values)
         elif version_value:
             setattr(main_object, field, version_value)
             changed = True
 
     return changed
+
+
+def delete_version_related_objects(version: Opinion) -> None:
+    """Delete objects related to citations that point to the version
+
+    :param version: the versioned opinion
+    :return None
+    """
+    # Decrease citation_count of all clusters cited by the version
+    cited_clusters = (
+        version.opinions_cited.all()
+        .only("cluster_id")
+        .values_list("cluster_id", flat=True)
+    )
+    if cited_clusters:
+        OpinionCluster.objects.filter(id__in=list(cited_clusters)).update(
+            citation_count=F("citation_count") - 1
+        )
+
+    OpinionsCited.objects.filter(
+        Q(citing_opinion_id=version.id) | Q(cited_opinion_id=version.id)
+    ).delete()
+
+    described_by_version = Parenthetical.objects.filter(
+        describing_opinion_id=version.id
+    )
+    if described_by_version.exists():
+        # recompute parenthetical groups for clusters described by the version
+        ids = described_by_version.only(
+            "describing_opinion__cluster_id"
+        ).values_list("describing_opinion__cluster_id", flat=True)
+        Parenthetical.objects.filter(
+            Q(described_opinion_id=version.id)
+            | Q(describing_opinion_id=version.id)
+        ).delete()
+        for cluster in OpinionCluster.objects.filter(id__in=ids):
+            create_parenthetical_groups(cluster)
+
+    else:
+        Parenthetical.objects.filter(described_opinion_id=version.id).delete()
+
+    version.unmatched_citations.all().delete()
 
 
 def merge_opinion_versions(
@@ -453,6 +511,12 @@ def merge_opinion_versions(
 
     main_citations = {str(c) for c in main_opinion.cluster.citations.all()}
 
+    joined_by_qs = OpinionJoinedBy.objects.filter(opinion=version_opinion)
+    if update_joined_by := joined_by_qs.exists():
+        exclude_existing_persons = OpinionJoinedBy.objects.filter(
+            opinion=main_opinion
+        ).values_list("person_id", flat=True)
+
     with transaction.atomic():
         if update_main_opinion:
             main_opinion.save()
@@ -465,6 +529,11 @@ def merge_opinion_versions(
         if not is_same_docket:
             update_referencing_objects(main_docket, version_docket)
 
+        if update_joined_by:
+            joined_by_qs.exclude(
+                person_id__in=exclude_existing_persons
+            ).update(opinion=main_opinion)
+
         # update the cluster_id to prevent the version cluster deletion cascade
         for version_citation in version_cluster.citations.all():
             if str(version_citation) in main_citations:
@@ -474,7 +543,22 @@ def merge_opinion_versions(
 
         version_opinion.cluster_id = main_opinion.cluster.id
         version_opinion.main_version = main_opinion
+        version_opinion.html_with_citations = ""
         version_opinion.save()
+        delete_version_related_objects(version_opinion)
+
+        # since the cluster was reassigned, this opinion was not cascade
+        # deleted, and then deleted from the ES index. We don't want versions
+        # to show up on search
+        remove_document_from_es_index.delay(
+            OpinionDocument.__name__,
+            ES_CHILD_ID(version_opinion.id).OPINION,
+            version_cluster.id,
+        )
+
+        ClusterRedirection.create_from_clusters(
+            main_opinion.cluster, version_cluster, ClusterRedirection.VERSION
+        )
 
         # Both Opinion and Citation have a ForeignKey to OpinionCluster, with
         # on_delete=models.CASCADE. Also, there are signals (see
@@ -485,15 +569,6 @@ def merge_opinion_versions(
 
         if not is_same_docket:
             version_docket.delete()
-
-        # since the cluster was reassigned, this opinion was not deleted from
-        # the ES index. We don't want versions to show up on search
-        try:
-            OpinionDocument.get(
-                id=ES_CHILD_ID(version_opinion.id).OPINION
-            ).delete()
-        except NotFoundError:
-            pass
 
 
 def merge_versions_by_download_url(
@@ -517,6 +592,7 @@ def merge_versions_by_download_url(
 
     qs = (
         Opinion.objects.filter(query)
+        .filter(cluster__source=SOURCES.COURT_WEBSITE)
         .exclude(Q(download_url="") | Q(download_url__isnull=True))
         .values("download_url")
         .annotate(
@@ -552,6 +628,7 @@ def merge_versions_by_download_url(
         # transitively
         main, *versions = (
             Opinion.objects.filter(query)
+            .filter(cluster__source=SOURCES.COURT_WEBSITE)
             .exclude(main_version__isnull=False)
             .select_related("cluster", "cluster__docket")
             .order_by("-date_created")

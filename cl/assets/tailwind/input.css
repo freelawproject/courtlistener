@@ -4,11 +4,15 @@
 
 @layer base {
   :root {
+    --mobile-breakpoint: theme(screens.md);
     --nav-menu-width: 222px;
     --profile-menu-width: 228px;
     --mobile-main-padding: theme(spacing.4);
     --padded-full-width: calc(100vw - (2 * var(--mobile-main-padding)));
     --corpus-search-height: theme(spacing.12);
+    --mobile-dialog-header-height: theme(spacing.18);
+    --mobile-dialog-panel-height: calc(100vh - var(--mobile-dialog-header-height));
+    --content-max-width: 1400px;
   }
   code {
     @apply font-sans text-sm bg-brand-100 text-brand-600 border border-brand-300 rounded-[2px] px-1;
@@ -52,11 +56,33 @@
   [x-cloak] {
     display: none !important;
   }
+  input[type="checkbox"] {
+    @apply relative appearance-none flex-shrink-0 w-5 h-5 rounded border border-greyscale-300 bg-white; /* base checkbox */
+    @apply checked:border-primary-600 checked:bg-primary-600 indeterminate:border-primary-600 indeterminate:bg-primary-600; /* checked or indeterminate */
+    @apply focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-primary-600/60; /* focus */
+    @apply disabled:border-greyscale-300 disabled:bg-greyscale-100 disabled:checked:bg-greyscale-100 forced-colors:appearance-auto; /* disabled and a11y */
+    @apply before:absolute before:inset-0 before:m-auto before:w-4 before:h-4 before:bg-white; /* check icon container */
+    @apply checked:before:scale-100 before:scale-0 before:transform before:duration-200 transition-colors; /* animate check icon */
+  }
+  input[type="checkbox"]::before {
+    mask: url("/static/svg/check_thick.svg") no-repeat center/contain;
+  }
 }
 
 @tailwind components;
 
 @layer components {
+  .alert {
+    @apply px-4 py-3 text-sm rounded-[10px] border;
+  }
+
+  .alert-warning {
+    @apply alert text-yellow-700 bg-yellow-100 border-yellow-500;
+  }
+
+   .alert-danger {
+    @apply alert bg-red-100 text-red-700 border-red-500;
+  }
   .btn {
     @apply py-2.5 px-3.5 rounded-lg w-fit text-sm font-normal flex gap-1 items-center;
   }
@@ -84,6 +110,9 @@
   .skip-link {
     @apply transition-[opacity,transform] ease-in-out pointer-events-none focus-visible:pointer-events-auto top-0 left-0 bg-primary-600 text-white absolute p-2 m-2 -translate-y-24 focus-visible:translate-y-0 focus-visible:opacity-100 opacity-0 focus-visible:ring focus-visible:ring-primary-900 focus-visible:outline focus-visible:outline-primary-900 z-50;
   }
+  .input-text {
+    @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3;
+  }
 }
 
 @tailwind utilities;
@@ -94,5 +123,11 @@
   }
   .lead {
     @apply text-xl text-greyscale-700 font-normal;
+  }
+  .focus-container {
+    @apply [&:has(input:focus)]:outline [&:has(input:focus)]:outline-2 [&:has(input:focus)]:outline-primary-600 flex;
+  }
+  .capped-width {
+    @apply w-full max-w-[--content-max-width] mx-auto;
   }
 }

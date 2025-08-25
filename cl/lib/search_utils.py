@@ -5,14 +5,15 @@ from collections.abc import Callable
 from typing import Any, TypedDict
 from urllib.parse import parse_qs, urlencode
 
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
-from django.core.paginator import EmptyPage, Page, PageNotAnInteger
+from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
+from elasticsearch_dsl.response import Response
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 
@@ -59,7 +60,6 @@ from cl.search.models import (
     SEARCH_TYPES,
     Court,
     OpinionCluster,
-    RECAPDocument,
     SearchQuery,
 )
 
@@ -251,24 +251,6 @@ async def add_depth_counts(
         return None
 
 
-async def clean_up_recap_document_file(item: RECAPDocument) -> None:
-    """Clean up the RecapDocument file-related fields after detecting the file
-    doesn't exist in the storage.
-
-    :param item: The RECAPDocument to work on.
-    :return: None
-    """
-
-    if isinstance(item, RECAPDocument):
-        await sync_to_async(item.filepath_local.delete)()
-        item.sha1 = ""
-        item.date_upload = None
-        item.file_size = None
-        item.page_count = None
-        item.is_available = False
-        await item.asave()
-
-
 def store_search_query(request: HttpRequest, search_results: dict) -> None:
     """Saves an user's search query in a SearchQuery model
 
@@ -322,7 +304,7 @@ def store_search_api_query(
 
 
 class CachedESSearchResults(TypedDict):
-    results: Page | list
+    hits: Response | list
     main_total: int | None
     child_total: int | None
 
@@ -335,7 +317,7 @@ def retrieve_cached_search_results(
 
     :param get_params: The GET parameters provided by the user.
     :return: A two-tuple containing either the cached search results and the
-    cache key based ona prefix and the get parameters, or None and the cache key
+    cache key based on a prefix and the get parameters, or None and the cache key
     if no cached results were found.
     """
 
@@ -353,6 +335,40 @@ def retrieve_cached_search_results(
     if cached_results:
         return pickle.loads(cached_results), cache_key
     return None, cache_key
+
+
+def get_results_from_paginator(
+    paginator: Paginator, page_num: int = 1
+) -> Page:
+    """Get results Page from Paginator
+
+    :param paginator: The paginator to get results from
+    :param page_num: Page number to request
+    :return: Page object
+    """
+    try:
+        results = paginator.page(page_num)
+    except PageNotAnInteger:
+        results = paginator.page(1)
+    except EmptyPage:
+        results = paginator.page(paginator.num_pages)
+
+    return results
+
+
+def enrich_search_results(results: Page, search_type: str, get_params: dict):
+    """Enrich dataset before returning to user
+
+    :param results: A ESPaginator page object
+    :param search_type: The search type
+    :param get_params: A dictionary of parameters sent in request
+    :return: None
+    """
+    convert_str_date_fields_to_date_objects(results, search_type)
+    merge_courts_from_db(results, search_type)
+    limit_inner_hits(get_params, results, search_type)
+    set_results_highlights(results, search_type)
+    merge_unavailable_fields_on_parent_document(results, search_type)
 
 
 def fetch_and_paginate_results(
@@ -375,29 +391,55 @@ def fetch_and_paginate_results(
     the total number of hits for the child document.
     """
 
-    # Run the query and set up pagination
+    # Get or set default params
+    try:
+        page = int(get_params.get("page", 1))
+    except ValueError:
+        page = 1
+    search_type = get_params.get("type", SEARCH_TYPES.OPINION)
+
+    # Check cache for displaying insights on the Home Page.
     if cache_key is not None:
-        # Check cache for displaying insights on the Home Page.
-        results = cache.get(cache_key)
-        if results is not None:
+        cache_data = cache.get(cache_key)
+        if cache_data is not None:
+            if type(cache_data) is Response:
+                # Deprecated. TODO: Remove after homepage-data-o-es cache expires
+                paginator = Paginator(cache_data, rows_per_page)
+            else:
+                cached_data = pickle.loads(cache_data)
+                # Create ESPaginator that contains the total results count.
+                paginator = ESPaginator(
+                    cached_data["main_total"],
+                    cached_data["hits"],
+                    rows_per_page,
+                )
+
+            results = get_results_from_paginator(paginator, page)
+            enrich_search_results(results, search_type, get_params)
             return results, 0, False, None, None
 
     # Check micro-cache for all other search requests.
     results_dict, micro_cache_key = retrieve_cached_search_results(get_params)
     if results_dict:
+        # Create paginator from ES hits
+        paginator = ESPaginator(
+            results_dict["main_total"], results_dict["hits"], rows_per_page
+        )
+
+        # Get appropriate page
+        results = get_results_from_paginator(paginator, page)
+
+        # Enrich results
+        enrich_search_results(results, search_type, get_params)
+
         # Return results and counts. Set query time to 1ms.
         return (
-            results_dict["results"],
+            results,
             1,
             False,
             results_dict["main_total"],
             results_dict["child_total"],
         )
-
-    try:
-        page = int(get_params.get("page", 1))
-    except ValueError:
-        page = 1
 
     # Check pagination depth
     check_pagination_depth(page)
@@ -406,35 +448,29 @@ def fetch_and_paginate_results(
     hits, query_time, error, main_total, child_total = fetch_es_results(
         get_params, search_query, child_docs_count_query, page, rows_per_page
     )
-
     if error:
         return [], query_time, error, main_total, child_total
+
+    # Create paginator from ES hits
     paginator = ESPaginator(main_total, hits, rows_per_page)
-    try:
-        results = paginator.page(page)
-    except PageNotAnInteger:
-        results = paginator.page(1)
-    except EmptyPage:
-        results = paginator.page(paginator.num_pages)
 
-    search_type = get_params.get("type", SEARCH_TYPES.OPINION)
-    # Set highlights in results.
-    convert_str_date_fields_to_date_objects(results, search_type)
-    merge_courts_from_db(results, search_type)
-    limit_inner_hits(get_params, results, search_type)
-    set_results_highlights(results, search_type)
-    merge_unavailable_fields_on_parent_document(results, search_type)
+    # Get appropriate page
+    results = get_results_from_paginator(paginator, page)
 
+    # Enrich results
+    enrich_search_results(results, search_type, get_params)
+
+    results_dict = {
+        "hits": hits,
+        "main_total": main_total,
+        "child_total": child_total,
+    }
     if cache_key is not None:
-        # Cache only Page results for displaying insights on the Home Page.
-        cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
+        # Cache only ES hits for displaying insights on the Home Page.
+        serialized_data = pickle.dumps(results_dict)
+        cache.set(cache_key, serialized_data, settings.QUERY_RESULTS_CACHE)
     elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
-        # Cache Page results and counts for all other search requests.
-        results_dict = {
-            "results": results,
-            "main_total": main_total,
-            "child_total": child_total,
-        }
+        # Cache ES hits and counts for all other search requests.
         serialized_data = pickle.dumps(results_dict)
         cache.set(
             micro_cache_key,

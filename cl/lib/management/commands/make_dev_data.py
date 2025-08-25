@@ -10,9 +10,9 @@ from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryFactory,
     DocketEntryForDocketFactory,
     DocketEntryReuseParentsFactory,
-    DocketEntryWithParentsFactory,
     DocketFactory,
     DocketWithChildrenFactory,
     OpinionClusterWithParentsFactory,
@@ -28,7 +28,7 @@ FACTORIES = {
     101: DocketFactory,
     102: OpinionClusterWithParentsFactory,
     103: OpinionWithParentsFactory,
-    104: DocketEntryWithParentsFactory,
+    104: DocketEntryFactory,
     105: ParentheticalWithParentsFactory,
     106: FjcIntegratedDatabaseFactory,
     107: DocketEntryForDocketFactory,
@@ -117,6 +117,10 @@ class Command(VerboseCommand):
                 (
                     "docket alerts and their parent objects",
                     DocketAlertWithParentsFactory,
+                ),
+                (
+                    "audio and their parent objects",
+                    AudioWithParentsFactory,
                 ),
             ):
                 logger.info(f"Making {count} {note}")

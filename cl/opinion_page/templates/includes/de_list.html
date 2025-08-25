@@ -37,9 +37,12 @@
         <i class="fa fa-info-circle"></i> There was a problem. Try again later.
       </span>
       &nbsp;
-      <a hx-get="{% url 'view_download_docket' docket.id %}"
-        hx-swap="none" hx-indicator="#export-csv-spinner" hx-trigger="click"
-        class="btn btn-default hidden-xs export-csv">
+      <a {% if user.is_authenticated %}
+        hx-get="{% url 'view_download_docket' docket.id %}"
+        hx-swap="none" hx-indicator="#export-csv-spinner"
+        hx-trigger="click"
+        {% endif %}
+        class="btn btn-default hidden-xs export-csv {% if not user.is_authenticated %} logged-out-modal-trigger {% endif %}">
         <div class="flex align-items-center">
           <i class="fa fa-download gray hidden-lg"></i>
           <i class="fa fa-download fa-lg gray visible-lg"></i>&nbsp;

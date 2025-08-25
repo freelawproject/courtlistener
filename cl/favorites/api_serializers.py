@@ -1,10 +1,12 @@
+import re
+
 from asgiref.sync import async_to_sync
 from django.conf import settings
-from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import ModelSerializer
 
+from cl.api.utils import DynamicFieldsMixin
 from cl.favorites.models import DocketTag, Prayer, UserTag
 from cl.favorites.utils import prayer_eligible
 from cl.search.models import Docket
@@ -72,3 +74,28 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
                 f"You have reached the maximum number of prayers ({settings.ALLOWED_PRAYER_COUNT}) allowed in the last 24 hours."
             )
         return data
+
+
+class EventCountSerializer(serializers.Serializer):
+    label = serializers.CharField(required=True, max_length=255)
+
+    def validate(self, attrs):
+        label = attrs.get("label")
+        # Define a list of allowed regex patterns for valid labels
+        # Currently supports:
+        # - 'd.<id>:view' format, e.g., 'd.123:view' for docket views
+        # - 'p.<id>:view' format, e.g., 'p.123:view' for judge views
+        # - 'o.<id>:view' format, e.g., 'o.123:view' for opinion views
+        valid_pattern = [
+            r"^[dpo]\.(\d{1,10}):view$",
+        ]
+        # Check if the label matches any of the allowed patterns
+        pattern_checks = [
+            re.match(pattern, label) for pattern in valid_pattern
+        ]
+        # If no pattern matches, raise a validation error
+        if not any(pattern_checks):
+            raise serializers.ValidationError(
+                {"label": "Invalid label format provided."}
+            )
+        return super().validate(attrs)

@@ -1,6 +1,7 @@
 import copy
 import logging
 import os
+import re
 import shutil
 from datetime import date
 from http import HTTPStatus
@@ -22,7 +23,7 @@ from django.core.files.base import ContentFile
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
-from django.utils.timezone import now
+from django.utils.timezone import localtime, now
 from eyecite.tokenizers import HyperscanTokenizer
 from httpx import (
     HTTPStatusError,
@@ -34,6 +35,7 @@ from httpx import (
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
+    ACMSAttachmentPage,
     AppellateAttachmentPage,
     AppellateDocketReport,
     AttachmentPage,
@@ -1588,42 +1590,57 @@ def probe_or_scrape_iquery_pages(
         return None
 
     if not reports_data:
-        logger.info(
-            "No cases were found during this probe for court %s - case IDs from %s to %s.",
-            court_id,
-            str(highest_known_pacer_case_id),
-            str(pacer_case_id_to_lookup),
-        )
-        court_empty_probe_attempts = r.incr(
-            f"iquery:court_empty_probe_attempts:{court_id}"
-        )
-        # Compute the duration of empty probes in hours based on the number of
-        # court_empty_probe_attempts and the current IQUERY_PROBE_WAIT interval
-        empty_probes_hours = (
-            court_empty_probe_attempts * settings.IQUERY_PROBE_WAIT
-        ) / 3600
-        court_empty_probe_limit_hours = (
-            settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS.get(
-                court_id, settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS["default"]
-            )
-        )
-        if empty_probes_hours >= court_empty_probe_limit_hours:
-            logger.error(
-                "Court %s has accumulated many probe attempts over "
-                "approximately %s hours. It appears the probe may be stuck; "
-                "manual intervention may be required.",
+        today = localtime().weekday()
+        # Only increment court_empty_probe_attempts if today is not
+        # Saturday (5) or Sunday (6). Courts usually don't publish on weekends,
+        # so this prevents logging courts as stuck due to this expected behavior.
+        if today in [5, 6]:
+            logger.info(
+                "Ignoring empty probe over the weekend for court %s - case IDs from %s to %s.",
                 court_id,
-                court_empty_probe_limit_hours,
+                str(highest_known_pacer_case_id),
+                str(pacer_case_id_to_lookup),
             )
-            # Restart court_blocked_attempts to avoid continue logging the
-            # error on next iterations.
-            r.set(f"iquery:court_empty_probe_attempts:{court_id}", 0)
-            # Add a court wait time of one hour so the problem can be manually handled.
-            r.set(
-                f"iquery:court_wait:{court_id}",
-                3600,
-                ex=3600,
+        else:
+            logger.info(
+                "No cases were found during this probe for court %s - case IDs from %s to %s.",
+                court_id,
+                str(highest_known_pacer_case_id),
+                str(pacer_case_id_to_lookup),
             )
+            court_empty_probe_attempts = r.incr(
+                f"iquery:court_empty_probe_attempts:{court_id}"
+            )
+            # Compute the duration of empty probes in hours based on the number
+            # of court_empty_probe_attempts and the current IQUERY_PROBE_WAIT
+            # interval
+            empty_probes_hours = (
+                court_empty_probe_attempts * settings.IQUERY_PROBE_WAIT
+            ) / 3600
+            court_empty_probe_limit_hours = (
+                settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS.get(
+                    court_id,
+                    settings.IQUERY_EMPTY_PROBES_LIMIT_HOURS["default"],
+                )
+            )
+            if empty_probes_hours >= court_empty_probe_limit_hours:
+                logger.error(
+                    "Court %s has accumulated many probe attempts over "
+                    "approximately %s hours. It appears the probe may be stuck; "
+                    "manual intervention may be required.",
+                    court_id,
+                    court_empty_probe_limit_hours,
+                )
+                # Restart court_blocked_attempts to avoid continue logging the
+                # error on next iterations.
+                r.set(f"iquery:court_empty_probe_attempts:{court_id}", 0)
+                # Add a court wait time of one hour so the problem can be
+                # manually handled.
+                r.set(
+                    f"iquery:court_wait:{court_id}",
+                    3600,
+                    ex=3600,
+                )
 
     # Process all the reports retrieved during the probing.
     # Avoid triggering the iQuery sweep signal except for the latest hit.
@@ -1868,11 +1885,24 @@ def get_att_report_by_rd(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    if is_appellate_court(pacer_court_id):
-        att_report = AppellateAttachmentPage(pacer_court_id, s)
+    is_appellate_case = is_appellate_court(pacer_court_id)
+    is_acms_document = rd.is_acms_document()
+
+    if is_acms_document:
+        report_class = ACMSAttachmentPage
+    elif is_appellate_case:
+        report_class = AppellateAttachmentPage
     else:
-        att_report = AttachmentPage(pacer_court_id, s)
-    att_report.query(rd.pacer_doc_id)
+        report_class = AttachmentPage
+
+    att_report = report_class(pacer_court_id, s)
+
+    if is_acms_document:
+        docket_case_id = rd.docket_entry.docket.pacer_case_id
+        rd_entry_id = rd.pacer_doc_id
+        att_report.query(docket_case_id, rd_entry_id)
+    else:
+        att_report.query(rd.pacer_doc_id)
     return att_report
 
 
@@ -2148,6 +2178,7 @@ def download_pdf_by_magic_number(
     magic_number: str,
     appellate: bool = False,
     de_seq_num: str | None = None,
+    acms: bool = False,
 ) -> tuple[Response | None, str]:
     """Small wrapper to fetch a PACER PDF document by magic number.
 
@@ -2160,6 +2191,7 @@ def download_pdf_by_magic_number(
     :param appellate: Whether the download belongs to an appellate court.
     :param de_seq_num: The sequential number assigned by the PACER system to
      identify the docket entry within a case.
+    :param acms: Whether the download belongs to an ACMS notification.
     :return: A two-tuple of requests.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
@@ -2169,7 +2201,7 @@ def download_pdf_by_magic_number(
     )
     report = FreeOpinionReport(court_id, s)
     r, r_msg = report.download_pdf(
-        pacer_case_id, pacer_doc_id, magic_number, appellate, de_seq_num
+        pacer_case_id, pacer_doc_id, magic_number, appellate, de_seq_num, acms
     )
     return r, r_msg
 
@@ -2201,6 +2233,7 @@ def get_document_number_for_appellate(
     court_id: str,
     pacer_doc_id: str,
     pq: ProcessingQueue,
+    acms: bool = False,
 ) -> str:
     """A wrapper to get the PACER document number either from the download
     confirmation page or from the PDF document.
@@ -2208,6 +2241,7 @@ def get_document_number_for_appellate(
     :param court_id: A CourtListener court ID to query the confirmation page.
     :param pacer_doc_id: The pacer_doc_id to query the confirmation page.
     :param pq: The ProcessingQueue that contains the PDF document.
+    :param acms: Whether the download belongs to an ACMS notification.
     :return: The PACER document number if available or an
     empty string if not.
     """
@@ -2228,7 +2262,7 @@ def get_document_number_for_appellate(
         if dn_response.is_success and dn_response.text:
             document_number = dn_response.text
 
-    if not document_number and pacer_doc_id:
+    if not document_number and pacer_doc_id and not acms:
         # If we still don't have the document number fall back on the
         # download confirmation page
         document_number = get_document_number_from_confirmation_page(
@@ -2236,8 +2270,9 @@ def get_document_number_for_appellate(
         )
 
     # Document numbers from documents with attachments have the format
-    # 1-1, 1-2, 1-3 in those cases the document number is the left number.
-    document_number_split = document_number.split("-")
+    # 1-1, 1-2, 1-3 or in ACMS 1.1, 1.2 in those cases the document number is
+    # the left number.
+    document_number_split = re.split(r"[-.]", document_number)
     if not len(document_number_split) == 1:
         document_number = document_number_split[0]
 
@@ -2314,6 +2349,7 @@ def update_rd_metadata(
     pacer_doc_id: str,
     document_number: str,
     attachment_number: int,
+    omit_page_count: bool = False,
 ) -> tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
 
@@ -2328,6 +2364,7 @@ def update_rd_metadata(
     :param document_number: The docket entry number for use in file names.
     :param attachment_number: The attachment number (if applicable) for use in
     file names.
+    :param omit_page_count: If true, omit requesting the page_count from doctor.
     :return: A two-tuple of a boolean indicating success and a corresponding
     error/success message string.
     """
@@ -2359,19 +2396,19 @@ def update_rd_metadata(
     rd.is_available = True  # We've got the PDF.
     rd.date_upload = rd.date_upload or now()
 
-    # request.content is sometimes a str, sometimes unicode, so
-    # force it all to be bytes, pleasing hashlib.
-    rd.sha1 = sha1(pdf_bytes)
-    response = async_to_sync(microservice)(
-        service="page-count",
-        item=rd,
-    )
-    if response.is_success:
-        rd.page_count = int(response.text)
-
-    assert isinstance(rd.page_count, (int | type(None))), (
-        "page_count must be an int or None."
-    )
+    if not omit_page_count:
+        # request.content is sometimes a str, sometimes unicode, so
+        # force it all to be bytes, pleasing hashlib.
+        rd.sha1 = sha1(pdf_bytes)
+        response = async_to_sync(microservice)(
+            service="page-count",
+            item=rd,
+        )
+        if response.is_success:
+            rd.page_count = int(response.text)
+        assert isinstance(rd.page_count, (int | type(None))), (
+            "page_count must be an int or None."
+        )
 
     # Save and extract, skipping OCR.
     rd.save()
