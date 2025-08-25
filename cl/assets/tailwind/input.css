@@ -68,6 +68,15 @@
   input[type="checkbox"]::before {
     mask: url("/static/svg/check_thick.svg") no-repeat center/contain;
   }
+  input[type="radio"] {
+    @apply relative appearance-none flex-shrink-0 w-5 h-5 rounded-full border border-greyscale-300;
+    @apply checked:border-primary-600 checked:bg-primary-600;
+    @apply focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-primary-600/60;
+    @apply disabled:border-greyscale-300 disabled:bg-greyscale-100 forced-colors:appearance-auto; /* disabled + a11y */
+    @apply before:absolute before:inset-0 before:m-auto before:w-2 before:h-2 before:rounded-full before:bg-white; /* inner dot container (pseudo) */
+    @apply before:scale-0 checked:before:scale-100 before:transform before:duration-200 transition-colors; /* animate inner dot */
+    @apply disabled:checked:before:bg-greyscale-400; /* disabled + checked dot color */
+  }
 }
 
 @tailwind components;
@@ -118,6 +127,9 @@
     @apply rounded-xl outline outline-1 outline-greyscale-200 w-fit shadow-md py-5 flex flex-col gap-3;
     @apply min-w-80 max-w-80 before:hidden after:hidden;
   }
+  .flatpickr-calendar.animate:not(.open) {
+    @apply pointer-events-none;
+  }
   .flatpickr-calendar.animate .flatpickr-months {
     @apply relative min-w-full max-w-full px-6;
   }
@@ -142,8 +154,9 @@
   }
   .flatpickr-day.nextMonthDay.selected,
   .flatpickr-day.prevMonthDay.selected,
+  .flatpickr-day.today.selected,
   .flatpickr-day.selected {
-    @apply bg-primary-600 hover:bg-primary-700 border-none;
+    @apply bg-primary-600 hover:bg-primary-700 border-none hover:text-white after:bg-greyscale-25;
   }
   .flatpickr-calendar.animate .flatpickr-weekdays {
     @apply justify-center;
