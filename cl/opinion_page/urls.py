@@ -133,12 +133,12 @@ urlpatterns = [
         name="citation_homepage",
     ),
     re_path(
-        r"^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,10})/(?P<page>.*)/)?$",
+        r"^c/(?:(?P<reporter>.*)/(?P<volume>.*)/(?P<page>.*)/)?$",
         citation_redirector,  # type: ignore[arg-type]
         name="citation_redirector",
     ),
     re_path(
-        r"^c/(?P<reporter>.*)/(?P<volume>\d{1,10})/$",
+        r"^c/(?P<reporter>.*)/(?P<volume>.*)/$",
         citation_redirector,  # type: ignore[arg-type]
         name="citation_redirector",
     ),

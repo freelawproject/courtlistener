@@ -155,7 +155,7 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
             volume = citation.groups.get("volume")
 
             # Validate the volume
-            if not volume or not volume.isdigit():
+            if not volume:
                 continue
 
             cite_type_str = citation.all_editions[0].reporter.cite_type
