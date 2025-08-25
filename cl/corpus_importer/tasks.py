@@ -2970,9 +2970,9 @@ def recap_document_into_opinions(
             logger.info("Skipping non-civil opinion in district court")
             return task_data
 
-    ops = Opinion.objects.filter(sha1=recap_document.sha1)
-    if ops.count() > 0:
-        logger.info("Skipping previously imported opinion: %s", ops[0].id)
+    hash_exists_qs = Opinion.objects.filter(sha1=recap_document.sha1)
+    if hash_exists_qs.exists():
+        logger.info("Skipping existing hash %s", recap_document.sha1)
         return task_data
 
     response = extract_recap_document_for_opinions(rd=recap_document)
@@ -2994,6 +2994,11 @@ def recap_document_into_opinions(
     case_law_citations = filter_out_non_case_law_citations(citations)
     if len(case_law_citations) == 0:
         logger.info("No citation found for rd: %s", recap_document.id)
+        return task_data
+
+    # repeat the check just before object creation
+    if hash_exists_qs.exists():
+        logger.info("Skipping existing hash %s", recap_document.sha1)
         return task_data
 
     with transaction.atomic():
