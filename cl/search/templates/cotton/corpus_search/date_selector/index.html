@@ -7,6 +7,7 @@
 <c-vars
   request
   label
+  second_label
   relative
   date_after_field_name
   date_before_field_name
@@ -18,7 +19,7 @@
   x-data="dateSelector"
   x-id="dateSelectorIdGroup"
   class="flex flex-col gap-1.5"
-  x-bind:aria-labelledby="labelId"
+  {% if not relative %}x-bind:aria-labelledby="labelId"{% endif %}
 >
   <input
     x-bind:id="flatpickrAfterInputId"
@@ -74,6 +75,10 @@
           >
           Relative
         </label>
+      </div>
+    {% elif second_label %}
+      <div class="flex w-1/2 pl-2">
+        <div class="w-full px-1 text-start text-sm font-medium text-greyscale-600">{{ second_label }}</div>
       </div>
     {% endif %}
   </div>

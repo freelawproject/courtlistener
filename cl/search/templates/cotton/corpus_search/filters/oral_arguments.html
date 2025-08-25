@@ -27,12 +27,13 @@
   </div>
 
   <c-corpus-search.date-selector
-    label="Argument Date"
+    label="Argued After"
+    second_label="Argued Before"
     :request="request"
     date_after_field_name="argued_after"
     date_before_field_name="argued_after"
-    date_after_placeholder="Argued After"
-    date_before_placeholder="Argued Before"
+    date_after_placeholder="mm/dd/yyyy"
+    date_before_placeholder="mm/dd/yyyy"
     only
   />
 
