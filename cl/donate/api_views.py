@@ -178,6 +178,7 @@ class MembershipWebhookViewSet(
             - termEndDate: The date the membership is scheduled to terminate
             - membershipName: The name of the membership level the user is
             enrolled in.
+            - paymentStatus: The current payment status for the membership.
         """
         # checks whether the webhook payloads match the expected schema defined
         # in the documentation
@@ -196,11 +197,17 @@ class MembershipWebhookViewSet(
                 "membershipName": data["membershipLevel"]["name"],
             }
 
+        payment_status = (
+            data.get("payments")[0].get("paymentStatus", "").lower()
+            if data.get("payments", [])
+            else ""
+        )
         membership.update(
             {
                 "accountId": data["accountId"],
                 "termEndDate": data["termEndDate"],
                 "status": data["status"].lower(),
+                "paymentStatus": payment_status,
             }
         )
 
