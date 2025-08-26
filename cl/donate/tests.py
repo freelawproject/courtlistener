@@ -684,6 +684,7 @@ class ProfileMembershipTest(TestCase):
             level=NeonMembership.LEGACY,
             user=self.user_profile.user,
             termination_date=termination_date,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
         )
         self.user_profile.refresh_from_db()
 
