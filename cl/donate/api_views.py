@@ -62,6 +62,8 @@ class MembershipWebhookViewSet(
             match webhook_data["eventTrigger"]:
                 case "createMembership":
                     self._handle_membership_creation(webhook_data)
+                case "editMembership" | "updateMembership":
+                    self._handle_membership_update(webhook_data)
                 case "deleteMembership":
                     self._handle_membership_deletion(webhook_data)
                 case _:
@@ -275,6 +277,27 @@ class MembershipWebhookViewSet(
             membership_id=membership_data["membershipId"],
             trigger=trigger,
         )
+
+    def _handle_membership_update(self, webhook_data) -> None:
+        membership_data = self._get_membership_data(webhook_data)
+        membership_query = NeonMembership.objects.filter(
+            neon_id=membership_data["membershipId"]
+        )
+        if not membership_query.exists():
+            return None
+
+        membership_level = NeonMembership.TYPES_INVERTED[
+            membership_data["membershipName"]
+        ]
+        payment_status = self._map_payment_status_value(
+            membership_data["paymentStatus"]
+        )
+
+        neon_membership = membership_query.first()
+        neon_membership.level = membership_level
+        neon_membership.termination_date = membership_data["termEndDate"]
+        neon_membership.payment_status = payment_status
+        neon_membership.save()
 
     def _handle_membership_creation(self, webhook_data) -> None:
         membership_data = self._get_membership_data(webhook_data)
