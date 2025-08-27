@@ -128,7 +128,7 @@
     @apply min-w-80 max-w-80 before:hidden after:hidden;
   }
   .flatpickr-calendar.animate:not(.open) {
-    @apply pointer-events-none;
+    @apply pointer-events-none hidden;
   }
   .flatpickr-calendar.animate .flatpickr-months {
     @apply relative min-w-full max-w-full px-6;
