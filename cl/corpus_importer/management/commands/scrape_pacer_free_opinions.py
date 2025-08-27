@@ -356,7 +356,7 @@ def get_pdfs(
         # we accept same hash RecapDocuments; but we don't want duplicates in
         # Opinions. Introduce some time variability between consecutive tasks
         # to help the hash checks in `recap_document_into_opinions` work
-        c.apply_async(countdown=random.uniform(5, 30))
+        c.apply_async(countdown=random.uniform(3, 10))
         completed += 1
 
         if completed % 1000 == 0:
