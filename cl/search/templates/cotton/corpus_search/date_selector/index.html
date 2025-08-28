@@ -4,10 +4,16 @@
 {% require_script "js/alpine/components/date_selector.js" %}
 {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 
+{% comment %}
+- This component renders a date range selector with date pickers for calendar dates.
+- Optionally, relative dates can be used if the `relative` prop is passed.
+- When relative dates are disabled, a second label can be introduced for the ending date.
+{% endcomment %}
+
 <c-vars
-  request
-  label
-  second_label
+  request {# Required to import the scripts. #}
+  label {# For relative dates, this labels the entire widget. Otherwise, it's the initial date. #}
+  second_label {# Only used when relative dates are disabled, and labels the ending date. #}
   relative
   date_after_field_name
   date_before_field_name
