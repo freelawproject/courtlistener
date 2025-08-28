@@ -25,13 +25,19 @@ def get_v2_homepage_stats():
         for x in range(0, 10)
     ]
 
-    alerts_in_last_ten = Stat.objects.filter(
-        name__contains="alerts.sent", date_logged__gte=ten_days_ago
-    ).aggregate(Sum("count"))["count__sum"]
+    alerts_in_last_ten = (
+        Stat.objects.filter(
+            name__contains="alerts.sent", date_logged__gte=ten_days_ago
+        ).aggregate(Sum("count"))["count__sum"]
+        or 0
+    )
 
-    queries_in_last_ten = Stat.objects.filter(
-        name="search.results", date_logged__gte=ten_days_ago
-    ).aggregate(Sum("count"))["count__sum"]
+    queries_in_last_ten = (
+        Stat.objects.filter(
+            name="search.results", date_logged__gte=ten_days_ago
+        ).aggregate(Sum("count"))["count__sum"]
+        or 0
+    )
 
     r = get_redis_interface("STATS")
     api_in_last_ten = sum(
@@ -43,7 +49,7 @@ def get_v2_homepage_stats():
     )
 
     minutes_of_oa = (
-        Audio.objects.aggregate(Sum("duration"))["duration__sum"] // 60
+        Audio.objects.aggregate(Sum("duration"))["duration__sum"] or 0 // 60
     )
 
     homepage_stats = {
