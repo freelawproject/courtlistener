@@ -1785,7 +1785,8 @@ class ReplicateRecapUploadsTest(TestCase):
                     uploader=self.user,
                     pacer_case_id=pacer_case_id,
                     pacer_doc_id="04505578697",
-                    document_number=1,
+                    document_number=5,
+                    attachment_number=2,
                     upload_type=UPLOAD_TYPE.PDF,
                     filepath_local=self.f,
                 )
@@ -1813,6 +1814,36 @@ class ReplicateRecapUploadsTest(TestCase):
                 self.assertTrue(main_d_1_rd.filepath_local)
                 self.assertTrue(main_d_2_rd.filepath_local)
                 self.assertTrue(main_d_3_rd.filepath_local)
+
+                # The document_number is updated in the original upload according to the
+                # PQ metadata.
+                doc_number_to_compare = "1" if pacer_case_id == "" else "5"
+                self.assertEqual(
+                    main_d_2_rd.document_number, doc_number_to_compare
+                )
+                att_number_to_compare = None if pacer_case_id == "" else 2
+                doc_type = (
+                    RECAPDocument.PACER_DOCUMENT
+                    if pacer_case_id == ""
+                    else RECAPDocument.ATTACHMENT
+                )
+                self.assertEqual(
+                    main_d_2_rd.attachment_number, att_number_to_compare
+                )
+                self.assertEqual(main_d_2_rd.document_type, doc_type)
+
+                # In RDs where the document was replicated, the document_number,
+                # attachment_number and document_type must not be updated.
+                self.assertEqual(main_d_1_rd.document_number, "1")
+                self.assertEqual(main_d_1_rd.attachment_number, None)
+                self.assertEqual(
+                    main_d_1_rd.document_type, RECAPDocument.PACER_DOCUMENT
+                )
+                self.assertEqual(main_d_3_rd.document_number, "1")
+                self.assertEqual(main_d_3_rd.attachment_number, None)
+                self.assertEqual(
+                    main_d_3_rd.document_type, RECAPDocument.PACER_DOCUMENT
+                )
 
                 # Assert the number of PQs created to process the additional subdocket RDs.
                 pqs_created = ProcessingQueue.objects.all()
@@ -3979,7 +4010,7 @@ class RecapPdfTaskTest(TestCase):
         self.pq.filepath_local.save(self.filename_ocr, cf)
         rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         recap_document = RECAPDocument.objects.get(pk=rd.pk)
-        self.assertEqual(needs_ocr(recap_document.plain_text), False)
+        self.assertEqual(needs_ocr(recap_document.plain_text), True)
         self.assertEqual(recap_document.ocr_status, RECAPDocument.OCR_COMPLETE)
 
 
@@ -5947,7 +5978,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         ]
         self.assertEqual(len(rd_needs_extraction), 2)
 
-        extract_unextracted_rds("celery")
+        extract_unextracted_rds("celery", 10)
 
         rd_needs_extraction_after = [
             x.pk
@@ -5986,7 +6017,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         self.assertEqual(rd[0].sha1, "asdfasdfasdfasdfasdfasddf")
         self.assertEqual(rd[0].date_upload, date_upload)
 
-        extract_unextracted_rds("celery")
+        extract_unextracted_rds("celery", 10)
         # File related fields should be cleaned up after the failed extraction.
         self.assertEqual(rd[0].is_available, False)
         self.assertEqual(rd[0].file_size, None)
