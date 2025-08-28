@@ -3453,10 +3453,10 @@ class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
         another_cluster = OpinionClusterWithChildrenAndParentsFactory.create()
         another_opinion = another_cluster.sub_opinions.first()
 
-        # prevent triggering the signal using a straightforward .create
         created = OpinionsCited.objects.create(
             citing_opinion=another_opinion, cited_opinion=another_opinion
         )
+        # prevent triggering the signal using .update
         OpinionsCited.objects.filter(id=created.id).update(
             citing_opinion=opinion
         )
