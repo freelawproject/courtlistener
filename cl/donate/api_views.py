@@ -1,5 +1,6 @@
 from collections import defaultdict
 from http import HTTPStatus
+from typing import Any
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
@@ -164,7 +165,7 @@ class MembershipWebhookViewSet(
         return user
 
     @staticmethod
-    def _get_membership_data(webhook_data: dict[str, str]) -> dict[str, str]:
+    def _get_membership_data(webhook_data: dict[str, Any]) -> dict[str, str]:
         """
         Extracts relevant membership information from a Neon webhook payload.
 
