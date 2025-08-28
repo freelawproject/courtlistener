@@ -163,9 +163,8 @@ class MembershipWebhookViewSet(
 
         return user
 
-    def _get_membership_data(
-        self, webhook_data: dict[str, str]
-    ) -> dict[str, str]:
+    @staticmethod
+    def _get_membership_data(webhook_data: dict[str, str]) -> dict[str, str]:
         """
         Extracts relevant membership information from a Neon webhook payload.
 
@@ -217,7 +216,8 @@ class MembershipWebhookViewSet(
 
         return membership
 
-    def _map_trigger_value(self, trigger_event: str) -> int:
+    @staticmethod
+    def _map_trigger_value(trigger_event: str) -> int:
         """
         Maps a string trigger event received from a Neon webhook to the
         corresponding integer value representing the trigger event type in
@@ -243,7 +243,8 @@ class MembershipWebhookViewSet(
 
         return trigger
 
-    def _map_payment_status_value(self, status: str) -> int:
+    @staticmethod
+    def _map_payment_status_value(status: str) -> int:
         """
         Maps a payment status string into its corresponding
         integer value defined in the `MembershipPaymentStatus` class.
@@ -343,7 +344,8 @@ class MembershipWebhookViewSet(
             neon_membership.payment_status = payment_status
             neon_membership.save()
 
-    def _handle_membership_deletion(self, webhook_data) -> None:
+    @staticmethod
+    def _handle_membership_deletion(webhook_data) -> None:
         membership_data = webhook_data["data"]["membership"]
         try:
             neon_membership = NeonMembership.objects.get(
