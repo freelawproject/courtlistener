@@ -13,7 +13,11 @@ from django.utils.timezone import now
 
 from cl.donate.api_views import MembershipWebhookViewSet
 from cl.donate.factories import NeonWebhookEventFactory
-from cl.donate.models import NeonMembership, NeonWebhookEvent
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonWebhookEvent,
+)
 from cl.lib.test_helpers import UserProfileWithParentsFactory
 from cl.tests.cases import TestCase
 from cl.users.models import UserProfile
@@ -44,7 +48,7 @@ class MembershipWebhookTest(TestCase):
 
     @override_settings(NEON_MAX_WEBHOOK_NUMBER=10)
     @patch(
-        "cl.donate.api_views.MembershipWebhookViewSet._handle_membership_creation_or_update",
+        "cl.donate.api_views.MembershipWebhookViewSet._handle_membership_creation",
     )
     def test_store_and_truncate_webhook_data(
         self, mock_membership_creation
@@ -113,11 +117,14 @@ class MembershipWebhookTest(TestCase):
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
     )
-    async def test_avoid_creating_membership_for_failed_transaction(
+    async def test_can_create_membership_for_failed_transaction(
         self, mock_store_webhook
     ) -> None:
         self.data["eventTrigger"] = "createMembership"
         self.data["data"]["membership"]["status"] = "FAILED"
+        self.data["data"]["membership"]["payments"] = [
+            {"paymentStatus": "Failed"}
+        ]
         r = await self.async_client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
             data=self.data,
@@ -127,7 +134,39 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         query = NeonMembership.objects.filter(neon_id="12345")
-        self.assertEqual(await query.acount(), 0)
+        self.assertEqual(await query.acount(), 1)
+
+        membership = await query.afirst()
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.FAILED
+        )
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_can_create_membership_for_pending_transaction(
+        self, mock_store_webhook
+    ) -> None:
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["status"] = "PENDING"
+        self.data["data"]["membership"]["payments"] = [
+            {"paymentStatus": "Pending"}
+        ]
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        membership = await query.afirst()
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.PENDING
+        )
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
@@ -285,6 +324,72 @@ class MembershipWebhookTest(TestCase):
 
         self.assertEqual(membership.neon_id, "12345")
         self.assertEqual(membership.level, NeonMembership.TIER_4)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_can_update_pending_membership(
+        self, mock_store_webhook
+    ) -> None:
+        await NeonMembership.objects.acreate(
+            user=self.user_profile.user,
+            neon_id="12345",
+            level=NeonMembership.TIER_1,
+            payment_status=MembershipPaymentStatus.PENDING,
+        )
+
+        # Update payment status
+        self.data["eventTrigger"] = "updateMembership"
+        self.data["data"]["membership"]["payments"] = [
+            {"paymentStatus": "Succeeded"}
+        ]
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v4"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+        membership = await NeonMembership.objects.aget(neon_id="12345")
+
+        self.assertEqual(membership.neon_id, "12345")
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.SUCCEEDED
+        )
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_can_update_failed_membership(
+        self, mock_store_webhook
+    ) -> None:
+        await NeonMembership.objects.acreate(
+            user=self.user_profile.user,
+            neon_id="12345",
+            level=NeonMembership.TIER_1,
+            payment_status=MembershipPaymentStatus.FAILED,
+        )
+
+        # Update payment status
+        self.data["eventTrigger"] = "updateMembership"
+        self.data["data"]["membership"]["payments"] = [
+            {"paymentStatus": "Succeeded"}
+        ]
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v4"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+        membership = await NeonMembership.objects.aget(neon_id="12345")
+
+        self.assertEqual(membership.neon_id, "12345")
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.SUCCEEDED
+        )
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None

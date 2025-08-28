@@ -86,10 +86,6 @@
     {% if FUNDRAISING_MODE %}
       {% include 'includes/dismissible_nav_banner.html' with link="https://donate.free.law/forms/supportflp" cookie_name="eoy_banner" button_text="Make your DONATION TODAY" button_emoji='<i class="fa fa-heart-o"></i>' text="Your support has grown CourtListener to over 10 million opinions, with improved search and API functionality. Help us continue expanding and enhancing access to the law. Donate before the end of 2024 to power free and open legal information for everyone" %}
     {% endif %}
-    <!-- Oral Arguments Transcript Banner -->
-    {% flag "transcript_feature" %}
-      {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2025/07/31/oral-argument-transcripts/" cookie_name="oa_transcripts_banner" button_text="Learn more here!" variant="info" text="📣 Transcripts for Oral Arguments are now live!<br><br><strong>Search and set alerts for anything said in court</strong> right here in CourtListener &mdash; we've got the largest collection of Oral Arguments audio on the internet! Transcripts are available just minutes after courts share audio." %}
-    {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">

@@ -150,9 +150,11 @@ document.addEventListener('alpine:init', () => {
       this.searchScopes.forEach((scope) => updateFieldset(scope));
     },
     onSubmit() {
-      Array.from(this.$el.elements).forEach((el) => {
-        const isInput = ['INPUT', 'SELECT'].includes(el.tagName);
-        if (isInput && !el.value.trim()) {
+      const formInputs = Array.from(this.$el.elements).filter((el) => ['INPUT', 'SELECT'].includes(el.tagName));
+      formInputs.forEach((el) => {
+        const isEmpty = !el.value.trim();
+        const shouldIgnore = el.dataset?.ignoreInput === 'true';
+        if (isEmpty || shouldIgnore) {
           el.setAttribute('disabled', 'disabled');
         }
       });

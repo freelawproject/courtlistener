@@ -6,11 +6,11 @@
     <input name="court" class="border border-greyscale-200 rounded-lg h-10 py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-primary-600">
   </div>
 
-  <c-corpus-search.filters.opinions :search_form="search_form" only />
+  <c-corpus-search.filters.opinions :search_form="search_form" :request="request" only />
 
-  <c-corpus-search.filters.recap :search_form="search_form" only />
+  <c-corpus-search.filters.recap :search_form="search_form" :request="request" only />
 
-  <c-corpus-search.filters.oral-arguments :search_form="search_form" only />
+  <c-corpus-search.filters.oral-arguments :search_form="search_form" :request="request" only />
 
-  <c-corpus-search.filters.judges :search_form="search_form" only />
+  <c-corpus-search.filters.judges :search_form="search_form" :request="request" only />
 </div>

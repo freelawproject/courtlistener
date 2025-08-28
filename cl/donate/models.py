@@ -189,6 +189,18 @@ class NeonWebhookEvent(AbstractDateTimeModel):
     )
 
 
+class MembershipPaymentStatus:
+    PENDING = 0
+    SUCCEEDED = 1
+    FAILED = 2
+
+    CHOICES = (
+        (PENDING, "Awaiting payment processing"),
+        (SUCCEEDED, "Payment successfully processed"),
+        (FAILED, "Payment failed or was declined"),
+    )
+
+
 @pghistory.track()
 class NeonMembership(AbstractDateTimeModel):
     BASIC = 1
@@ -237,6 +249,10 @@ class NeonMembership(AbstractDateTimeModel):
         help_text="The date a user's Neon membership will be terminated",
         blank=True,
         null=True,
+    )
+    payment_status = models.SmallIntegerField(
+        choices=MembershipPaymentStatus.CHOICES,
+        default=MembershipPaymentStatus.PENDING,
     )
 
     @property
