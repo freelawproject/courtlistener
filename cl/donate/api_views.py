@@ -286,6 +286,20 @@ class MembershipWebhookViewSet(
             neon_id=membership_data["membershipId"]
         )
         if not membership_query.exists():
+            # Prevents an existing membership from being overwritten by data
+            # from an updateMembership webhook that's either from a previous
+            # membership or one that doesn't exist in our database.
+            #
+            # The updateMembership is triggered when a membership upgrade
+            # occurs. Its payload contains the details of the previous
+            # membership record, but with an updated 'termEndDate' field.
+            #
+            # During the upgrade process, a createMembership webhook is also
+            # triggered, and both requests are sent almost simultaneously.
+            # However, we are skipping this webhooks to avoid data integrity
+            # issues.
+            #
+            # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
             return None
 
         membership_level = NeonMembership.TYPES_INVERTED[
