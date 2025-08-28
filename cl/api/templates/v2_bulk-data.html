@@ -29,15 +29,19 @@
 >
   <c-layout-with-navigation.section id="about">
     <h1>Bulk Legal Data</h1>
-    <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general the files that are available correspond to the major types of data we have in our database, such as case law, oral arguments, dockets, and judges.</p>
+    <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general the files that are available correspond to the major types of data we have in our database, such as case law, case law embeddings, oral arguments, dockets, and judges.</p>
     <p><a class="underline" href="{% url "contact" %}">Get in touch</a> if you're interested in types of data not provided here.</p>
     <p>If you have questions about the data, <a class="underline" href="https://github.com/freelawproject/courtlistener/discussions">please use our forum</a> and we'll get back to you as soon as possible.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="Browse">
     <h2>Browse the Data Files</h2>
-    <p>As they are generated, files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type. Files are snapshots, not deltas.</p>
+    <p>As they are generated, bulk data files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type. Files are snapshots, not deltas.</p>
     <p><a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/" class="btn-primary">Browse Bulk Data</a></p>
+    <p>In addition to bulk data files, we also generate and provide embeddings for our case law data. The data as well as the <a class="underline" href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=embeddings/inventories/">inventory files</a> are stored in an AWS S3 bucket and is updated daily.</p>
+    <p>The embeddings are generated using an encoder model finetuned by us and served using our Microservice <a class="underline" href="https://github.com/freelawproject/inception/tree/main">Inception</a>. <a class="underline" href="https://free.law/2025/03/11/semantic-search/">Read the blog post</a> to learn more about our approach and the model we use.</p>
+    <p>This data is used to power our Case Law Semantic Search and we have made the data available to the public to encourage innovations in the legal tech space and to propel research in the legal domain.</p>
+    <p><a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=embeddings/" class="btn-primary">Browse Embedding Data</a></p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="formats">
