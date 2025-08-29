@@ -101,9 +101,11 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
     actions = ("seal_clusters",)
 
     SEAL_BLOCKERS_MAP = {
-        # These prevent cluster deletion and thus redirection
+        # These prevent cluster deletion
         "favorites.UserTag": lambda cluster: cluster.docket.user_tags,
-        "favorites.Note": lambda cluster: cluster.docket.note_set,
+        "favorites.Note": lambda cluster: cluster.docket.note_set.all().union(
+            cluster.note_set.all()
+        ),
         "alerts.DocketAlert": lambda cluster: cluster.docket.alerts,
         "visualizations.SCOTUSMap": lambda cluster: SCOTUSMap.objects.filter(
             Q(cluster_start=cluster)
@@ -275,7 +277,7 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
 
         if sealed_count:
             self.message_user(
-                request, f"Sealed {sealed_count} clusters.", messages.SUCCESS
+                request, f"Sealed {sealed_count} cluster(s).", messages.SUCCESS
             )
 
         if error_messages:
@@ -290,7 +292,7 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
                     if url
                     else "",
                 )
-                self.message_user(request, message, level=messages.WARNING)
+                self.message_user(request, message, messages.WARNING)
 
 
 @admin.register(Court)
