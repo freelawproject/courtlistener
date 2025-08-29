@@ -1,5 +1,6 @@
 from collections import defaultdict
 from http import HTTPStatus
+from typing import Any
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
@@ -163,9 +164,8 @@ class MembershipWebhookViewSet(
 
         return user
 
-    def _get_membership_data(
-        self, webhook_data: dict[str, str]
-    ) -> dict[str, str]:
+    @staticmethod
+    def _get_membership_data(webhook_data: dict[str, Any]) -> dict[str, str]:
         """
         Extracts relevant membership information from a Neon webhook payload.
 
@@ -217,7 +217,8 @@ class MembershipWebhookViewSet(
 
         return membership
 
-    def _map_trigger_value(self, trigger_event: str) -> int:
+    @staticmethod
+    def _map_trigger_value(trigger_event: str) -> int:
         """
         Maps a string trigger event received from a Neon webhook to the
         corresponding integer value representing the trigger event type in
@@ -243,7 +244,8 @@ class MembershipWebhookViewSet(
 
         return trigger
 
-    def _map_payment_status_value(self, status: str) -> int:
+    @staticmethod
+    def _map_payment_status_value(status: str) -> int:
         """
         Maps a payment status string into its corresponding
         integer value defined in the `MembershipPaymentStatus` class.
@@ -284,6 +286,20 @@ class MembershipWebhookViewSet(
             neon_id=membership_data["membershipId"]
         )
         if not membership_query.exists():
+            # Prevents an existing membership from being overwritten by data
+            # from an updateMembership webhook that's either from a previous
+            # membership or one that doesn't exist in our database.
+            #
+            # The updateMembership is triggered when a membership upgrade
+            # occurs. Its payload contains the details of the previous
+            # membership record, but with an updated 'termEndDate' field.
+            #
+            # During the upgrade process, a createMembership webhook is also
+            # triggered, and both requests are sent almost simultaneously.
+            # However, we are skipping this webhooks to avoid data integrity
+            # issues.
+            #
+            # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
             return None
 
         membership_level = NeonMembership.TYPES_INVERTED[
@@ -343,7 +359,8 @@ class MembershipWebhookViewSet(
             neon_membership.payment_status = payment_status
             neon_membership.save()
 
-    def _handle_membership_deletion(self, webhook_data) -> None:
+    @staticmethod
+    def _handle_membership_deletion(webhook_data) -> None:
         membership_data = webhook_data["data"]["membership"]
         try:
             neon_membership = NeonMembership.objects.get(
