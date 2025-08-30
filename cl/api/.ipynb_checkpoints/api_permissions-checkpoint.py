@@ -97,7 +97,6 @@ class V3APIPermission(permissions.BasePermission):
             raise PermissionDenied(self.v3_blocked_message)
         return True
 
-
 class CanViewTranscriptPermission(permissions.BasePermission):
     """
     Custom permission to only allow users with the 'can_view_transcript' permission to view transcripts.
@@ -105,3 +104,4 @@ class CanViewTranscriptPermission(permissions.BasePermission):
 
     def has_permission(self, request, view):
         return request.user.has_perm("audio.can_view_transcript")
+

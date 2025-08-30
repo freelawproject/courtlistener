@@ -39,7 +39,6 @@ class AudioSerializer(
         model = audio_models.Audio
         fields = "__all__"
 
-
 class TranscriptSerializer(ModelSerializer):
     class Meta:
         model = audio_models.Audio
