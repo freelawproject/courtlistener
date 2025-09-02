@@ -34,7 +34,13 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_versions_by_text_similarity,
 )
 from cl.scrapers.utils import citation_is_duplicated, make_citation
-from cl.search.models import SOURCES, Docket, Opinion, RECAPDocument
+from cl.search.models import (
+    SOURCES,
+    Docket,
+    Opinion,
+    OriginatingCourtInformation,
+    RECAPDocument,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,15 +52,8 @@ def update_document_from_text(
 ) -> dict:
     """Extract additional metadata from document text
 
-    We use this code with BIA decisions. Previously Tax.
-    I think it is not unlikely that we will use or need this in the future.
-
-    Use functions from Juriscraper to pull metadata out of opinion
-    text. Formerly implemented in only Tax Court, but functional in all
-    scrapers via AbstractSite object.
-
-    Note that this updates the values but does not save them for
-    Docket, OpinionCluster and Opinion. Saving is left to
+    Note that this updates the values but does not save them for Docket,
+    OpinionCluster, Opinion and OriginatingCourtInformation. Saving is left to
     the calling function. It does save Citations
 
     :param opinion: Opinion object
@@ -82,6 +81,15 @@ def update_document_from_text(
             citation_created = True
         elif model_name == "Opinion":
             opinion.__dict__.update(data)
+        elif model_name == "OriginatingCourtInformation":
+            docket = opinion.cluster.docket
+            if docket.originating_court_information:
+                docket.originating_court_information.__dict__.update(data)
+            else:
+                docket.originating_court_information = (
+                    OriginatingCourtInformation(**data)
+                )
+
         else:
             raise NotImplementedError(
                 f"Object type of {model_name} not yet supported."
@@ -209,6 +217,9 @@ def extract_doc_content(
     # Save item
     # noinspection PyBroadException
     try:
+        if opinion.cluster.docket.originating_court_information:
+            opinion.cluster.docket.originating_court_information.save()
+
         opinion.cluster.docket.save()
         opinion.cluster.save()
         opinion.save()

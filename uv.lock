@@ -1585,7 +1585,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.88"
+version = "2.6.89"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1603,9 +1603,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/52/16/2d430238e364cc9daf1d527524c174e9d13b1a1d9393b4dbd96e43fb53f5/juriscraper-2.6.88.tar.gz", hash = "sha256:dd064f73ee7febd0599bbbf097a45289770db2f0b2291e6319143d691d170ddb", size = 314838, upload-time = "2025-08-27T16:55:11.694Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8e/f7/63302ba13604e6d22cdbaf5a2bac6e63be5275061f54fc235dc380e03ec9/juriscraper-2.6.89.tar.gz", hash = "sha256:8fb7e0aad2d6099041e065e997ddf3d46dffb6d5b3e9ab5ec5f8cedef1ac7883", size = 320294, upload-time = "2025-09-02T19:52:24.215Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/24/f2ec484e25148d77100a396397a95c58c9599af081a5716668c8d60a5f6d/juriscraper-2.6.88-py3-none-any.whl", hash = "sha256:305dc73f1e8e475e3c06207e1ca00460c4545e259f1b25fa6c9262a03e62ea47", size = 520824, upload-time = "2025-08-27T16:55:09.187Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/71/6841cc47b9b7fd786d67df2876aaab08f25e36a98c3ba7991e091b5a2883/juriscraper-2.6.89-py3-none-any.whl", hash = "sha256:13c304c7e2b53cb05814cee56a58344e8509485e321a0e8265928c2c30141d9e", size = 527039, upload-time = "2025-09-02T19:52:22.099Z" },
 ]
 
 [[package]]

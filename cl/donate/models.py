@@ -257,6 +257,9 @@ class NeonMembership(AbstractDateTimeModel):
 
     @property
     def is_active(self) -> bool:
+        if self.payment_status != MembershipPaymentStatus.SUCCEEDED:
+            return False
+
         if not self.termination_date:
             return True
 

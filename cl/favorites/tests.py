@@ -17,7 +17,7 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.custom_filters.templatetags.pacer import price
-from cl.donate.models import NeonMembership
+from cl.donate.models import MembershipPaymentStatus, NeonMembership
 from cl.favorites.factories import NoteFactory, PrayerFactory
 from cl.favorites.models import (
     DocketTag,
@@ -670,7 +670,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         """Does the prayer_eligible method work properly?"""
         # Create a membership for one of the users
         await sync_to_async(NeonMembership.objects.create)(
-            level=NeonMembership.LEGACY, user=self.user_2
+            level=NeonMembership.LEGACY,
+            user=self.user_2,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
         )
         current_time = now()
         with time_machine.travel(current_time, tick=False):
