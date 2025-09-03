@@ -7,7 +7,7 @@ from asgiref.sync import sync_to_async
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
-from django.test import AsyncClient, SimpleTestCase
+from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
@@ -22,7 +22,6 @@ from cl.alerts.management.commands.cl_send_scheduled_alerts import (
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
-from cl.users.factories import UserFactory
 
 
 class RestartRateLimitMixin:
