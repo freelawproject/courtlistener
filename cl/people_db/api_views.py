@@ -1,6 +1,9 @@
 from django.db.models import Exists, OuterRef, Prefetch
 from rest_framework import viewsets
-from rest_framework.permissions import DjangoModelPermissions
+from rest_framework.permissions import (
+    DjangoModelPermissions,
+    DjangoModelPermissionsOrAnonReadOnly,
+)
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import TinyAdjustablePagination
@@ -97,7 +100,7 @@ class PersonDisclosureViewSet(viewsets.ModelViewSet):
     filterset_class = PersonDisclosureFilter
     pagination_class = TinyAdjustablePagination
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = (
