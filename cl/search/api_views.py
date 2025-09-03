@@ -6,7 +6,10 @@ from django.urls import reverse
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import DjangoModelPermissions
+from rest_framework.permissions import (
+    DjangoModelPermissions,
+    DjangoModelPermissionsOrAnonReadOnly,
+)
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 
@@ -79,7 +82,7 @@ class OriginatingCourtInformationViewSet(
 ):
     serializer_class = OriginalCourtInformationSerializer
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     # Default cursor ordering key
@@ -204,7 +207,7 @@ class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     serializer_class = CourtSerializer
     filterset_class = CourtFilter
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -341,7 +344,7 @@ class OpinionsCitedViewSet(
     serializer_class = OpinionsCitedSerializer
     filterset_class = OpinionsCitedFilter
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     # Default cursor ordering key
@@ -407,8 +410,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
 
 
 class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
-    # Default permissions use Django permissions, so here we AllowAny,
-    # but folks will need to log in to get past the thresholds.
+    # Only allowed for Authenticated users.
     permission_classes = (permissions.IsAuthenticated,)
 
     supported_search_types = {
