@@ -61,6 +61,8 @@ def delete_duplicate_opinion(
             strict_merging,
         )
 
+    update_referencing_objects(opinion_to_keep, opinion_to_delete)
+
     if not is_same_cluster:
         update_referencing_objects(
             opinion_to_keep.cluster, opinion_to_delete.cluster
