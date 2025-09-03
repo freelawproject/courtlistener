@@ -90,7 +90,7 @@ from cl.search.models import (
 from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import AuthAPIClientMixin, ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -393,9 +393,10 @@ class RECAPDocumentValidationTest(TestCase):
     "cl.lib.courts.get_cache_key_for_court_list",
     return_value="common_search:minimal-court-list",
 )
-class ESCommonSearchTest(ESIndexTestCase, TestCase):
+class ESCommonSearchTest(AuthAPIClientMixin, ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.rebuild_index("search.OpinionCluster")
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.child_court_1 = CourtFactory(
@@ -1494,8 +1495,12 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertEqual(body["lte"], "2025-05-10T23:59:59Z")
 
 
-class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
+class SearchAPIV4CommonTest(AuthAPIClientMixin, ESIndexTestCase, TestCase):
     """Common tests for the Search API V4 endpoints."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
 
     async def test_es_general_bad_request_error_(self) -> None:
         """Can we properly raise the ElasticBadRequestError exception?"""
@@ -1986,7 +1991,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
 
 
-class SaveSearchQueryTest(TestCase):
+class SaveSearchQueryTest(ESIndexTestCase, TestCase):
     def setUp(self) -> None:
         self.user = UserFactory()
         self.async_client = AsyncClient()
