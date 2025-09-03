@@ -789,9 +789,7 @@ class BlockV3APITests(TestCase):
             )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    async def test_allow_v4_for_anonymous_users(
-        self, mock_api_prefix
-    ) -> None:
+    async def test_allow_v4_for_anonymous_users(self, mock_api_prefix) -> None:
         """Confirm V4 anonymous API users are not allowed to use V4 of the API"""
         with mock.patch.object(
             V3APIPermission, "check_request", return_value=True
