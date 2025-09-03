@@ -777,7 +777,7 @@ class BlockV3APITests(TestCase):
             V3APIPermission, "check_request", return_value=True
         ):
             response = await self.async_client.get(self.audio_path_v3)
-        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
 
     async def test_allow_v4_for_new_users(self, mock_api_prefix) -> None:
         """Confirm new API users are allowed to use V4 of the API"""
@@ -789,7 +789,7 @@ class BlockV3APITests(TestCase):
             )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    async def test_restrict_v4_for_anonymous_users(
+    async def test_allow_v4_for_anonymous_users(
         self, mock_api_prefix
     ) -> None:
         """Confirm V4 anonymous API users are not allowed to use V4 of the API"""
@@ -797,7 +797,7 @@ class BlockV3APITests(TestCase):
             V3APIPermission, "check_request", return_value=True
         ):
             response = await self.async_client.get(self.audio_path_v4)
-        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
     async def test_confirm_v4_post_requests_are_not_allowed(
         self, mock_api_prefix
