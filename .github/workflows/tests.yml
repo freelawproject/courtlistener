@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out CourtListener
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: courtlistener
 
@@ -48,7 +48,7 @@ jobs:
         tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
       - name: Check out CourtListener
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: courtlistener
 
@@ -74,7 +74,7 @@ jobs:
         working-directory: courtlistener/docker/courtlistener
         run: docker compose pull --quiet --ignore-buildable
       - name: Download courtlistener image
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: courtlistener
           path: /tmp
