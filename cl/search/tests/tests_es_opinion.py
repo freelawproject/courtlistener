@@ -74,6 +74,7 @@ from cl.search.tasks import (
     update_es_document,
 )
 from cl.tests.cases import (
+    AuthAPIClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
@@ -566,6 +567,7 @@ class OpinionV3APISearchTest(
 
 
 class OpinionV4APISearchTest(
+    AuthAPIClientMixin,
     OpinionSearchAPICommonTests,
     ESIndexTestCase,
     TestCase,
@@ -2361,7 +2363,7 @@ class OpinionsESSearchTest(
 
 
 class OpinionSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthAPIClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
     """
     Opinion Search Decay Relevancy Tests
