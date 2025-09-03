@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from rest_framework.permissions import DjangoModelPermissions
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.utils import (
@@ -48,7 +48,7 @@ class AgreementViewSet(
     queryset = Agreement.objects.all().order_by("-id")
     serializer_class = AgreementSerializer
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified")
@@ -67,7 +67,7 @@ class DebtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     queryset = Debt.objects.all().order_by("-id")
     serializer_class = DebtSerializer
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified")
@@ -103,7 +103,7 @@ class FinancialDisclosureViewSet(
     serializer_class = FinancialDisclosureSerializer
     filterset_class = FinancialDisclosureFilter
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified")
@@ -122,7 +122,7 @@ class GiftViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     serializer_class = GiftSerializer
     filterset_class = GiftFilter
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified")
@@ -146,7 +146,7 @@ class InvestmentViewSet(
     serializer_class = InvestmentSerializer
     filterset_class = InvestmentFilter
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified")
@@ -167,7 +167,7 @@ class NonInvestmentIncomeViewSet(
     serializer_class = NonInvestmentIncomeSerializer
     filterset_class = NonInvestmentIncomeFilter
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified")
@@ -188,7 +188,7 @@ class PositionViewSet(
     serializer_class = PositionSerializer
     filterset_class = PositionFilter
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified")
@@ -209,7 +209,7 @@ class ReimbursementViewSet(
     serializer_class = ReimbursementSerializer
     filterset_class = ReimbursementFilter
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified")
@@ -230,7 +230,7 @@ class SpouseIncomeViewSet(
     serializer_class = SpouseIncomeSerializer
     filterset_class = SpouseIncomeFilter
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified")
