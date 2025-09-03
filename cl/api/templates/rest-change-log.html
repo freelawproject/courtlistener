@@ -31,6 +31,62 @@
   <h1 id="about">REST API Change Log</h1>
   <ul>
     <li>
+      <p><strong>v4.3</strong> — Enhances security by enforcing authentication in V4 API endpoints. Anonymous requests
+        now receive a <code>401 Unauthorized</code> response. This change affects the following endpoints:
+      <ul>
+        <!-- Audio -->
+        <li><strong>Audio:</strong> <a href="{% url "oral_argument_api_help" %}#audio-endpoint">audio</a></p>
+
+          <!-- Financial Disclosures -->
+        <li>
+          <p><strong>Financial Disclosures:</strong>
+            <a href="{% url "financial_disclosures_api_help" %}#agreement-api">agreements</a>,
+            <a href="{% url "financial_disclosures_api_help" %}#debt-api">debts</a>,
+            <a href="{% url "financial_disclosures_api_help" %}#disclosure-api">financial-disclosures</a>,
+            <a href="{% url "financial_disclosures_api_help" %}#gift-api">gifts</a>,
+            <a href="{% url "financial_disclosures_api_help" %}#investment-api">investments</a>,
+            <a href="{% url "financial_disclosures_api_help" %}#non-investment-api">non-investment-incomes</a>,
+            <a href="{% url "financial_disclosures_api_help" %}#position-api">disclosure-positions</a>,
+            <a href="{% url "financial_disclosures_api_help" %}#reimbursement-api">reimbursements</a>,
+            <a href="{% url "financial_disclosures_api_help" %}#spouse-non-investment-income-api">spouse-incomes</a>
+          </p>
+        </li>
+
+        <!-- People -->
+        <li>
+          <p><strong>People:</strong>
+            <a href="{% url "judge_api_help" %}#people-endpoint">people</a>,
+            <a href="{% url "judge_api_help" %}#positions-endpoint">positions</a>,
+            <a href="{% url "judge_api_help" %}#retention-events">retention-events</a>,
+            <a href="{% url "judge_api_help" %}#education-history">educations and schools</a>,
+            <a href="{% url "judge_api_help" %}#affiliations-endpoint">political-affiliations</a>,
+            <a href="{% url "judge_api_help" %}#sources-endpoint">sources</a>,
+            <a href="{% url "judge_api_help" %}#aba-ratings">aba-ratings</a>
+          </p>
+        </li>
+
+        <!-- RECAP -->
+        <li>
+          <p><strong>RECAP:</strong>
+            <a href="{% url "pacer_api_help" %}#idb-data-endpoint">fjc-integrated-database</a>
+          </p>
+        </li>
+
+        <!-- Search -->
+        <li>
+          <p><strong>Search:</strong>
+            <a href="{% url "search_api_help" %}#api-rest-v4-search">search</a>,
+            <a href="{% url "pacer_api_help" %}#docket-endpoint">dockets</a>,
+            <a href="{% url "pacer_api_help" %}#court-endpoint">courts</a>,
+            <a href="{% url "case_law_api_help" %}#cluster-endpoint">opinion-clusters</a>,
+            <a href="{% url "case_law_api_help" %}#opinion-endpoint">opinions</a>,
+            <a href="{% url "citation_api_help" %}#cites-endpoint">opinions-cited</a>,
+            <a href="{% url "pacer_api_help" %}#og-court-info-endpoint">originating-court-information</a>
+          </p>
+        </li>
+      </ul>
+    </li>
+    <li>
       <p><strong>v4.2</strong> — Enhances support for <a href="{% url "rest_docs" version=version %}#field-selection">Field Selection</a> in nested resources via the <code>fields</code> and <code>omit</code> parameters to reduce payload size and improve response times. Clients can now select nested fields (e.g. <code>fields=educations__date_modified</code>) or
         exclude them (e.g. <code>omit=recap_documents__plain_text</code>), allowing fine-grained control over serialized nested data.
       (<a href="https://github.com/freelawproject/courtlistener/issues/5748">Issue #5748</a>, <a
