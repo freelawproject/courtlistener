@@ -410,8 +410,9 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
 
 
 class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
-    # Only allowed for Authenticated users.
-    permission_classes = (permissions.IsAuthenticated,)
+    # Default permissions use Django permissions, so here we AllowAny,
+    # but folks will need to log in to get past the thresholds.
+    permission_classes = (permissions.AllowAny,)
 
     supported_search_types = {
         SEARCH_TYPES.RECAP: {
