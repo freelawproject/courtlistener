@@ -33,6 +33,7 @@ from cl.search.factories import CourtFactory, DocketFactory, PersonFactory
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.tasks import es_save_document, update_es_document
 from cl.tests.cases import (
+    AuthAPIClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
@@ -494,7 +495,11 @@ class OAV3SearchAPITests(
 
 
 class OAV4SearchAPITests(
-    OASearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    AuthAPIClientMixin,
+    OASearchAPICommonTests,
+    ESIndexTestCase,
+    TestCase,
+    V4SearchAPIAssertions,
 ):
     version_api = "v4"
     skip_common_tests = False
@@ -2606,13 +2611,14 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
 
 class OralArgumentsSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthAPIClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
     """Oral Arguments Search Decay Relevancy Tests"""
 
     @classmethod
     def setUpTestData(cls):
         # Same keywords but different dateArgued
+        super().setUpTestData()
         with cls.captureOnCommitCallbacks(execute=True):
             cls.docket_old = DocketFactory.create(
                 docket_number="1:21-bk-1235",
