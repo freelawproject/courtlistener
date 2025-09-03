@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
-from django.test import Client, override_settings
+from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
@@ -92,7 +92,7 @@ from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
-from cl.users.factories import UserProfileWithParentsFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 class ModelTest(TestCase):
@@ -1988,7 +1988,11 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
 class SaveSearchQueryTest(TestCase):
     def setUp(self) -> None:
-        self.client = Client()
+        self.user = UserFactory()
+        self.async_client = AsyncClient()
+        self.async_client.force_login(self.user)
+        self.client.force_login(self.user)
+
         # Using plain text, fielded queries and manual filters
 
         self.base_searches = [

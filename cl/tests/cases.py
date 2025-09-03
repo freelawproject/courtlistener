@@ -7,7 +7,7 @@ from asgiref.sync import sync_to_async
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
-from django.test import SimpleTestCase
+from django.test import AsyncClient, SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
@@ -22,6 +22,7 @@ from cl.alerts.management.commands.cl_send_scheduled_alerts import (
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
+from cl.users.factories import UserFactory
 
 
 class RestartRateLimitMixin:
@@ -100,6 +101,7 @@ class APITestCase(
 class ESIndexTestCase(SimpleTestCase):
     @classmethod
     def setUpClass(cls):
+        cls.user = UserFactory()
         _index_suffixe = cls.__name__.lower()
         for index in registry.get_indices():
             index._name += f"-{_index_suffixe}"
@@ -139,6 +141,12 @@ class ESIndexTestCase(SimpleTestCase):
     def tearDown(self) -> None:
         self.restart_celery_throttle_key()
         super().tearDown()
+
+    def setUp(self):
+        super().setUp()
+        self.async_client = AsyncClient()
+        self.async_client.force_login(self.user)
+        self.client.force_login(self.user)
 
     def assert_es_feed_content(self, node_tests, response, namespaces):
         """Common assertion that checks the presence of specified nodes in an
