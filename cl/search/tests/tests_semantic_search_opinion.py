@@ -20,7 +20,7 @@ from cl.search.factories import (
     OpinionFactory,
 )
 from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import AuthAPIClientMixin, ESIndexTestCase, TestCase
 
 
 def mock_read_from_s3(file_path, r):
@@ -193,10 +193,11 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 @override_settings(KNN_SIMILARITY=0.3)
 @override_settings(KNN_SEARCH_ENABLED=True)
 @mock.patch("cl.lib.elasticsearch_utils.microservice")
-class SemanticSearchTests(ESIndexTestCase, TestCase):
+class SemanticSearchTests(AuthAPIClientMixin, ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         """Set up test index and test data."""
+        super().setUpTestData()
         cls.rebuild_index("search.OpinionCluster")
         cls.ohio_court = CourtFactory(
             id="ohioctapp",
