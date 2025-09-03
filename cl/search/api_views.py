@@ -6,7 +6,10 @@ from django.urls import reverse
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.permissions import (
+    DjangoModelPermissions,
+    DjangoModelPermissionsOrAnonReadOnly,
+)
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 
@@ -102,7 +105,7 @@ class DocketViewSet(
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -232,7 +235,7 @@ class OpinionClusterViewSet(
     serializer_class = OpinionClusterSerializer
     filterset_class = OpinionClusterFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -303,7 +306,7 @@ class OpinionViewSet(
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     # keep the order as in `settings.rest_framework.DEFAULT_RENDERER_CLASSES`
