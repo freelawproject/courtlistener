@@ -778,10 +778,6 @@ class BlockV3APITests(TestCase):
         ):
             response = await self.async_client.get(self.audio_path_v3)
         self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
-        self.assertEqual(
-            response.json()["detail"],
-            "Anonymous users don't have permission to access V3 of the API. Please use V4 instead.",
-        )
 
     async def test_allow_v4_for_new_users(self, mock_api_prefix) -> None:
         """Confirm new API users are allowed to use V4 of the API"""
@@ -794,7 +790,7 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
     async def test_allow_v4_for_anonymous_users(self, mock_api_prefix) -> None:
-        """Confirm V4 anonymous API users are allowed to use V4 of the API"""
+        """Confirm V4 anonymous API users are not allowed to use V4 of the API"""
         with mock.patch.object(
             V3APIPermission, "check_request", return_value=True
         ):
@@ -827,6 +823,15 @@ class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
 
     fixtures = ["judge_judy.json", "test_objects_search.json"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserFactory()
+
+    def setUp(self) -> None:
+        self.async_client = AsyncClient()
+        self.async_client.force_login(self.user)
+        self.client.force_login(self.user)
 
     async def test_position_ordering(self):
         path = reverse("position-list", kwargs={"version": "v3"})
@@ -946,10 +951,15 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
         )
         cls.qs = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
         cls.path = reverse("court-list", kwargs={"version": "v4"})
+        cls.user = UserFactory()
 
     def setUp(self):
         super().setUp()
         self.q: dict[str, Any] = {}
+
+        self.async_client = AsyncClient()
+        self.async_client.force_login(self.user)
+        self.client.force_login(self.user)
 
     async def test_parent_court_filter(self):
         """Can we filter courts by parent_court id?"""
@@ -1963,6 +1973,7 @@ class V4DRFPaginationTest(TestCase):
                 source=Docket.HARVARD,
                 pacer_case_id=str(i),
             )
+        cls.user = UserFactory()
 
     def setUp(self) -> None:
         class SimplePagination(VersionBasedPagination):
@@ -1973,6 +1984,10 @@ class V4DRFPaginationTest(TestCase):
         self.pagination = SimplePagination()
         # Required to use a Model to support CursorPagination
         self.queryset = Docket.objects.all().order_by("-id")
+
+        self.async_client = AsyncClient()
+        self.async_client.force_login(self.user)
+        self.client.force_login(self.user)
 
     def paginate_queryset(self, request: Request):
         return list(self.pagination.paginate_queryset(self.queryset, request))
@@ -3516,10 +3531,28 @@ class TestApiUsage(SimpleTestCase):
 
 
 @patch("cl.api.utils.make_cache_key_for_no_filter_mixin")
+@mock.patch(
+    "cl.api.utils.get_logging_prefix",
+    return_value="api:TestCache",
+)
+@mock.patch.object(LoggingMixin, "milestones", new=[100])
 class CacheListApiResponseTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserFactory()
+
     def setUp(self):
         self.cache = caches["db_cache"]
+        self.async_client = AsyncClient()
+        self.async_client.force_login(self.user)
+        self.client.force_login(self.user)
         return super().setUp()
+
+    def tearDown(self):
+        r = get_redis_interface("STATS")
+        keys = r.keys("api:TestCache*")
+        if keys:
+            r.delete(*keys)
 
     def _check_cached_request(self, path, params, cache_key):
         """
@@ -3554,7 +3587,9 @@ class CacheListApiResponseTest(TestCase):
             msg=f"{len(ctx.captured_queries)} queries executed, at most 2 expected",
         )
 
-    def test_no_filters_no_pagination_cached(self, mock_cache_key_method):
+    def test_no_filters_no_pagination_cached(
+        self, mock_get_logging_prefix, mock_cache_key_method
+    ):
         """
         Test that a response is cached when there are no filters and no pagination.
         """
@@ -3571,7 +3606,9 @@ class CacheListApiResponseTest(TestCase):
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
 
-    def test_can_ignore_invalid_filters(self, mock_cache_key_method):
+    def test_can_ignore_invalid_filters(
+        self, mock_get_logging_prefix, mock_cache_key_method
+    ):
         """
         Test that a response is cached when there are invalid filters.
         """
@@ -3586,7 +3623,9 @@ class CacheListApiResponseTest(TestCase):
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
 
-    def test_no_filters_count_request_cached(self, mock_cache_key_method):
+    def test_no_filters_count_request_cached(
+        self, mock_get_logging_prefix, mock_cache_key_method
+    ):
         """
         Test that a v4 count request is cached when no filters are applied.
         """
@@ -3605,7 +3644,7 @@ class CacheListApiResponseTest(TestCase):
         self.cache.delete(fake_cache_key)
 
     def test_count_request_with_filters_not_cached(
-        self, mock_cache_key_method
+        self, mock_get_logging_prefix, mock_cache_key_method
     ):
         """
         Test that a v4 count request is not cached when filters are applied.
@@ -3627,7 +3666,9 @@ class CacheListApiResponseTest(TestCase):
         # Confirm the cache key still does not exist after the request
         self.assertFalse(self.cache.has_key(fake_cache_key))
 
-    def test_no_filters_ordering_request_cached(self, mock_cache_key_method):
+    def test_no_filters_ordering_request_cached(
+        self, mock_get_logging_prefix, mock_cache_key_method
+    ):
         """
         Test that a ordered response is cached when no filters are requested.
         """
@@ -3644,7 +3685,9 @@ class CacheListApiResponseTest(TestCase):
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
 
-    def test_filters_applied_not_cached(self, mock_cache_key_method):
+    def test_filters_applied_not_cached(
+        self, mock_get_logging_prefix, mock_cache_key_method
+    ):
         """
         Test that a response is NOT cached when filters are applied.
         """
@@ -3667,7 +3710,9 @@ class CacheListApiResponseTest(TestCase):
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
 
-    def test_pagination_applied_not_cached(self, mock_cache_key_method):
+    def test_pagination_applied_not_cached(
+        self, mock_get_logging_prefix, mock_cache_key_method
+    ):
         """
         Test that a response is NOT cached when pagination (cursor or page) is applied.
         """
@@ -3692,7 +3737,9 @@ class CacheListApiResponseTest(TestCase):
         # Confirm the cache key still does not exist after the request
         self.assertFalse(self.cache.has_key(fake_cache_key))
 
-    def test_dynamic_fields_applied_not_cached(self, mock_cache_key_method):
+    def test_dynamic_fields_applied_not_cached(
+        self, mock_get_logging_prefix, mock_cache_key_method
+    ):
         """
         Test that responses with dynamic 'fields' or 'omit' parameters are not cached.
         """

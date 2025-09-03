@@ -24,6 +24,7 @@ from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
     SOURCES,
     BankruptcyInformation,
+    Citation,
     Claim,
     ClusterRedirection,
     Docket,
@@ -88,34 +89,44 @@ def explain_version_differences(opinions: list[Opinion | int]) -> None:
 
 
 models_that_reference_docket = [
-    (DocketAlert, "docket"),
-    (Audio, "docket"),
-    (DocketTags, "docket"),
-    (Note, "docket_id"),
-    (AttorneyOrganizationAssociation, "docket"),
-    (PartyType, "docket"),  # UNIQUE CONSTRAINT(docket_id, party_id, name)
+    # (model, related name to the docket, unique together field)
+    (DocketAlert, "docket", "user_id"),
+    (Audio, "docket", None),
+    (DocketTags, "docket", None),
+    (Note, "docket_id", "user_id"),
     (
-        Role,
+        AttorneyOrganizationAssociation,
         "docket",
-    ),  # UNIQUE CONSTRAINT, btree (party_id, attorney_id, role, docket_id, date_action)
-    (PacerFetchQueue, "docket"),
-    (ProcessingQueue, "docket"),
-    (PACERMobilePageData, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id)
-    (BankruptcyInformation, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id)
-    (Claim, "docket"),
-    (DocketPanel, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id, person_id)
-    (DocketEntry, "docket"),
-    (DocketTag, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id, tag_id)
-    (OpinionCluster, "docket"),
+        ("attorney_organization_id", "attorney_id"),
+    ),
+    (PartyType, "docket", ("party_id", "name")),
+    (Role, "docket", ("party_id", "attorney_id", "date_action", "role")),
+    (PacerFetchQueue, "docket", None),
+    (ProcessingQueue, "docket", None),
+    (PACERMobilePageData, "docket", "docket_id"),
+    (BankruptcyInformation, "docket", "docket_id"),
+    (Claim, "docket", None),
+    (DocketPanel, "docket", "person_id"),
+    (DocketEntry, "docket", None),
+    (DocketTag, "docket", "tag_id"),
+    (OpinionCluster, "docket", None),
 ]
 
-# related names are not standard
+
 models_that_reference_cluster = [
-    (Note, "cluster_id"),
-    (Opinion, "cluster"),
-    (OpinionClusterPanel, "opinioncluster"),
-    (OpinionClusterNonParticipatingJudges, "opinioncluster"),
+    # (model, related name to the cluster, unique together field)
+    (
+        Note,
+        "cluster_id",
+        "user_id",
+    ),
+    (Opinion, "cluster", None),
+    (OpinionClusterPanel, "opinioncluster", "person_id"),
+    (OpinionClusterNonParticipatingJudges, "opinioncluster", "person_id"),
+    (Citation, "cluster", ("reporter", "page", "volume")),
 ]
+
+models_that_reference_opinion = [(OpinionJoinedBy, "opinion", "person_id")]
 
 
 def get_separator(name: str) -> str:
@@ -330,14 +341,15 @@ def text_is_similar(text1: str, text2: str) -> bool:
 
 
 def update_referencing_objects(
-    main_object: OpinionCluster | Docket,
-    version_object: OpinionCluster | Docket,
-):
+    main_object: Docket | OpinionCluster | Opinion,
+    version_object: Docket | OpinionCluster | Opinion,
+) -> None:
     """Make all objects referencing to `version_object` point to `main_object`
 
-    This way, prevent cascade deletion. Some of these may fail due to
-    unique constraints; this will break the whole update. Let's let this
-    happen so we can debug, and control it later
+    This way, prevent cascade deletion. Unique constraints are handled:
+    - no constraints, a naive update is performed
+    - there is a single key constraint (like JoinedBy -> Opinion)
+    - there are multiple key constraints (like Citation -> OpinionCluster)
 
     :param main_object: the main version OpinionCluster or Docket
     :param version_object: the secondary version OpinionCluster or Docket
@@ -346,22 +358,67 @@ def update_referencing_objects(
         referencing_models = models_that_reference_cluster
     elif isinstance(main_object, Docket):
         referencing_models = models_that_reference_docket
-    else:
-        return
+    elif isinstance(main_object, Opinion):
+        referencing_models = models_that_reference_opinion
 
-    for model, related_name in referencing_models:
+    for model, related_name, unique_together in referencing_models:
         filter_query = {related_name: version_object}
-        update_query = {related_name: main_object}
+        update_query = existing_for_main_object_query = {
+            related_name: main_object
+        }
 
-        qs = model.objects.filter(**filter_query)
-        if qs.exists():
-            logger.info(
-                "Updating related %s for %s %s",
-                model._meta.model_name,
-                main_object._meta.model_name,
-                main_object.id,
+        related_to_version_qs = model.objects.filter(**filter_query)
+        if not related_to_version_qs.exists():
+            continue
+
+        logger.info(
+            "Updating related %s for %s %s",
+            model._meta.model_name,
+            main_object._meta.model_name,
+            main_object.id,
+        )
+        if not unique_together:
+            related_to_version_qs.update(**update_query)
+            continue
+
+        if isinstance(unique_together, str):
+            existing_for_main = (
+                model.objects.filter(**existing_for_main_object_query)
+                .only(unique_together)
+                .values_list(unique_together, flat=True)
             )
-            qs.update(**update_query)
+            exclude_query = {f"{unique_together}__in": existing_for_main}
+
+            # for the objects that point to the version, exclude the ids that
+            # already point to main; update the rest. When the version is
+            # deleted the stragglers will be cascade deleted
+            related_to_version_qs.exclude(**exclude_query).update(
+                **update_query
+            )
+            continue
+
+        # final case, we need to compare over many unique together fields
+        related_to_version = related_to_version_qs.only(
+            *[f for f in unique_together] + ["id"]
+        )
+        related_to_main = model.objects.filter(
+            **existing_for_main_object_query
+        ).only(*unique_together)
+        main_objects = {
+            tuple(getattr(obj, field) for field in unique_together)
+            for obj in related_to_main
+        }
+
+        for obj in related_to_version:
+            if (
+                tuple(getattr(obj, field) for field in unique_together)
+                in main_objects
+            ):
+                continue
+
+            # use .save to trigger signals. Useful for `Citation`
+            setattr(obj, related_name, main_object)
+            obj.save()
 
 
 def merge_metadata(
@@ -509,14 +566,6 @@ def merge_opinion_versions(
     is_same_docket = main_docket.id == version_docket.id
     updated_main_docket = merge_metadata(main_docket, version_docket)
 
-    main_citations = {str(c) for c in main_opinion.cluster.citations.all()}
-
-    joined_by_qs = OpinionJoinedBy.objects.filter(opinion=version_opinion)
-    if update_joined_by := joined_by_qs.exists():
-        exclude_existing_persons = OpinionJoinedBy.objects.filter(
-            opinion=main_opinion
-        ).values_list("person_id", flat=True)
-
     with transaction.atomic():
         if update_main_opinion:
             main_opinion.save()
@@ -525,21 +574,11 @@ def merge_opinion_versions(
         if updated_main_docket:
             main_opinion.cluster.docket.save()
 
+        update_referencing_objects(main_opinion, version_opinion)
+
         update_referencing_objects(main_opinion.cluster, version_cluster)
         if not is_same_docket:
             update_referencing_objects(main_docket, version_docket)
-
-        if update_joined_by:
-            joined_by_qs.exclude(
-                person_id__in=exclude_existing_persons
-            ).update(opinion=main_opinion)
-
-        # update the cluster_id to prevent the version cluster deletion cascade
-        for version_citation in version_cluster.citations.all():
-            if str(version_citation) in main_citations:
-                continue
-            version_citation.cluster_id = main_opinion.cluster.id
-            version_citation.save()
 
         version_opinion.cluster_id = main_opinion.cluster.id
         version_opinion.main_version = main_opinion
