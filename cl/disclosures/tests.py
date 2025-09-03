@@ -3,7 +3,6 @@ import os
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.test import AsyncClient
 from django.urls import reverse
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
@@ -33,7 +32,6 @@ from cl.people_db.factories import PersonWithChildrenFactory
 from cl.people_db.models import Person
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import TestCase
-from cl.users.factories import UserFactory
 
 
 class DisclosureIngestionTest(TestCase):
@@ -166,12 +164,6 @@ class DisclosureAPITest(TestCase):
         ReimbursementFactory.create_batch(
             10, financial_disclosure=fd, redacted=False
         )
-        cls.user = UserFactory()
-
-    def setUp(self) -> None:
-        self.async_client = AsyncClient()
-        self.async_client.force_login(self.user)
-        self.client.force_login(self.user)
 
     async def test_disclosure_position_api(self) -> None:
         """Can we query the financial disclosure position API?"""

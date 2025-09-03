@@ -4,7 +4,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import (
-    DjangoModelPermissions,
+    DjangoModelPermissionsOrAnonReadOnly,
     IsAuthenticatedOrReadOnly,
 )
 from rest_framework.viewsets import ModelViewSet
@@ -186,7 +186,7 @@ class FjcIntegratedDatabaseViewSet(
     serializer_class = FjcIntegratedDatabaseSerializer
     filterset_class = FjcIntegratedDatabaseFilter
     permission_classes = [
-        DjangoModelPermissions,
+        DjangoModelPermissionsOrAnonReadOnly,
         V3APIPermission,
     ]
     ordering_fields = (
