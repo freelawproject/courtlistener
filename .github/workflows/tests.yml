@@ -106,7 +106,7 @@ jobs:
         run: >
           docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
           ./manage.py test
-          cl --verbosity=2 ${{ matrix.tag_flags }} --parallel=1
+          cl --verbosity=2 ${{ matrix.tag_flags }} --parallel
       - name: Export selenium results from docker to host
         if: failure()
         run: |
