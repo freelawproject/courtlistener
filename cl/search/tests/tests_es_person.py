@@ -36,7 +36,6 @@ from cl.search.factories import CourtFactory
 from cl.search.models import SEARCH_TYPES
 from cl.search.tasks import es_save_document, update_es_document
 from cl.tests.cases import (
-    AuthAPIClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
@@ -579,7 +578,6 @@ class PeopleV3APISearchTest(
 
 
 class PeopleV4APISearchTest(
-    AuthAPIClientMixin,
     PeopleSearchAPICommonTests,
     ESIndexTestCase,
     TestCase,

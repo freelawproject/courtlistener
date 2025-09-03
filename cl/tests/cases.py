@@ -730,16 +730,3 @@ class SearchAlertsAssertions:
 
         snippet_text = snippet_content[0].text_content().strip()
         return snippet_text.replace("…", "").replace("&hellip;", "")
-
-
-class AuthAPIClientMixin:
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.user_api = UserFactory()
-
-    def setUp(self):
-        super().setUp()
-        self.async_client = AsyncClient()
-        self.async_client.force_login(self.user_api)
-        self.client.force_login(self.user_api)
