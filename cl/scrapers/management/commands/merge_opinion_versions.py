@@ -341,12 +341,15 @@ def text_is_similar(text1: str, text2: str) -> bool:
 
 
 def update_referencing_objects(
-    main_object: OpinionCluster | Docket,
-    version_object: OpinionCluster | Docket,
-):
+    main_object: Docket | OpinionCluster | Opinion,
+    version_object: Docket | OpinionCluster | Opinion,
+) -> None:
     """Make all objects referencing to `version_object` point to `main_object`
 
-    This way, prevent cascade deletion. This handles unique constraints
+    This way, prevent cascade deletion. Unique constraints are handled:
+    - no constraints, a naive update is performed
+    - there is a single key constraint (like JoinedBy -> Opinion)
+    - there are multiple key constraints (like Citation -> OpinionCluster)
 
     :param main_object: the main version OpinionCluster or Docket
     :param version_object: the secondary version OpinionCluster or Docket
@@ -379,18 +382,16 @@ def update_referencing_objects(
             continue
 
         if isinstance(unique_together, str):
-            exclude_existing_for_main = (
+            existing_for_main = (
                 model.objects.filter(**existing_for_main_object_query)
                 .only(unique_together)
                 .values_list(unique_together, flat=True)
             )
-            exclude_query = {
-                f"{unique_together}__in": exclude_existing_for_main
-            }
+            exclude_query = {f"{unique_together}__in": existing_for_main}
 
             # for the objects that point to the version, exclude the ids that
-            # already point to main; update the rest. When the version is deleted
-            # the stragglers will be cascade deleted
+            # already point to main; update the rest. When the version is
+            # deleted the stragglers will be cascade deleted
             related_to_version_qs.exclude(**exclude_query).update(
                 **update_query
             )
