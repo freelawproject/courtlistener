@@ -124,6 +124,9 @@
   .input-text {
     @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3;
   }
+
+  /* ----------- THIRD PARTY OVERRIDES ----------- */
+
   .flatpickr-calendar.animate {
     @apply rounded-xl outline outline-1 outline-greyscale-200 w-fit shadow-md py-5 flex flex-col gap-3;
     @apply min-w-80 max-w-80 before:hidden after:hidden;
@@ -198,7 +201,7 @@
   .lead {
     @apply text-xl text-greyscale-700 font-normal;
   }
-  .focus-container {
+  .focus-container { /** provides focus state when a child input is focused */
     @apply [&:has(input:focus)]:outline [&:has(input:focus)]:outline-2 [&:has(input:focus)]:outline-primary-600 flex;
   }
   .capped-width {
