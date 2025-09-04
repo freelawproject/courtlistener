@@ -8,8 +8,9 @@
 
 <header
   x-data="header"
-  class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:h-[102px] max-md:h-18 {% endif %}flex justify-between items-center gap-4 px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
+  class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:max-h-[--desktop-header-height] max-md:h-18 {% endif %} px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
 >
+<div class="capped-width flex justify-between items-center gap-4">
   <a href="#main" class="skip-link">Skip to main content</a>
   <a href="#footer" class="skip-link">Skip to footer</a>
 
@@ -303,4 +304,5 @@
       </div>
     {% endif %}
   </div>
+</div>
 </header>
