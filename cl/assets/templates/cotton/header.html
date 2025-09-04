@@ -82,17 +82,45 @@
     </div>
 
     {# DESKTOP SEARCH BAR #}
-    <c-corpus-search class="w-full h-12 hidden md:flex" only>
+    <c-corpus-search :request="request" class="w-full h-12 hidden md:flex" only>
       <c-corpus-search.scope
         class="!rounded-r-none text-greyscale-600"
         menu_class="left-0 top-12 w-55 text-md font-cooper text-greyscale-800"
         item_class="py-1.5"
         only
       />
-      <c-corpus-search.input :request="request" only/>
+      <c-corpus-search.input :request="request" only>
+        <button
+          class="btn-outline max-h-9 bg-white max-lg:px-2"
+          aria-label="Toggle advanced filters panel open/closed"
+          type="button"
+          x-on:click="toggleAdvancedFiltersDesktop"
+        >
+          {% svg "funnel" class="text-greyscale-400 flex-grow-0 h-5 w-5" aria_hidden="true" %}
+          <span class="max-lg:hidden">Filters</span>
+        </button>
+      </c-corpus-search.input>
       <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
         {% svg "magnifier" class="text-white" aria_hidden="true" %}
       </c-corpus-search.button>
+
+      {#  Advanced Filters Overlay  #}
+      <div
+        class="fixed w-screen h-screen bg-greyscale-600/40 inset-x-0 top-26 z-10"
+        x-show="advancedFiltersExpandedDesktop"
+        x-on:click="toggleAdvancedFiltersDesktop"
+      ></div>
+      {#   Advanced Filters Panel   #}
+      <div
+        class="fixed w-screen py-6 px-10 bg-white inset-x-0 top-26 border-b border-greyscale-200 z-10 overflow-visible"
+        x-show="advancedFiltersExpandedDesktop"
+        x-collapse
+      >
+        <div class="capped-width">
+          <c-corpus-search.filters :request="request" :search_form="search_form"/>
+        </div>
+      </div>
+
     </c-corpus-search>
   {% endif %}
 

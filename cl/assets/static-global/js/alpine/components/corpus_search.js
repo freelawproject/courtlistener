@@ -43,7 +43,9 @@ document.addEventListener('alpine:init', () => {
     },
   });
   Alpine.data('search', () => ({
+    ...createUtils(),
     advancedFiltersExpanded: false,
+    advancedFiltersExpandedDesktop: false,
     get scopeMenuExpanded() {
       return this.$store.corpusSearch.scopeMenuExpanded;
     },
@@ -117,6 +119,9 @@ document.addEventListener('alpine:init', () => {
     updateKeyword(event) {
       this.$store.corpusSearch.keywordQuery = event.target.value;
     },
+    toggleAdvancedFiltersDesktop() {
+      this.advancedFiltersExpandedDesktop = !this.advancedFiltersExpandedDesktop;
+    },
     toggleAdvancedFilters() {
       this.advancedFiltersExpanded = !this.advancedFiltersExpanded;
     },
@@ -159,8 +164,12 @@ document.addEventListener('alpine:init', () => {
         }
       });
     },
+
     init() {
       this.$watch('selectedScope', (newVal) => this.updateFieldsets(newVal));
+      this.onBreakpointChange(() => {
+        this.advancedFiltersExpandedDesktop = false;
+      });
     },
   }));
 });
