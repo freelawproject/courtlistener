@@ -84,6 +84,7 @@
 
     {# DESKTOP SEARCH BAR #}
     <c-corpus-search :request="request" class="w-full h-12 hidden md:flex" only>
+    <div class="contents h-fit" x-trap.noscroll.inert="advancedFiltersExpandedDesktop">
       <c-corpus-search.scope
         class="!rounded-r-none text-greyscale-600"
         menu_class="left-0 top-12 w-55 text-md font-cooper text-greyscale-800"
@@ -113,14 +114,16 @@
       ></div>
       {#   Advanced Filters Panel   #}
       <div
-        class="fixed w-screen py-6 px-10 bg-white inset-x-0 top-26 border-b border-greyscale-200 z-10 overflow-visible"
+        class="fixed w-screen py-6 px-10 bg-white inset-x-0 top-26 border-b border-greyscale-200 z-10 md:overflow-visible overflow-auto max-h-[--desktop-header-filters-height]"
         x-show="advancedFiltersExpandedDesktop"
+        x-on:keyup.esc.window="toggleAdvancedFiltersDesktop"
         x-collapse
       >
         <div class="capped-width">
-          <c-corpus-search.filters :request="request" :search_form="search_form"/>
+          <c-corpus-search.filters :request="request" :search_form="search_form" only/>
         </div>
       </div>
+    </div>
 
     </c-corpus-search>
   {% endif %}

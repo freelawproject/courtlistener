@@ -11,7 +11,8 @@
     --mobile-main-padding: theme(spacing.4);
     --padded-full-width: calc(100vw - (2 * var(--mobile-main-padding)));
     --corpus-search-height: theme(spacing.12);
-    --desktop-header-height: theme(spacing.6);
+    --desktop-header-height: theme(spacing.26);
+    --desktop-header-filters-height: calc(100svh - var(--desktop-header-height));
     --mobile-dialog-header-height: theme(spacing.18);
     --mobile-dialog-panel-height: calc(100vh - var(--mobile-dialog-header-height));
     --content-max-width: 1200px;
