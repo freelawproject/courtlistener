@@ -100,6 +100,7 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
     )
     actions = ("seal_clusters",)
 
+    # nosemgrep: python.lang.bad-return-outside-function
     SEAL_BLOCKERS_MAP = {
         # These prevent cluster deletion
         "favorites.UserTag": lambda cluster: cluster.docket.user_tags,
