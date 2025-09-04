@@ -123,6 +123,9 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         ),
         "search.Claim": lambda cluster: cluster.docket.claims,
         "search.DocketEntry": lambda cluster: cluster.docket.docket_entries,
+        "search.OpinionCluster": lambda cluster: cluster.docket.clusters.exclude(
+            pk=cluster.pk
+        ),
     }
 
     # Prevent cluster deletion
@@ -183,6 +186,7 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
             if relation:
                 qs = relation.all() if hasattr(relation, "all") else [relation]
                 for obj in qs:
+                    # nosemgrep: template.xss.href-django.avoid-variable-in-href
                     obj.admin_url = reverse(
                         f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change",
                         args=[obj.pk],
