@@ -92,16 +92,22 @@
         only
       />
       <c-corpus-search.input :request="request" only>
+        {#    Advanced Filters Trigger Button    #}
         <button
           class="btn-outline max-h-9 bg-white max-lg:px-2"
           aria-label="Toggle advanced filters panel open/closed"
           type="button"
           x-on:click="toggleAdvancedFiltersDesktop"
+          x-bind:aria-expanded="advancedFiltersExpandedDesktop"
+          aria-haspopup="dialog"
+          aria-controls="advanced-filters-panel"
         >
           {% svg "funnel" class="text-greyscale-400 flex-grow-0 h-5 w-5" aria_hidden="true" %}
           <span class="max-lg:hidden">Filters</span>
         </button>
       </c-corpus-search.input>
+
+      {#   Search Button   #}
       <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
         {% svg "magnifier" class="text-white" aria_hidden="true" %}
       </c-corpus-search.button>
@@ -112,15 +118,20 @@
         x-show="advancedFiltersExpandedDesktop"
         x-on:click="toggleAdvancedFiltersDesktop"
         x-transition.opacity.duration.200ms
+        aria-hidden="true"
       ></div>
       {#   Advanced Filters Panel   #}
       <div
+        id="advanced-filters-panel"
+        role="dialog"
+        aria-labelledby="advanced-filters-title"
         class="fixed w-screen py-6 px-10 bg-white inset-x-0 top-26 border-b border-greyscale-200 z-10 md:overflow-visible overflow-auto max-h-[--desktop-header-filters-height]"
         x-show="advancedFiltersExpandedDesktop"
         x-on:keyup.esc.window="toggleAdvancedFiltersDesktop"
         x-collapse.duration.250ms
       >
         <div class="capped-width">
+          <h2 id="advanced-filters-title" class="sr-only">Advanced filters</h2>
           <c-corpus-search.filters :request="request" :search_form="search_form" only/>
         </div>
       </div>
