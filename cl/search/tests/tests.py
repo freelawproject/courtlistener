@@ -3677,7 +3677,7 @@ class AdminActionsTest(TestCase):
         # Check cannot be sealed
         clusters_admin.message_user.assert_called_once_with(
             request,
-            f'Problem sealing cluster id: {cluster3_pk} - <a href="/admin/search/opinioncluster/blocking-confirmation/{cluster3_pk}/" target="_blank">View Dependencies</a>',
+            f'ERROR: Problem sealing cluster id: {cluster3_pk} - <a href="/admin/search/opinioncluster/blocking-confirmation/{cluster3_pk}/" target="_blank">View Dependencies</a>',
             messages.WARNING,
         )
 
