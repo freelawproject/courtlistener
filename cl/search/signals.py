@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models.signals import post_save
@@ -42,7 +44,9 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
+from cl.settings import DEVELOPMENT, TESTING
 
+logger = logging.getLogger(__name__)
 # This field mapping is used to define which fields should be updated in the
 # Elasticsearch index document when they change in the DB. The outer keys
 # represent the actions that will trigger signals:
@@ -634,3 +638,20 @@ def update_court_cache(sender, instance: Court, created: bool, **kwargs):
     instance is created or updated.
     """
     cache.delete(get_cache_key_for_court_list())
+
+
+@receiver(
+    post_save,
+    sender=Court,
+    dispatch_uid="handle_new_court_needs_courthouse",
+)
+def update_court_cache(sender, instance: Court, created: bool, **kwargs):
+    """
+    A new courthouse should be created alongside a new court. Send a warning
+    to Sentry for someone to look at it
+    """
+    if TESTING or DEVELOPMENT:
+        return
+
+    if created:
+        logger.error("Create a courthouse for new court '%s'", instance.id)

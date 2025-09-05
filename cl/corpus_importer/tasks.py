@@ -36,6 +36,7 @@ from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     ACMSAttachmentPage,
+    ACMSDocketReport,
     AppellateAttachmentPage,
     AppellateDocketReport,
     AttachmentPage,
@@ -2123,6 +2124,32 @@ def save_attachment_pq_from_text(
         "attachment_page.html", ContentFile(att_report_text.encode())
     )
     return pq.pk
+
+
+def download_acms_pdf_by_rd(
+    court_id: str,
+    acms_entry_id: str,
+    acms_doc_id: str,
+    session_data: SessionData,
+) -> tuple[Response | None, str]:
+    """Download a PDF document from ACMS given its entry and document IDs.
+
+    :param court_id: The court ID,
+    :param acms_entry_id: The ACMS docket entry ID.
+    :param acms_doc_id: The ACMS document ID to download.
+    :param session_data: A SessionData object containing the session's cookies
+        and proxy information.
+    :return: A two-tuple of requests.Response object usually containing a PDF,
+    or None if that wasn't possible, and a string representing the error if
+    there was one.
+    """
+    pacer_court_id = map_cl_to_pacer_id(court_id)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
+    report = ACMSDocketReport(pacer_court_id, s)
+    r, r_msg = report.download_pdf(acms_entry_id, acms_doc_id)
+    return r, r_msg
 
 
 def download_pacer_pdf_by_rd(
