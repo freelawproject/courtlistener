@@ -111,13 +111,14 @@
         class="fixed w-screen h-screen bg-greyscale-600/40 inset-x-0 top-26 z-10"
         x-show="advancedFiltersExpandedDesktop"
         x-on:click="toggleAdvancedFiltersDesktop"
+        x-transition.opacity.duration.200ms
       ></div>
       {#   Advanced Filters Panel   #}
       <div
         class="fixed w-screen py-6 px-10 bg-white inset-x-0 top-26 border-b border-greyscale-200 z-10 md:overflow-visible overflow-auto max-h-[--desktop-header-filters-height]"
         x-show="advancedFiltersExpandedDesktop"
         x-on:keyup.esc.window="toggleAdvancedFiltersDesktop"
-        x-collapse
+        x-collapse.duration.250ms
       >
         <div class="capped-width">
           <c-corpus-search.filters :request="request" :search_form="search_form" only/>
