@@ -288,7 +288,7 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         if error_messages:
             for cluster, url in error_messages:
                 message = format_html(
-                    "Problem sealing cluster id: {}{}",
+                    "ERROR: Problem sealing cluster id: {}{}",
                     cluster.pk,
                     format_html(
                         ' - <a href="{}" target="_blank">View Dependencies</a>',
