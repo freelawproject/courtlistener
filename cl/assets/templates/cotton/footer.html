@@ -3,7 +3,7 @@
 <div class="w-full border-t border-greyscale-200">
 <footer id="footer" class="capped-width pt-14 lg:pt-18 px-4 lg:px-10 flex flex-col gap-18">
   <div class="flex flex-col lg:flex-row justify-between gap-y-11">
-    <div class="flex flex-col md:flex-row gap-x-4 gap-y-11 md:gap-x-11 2xl:gap-[80px]">
+    <div class="flex flex-col md:flex-row gap-x-4 gap-y-11 md:gap-x-11">
       {#   DONATE BANNER   #}
       <div class="p-4 banner w-full md:min-w-70 md:w-70 max-md:mx-auto h-53">
         <div class="w-5 h-5 text-primary-600">
@@ -26,7 +26,7 @@
 
       {#   NAVIGATION LINKS   #}
       <nav class="flex flex-wrap gap-y-11 gap-x-2">
-        <div class="flex flex-col w-41 lg:w-28 xl:w-42 gap-4">
+        <div class="flex flex-col w-41 lg:w-28 gap-4">
           <h5 class="text-sm font-normal text-greyscale-600">Organization</h5>
           <a
             href="https://free.law/about/"
@@ -44,7 +44,7 @@
           <a href="{% url "contact" %}" class="text-sm font-medium">Contact</a>
           <a href="{% url "contribute" %}" class="text-sm font-medium">Contribute</a>
         </div>
-        <div class="flex flex-col w-41 lg:w-30 xl:w-42 gap-4">
+        <div class="flex flex-col w-41 lg:w-30 gap-4">
           <h5 class="text-sm font-normal text-greyscale-600">Data</h5>
           <a href="{% url "coverage" %}" class="text-sm font-medium">About Our Data</a>
           <a
@@ -61,7 +61,7 @@
           >Install RECAP</a>
           <a href="{% url "api_index" %}" class="text-sm font-medium">APIs & Bulk Data</a>
         </div>
-        <div class="flex flex-col w-41 lg:w-28 xl:w-42 gap-4">
+        <div class="flex flex-col w-41 lg:w-28 gap-4">
           <h5 class="text-sm font-normal text-greyscale-600">Legal</h5>
           <a href="{% url "terms" %}" class="text-sm font-medium">Terms & Privacy</a>
           <a href="{% url "terms" %}#removal" class="text-sm font-medium">Removal</a>
@@ -76,7 +76,7 @@
     </div>
 
     {#  NEWSLETTER  #}
-    <div class="flex flex-col xl:max-w-[343px] lg:max-w-72 gap-6">
+    <div class="flex flex-col lg:max-w-72 gap-6">
       <div class="sm:block hidden">
         <img height="84" src="{% static "png/logo.png" %}" alt="CourtListener logo">
       </div>
