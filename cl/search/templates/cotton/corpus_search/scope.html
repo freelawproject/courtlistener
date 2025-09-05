@@ -56,24 +56,37 @@
 {% else %}
 
   {#  scope selector  #}
-  <button
-    type="button"
-    x-bind:id="triggerButtonId"
-    x-on:click="openScopeMenu"
-    x-bind:aria-controls="menuId"
-    aria-haspopup="menu"
-    x-bind:aria-expanded="scopeMenuExpanded"
-    class="h-[--corpus-search-height] btn-outline hover:text-greyscale-900 hover:border-greyscale-300 hover:bg-greyscale-50 justify-between rounded-xl border-greyscale-200 {{ class }}"
-    aria-label="Open menu to select the scope of your search"
-  >
-    <span class="text-sm" x-text="selectedScope"></span>
-    <span
-      x-bind:class="scopeCaretClass"
-      class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
-      aria-hidden="true"
-    >{% svg 'chevron' class="w-full h-full text-greyscale-400" aria_hidden="true" %}
-    </span>
-  </button>
+  <div class="flex justify-between items-center mb-2">
+    <div class="flex flex-col items-start">
+       <span
+          x-text="selectedScope"
+          class=""
+        ></span>
+        <span
+          x-text="selectedScopeDescription"
+          class="text-xs text-greyscale-500"
+        ></span>
+    </div>
+
+    <button
+      type="button"
+      x-bind:id="triggerButtonId"
+      x-on:click="openScopeMenu"
+      x-bind:aria-controls="menuId"
+      aria-haspopup="menu"
+      x-bind:aria-expanded="scopeMenuExpanded"
+      class="btn-outline border-0"
+      aria-label="Open menu to select the scope of your search"
+    >
+      <span class="text-sm" x-text="selectedScope"></span>
+      <span
+        x-bind:class="scopeCaretClass"
+        class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+        aria-hidden="true"
+      >{% svg 'chevron' class="w-full h-full text-greyscale-400" aria_hidden="true" %}
+      </span>
+    </button>
+  </div>
 
   {#  scope menu  #}
   <menu
