@@ -1,7 +1,9 @@
 import logging
+import pickle
 from collections import defaultdict
 
 from django.conf import settings
+from django.core.cache import cache
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import MultiSearch, Q
 from elasticsearch_dsl.response import Response
@@ -22,7 +24,10 @@ from cl.lib.elasticsearch_utils import (
     set_child_docs_and_score,
     set_results_highlights,
 )
-from cl.lib.search_utils import store_search_api_query
+from cl.lib.search_utils import (
+    retrieve_cached_search_results,
+    store_search_api_query,
+)
 from cl.search.constants import SEARCH_HL_TAG, cardinality_query_unique_ids
 from cl.search.documents import (
     AudioDocument,
@@ -226,29 +231,21 @@ class CursorESList:
         self.cursor = None
         self.results = None
         self.reverse = False
+        self.page_int = None
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
         self.cursor = cursor
         if self.cursor is not None:
             self.reverse = self.cursor.reverse
             self.search_after = self.cursor.search_after
+            self.page_int = self.cursor.page_int
 
         # Return one extra document beyond the page size, so we're able to
         # determine if there are more documents and decide whether to display a
         # next or previous page link.
         self.page_size = page_size + 1
 
-    def get_paginated_results(
-        self,
-    ) -> tuple[list[defaultdict], int, Response, Response | None]:
-        """Executes the search query with pagination settings and processes
-        the results.
-
-        :return: A four-tuple containing a list of defaultdicts with the results,
-        the number of hits returned by the main query, a response object
-        related to the main query's cardinality count, and a response object
-        related to the child query's cardinality count, if available.
-        """
+    def perform_es_query(self):
         if self.search_after:
             self.main_query = self.main_query.extra(
                 search_after=self.search_after
@@ -267,8 +264,10 @@ class CursorESList:
         )
 
         # Build a cardinality query to count child documents.
+        main_results = None
         child_cardinality_query = None
         child_cardinality_count_response = None
+        cardinality_count_response = None
         if (
             self.child_docs_query
             and self.clean_data["type"] == SEARCH_TYPES.RECAP
@@ -301,7 +300,7 @@ class CursorESList:
                 multi_search = multi_search.add(child_cardinality_query)
 
             responses = multi_search.execute()
-            self.results = responses[0]
+            main_results = responses[0]
             cardinality_count_response = responses[1]
             if child_cardinality_query:
                 child_cardinality_count_response = responses[2]
@@ -318,14 +317,79 @@ class CursorESList:
         store_search_api_query(
             request=self.request,
             failed=bool(error_to_raise),
-            query_time=self.results.took if not error_to_raise else None,
+            query_time=main_results.took if not error_to_raise else None,
             engine=SearchQuery.ELASTICSEARCH,
         )
         if error_to_raise:
             raise error_to_raise()
 
-        self.process_results(self.results)
+        return (
+            main_results,
+            cardinality_count_response,
+            child_cardinality_count_response,
+        )
+
+    def get_paginated_results(
+        self,
+    ) -> tuple[list[defaultdict], int, Response, Response | None]:
+        """Returns the page results from the micro-cache if available or
+        executes the search query with pagination settings and processes
+        the results.
+
+        :return: A four-tuple containing a list of defaultdicts with the results,
+        the number of hits returned by the main query, a response object
+        related to the main query's cardinality count, and a response object
+        related to the child query's cardinality count, if available.
+        """
+
+        get_params_for_cache = self.request.GET.copy()
+        get_params_for_cache.pop("cursor", None)
+        page_int = self.page_int if self.page_int is not None else 1
+        get_params_for_cache["page"] = page_int
+        results_dict_cached, micro_cache_key = retrieve_cached_search_results(
+            get_params_for_cache, "search_results_cache_api:"
+        )
+        if results_dict_cached:
+            # Return results from cache.
+            self.results = results_dict_cached["es_results_items"]
+            self.process_results(self.results)
+            es_results_items = [
+                defaultdict(lambda: None, result.to_dict(skip_empty=False))
+                for result in self.results
+            ]
+            return (
+                es_results_items,
+                results_dict_cached["main_query_hits"],
+                results_dict_cached["cardinality_count_response"],
+                results_dict_cached["child_cardinality_count_response"],
+            )
+
+        # Execute ES query.
+        (
+            main_results,
+            cardinality_count_response,
+            child_cardinality_count_response,
+        ) = self.perform_es_query()
+        self.results = main_results
+
         main_query_hits = self.results.hits.total.value
+        results_dict = {
+            "es_results_items": self.results,
+            "main_query_hits": main_query_hits,
+            "cardinality_count_response": cardinality_count_response,
+            "child_cardinality_count_response": child_cardinality_count_response,
+        }
+        if settings.ELASTICSEARCH_API_MICRO_CACHE_ENABLED:
+            # Cache ES hits and counts for all other search requests.
+            serialized_data = pickle.dumps(results_dict)
+            cache.set(
+                micro_cache_key,
+                serialized_data,
+                settings.SEARCH_RESULTS_MICRO_CACHE,
+            )
+
+        self.process_results(self.results)
+
         es_results_items = [
             defaultdict(lambda: None, result.to_dict(skip_empty=False))
             for result in self.results

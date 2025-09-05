@@ -268,6 +268,7 @@ class ESCursorPagination(BasePagination):
     cursor_query_param = "cursor"
     invalid_cursor_message = "Invalid cursor"
     request_date = None
+    page_int = 0
 
     def initialize_context_from_request(
         self, request, search_type
@@ -284,6 +285,8 @@ class ESCursorPagination(BasePagination):
             if self.cursor
             else datetime.datetime.now().date()
         )
+        self.page_int = self.cursor.page_int if self.cursor else 1
+
         return self.request_date
 
     def paginate_queryset(
@@ -334,11 +337,14 @@ class ESCursorPagination(BasePagination):
         if not self.has_next():
             return None
 
+        # Increase page_int by 1 for the next page.
+        page_int = self.page_int + 1
         cursor = ESCursor(
             search_after=search_after_sort_key,
             reverse=False,
             search_type=self.search_type,
             request_date=self.request_date,
+            page_int=page_int,
         )
         return self.encode_cursor(cursor)
 
@@ -351,12 +357,15 @@ class ESCursorPagination(BasePagination):
         )
         if not self.has_prev():
             return None
-
+        # Decrease page_int by 1 for the previous page, or set it to 1 if it's
+        # the first page, since there is no page 0.
+        page_int = self.page_int - 1 or 1
         cursor = ESCursor(
             search_after=reverse_search_after_sort_key,
             reverse=True,
             search_type=self.search_type,
             request_date=self.request_date,
+            page_int=page_int,
         )
         return self.encode_cursor(cursor)
 
@@ -373,6 +382,7 @@ class ESCursorPagination(BasePagination):
             reverse = bool(int(tokens.get("r", ["0"])[0]))
             search_type = tokens.get("t", [None])[0]
             request_date = tokens.get("d", [None])[0]
+            page_int = int(tokens.get("p", [0])[0])
         except (TypeError, ValueError):
             raise NotFound(self.invalid_cursor_message)
 
@@ -390,6 +400,7 @@ class ESCursorPagination(BasePagination):
             reverse=reverse,
             search_type=search_type,
             request_date=request_date,
+            page_int=page_int,
         )
         return self.cursor
 
@@ -404,6 +415,8 @@ class ESCursorPagination(BasePagination):
             tokens["t"] = self.search_type
         if cursor.request_date:
             tokens["d"] = cursor.request_date
+        if cursor.page_int:
+            tokens["p"] = cursor.page_int
 
         querystring = urlencode(tokens, doseq=True)
         encoded = b64encode(querystring.encode("ascii")).decode("ascii")
@@ -456,6 +469,9 @@ class ESCursorPagination(BasePagination):
         """
         # Check if it's the first page or if there are no results on the page.
         if self.cursor is None:
+            return False
+
+        if self.cursor.page_int == 1:
             return False
 
         if self.cursor.reverse:
