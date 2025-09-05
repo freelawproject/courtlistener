@@ -8,8 +8,9 @@
 
 <header
   x-data="header"
-  class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:h-[102px] max-md:h-18 {% endif %}flex justify-between items-center gap-4 px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
+  class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:max-h-[--desktop-header-height] max-md:h-18 {% endif %} px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
 >
+<div class="capped-width flex justify-between items-center gap-4">
   <a href="#main" class="skip-link">Skip to main content</a>
   <a href="#footer" class="skip-link">Skip to footer</a>
 
@@ -82,17 +83,60 @@
     </div>
 
     {# DESKTOP SEARCH BAR #}
-    <c-corpus-search class="w-full h-12 hidden md:flex" only>
+    <c-corpus-search :request="request" class="w-full h-12 hidden md:flex" only>
+    <div class="contents h-fit" x-trap.noscroll.inert="advancedFiltersExpandedDesktop">
       <c-corpus-search.scope
         class="!rounded-r-none text-greyscale-600"
         menu_class="left-0 top-12 w-55 text-md font-cooper text-greyscale-800"
         item_class="py-1.5"
         only
       />
-      <c-corpus-search.input :request="request" only/>
+      <c-corpus-search.input :request="request" only>
+        {#    Advanced Filters Trigger Button    #}
+        <button
+          class="btn-outline max-h-9 bg-white max-lg:px-2 aria-expanded:bg-greyscale-200 aria-expanded:ring-greyscale-300 aria-expanded:ring-2"
+          aria-label="Toggle advanced filters panel open/closed"
+          type="button"
+          x-on:click="toggleAdvancedFiltersDesktop"
+          x-bind:aria-expanded="advancedFiltersExpandedDesktop"
+          aria-haspopup="dialog"
+          aria-controls="advanced-filters-panel"
+        >
+          {% svg "funnel" class="text-greyscale-400 flex-grow-0 h-5 w-5" aria_hidden="true" %}
+          <span class="max-lg:hidden">Filters</span>
+        </button>
+      </c-corpus-search.input>
+
+      {#   Search Button   #}
       <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
         {% svg "magnifier" class="text-white" aria_hidden="true" %}
       </c-corpus-search.button>
+
+      {#  Advanced Filters Overlay  #}
+      <div
+        class="fixed w-screen h-screen bg-greyscale-600/40 inset-x-0 top-26 z-10"
+        x-show="advancedFiltersExpandedDesktop"
+        x-on:click="toggleAdvancedFiltersDesktop"
+        x-transition.opacity.duration.200ms
+        aria-hidden="true"
+      ></div>
+      {#   Advanced Filters Panel   #}
+      <div
+        id="advanced-filters-panel"
+        role="dialog"
+        aria-labelledby="advanced-filters-title"
+        class="fixed w-screen py-6 px-10 bg-white inset-x-0 top-26 border-b border-greyscale-200 z-10 md:overflow-visible overflow-auto max-h-[--desktop-header-filters-height]"
+        x-show="advancedFiltersExpandedDesktop"
+        x-on:keyup.esc.window="toggleAdvancedFiltersDesktop"
+        x-collapse.duration.250ms
+      >
+        <div class="capped-width">
+          <h2 id="advanced-filters-title" class="sr-only">Advanced filters</h2>
+          <c-corpus-search.filters :request="request" :search_form="search_form" only/>
+        </div>
+      </div>
+    </div>
+
     </c-corpus-search>
   {% endif %}
 
@@ -275,4 +319,5 @@
       </div>
     {% endif %}
   </div>
+</div>
 </header>
