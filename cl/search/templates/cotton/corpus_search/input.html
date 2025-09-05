@@ -3,10 +3,10 @@
 <c-vars rounded class=""></c-vars>
 
 <div
-  class="focus-container -outline-offset-2 bg-greyscale-100 flex flex-row gap-2 items-center pl-4 pr-2 flex-grow h-[--corpus-search-height] border-y border-greyscale-200{% if rounded %} rounded-lg border-x{% endif %} {{ class }}"
+  class="focus-container -outline-offset-2 bg-greyscale-50 flex flex-row gap-2 items-center pl-4 pr-2 flex-grow h-[--corpus-search-height] border-y border-greyscale-200{% if rounded %} rounded-lg border-x{% endif %} {{ class }}"
 >
   {% svg "magnifier" class="text-greyscale-400 flex-grow-0 h-5 w-5" aria_hidden="true" %}
-  <div class="bg-greyscale-200 flex-grow" x-id="corpusInputIdGroup">
+  <div class="bg-greyscale-100 flex-grow" x-id="corpusInputIdGroup">
     <label x-bind:for="inputId" class="sr-only" type="text">Search <span x-text="selectedScope"></span></label>
     <input
       x-bind:id="inputId"
@@ -14,7 +14,7 @@
       x-on:input.debounce="updateKeyword"
       type="search"
       autocomplete="off"
-      class="w-full bg-greyscale-100 placeholder:text-sm placeholder:text-greyscale-500 focus-visible:ring-0 focus-visible:outline-none bg-none placeholder:text-ellipsis"
+      class="w-full bg-greyscale-50 placeholder:text-sm placeholder:text-greyscale-500 focus-visible:ring-0 focus-visible:outline-none bg-none placeholder:text-ellipsis"
       placeholder="Enter keyword(s)"
     >
   </div>

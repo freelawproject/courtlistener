@@ -56,11 +56,20 @@
 {% else %}
 
   {#  scope selector  #}
-  <div class="flex justify-between items-center mb-2">
+
+  {# mobile dropdown trigger #}
+  <div 
+    x-on:click="openScopeMenu"
+    aria-haspopup="menu"
+    x-bind:aria-expanded="scopeMenuExpanded"
+    class="flex justify-between items-center py-[10px] md:hidden"
+    aria-label="Open menu to select the scope of your search"
+    >
+    
     <div class="flex flex-col items-start">
        <span
           x-text="selectedScope"
-          class=""
+          class="font-semibold"
         ></span>
         <span
           x-text="selectedScopeDescription"
@@ -68,25 +77,33 @@
         ></span>
     </div>
 
-    <button
-      type="button"
-      x-bind:id="triggerButtonId"
-      x-on:click="openScopeMenu"
-      x-bind:aria-controls="menuId"
-      aria-haspopup="menu"
-      x-bind:aria-expanded="scopeMenuExpanded"
-      class="btn-outline border-0"
-      aria-label="Open menu to select the scope of your search"
-    >
-      <span class="text-sm" x-text="selectedScope"></span>
-      <span
+     <span
         x-bind:class="scopeCaretClass"
-        class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+        class="transition-transform duration-200 flex justify-center items-center w-6 h-10"
         aria-hidden="true"
-      >{% svg 'chevron' class="w-full h-full text-greyscale-400" aria_hidden="true" %}
+      >{% svg 'chevron' class="w-full h-full text-greyscale-600 font-normal" aria_hidden="true" %}
       </span>
-    </button>
   </div>
+
+  {# desktop dropdown trigger #}
+  <button
+    type="button"
+    x-bind:id="triggerButtonId"
+    x-on:click="openScopeMenu"
+    x-bind:aria-controls="menuId"
+    aria-haspopup="menu"
+    x-bind:aria-expanded="scopeMenuExpanded"
+    class="h-[--corpus-search-height] btn-outline hover:text-greyscale-900 hover:border-greyscale-300 hover:bg-greyscale-50 justify-between rounded-xl border-greyscale-200 hidden md:flex {{ class }}"
+    aria-label="Open menu to select the scope of your search"
+  >
+    <span class="text-sm" x-text="selectedScope"></span>
+    <span
+      x-bind:class="scopeCaretClass"
+      class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+      aria-hidden="true"
+    >{% svg 'chevron' class="w-full h-full text-greyscale-400" aria_hidden="true" %}
+    </span>
+  </button>
 
   {#  scope menu  #}
   <menu
@@ -114,13 +131,13 @@
     <template x-for="scope in searchScopes">
       <li
         x-bind:key="scope.label"
-        class="{{ item_class }} px-4 flex hover:bg-greyscale-50"
+        class="{{ item_class }} px-4 flex hover:bg-greyscale-50 font-semibold"
         role="none"
         x-on:keydown.tab="closeScopeMenu"
       >
         <button
           type="button"
-          class="flex justify-between w-full"
+          class="flex justify-between w-full outline-none"
           x-on:click="selectScope"
           x-bind:data-scope="scope.label"
           x-bind:id="scope.label"
