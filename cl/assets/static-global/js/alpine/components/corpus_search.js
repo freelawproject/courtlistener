@@ -56,6 +56,9 @@ document.addEventListener('alpine:init', () => {
     get selectedScopeType() {
       return this.$store.corpusSearch.selectedScope.type;
     },
+    get selectedScopeDescription() {
+      return this.$store.corpusSearch.selectedScope.shortDescription;
+    },
     get searchScopes() {
       return this.$store.corpusSearch.searchScopes;
     },
