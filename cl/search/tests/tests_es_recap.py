@@ -62,6 +62,7 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
 )
+from cl.search.api_utils import CursorESList
 from cl.search.api_views import SearchV4ViewSet
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
@@ -2760,7 +2761,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Clean search_results_cache before starting the test.
         r = get_redis_interface("CACHE")
-        keys = r.keys("search_results_cache")
+        keys = r.keys(":1:search_results_cache:*")
         if keys:
             r.delete(*keys)
 
@@ -5495,6 +5496,145 @@ class RECAPSearchAPIV4Test(
             docket.delete()
             docket_1.delete()
             docket_3.delete()
+
+    @override_settings(
+        SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_API_MICRO_CACHE_ENABLED=True
+    )
+    @mock.patch(
+        "cl.search.api_utils.CursorESList.perform_es_query",
+        autospec=True,
+        wraps=CursorESList.perform_es_query,
+    )
+    def test_recap_micro_cache_for_search_api(self, mock_es_query) -> None:
+        """Assert micro-cache for search API results behaves properly."""
+
+        r = get_redis_interface("CACHE")
+        keys = r.keys(":1:search_results_cache_api:*")
+        if keys:
+            r.delete(*keys)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_0 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 0",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2024, 2, 23),
+            )
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 1",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2023, 2, 23),
+            )
+            docket_1 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 2",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2022, 2, 23),
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+
+        # Page 1
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(mock_es_query.call_count, 1)
+
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertIn("<mark>", r.data["results"][0]["caseName"])
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        next_page = r.data["next"]
+
+        first_page_ids = {result["docket_id"] for result in r.data["results"]}
+
+        # Page 2
+        r = self.client.get(next_page)
+        self.assertEqual(mock_es_query.call_count, 2)
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        next_page = r.data["next"]
+
+        second_page_ids = {result["docket_id"] for result in r.data["results"]}
+
+        # No Dockets from the previous page are shown in the next page.
+        self.assertFalse(second_page_ids & first_page_ids)
+
+        # Page 3
+        r = self.client.get(next_page)
+        self.assertEqual(mock_es_query.call_count, 3)
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertFalse(r.data["next"])
+
+        third_page_ids = {result["docket_id"] for result in r.data["results"]}
+
+        # No Dockets from the previous page are shown in the next page.
+        self.assertFalse(second_page_ids & third_page_ids)
+
+        # Cached requests.
+        # Page 3
+        r = self.client.get(next_page)
+        # An ES request shouldn’t be made.
+        self.assertEqual(mock_es_query.call_count, 3)
+        previous_page = r.data["previous"]
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertFalse(r.data["next"])
+        self.assertTrue(previous_page)
+        cached_third_page_ids = {
+            result["docket_id"] for result in r.data["results"]
+        }
+        self.assertEqual(third_page_ids, cached_third_page_ids)
+
+        # Page 2
+        r = self.client.get(previous_page)
+        # An ES request shouldn’t be made.
+        self.assertEqual(mock_es_query.call_count, 3)
+        previous_page = r.data["previous"]
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertTrue(r.data["next"])
+        self.assertTrue(previous_page)
+        cached_second_page_ids = {
+            result["docket_id"] for result in r.data["results"]
+        }
+
+        self.assertEqual(second_page_ids, cached_second_page_ids)
+
+        # Page 1
+        r = self.client.get(previous_page)
+        # An ES request shouldn’t be made.
+        self.assertEqual(mock_es_query.call_count, 3)
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertIn("<mark>", r.data["results"][0]["caseName"])
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertTrue(r.data["next"])
+        self.assertFalse(r.data["previous"])
+        cached_first_page_ids = {
+            result["docket_id"] for result in r.data["results"]
+        }
+
+        self.assertEqual(first_page_ids, cached_first_page_ids)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_0.delete()
+            docket_1.delete()
+            docket.delete()
+
+        cache.clear()
 
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_more_docs_field(self) -> None:
