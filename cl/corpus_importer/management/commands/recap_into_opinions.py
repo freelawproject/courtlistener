@@ -78,7 +78,7 @@ def import_opinions_from_recap(
                 is_free_on_pacer=True,
             )
             .only("id", "sha1")
-            .values_list("id", "sha1", flat=True)
+            .values_list("id", "sha1")
             .order_by("id")
         )
 
