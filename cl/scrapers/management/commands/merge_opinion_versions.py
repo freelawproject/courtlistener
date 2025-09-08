@@ -539,6 +539,7 @@ def delete_version_related_objects(version: Opinion) -> None:
         Parenthetical.objects.filter(described_opinion_id=version.id).delete()
 
     version.unmatched_citations.all().delete()
+    version.citing_documents.all().delete()
 
 
 def merge_opinion_versions(
