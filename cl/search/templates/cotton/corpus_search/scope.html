@@ -57,35 +57,6 @@
 
   {#  scope selector  #}
 
-  {# mobile dropdown trigger #}
-  <div 
-    x-on:click="openScopeMenu"
-    aria-haspopup="menu"
-    x-bind:aria-expanded="scopeMenuExpanded"
-    class="flex justify-between items-center py-[10px] md:hidden"
-    aria-label="Open menu to select the scope of your search"
-    >
-    
-    <div class="flex flex-col items-start">
-       <span
-          x-text="selectedScope"
-          class="font-semibold"
-        ></span>
-        <span
-          x-text="selectedScopeDescription"
-          class="text-xs text-greyscale-500"
-        ></span>
-    </div>
-
-     <span
-        x-bind:class="scopeCaretClass"
-        class="transition-transform duration-200 flex justify-center items-center w-6 h-10"
-        aria-hidden="true"
-      >{% svg 'chevron' class="w-full h-full text-greyscale-600 font-normal" aria_hidden="true" %}
-      </span>
-  </div>
-
-  {# desktop dropdown trigger #}
   <button
     type="button"
     x-bind:id="triggerButtonId"
@@ -93,13 +64,25 @@
     x-bind:aria-controls="menuId"
     aria-haspopup="menu"
     x-bind:aria-expanded="scopeMenuExpanded"
-    class="h-[--corpus-search-height] btn-outline hover:text-greyscale-900 hover:border-greyscale-300 hover:bg-greyscale-50 justify-between rounded-xl border-greyscale-200 hidden md:flex {{ class }}"
+    class="md:h-[--corpus-search-height] btn-outline border-0 md:border hover:text-greyscale-900 hover:border-greyscale-300 hover:bg-greyscale-50 justify-between md:rounded-xl md:border-greyscale-200 px-0 py-[10px] pt-0 md:p-2 {{ class }}"
     aria-label="Open menu to select the scope of your search"
   >
-    <span class="text-sm" x-text="selectedScope"></span>
+
+    <div
+      class="flex flex-col items-start">
+       <span
+          x-text="selectedScope"
+          class="font-semibold md:font-normal"
+        ></span>
+        <span
+          x-text="selectedScopeDescription"
+          class="text-xs text-greyscale-500 md:hidden"
+        ></span>
+    </div>
+
     <span
       x-bind:class="scopeCaretClass"
-      class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+      class="transition-transform duration-200 flex justify-center items-center w-6 h-10 md:w-4 md:h-4"
       aria-hidden="true"
     >{% svg 'chevron' class="w-full h-full text-greyscale-400" aria_hidden="true" %}
     </span>
