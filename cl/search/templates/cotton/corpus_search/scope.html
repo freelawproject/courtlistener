@@ -64,27 +64,26 @@
     x-bind:aria-controls="menuId"
     aria-haspopup="menu"
     x-bind:aria-expanded="scopeMenuExpanded"
-    class="md:h-[--corpus-search-height] btn-outline border-0 md:border hover:text-greyscale-900 hover:border-greyscale-300 hover:bg-greyscale-50 justify-between md:rounded-xl md:border-greyscale-200 px-0 py-[10px] pt-0 md:p-2 {{ class }}"
+    class="md:h-[--corpus-search-height] btn-outline border-0 md:border hover:text-greyscale-900 hover:border-greyscale-300 hover:bg-greyscale-50 justify-between md:rounded-xl md:border-greyscale-200 px-0 pb-2.5 md:p-2 {{ class }}"
     aria-label="Open menu to select the scope of your search"
   >
-
-    <div
+    <span
       class="flex flex-col items-start">
-       <span
+        <span
           x-text="selectedScope"
-          class="font-semibold md:font-normal"
+          class="font-semibold md:font-normal text-greyscale-900"
         ></span>
         <span
           x-text="selectedScopeDescription"
           class="text-xs text-greyscale-500 md:hidden"
         ></span>
-    </div>
+    </span>
 
     <span
       x-bind:class="scopeCaretClass"
       class="transition-transform duration-200 flex justify-center items-center w-6 h-10 md:w-4 md:h-4"
       aria-hidden="true"
-    >{% svg 'chevron' class="w-full h-full text-greyscale-400" aria_hidden="true" %}
+    >{% svg 'chevron' class="w-full h-full text-greyscale-500" aria_hidden="true" %}
     </span>
   </button>
 
@@ -114,7 +113,7 @@
     <template x-for="scope in searchScopes">
       <li
         x-bind:key="scope.label"
-        class="{{ item_class }} px-4 flex hover:bg-greyscale-50 font-semibold"
+        class="py-1.5 pr-3.5 pl-4 flex hover:bg-greyscale-50 font-bold md:font-normal text-greyscale-800 text-base md:text-sm font-cooper md:font-sans"
         role="none"
         x-on:keydown.tab="closeScopeMenu"
       >
