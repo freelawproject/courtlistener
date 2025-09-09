@@ -68,6 +68,11 @@ class ProxyPacerSession(PacerSession):
         }
         self.headers["X-WhSentry-TLS"] = "true"
 
+    def send(self, request, **kwargs):
+        """Send a given PreparedRequest."""
+        request.url = self._change_protocol(request.url)
+        return super().send(request, **kwargs)
+
     def _pick_proxy_connection(self) -> str:
         """
         Picks a proxy connection string from available options.
