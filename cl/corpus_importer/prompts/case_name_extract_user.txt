@@ -1,0 +1,51 @@
+You are given the first page of text of a legal document.
+
+Your tasks:
+1. Decide if this is a judicial opinion, memorandum, or order, or some other type of document.
+2. Extract:
+   - case_name: a normalized short style (e.g., "Smith v. Jones").
+   - case_name_full: the full caption exactly as it appears on the page, normalized:
+       * remove new lines
+       * remove excess whitespace
+       * convert all versus indicators (vs., versus, -against-) to "v."
+   - case_name_short: one or two words, taken from the non-governmental party if possible (e.g., defendant’s surname or company name).  Case Name Short should enver be shortened to a single Intial. like G.
+       * case_name_short Should also not use Commissioners, or other government officials.  If unsure leave it blank
+     Do not return "United States", "State", "People", "Attorney General", or other governmental names as the short.
+
+3. Compare the extracted case_name_full to the DOCKET TITLE provided.
+   - If they clearly refer to the same case (even with formatting or capitalization differences), set case_name_match = true.
+   - If they likely refer to different cases, set case_name_match = false.
+
+Avoid putting docket numbers in the case name full
+
+IF CASE Exists
+
+CAPTION-ONLY RULES
+• Extract case_name, case_name_full, and case_name_short **from the caption only**.
+• The caption is the party block at the top of the first page, typically between the court heading and the first major heading (e.g., “MEMORANDUM AND ORDER”, “OPINION”, “ORDER”, “BACKGROUND”).
+• Ignore all body text, headings, and procedural text outside the caption (e.g., “MEMORANDUM AND ORDER”, “For the reasons stated…”, “IT IS HEREBY ORDERED…”).
+• Ignore docket numbers/lines such as “Case No.”, “No.”, “3:24-cv-…”, judge names, division lines, and filing stamps.
+
+* REMEMBER *** CASE NAME SHORT MUST BE GENERATED FROM CASE_NAME
+* Double check that case_name_short is contained in case_name
+
+ADVERSARIAL vs NON-ADVERSARIAL
+
+• Only produce “X v. Y” if the caption itself contains a versus connector (“v.”, “vs.”, “versus”, “-against-”).
+• If the caption is non-adversarial (“In re…”, “In the Matter of…”, “Ex parte…”, “In the Interest of…”) and has **no** versus connector on the page, do **not** invent “v.” — set `case_name` to the normalized non-adversarial form (e.g., “In the Matter of Osage Marine Services, Inc.”).
+
+
+Special rules:
+- If there is no readable case name and the page looks like a scan/bates stamp/cover sheet, set needs_ocr = true.
+- If it's not an opinion/memorandum/order, set is_opinion = false and put a ~10-word explanation in "error".
+
+RETURN JSON only in the exact schema:
+{
+  "is_opinion": bool,
+  "case_name_short": string,
+  "case_name": string,
+  "case_name_full": string,
+  "case_name_match": bool,
+  "needs_ocr": bool,
+  "error": string | null
+}
