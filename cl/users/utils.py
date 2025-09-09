@@ -272,6 +272,30 @@ emails: dict[str, EmailType] = {
         "please see our contact page, https://www.courtlistener.com/contact/",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
+    "not_confirmed_edu_account": {
+        "subject": "Confirm Your .edu Membership Email",
+        "body": "Hello, %s,\n\n"
+        "Thank you for requesting a .edu membership.\n\n"
+        "We noticed that your email address has not yet been confirmed in our "
+        "system. To complete your membership request, please confirm your email "
+        "address by following the link we sent when you registered.\n\n"
+        "------------------\n\n"
+        "Need help? Please visit our contact page: https://www.courtlistener.com/contact/",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+    },
+    "not_edu_account_in_system": {
+        "subject": "Complete Your .edu Membership Registration",
+        "body": "Hello,\n\n"
+        "We received your request for a .edu membership, but it looks like there is no "
+        "account in our system associated with this email address.\n\n"
+        "To proceed, please create an account here: https://www.courtlistener.com/register/ "
+        "using your .edu email address. Once your account is created and confirmed, "
+        "you’ll be eligible for a .edu membership.\n\n"
+        "------------------\n\n"
+        "If you already have an account but are still seeing this message, please "
+        "reach out through our contact page: https://www.courtlistener.com/contact/",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+    },
 }
 
 message_dict = {
