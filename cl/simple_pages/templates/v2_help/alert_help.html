@@ -12,7 +12,6 @@
   data-first-active="about"
   :nav_items="[
     {'href': '#about', 'text': 'Overview'},
-    {'href': '#receiving-alerts', 'text': 'Receiving Alerts'},
     {'href': '#recap-alerts', 'text': 'Docket Alerts', 'children': [
       {'href': '#limitations', 'text': 'Limitations'},
       {'href': '#creating-docket-alert', 'text': 'Creating Alerts'},
@@ -29,26 +28,13 @@
       {'href': '#courts', 'text': 'Supported Courts'},
     ]},
     {'href': '#citation-alerts', 'text': 'Citation Alerts'},
+    {'href': '#receiving-alerts', 'text': 'Receiving Alerts'},
   ]"
 >
   <c-layout-with-navigation.section id="about">
     <h1>Help with Search and Docket Alerts</h1>
     <p class="text-xl font-sans font-normal text-greyscale-700">Since 2009, CourtListener has helped people keep up with new cases and legal topics.</p>
     <p>We currently have three kinds of alerts: Search Alerts, Docket Alerts for PACER, and Citation Alerts. Each of these can send emails to your inbox or <a class="underline" href="{% url "webhooks_docs" %}">webhook events</a> to your server.</p>
-  </c-layout-with-navigation.section>
-
-  {# How to receive alerts #}
-  <c-layout-with-navigation.section id="receiving-alerts">
-    <h2>How to Receive Alerts</h2>
-    <p>You can choose how alerts are delivered:</p>
-    <ul>
-      <li>
-        <strong>Email:</strong> Stay informed in your inbox with straightforward notifications. This is the simplest, easiest way to get alerts, and it doesn't require any additional setup.
-      </li>
-      <li>
-        <strong>Webhooks:</strong> For more advanced uses, webhook events can be sent to your applications or services. This option is mainly for developers. Check out the <a class="underline" href="{% url "webhooks_docs" %}">webhook documentation</a> to learn more.
-      </li>
-    </ul>
   </c-layout-with-navigation.section>
 
   {# Docket Alerts for PACER #}
@@ -330,6 +316,20 @@
     <p>For more on citation alerts, <a class="underline" href="https://free.law/2016/01/30/citation-searching/">see our blog post announcing this feature</a>.
     </p>
   </section>
+
+  {# How to receive alerts #}
+  <c-layout-with-navigation.section id="receiving-alerts">
+    <h2>How to Receive Alerts</h2>
+    <p>You can choose how alerts are delivered:</p>
+    <ul>
+      <li>
+        <strong>Email:</strong> Stay informed in your inbox with straightforward notifications. This is the simplest, easiest way to get alerts, and it doesn't require any additional setup.
+      </li>
+      <li>
+        <strong>Webhooks:</strong> For more advanced uses, webhook events can be sent to your applications or services. This option is mainly for developers. Check out the <a class="underline" href="{% url "webhooks_docs" %}">webhook documentation</a> to learn more.
+      </li>
+    </ul>
+  </c-layout-with-navigation.section>
 
 </c-layout-with-navigation>
 {% endblock %}

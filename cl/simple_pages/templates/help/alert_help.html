@@ -45,7 +45,6 @@
     <h3>Table of Contents</h3>
     <ul>
       <li><a href="#about">Overview</a></li>
-      <li><a href="#receiving-alerts">Receiving Alerts</a></li>
       <li>
         <a href="#recap-alerts">Docket Alerts</a>
         <ul>
@@ -69,6 +68,7 @@
         </ul>
       </li>
       <li><a href="#citation-alerts">Citation Alerts</a></li>
+      <li><a href="#receiving-alerts">Receiving Alerts</a></li>
     </ul>
   </div>
 </div>
@@ -78,17 +78,6 @@
   <h1 id="about">Help with Search and Docket&nbsp;Alerts</h1>
   <p class="lead">Since 2009, CourtListener has helped people keep up with new cases and legal topics.</p>
   <p>We currently have three kinds of alerts: Search Alerts, Docket Alerts for PACER, and Citation Alerts. Each of these can send emails to your inbox or <a href="{% url "webhooks_docs" %}">webhook events</a> to your server.</p>
-
-  <h2 id="receiving-alerts">How to Receive Alerts</h2>
-  <p>You can choose how alerts are delivered:</p>
-  <ul>
-    <li>
-      <strong>Email:</strong> Stay informed in your inbox with straightforward notifications. This is the simplest, easiest way to get alerts, and it doesn't require any additional setup.
-    </li>
-    <li>
-      <strong>Webhooks:</strong> For more advanced uses, webhook events can be sent to your applications or services. This option is mainly for developers. Check out the <a class="underline" href="{% url "webhooks_docs" %}">webhook documentation</a> to learn more.
-    </li>
-  </ul>
 
   <h2 id="recap-alerts">Docket Alerts for PACER</h2>
   <p>Docket Alerts allow you to keep up with federal cases and bankruptcies in the PACER system. These alerts monitor tens of thousands of cases across the country for new docket entries and send emails and <a href="{% url "webhooks_docs" %}">webhook events</a> whenever new data is found.
@@ -351,6 +340,17 @@
   <p>For more on citation alerts, <a href="https://free.law/2016/01/30/citation-searching/">see our blog post announcing this feature</a>.
   </p>
   <hr>
+
+  <h2 id="receiving-alerts">How to Receive Alerts</h2>
+  <p>You can choose how alerts are delivered:</p>
+  <ul>
+    <li>
+      <strong>Email:</strong> Stay informed in your inbox with straightforward notifications. This is the simplest, easiest way to get alerts, and it doesn't require any additional setup.
+    </li>
+    <li>
+      <strong>Webhooks:</strong> For more advanced uses, webhook events can be sent to your applications or services. This option is mainly for developers. Check out the <a class="underline" href="{% url "webhooks_docs" %}">webhook documentation</a> to learn more.
+    </li>
+  </ul>
 
   {% include "includes/donate_footer_plea.html" %}
 </div>
