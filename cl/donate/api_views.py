@@ -323,10 +323,7 @@ class MembershipWebhookViewSet(
         ]
 
         if membership_level == NeonMembership.EDU:
-            is_valid_edu_account = (
-                user.profile.email_confirmed and user.email.endswith(".edu")
-            )
-            if not is_valid_edu_account:
+            if not user.email.endswith(".edu"):
                 email: EmailType = emails["not_valid_edu_account"]
                 send_mail(
                     email["subject"],
@@ -335,6 +332,24 @@ class MembershipWebhookViewSet(
                     [user.email],
                 )
                 return None
+
+            if not user.profile.email_confirmed:
+                if user.profile.stub_account:
+                    email: EmailType = emails["not_edu_account_in_system"]
+                    send_mail(
+                        email["subject"],
+                        email["body"],
+                        email["from_email"],
+                        [user.email],
+                    )
+                else:
+                    email: EmailType = emails["not_confirmed_edu_account"]
+                    send_mail(
+                        email["subject"],
+                        email["body"] % (user.username),
+                        email["from_email"],
+                        [user.email],
+                    )
 
         payment_status = self._map_payment_status_value(
             membership_data["paymentStatus"]

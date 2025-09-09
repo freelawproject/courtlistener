@@ -171,9 +171,12 @@ class MembershipWebhookTest(TestCase):
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
     )
-    async def test_reject_edu_membership_for_non_confirmed_mail(
+    async def test_edu_unconfirmed_email_sends_confirmation(
         self, mock_store_webhook
     ) -> None:
+        self.user_profile.user.email = "test@university.edu"
+        await self.user_profile.user.asave()
+
         # mark user's email as unconfirmed
         self.user_profile.email_confirmed = False
         await self.user_profile.asave()
@@ -190,15 +193,68 @@ class MembershipWebhookTest(TestCase):
         # Assert that the webhook request was accepted
         self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
-        # Verify that no membership was created for the user
-        query = NeonMembership.objects.filter(neon_id="12345")
-        self.assertEqual(await query.acount(), 0)
-
-        # Verify that a rejection email was sent to the user
+        # A confirmation email should be sent to the user
         self.assertEqual(len(mail.outbox), 1)
         message_sent = mail.outbox[0]
-        self.assertIn("Request for a .edu Membership", message_sent.subject)
-        self.assertIn(self.user_profile.user.email, message_sent.to)
+        self.assertIn(
+            "Confirm Your .edu Membership Email", message_sent.subject
+        )
+        self.assertIn("test@university.edu", message_sent.to)
+
+        # The EDU membership should still be created for the user
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        membership = await query.afirst()
+        self.assertEqual(membership.level, membership.EDU)
+
+    @patch(
+        "cl.lib.neon_utils.NeonClient.get_account_by_id",
+    )
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_no_edu_account_sends_registration_email(
+        self, mock_store_webhook, mock_get_account
+    ) -> None:
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["accountId"] = "9999"
+        self.data["data"]["membership"]["membershipName"] = "EDU Membership"
+
+        # mocks the Neon API response
+        mock_get_account.return_value = {
+            "accountId": "9999",
+            "primaryContact": {
+                "email1": "test@free.edu",
+                "firstName": "test",
+                "lastName": "test",
+                "addresses": [],
+            },
+        }
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        # Webhook should be accepted
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        # A registration email should be sent to the user
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+        self.assertIn(
+            "Complete Your .edu Membership Registration", message_sent.subject
+        )
+        self.assertIn("test@free.edu", message_sent.to)
+
+        # The EDU membership should still be created for the user
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        membership = await query.afirst()
+        self.assertEqual(membership.level, membership.EDU)
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
