@@ -1,0 +1,45 @@
+{% load extras %}
+
+{% url "rest_docs" version=version as rest_docs_url %}
+{% url "field_api_help" as field_api_help_url %}
+
+{# recap_document_endpoint.html #}
+<c-callout type="default" title="">
+  <p>Each docket entry contains several documents, which we call <code>RECAP Document</code> objects.
+  </p>
+  <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.
+  </p>
+  <p>A few field-level notes:</p>
+
+<c-data-table
+  safe
+  caption="Document field notes"
+  :columns="[
+    { 'label': 'Field', 'field': 'field' },
+    { 'label': 'Notes', 'field': 'notes' }
+  ]"
+  :rows="[
+    {
+      'field': '<code>plain_text</code>',
+      'notes': '<p>This field contains the extracted text of the document.</p>'
+               '<p>We use <a href=&quot;https://free.law/projects/doctor&quot; class=&quot;underline&quot;>Doctor</a> to complete this task. '
+               'If needed, Doctor uses an optimized version of Tesseract to complete OCR.</p>'
+               '<p>To see whether OCR was used, check the <code>ocr_status</code> field.</p>'
+               '<p>If you don’t need this content, omit it via '
+               '<a href=&quot;{{ rest_docs_url }}#field-selection&quot; class=&quot;underline&quot;>Field Selection</a> '
+               'to significantly reduce response times and payload size.</p>'
+    },
+    {
+      'field': '<code>filepath_local</code>',
+      'notes': '<p>This field contains the path to the binary file if we have it (<code>is_available=True</code>). '
+               'To use this field, see the <a href=&quot;{{ field_api_help_url }}#downloads&quot; class=&quot;underline&quot;>help article on this topic</a>.</p>'
+               '<p>The name of this field dates back to when all our files were locally stored on a single server.</p>'
+    }
+  ]"
+></c-data-table>
+
+  {% if not perms.search.has_recap_api_access %}
+    <p class="mt-2.5">This endpoint is only available to select users. Please <a href="{% url "contact" %}" class="underline">get in touch</a> to access this API.
+    </p>
+  {% endif %}
+</c-callout>
