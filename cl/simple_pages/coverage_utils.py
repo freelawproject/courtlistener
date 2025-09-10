@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from django.db.models import Max, Min
@@ -5,6 +6,8 @@ from django.db.models import Max, Min
 from cl.lib.elasticsearch_utils import get_opinions_coverage_chart_data
 from cl.search.documents import OpinionClusterDocument
 from cl.search.models import SOURCES, Court, Docket, OpinionCluster
+
+logger = logging.getLogger(__name__)
 
 
 async def fetch_data(jurisdictions, group_by_state=True):
@@ -29,6 +32,9 @@ async def fetch_data(jurisdictions, group_by_state=True):
             continue
         if group_by_state:
             courthouse = await court.courthouses.afirst()
+            if not courthouse:
+                logger.error("Court missing courthouse: %s", court.id)
+                continue
             state = courthouse.get_state_display()
         else:
             state = "NONE"
