@@ -199,6 +199,8 @@ class MembershipWebhookTest(TestCase):
         self.assertIn(
             "Confirm Your .edu Membership Email", message_sent.subject
         )
+        await self.user_profile.arefresh_from_db()
+        self.assertIn(self.user_profile.activation_key, message_sent.body)
         self.assertIn("test@university.edu", message_sent.to)
 
         # The EDU membership should still be created for the user

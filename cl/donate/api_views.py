@@ -1,3 +1,4 @@
+import datetime
 from collections import defaultdict
 from http import HTTPStatus
 from typing import Any
@@ -8,6 +9,7 @@ from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F
 from django.http import HttpResponse
+from django.utils.timezone import now
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -18,6 +20,7 @@ from cl.donate.models import (
     NeonMembership,
     NeonWebhookEvent,
 )
+from cl.lib.crypto import sha1_activation_key
 from cl.lib.neon_utils import NeonClient
 from cl.lib.types import EmailType
 from cl.users.utils import (
@@ -343,10 +346,18 @@ class MembershipWebhookViewSet(
                         [user.email],
                     )
                 else:
+                    # Build and save a new activation key for the account.
+                    up = user.profile
+                    activation_key = sha1_activation_key(user.username)
+                    key_expires = now() + datetime.timedelta(5)
+                    up.activation_key = activation_key
+                    up.key_expires = key_expires
+                    up.save()
+
                     email: EmailType = emails["not_confirmed_edu_account"]
                     send_mail(
                         email["subject"],
-                        email["body"] % (user.username),
+                        email["body"] % (up.activation_key),
                         email["from_email"],
                         [user.email],
                     )
