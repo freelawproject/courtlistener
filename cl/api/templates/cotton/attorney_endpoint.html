@@ -1,0 +1,52 @@
+{% load extras %}
+
+{# attorney_endpoint.html #}
+
+<c-callout type="default" title="">
+  <p>Use this API to look up an attorney in our system.</p>
+  <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP OPTIONS request.</p>
+  <p>Like docket entries and parties, attorneys can be filtered to a particular docket. For example:
+  </p>
+  <p class="alert alert-warning mb-2.5"><i class="fa fa-warning"></i> <strong>Listen Up:</strong> Like the parties endpoint, filters applied to this endpoint only affect the top-level data. To filter the nested data for each attorney, include the <code>filter_nested_results=True</code> parameter in your API request URL.
+  </p>
+
+  <c-code disable_copy>
+   curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "attorney-list" version=version %}?docket=4214664"
+  </c-code>
+
+  <p class="mt-2.5">Returns:</p>
+  <c-code disable_copy>{
+    "next": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/?docket=4214664&cursor=cD0xMjA5NjAyMg%3D%3D&docket=4214664",
+    "previous": null,
+    "results": [
+        {
+            "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/9247906/",
+            "id": 9247906,
+            "parties_represented": [
+                {
+                    "role": 10,
+                    "docket": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/4214664/",
+                    "party": "https://www.courtlistener.com/api/rest/{{ version }}/parties/13730908/",
+                    "date_action": null
+                }
+            ],
+            "date_created": "2024-04-24T13:33:39.109264-07:00",
+            "date_modified": "2024-05-07T21:32:12.465340-07:00",
+            "name": "ERIC ALAN ISAACSON",
+            "contact_raw": "6580 Avenida Mirola\nLa Jolla, CA 92037\n(858) 263-9581\nPRO SE\n",
+            "phone": "(858) 263-9581",
+            "fax": "",
+            "email": ""
+        },
+  ...
+  </c-code>
+
+  <p class="mt-2.5">Similar to the party API above, when you filter attorneys to a particular docket, the nested <code>parties_represented</code> field is not filtered and can show other parties the attorney represented in other dockets.
+  </p>
+  {% if not perms.people_db.has_recap_api_access %}
+    <p>These endpoints are only available to select users. Please <a href="{% url "contact" %}" class="underline">get in touch</a> to access these endpoints.
+    </p>
+  {% endif %}
+</c-callout>

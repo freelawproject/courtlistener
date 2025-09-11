@@ -1,0 +1,43 @@
+{% load extras %}
+
+<c-callout type="default" title="">
+  <p>This API is used to check if documents with known IDs are available in our system.
+  </p>
+  <p>To use it, provide a court ID and a comma-separated list of <code>pacer_doc_id</code>'s:
+  </p>
+
+  <c-code disable_copy>curl \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  '{% get_full_host %}{% url "fast-recapdocument-list" version=version %}?docket_entry__docket__court=dcd&pacer_doc_id__in=04505578698,04505578717' \
+</c-code>
+
+  <p class="mt-2.5">This will return one entry for each document found, up to a maximum of 300 items:</p>
+  <c-code disable_copy>{
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "pacer_doc_id": "04505578717",
+      "filepath_local": "recap/gov.uscourts.dcd.178502/gov.uscourts.dcd.178502.2.0_54.pdf",
+      "id": 2974081
+    },
+    {
+      "pacer_doc_id": "04505578698",
+      "filepath_local": "recap/gov.uscourts.dcd.178502/gov.uscourts.dcd.178502.1.0_48.pdf",
+      "id": 2974077
+    }
+  ]
+}
+</c-code>
+
+<div class="my-2.5">
+    <c-court_id_mappings></c-court_id_mappings>
+</div>
+
+<p class="alert alert-warning mb-2.5"><i class="fa fa-warning"></i> <strong>Careful:</strong> When placing queries, the fourth digit of a PACER document ID can be a zero or one. We always normalize it to zero, and you will need to do so in your queries.</p>
+<p>To query whether a case is in our system, use the <code>Docket</code> endpoint described above.</p>
+{% if not perms.search.has_recap_api_access %}
+<p>This endpoint is only available to select users. Please <a href="{% url "contact" %}" class="underline">get in touch</a> to access this API.
+</p>
+{% endif %}
+</c-callout>

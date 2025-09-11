@@ -1,0 +1,93 @@
+{% load extras %}
+
+{# party_endpoint.html #}
+
+<c-callout type="default" title="">
+  <p>The <code>Party</code> endpoint provides details about parties that have been involved in federal cases in PACER, and contains nested attorney information.
+  </p>
+  <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.
+  </p>
+  <p>This API can be filtered by docket ID to show all the parties for a particular case.
+  </p>
+  <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up:</strong> Filters applied to this endpoint only affect the top-level data, not the data nested records within it. Therefore, each party returned by this API will list all the attorneys that have represented them in any case, even if the parties themselves are filtered to a particular case. <br><br>
+    To filter the nested attorney data for each party, include the <code>filter_nested_results=True</code> parameter in your API request.
+  </p>
+  <p class="my-2.5">For example, this query returns the parties for docket number <code>123</code>:</p>
+
+  <c-code disable_copy>
+   curl -v \
+    --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+    "{% get_full_host %}{% url "party-list" version=version %}?docket=123"
+  </c-code>
+
+ <p class="mt-2.5">It returns something like:</p>
+
+  <c-code disable_copy>{
+① "next": "https://www.courtlistener.com/api/rest/{{ version }}/parties/?docket=123&cursor=cD0xMjA5NjAyMg%3D%3D&docket=4214664",",
+  "previous": null,
+  "results": [
+    {
+      "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/parties/42/",
+      "id": 42,
+②    "attorneys": [
+        {
+          "attorney": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/1/",
+          "attorney_id": 1,
+          "date_action": null,
+          "docket": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/123/",
+          "docket_id": 123,
+          "role": 10
+        },
+        {
+          "attorney": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/2/",
+          "attorney_id": 2,
+          "date_action": null,
+          "docket": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/456/",
+          "docket_id": 456,
+          "role": 2
+        }
+      ],
+③    "party_types": [
+        {
+          "docket": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/123/",
+          "docket_id": 123,
+          "name": "Plaintiff",
+          "date_terminated": null,
+          "extra_info": "",
+④         "highest_offense_level_opening": "",
+          "highest_offense_level_terminated": "",
+          "criminal_counts": [],
+          "criminal_complaints": []
+        }
+      ],
+      "date_created": "2024-04-24T13:33:39.096780-07:00",
+      "date_modified": "2024-04-24T13:33:39.096790-07:00",
+      "name": "Samuel Jackson",
+      "extra_info": ""
+    },
+    ...
+  </c-code>
+
+  <p class="mt-2.5">Note that:</p>
+  <ol>
+    <li>
+      <p>There are 35 parties in this case. (Only the first is shown in this example.)</p>
+    </li>
+    <li>
+      <p>The first party (ID 42) has had two attorneys. The first attorney (ID 1) represented them with role 10 in case 123 (the one we filtered to). The second attorney (ID 2) represented party 42 with role 2 in case 456.
+      </p>
+    </li>
+    <li>
+      <p>The <code>party_types</code> field indicates the role the party has in the case (defendant, plaintiff, trustee, etc).
+      </p>
+    </li>
+    <li>
+      <p>In criminal cases, the <code>party_type</code> field may also include the highest offenses, criminal counts, and criminal complaints against the defendant.
+      </p>
+    </li>
+  </ol>
+  {% if not perms.people_db.has_recap_api_access %}
+    <p>These endpoints are only available to select users. Please <a href="{% url "contact" %}" class="underline">get in touch</a> to access these endpoints.
+    </p>
+  {% endif %}
+</c-callout>

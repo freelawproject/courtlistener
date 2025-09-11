@@ -1,9 +1,9 @@
 {% load extras %}
 
-<c-vars columns rows footer caption="Data table" safe></c-vars>
+<c-vars columns rows tableStyle footer caption="Data table" safe></c-vars>
 
 <div class="w-full overflow-auto">
-  <table>
+  <table class={{tableStyle}}>
     <caption class="sr-only">{{ caption }}</caption>
     <thead>
     <tr class="border-none">
