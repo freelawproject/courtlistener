@@ -331,15 +331,16 @@ class CursorESList:
 
     def get_paginated_results(
         self,
-    ) -> tuple[list[defaultdict], int, Response, Response | None]:
+    ) -> tuple[list[defaultdict], int, Response, Response | None, bool]:
         """Returns the page results from the micro-cache if available or
         executes the search query with pagination settings and processes
         the results.
 
-        :return: A four-tuple containing a list of defaultdicts with the results,
+        :return: A five-tuple containing a list of defaultdicts with the results,
         the number of hits returned by the main query, a response object
-        related to the main query's cardinality count, and a response object
-        related to the child query's cardinality count, if available.
+        related to the main query's cardinality count, a response object
+        related to the child query's cardinality count, if available and a
+        boolean indicating whether this is a cached response.
         """
 
         get_params_for_cache = self.request.GET.copy()
@@ -352,7 +353,7 @@ class CursorESList:
         if results_dict_cached:
             # Return results from cache.
             self.results = results_dict_cached["es_results_items"]
-            self.process_results(self.results)
+            self.process_results(self.results, cached_response=True)
             es_results_items = [
                 defaultdict(lambda: None, result.to_dict(skip_empty=False))
                 for result in self.results
@@ -362,6 +363,7 @@ class CursorESList:
                 results_dict_cached["main_query_hits"],
                 results_dict_cached["cardinality_count_response"],
                 results_dict_cached["child_cardinality_count_response"],
+                True,
             )
 
         # Execute ES query.
@@ -399,9 +401,12 @@ class CursorESList:
             main_query_hits,
             cardinality_count_response,
             child_cardinality_count_response,
+            False,
         )
 
-    def process_results(self, results: Response) -> None:
+    def process_results(
+        self, results: Response, cached_response: bool = False
+    ) -> None:
         """Processes the raw results from ES for handling inner hits,
         highlighting and merging of unavailable fields.
         """
@@ -421,34 +426,43 @@ class CursorESList:
             merge_semantic_relevant_chunks(results)
         set_child_docs_and_score(results, merge_score=True)
 
-        if self.reverse:
+        if self.reverse and not cached_response:
             # If doing backward pagination, reverse the results of the current
             # page to maintain consistency of the results on the page,
             # because the original order is inverse when paginating backwards.
+            # Don’t reverse the cached response since it’s already in the expected order.
             self.results.hits.reverse()
 
-    def _get_search_after_key(self, index_position: int) -> AttrList | None:
+    def _get_search_after_key(
+        self, index_position: int, cached_response: bool
+    ) -> AttrList | None:
         if self.results and len(self.results) > 0:
             limited_results = limit_api_results_to_page(
-                self.results.hits, self.cursor
+                self.results.hits, self.cursor, cached_response
             )
             last_result = limited_results[index_position]
             return last_result.meta.sort
         return None
 
-    def get_search_after_sort_key(self) -> AttrList | None:
+    def get_search_after_sort_key(
+        self, cached_response: bool
+    ) -> AttrList | None:
         """Retrieves the sort key from the last item in the current page to
         use for the next page's search_after parameter.
         """
         last_result_in_page = -1
-        return self._get_search_after_key(last_result_in_page)
+        return self._get_search_after_key(last_result_in_page, cached_response)
 
-    def get_reverse_search_after_sort_key(self) -> AttrList | None:
+    def get_reverse_search_after_sort_key(
+        self, cached_response: bool
+    ) -> AttrList | None:
         """Retrieves the sort key from the last item in the current page to
         use for the next page's search_after parameter.
         """
         first_result_in_page = 0
-        return self._get_search_after_key(first_result_in_page)
+        return self._get_search_after_key(
+            first_result_in_page, cached_response
+        )
 
     def get_api_query_sorting(self):
         """Build the sorting settings for an ES query to work with the
@@ -495,7 +509,9 @@ class ResultObject:
 
 
 def limit_api_results_to_page(
-    results: list[defaultdict], cursor: ESCursor | None
+    results: list[defaultdict],
+    cursor: ESCursor | None,
+    cached_response: bool = False,
 ) -> list[defaultdict]:
     """In ES Cursor pagination, an additional document is returned in each
     query response to determine whether to display the next page or previous
@@ -506,13 +522,16 @@ def limit_api_results_to_page(
     :param results: The results returned by ES.
     :param cursor: A ESCursor instance containing the "search_after" parameter
      and a boolean "reverse" indicating if going backwards.
+    :param cached_response: True if this comes from a cached response.
     :return: A slice of the results list, limited to the number of items as
     specified by the SEARCH_API_PAGE_SIZE.
     """
 
     reverse = cursor.reverse if cursor else False
-    if reverse:
+    if reverse and not cached_response:
         # Limit results in page starting from the last item.
+        # Don't reverse the order in cached responses since they're already
+        # in the right order.
         return results[-settings.SEARCH_API_PAGE_SIZE :]
 
     # First page or going forward, limit results on the page starting from the
