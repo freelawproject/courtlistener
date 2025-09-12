@@ -155,20 +155,24 @@
   >
     <div class="flex w-full relative">
       {#   Relative date input   #}
-      <div class="focus-container input-text flex justify-stretch items-stretch gap-2 w-full">
+      <div x-on:keydown.down.stop.prevent="enterDropdownFocus" class="focus-container input-text flex justify-stretch items-stretch gap-2 w-full">
         <label x-bind:for="relativeInputId" class="sr-only">Enter a relative date, for example '1d ago'</label>
         <input
           type="text"
           x-bind:value="dateAfterRelative"
           x-on:focusin="openDropdownMenu"
+          x-on:input="updateDateAfterRelative"
           x-bind:id="relativeInputId"
           x-bind:disabled="disabled"
-          x-on:keyup.esc="closeDropdownMenu"
+          x-on:keyup.esc.stop.prevent="onComboboxEscape"
+          x-on:keydown.shift.tab="closeDropdownMenu"
           name="{{ date_after_field_name }}"
           data-type="relative"
           placeholder="Enter a Relative date"
           class="focus:ring-0 focus:outline-none w-full"
           autocomplete="off"
+          role="combobox"
+          x-bind:aria-expanded="dropdownMenuOpen"
         >
         {#    Toggle button for relative dates menu    #}
         <button
@@ -181,6 +185,7 @@
           data-type="relative"
           aria-label="Toggle relative dates menu to autofill the input with common values"
           x-bind:aria-expanded="dropdownMenuOpen"
+          tabindex="-1"
         >
           {% svg "chevron" aria_hidden="true" class="text-greyscale-400" %}
         </button>
@@ -191,12 +196,12 @@
         x-bind:id="relativeDatesMenuId"
         x-show="dropdownMenuOpen"
         x-cloak
-        x-on:keyup.esc="closeDropdownMenu"
+        x-on:keyup.esc.stop.prevent="focusRelativeInput"
         x-on:keydown.down.stop.prevent="focusNext"
         x-on:keydown.up.stop.prevent="focusPrevious"
         x-on:keydown.home.stop.prevent="focusFirst"
         x-on:keydown.end.stop.prevent="focusLast"
-        class="absolute z-10 top-11 w-full overflow-auto rounded-lg bg-white py-1 shadow-lg border border-greyscale-200 focus:outline-hidden list-none pl-0 flex flex-col justify-stretch"
+        class="absolute z-20 top-11 w-full overflow-auto rounded-lg bg-white py-1 shadow-lg border border-greyscale-200 focus:outline-hidden list-none pl-0 flex flex-col justify-stretch"
         tabindex="-1"
         role="listbox"
         aria-label="Options to autofill {{ label }} with common Relative Dates"
