@@ -139,3 +139,4 @@ class ESCursor:
     reverse: bool
     search_type: str
     request_date: date | None
+    page_int: int

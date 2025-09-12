@@ -94,7 +94,11 @@ class IncrementalNewTemplateMiddleware:
         if not use_new_design or not is_template_resp or rendered:
             return response
 
+        # {response.template_name} could return a list if TemplateView is used directly
         old_template = response.template_name
+        if isinstance(old_template, list | tuple):
+            old_template = old_template[0]
+
         if not isinstance(old_template, str):
             return response
 

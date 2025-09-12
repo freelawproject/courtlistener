@@ -304,18 +304,20 @@ def store_search_api_query(
 
 
 class CachedESSearchResults(TypedDict):
-    hits: Response | list
-    main_total: int | None
-    child_total: int | None
+    es_results_items: Response | list
+    main_query_hits: int | None
+    cardinality_count_response: Response | int | None
+    child_cardinality_count_response: Response | int | None
 
 
 def retrieve_cached_search_results(
-    get_params: QueryDict,
+    get_params: QueryDict, key_prefix: str = "search_results_cache:"
 ) -> tuple[CachedESSearchResults | None, str]:
     """
     Retrieve cached search results based on the GET parameters.
 
     :param get_params: The GET parameters provided by the user.
+    :param key_prefix: The key prefix used to generate the cache key.
     :return: A two-tuple containing either the cached search results and the
     cache key based on a prefix and the get parameters, or None and the cache key
     if no cached results were found.
@@ -328,7 +330,6 @@ def retrieve_cached_search_results(
     params.setdefault("page", "1")
     params.setdefault("q", "")
     sorted_params = dict(sorted(params.items()))
-    key_prefix = "search_results_cache:"
     params_hash = sha256(pickle.dumps(sorted_params))
     cache_key = f"{key_prefix}{params_hash}"
     cached_results = cache.get(cache_key)
@@ -402,17 +403,26 @@ def fetch_and_paginate_results(
     if cache_key is not None:
         cache_data = cache.get(cache_key)
         if cache_data is not None:
-            if type(cache_data) is Response:
-                # Deprecated. TODO: Remove after homepage-data-o-es cache expires
-                paginator = Paginator(cache_data, rows_per_page)
-            else:
-                cached_data = pickle.loads(cache_data)
-                # Create ESPaginator that contains the total results count.
-                paginator = ESPaginator(
-                    cached_data["main_total"],
-                    cached_data["hits"],
-                    rows_per_page,
-                )
+            cached_data = pickle.loads(cache_data)
+            # TODO: hits and main_total are deprecated.
+            #  Remove after the current micro-cache has expired.
+            use_es_items = "es_results_items" in cached_data
+            hits = (
+                cached_data["es_results_items"]
+                if use_es_items
+                else cached_data["hits"]
+            )
+            total = (
+                cached_data["cardinality_count_response"]
+                if use_es_items
+                else cached_data["main_total"]
+            )
+            # Create ESPaginator that contains the total results count.
+            paginator = ESPaginator(
+                total,
+                hits,
+                rows_per_page,
+            )
 
             results = get_results_from_paginator(paginator, page)
             enrich_search_results(results, search_type, get_params)
@@ -421,25 +431,33 @@ def fetch_and_paginate_results(
     # Check micro-cache for all other search requests.
     results_dict, micro_cache_key = retrieve_cached_search_results(get_params)
     if results_dict:
-        # Create paginator from ES hits
-        paginator = ESPaginator(
-            results_dict["main_total"], results_dict["hits"], rows_per_page
+        # TODO: hits, main_total and child_total are deprecated.
+        #  Remove after the current micro-cache has expired.
+        use_es_items = "es_results_items" in results_dict
+        hits = (
+            results_dict["es_results_items"]
+            if use_es_items
+            else results_dict["hits"]  # type: ignore[typeddict-item]
+        )
+        main_total = (
+            results_dict["cardinality_count_response"]
+            if use_es_items
+            else results_dict["main_total"]  # type: ignore[typeddict-item]
+        )
+        child_total = (
+            results_dict["child_cardinality_count_response"]
+            if use_es_items
+            else results_dict["child_total"]  # type: ignore[typeddict-item]
         )
 
+        # Create paginator from ES hits
+        paginator = ESPaginator(main_total, hits, rows_per_page)
         # Get appropriate page
         results = get_results_from_paginator(paginator, page)
-
         # Enrich results
         enrich_search_results(results, search_type, get_params)
 
-        # Return results and counts. Set query time to 1ms.
-        return (
-            results,
-            1,
-            False,
-            results_dict["main_total"],
-            results_dict["child_total"],
-        )
+        return results, 1, False, main_total, child_total
 
     # Check pagination depth
     check_pagination_depth(page)
@@ -461,9 +479,10 @@ def fetch_and_paginate_results(
     enrich_search_results(results, search_type, get_params)
 
     results_dict = {
-        "hits": hits,
-        "main_total": main_total,
-        "child_total": child_total,
+        "es_results_items": hits,
+        "main_query_hits": None,
+        "cardinality_count_response": main_total,
+        "child_cardinality_count_response": child_total,
     }
     if cache_key is not None:
         # Cache only ES hits for displaying insights on the Home Page.

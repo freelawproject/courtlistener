@@ -268,6 +268,7 @@ class ESCursorPagination(BasePagination):
     cursor_query_param = "cursor"
     invalid_cursor_message = "Invalid cursor"
     request_date = None
+    page_int = 0
 
     def initialize_context_from_request(
         self, request, search_type
@@ -284,35 +285,58 @@ class ESCursorPagination(BasePagination):
             if self.cursor
             else datetime.datetime.now().date()
         )
+        self.page_int = self.cursor.page_int if self.cursor else 1
+
         return self.request_date
 
     def paginate_queryset(
         self, es_list_instance: CursorESList, request: Request, view=None
-    ) -> list[defaultdict]:
-        """Paginate the Elasticsearch query and retrieve the results."""
+    ) -> tuple[list[defaultdict], bool]:
+        """Paginate the Elasticsearch query and retrieve the results.
+
+        :param es_list_instance: Instance of CursorESList used to execute
+        and paginate the Elasticsearch query.
+        :param request: The current DRF request object.
+        :param view: The DRF view instance.
+        :return: A two-tuple containing:
+            - A list of result items.
+            - A boolean indicating whether the results came from cache.
+        """
 
         self.es_list_instance = es_list_instance
         self.es_list_instance.set_pagination(
             self.cursor, settings.SEARCH_API_PAGE_SIZE
         )
-        results, main_hits, cardinality_count, child_cardinality_count = (
-            self.es_list_instance.get_paginated_results()
-        )
+        (
+            results,
+            main_hits,
+            cardinality_count,
+            child_cardinality_count,
+            cached_response,
+        ) = self.es_list_instance.get_paginated_results()
         self.results_in_page = len(results)
         self.results_count_approximate = cardinality_count
         self.results_count_exact = main_hits
         self.child_results_count = child_cardinality_count
-        return results
+        return results, cached_response
 
-    def get_paginated_response(self, data):
-        """Generate a custom paginated response using the data provided."""
+    def get_paginated_response(
+        self, data: list[dict], cached_response: bool
+    ) -> Response:
+        """Generate a custom paginated response using the provided data.
+
+        :param data: A list of serialized result dictionaries e.
+        :param cached_response: Boolean indicating whether the response
+        originated from cache.
+        :return: A DRF Response object containing pagination metadata.
+        """
 
         base_response = {
             "count": self.get_results_count(),
         }
         remaining_fields = {
-            "next": self.get_next_link(),
-            "previous": self.get_previous_link(),
+            "next": self.get_next_link(cached_response),
+            "previous": self.get_previous_link(cached_response),
             "results": data,
         }
 
@@ -324,39 +348,47 @@ class ESCursorPagination(BasePagination):
         base_response.update(remaining_fields)
         return Response(base_response)
 
-    def get_next_link(self) -> str | None:
+    def get_next_link(self, cached_response: bool) -> str | None:
         """Constructs the URL for the next page based on the current page's
         last item.
         """
         search_after_sort_key = (
-            self.es_list_instance.get_search_after_sort_key()
+            self.es_list_instance.get_search_after_sort_key(cached_response)
         )
         if not self.has_next():
             return None
 
+        # Increase page_int by 1 for the next page.
+        page_int = self.page_int + 1
         cursor = ESCursor(
             search_after=search_after_sort_key,
             reverse=False,
             search_type=self.search_type,
             request_date=self.request_date,
+            page_int=page_int,
         )
         return self.encode_cursor(cursor)
 
-    def get_previous_link(self) -> str | None:
+    def get_previous_link(self, cached_response: bool) -> str | None:
         """Constructs the URL for the next page based on the current page's
         last item.
         """
         reverse_search_after_sort_key = (
-            self.es_list_instance.get_reverse_search_after_sort_key()
+            self.es_list_instance.get_reverse_search_after_sort_key(
+                cached_response
+            )
         )
         if not self.has_prev():
             return None
-
+        # Decrease page_int by 1 for the previous page, or set it to 1 if it's
+        # the first page, since there is no page 0.
+        page_int = self.page_int - 1 or 1
         cursor = ESCursor(
             search_after=reverse_search_after_sort_key,
             reverse=True,
             search_type=self.search_type,
             request_date=self.request_date,
+            page_int=page_int,
         )
         return self.encode_cursor(cursor)
 
@@ -373,6 +405,7 @@ class ESCursorPagination(BasePagination):
             reverse = bool(int(tokens.get("r", ["0"])[0]))
             search_type = tokens.get("t", [None])[0]
             request_date = tokens.get("d", [None])[0]
+            page_int = int(tokens.get("p", [0])[0])
         except (TypeError, ValueError):
             raise NotFound(self.invalid_cursor_message)
 
@@ -390,6 +423,7 @@ class ESCursorPagination(BasePagination):
             reverse=reverse,
             search_type=search_type,
             request_date=request_date,
+            page_int=page_int,
         )
         return self.cursor
 
@@ -404,6 +438,8 @@ class ESCursorPagination(BasePagination):
             tokens["t"] = self.search_type
         if cursor.request_date:
             tokens["d"] = cursor.request_date
+        if cursor.page_int:
+            tokens["p"] = cursor.page_int
 
         querystring = urlencode(tokens, doseq=True)
         encoded = b64encode(querystring.encode("ascii")).decode("ascii")
@@ -456,6 +492,9 @@ class ESCursorPagination(BasePagination):
         """
         # Check if it's the first page or if there are no results on the page.
         if self.cursor is None:
+            return False
+
+        if self.cursor.page_int == 1:
             return False
 
         if self.cursor.reverse:
