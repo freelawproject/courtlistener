@@ -291,31 +291,52 @@ class ESCursorPagination(BasePagination):
 
     def paginate_queryset(
         self, es_list_instance: CursorESList, request: Request, view=None
-    ) -> list[defaultdict]:
-        """Paginate the Elasticsearch query and retrieve the results."""
+    ) -> tuple[list[defaultdict], bool]:
+        """Paginate the Elasticsearch query and retrieve the results.
+
+        :param es_list_instance: Instance of CursorESList used to execute
+        and paginate the Elasticsearch query.
+        :param request: The current DRF request object.
+        :param view: The DRF view instance.
+        :return: A two-tuple containing:
+            - A list of result items.
+            - A boolean indicating whether the results came from cache.
+        """
 
         self.es_list_instance = es_list_instance
         self.es_list_instance.set_pagination(
             self.cursor, settings.SEARCH_API_PAGE_SIZE
         )
-        results, main_hits, cardinality_count, child_cardinality_count = (
-            self.es_list_instance.get_paginated_results()
-        )
+        (
+            results,
+            main_hits,
+            cardinality_count,
+            child_cardinality_count,
+            cached_response,
+        ) = self.es_list_instance.get_paginated_results()
         self.results_in_page = len(results)
         self.results_count_approximate = cardinality_count
         self.results_count_exact = main_hits
         self.child_results_count = child_cardinality_count
-        return results
+        return results, cached_response
 
-    def get_paginated_response(self, data):
-        """Generate a custom paginated response using the data provided."""
+    def get_paginated_response(
+        self, data: list[dict], cached_response: bool
+    ) -> Response:
+        """Generate a custom paginated response using the provided data.
+
+        :param data: A list of serialized result dictionaries e.
+        :param cached_response: Boolean indicating whether the response
+        originated from cache.
+        :return: A DRF Response object containing pagination metadata.
+        """
 
         base_response = {
             "count": self.get_results_count(),
         }
         remaining_fields = {
-            "next": self.get_next_link(),
-            "previous": self.get_previous_link(),
+            "next": self.get_next_link(cached_response),
+            "previous": self.get_previous_link(cached_response),
             "results": data,
         }
 
@@ -327,12 +348,12 @@ class ESCursorPagination(BasePagination):
         base_response.update(remaining_fields)
         return Response(base_response)
 
-    def get_next_link(self) -> str | None:
+    def get_next_link(self, cached_response: bool) -> str | None:
         """Constructs the URL for the next page based on the current page's
         last item.
         """
         search_after_sort_key = (
-            self.es_list_instance.get_search_after_sort_key()
+            self.es_list_instance.get_search_after_sort_key(cached_response)
         )
         if not self.has_next():
             return None
@@ -348,12 +369,14 @@ class ESCursorPagination(BasePagination):
         )
         return self.encode_cursor(cursor)
 
-    def get_previous_link(self) -> str | None:
+    def get_previous_link(self, cached_response: bool) -> str | None:
         """Constructs the URL for the next page based on the current page's
         last item.
         """
         reverse_search_after_sort_key = (
-            self.es_list_instance.get_reverse_search_after_sort_key()
+            self.es_list_instance.get_reverse_search_after_sort_key(
+                cached_response
+            )
         )
         if not self.has_prev():
             return None

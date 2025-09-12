@@ -5545,6 +5545,8 @@ class RECAPSearchAPIV4Test(
             reverse("search-list", kwargs={"version": "v4"}),
             search_params,
         )
+
+        p1_first_result_id = r.data["results"][0]["docket_id"]
         self.assertEqual(mock_es_query.call_count, 1)
 
         self.assertEqual(len(r.data["results"]), 2)
@@ -5557,6 +5559,7 @@ class RECAPSearchAPIV4Test(
 
         # Page 2
         r = self.client.get(next_page)
+        p2_first_result_id = r.data["results"][0]["docket_id"]
         self.assertEqual(mock_es_query.call_count, 2)
         self.assertEqual(len(r.data["results"]), 2)
         self.assertEqual(r.data["count"], 5)
@@ -5570,6 +5573,7 @@ class RECAPSearchAPIV4Test(
 
         # Page 3
         r = self.client.get(next_page)
+        p3_first_result_id = r.data["results"][0]["docket_id"]
         self.assertEqual(mock_es_query.call_count, 3)
         self.assertEqual(len(r.data["results"]), 1)
         self.assertEqual(r.data["count"], 5)
@@ -5595,7 +5599,9 @@ class RECAPSearchAPIV4Test(
         cached_third_page_ids = {
             result["docket_id"] for result in r.data["results"]
         }
+        # Confirm that the content and order match in the cached response.
         self.assertEqual(third_page_ids, cached_third_page_ids)
+        self.assertEqual(p3_first_result_id, r.data["results"][0]["docket_id"])
 
         # Page 2
         r = self.client.get(previous_page)
@@ -5611,6 +5617,8 @@ class RECAPSearchAPIV4Test(
             result["docket_id"] for result in r.data["results"]
         }
 
+        # Confirm that the content and order match in the cached response.
+        self.assertEqual(p2_first_result_id, r.data["results"][0]["docket_id"])
         self.assertEqual(second_page_ids, cached_second_page_ids)
 
         # Page 1
@@ -5627,7 +5635,9 @@ class RECAPSearchAPIV4Test(
             result["docket_id"] for result in r.data["results"]
         }
 
+        # Confirm that the content and order match in the cached response.
         self.assertEqual(first_page_ids, cached_first_page_ids)
+        self.assertEqual(p1_first_result_id, r.data["results"][0]["docket_id"])
 
         with self.captureOnCommitCallbacks(execute=True):
             docket_0.delete()
