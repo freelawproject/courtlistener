@@ -310,8 +310,13 @@ class CachedESSearchResults(TypedDict):
     child_cardinality_count_response: Response | int | None
 
 
+def get_micro_cache_key(key_prefix: str = "search_results_cache:") -> str:
+    """Just a small wrapper useful for testing."""
+    return key_prefix
+
+
 def retrieve_cached_search_results(
-    clean_params: dict, key_prefix: str = "search_results_cache:"
+    clean_params: dict, key_prefix: str
 ) -> tuple[CachedESSearchResults | None, str]:
     """
     Retrieve cached search results based on the GET parameters.
@@ -418,8 +423,9 @@ def fetch_and_paginate_results(
             return results, 0, False, None, None
 
     # Check micro-cache for all other search requests.
+    key_prefix = get_micro_cache_key("search_results_cache:")
     results_dict, micro_cache_key = retrieve_cached_search_results(
-        clean_params
+        clean_params, key_prefix
     )
     if results_dict:
         # TODO: hits, main_total and child_total are deprecated.

@@ -25,6 +25,7 @@ from cl.lib.elasticsearch_utils import (
     set_results_highlights,
 )
 from cl.lib.search_utils import (
+    get_micro_cache_key,
     retrieve_cached_search_results,
     store_search_api_query,
 )
@@ -349,8 +350,9 @@ class CursorESList:
         # regardless of whether the page parameter is included.
         page_int = self.page_int if self.page_int is not None else 1
         clean_params_for_cache["page"] = page_int
+        key_prefix = get_micro_cache_key("search_results_cache_api:")
         results_dict_cached, micro_cache_key = retrieve_cached_search_results(
-            clean_params_for_cache, "search_results_cache_api:"
+            clean_params_for_cache, key_prefix
         )
         if results_dict_cached:
             # Return results from cache.

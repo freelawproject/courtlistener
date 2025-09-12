@@ -9,7 +9,6 @@ import time_machine
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import admin
-from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
@@ -123,6 +122,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
         # Index parties in ES.
         index_docket_parties_in_es.delay(cls.de.docket.pk)
+
+    @staticmethod
+    def _clean_micro_cache():
+        r = get_redis_interface("CACHE")
+        keys = r.keys(":1:search_results_cache_test:*")
+        if keys:
+            r.delete(*keys)
 
     async def _test_article_count(self, params, expected_count, field_name):
         r = await self.async_client.get("/", params)
@@ -2752,18 +2758,21 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Shouldn't be a response
         self.assertIsNone(r)
 
+    @mock.patch(
+        "cl.lib.search_utils.get_micro_cache_key",
+        return_value="search_results_cache_test:",
+    )
     @mock.patch("cl.lib.search_utils.fetch_es_results")
     @override_settings(
         RECAP_SEARCH_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
     )
-    async def test_micro_cache_for_search_results(self, mock_fetch_es) -> None:
+    async def test_micro_cache_for_search_results(
+        self, mock_fetch_es, mock_cache_key
+    ) -> None:
         """Assert micro-cache for search results behaves properly."""
 
         # Clean search_results_cache before starting the test.
-        r = get_redis_interface("CACHE")
-        keys = r.keys(":1:search_results_cache:*")
-        if keys:
-            r.delete(*keys)
+        self._clean_micro_cache()
 
         mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
             *args, **kwargs
@@ -2885,14 +2894,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(params, 0, "filter + text query")
         # fetch_es_results is called this time; the cache is not used.
         self.assertEqual(mock_fetch_es.call_count, 5)
-        cache.clear()
+        self._clean_micro_cache()
 
     @override_settings(
         SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
     )
+    @mock.patch(
+        "cl.lib.search_utils.get_micro_cache_key",
+        return_value="search_results_cache_test:",
+    )
     @mock.patch("cl.lib.search_utils.fetch_es_results")
     async def test_search_micro_cache_ignore_invalid_params(
-        self, mock_fetch_es
+        self, mock_fetch_es, mock_cache_key
     ) -> None:
         """Confirm that invalid search parameters are ignored when caching a
         Search Frontend request.
@@ -2901,10 +2914,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
             *args, **kwargs
         )
-        r = get_redis_interface("CACHE")
-        keys = r.keys(":1:search_results_cache:*")
-        if keys:
-            r.delete(*keys)
+        self._clean_micro_cache()
 
         # Initial request.
         search_params = {
@@ -2938,7 +2948,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             mock_fetch_es.call_count, 1, "Wrong number of query calls."
         )
-        cache.clear()
+        self._clean_micro_cache()
 
     def test_uses_exact_version_for_case_name_field(self) -> None:
         """Confirm that stemming and synonyms are disabled on the case_name
@@ -4412,6 +4422,13 @@ class RECAPSearchAPIV4Test(
             index_docket_parties_in_es.delay(cls.de_api.docket.pk)
 
     @staticmethod
+    def _clean_micro_cache():
+        r = get_redis_interface("CACHE")
+        keys = r.keys(":1:search_results_cache_api_test:*")
+        if keys:
+            r.delete(*keys)
+
+    @staticmethod
     def mock_merge_unavailable_fields_on_parent_document(*args, **kwargs):
         """Mock function that first deletes a specific RECAPDocument
         and then calls the original merge function with the provided arguments.
@@ -5554,17 +5571,20 @@ class RECAPSearchAPIV4Test(
         SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_API_MICRO_CACHE_ENABLED=True
     )
     @mock.patch(
+        "cl.search.api_utils.get_micro_cache_key",
+        return_value="search_results_cache_api_test:",
+    )
+    @mock.patch(
         "cl.search.api_utils.CursorESList.perform_es_query",
         autospec=True,
         wraps=CursorESList.perform_es_query,
     )
-    def test_recap_micro_cache_for_search_api(self, mock_es_query) -> None:
+    def test_recap_micro_cache_for_search_api(
+        self, mock_es_query, mock_cache_key
+    ) -> None:
         """Assert micro-cache for search API results behaves properly."""
 
-        r = get_redis_interface("CACHE")
-        keys = r.keys(":1:search_results_cache_api:*")
-        if keys:
-            r.delete(*keys)
+        self._clean_micro_cache()
 
         with self.captureOnCommitCallbacks(execute=True):
             docket_0 = DocketFactory(
@@ -5697,10 +5717,14 @@ class RECAPSearchAPIV4Test(
             docket_1.delete()
             docket.delete()
 
-        cache.clear()
+        self._clean_micro_cache()
 
     @override_settings(
         SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_API_MICRO_CACHE_ENABLED=True
+    )
+    @mock.patch(
+        "cl.search.api_utils.get_micro_cache_key",
+        return_value="search_results_cache_api_test:",
     )
     @mock.patch(
         "cl.search.api_utils.CursorESList.perform_es_query",
@@ -5708,15 +5732,12 @@ class RECAPSearchAPIV4Test(
         wraps=CursorESList.perform_es_query,
     )
     def test_search_micro_cache_ignore_invalid_params(
-        self, mock_es_query
+        self, mock_es_query, mock_cache_key
     ) -> None:
         """Confirm that invalid search parameters are ignored when caching a
         Search API request.
         """
-        r = get_redis_interface("CACHE")
-        keys = r.keys(":1:search_results_cache_api:*")
-        if keys:
-            r.delete(*keys)
+        self._clean_micro_cache()
 
         # Initial request.
         search_params = {
@@ -5757,8 +5778,7 @@ class RECAPSearchAPIV4Test(
         self.assertEqual(
             mock_es_query.call_count, 1, "Wrong number of query calls."
         )
-
-        cache.clear()
+        self._clean_micro_cache()
 
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_more_docs_field(self) -> None:
