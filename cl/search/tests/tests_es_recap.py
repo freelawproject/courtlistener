@@ -2887,6 +2887,59 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(mock_fetch_es.call_count, 5)
         cache.clear()
 
+    @override_settings(
+        SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
+    )
+    @mock.patch("cl.lib.search_utils.fetch_es_results")
+    async def test_search_micro_cache_ignore_invalid_params(
+        self, mock_fetch_es
+    ) -> None:
+        """Confirm that invalid search parameters are ignored when caching a
+        Search Frontend request.
+        """
+
+        mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
+            *args, **kwargs
+        )
+        r = get_redis_interface("CACHE")
+        keys = r.keys(":1:search_results_cache:*")
+        if keys:
+            r.delete(*keys)
+
+        # Initial request.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = await self._test_article_count(
+            search_params, 2, "filter + text query"
+        )
+        self.assertEqual(
+            mock_fetch_es.call_count, 1, "Wrong number of query calls."
+        )
+
+        # Same request with an additional invalid parameter.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "fake_param": "fake",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = await self._test_article_count(
+            search_params, 2, "filter + text query"
+        )
+        # The request ignores the invalid parameter, so the cache key remains the same
+        # and the response is retrieved from the cache.
+        self.assertEqual(
+            mock_fetch_es.call_count, 1, "Wrong number of query calls."
+        )
+        cache.clear()
+
     def test_uses_exact_version_for_case_name_field(self) -> None:
         """Confirm that stemming and synonyms are disabled on the case_name
         filter and text query.
@@ -5643,6 +5696,67 @@ class RECAPSearchAPIV4Test(
             docket_0.delete()
             docket_1.delete()
             docket.delete()
+
+        cache.clear()
+
+    @override_settings(
+        SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_API_MICRO_CACHE_ENABLED=True
+    )
+    @mock.patch(
+        "cl.search.api_utils.CursorESList.perform_es_query",
+        autospec=True,
+        wraps=CursorESList.perform_es_query,
+    )
+    def test_search_micro_cache_ignore_invalid_params(
+        self, mock_es_query
+    ) -> None:
+        """Confirm that invalid search parameters are ignored when caching a
+        Search API request.
+        """
+        r = get_redis_interface("CACHE")
+        keys = r.keys(":1:search_results_cache_api:*")
+        if keys:
+            r.delete(*keys)
+
+        # Initial request.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(
+            mock_es_query.call_count, 1, "Wrong number of query calls."
+        )
+
+        # Same request with an additional invalid parameter.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "fake_param": "fake",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        # The request ignores the invalid parameter, so the cache key remains the same
+        # and the response is retrieved from the cache.
+        self.assertEqual(
+            len(r.data["results"]),
+            2,
+        )
+        self.assertEqual(
+            mock_es_query.call_count, 1, "Wrong number of query calls."
+        )
 
         cache.clear()
 

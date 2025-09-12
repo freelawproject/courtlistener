@@ -343,12 +343,14 @@ class CursorESList:
         boolean indicating whether this is a cached response.
         """
 
-        get_params_for_cache = self.request.GET.copy()
-        get_params_for_cache.pop("cursor", None)
+        clean_params_for_cache = self.clean_data.copy()
+        # Set the default page value if the page parameter is missing.
+        # Set it to 1 to generate the same hash for page 1,
+        # regardless of whether the page parameter is included.
         page_int = self.page_int if self.page_int is not None else 1
-        get_params_for_cache["page"] = page_int
+        clean_params_for_cache["page"] = page_int
         results_dict_cached, micro_cache_key = retrieve_cached_search_results(
-            get_params_for_cache, "search_results_cache_api:"
+            clean_params_for_cache, "search_results_cache_api:"
         )
         if results_dict_cached:
             # Return results from cache.
