@@ -3188,10 +3188,13 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     case_name_short = llm_response.case_name_short or obj.case_name_short
 
     # Check if any of the values changed before updating the cluster
-    changed = (
-        obj.case_name_short != case_name_short
-        or obj.case_name_full != case_name_full
-        or obj.case_name != case_name
+    changed = any(
+        new_val not in (None, "") and old_val != new_val
+        for old_val, new_val in [
+            (obj.case_name_short, case_name_short),
+            (obj.case_name_full, case_name_full),
+            (obj.case_name, case_name),
+        ]
     )
 
     if changed:
