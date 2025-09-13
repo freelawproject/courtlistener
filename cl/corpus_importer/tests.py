@@ -19,6 +19,7 @@ from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
 from openai import RateLimitError
+from pydantic import ValidationError
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
@@ -34,6 +35,7 @@ from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
+from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
@@ -72,7 +74,7 @@ from cl.corpus_importer.signals import (
     update_latest_case_id_and_schedule_iquery_sweep,
 )
 from cl.corpus_importer.tasks import (
-    classify_opinion_case_name_task,
+    classify_case_name_by_llm,
     generate_ia_json,
     get_and_save_free_document_report,
     probe_or_scrape_iquery_pages,
@@ -3952,15 +3954,15 @@ class LlmTest(TestCase):
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
 
-        cls.valid_response = {
-            "is_opinion": True,
-            "case_name_short": "Carrecter",
-            "case_name": "'Carrecter v. Herri",
-            "case_name_full": "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
-            "case_name_match": True,
-            "needs_ocr": False,
-            "error": None,
-        }
+        cls.valid_response = CaseNameExtractionResponse(
+            is_opinion=True,
+            case_name_short="Carrecter",
+            case_name="'Carrecter v. Herri",
+            case_name_full="JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+            case_name_match=True,
+            needs_ocr=False,
+            error=None,
+        )
 
     @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "123"}, clear=True)
     @mock.patch("cl.corpus_importer.tasks.call_llm")
@@ -3968,12 +3970,10 @@ class LlmTest(TestCase):
         self, mock_call_llm
     ):
         """Verifies that the classify_opinion_case_name_task updates OpinionCluster fields correctly"""
-        mock_response = json.dumps(self.valid_response)
-        mock_call_llm.return_value = mock_response
+        # mock_response = json.dumps(self.valid_response)
+        mock_call_llm.return_value = self.valid_response
 
-        classify_opinion_case_name_task(
-            self.opinion_cluster.pk, self.recap_doc.pk
-        )
+        classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
 
         self.opinion_cluster.refresh_from_db()
 
@@ -3984,7 +3984,7 @@ class LlmTest(TestCase):
 
     @mock.patch("cl.corpus_importer.tasks.call_llm")
     @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "123"}, clear=True)
-    @mock.patch.object(classify_opinion_case_name_task, "retry", autospec=True)
+    @mock.patch.object(classify_case_name_by_llm, "retry", autospec=True)
     def test_classify_opinion_case_name_task_retries_on_ratelimit(
         self, mock_retry, mock_call_llm
     ):
@@ -4002,7 +4002,7 @@ class LlmTest(TestCase):
             RateLimitError(
                 "Rate limit exceeded", response=mock_response, body=error_body
             ),
-            json.dumps(self.valid_response),
+            self.valid_response,
         ]
 
         def call_llm_side_effect(*args, **kwargs):
@@ -4018,7 +4018,7 @@ class LlmTest(TestCase):
 
         with self.assertRaises(Retry):
             # expected retry exception
-            classify_opinion_case_name_task(
+            classify_case_name_by_llm(
                 self.opinion_cluster.pk, self.recap_doc.pk
             )
 
@@ -4027,14 +4027,44 @@ class LlmTest(TestCase):
         # After retry exception, manually call the task again with successful mock response
         # to simulate the retry handling completing successfully.
         mock_call_llm.side_effect = None
-        mock_call_llm.return_value = json.dumps(self.valid_response)
+        mock_call_llm.return_value = self.valid_response
 
-        classify_opinion_case_name_task(
-            self.opinion_cluster.pk, self.recap_doc.pk
-        )
+        classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
         self.opinion_cluster.refresh_from_db()
 
         self.assertEqual(
             self.opinion_cluster.case_name_full,
             "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.call_llm")
+    @mock.patch("cl.corpus_importer.tasks.logger")
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "123"}, clear=True)
+    def test_classify_case_name_by_llm_handles_validation_error(
+        self, mock_logger, mock_call_llm
+    ):
+        """Test that classify_case_name_by_llm catches Pydantic ValidationError from call_llm and handles it correctly
+        by logging and returning without an exception
+        """
+
+        mock_call_llm.side_effect = ValidationError.from_exception_data(
+            "Invalid data", line_errors=[]
+        )
+
+        result = classify_case_name_by_llm(
+            self.opinion_cluster.pk, self.recap_doc.pk
+        )
+
+        self.assertIsNone(result)
+
+        # Logger.error should have been called at least once with validation error message
+        mock_logger.error.assert_called()
+        called_messages = [
+            args[0] for args, _ in mock_logger.error.call_args_list
+        ]
+        self.assertTrue(
+            any(
+                "validation error" in message.lower()
+                for message in called_messages
+            )
         )

@@ -57,6 +57,7 @@ from openai import (
     InternalServerError,
     RateLimitError,
 )
+from pydantic import ValidationError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
 from requests.exceptions import (
@@ -77,6 +78,9 @@ from cl.citations.tasks import (
 )
 from cl.citations.utils import filter_out_non_case_law_citations
 from cl.corpus_importer.api_serializers import IADocketSerializer
+from cl.corpus_importer.llm_models import CaseNameExtractionResponse
+from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
+from cl.corpus_importer.prompts.user import CASE_NAME_EXTRACT_USER
 from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
@@ -90,7 +94,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry
-from cl.lib.llm import call_llm, load_prompt_cached, parse_llm_json
+from cl.lib.llm import call_llm
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import (
     get_blocked_status,
@@ -3063,7 +3067,7 @@ def recap_document_into_opinions(
         )
 
     # Update case name using llm
-    classify_opinion_case_name_task.delay(cluster.pk, recap_document_id)
+    classify_case_name_by_llm.delay(cluster.pk, recap_document_id)
 
     if not skip_citation_finding:
         find_citations_and_parentheticals_for_opinion_by_pks.delay(
@@ -3087,7 +3091,7 @@ def recap_document_into_opinions(
     ),
     retry_kwargs={"max_retries": 5},
 )
-def classify_opinion_case_name_task(self, pk: int, recap_document_id: int):
+def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     """Use LLM to extract and verify the correct case name for an opinion ingested from Recap
 
     This task fetches an OpinionCluster instance, extracts the first 2000 characters of the first
@@ -3103,17 +3107,19 @@ def classify_opinion_case_name_task(self, pk: int, recap_document_id: int):
     :param recap_document_id: RECAPDocument id
     """
 
-    system_prompt_path = (
-        "cl/corpus_importer/prompts/case_name_extract_system.txt"
-    )
-    user_prompt_path = "cl/corpus_importer/prompts/case_name_extract_user.txt"
+    system_prompt = CASE_NAME_EXTRACT_SYSTEM
+    user_prompt = CASE_NAME_EXTRACT_USER
 
     try:
-        obj = OpinionCluster.objects.get(pk=pk)
+        obj = (
+            OpinionCluster.objects.select_related("docket")
+            .prefetch_related("sub_opinions")
+            .get(pk=pk)
+        )
     except OpinionCluster.DoesNotExist:
         return
 
-    sub_opinion = obj.sub_opinions.first()
+    sub_opinion = obj.sub_opinions.all().first()
     if not sub_opinion or not sub_opinion.plain_text:
         return
     plain_text = sub_opinion.plain_text[:2000]
@@ -3123,52 +3129,58 @@ def classify_opinion_case_name_task(self, pk: int, recap_document_id: int):
 
     user_message = f"{plain_text}\n\n DOCKET TITLE: `{docket_name}`"
 
-    system_prompt = load_prompt_cached(system_prompt_path)
-    user_prompt = load_prompt_cached(user_prompt_path)
     try:
-        response_text = call_llm(system_prompt, user_prompt, user_message)
-    except Exception as e:
-        # Only expect to get openai exceptions here to track them
-        capture_exception(e)
-        raise
-    llm_response = parse_llm_json(response_text)
-
-    if llm_response is None:
-        logger.warning(
-            "Something failed with llm response for cluster_id: %s and recap_document_id: %s",
+        llm_response = call_llm(
+            system_prompt,
+            user_prompt,
+            user_message,
+            response_model=CaseNameExtractionResponse,
+        )
+    except ValidationError as e:
+        logger.error(
+            "LLM response validation error for cluster_id=%s, recap_document_id=%s",
             pk,
             recap_document_id,
+            extra={
+                "validation_errors": e.errors(),
+                "fingerprint": ["llm-casenames-validation-error"],
+            },
+        )
+        return
+    except Exception as e:
+        # Only expect to get instructr exceptions here to track them
+        capture_exception(e)
+        raise
+
+    if llm_response.needs_ocr:
+        llm_response["recap_document_id"] = recap_document_id
+        logger.error(
+            "Probably recap document needs OCR", llm_response.model_dump()
         )
         return
 
-    llm_case_name_match = llm_response.get("case_name_match", False)
-    case_name = (
-        llm_response.get("case_name")
-        if llm_case_name_match
-        else docket.case_name
-    )
-    case_name_full = (
-        llm_response.get("case_name_full")
-        if llm_case_name_match
-        else docket.case_name_full
-    )
-    case_name_short = (
-        llm_response.get("case_name_short")
-        if llm_case_name_match
-        else docket.case_name_short
-    )
-    error_detected = llm_response.get("error", None)
-    needs_ocr = llm_response.get("needs_ocr", False)
-
-    if needs_ocr:
-        llm_response["recap_document_id"] = recap_document_id
-        logger.warning("Probably recap document needs OCR", llm_response)
+    if llm_response.error:
+        logger.error(
+            "LLM error for cluster_id=%s, recap_document_id=%s: %s",
+            pk,
+            recap_document_id,
+            llm_response.error,
+            extra={
+                "error_detail": llm_response.error,
+                "raw_response": llm_response.model_dump(),
+                "fingerprint": ["llm-casenames-llm-error"],
+            },
+        )
         return
 
-    if not llm_case_name_match:
+    if not llm_response.case_name_match:
         # The name of the docket case and the opinion do not necessarily match, we log it for manual review
         llm_response["recap_document_id"] = recap_document_id
-        logger.warning("Case name did not match", llm_response)
+        logger.error("Case name did not match", llm_response.model_dump())
+
+    case_name = llm_response.case_name or obj.case_name
+    case_name_full = llm_response.case_name_full or obj.case_name_full
+    case_name_short = llm_response.case_name_short or obj.case_name_short
 
     # Check if any of the values changed before updating the cluster
     changed = (
@@ -3177,7 +3189,7 @@ def classify_opinion_case_name_task(self, pk: int, recap_document_id: int):
         or obj.case_name != case_name
     )
 
-    if not error_detected or not needs_ocr and changed:
+    if changed:
         with transaction.atomic():
             obj.case_name_short = case_name_short
             obj.case_name_full = case_name_full
