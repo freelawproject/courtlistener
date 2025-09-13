@@ -3152,6 +3152,11 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         capture_exception(e)
         raise
 
+    if not isinstance(llm_response, CaseNameExtractionResponse):
+        # Added this to avoid mypy errors
+        logger.error("Invalid llm_response type: %s", type(llm_response))
+        return
+
     if llm_response.needs_ocr:
         llm_response["recap_document_id"] = recap_document_id
         logger.error(
