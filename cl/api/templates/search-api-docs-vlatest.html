@@ -260,7 +260,9 @@
 
 
   <h2 id="monitoring">Monitoring a Query for New&nbsp;Results</h2>
-  <p>To monitor queries for new results, use the <a href="{% url "search_api_help" %}">Alert API</a>, which will send emails or webhook events when there are new results.
+  <p>All query results are cached for ten minutes. This provides instant responses to front-end users who frequently refresh or paginate results.
+  </p>
+  <p>Because of this, we do not recommend polling as a mechanism for monitoring queries for new results. Instead, use the <a href="{% url "search_api_help" %}">Alert API</a>, which will send emails or <a href="{% url "webhooks_docs" %}">webhook events</a> when there are new hits.
   </p>
 
   {% include "includes/donate_footer_plea.html" %}
