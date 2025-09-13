@@ -1,3 +1,4 @@
+CASE_NAME_EXTRACT_USER = """
 You are given the first page of text of a legal document.
 
 Your tasks:
@@ -8,7 +9,7 @@ Your tasks:
        * remove new lines
        * remove excess whitespace
        * convert all versus indicators (vs., versus, -against-) to "v."
-   - case_name_short: one or two words, taken from the non-governmental party if possible (e.g., defendant’s surname or company name).  Case Name Short should enver be shortened to a single Intial. like G.
+   - case_name_short: one or two words, taken from the non-governmental party if possible (e.g., defendant’s surname or company name).  Case Name Short should never be shortened to a single Initial. like G.
        * case_name_short Should also not use Commissioners, or other government officials.  If unsure leave it blank
      Do not return "United States", "State", "People", "Attorney General", or other governmental names as the short.
 
@@ -49,3 +50,4 @@ RETURN JSON only in the exact schema:
   "needs_ocr": bool,
   "error": string | null
 }
+"""
