@@ -15,7 +15,7 @@
     --desktop-header-filters-height: calc(100svh - var(--desktop-header-height));
     --mobile-dialog-header-height: theme(spacing.18);
     --mobile-dialog-panel-height: calc(100vh - var(--mobile-dialog-header-height));
-    --content-max-width: 1200px;
+    --content-max-width: 1280px;
   }
   code {
     @apply font-sans text-sm bg-brand-100 text-brand-600 border border-brand-300 rounded-[2px] px-1;
