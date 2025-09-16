@@ -980,7 +980,9 @@ class UpdateFromTextCommandTest(TestCase):
             ),
             plain_text="""Docket Number: 2020-12
             Disposition: Affirmed
-            2020 VT 11""",
+            2020 VT 11
+            Originating Court Docket Number: 18-2222
+            """,
         )
         self.opinion_2020_unpub = OpinionFactory(
             cluster=OpinionClusterFactory(
@@ -1078,6 +1080,11 @@ class UpdateFromTextCommandTest(TestCase):
             self.opinion_2020_unpub.cluster.docket.docket_number,
             "13",
             "Unpublished docket should not be modified",
+        )
+        self.assertEqual(
+            self.opinion_2020.cluster.docket.originating_court_information.docket_number,
+            "18-2222",
+            "Originating Court Information was not created",
         )
 
 
@@ -1677,7 +1684,9 @@ class DeleteDuplicatesTest(TestCase):
         - abort deletion if something doesn't match
         """
         stats = defaultdict(lambda: 0)
-        delete_duplicates.delete_same_hash_duplicates(stats)
+        delete_duplicates.delete_same_hash_duplicates(
+            stats, [SOURCES.COURT_WEBSITE]
+        )
 
         try:
             self.should_delete.refresh_from_db()

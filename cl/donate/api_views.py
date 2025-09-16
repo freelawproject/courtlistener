@@ -1,5 +1,7 @@
+import datetime
 from collections import defaultdict
 from http import HTTPStatus
+from typing import Any
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
@@ -7,12 +9,18 @@ from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F
 from django.http import HttpResponse
+from django.utils.timezone import now
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from cl.donate.api_permissions import AllowNeonWebhook
-from cl.donate.models import NeonMembership, NeonWebhookEvent
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonWebhookEvent,
+)
+from cl.lib.crypto import sha1_activation_key
 from cl.lib.neon_utils import NeonClient
 from cl.lib.types import EmailType
 from cl.users.utils import (
@@ -56,10 +64,10 @@ class MembershipWebhookViewSet(
         self._store_webhook_payload(webhook_data)
         with transaction.atomic():
             match webhook_data["eventTrigger"]:
-                case (
-                    "createMembership" | "editMembership" | "updateMembership"
-                ):
-                    self._handle_membership_creation_or_update(webhook_data)
+                case "createMembership":
+                    self._handle_membership_creation(webhook_data)
+                case "editMembership" | "updateMembership":
+                    self._handle_membership_update(webhook_data)
                 case "deleteMembership":
                     self._handle_membership_deletion(webhook_data)
                 case _:
@@ -159,9 +167,8 @@ class MembershipWebhookViewSet(
 
         return user
 
-    def _get_membership_data(
-        self, webhook_data: dict[str, str]
-    ) -> dict[str, str]:
+    @staticmethod
+    def _get_membership_data(webhook_data: dict[str, Any]) -> dict[str, str]:
         """
         Extracts relevant membership information from a Neon webhook payload.
 
@@ -178,6 +185,7 @@ class MembershipWebhookViewSet(
             - termEndDate: The date the membership is scheduled to terminate
             - membershipName: The name of the membership level the user is
             enrolled in.
+            - paymentStatus: The current payment status for the membership.
         """
         # checks whether the webhook payloads match the expected schema defined
         # in the documentation
@@ -196,17 +204,24 @@ class MembershipWebhookViewSet(
                 "membershipName": data["membershipLevel"]["name"],
             }
 
+        payment_status = (
+            data.get("payments")[0].get("paymentStatus", "").lower()
+            if data.get("payments", [])
+            else ""
+        )
         membership.update(
             {
                 "accountId": data["accountId"],
                 "termEndDate": data["termEndDate"],
                 "status": data["status"].lower(),
+                "paymentStatus": payment_status,
             }
         )
 
         return membership
 
-    def _map_trigger_value(self, trigger_event: str) -> int:
+    @staticmethod
+    def _map_trigger_value(trigger_event: str) -> int:
         """
         Maps a string trigger event received from a Neon webhook to the
         corresponding integer value representing the trigger event type in
@@ -232,6 +247,29 @@ class MembershipWebhookViewSet(
 
         return trigger
 
+    @staticmethod
+    def _map_payment_status_value(status: str) -> int:
+        """
+        Maps a payment status string into its corresponding
+        integer value defined in the `MembershipPaymentStatus` class.
+
+        Args:
+            status (str): The payment status string (e.g., "succeeded", "failed").
+
+        Returns:
+            int: The mapped constant value from `MembershipPaymentStatus`.
+                Defaults to `PENDING` for unrecognized values.
+        """
+        match status:
+            case "succeeded":
+                payment_status = MembershipPaymentStatus.SUCCEEDED
+            case "failed":
+                payment_status = MembershipPaymentStatus.FAILED
+            case _:
+                payment_status = MembershipPaymentStatus.PENDING
+
+        return payment_status
+
     def _store_webhook_payload(self, webhook_data) -> None:
         trigger = self._map_trigger_value(webhook_data["eventTrigger"])
         if trigger != NeonWebhookEvent.MEMBERSHIP_DELETE:
@@ -245,20 +283,50 @@ class MembershipWebhookViewSet(
             trigger=trigger,
         )
 
-    def _handle_membership_creation_or_update(self, webhook_data) -> None:
+    def _handle_membership_update(self, webhook_data) -> None:
         membership_data = self._get_membership_data(webhook_data)
-        if membership_data["status"] not in ["succeeded", "succeed"]:
+        membership_query = NeonMembership.objects.filter(
+            neon_id=membership_data["membershipId"]
+        )
+        if not membership_query.exists():
+            # Prevents an existing membership from being overwritten by data
+            # from an updateMembership webhook that's either from a previous
+            # membership or one that doesn't exist in our database.
+            #
+            # The updateMembership is triggered when a membership upgrade
+            # occurs. Its payload contains the details of the previous
+            # membership record, but with an updated 'termEndDate' field.
+            #
+            # During the upgrade process, a createMembership webhook is also
+            # triggered, and both requests are sent almost simultaneously.
+            # However, we are skipping this webhooks to avoid data integrity
+            # issues.
+            #
+            # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
             return None
+
+        membership_level = NeonMembership.TYPES_INVERTED[
+            membership_data["membershipName"]
+        ]
+        payment_status = self._map_payment_status_value(
+            membership_data["paymentStatus"]
+        )
+
+        neon_membership = membership_query.first()
+        neon_membership.level = membership_level
+        neon_membership.termination_date = membership_data["termEndDate"]
+        neon_membership.payment_status = payment_status
+        neon_membership.save()
+
+    def _handle_membership_creation(self, webhook_data) -> None:
+        membership_data = self._get_membership_data(webhook_data)
         user = self._get_member_record(membership_data["accountId"])
         membership_level = NeonMembership.TYPES_INVERTED[
             membership_data["membershipName"]
         ]
 
         if membership_level == NeonMembership.EDU:
-            is_valid_edu_account = (
-                user.profile.email_confirmed and user.email.endswith(".edu")
-            )
-            if not is_valid_edu_account:
+            if not user.email.endswith(".edu"):
                 email: EmailType = emails["not_valid_edu_account"]
                 send_mail(
                     email["subject"],
@@ -267,6 +335,36 @@ class MembershipWebhookViewSet(
                     [user.email],
                 )
                 return None
+
+            if not user.profile.email_confirmed:
+                if user.profile.stub_account:
+                    email: EmailType = emails["not_edu_account_in_system"]
+                    send_mail(
+                        email["subject"],
+                        email["body"],
+                        email["from_email"],
+                        [user.email],
+                    )
+                else:
+                    # Build and save a new activation key for the account.
+                    up = user.profile
+                    activation_key = sha1_activation_key(user.username)
+                    key_expires = now() + datetime.timedelta(5)
+                    up.activation_key = activation_key
+                    up.key_expires = key_expires
+                    up.save()
+
+                    email: EmailType = emails["not_confirmed_edu_account"]
+                    send_mail(
+                        email["subject"],
+                        email["body"] % (up.activation_key),
+                        email["from_email"],
+                        [user.email],
+                    )
+
+        payment_status = self._map_payment_status_value(
+            membership_data["paymentStatus"]
+        )
 
         try:
             neon_membership = user.membership
@@ -278,30 +376,17 @@ class MembershipWebhookViewSet(
                     membership_data["membershipName"]
                 ],
                 termination_date=membership_data["termEndDate"],
+                payment_status=payment_status,
             )
         else:
-            if webhook_data["eventTrigger"] != "updateMembership":
-                neon_membership.neon_id = membership_data["membershipId"]
-            elif neon_membership.neon_id != membership_data["membershipId"]:
-                # The membership record was previously updated and we should
-                # ignore this webhook notification.
-                #
-                # The updateMembership is triggered when a membership upgrade
-                # occurs. Its payload contains the details of the previous
-                # membership record, but with an updated 'termEndDate' field.
-                #
-                # During the upgrade process, a createMembership webhook is also
-                # triggered, and both requests are sent almost simultaneously.
-                # However, we are skipping this webhooks to avoid data integrity
-                # issues.
-                #
-                # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
-                return None
+            neon_membership.neon_id = membership_data["membershipId"]
             neon_membership.level = membership_level
             neon_membership.termination_date = membership_data["termEndDate"]
+            neon_membership.payment_status = payment_status
             neon_membership.save()
 
-    def _handle_membership_deletion(self, webhook_data) -> None:
+    @staticmethod
+    def _handle_membership_deletion(webhook_data) -> None:
         membership_data = webhook_data["data"]["membership"]
         try:
             neon_membership = NeonMembership.objects.get(

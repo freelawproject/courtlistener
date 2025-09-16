@@ -1,0 +1,37 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+
+    {% if has_blocking %}
+
+        <p>The cluster <strong>{{ cluster }}</strong> contains the following blocking related items that prevent sealing:
+        </p>
+
+        <ul>
+            {% for label, items in blocking_relations.items %}
+                {% if items.exists %}
+                    <li><strong>{{ label }} ({{ items.count }})</strong>
+                        <ul>
+                            {% for item in items %}
+                                <li>
+                                    {% if item.admin_url %}
+                                        <a href="{{ item.admin_url }}">{{ item }}</a>
+                                    {% else %}
+                                        {{ item }}
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+
+        <p>Please remove or reassign these objects before attempting to seal the cluster.</p>
+
+    {% else %}
+        <p>The cluster <strong>{{ cluster }}</strong> doesn't contains blocking related items that would prevent sealing.
+        </p>
+    {% endif %}
+
+{% endblock %}

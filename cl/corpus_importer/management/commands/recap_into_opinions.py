@@ -77,21 +77,29 @@ def import_opinions_from_recap(
                 is_available=True,
                 is_free_on_pacer=True,
             )
-            .only("id")
+            .only("id", "sha1")
+            .values_list("id", "sha1")
             .order_by("id")
         )
 
+        seen_sha1 = set()
         throttle = CeleryThrottle(queue_name=queue)
-        for recap_document in recap_documents.iterator():
+        for recap_document_id, sha1 in recap_documents.iterator():
+            if sha1 in seen_sha1:
+                logger.info("Skipping repeated hash %s", sha1)
+                continue
+
             logger.info(
-                f"{count}: Importing rd {recap_document.id} in {court.id}"
+                f"{count}: Importing rd {recap_document_id} in {court.id}"
             )
             throttle.maybe_wait()
             recap_document_into_opinions.apply_async(
-                args=[{}, recap_document.id, skip_citation_finding],
+                args=[{}, recap_document_id, skip_citation_finding],
                 queue=queue,
             )
+            seen_sha1.add(sha1)
             count += 1
+
             if total_count > 0 and count >= total_count:
                 logger.info(
                     f"RECAP import completed for {total_count} documents"
