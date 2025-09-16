@@ -18,6 +18,7 @@ from cl.donate.api_permissions import AllowNeonWebhook
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
+    NeonMembershipLevel,
     NeonWebhookEvent,
 )
 from cl.lib.crypto import sha1_activation_key
@@ -305,7 +306,7 @@ class MembershipWebhookViewSet(
             # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
             return None
 
-        membership_level = NeonMembership.TYPES_INVERTED[
+        membership_level = NeonMembershipLevel.TYPES_INVERTED[
             membership_data["membershipName"]
         ]
         payment_status = self._map_payment_status_value(
@@ -321,11 +322,11 @@ class MembershipWebhookViewSet(
     def _handle_membership_creation(self, webhook_data) -> None:
         membership_data = self._get_membership_data(webhook_data)
         user = self._get_member_record(membership_data["accountId"])
-        membership_level = NeonMembership.TYPES_INVERTED[
+        membership_level = NeonMembershipLevel.TYPES_INVERTED[
             membership_data["membershipName"]
         ]
 
-        if membership_level == NeonMembership.EDU:
+        if membership_level == NeonMembershipLevel.EDU:
             if not user.email.endswith(".edu"):
                 email: EmailType = emails["not_valid_edu_account"]
                 send_mail(
@@ -372,7 +373,7 @@ class MembershipWebhookViewSet(
             NeonMembership.objects.create(
                 user=user,
                 neon_id=membership_data["membershipId"],
-                level=NeonMembership.TYPES_INVERTED[
+                level=NeonMembershipLevel.TYPES_INVERTED[
                     membership_data["membershipName"]
                 ],
                 termination_date=membership_data["termEndDate"],

@@ -33,7 +33,11 @@ from cl.alerts.utils import (
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.api.utils import get_webhook_deprecation_date
-from cl.donate.models import MembershipPaymentStatus, NeonMembership
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
+)
 from cl.lib.date_time import midnight_pt
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
@@ -100,13 +104,13 @@ class RECAPAlertsSweepIndexTest(
 
             cls.user_profile = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY,
+                level=NeonMembershipLevel.LEGACY,
                 user=cls.user_profile.user,
                 payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
             cls.user_profile_2 = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY,
+                level=NeonMembershipLevel.LEGACY,
                 user=cls.user_profile_2.user,
                 payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
@@ -2708,7 +2712,7 @@ class RECAPAlertsPercolatorTest(
 
             cls.user_profile = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY,
+                level=NeonMembershipLevel.LEGACY,
                 user=cls.user_profile.user,
                 payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
@@ -2720,7 +2724,7 @@ class RECAPAlertsPercolatorTest(
             )
             cls.user_profile_2 = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY,
+                level=NeonMembershipLevel.LEGACY,
                 user=cls.user_profile_2.user,
                 payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
