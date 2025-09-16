@@ -11,10 +11,9 @@ from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import connections
 from lxml import html
-from waffle.testutils import override_flag
 
 from cl.alerts.models import Alert
-from cl.alerts.utils import percolate_es_document
+from cl.alerts.utils import add_cutoff_timestamp_filter, percolate_es_document
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import (
@@ -57,11 +56,11 @@ class OASearchAPICommonTests(AudioESTestCase):
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -113,7 +112,7 @@ class OASearchAPICommonTests(AudioESTestCase):
         )
         self.assertTrue(
             r.content.decode().index("Jose")
-            > r.content.decode().index("Hong Liu"),
+            < r.content.decode().index("Hong Liu"),
             msg="'Jose' should come AFTER 'Hong Liu' when order_by relevance.",
         )
 
@@ -273,9 +272,9 @@ class OASearchAPICommonTests(AudioESTestCase):
         )
         self.assertTrue(
             r.content.decode().index("Jose")
-            > r.content.decode().index("Hong Liu Lorem")
+            < r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Hong Liu Yang"),
-            msg="'Jose' should come AFTER 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
+            msg="'Jose' should come Before 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
         )
 
     @skip_if_common_tests_skipped
@@ -394,9 +393,10 @@ class OAV3SearchAPITests(
         """Confirm fields in V3 ES Oral Arguments Search API results."""
         mock_date = now()
         print("Mock date", mock_date)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             audio_1 = AudioFactory.create(
                 case_name="United States v. Lee ",
                 case_name_full="a_random_title",
@@ -519,11 +519,11 @@ class OAV4SearchAPITests(
         self.assertEqual(
             got,
             expected_count,
-            msg="Did not get the right number of search results in API with %s "
+            msg=f"Did not get the right number of search results in API with {field_name} "
             "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
         )
         return r
 
@@ -559,9 +559,10 @@ class OAV4SearchAPITests(
         """Confirm  empty fields values in V4 OA Search API results."""
 
         mock_date = now().replace(day=15, hour=0)
-        with time_machine.travel(
-            mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             docket = DocketFactory.create(
                 docket_number="",
                 court_id=self.court_1.pk,
@@ -983,14 +984,14 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     @staticmethod
     def save_percolator_query(cd):
         search_query = AudioDocument.search()
+        # Sorting key is not required in percolator queries.
+        del cd["order_by"]
         es_queries = build_es_base_query(search_query, cd)
-        search_query = es_queries.search_query
-        query_dict = search_query.to_dict()["query"]
         percolator_query = AudioPercolator(
-            percolator_query=query_dict, rate=Alert.REAL_TIME
+            percolator_query=es_queries.search_query.to_dict()["query"],
+            rate=Alert.REAL_TIME,
         )
         percolator_query.save(refresh=True)
-
         return percolator_query.meta.id
 
     @staticmethod
@@ -1052,9 +1053,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Jose")
-            > r.content.decode().index("Hong Liu"),
-            msg="'Jose' should come AFTER 'Hong Liu' when order_by relevance.",
+            r.content.decode().index("Jose")  # 2015, 8, 15
+            < r.content.decode().index("Hong Liu"),  # 2015, 8, 14
+            msg="'Jose' should come Before 'Hong Liu' when order_by relevance.",
         )
 
     def test_oa_results_search_match_phrase(self) -> None:
@@ -1234,7 +1235,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
     def test_oa_docket_number_filtering(self) -> None:
@@ -1254,9 +1255,114 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "docket number. Expected %s, but got %s." % (expected, actual),
+            f"docket number. Expected {expected}, but got {actual}.",
         )
         self.assertIn("SEC", r.content.decode())
+
+        # Filter by docket_number containing repeated numbers like: 1:21-bk-0021
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = DocketFactory.create(
+                docket_number="1:21-bk-0021",
+                court_id=self.court_1.pk,
+                date_argued=datetime.date(2013, 8, 14),
+            )
+            AudioFactory.create(
+                case_name="Lorem Ipsum",
+                docket_id=docket.pk,
+                duration=420,
+                local_path_original_file="test/audio/ander_v._leo.mp3",
+                local_path_mp3=self.filepath_local,
+                sha1="a49ada009774496ac01fb49818837e2296705c97",
+                stt_status=Audio.STT_COMPLETE,
+            )
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "docket_number": "1:21-bk-0021",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertEqual(
+            self.get_article_count(r),
+            1,
+            msg="Did not get expected number of results when filtering by "
+            f"docket number. Expected {expected}, but got {actual}.",
+        )
+        self.assertIn("Lorem Ipsum", r.content.decode())
+        self.assertIn("<mark>1:21-bk-0021</mark>", r.content.decode())
+
+        # Remove factories to prevent affecting other tests.
+        docket.delete()
+
+    def test_timestamp_filtering(self) -> None:
+        """Confirm the timestamp fielded filter works properly"""
+
+        mock_date = now().replace(
+            day=29, hour=0, minute=0, second=0, microsecond=0
+        )
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            with (
+                mock.patch(
+                    "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                    side_effect=lambda x, y: True,
+                ),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
+                audio = AudioFactory.create(
+                    case_name="Lorem Ipsum Natural Gas",
+                    docket_id=self.docket_2.pk,
+                    duration=420,
+                    local_path_original_file="test/audio/ander_v._leo.mp3",
+                    local_path_mp3=self.filepath_local,
+                    sha1="a49ada009774496ac01fb49818837e2296705c97",
+                    stt_status=Audio.STT_COMPLETE,
+                )
+
+        params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(params["q"], mock_date)
+        # Audio with mock_date as timestamp should be found.
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertEqual(
+            self.get_article_count(r),
+            1,
+            msg="Did not get expected number of results when filtering by timestamp.",
+        )
+
+        params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Natural Gas",
+        }
+        params["q"] = add_cutoff_timestamp_filter(
+            params["q"], mock_date + datetime.timedelta(seconds=1)
+        )
+        # Querying for a timestamp one second greater than mock_date shouldn't return any results.
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertEqual(
+            self.get_article_count(r),
+            0,
+            msg="Did not get expected number of results when filtering by timestamp.",
+        )
+
+        audio.delete()
 
     def test_oa_jurisdiction_filtering(self) -> None:
         """Filter by court"""
@@ -1275,7 +1381,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (expected, actual),
+            f"jurisdiction. Expected {expected}, but got {actual}.",
         )
 
     def test_oa_date_argued_filtering(self) -> None:
@@ -1300,7 +1406,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "argued_after. Expected %s, but got %s." % (actual, expected),
+            f"argued_after. Expected {actual}, but got {expected}.",
         )
         self.assertIn(
             "SEC v. Frank J. Information, WikiLeaks",
@@ -1326,7 +1432,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
         # Text query filtered by case_name
@@ -1346,7 +1452,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
         # Text query filtered by case_name and judge
@@ -1367,7 +1473,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
         # Text query filtered by argued_after. Notice that out of two audios
@@ -1387,7 +1493,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+            f"case name. Expected {expected}, but got {actual}.",
         )
 
     def test_oa_advanced_search_not_query(self) -> None:
@@ -1642,10 +1748,14 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Jose"),
-            msg="'Hong Liu Lorem' should come BEFORE 'Hong Liu Yang' and 'Jose' when order_by relevance.",
+            r.content.decode().index(
+                "Hong Liu Lorem"
+            )  # 2015, 8, 14 - 9.486339
+            < r.content.decode().index(
+                "Hong Liu Yang"
+            )  # 2015, 8, 14 - 9.034608
+            < r.content.decode().index("Jose"),  # 2015, 8, 15 - 4.7431693
+            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
         )
 
         # Relevance order, two words match, reverse order.
@@ -1663,10 +1773,10 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Jose")
-            > r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang"),
-            msg="'Jose' should come AFTER 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
+            r.content.decode().index("Jose")  # 2015, 8, 15
+            < r.content.decode().index("Hong Liu Lorem")  # 2015, 8, 14
+            < r.content.decode().index("Hong Liu Yang"),  # 2015, 8, 14
+            msg="'Jose' should come Before 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
         )
 
         # Relevance order, hyphenated compound word.
@@ -2252,6 +2362,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 1
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2272,6 +2383,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 2
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2291,6 +2403,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_1.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 1
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2312,6 +2425,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_5.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 1
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2334,6 +2448,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_1.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 2
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2355,6 +2470,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 3
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2376,6 +2492,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             str(self.audio_4.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
+            app_label="audio.Audio",
         )
         expected_queries = 2
         self.assertEqual(len(responses.main_response), expected_queries)
@@ -2486,6 +2603,285 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         )
         self.assertEqual(self.get_article_count(r), 1)
         self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+
+class OralArgumentsSearchDecayRelevancyTest(
+    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+):
+    """Oral Arguments Search Decay Relevancy Tests"""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Same keywords but different dateArgued
+        with cls.captureOnCommitCallbacks(execute=True):
+            cls.docket_old = DocketFactory.create(
+                docket_number="1:21-bk-1235",
+                date_argued=datetime.date(1832, 2, 23),
+            )
+            cls.audio_old = AudioFactory.create(
+                case_name="Keyword Match",
+                case_name_full="",
+                docket_id=cls.docket_old.pk,
+                duration=420,
+                judges="Judge Old",
+                local_path_original_file="test/audio/audio_old.mp3",
+                local_path_mp3="test/audio/audio_old.mp3",
+                source="C",
+                blocked=False,
+                sha1="old_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="Transcript for old audio",
+            )
+
+            cls.docket_recent = DocketFactory.create(
+                docket_number="1:21-bk-1236",
+                date_argued=datetime.date(2024, 2, 23),
+            )
+            cls.audio_recent = AudioFactory.create(
+                case_name="Keyword Match",
+                case_name_full="",
+                docket_id=cls.docket_recent.pk,
+                duration=420,
+                judges="Judge Recent",
+                local_path_original_file="test/audio/audio_recent.mp3",
+                local_path_mp3="test/audio/audio_recent.mp3",
+                source="C",
+                blocked=False,
+                sha1="recent_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="Transcript for recent audio",
+            )
+
+            # Different relevance with same dateArgued
+            cls.docket_low_relevance = DocketFactory.create(
+                case_name="Highly Relevant Keywords",
+                docket_number="1:21-bk-1238",
+                date_argued=datetime.date(2022, 2, 23),
+            )
+            cls.audio_low_relevance = AudioFactory.create(
+                case_name="Highly Relevant Keywords",
+                case_name_full="",
+                docket_id=cls.docket_low_relevance.pk,
+                duration=420,
+                judges="Judge Low",
+                local_path_original_file="test/audio/audio_low_rel.mp3",
+                local_path_mp3="test/audio/audio_low_rel.mp3",
+                source="C",
+                blocked=False,
+                sha1="low_rel_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="",
+            )
+
+            cls.docket_high_relevance = DocketFactory.create(
+                case_name="Highly Relevant Keywords",
+                docket_number="1:21-bk-1237",
+                date_argued=datetime.date(2022, 2, 23),
+            )
+            cls.audio_high_relevance = AudioFactory.create(
+                case_name="Highly Relevant Keywords",
+                case_name_full="",
+                docket_id=cls.docket_high_relevance.pk,
+                duration=420,
+                judges="Judge High",
+                local_path_original_file="test/audio/audio_high_rel.mp3",
+                local_path_mp3="test/audio/audio_high_rel.mp3",
+                source="C",
+                blocked=False,
+                sha1="high_rel_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="More Highly Relevant Keywords in the transcript",
+            )
+
+            # Different relevance with different dateArgued
+            cls.docket_high_relevance_old_date = DocketFactory.create(
+                case_name="Ipsum Dolor Terms",
+                docket_number="1:21-bk-1239",
+                date_argued=datetime.date(1900, 2, 23),
+            )
+            cls.audio_high_relevance_old_date = AudioFactory.create(
+                case_name="Ipsum Dolor Terms",
+                case_name_full="",
+                docket_id=cls.docket_high_relevance_old_date.pk,
+                duration=420,
+                judges="Judge Old Relevant",
+                local_path_original_file="test/audio/audio_high_rel_old.mp3",
+                local_path_mp3="test/audio/audio_high_rel_old.mp3",
+                source="C",
+                blocked=False,
+                sha1="high_rel_old_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="More Ipsum Dolor Terms",
+            )
+
+            cls.docket_high_relevance_null_date = DocketFactory.create(
+                case_name="Ipsum Dolor Terms",
+                docket_number="1:21-bk-1240",
+                date_argued=None,
+            )
+            cls.audio_high_relevance_null_date = AudioFactory.create(
+                case_name="Ipsum Dolor Terms",
+                case_name_full="",
+                docket_id=cls.docket_high_relevance_null_date.pk,
+                duration=420,
+                judges="Judge Null",
+                local_path_original_file="test/audio/audio_high_rel_null.mp3",
+                local_path_mp3="test/audio/audio_high_rel_null.mp3",
+                source="C",
+                blocked=False,
+                sha1="high_rel_null_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="More Ipsum Dolor Terms",
+            )
+
+            cls.docket_low_relevance_new_date = DocketFactory.create(
+                case_name="Ipsum Dolor Terms",
+                docket_number="1:21-bk-1241",
+                date_argued=datetime.date(2024, 12, 23),
+            )
+            cls.audio_low_relevance_new_date = AudioFactory.create(
+                case_name="Ipsum Dolor Terms",
+                case_name_full="",
+                docket_id=cls.docket_low_relevance_new_date.pk,
+                duration=420,
+                judges="Judge New Low",
+                local_path_original_file="test/audio/audio_low_rel_new.mp3",
+                local_path_mp3="test/audio/audio_low_rel_new.mp3",
+                source="C",
+                blocked=False,
+                sha1="low_rel_new_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="",
+            )
+
+        cls.test_cases = [
+            {
+                "name": "Same keywords different dateArgued",
+                "search_params": {
+                    "q": "Keyword Match",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                },
+                "expected_order_frontend": [
+                    cls.docket_recent.docket_number,  # Most recent dateArgued
+                    cls.docket_old.docket_number,  # Oldest dateArgued
+                ],
+                "expected_order": [  # API
+                    cls.audio_recent.pk,
+                    cls.audio_old.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy same dateArgued",
+                "search_params": {
+                    "q": "Highly Relevant Keywords",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                },
+                "expected_order_frontend": [
+                    cls.docket_high_relevance.docket_number,  # Most relevant by keywords
+                    cls.docket_low_relevance.docket_number,  # Less relevant by keywords
+                ],
+                "expected_order": [
+                    cls.audio_high_relevance.pk,
+                    cls.audio_low_relevance.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy different dateArgued",
+                "search_params": {
+                    "q": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,  # Combination of relevance and date rank it first.
+                    cls.docket_high_relevance_old_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,  # docs with a null dateFiled are ranked lower.
+                ],
+                "expected_order": [  # API
+                    cls.audio_low_relevance_new_date.pk,
+                    cls.audio_high_relevance_old_date.pk,
+                    cls.audio_high_relevance_null_date.pk,
+                ],
+            },
+            {
+                "name": "Fixed main score for all (0 or 1) (using filters) and different dateArgued",
+                "search_params": {
+                    "case_name": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,  # Most recent dateFiled
+                    cls.docket_high_relevance_old_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,  # docs with a null dateFiled are ranked lower.
+                ],
+                "expected_order": [  # API
+                    cls.audio_low_relevance_new_date.pk,
+                    cls.audio_high_relevance_old_date.pk,
+                    cls.audio_high_relevance_null_date.pk,
+                ],
+            },
+            {
+                "name": "Match all query decay relevancy.",
+                "search_params": {
+                    "q": "",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,  # 2024-12-23 1:21-bk-1241
+                    cls.docket_recent.docket_number,  # 2024-02-23 1:21-bk-1236
+                    cls.docket_low_relevance.docket_number,  # 2022-02-23 1:21-bk-1238 Indexed first, displayed first.
+                    cls.docket_high_relevance.docket_number,  # 2022-02-23 1:21-bk-1237
+                    cls.docket_high_relevance_old_date.docket_number,  # 1800-02-23 1:21-bk-1239
+                    cls.docket_old.docket_number,  # 1732-02-23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.docket_number,  # Null dateArgued 1:21-bk-1240
+                ],
+                "expected_order": [  # V4 API
+                    cls.audio_low_relevance_new_date.pk,  # 2024-12-23
+                    cls.audio_recent.pk,  # 2024-02-23
+                    cls.audio_high_relevance.pk,  # 2022-02-23 Higher PK in V4 API, pk is a secondary sorting key.
+                    cls.audio_low_relevance.pk,  # 2022-02-23
+                    cls.audio_high_relevance_old_date.pk,  # 1800-02-23
+                    cls.audio_old.pk,  # 1732-02-23
+                    cls.audio_high_relevance_null_date.pk,  # Null dateArgued
+                ],
+                "expected_order_v3": [  # V3 API
+                    cls.audio_low_relevance_new_date.pk,  # 2024-12-23
+                    cls.audio_recent.pk,  # 2024-02-23
+                    cls.audio_low_relevance.pk,  # 2022-02-23 Indexed first, displayed first.
+                    cls.audio_high_relevance.pk,  # 2022-02-23
+                    cls.audio_high_relevance_old_date.pk,  # 1800-02-23
+                    cls.audio_old.pk,  # 1732-02-23
+                    cls.audio_high_relevance_null_date.pk,  # Null dateArgued
+                ],
+            },
+        ]
+
+    def test_relevancy_decay_scoring_frontend(self) -> None:
+        """Test relevancy decay scoring for Oral Arguments search Frontend"""
+        for test in self.test_cases:
+            with self.subTest(test["name"]):
+                r = async_to_sync(self._test_article_count)(
+                    test["search_params"],
+                    len(test["expected_order_frontend"]),
+                    f"Failed count {test['name']}",
+                )
+                self._assert_order_in_html(
+                    r.content.decode(), test["expected_order_frontend"]
+                )
+
+    def test_relevancy_decay_scoring_v4_api(self) -> None:
+        """Test relevancy decay scoring for Oral Arguments search V4 API"""
+        for test in self.test_cases:
+            self._test_results_ordering(test, "id", version="v4")
+
+    def test_relevancy_decay_scoring_v3_api(self) -> None:
+        """Test relevancy decay scoring for Oral Arguments search V3 API"""
+        for test in self.test_cases:
+            self._test_results_ordering(test, "id", version="v3")
 
 
 class OralArgumentIndexingTest(

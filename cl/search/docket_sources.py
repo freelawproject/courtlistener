@@ -132,9 +132,7 @@ class DocketSources:
     COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 116
     RECAP_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 117
     SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 118
-    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = (
-        119
-    )
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 119
     IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 120
     RECAP_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 121
     SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 122
@@ -144,9 +142,7 @@ class DocketSources:
     SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = (
         126
     )
-    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = (
-        127
-    )
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 127
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -637,3 +633,29 @@ class DocketSources:
                 "ANON_2020", exclude=True
             )
         return cls._NON_ANON_2020_SOURCES_CACHE
+
+    @classmethod
+    def merge_sources(cls, source1: int, source2: int) -> int:
+        """If one source is included in the other; take the max. If not, sum
+
+        Use this to merge sources when merging dockets
+
+        :param source1: a DocketSource
+        :param source2: other DocketSource
+        :return: a Docket source which merges the input docket sources
+        """
+        if source1 == source2:
+            return source1
+
+        max_source = max(source1, source2)
+        min_source = min(source1, source2)
+
+        if min_source == cls.DEFAULT:
+            return max_source
+
+        # bitwise AND will return the `min_source` it that one is included
+        # in the max source
+        if max_source & min_source == min_source:
+            return max_source
+
+        return max_source + min_source

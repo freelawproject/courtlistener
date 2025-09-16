@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% load extras static humanize %}
 
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/api/templates/v2_bulk-data.html                                      ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
 {% block title %}Bulk Legal Data – CourtListener.com{% endblock %}
 {% block description %}Free legal bulk data for federal and state case law, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
 {% block og_description %}Free legal bulk data for federal and state case law, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
@@ -50,7 +63,9 @@
 
 
     <h2 id="browsing">Browsing the Data Files</h2>
-    <p>As they are generated, files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type. Files are snapshots, not deltas.
+    <p>As they are generated, files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type.
+    </p>
+    <p><strong>Important:</strong> Files are snapshots, not deltas, meaning each file contains everything in our database at the time of generation.
     </p>
     <p>
       <a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/" class="btn btn-primary btn-lg">Browse Bulk Data</a>
@@ -62,7 +77,7 @@
     </p>
     <blockquote>
       <code>
-        COPY public.search_opinionscited (id, depth, cited_opinion_id, citing_opinion_id) FROM 'path_to_csv_file.csv' WITH (FORMAT csv, ENCODING utf8, header);
+        COPY public.search_opinionscited (id, depth, cited_opinion_id, citing_opinion_id) FROM 'path_to_csv_file.csv' WITH (FORMAT csv, ENCODING utf8, ESCAPE '\', HEADER);
       </code>
     </blockquote>
     <p>The SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:
@@ -163,6 +178,9 @@
     </p>
 
     <h3 id="old">Release Notes</h3>
+    <p>
+      <strong>2025-01-24</strong>: Improved PostgreSQL bulk data export by defaulting to double quotes for quoting instead of backticks, resolving parsing errors. Added the <code>ESCAPE</code> option to handle embedded double quotes, ensuring reliable exports and data integrity. Updated the generated import shell script to include this option.
+    </p>
     <p>
       <strong>2024-08-07</strong>: Added <code>filepath_pdf_harvard</code> field to OpinionCluster data in bulk exports. This field contains the path to the PDF file from the Harvard Caselaw Access Project for the given case.
     </p>

@@ -1,20 +1,30 @@
 import logging
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Tuple, TypeVar
+from typing import TypeVar
 
+import nh3
 import pghistory
 import pytz
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
-from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
-from django.db.models import Q, QuerySet
-from django.db.models.functions import MD5
-from django.urls import NoReverseMatch, reverse
+from django.db.models import (
+    Case,
+    CharField,
+    F,
+    Prefetch,
+    Q,
+    QuerySet,
+    Value,
+    When,
+)
+from django.db.models.aggregates import Count, Sum
+from django.db.models.functions import MD5, Coalesce, NullIf
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.functional import cached_property
@@ -28,7 +38,6 @@ from model_utils import FieldTracker
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
-from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     CSVExportMixin,
     linkify_orig_docket_number,
@@ -37,9 +46,8 @@ from cl.lib.model_helpers import (
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
-from cl.lib.search_index_utils import InvalidDocumentError
 from cl.lib.storage import IncrementingAWSMediaStorage
-from cl.lib.string_utils import trunc
+from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.docket_sources import DocketSources
 from cl.users.models import User
 
@@ -231,6 +239,33 @@ class SOURCES:
         ),
     )
 
+    # use a frozenset since the order of characters is arbitrary
+    parts_to_source_mapper = {frozenset(name[0]): name[0] for name in NAMES}
+
+    @classmethod
+    def merge_sources(cls, source1: str, source2: str) -> str:
+        """Merge source values
+
+        Use this to merge sources when merging clusters
+
+        :param source1: a source
+        :param source2: other source
+        :return: a source which merges the input sources
+        """
+        if source1 in source2:
+            return source2
+        if source2 in source1:
+            return source1
+
+        unique_parts = frozenset(source1 + source2)
+        if cls.parts_to_source_mapper.get(unique_parts):
+            return cls.parts_to_source_mapper.get(unique_parts)
+
+        # Unexpected case
+        if len(source1) > len(source2):
+            return source1
+        return source2
+
 
 @pghistory.track()
 class OriginatingCourtInformation(AbstractDateTimeModel):
@@ -286,8 +321,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     )
     ordering_judge_str = models.TextField(
         help_text=(
-            "The judge that issued the final order in the case, as a "
-            "string."
+            "The judge that issued the final order in the case, as a string."
         ),
         blank=True,
     )
@@ -411,8 +445,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     idb_data = models.OneToOneField(
         "recap.FjcIntegratedDatabase",
         help_text=(
-            "Data from the FJC Integrated Database associated with this "
-            "case."
+            "Data from the FJC Integrated Database associated with this case."
         ),
         related_name="docket",
         on_delete=models.SET_NULL,
@@ -869,6 +902,22 @@ class Docket(AbstractDateTimeModel, DocketSources):
         The returned queryset is sorted by the depth field.
         """
         return build_authorities_query(self.authorities)
+
+    @property
+    def authority_opinions(self):
+        """Return a queryset of Opinions cited by this docket's RDs.
+
+        This is similar to the authorities property, but instead of
+        listing OpinionsCitedByRECAPDocuments, it lists Opinions.
+
+        The returned queryset is annotated with the number of filings
+        and the total depth across references, and optimized by prefetching
+        related data.
+        """
+        opinions = Opinion.objects.filter(
+            citing_documents__citing_document__docket_entry__docket_id=self.pk
+        )
+        return build_authority_opinions_query(opinions)
 
     def add_idb_source(self):
         if self.source in self.NON_IDB_SOURCES():
@@ -1331,12 +1380,7 @@ class RECAPDocument(
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
     def __str__(self) -> str:
-        return "%s: Docket_%s , document_number_%s , attachment_number_%s" % (
-            self.pk,
-            self.docket_entry.docket.docket_number,
-            self.document_number,
-            self.attachment_number,
-        )
+        return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
     def get_absolute_url(self) -> str:
         if not self.document_number:
@@ -1383,6 +1427,19 @@ class RECAPDocument(
                 },
             )
 
+    def is_acms_document(self) -> bool:
+        """
+        Checks if the document is from ACMS based on the presence of hyphens
+        in the pacer_doc_id.
+
+        ACMS documents are currently the only ones using hyphens in their
+        doc_id.
+
+        :return: True if the doc_id contains more than one hyphen, False
+            otherwise.
+        """
+        return self.pacer_doc_id.count("-") > 1
+
     @property
     def pacer_url(self) -> str | None:
         """Construct a doc1 URL for any item, if we can. Else, return None."""
@@ -1391,7 +1448,7 @@ class RECAPDocument(
         court = self.docket_entry.docket.court
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
-            if self.pacer_doc_id.count("-") > 1:
+            if self.is_acms_document():
                 return (
                     f"https://{court_id}-showdoc.azurewebsites.us/docs/"
                     f"{self.docket_entry.docket.pacer_case_id}/"
@@ -1487,11 +1544,10 @@ class RECAPDocument(
                     raise ValidationError(
                         "Multiple duplicate values violate save constraint "
                         "and we are unable to fix it automatically for "
-                        "rd: %s" % self.pk
+                        f"rd: {self.pk}"
                     )
-                else:
-                    # Only one duplicate. Attempt auto-resolution.
-                    other = others[0]
+                # Only one duplicate. Attempt auto-resolution.
+                other = others[0]
                 if other.pacer_doc_id == self.pacer_doc_id:
                     # Delete "other"; the new one probably has better data.
                     # Lots of code could be written here to merge "other" into
@@ -1504,8 +1560,7 @@ class RECAPDocument(
                     raise ValidationError(
                         "Duplicate values violate save constraint and we are "
                         "unable to fix it because the items have different "
-                        "pacer_doc_id values. The rds are %s and %s "
-                        % (self.pk, other.pk)
+                        f"pacer_doc_id values. The rds are {self.pk} and {other.pk} "
                     )
 
         if update_fields is not None:
@@ -1557,61 +1612,6 @@ class RECAPDocument(
             )
             logger.error(msg)
             raise ValidationError({"attachment_number": msg})
-
-    def get_docket_metadata(self):
-        """The metadata for the item that comes from the Docket."""
-        docket = self.docket_entry.docket
-        # IDs
-        out = {
-            "docket_id": docket.pk,
-            "court_id": docket.court.pk,
-            "assigned_to_id": getattr(docket.assigned_to, "pk", None),
-            "referred_to_id": getattr(docket.referred_to, "pk", None),
-        }
-
-        # Docket
-        out.update(
-            {
-                "docketNumber": docket.docket_number,
-                "caseName": best_case_name(docket),
-                "suitNature": docket.nature_of_suit,
-                "cause": docket.cause,
-                "juryDemand": docket.jury_demand,
-                "jurisdictionType": docket.jurisdiction_type,
-            }
-        )
-        if docket.date_argued is not None:
-            out["dateArgued"] = midnight_pt(docket.date_argued)
-        if docket.date_filed is not None:
-            out["dateFiled"] = midnight_pt(docket.date_filed)
-        if docket.date_terminated is not None:
-            out["dateTerminated"] = midnight_pt(docket.date_terminated)
-        try:
-            out["docket_absolute_url"] = docket.get_absolute_url()
-        except NoReverseMatch:
-            raise InvalidDocumentError(
-                f"Unable to save to index due to missing absolute_url: {self.pk}"
-            )
-
-        # Judges
-        if docket.assigned_to is not None:
-            out["assignedTo"] = docket.assigned_to.name_full
-        elif docket.assigned_to_str:
-            out["assignedTo"] = docket.assigned_to_str
-        if docket.referred_to is not None:
-            out["referredTo"] = docket.referred_to.name_full
-        elif docket.referred_to_str:
-            out["referredTo"] = docket.referred_to_str
-
-        # Court
-        out.update(
-            {
-                "court": docket.court.full_name,
-                "court_exact": docket.court_id,  # For faceting
-                "court_citation_string": docket.court.citation_string,
-            }
-        )
-        return out
 
     def get_csv_columns(self, get_column_name=False):
         columns = [
@@ -1815,24 +1815,19 @@ class Claim(AbstractDateTimeModel):
     )
     description = models.TextField(
         help_text=(
-            "The description of the claim that appears on the claim "
-            "register."
+            "The description of the claim that appears on the claim register."
         ),
         blank=True,
     )
     remarks = models.TextField(
         help_text=(
-            "The remarks of the claim that appear on the claim " "register."
+            "The remarks of the claim that appear on the claim register."
         ),
         blank=True,
     )
 
     def __str__(self) -> str:
-        return "Claim #%s on docket %s with pk %s" % (
-            self.claim_number,
-            self.docket_id,
-            self.pk,
-        )
+        return f"Claim #{self.claim_number} on docket {self.docket_id} with pk {self.pk}"
 
 
 @pghistory.track(
@@ -1865,9 +1860,8 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     claim_document_type = models.IntegerField(
         help_text=(
             "The type of document that is used in the history row for "
-            "the claim. One of: %s"
-        )
-        % ", ".join([f"{t[0]} ({t[1]})" for t in CLAIM_TYPES]),
+            "the claim. One of: {}"
+        ).format(", ".join([f"{t[0]} ({t[1]})" for t in CLAIM_TYPES])),
         choices=CLAIM_TYPES,
     )
     description = models.TextField(
@@ -1937,7 +1931,8 @@ class FederalCourtsQuerySet(models.QuerySet):
 
     def appellate_pacer_courts(self) -> models.QuerySet:
         return self.filter(
-            Q(jurisdiction=Court.FEDERAL_APPELLATE) |
+            Q(jurisdiction=Court.FEDERAL_APPELLATE)
+            |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
             end_date__isnull=True,
@@ -1970,7 +1965,12 @@ class FederalCourtsQuerySet(models.QuerySet):
 @pghistory.track()
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
-    as needed."""
+    as needed.
+
+    Note that a Courthouse object should be created alongside each new Court.
+    Even if this is not enforced by the data model, there is some logic tied
+    to that relation. Examples in `find_citations` and `coverage_utils`
+    """
 
     # Note that spaces cannot be used in the keys, or else the SearchForm won't
     # work
@@ -2174,8 +2174,9 @@ class Court(models.Model):
         null=True,
     )
     jurisdiction = models.CharField(
-        help_text="the jurisdiction of the court, one of: %s"
-        % ", ".join(f"{t[0]} ({t[1]})" for t in JURISDICTIONS),
+        help_text="the jurisdiction of the court, one of: {}".format(
+            ", ".join(f"{t[0]} ({t[1]})" for t in JURISDICTIONS)
+        ),
         max_length=3,
         choices=JURISDICTIONS,
     )
@@ -2414,8 +2415,9 @@ class OpinionCluster(AbstractDateTimeModel):
         null=True,
     )
     source = models.CharField(
-        help_text="the source of the cluster, one of: %s"
-        % ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES),
+        help_text="the source of the cluster, one of: {}".format(
+            ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES)
+        ),
         max_length=10,
         choices=SOURCES.NAMES,
         blank=True,
@@ -2440,7 +2442,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     syllabus = models.TextField(
         help_text=(
-            "A summary of the issues presented in the case and the " "outcome."
+            "A summary of the issues presented in the case and the outcome."
         ),
         blank=True,
     )
@@ -2521,14 +2523,15 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     citation_count = models.IntegerField(
         help_text=(
-            "The number of times this document is cited by other " "opinion"
+            "The number of times this document is cited by other opinion"
         ),
         default=0,
         db_index=True,
     )
     precedential_status = models.CharField(
-        help_text="The precedential status of document, one of: "
-        "%s" % ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES]),
+        help_text="The precedential status of document, one of: {}".format(
+            ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES])
+        ),
         max_length=50,
         blank=True,
         choices=PRECEDENTIAL_STATUS.NAMES,
@@ -2879,6 +2882,8 @@ class OpinionCluster(AbstractDateTimeModel):
     def ordered_opinions(self):
         # Fetch all sub-opinions ordered by ordering_key
         sub_opinions = self.sub_opinions.all().order_by("ordering_key")
+        if self.sub_opinions.filter(main_version__isnull=False).exists():
+            sub_opinions = sub_opinions.filter(main_version__isnull=True)
 
         # Check if there is more than one sub-opinion
         if sub_opinions.count() > 1:
@@ -2935,8 +2940,7 @@ class OpinionClusterNonParticipatingJudges(
         proxy = True
 
 
-@pghistory.track()
-class Citation(models.Model):
+class BaseCitation(models.Model):
     """A simple class to hold citations."""
 
     FEDERAL = 1
@@ -2976,12 +2980,6 @@ class Citation(models.Model):
             "72 Soc.Sec.Rep.Serv. 318)",
         ),
     )
-    cluster = models.ForeignKey(
-        OpinionCluster,
-        help_text="The cluster that the citation applies to",
-        related_name="citations",
-        on_delete=models.CASCADE,
-    )
     volume = models.SmallIntegerField(help_text="The volume of the reporter")
     reporter = models.TextField(
         help_text="The abbreviation for the reporter",
@@ -3002,9 +3000,24 @@ class Citation(models.Model):
         help_text="The type of citation that this is.", choices=CITATION_TYPES
     )
 
+    class Meta:
+        abstract = True
+
     def __str__(self) -> str:
         # Note this representation is used in the front end.
         return "{volume} {reporter} {page}".format(**self.__dict__)
+
+
+@pghistory.track()
+class Citation(BaseCitation):
+    """A citation to an OpinionCluster"""
+
+    cluster = models.ForeignKey(
+        OpinionCluster,
+        help_text="The cluster that the citation applies to",
+        related_name="citations",
+        on_delete=models.CASCADE,
+    )
 
     def get_absolute_url(self) -> str:
         return self.cluster.get_absolute_url()
@@ -3069,7 +3082,67 @@ def sort_cites(c):
         return 8
 
 
-@pghistory.track()
+OPINION_TEXT_SOURCE_FIELDS = [
+    "html_with_citations",
+    "xml_harvard",
+    "html_columbia",
+    "html_lawbox",
+    "html_anon_2020",
+    "html",
+]
+
+
+class OpinionQuerySet(models.QuerySet):
+    def with_best_text(self):
+        """Annotates an Opinion QuerySet with best_text and best_text_source.
+
+        To determine the best text, we get the first non-empty value from
+        various source fields, prioritizing HTML formats with citations
+        over plain text.
+
+        The best_text_source is a CharField that indicates
+        the name of the field from which the best_text was retrieved.
+
+        The supported source fields are:
+            - html_with_citations (preferred)
+            - xml_harvard
+            - html_columbia
+            - html_lawbox
+            - html_anon_2020
+            - html
+        """
+        source_fields = OPINION_TEXT_SOURCE_FIELDS
+        # To populate best_text we get the first non-empty value
+        # from the list of possible text sources:
+        coalesce_args = [
+            NullIf(F(field), Value("")) for field in source_fields
+        ]
+        # And we fall back to plain_text if all of the above are empty:
+        coalesce_args.append(F("plain_text"))
+
+        # We use When clauses to determine the name of the field that was used
+        # as the source for the best text:
+        when_clauses = [
+            When(
+                Q(**{f"{field}__isnull": False}) & ~Q(**{field: ""}),
+                then=Value(field),
+            )
+            for field in source_fields
+        ]
+
+        deferred_fields = source_fields + ["plain_text"]
+
+        return self.defer(*deferred_fields).annotate(
+            best_text=Coalesce(*coalesce_args, output_field=CharField()),
+            best_text_source=Case(
+                *when_clauses,
+                default=Value("plain_text"),
+                output_field=CharField(),
+            ),
+        )
+
+
+@pghistory.track(exclude=["html_with_citations"])
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
@@ -3138,14 +3211,13 @@ class Opinion(AbstractDateTimeModel):
         "people_db.Person",
         related_name="opinions_joined",
         help_text=(
-            "Other judges that joined the primary author " "in this opinion"
+            "Other judges that joined the primary author in this opinion"
         ),
         blank=True,
     )
     joined_by_str = models.TextField(
         help_text=(
-            "Other judges that joined the primary author "
-            "in this opinion str"
+            "Other judges that joined the primary author in this opinion str"
         ),
         blank=True,
     )
@@ -3240,9 +3312,19 @@ class Opinion(AbstractDateTimeModel):
             "html",
             "plain_text",
             "sha1",
+            "ordering_key",
         ]
     )
     ordering_key = models.IntegerField(null=True, blank=True)
+    main_version = models.ForeignKey(
+        "self",
+        help_text="The id of another Opinion which is the updated or final version of this opinion",
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="versions",
+    )
+
+    objects = OpinionQuerySet.as_manager()
 
     class Meta:
         constraints = [
@@ -3256,6 +3338,34 @@ class Opinion(AbstractDateTimeModel):
     def siblings(self) -> QuerySet:
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
+
+    @property
+    def clean_text(self) -> str:
+        """
+        Returns the cleaned opinion text by using the annotated `best_text`
+        if it exists; otherwise, it falls back to computing the value in Python.
+
+        The retrieved text is then cleaned using the `nh3.clean`. This cleaning
+        process removes all HTML tags while preserving the content.
+
+        The annotated field `best_text` is added when calling the QuerySet
+        using with_best_text like so:
+        Opinion.objects.filter(something_here=foo).with_best_text()
+        """
+        if hasattr(self, "best_text"):
+            return nh3.clean(self.best_text, tags=set())
+
+        for field in OPINION_TEXT_SOURCE_FIELDS:
+            value = getattr(self, field, None)
+            if value and value.strip():
+                return nh3.clean(value, tags=set())
+
+        return nh3.clean(self.plain_text, tags=set())
+
+    @property
+    def token_count(self) -> int:
+        """Returns the number of tokens in this opinion text."""
+        return get_token_count_from_string(self.clean_text)
 
     def __str__(self) -> str:
         try:
@@ -3276,8 +3386,8 @@ class Opinion(AbstractDateTimeModel):
 
     def save(
         self,
-        *args: List,
-        **kwargs: Dict,
+        *args: list,
+        **kwargs: dict,
     ) -> None:
         self.clean()
         super().save(*args, **kwargs)
@@ -3343,6 +3453,51 @@ class OpinionsCitedByRECAPDocument(models.Model):
         verbose_name_plural = "Opinions cited by RECAP document"
         unique_together = ("citing_document", "cited_opinion")
         indexes = [models.Index(fields=["depth"])]
+
+
+def build_authority_opinions_query(
+    base_queryset: QuerySet[Opinion],
+) -> QuerySet[Opinion]:
+    """Annotates a queryset of Opinions and optimizes related queries.
+
+    The annotated queryset includes the number of filings (total number of
+    RECAPDocuments that cite each opinion) and the total depth (total
+    number of references across documents).
+    """
+    return (
+        base_queryset.select_related("cluster__docket__court")
+        .prefetch_related(
+            "cluster__citations",
+            "citing_documents",
+            Prefetch(
+                "cluster__sub_opinions",
+                queryset=Opinion.objects.only("pk", "cluster_id"),
+            ),
+        )
+        .annotate(
+            num_filings=Count(
+                "citing_documents__citing_document", distinct=True
+            ),
+            total_depth=Sum("citing_documents__depth"),
+        )
+        .only(
+            "cluster__id",
+            "cluster__blocked",
+            "cluster__case_name",
+            "cluster__case_name_full",
+            "cluster__case_name_short",
+            "cluster__docket_id",
+            "cluster__docket__court__full_name",
+            "cluster__docket__docket_number",
+            "cluster__docket__court_id",
+            "cluster__docket__court__citation_string",
+            "cluster__slug",
+            "cluster__citation_count",
+            "cluster__docket_id",
+            "cluster__date_filed",
+        )
+        .order_by("-num_filings", "-total_depth")
+    )
 
 
 def build_authorities_query(
@@ -3477,7 +3632,7 @@ class Tag(AbstractDateTimeModel):
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
 
-    def tag_object(self, thing: TaggableType) -> Tuple["Tag", bool]:
+    def tag_object(self, thing: TaggableType) -> tuple["Tag", bool]:
         """Atomically add a tag to an item.
 
         Django has a system for adding to a m2m relationship like the ones
@@ -3498,19 +3653,19 @@ class Tag(AbstractDateTimeModel):
         wish to tag.
         :return: A tuple with the tag and whether a new item was created
         """
-        if type(thing) == Docket:
+        if isinstance(thing, Docket):
             return self.dockets.through.objects.get_or_create(
                 docket_id=thing.pk, tag_id=self.pk
             )
-        elif type(thing) == DocketEntry:
+        elif isinstance(thing, DocketEntry):
             return self.docket_entries.through.objects.get_or_create(
                 docketentry_id=thing.pk, tag_id=self.pk
             )
-        elif type(thing) == RECAPDocument:
+        elif isinstance(thing, RECAPDocument):
             return self.recap_documents.through.objects.get_or_create(
                 recapdocument_id=thing.pk, tag_id=self.pk
             )
-        elif type(thing) == Claim:
+        elif isinstance(thing, Claim):
             return self.claims.through.objects.get_or_create(
                 claim_id=thing.pk, tag_id=self.pk
             )
@@ -3575,7 +3730,12 @@ class SEARCH_TYPES:
     SUPPORTED_ALERT_TYPES = (
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
+        (DOCKETS, "RECAP Dockets"),
         (ORAL_ARGUMENT, "Oral Arguments"),
+    )
+    RECAP_ALERT_TYPES = (
+        (RECAP, "RECAP"),
+        (DOCKETS, "RECAP Dockets"),
     )
 
 
@@ -3629,3 +3789,78 @@ class SearchQuery(models.Model):
         indexes = [
             models.Index(fields=["date_created"]),
         ]
+        verbose_name_plural = "Search Queries"
+
+
+class ClusterRedirection(models.Model):
+    """Model to prevent dead /opinion/ links"""
+
+    VERSION = 1
+    DUPLICATE = 2
+    CONSOLIDATION = 3
+    SEALED = 4
+    REDIRECTION_REASON = (
+        (
+            VERSION,
+            "Cluster replaced by a newer version of the same opinion",
+        ),
+        (DUPLICATE, "Cluster removed as a duplicate"),
+        (
+            CONSOLIDATION,
+            "Spread opinions were consolidated in a single cluster (e.g., a dissent opinion added to a cluster containing the majority opinion)",
+        ),
+        (SEALED, "Cluster removed by court order"),
+    )
+    date_created = models.DateTimeField(
+        help_text="Datetime when the record was created.",
+        auto_now_add=True,
+    )
+    deleted_cluster_id = models.IntegerField(unique=True)
+    cluster = models.ForeignKey(
+        OpinionCluster,
+        help_text="The existing cluster the deleted clusters now point to",
+        related_name="merged_clusters",
+        # if a cluster with `merged_cluster` is to be deleted, it will raise
+        # an IntegrityError. User should assign a different cluster before
+        # deleting the current cluster
+        on_delete=models.DO_NOTHING,
+        # need null values for SEALED opinions
+        null=True,
+    )
+    reason = models.SmallIntegerField(
+        help_text="The reason why the old cluster was deleted",
+        choices=REDIRECTION_REASON,
+    )
+
+    @classmethod
+    def create_from_clusters(
+        cls,
+        cluster_to_keep: OpinionCluster,
+        cluster_to_delete: OpinionCluster,
+        reason: int,
+    ):
+        """Create a ClusterRedirection entry from two OpinionCluster objects
+
+        Accounts for redirections pointing to the cluster to delete
+        Deletion of the `cluster_to_delete` is left to the caller
+
+        :param cluster_to_keep: the redirection will point to this cluster
+        :param cluster_to_delete: this id will go into deleted_cluster_id
+        :param reason: one of ClusterRedirection.REDIRECTION_REASON
+        """
+        if reason not in [i[0] for i in cls.REDIRECTION_REASON]:
+            raise ValueError("Invalid value for `ClusterRedirection.reason`")
+
+        with transaction.atomic():
+            # the cluster to delete has ClusterRedirection entries pointing to
+            # it, make them point to the new cluster to keep
+            if cluster_to_delete.merged_clusters.exists():
+                cluster_to_delete.merged_clusters.update(
+                    cluster=cluster_to_keep
+                )
+
+            ClusterRedirection.objects.get_or_create(
+                deleted_cluster_id=cluster_to_delete.id,
+                cluster=cluster_to_keep,
+                reason=reason,
+            )

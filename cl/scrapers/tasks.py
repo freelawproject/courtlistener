@@ -1,12 +1,11 @@
 import logging
 import random
 import traceback
-from typing import List, Optional, Tuple, Union
+from collections import defaultdict
 
 import httpx
 import requests
 from asgiref.sync import async_to_sync
-from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from httpx import Response
@@ -30,12 +29,22 @@ from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
-from cl.scrapers.utils import scraped_citation_object_is_valid
-from cl.search.models import Docket, Opinion, RECAPDocument
+from cl.scrapers.management.commands.merge_opinion_versions import (
+    get_query_from_url,
+    merge_versions_by_text_similarity,
+)
+from cl.scrapers.utils import citation_is_duplicated, make_citation
+from cl.search.models import (
+    SOURCES,
+    Docket,
+    Opinion,
+    OriginatingCourtInformation,
+    RECAPDocument,
+)
 
 logger = logging.getLogger(__name__)
 
-ExtractProcessResult = Tuple[str, Optional[str]]
+ExtractProcessResult = tuple[str, str | None]
 
 
 def update_document_from_text(
@@ -43,44 +52,51 @@ def update_document_from_text(
 ) -> dict:
     """Extract additional metadata from document text
 
-    We use this code with BIA decisions. Previously Tax.
-    I think it is not unlikely that we will use or need this in the future.
-
-    Use functions from Juriscraper to pull metadata out of opinion
-    text. Formerly implemented in only Tax Court, but functional in all
-    scrapers via AbstractSite object.
-
-    Note that this updates the values but does not save them. Saving is left to
-    the calling function.
+    Note that this updates the values but does not save them for Docket,
+    OpinionCluster, Opinion and OriginatingCourtInformation. Saving is left to
+    the calling function. It does save Citations
 
     :param opinion: Opinion object
     :param juriscraper_module: full module to get Site object
     :return: the extracted data dictionary
     """
-    court = opinion.cluster.docket.court.pk
-    site = get_scraper_object_by_name(court, juriscraper_module)
+    court_id = opinion.cluster.docket.court.pk
+    site = get_scraper_object_by_name(court_id, juriscraper_module)
     if site is None:
         logger.debug("No site found %s", juriscraper_module)
         return {}
 
+    citation_created = False
     metadata_dict = site.extract_from_text(opinion.plain_text or opinion.html)
     for model_name, data in metadata_dict.items():
-        ModelClass = apps.get_model(f"search.{model_name}")
         if model_name == "Docket":
             opinion.cluster.docket.__dict__.update(data)
         elif model_name == "OpinionCluster":
             opinion.cluster.__dict__.update(data)
         elif model_name == "Citation":
-            data["cluster_id"] = opinion.cluster_id
-            if scraped_citation_object_is_valid(data):
-                _, citation_created = ModelClass.objects.get_or_create(**data)
-                metadata_dict["Citation"]["created"] = citation_created
+            citation = make_citation(data, opinion.cluster, court_id)
+            if not citation or citation_is_duplicated(citation, data):
+                continue
+            citation.save()
+            citation_created = True
         elif model_name == "Opinion":
             opinion.__dict__.update(data)
+        elif model_name == "OriginatingCourtInformation":
+            docket = opinion.cluster.docket
+            if docket.originating_court_information:
+                docket.originating_court_information.__dict__.update(data)
+            else:
+                docket.originating_court_information = (
+                    OriginatingCourtInformation(**data)
+                )
+
         else:
             raise NotImplementedError(
                 f"Object type of {model_name} not yet supported."
             )
+
+    # if the candidate citation was saved successfully, it will have an id
+    metadata_dict["citation_created"] = citation_created
 
     return metadata_dict
 
@@ -144,7 +160,8 @@ def extract_doc_content(
     )
     if not response.is_success:
         logger.error(
-            f"Error from document-extract microservice: {response.status_code}",
+            "Error from document-extract microservice: %s",
+            response.status_code,
             extra=dict(
                 opinion_id=opinion.id,
                 url=opinion.download_url,
@@ -181,22 +198,28 @@ def extract_doc_content(
     if data["page_count"]:
         opinion.page_count = data["page_count"]
 
-    assert isinstance(
-        content, str
-    ), f"content must be of type str, not {type(content)}"
+    assert isinstance(content, str), (
+        f"content must be of type str, not {type(content)}"
+    )
 
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion, juriscraper_module)
 
     if data["err"]:
         logger.error(
-            f"****Error: {data['err']}, extracting text from {extension}: {opinion}****"
+            "****Error: %s, extracting text from %s: %s****",
+            data["err"],
+            extension,
+            opinion,
         )
         return
 
     # Save item
     # noinspection PyBroadException
     try:
+        if opinion.cluster.docket.originating_court_information:
+            opinion.cluster.docket.originating_court_information.save()
+
         opinion.cluster.docket.save()
         opinion.cluster.save()
         opinion.save()
@@ -208,10 +231,50 @@ def extract_doc_content(
         )
         return
 
+    find_and_merge_versions.delay(pk=opinion.id)
+
     # Identify and link citations within the document content
     find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
         ([opinion.pk],), countdown=random.randint(0, 3600)
     )
+
+
+@app.task(bind=True)
+def find_and_merge_versions(self, pk: int) -> None:
+    """Find versions of the `pk` opinion, and try to merge them
+
+    Since this relies on text similarity, we are calling it from
+    `extract_doc_content`
+
+    Currently only checks for exact `download_url` match, update this when
+    different strategies are implemented
+
+    :param self: the celery task
+    :param pk: opinion primary key
+    :return None:
+    """
+    recently_scraped_opinion = Opinion.objects.get(id=pk)
+    if not recently_scraped_opinion.download_url:
+        return
+    query = get_query_from_url(recently_scraped_opinion.download_url, "exact")
+    versions = (
+        Opinion.objects.filter(query)
+        .filter(cluster__source=SOURCES.COURT_WEBSITE)
+        .exclude(id=pk)
+        .exclude(main_version__isnull=False)
+        .order_by("-date_created")
+    )
+
+    # versions are ordered in descending date_created, we keep the latest
+    # creation as the main version, since we expect it to be freshest
+    # from the court's server. Since this task is called on a scrape, we assume
+    # that is the most recent
+    if versions.exists():
+        stats = defaultdict(lambda: 0)
+        merge_versions_by_text_similarity(
+            recently_scraped_opinion, versions, stats
+        )
+        logger.debug(stats)
 
 
 @app.task(
@@ -226,10 +289,10 @@ def extract_doc_content(
 )
 def extract_recap_pdf(
     self,
-    pks: Union[int, List[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> List[int]:
+) -> list[int]:
     """Celery task wrapper for extract_recap_pdf_base
     Extract the contents from a RECAP PDF if necessary.
 
@@ -261,10 +324,10 @@ def extract_recap_pdf(
 
 
 async def extract_recap_pdf_base(
-    pks: Union[int, List[int]],
+    pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> List[int]:
+) -> list[int]:
     """Extract the contents from a RECAP PDF if necessary.
 
     :param pks: The RECAPDocument pk or list of pks to work on.
@@ -278,7 +341,7 @@ async def extract_recap_pdf_base(
     if not is_iter(pks):
         pks = [pks]
 
-    processed: List[int] = []
+    processed: list[int] = []
     for pk in pks:
         rd = await RECAPDocument.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
@@ -335,6 +398,7 @@ async def extract_recap_pdf_base(
     max_retries=3,
     retry_backoff=10,
 )
+@throttle_task("1/3m")
 def process_audio_file(self, pk) -> None:
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.
@@ -439,4 +503,5 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
         report.response.text,
         d,
         tag_names=None,
+        skip_iquery_sweep=True,
     )

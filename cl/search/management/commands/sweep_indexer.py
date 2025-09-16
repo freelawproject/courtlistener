@@ -1,6 +1,7 @@
 import time
+from collections.abc import Iterable, Mapping
 from datetime import datetime
-from typing import Iterable, Literal, Mapping, cast
+from typing import Literal, cast
 
 from django.apps import apps
 from django.conf import settings
@@ -23,7 +24,7 @@ from cl.search.documents import (
 from cl.search.models import SEARCH_TYPES, Docket, Opinion, RECAPDocument
 from cl.search.tasks import (
     index_parent_and_child_docs,
-    index_parent_or_child_docs,
+    index_parent_or_child_docs_in_es,
 )
 from cl.search.types import ESDocumentClassType
 
@@ -234,7 +235,7 @@ class Command(VerboseCommand):
         child: Literal["parent", "child"] = "child"
         while models_stack:
             app_label = models_stack.pop()
-            task_to_use = "index_parent_or_child_docs"
+            task_to_use = "index_parent_or_child_docs_in_es"
 
             match app_label:
                 case "people_db.Person":
@@ -363,6 +364,7 @@ class Command(VerboseCommand):
             min_items=self.chunk_size,
             queue_name=self.queue,
         )
+        use_streaming_bulk = True if testing_mode else False
         document_type, search_type, es_document = task_params
         for item in items:
             if isinstance(item, tuple):
@@ -393,15 +395,17 @@ class Command(VerboseCommand):
                 match task_to_use:
                     case "index_parent_and_child_docs":
                         index_parent_and_child_docs.si(
-                            chunk, search_type, testing_mode=testing_mode
+                            chunk,
+                            search_type,
+                            use_streaming_bulk=use_streaming_bulk,
                         ).set(queue=self.queue).apply_async()
 
-                    case "index_parent_or_child_docs":
-                        index_parent_or_child_docs.si(
+                    case "index_parent_or_child_docs_in_es":
+                        index_parent_or_child_docs_in_es.si(
                             chunk,
                             search_type,
                             document_type,
-                            testing_mode=testing_mode,
+                            use_streaming_bulk=use_streaming_bulk,
                         ).set(queue=self.queue).apply_async()
 
                 accumulated_chunk += len(chunk)
@@ -412,16 +416,11 @@ class Command(VerboseCommand):
                     # it will wait for 0.1 seconds for every 10 documents processed,
                     # maintaining an index rate of 100 documents per second.
                     time.sleep(
-                        1 / settings.ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS  # type: ignore
+                        1
+                        / settings.ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS  # type: ignore
                     )
                 self.stdout.write(
-                    "\rProcessed {}/{}, ({:.0%}), last {} ID indexed: {},".format(
-                        processed_count,
-                        count,
-                        processed_count * 1.0 / count,
-                        app_label,
-                        item_id,
-                    )
+                    f"\rProcessed {processed_count}/{count}, ({processed_count * 1.0 / count:.0%}), last {app_label} ID indexed: {item_id},"
                 )
                 chunk = []
 

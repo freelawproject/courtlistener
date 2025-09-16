@@ -45,8 +45,9 @@ class Audio(AbstractDateTimeModel):
         null=True,
     )
     source = models.CharField(
-        help_text="the source of the audio file, one of: %s"
-        % ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES),
+        help_text="the source of the audio file, one of: {}".format(
+            ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES)
+        ),
         max_length=10,
         choices=SOURCES.NAMES,
         blank=True,

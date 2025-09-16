@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load static humanize partition_util %}
+
+{% block title %}Help with Pray and Pay Project – CourtListener.com{% endblock %}
+{% block og_title %}Help with Pray and Pay Project – CourtListener.com{% endblock %}
+
+{% block description %}The Pray and Pay project helps you flag PACER documents you want so others can buy them for you. Learn more.{% endblock %}
+{% block og_description %}The Pray and Pay project helps you flag PACER documents you want so others can buy them for you. Learn more.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "help_home" %}">Back to Help</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "help_home" %}">Back to Help</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li>
+        <a href="#pray-and-pay">Pray and Pay Project</a>
+        <ul>
+          <li><a href="#fulfilling-prayer">Fulfilling a Prayer</a></li>
+          <li><a href="#creating-prayer">Creating a Prayer</a></li>
+          <li><a href="#public-prayers">Sharing Prayers with Others</a></li>
+          <li><a href="#limitations">Limitations</a></li>
+          <li><a href="#deleting-prayer">Deleting a Prayer</a></li>
+        </ul>
+      </li>
+      <li><a href="#coming-soon">Coming Soon</a></li>
+    </ul>
+  </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Help with Pray and Pay&nbsp;Project</h1>
+  <p class="lead">Since 2009, CourtListener has helped people keep up with new cases and legal topics.</p>
+  <p>The Pray and Pay Project is a system so you can "Pray" for PACER documents you want, and others can grant those prayers by "Paying" for them on your behalf.</p>
+
+  <h2 id="pray-and-pay">Pray and Pay Project</h2>
+  <p>PACER is the largest paywall on the internet with around a half-million new documents filed weekly.
+  </p>
+  <p>To advance our mission of open access to the courts, this system allows you to request documents you want on PACER (by "praying" for them), and to fulfill the prayers of others by buying the most-wanted documents in the community.
+  </p>
+  <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up:</strong> PACER waives the first $30.00 of purchases you make each quarter. By sending reminder emails near the end of each quarter, we encourage users to use this money to contribute the documents other users need.
+  </p>
+  <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=32" class="btn btn-primary">Sign Up for Reminders</a>
+  <p>Since the project's creation, users have fulfilled <span class="bold">{{ granted_stats.prayer_count|intcomma }}</span> prayers from <span class="bold">{{ granted_stats.distinct_users|intcomma }}</span> people for <span class="bold">{{ granted_stats.distinct_count|intcomma }}</span> documents, for a total contribution of <span class="bold">${{ granted_stats.total_cost }}</span>!
+  </p>
+
+
+  <h3 id="fulfilling-prayer">Fulfilling a Prayer</h3>
+  <p>The most-wanted documents are shown on a <a href="{% url "top_prayers" %}">leaderboard</a> ranked by how many users have requested a particular document and how many views their corresponding docket has received. After a document is requested, we check PACER to see if it is available for purchase. Unavailable documents are ranked at the bottom of the list; if they later become available, they will be sorted with other open requests. As requests are fulfilled, they are removed from the leaderboard.
+  </p>
+  <p>Fulfilling somebody's prayer only works if you install the RECAP extension. Once it's installed, all your PACER purchases will be sent to CourtListener automatically — prayers will be granted!</p>
+  <p>
+    <a href="https://free.law/recap/"
+       class="btn btn-primary">Install RECAP</a>
+    <a href="{% url "top_prayers" %}"
+       class="btn btn-primary"> See the Leaderboard</a>
+  </p>
+
+  <h3 id="creating-prayer">Creating a Prayer</h3>
+  <p>To create a prayer, find a document you are interested in, and press the "Prayer Hands" emoji button on the right (🙏). The number on the button is how many others have requested the document. If you have reached your daily limit, a message will inform you.
+  </p>
+  <p>
+    <img src="{% static "png/pray-button.png" %}"
+      alt="screenshot of the prayer button"
+      class="img-responsive img-rounded shadow center-block"
+      width="45">
+  </p>
+  <p>When your prayer is granted, we will send you an email so you know.
+  </p>
+  <p>Here's an example of what an email might look like:</p>
+  <p class="v-offset-above-2">
+    <a href="{% static "png/prayer-email.png" %}">
+      <img src="{% static "png/prayer-email.png" %}"
+           width="749"
+           height="529"
+           class="img-responsive img-rounded center-block shadow"
+      >
+    </a>
+  </p>
+  <p class="v-offset-below-2 gray alt small">
+    (Click for full size version.)
+  </p>
+
+  <h3 id="public-prayers">Sharing Prayers with Others</h3>
+  <p>Via the toggle switch available on their page of requests, users can make their list of pending prayers available to the public. While all requests are anonymously compiled on the leaderboard, journalists and others can share their personal wishlists to help crowdsource documents of interest.</p>
+
+  <h3 id="limitations">Limitations</h3>
+  <p>Each user can place <span class="bold">{{ daily_quota }}</span> prayers per day. This prevents people from praying for every item on the site.
+  </p>
+  <p>Members can place <span class="bold">{% widthratio daily_quota 1 3 %}</span> prayers per day.
+  </p>
+  <p>Many documents are unavailable for purchase on PACER. These include sealed filings, transcripts with delayed release dates, and in some cases, filings related to immigration and social security claims. To avoid having unavailable documents remain on the community leaderboard indefinitely, our servers check whether a document is available for purchase after it has been requested. If it is unavailable, users will be notified via email, and their prayer will be demoted on the leaderboard. Users can request the document again in the future in case it is later available.
+  </p>
+  <p>
+    <a href="https://donate.free.law/forms/membership"
+       class="btn btn-danger"><i class="fa fa-heart-o"></i> Join Free.law</a>
+  </p>
+
+  <h3 id="deleting-prayer">Deleting a Prayer</h3>
+  <p>To delete a prayer, navigate to a docket you have previously requested a document from, and press the 🙏 button on the right again. Alternatively, you can navigate to the {% if user.is_authenticated %}<a href="{% url 'user_prayers' user.username %}">list of prayers in your profile</a>{% else %}list of prayers in your profile{% endif %} and delete from there. It is not possible to delete a prayer once it is fulfilled.
+  </p>
+
+  <h2>Coming Soon</h2>
+  <p>We do not currently support requests to purchase docket information such as attorneys, parties, or docket text such as minute orders, but we hope to support that in the future.
+  </p>
+  <p>Please stay tuned!</p>
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

@@ -51,7 +51,7 @@
   <h1 id="about">Legal Search&nbsp;API</h1>
   <h2><code>{% url "search-list" version=version %}</code></h2>
   <p class="lead v-offset-above-3">Use this API to search case law, PACER data, judges, and oral argument audio recordings.</p>
-  <p>To get the most out of this API, see our <a href="{% url "coverage" %}">coverage</a> and <a href="{% url "advanced_search" %}">advanced operators</a> documentation.
+  <p>To get the most out of this API, see our <a href="{% url "coverage" %}">coverage</a> and <a href="{% url "advanced_search" %}">advanced operators</a>, and <a href="{% url "relative_dates" %}">relative date queries</a> documentation.
   </p>
 
   <h2 id="usage">Basic Usage</h2>
@@ -154,7 +154,7 @@
     <tbody>
     <tr>
       <td><code>o</code></td>
-      <td>Case law opinions</td>
+      <td>Case law opinion clusters with nested Opinion documents.</td>
     </tr>
     <tr>
       <td><code>r</code></td>
@@ -260,7 +260,9 @@
 
 
   <h2 id="monitoring">Monitoring a Query for New&nbsp;Results</h2>
-  <p>To monitor queries for new results, use the <a href="{% url "search_api_help" %}">Alert API</a>, which will send emails or webhook events when there are new results.
+  <p>All query results are cached for ten minutes. This provides instant responses to front-end users who frequently refresh or paginate results.
+  </p>
+  <p>Because of this, we do not recommend polling as a mechanism for monitoring queries for new results. Instead, use the <a href="{% url "search_api_help" %}">Alert API</a>, which will send emails or <a href="{% url "webhooks_docs" %}">webhook events</a> when there are new hits.
   </p>
 
   {% include "includes/donate_footer_plea.html" %}

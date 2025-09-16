@@ -1,5 +1,4 @@
 import datetime
-from typing import Optional, Union
 
 import requests
 from asgiref.sync import async_to_sync
@@ -76,7 +75,7 @@ def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
 def extract_content(
     pdf_bytes: bytes,
     disclosure_key: str,
-) -> dict[str, Union[str, int]]:
+) -> dict[str, str | int]:
     """Extract the content of the PDF.
 
     Attempt extraction using multiple methods if necessary.
@@ -132,7 +131,7 @@ class ChristmasError(Exception):
         self.message = message
 
 
-def get_date(text: str, year: int) -> Optional[datetime.date]:
+def get_date(text: str, year: int) -> datetime.date | None:
     """Extract date from date strings if possible
 
     Because we know year we can verify that the date is ... close.
@@ -316,7 +315,7 @@ def save_and_upload_disclosure(
     disclosure_key: str,
     response: Response,
     data: dict,
-) -> Optional[FinancialDisclosure]:
+) -> FinancialDisclosure | None:
     """Save disclosure PDF to S3 and generate a FinancialDisclosure object.
 
     :param redis_db: The redis db storing our disclosure keys
@@ -374,7 +373,7 @@ def save_and_upload_disclosure(
     interval_start=10,
     ignore_result=True,
 )
-def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
+def import_disclosure(self, data: dict[str, str | int | list]) -> None:
     """Import disclosures into Courtlistener
 
     :param data: The disclosure information to process

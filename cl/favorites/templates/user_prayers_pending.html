@@ -1,0 +1,81 @@
+{% extends "user_prayers_list.html" %}
+{% load extras %}
+{% load text_filters %}
+{% load static %}
+{% load pacer %}
+{% load tz %}
+{% load humanize %}
+
+{% block nav-prayer-pending %}active{% endblock %}
+
+{% block prayer_list %}
+  <div class="col-xs-12" id="prayer_list_waiting" hx-swap-oob="true">
+    <div class="table-responsive">
+      <table class="settings-table table">
+        <thead>
+            <tr>
+              <th>Court</th>
+              <th>Case Name</th>
+              <th>Document Number</th>
+              <th>Document Description</th>
+              <th>Requested On</th>
+              {% if is_page_owner %}<th>Delete</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for rd in rd_with_prayers_waiting %}
+            <tr>
+              <td>{{ rd.docket_entry.docket.court.citation_string }}</td>
+              {% with docket=rd.docket_entry.docket %}
+              <td>
+                <a href="{% url "view_docket" docket.pk docket.slug %}">
+                  {{ docket|best_case_name|safe|v_wrapper }} ({{ docket.docket_number }})
+                </a>
+              </td>
+              <td>
+                <a href="{{ rd.get_absolute_url }}" rel="nofollow">
+                  {% if rd.attachment_number %}
+                    {{ rd.document_number }}-{{ rd.attachment_number }}
+                  {% else %}
+                    {{ rd.document_number }}
+                  {% endif %}
+                </a>
+              </td>
+              {% endwith %}
+              <td>{{ rd.description }}</td>
+              <td>{{ rd.prayer_date_created|date:"M j, Y" }}</td>
+              {% if is_page_owner %}
+                <td>
+                  <div class="flex justify-content-center">
+                    <form id="pray_{{rd.pk}}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-swap="none"
+                      hx-post="{% url 'delete_prayer' rd.pk %}" hx-indicator="#delete-spinner-{{rd.pk}}">
+                      <input type="hidden" name="source" value="user_prayer_list">
+                      <button class="btn btn-danger btn-xs">
+                        <i class="fa fa-trash-o"></i>
+                      </button>
+                    </form>
+                    &nbsp;
+                    <span id="delete-spinner-{{rd.pk}}" class="htmx-hidden-indicator" >
+                      <i class="fa fa-spinner fa-spin fa-lg"></i>
+                    </span>
+                  </div>
+                </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="2">No document requests pending. Consider making one!</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if rd_with_prayers_waiting.has_other_pages %}
+  <div class="col-xs-12" >
+    {% include "includes/pagination.html" with page_obj=rd_with_prayers_waiting %}
+  </div>
+  {% endif %}
+
+{% endblock %}

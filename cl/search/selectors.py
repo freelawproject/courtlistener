@@ -1,7 +1,48 @@
 import natsort
-from django.db.models import F, Prefetch, QuerySet
+from django.db import connection
+from django.db.models import Q, QuerySet
 
-from cl.search.models import OpinionCluster
+from cl.search.models import Citation, OpinionCluster
+
+
+def get_total_estimate_count(table_name: str) -> int:
+    full_name = f"public.{table_name}"
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT reltuples::bigint AS estimated_total
+            FROM pg_class
+            WHERE oid = to_regclass(%s);
+            """,
+            [full_name],
+        )
+        result = cursor.fetchone()
+        return result[0] if result and result[0] > 0 else 0
+
+
+def get_available_documents_estimate_count() -> int:
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            WITH stats AS (
+              SELECT
+                most_common_vals,
+                most_common_freqs,
+                array_position(most_common_vals::text::text[], 't') AS index
+              FROM pg_stats
+              WHERE tablename = 'search_recapdocument' AND attname = 'is_available'
+            ),
+            doc_estimate AS (
+              SELECT reltuples::bigint AS estimate
+              FROM pg_class
+              WHERE oid = 'public.search_recapdocument'::regclass
+            )
+            SELECT
+              (most_common_freqs[index] * estimate)::bigint AS estimated_true_count
+            FROM stats, doc_estimate
+            WHERE index IS NOT NULL;
+        """)
+        result = cursor.fetchone()
+        return result[0] if result and result[0] > 0 else 0
 
 
 async def get_clusters_from_citation_str(
@@ -50,12 +91,10 @@ async def get_clusters_from_citation_str(
         # Create a list of the closest opinion clusters id and page to the
         # input citation
         closest_opinion_clusters = [
-            opinion
-            async for opinion in OpinionCluster.objects.filter(
-                citations__reporter=reporter, citations__volume=volume
-            )
-            .annotate(cite_page=(F("citations__page")))
-            .values_list("id", "cite_page")
+            c
+            async for c in Citation.objects.filter(
+                reporter=reporter, volume=volume
+            ).values_list("cluster_id", "page")
         ]
 
         # Create a temporal item and add it to the values list
@@ -82,8 +121,9 @@ async def get_clusters_from_citation_str(
             # There may be different page cite formats that aren't yet
             # accounted for by this code.
             clusters = OpinionCluster.objects.filter(
-                id=possible_match.id,
-                sub_opinions__html_with_citations__contains=f"*{page}",
+                Q(id=possible_match.id),
+                Q(sub_opinions__html_with_citations__contains=f"*{page}")
+                | Q(sub_opinions__xml_harvard__contains=f"*{page}"),
             ).select_related("docket__court")
             cluster_count = 1 if await clusters.aexists() else 0
 

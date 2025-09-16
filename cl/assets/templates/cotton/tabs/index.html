@@ -1,0 +1,59 @@
+{% load component_tags %}
+{% require_script "js/alpine/components/tabs.js" %}
+{% require_script "js/alpine/composables/focus.js" %}
+{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+
+<c-vars title="" class=""></c-vars>
+
+<div
+  x-data="tabsComponent"
+  class="w-full {{ class }}"
+  {{ attrs }}
+>
+  {# DESKTOP tabs #}
+  <div
+    data-title="{{ title }}"
+    role="tablist"
+    class="w-full gap-1 hidden md:flex"
+    x-data="focus"
+    x-on:keydown.left="focusPrevious"
+    x-on:keydown.right="focusNext"
+    x-on:keydown.home.prevent="focusFirst"
+    x-on:keydown.end.prevent="focusLast"
+  >
+    <template x-for="tab in tabs">
+      <div>
+        <button
+          x-on:click="setActiveTab"
+          x-bind:aria-selected="isActive"
+          x-bind:class="tabClass"
+          x-bind:data-tab-id="tab"
+          x-text="tab"
+          type="button"
+          role="tab"
+          class="px-5 py-3 text-sm font-normal rounded-t-2xl text-greyscale-600"
+        >
+        </button>
+      </div>
+    </template>
+  </div>
+
+  {# MOBILE tabs #}
+  <div class="bg-greyscale-100 rounded-t-2xl md:hidden pt-3 px-4">
+    <select aria-label="Select {{ title }} tabs" @change="handleChange" class="w-full">
+      <template x-for="tab in tabs">
+        <option
+          x-text="tab"
+          x-bind:aria-selected="isActive"
+          x-bind:data-tab-id="tab"
+          class="appearance-none"
+        ></option>
+      </template>
+    </select>
+  </div>
+
+  {# Active panel content #}
+  <div aria-label="Active {{ title }} panel" role="tabpanel" class="w-full bg-greyscale-100 text-greyscale-900 p-4 rounded-b-2xl md:rounded-tr-2xl rounded-tl-none">
+    {{ slot }}
+  </div>
+</div>

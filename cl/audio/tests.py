@@ -38,10 +38,13 @@ class PodcastTest(ESIndexTestCase, TestCase):
             jurisdiction="F",
             citation_string="Appeals. CA8.",
         )
-        with mock.patch(
-            "cl.lib.es_signal_processor.allow_es_audio_indexing",
-            side_effect=lambda x, y: True,
-        ), cls.captureOnCommitCallbacks(execute=True):
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ),
+            cls.captureOnCommitCallbacks(execute=True),
+        ):
             cls.audio = AudioWithParentsFactory.create(
                 docket=DocketFactory(
                     court=cls.court_1, date_argued=datetime.date(2014, 8, 16)
@@ -159,10 +162,8 @@ class PodcastTest(ESIndexTestCase, TestCase):
         self.assertEqual(
             node_count,
             expected_item_count,
-            msg="Did not get {expected} node(s) during search podcast "
-            "generation. Instead found: {actual}".format(
-                expected=expected_item_count, actual=node_count
-            ),
+            msg=f"Did not get {expected_item_count} node(s) during search podcast "
+            f"generation. Instead found: {node_count}",
         )
         # pubDate key must be present in Audios with date_argued.
         pubdate_present = xml_tree.xpath(
@@ -473,9 +474,13 @@ class TranscriptionTest(TestCase):
         """Is Audio object updated and AudioTranscriptMetadata created correctly?"""
         audio = self.audio_1
 
-        with mock.patch(
-            "openai.resources.audio.transcriptions.Transcriptions.create"
-        ) as patched_transcription:
+        with (
+            mock.patch(
+                "openai.resources.audio.transcriptions.Transcriptions.create"
+            ) as patched_transcription,
+            mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait,
+        ):
+            patched_wait.return_value = 0
             patched_transcription.return_value = (
                 self.OpenAITranscriptionClass()
             )
@@ -526,9 +531,12 @@ class TranscriptionTest(TestCase):
         """Is Audio.stt_status updated correctly on failure?"""
         audio = self.audio_1
 
-        with mock.patch(
-            "openai.resources.audio.transcriptions.Transcriptions.create"
-        ) as patched_transcription:
+        with (
+            mock.patch(
+                "openai.resources.audio.transcriptions.Transcriptions.create"
+            ) as patched_transcription,
+            mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait,
+        ):
             mock_response = MockResponse(422, content="")
             setattr(mock_response, "request", {})
             setattr(mock_response, "headers", {"x-request-id": "1"})
@@ -539,6 +547,7 @@ class TranscriptionTest(TestCase):
                     body="",
                 )
             )
+            patched_wait.return_value = 0
             transcribe_from_open_ai_api(audio_pk=audio.pk)
 
         audio.refresh_from_db()

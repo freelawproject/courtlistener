@@ -1,16 +1,16 @@
+from collections.abc import Iterable
 from datetime import date, datetime
-from typing import Iterable
 
 from django.conf import settings
 
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.redis_utils import get_redis_interface
-from cl.search.documents import DocketDocument, OpinionDocument
-from cl.search.management.commands.cl_index_parent_and_child_docs import (
+from cl.lib.indexing_utils import (
+    get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
+from cl.search.documents import DocketDocument, OpinionDocument
 from cl.search.models import Docket
 from cl.search.tasks import remove_documents_by_query
 
@@ -20,19 +20,6 @@ def compose_redis_key_remove_content() -> str:
     :return: A Redis key as a string.
     """
     return "es_remove_content_from_es:log"
-
-
-def get_last_parent_document_id_processed() -> int:
-    """Get the last document ID indexed.
-    :return: The last document ID indexed.
-    """
-
-    r = get_redis_interface("CACHE")
-    log_key = compose_redis_key_remove_content()
-    stored_values = r.hgetall(log_key)
-    last_document_id = int(stored_values.get("last_document_id", 0))
-
-    return last_document_id
 
 
 class Command(VerboseCommand):
@@ -119,7 +106,9 @@ class Command(VerboseCommand):
 
         pk_offset = 0
         if auto_resume:
-            pk_offset = get_last_parent_document_id_processed()
+            pk_offset = get_last_parent_document_id_processed(
+                compose_redis_key_remove_content()
+            )
             self.stdout.write(
                 f"Auto-resume enabled starting indexing from ID: {pk_offset}."
             )
@@ -186,12 +175,7 @@ class Command(VerboseCommand):
                 ).set(queue=queue).apply_async()
                 chunk = []
                 self.stdout.write(
-                    "\rProcessed {}/{}, ({:.0%}), last PK {}".format(
-                        processed_count,
-                        count,
-                        processed_count * 1.0 / count,
-                        item_id,
-                    )
+                    f"\rProcessed {processed_count}/{count}, ({processed_count * 1.0 / count:.0%}), last PK {item_id}"
                 )
                 if not processed_count % 1000:
                     # Log every 1000 parent documents processed.

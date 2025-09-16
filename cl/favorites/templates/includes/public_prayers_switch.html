@@ -1,0 +1,15 @@
+<div class="flex justify-content-center align-items-center gap-2"
+  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-swap="none" hx-trigger="change"
+  hx-post="{% url "toggle_prayer_public" %}" hx-include="[name=current_toggle_status]">
+  <div>Public:</div>
+  <div id="toogle-button" class="flex justify-content-center align-items-center gap-1">
+    <input id="current_toggle_status" name="current_toggle_status" type="hidden"
+      value="{% if page_public %}{{page_public}}{% endif %}" hx-swap-oob="true" />
+    <label for="prayer_public" class="prayers-public-switch">
+      <input {% if page_public %} checked {% endif %} type="checkbox" id="prayer_public" hx-swap-oob="true">
+      <span class="toggle">
+        <span class="switch"></span>
+      </span>
+    </label>
+  </div>
+</div>

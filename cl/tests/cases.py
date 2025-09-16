@@ -1,55 +1,27 @@
 import re
-import sys
-from io import StringIO
-from unittest import mock
+from datetime import datetime
+from typing import cast
+from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
+from django.test import SimpleTestCase
 from django.urls import reverse
+from django.utils.dateformat import format
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
-from rest_framework.test import APITestCase
+from lxml.html import HtmlElement
+from rest_framework.test import APITestCase as DRFTestCase
 from rest_framework.utils.serializer_helpers import ReturnList
 
+from cl.alerts.management.commands.cl_send_scheduled_alerts import (
+    get_cut_off_date,
+)
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
-
-
-class OutputBlockerTestMixin:
-    """Block the output of tests so that they run a bit faster.
-
-    This is pulled from Speed Up Your Django Tests, Chapter, 4.9 "Prevent
-    Output". In Django 3.2, this should be easier via a new --buffer argument.
-    """
-
-    def _callTestMethod(self, method):
-        try:
-            out = StringIO()
-            err = StringIO()
-            with mock.patch.object(sys, "stdout", new=out), mock.patch.object(
-                sys, "stderr", new=err
-            ):
-                super()._callTestMethod(method)
-        except Exception:
-            print(out.getvalue(), end="")
-            print(err.getvalue(), end="", file=sys.stderr)
-            raise
-
-
-class OneDatabaseMixin:
-    """Only use one DB during tests
-
-    If you have more than one DB in your settings, which we sometimes do,
-    Django creates transactions for each DB and each test. This takes time.
-
-    Since we don't have multi-DB features/tests, simply ensure that all our
-    tests use only one DB, the default one.
-    """
-
-    databases = {"default"}
 
 
 class RestartRateLimitMixin:
@@ -86,17 +58,7 @@ class RestartSentEmailQuotaMixin:
         super().tearDown()
 
 
-class SimpleTestCase(
-    OutputBlockerTestMixin,
-    OneDatabaseMixin,
-    test.SimpleTestCase,
-):
-    pass
-
-
 class TestCase(
-    OutputBlockerTestMixin,
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TestCase,
 ):
@@ -104,8 +66,6 @@ class TestCase(
 
 
 class TransactionTestCase(
-    OutputBlockerTestMixin,
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TransactionTestCase,
 ):
@@ -113,8 +73,6 @@ class TransactionTestCase(
 
 
 class LiveServerTestCase(
-    OutputBlockerTestMixin,
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     test.LiveServerTestCase,
 ):
@@ -122,8 +80,6 @@ class LiveServerTestCase(
 
 
 class StaticLiveServerTestCase(
-    OutputBlockerTestMixin,
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     testing.StaticLiveServerTestCase,
 ):
@@ -131,10 +87,8 @@ class StaticLiveServerTestCase(
 
 
 class APITestCase(
-    OutputBlockerTestMixin,
-    OneDatabaseMixin,
     RestartRateLimitMixin,
-    APITestCase,
+    DRFTestCase,
 ):
     pass
 
@@ -206,8 +160,8 @@ class ESIndexTestCase(SimpleTestCase):
                 self.assertEqual(
                     node_count,
                     count,
-                    msg="Did not find %s node(s) with XPath query: %s. "
-                    "Instead found: %s" % (count, test_content, node_count),
+                    msg=f"Did not find {count} node(s) with XPath query: {test_content}. "
+                    f"Instead found: {node_count}",
                 )
 
         return xml_tree
@@ -242,9 +196,9 @@ class CountESTasksTestCase(SimpleTestCase):
     def reset_and_assert_task_count(self, expected) -> None:
         """Resets the task call count and asserts the expected number of calls."""
 
-        assert (
-            self.task_call_count == expected
-        ), f"Expected {expected} task calls, but got {self.task_call_count}"
+        assert self.task_call_count == expected, (
+            f"Expected {expected} task calls, but got {self.task_call_count}"
+        )
         self.task_call_count = 0
 
 
@@ -272,7 +226,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
             )
             for score_value in meta_value.values():
                 self.assertIsNotNone(
-                    score_value, f"The score value can't be None."
+                    score_value, "The score value can't be None."
                 )
 
         else:
@@ -346,23 +300,63 @@ class V4SearchAPIAssertions(SimpleTestCase):
                         f"Parent field '{field}' does not match.",
                     )
 
-    def _test_results_ordering(self, test, field):
+    def _test_results_ordering(self, test, field, version="v4"):
         """Ensure dockets appear in the response in a specific order."""
 
-        with self.subTest(test=test, msg=f'{test["name"]}'):
+        with self.subTest(test=test, msg=f"{test['name']}"):
             r = self.client.get(
-                reverse("search-list", kwargs={"version": "v4"}),
+                reverse("search-list", kwargs={"version": version}),
                 test["search_params"],
             )
-            self.assertEqual(len(r.data["results"]), test["expected_results"])
+
+            expected_order_key = "expected_order"
+            if version == "v3":
+                expected_order_key = (
+                    "expected_order_v3"
+                    if "expected_order_v3" in test
+                    else "expected_order"
+                )
+
+            self.assertEqual(
+                len(r.data["results"]), len(test[expected_order_key])
+            )
             # Note that dockets where the date_field is null are sent to the bottom
             # of the results
             actual_order = [result[field] for result in r.data["results"]]
             self.assertEqual(
                 actual_order,
-                test["expected_order"],
-                msg=f'Expected order {test["expected_order"]}, but got {actual_order}',
+                test[expected_order_key],
+                msg=f"Expected order {test[expected_order_key]}, but got {actual_order} for "
+                f"Search type: {test['search_params']['type']}",
             )
+
+    def _assert_order_in_html(
+        self, decoded_content: str, expected_order: list
+    ) -> None:
+        """Assert that the expected order of documents appears correctly in the
+        HTML content."""
+
+        for i in range(len(expected_order) - 1):
+            self.assertTrue(
+                decoded_content.index(str(expected_order[i]))
+                < decoded_content.index(str(expected_order[i + 1])),
+                f"Expected {expected_order[i]} to appear before {expected_order[i + 1]} in the HTML content.",
+            )
+
+    async def _test_article_count(self, params, expected_count, field_name):
+        r = await self.async_client.get("/", params)
+        tree = html.fromstring(r.content.decode())
+        got = len(tree.xpath("//article"))
+        self.assertEqual(
+            got,
+            expected_count,
+            msg=f"Did not get the right number of search results in Frontend with {field_name} "
+            "filter applied.\n"
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
+        )
+        return r
 
     def _test_page_variables(
         self, response, test_case, current_page, search_type
@@ -418,7 +412,6 @@ class V4SearchAPIAssertions(SimpleTestCase):
 
 
 class SearchAlertsAssertions:
-
     @staticmethod
     def get_html_content_from_email(email_content):
         html_content = None
@@ -437,7 +430,7 @@ class SearchAlertsAssertions:
             got,
             expected_count,
             msg="Did not get the right number of alerts in the email. "
-            "Expected: %s - Got: %s\n\n" % (expected_count, got),
+            f"Expected: {expected_count} - Got: {got}\n\n",
         )
 
     @staticmethod
@@ -499,9 +492,8 @@ class SearchAlertsAssertions:
         self.assertEqual(
             len(alert_cases),
             expected_hits,
-            msg="Did not get the right number of hits for the alert %s. "
-            "Expected: %s - Got: %s\n\n"
-            % (alert_title, expected_hits, len(alert_cases)),
+            msg=f"Did not get the right number of hits for the alert {alert_title}. "
+            f"Expected: {expected_hits} - Got: {len(alert_cases)}\n\n",
         )
         if case_title:
             for case in alert_cases:
@@ -518,9 +510,8 @@ class SearchAlertsAssertions:
                     self.assertEqual(
                         child_hit_count,
                         expected_child_hits,
-                        msg="Did not get the right number of child hits for the case %s. "
-                        "Expected: %s - Got: %s\n\n"
-                        % (case_title, expected_child_hits, child_hit_count),
+                        msg=f"Did not get the right number of child hits for the case {case_title}. "
+                        f"Expected: {expected_child_hits} - Got: {child_hit_count}\n\n",
                     )
                     break
 
@@ -586,8 +577,7 @@ class SearchAlertsAssertions:
                 self.assertEqual(
                     len(webhook_cases),
                     expected_hits,
-                    msg=f"Did not get the right number of hits for the alert %s. "
-                    % alert_title,
+                    msg=f"Did not get the right number of hits for the alert {alert_title}. ",
                 )
                 matched_alert_name = True
                 for case in webhook["payload"]["results"]:
@@ -599,8 +589,7 @@ class SearchAlertsAssertions:
                         self.assertEqual(
                             len(case[nested_field]),
                             expected_child_hits,
-                            msg=f"Did not get the right number of child documents for the case %s. "
-                            % case_title,
+                            msg=f"Did not get the right number of child documents for the case {case_title}. ",
                         )
         self.assertTrue(matched_alert_name, msg="Alert name didn't match")
         self.assertTrue(matched_case_title, msg="Case title didn't match")
@@ -632,8 +621,9 @@ class SearchAlertsAssertions:
                 self.assertEqual(
                     1,
                     len(hits),
-                    msg=f"Did not get the right number of hits for the case %s. "
-                    % webhook["payload"]["results"][0]["caseName"],
+                    msg="Did not get the right number of hits for the case {}. ".format(
+                        webhook["payload"]["results"][0]["caseName"]
+                    ),
                 )
                 alert_child_hits = alert_child_hits + len(
                     webhook["payload"]["results"][0]["recap_documents"]
@@ -644,21 +634,18 @@ class SearchAlertsAssertions:
         self.assertEqual(
             alert_title_webhooks,
             expected_hits,
-            msg=f"Did not get the right number of webhooks for alert %s. "
-            % alert_title,
+            msg=f"Did not get the right number of webhooks for alert {alert_title}. ",
         )
         self.assertEqual(
             alert_child_hits,
             expected_child_hits,
-            msg=f"Did not get the right number of child hits for alert %s. "
-            % alert_title,
+            msg=f"Did not get the right number of child hits for alert {alert_title}. ",
         )
         if expected_child_descriptions:
             self.assertEqual(
                 alert_child_ids,
                 set(expected_child_descriptions),
-                msg=f"Did not get the right child hits IDs for alert %s. "
-                % alert_title,
+                msg=f"Did not get the right child hits IDs for alert {alert_title}. ",
             )
 
     def _assert_webhook_hit_hl(
@@ -684,8 +671,7 @@ class SearchAlertsAssertions:
                     self.assertIn(
                         hl_expected,
                         child_field_content,
-                        msg=f"Did not get the HL content in field: %s. "
-                        % field_name,
+                        msg=f"Did not get the HL content in field: {field_name}. ",
                     )
                 else:
                     self.assertNotIn(
@@ -697,6 +683,49 @@ class SearchAlertsAssertions:
                     self.assertIn(
                         hl_expected,
                         parent_field_content,
-                        msg=f"Did not get the HL content in field: %s. "
-                        % field_name,
+                        msg=f"Did not get the HL content in field: {field_name}. ",
                     )
+
+    def _assert_timestamp_filter(
+        self, html_content, rate, date, sweep_index=False
+    ):
+        """Confirm that timestamp filter is properly set in the
+        'View Full Results' URL.
+        """
+        view_results_url = html.fromstring(str(html_content)).xpath(
+            '//a[text()="View Full Results / Edit this Alert"]/@href'
+        )
+        parsed_url = urlparse(view_results_url[0])
+        params = parse_qs(parsed_url.query)
+        cut_off_date = get_cut_off_date(rate, date, sweep_index)
+        iso_datetime = (
+            cut_off_date.strftime("%Y-%m-%dT%H:%M:%S")
+            if isinstance(cut_off_date, datetime)
+            else cut_off_date.strftime("%Y-%m-%d")
+        )
+        self.assertIn(f"timestamp:[{iso_datetime} TO *]", params["q"][0])
+
+    def _assert_date_updated(self, date_to_compare, html_content, txt_content):
+        """Confirm that date_updated is properly set in the alert email."""
+
+        self.assertIn(
+            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            html_content,
+        )
+
+        self.assertIn(
+            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            txt_content,
+        )
+
+    @staticmethod
+    def _extract_snippet_content(html_content: str):
+        html_doc = html.fromstring(html_content)
+        snippet_content = cast(
+            list[HtmlElement],
+            html_doc.xpath('//*[self::p or self::span][@id="snippet"]'),
+        )
+        assert snippet_content, "No snippet found"
+
+        snippet_text = snippet_content[0].text_content().strip()
+        return snippet_text.replace("…", "").replace("&hellip;", "")

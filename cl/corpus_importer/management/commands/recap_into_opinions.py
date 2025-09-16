@@ -15,6 +15,7 @@ def import_opinions_from_recap(
     total_count: int = 0,
     queue: str = "batch1",
     db_connection: str = "default",
+    skip_citation_finding: bool = True,
 ) -> None:
     """Import recap documents into opinion db
 
@@ -24,6 +25,11 @@ def import_opinions_from_recap(
     :param total_count: The number of new opinions to add
     :param queue: The queue to use for celery
     :param db_connection: The db to use
+    :param skip_citation_finding: if True, the ingestion task will not create
+        a `find_citations_and_parentheticals_for_opinion_by_pks` task.
+        This is helpful to prevent creating too many single-opinion tasks
+        during bulk work
+
     :return: None
     """
     court_query = Court.objects.using(db_connection)
@@ -71,20 +77,29 @@ def import_opinions_from_recap(
                 is_available=True,
                 is_free_on_pacer=True,
             )
-            .only("id")
+            .only("id", "sha1")
+            .values_list("id", "sha1")
             .order_by("id")
         )
 
+        seen_sha1 = set()
         throttle = CeleryThrottle(queue_name=queue)
-        for recap_document in recap_documents.iterator():
+        for recap_document_id, sha1 in recap_documents.iterator():
+            if sha1 in seen_sha1:
+                logger.info("Skipping repeated hash %s", sha1)
+                continue
+
             logger.info(
-                f"{count}: Importing rd {recap_document.id} in {court.id}"
+                f"{count}: Importing rd {recap_document_id} in {court.id}"
             )
             throttle.maybe_wait()
             recap_document_into_opinions.apply_async(
-                args=[{}, recap_document.id], queue=queue
+                args=[{}, recap_document_id, skip_citation_finding],
+                queue=queue,
             )
+            seen_sha1.add(sha1)
             count += 1
+
             if total_count > 0 and count >= total_count:
                 logger.info(
                     f"RECAP import completed for {total_count} documents"
@@ -138,6 +153,19 @@ class Command(BaseCommand):
             default=False,
             help="Use this flag to run the queries in the replica db",
         )
+        parser.add_argument(
+            "--find-citations",
+            action="store_true",
+            default=False,
+            help=(
+                "If you pass this flag, each opinion created will create a"
+                " `find_citations_and_parentheticals_for_opinion_by_pks` task"
+                " which may eat up Redis memory if the bulk work is too much."
+                "By default, we skip citation finding. However, you will have"
+                " to run the `find_citations` command afterwards. Otherwise"
+                " `Opinion.html_with_citations` will be blank"
+            ),
+        )
 
     def handle(self, *args, **options):
         jurisdiction = options.get("jurisdiction")
@@ -150,6 +178,11 @@ class Command(BaseCommand):
             if options.get("use_replica") and "replica" in settings.DATABASES
             else "default"
         )
+        skip_citation_finding = not options["find_citations"]
+        if skip_citation_finding:
+            logger.warning(
+                "Opinions created will not have `html_with_citations`. Run `find_citations` over these opinions"
+            )
 
         import_opinions_from_recap(
             jurisdiction,
@@ -158,4 +191,5 @@ class Command(BaseCommand):
             total_count,
             queue,
             db_connection,
+            skip_citation_finding,
         )

@@ -18,8 +18,8 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import BadContentError
 from cl.scrapers.management.commands import cl_back_scrape_opinions
 from cl.scrapers.management.commands.cl_scrape_opinions import make_citation
-from cl.scrapers.utils import get_binary_content
-from cl.search.models import Citation, Court, Opinion
+from cl.scrapers.utils import citation_is_duplicated, get_binary_content
+from cl.search.models import Court, Opinion
 
 
 class Command(cl_back_scrape_opinions.Command):
@@ -92,7 +92,7 @@ class Command(cl_back_scrape_opinions.Command):
                 if not citation_candidate:
                     continue
 
-                if self.citation_is_duplicated(citation_candidate, cite):
+                if citation_is_duplicated(citation_candidate, cite):
                     continue
 
                 try:
@@ -106,46 +106,3 @@ class Command(cl_back_scrape_opinions.Command):
                         cite,
                         cluster,
                     )
-
-    def citation_is_duplicated(
-        self, citation_candidate: Citation, cite: str
-    ) -> bool:
-        """Checks if the citation is duplicated for the cluster
-
-        Following corpus_importer.utils.add_citations_to_cluster we
-        identify 2 types of duplication:
-        - exact: a citation with the same fields already exists for the cluster
-        - duplication in the same reporter: the cluster already has a citation
-            in that reporter
-
-        :param citation_candidate: the citation object
-        :param cite: citation string
-
-        :return: True if citation is duplicated, False if not
-        """
-        citation_params = {**citation_candidate.__dict__}
-        citation_params.pop("_state", "")
-        citation_params.pop("id", "")
-        cluster_id = citation_candidate.cluster.id
-
-        # Exact duplication
-        if Citation.objects.filter(**citation_params).exists():
-            logger.info(
-                "Citation '%s' already exists for cluster %s",
-                cite,
-                cluster_id,
-            )
-            return True
-
-        # Duplication in the same reporter
-        if Citation.objects.filter(
-            cluster_id=cluster_id, reporter=citation_candidate.reporter
-        ).exists():
-            logger.info(
-                "Another citation in the same reporter '%s' exists for cluster %s",
-                citation_candidate.reporter,
-                cluster_id,
-            )
-            return True
-
-        return False

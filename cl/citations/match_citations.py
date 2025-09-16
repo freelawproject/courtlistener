@@ -1,6 +1,8 @@
 #!/usr/bin/env python
-from typing import Dict, Iterable, List, Optional, no_type_check
+from collections.abc import Iterable
+from typing import no_type_check
 
+from asgiref.sync import async_to_sync
 from elasticsearch_dsl.response import Hit
 from eyecite import resolve_citations
 from eyecite.models import (
@@ -23,22 +25,30 @@ from cl.citations.types import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.search.models import Opinion, RECAPDocument
+from cl.search.selectors import get_clusters_from_citation_str
 
 DEBUG = True
 
 
 NO_MATCH_RESOURCE = Resource(case_citation(source_text="UNMATCHED_CITATION"))
+MULTIPLE_MATCHES_RESOURCE = Resource(
+    case_citation(
+        source_text="MULTIPLE_MATCHES", page="999999", volume="999999"
+    )
+)
+# to be used when storing unmatched citations
+MULTIPLE_MATCHES_FLAG = "is_ambiguous"
 
 
 def filter_by_matching_antecedent(
     opinion_candidates: Iterable[Opinion],
-    antecedent_guess: Optional[str],
-) -> Optional[Opinion]:
+    antecedent_guess: str | None,
+) -> Opinion | None:
     if not antecedent_guess:
         return None
 
     antecedent_guess = strip_punct(antecedent_guess)
-    candidates: List[Opinion] = []
+    candidates: list[Opinion] = []
 
     for o in opinion_candidates:
         if antecedent_guess in best_case_name(o.cluster):
@@ -56,6 +66,51 @@ def resolve_fullcase_citation(
     if type(full_citation) is FullCaseCitation:
         db_search_results: list[Hit]
         db_search_results, _ = es_search_db_for_full_citation(full_citation)
+        # If there is more than one result, return a placeholder with the
+        # citation with multiple results
+
+        if len(db_search_results) == 0:
+            # If no citation is found use get_clusters_from_citation as a backup
+            volume = full_citation.groups.get("volume")
+            reporter = full_citation.corrected_reporter()
+            page = full_citation.corrected_page()
+            if (
+                volume is not None
+                and volume.isdigit()
+                and reporter is not None
+                and page is not None
+            ):
+                clusters, _count = async_to_sync(
+                    get_clusters_from_citation_str
+                )(volume=volume, reporter=reporter, page=page)
+
+                if _count == 0:
+                    return NO_MATCH_RESOURCE
+
+                # exclude self links
+                if getattr(full_citation, "citing_opinion", False):
+                    clusters = [
+                        cluster
+                        for cluster in clusters
+                        if cluster.id
+                        != full_citation.citing_opinion.cluster.pk
+                    ]
+                    _count = len(clusters)
+
+                if _count == 1:
+                    # return the first item by ordering key
+                    return clusters[0].ordered_opinions.first()
+                elif _count >= 2:
+                    # set an attribute to differentiate 0-match and
+                    # more-than-one-match citations
+                    setattr(full_citation, MULTIPLE_MATCHES_FLAG, True)
+                    # if two or more remain return multiple matches
+                    return MULTIPLE_MATCHES_RESOURCE
+
+        if len(db_search_results) > 1:
+            setattr(full_citation, MULTIPLE_MATCHES_FLAG, True)
+            return MULTIPLE_MATCHES_RESOURCE
+
         # If there is one search result, try to return it
         if len(db_search_results) == 1:
             result_id = db_search_results[0]["id"]
@@ -79,8 +134,8 @@ def resolve_fullcase_citation(
 def resolve_shortcase_citation(
     short_citation: ShortCaseCitation,
     resolved_full_cites: ResolvedFullCites,
-) -> Optional[Opinion]:
-    candidates: List[Opinion] = []
+) -> Opinion | None:
+    candidates: list[Opinion] = []
     matched_opinions = [
         o for c, o in resolved_full_cites if type(o) is Opinion
     ]
@@ -109,7 +164,7 @@ def resolve_shortcase_citation(
 def resolve_supra_citation(
     supra_citation: SupraCitation,
     resolved_full_cites: ResolvedFullCites,
-) -> Optional[Opinion]:
+) -> Opinion | None:
     matched_opinions = [
         o for c, o in resolved_full_cites if type(o) is Opinion
     ]
@@ -120,8 +175,8 @@ def resolve_supra_citation(
 
 @no_type_check
 def do_resolve_citations(
-    citations: List[CitationBase], citing_object: Opinion | RECAPDocument
-) -> Dict[MatchedResourceType, List[SupportedCitationType]]:
+    citations: list[CitationBase], citing_object: Opinion | RECAPDocument
+) -> dict[MatchedResourceType, list[SupportedCitationType]]:
     # Set the citing opinion on FullCaseCitation objects for later matching
     for c in citations:
         if type(c) is FullCaseCitation:

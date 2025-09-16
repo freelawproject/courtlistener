@@ -1,6 +1,6 @@
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable
 
 from django.contrib.syndication.views import Feed
 from django.http import HttpResponse
@@ -19,6 +19,8 @@ from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
 from cl.search.documents import ESRECAPDocument, OpinionClusterDocument
 from cl.search.exception import (
     BadProximityQuery,
+    DisallowedWildcardPattern,
+    InvalidRelativeDateSyntax,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
 )
@@ -255,6 +257,8 @@ def search_feed_error_handler(view_func: Callable) -> Callable:
             UnbalancedParenthesesQuery,
             UnbalancedQuotesQuery,
             BadProximityQuery,
+            DisallowedWildcardPattern,
+            InvalidRelativeDateSyntax,
             ApiError,
         ) as e:
             logger.warning("Couldn't load the feed page. Error was: %s", e)

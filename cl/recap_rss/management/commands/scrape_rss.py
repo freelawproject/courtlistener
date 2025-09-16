@@ -65,11 +65,11 @@ class Command(VerboseCommand):
             with open(f"/tmp/rss-scraper-{court_str}.pid", "w") as fp:
                 try:
                     fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except IOError:
+                except OSError:
                     print(
                         "Another instance of this program is running with "
                         "this combination of courts. Only one instance "
-                        "can crawl these courts at a time: '%s'" % court_str
+                        f"can crawl these courts at a time: '{court_str}'"
                     )
                     sys.exit(1)
 
@@ -143,6 +143,9 @@ class Command(VerboseCommand):
                 )
 
                 # Check if the item needs crawling, and crawl it if so.
+                # Make the chain expire after RSS_MAX_PROCESSING_DURATION,
+                # which is the threshold time after which a new chain for the
+                # court will be scheduled.
                 chain(
                     check_if_feed_changed.s(
                         court.pk, new_status.pk, feed_status.date_last_build
@@ -155,7 +158,7 @@ class Command(VerboseCommand):
                     # have information about hundreds or thousands of
                     # dockets. Updating them all would be very bad.
                     mark_status_successful.si(new_status.pk),
-                ).apply_async()
+                ).apply_async(expires=self.RSS_MAX_PROCESSING_DURATION)
 
             # Trim if not too recently trimmed.
             trim_cutoff_date = now() - timedelta(

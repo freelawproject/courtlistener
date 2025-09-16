@@ -116,11 +116,7 @@ class Donation(AbstractDateTimeModel):
     referrer = models.TextField("GET or HTTP referrer", blank=True)
 
     def __str__(self) -> str:
-        return "%s: $%s, %s" % (
-            self.get_payment_provider_display(),
-            self.amount,
-            self.get_status_display(),
-        )
+        return f"{self.get_payment_provider_display()}: ${self.amount}, {self.get_status_display()}"
 
     class Meta:
         ordering = ["-date_created"]
@@ -161,11 +157,7 @@ class MonthlyDonation(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "%s: $%s by %s" % (
-            self.pk,
-            self.monthly_donation_amount,
-            self.get_payment_provider_display(),
-        )
+        return f"{self.pk}: ${self.monthly_donation_amount} by {self.get_payment_provider_display()}"
 
 
 class NeonWebhookEvent(AbstractDateTimeModel):
@@ -197,6 +189,18 @@ class NeonWebhookEvent(AbstractDateTimeModel):
     )
 
 
+class MembershipPaymentStatus:
+    PENDING = 0
+    SUCCEEDED = 1
+    FAILED = 2
+
+    CHOICES = (
+        (PENDING, "Awaiting payment processing"),
+        (SUCCEEDED, "Payment successfully processed"),
+        (FAILED, "Payment failed or was declined"),
+    )
+
+
 @pghistory.track()
 class NeonMembership(AbstractDateTimeModel):
     BASIC = 1
@@ -205,8 +209,6 @@ class NeonMembership(AbstractDateTimeModel):
     TIER_2 = 4
     TIER_3 = 5
     TIER_4 = 6
-    TIER_5 = 7
-    PLATINUM = 8
     EDU = 9
     GROUP_SMALLEST = 10
     GROUP_SMALL = 11
@@ -220,8 +222,6 @@ class NeonMembership(AbstractDateTimeModel):
         (TIER_2, "CL Membership - Tier 2"),
         (TIER_3, "CL Membership - Tier 3"),
         (TIER_4, "CL Membership - Tier 4"),
-        (TIER_5, "CL Membership - Tier 5"),
-        (PLATINUM, "CL Platinum Membership"),
         (EDU, "EDU Membership"),
         (GROUP_SMALLEST, "Group Membership - Smallest"),
         (GROUP_SMALL, "Group Membership - Small"),
@@ -250,10 +250,17 @@ class NeonMembership(AbstractDateTimeModel):
         blank=True,
         null=True,
     )
+    payment_status = models.SmallIntegerField(
+        choices=MembershipPaymentStatus.CHOICES,
+        default=MembershipPaymentStatus.PENDING,
+    )
 
     @property
     def is_active(self) -> bool:
+        if self.payment_status != MembershipPaymentStatus.SUCCEEDED:
+            return False
+
         if not self.termination_date:
             return True
 
-        return self.termination_date > timezone.now()
+        return self.termination_date.date() >= timezone.now().date()

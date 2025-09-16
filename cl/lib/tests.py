@@ -1,13 +1,20 @@
 import datetime
 import pickle
-from typing import Tuple, TypedDict, cast
+from typing import TypedDict, cast
+from unittest import mock
 from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
+from django.core.cache import cache
 from django.core.files.base import ContentFile
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from requests.cookies import RequestsCookieJar
 
+from cl.lib.courts import (
+    get_active_court_from_cache,
+    get_minimal_list_of_courts,
+    lookup_child_courts_cache,
+)
 from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
@@ -34,11 +41,13 @@ from cl.lib.pacer_session import (
 )
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
+from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import (
     acquire_redis_lock,
     get_redis_interface,
     release_redis_lock,
 )
+from cl.lib.search_index_utils import get_parties_from_case_name_bankr
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
     check_for_proximity_tokens,
@@ -52,10 +61,10 @@ from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
-    OpinionClusterFactoryMultipleOpinions,
+    OpinionClusterWithMultipleOpinionsFactory,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 
 
 class TestPacerUtils(TestCase):
@@ -75,8 +84,7 @@ class TestPacerUtils(TestCase):
         )
         self.assertFalse(
             blocked,
-            msg="Bankruptcy dockets with many entries "
-            "should not be blocked",
+            msg="Bankruptcy dockets with many entries should not be blocked",
         )
         # This should stay blocked even though it's a big bankruptcy docket.
         d.blocked = True
@@ -85,16 +93,106 @@ class TestPacerUtils(TestCase):
         )
         self.assertTrue(
             blocked,
-            msg="Bankruptcy dockets that start blocked "
-            "should stay blocked.",
+            msg="Bankruptcy dockets that start blocked should stay blocked.",
         )
+
+
+@mock.patch(
+    "cl.lib.courts.get_cache_key_for_court_list",
+    return_value="lib_test:minimal-court-list",
+)
+class TestCachedCourtUtils(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent_court = CourtFactory(id="parent_court")
+        cls.child_court_1 = CourtFactory(
+            id="child_1", jurisdiction="FB", parent_court=cls.parent_court
+        )
+        cls.child_court_2 = CourtFactory(
+            id="child_2",
+            jurisdiction="FB",
+            parent_court=cls.parent_court,
+        )
+        cls.court_not_in_use = CourtFactory(in_use=False)
+
+        cls.self_referencing_court = CourtFactory(
+            id="self_ref", parent_court_id="self_ref"
+        )
+        cls.self_referencing_child_1 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+        cls.self_referencing_child_1_1 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+        cls.self_referencing_child_2 = CourtFactory(
+            parent_court=cls.self_referencing_court
+        )
+
+    def setUp(self):
+        # Pre-populate the cache with the court list
+        with patch(
+            "cl.lib.courts.get_cache_key_for_court_list",
+            return_value="lib_test:minimal-court-list",
+        ):
+            get_minimal_list_of_courts()
+
+    def test_can_get_active_courts_from_cache(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            in_use_courts = get_active_court_from_cache()
+
+        court_count = Court.objects.filter(in_use=True).count()
+        self.assertEqual(len(in_use_courts), court_count)
+
+    def test_can_handle_empty_inputs(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([])
+
+        self.assertEqual(child_ids, set())
+
+    def test_can_return_empty_set_for_court_w_no_child(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([self.court_not_in_use.pk])
+
+        self.assertEqual(child_ids, set())
+
+    def test_can_return_set_with_child_court_ids(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache([self.parent_court.pk])
+
+        self.assertSetEqual(
+            {
+                self.parent_court.pk,
+                self.child_court_1.pk,
+                self.child_court_2.pk,
+            },
+            child_ids,
+        )
+
+    def test_can_handle_self_referencing_courts(self, mock_cache_key):
+        with self.assertNumQueries(0):
+            child_ids = lookup_child_courts_cache(
+                [self.self_referencing_court.pk]
+            )
+
+        self.assertSetEqual(
+            {
+                self.self_referencing_court.pk,
+                self.self_referencing_child_1.pk,
+                self.self_referencing_child_1_1.pk,
+                self.self_referencing_child_2.pk,
+            },
+            child_ids,
+        )
+
+    def tearDown(self):
+        cache.delete("lib_test:minimal-court-list")
+        return super().tearDown()
 
 
 @override_settings(
     EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
 )
 class TestPacerSessionUtils(TestCase):
-
     def setUp(self) -> None:
         r = get_redis_interface("CACHE", decode_responses=False)
         # Clear cached session keys to prevent data inconsistencies.
@@ -181,7 +279,7 @@ class TestStringUtils(SimpleTestCase):
             ellipsis: str
 
         s = "Henry wants apple."
-        tests: Tuple[TestType, ...] = (
+        tests: tuple[TestType, ...] = (
             # Simple case
             {"length": 13, "result": "Henry wants"},
             # Off by one cases
@@ -208,14 +306,15 @@ class TestStringUtils(SimpleTestCase):
             self.assertEqual(
                 result,
                 test_dict["result"],
-                msg="Failed with dict: %s.\n"
-                "%s != %s" % (test_dict, result, test_dict["result"]),
+                msg="Failed with dict: {}.\n{} != {}".format(
+                    test_dict, result, test_dict["result"]
+                ),
             )
             self.assertTrue(
                 len(result) <= test_dict["length"],
-                msg="Failed with dict: %s.\n"
-                "%s is longer than %s"
-                % (test_dict, result, test_dict["length"]),
+                msg="Failed with dict: {}.\n{} is longer than {}".format(
+                    test_dict, result, test_dict["length"]
+                ),
             )
 
     def test_anonymize(self) -> None:
@@ -305,6 +404,11 @@ class TestModelHelpers(TestCase):
 
         # Do we automatically zero-pad short docket numbers?
         self.assertEqual(make_docket_number_core("12-cv-1032"), expected)
+
+        # Case type up to 5 letters.
+        self.assertEqual(
+            make_docket_number_core("4:25-crcor-00029"), "2500029"
+        )
 
         # bankruptcy numbers
         self.assertEqual(make_docket_number_core("12-33112"), "12033112")
@@ -941,7 +1045,7 @@ class TestFactoriesClasses(TestCase):
         court_scotus = CourtFactory(id="scotus")
 
         # Create 3 opinions by default
-        cluster_1 = OpinionClusterFactoryMultipleOpinions(
+        cluster_1 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=court_scotus,
                 case_name="Foo v. Bar",
@@ -955,7 +1059,7 @@ class TestFactoriesClasses(TestCase):
         self.assertEqual(cluster_1.sub_opinions.all().count(), 3)
 
         # Create 3 opinions specifying type for each one
-        cluster_2 = OpinionClusterFactoryMultipleOpinions(
+        cluster_2 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=court_scotus,
                 case_name="Lorem v. Ipsum",
@@ -1100,9 +1204,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_for_proximity_tokens(
-                test["input_str"]  # type: ignore
-            )
+            output = check_for_proximity_tokens(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         # Check for Unbalanced parentheses.
@@ -1139,15 +1241,11 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = check_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_parenthesis(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_parenthesis(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
 
         # Check for Unbalanced quotes.
@@ -1158,12 +1256,27 @@ class TestElasticsearchUtils(SimpleTestCase):
                 "sanitized": "This is unbalanced",
             },
             {
+                "input_str": "This is “unbalanced",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
                 "input_str": 'This is "unbalanced""',
                 "output": True,
                 "sanitized": 'This is "unbalanced"',
             },
             {
+                "input_str": "This is “unbalanced””",
+                "output": True,
+                "sanitized": 'This is "unbalanced"',
+            },
+            {
                 "input_str": 'This "is" unbalanced"',
+                "output": True,
+                "sanitized": 'This "is" unbalanced',
+            },
+            {
+                "input_str": 'This "is” unbalanced"',
                 "output": True,
                 "sanitized": 'This "is" unbalanced',
             },
@@ -1183,10 +1296,139 @@ class TestElasticsearchUtils(SimpleTestCase):
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_quotes(
-                test["input_str"]  # type: ignore
-            )
+            output = sanitize_unbalanced_quotes(test["input_str"])  # type: ignore
             self.assertEqual(output, test["sanitized"])
+
+    def test_can_get_parties_from_bankruptcy_case_name(self) -> None:
+        class PartiesNameTestType(TypedDict):
+            case_name: str
+            output: list[str]
+
+        tests: list[PartiesNameTestType] = [
+            {
+                "case_name": "Mendelsohn. Singh",
+                "output": ["Mendelsohn. Singh"],
+            },
+            {
+                "case_name": "Cadle Co. v Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. v Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. v. Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. vs Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Cadle Co. vs. Matos",
+                "output": ["Cadle Co.", "Matos"],
+            },
+            {
+                "case_name": "Paul Thomas Presbury, Jr. and Lisa Rae Presbury",
+                "output": ["Paul Thomas Presbury, Jr.", "Lisa Rae Presbury"],
+            },
+            {
+                "case_name": "Ma Margarita Bernal Sosa -ABOVE MED",
+                "output": ["Ma Margarita Bernal Sosa"],
+            },
+            {
+                "case_name": "Jennifer Renee' Abbott and Quentin Andrew Abbott -ABOVE MED",
+                "output": ["Jennifer Renee' Abbott", "Quentin Andrew Abbott"],
+            },
+            {
+                "case_name": "Aiesha Renee -BELOW MED",
+                "output": ["Aiesha Renee"],
+            },
+            {
+                "case_name": "Justin Kaiser and Belinda Kaiser -BELOW MED",
+                "output": ["Justin Kaiser", "Belinda Kaiser"],
+            },
+            {
+                "case_name": "Cosmorex Ltd. (in Liquidation)",
+                "output": ["Cosmorex Ltd."],
+            },
+            {
+                "case_name": "Cowen & Co. v. Zagar (In re Zagar)",
+                "output": ["Cowen & Co.", "Zagar"],
+            },
+            {
+                "case_name": 'Advantage LLC <b><font color="red">Jointly Administered under 23-90886.</font></b>',
+                "output": ["Advantage LLC"],
+            },
+            {
+                "case_name": 'Sather v. Carlson<b><font color="red">DO NOT DOCKET. CASE TRANSFERRED OUT.</font></b>',
+                "output": ["Sather", "Carlson"],
+            },
+            {
+                "case_name": 'Saucedo and Green Dream International, LLC <b> <font color="red"> Case Consolidated under 23-03142 </font> </b>',
+                "output": ["Saucedo", "Green Dream International, LLC"],
+            },
+            {
+                "case_name": "In re: Matter of Nicholas M. Wajda",
+                "output": [],
+            },
+            {
+                "case_name": "In re Matter of Proof of Claim Replacement Filings",
+                "output": [],
+            },
+            {
+                "case_name": "In re T.H.",
+                "output": [],
+            },
+            {
+                "case_name": "In Re: Dempsey Clay Ward",
+                "output": [],
+            },
+            {
+                "case_name": "In re: Receivership of Horses and Equipment v. Gabriel",
+                "output": [],
+            },
+            {
+                "case_name": "In Re: Appearances of Attorney James G. ORourke in Pending Bankruptcy Cases",
+                "output": [],
+            },
+            {
+                "case_name": "In the matter of Attorney Rodney D. Shepherd",
+                "output": [],
+            },
+            {
+                "case_name": "Rochester Drug Cooperative, Inc. - Adversary Proceeding",
+                "output": ["Rochester Drug Cooperative, Inc."],
+            },
+            {
+                "case_name": "Ronald W. Howland, Jr and Marilee R Howland - Adversary Proceeding",
+                "output": ["Ronald W. Howland, Jr", "Marilee R Howland"],
+            },
+            {
+                "case_name": "Derrick D. Thomas v Kacy L. Thomas - Adversary Proceeding",
+                "output": ["Derrick D. Thomas", "Kacy L. Thomas"],
+            },
+            {
+                "case_name": "Unknown Case Title",
+                "output": [],
+            },
+            {
+                "case_name": "Unknown Case Title - Adversary Proceeding",
+                "output": [],
+            },
+        ]
+        for test in tests:
+            with self.subTest(
+                input=test["case_name"], msg="get parties names from case name"
+            ):
+                parties: list[str] = get_parties_from_case_name_bankr(
+                    test["case_name"]
+                )
+                self.assertEqual(
+                    parties,
+                    test["output"],
+                )
 
 
 class TestRedisUtils(SimpleTestCase):
@@ -1248,6 +1490,16 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                 "https://www.federalregister.gov/citation/89-FR-34,620",
             ),
             (
+                "Animal and Plant Health Inspection Service",
+                "89 FR 106981",
+                "https://www.federalregister.gov/citation/89-FR-106981",
+            ),
+            (
+                "Animal and Plant Health Inspection Service",
+                "89 Fed. Reg. 106,981",
+                "https://www.federalregister.gov/citation/89-FR-106,981",
+            ),
+            (
                 "Environmental Protection Agency",
                 "EPA-HQ-OW-2020-0005",
                 "https://www.regulations.gov/docket/EPA-HQ-OW-2020-0005",
@@ -1288,3 +1540,269 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                     expected_output,
                     f"Got incorrect result from clean_parenthetical_text for text: {agency, docket_number}",
                 )
+
+
+@override_settings(LINE_THRESHOLD_OCR_PER_PAGE=3)
+class TestRecapUtils(SimpleTestCase):
+    def test_needs_ocr_cacb_example(self):
+        """Test needs_ocr function with multi-line headers from cacb example provided in issue #598
+
+        This text contains headers like 'Case...', 'Doc...Filed...',
+        'Main Document', and 'Desc'. The function should recognize these
+        as non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.cacb.1466705.1.0.pdf
+        """
+        cacb_text = """
+Case 2:12-bk-17500-TD   Doc 1 Filed 03/01/12 Entered 03/01/12 12:14:26   Desc
+
+Main Document Page 1 of 58
+
+
+Case 2:12-bk-17500-TD
+
+Doc 1 Filed 03/01/12 Entered 03/01/12 12:14:26
+Main Document
+Page 58 of 58
+
+Desc
+
+
+"""
+        self.assertTrue(
+            needs_ocr(cacb_text), msg="cacb example should need OCR"
+        )
+
+    def test_needs_ocr_cacd_example(self):
+        """Test needs_ocr function with multi-line headers from cacd example provided in issue #598
+
+        This text contains headers like 'Case...', 'Doc...Filed...',
+        'Main Document', and 'Desc'. The function should recognize these
+        as non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.cacd.584625.9.0.pdf
+        """
+        cacd_text = """
+Case
+ Case9:13-bk-10313-RR
+      2:14-cv-01681-DOCDoc
+                         Document
+                           138 Filed
+                                  9 04/10/14
+                                     Filed 04/10/14
+                                                Entered
+                                                     Page
+                                                        04/10/14
+                                                          1 of 22 15:07:33
+                                                                   Page ID #:32
+                                                                            Desc
+                        Main Document     Page 1 of 22
+Case
+ Case9:13-bk-10313-RR
+      2:14-cv-01681-DOCDoc
+                         Document
+                           138 Filed
+                                  9 04/10/14
+                                     Filed 04/10/14
+                                                Entered
+                                                     Page
+                                                        04/10/14
+                                                          2 of 22 15:07:33
+                                                                   Page ID #:33
+                                                                            Desc
+                        Main Document     Page 2 of 22
+"""
+        self.assertTrue(
+            needs_ocr(cacd_text), msg="cacd example should need OCR"
+        )
+
+    def test_needs_ocr_msnd_example(self):
+        """Test needs_ocr function with multi-line headers from msnd example
+        provided in issue #598
+
+        This text contains headers like 'Case...', 'Doc...Filed...',
+        'Main Document', and 'Desc'. The function should recognize these
+        as non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.msnd.49844/gov.uscourts.msnd.49844.2.0_1.pdf
+        """
+        msnd_text = """
+Case: 3:24-cv-00304-MPM-JMV Doc #: 1 Filed: 09/25/24 1 of 7 PageID #: 1
+Case: 3:24-cv-00304-MPM-JMV Doc #: 1 Filed: 09/25/24 2 of 7 PageID #: 2
+3:24-cv-304-MPM-JMV
+"""
+        self.assertTrue(
+            needs_ocr(msnd_text), msg="msnd example should need OCR"
+        )
+
+    def test_needs_ocr_wvnd_example(self):
+        """Test needs_ocr with specific case number format from wvnd example.
+
+        This text contains a case number line ('1:16-CV-107') and a
+        'Received:' line. The function should recognize these as
+        non-content lines and return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.wvnd.38975/gov.uscourts.wvnd.38975.1.3_1.pdf
+        """
+        wvnd_text = """ 1:16-CV-107 Received: 06/03/2016 """
+        self.assertTrue(
+            needs_ocr(wvnd_text), msg="wvnd example should need OCR"
+        )
+
+    def test_needs_ocr_with_good_content(self):
+        """Test needs_ocr returns False when substantive content is present.
+
+        This text includes standard headers but also lines like
+        'This is the first line of actual content.', which should cause
+        the function to return False (doesn't need OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.flnd.526212/gov.uscourts.flnd.526212.13.0.pdf
+        """
+        good_text = """
+Case 3:24-cv-00304-MCR-ZCB Document 13 Filed 01/27/25 Page 1 of 2
+
+This is the first line of actual content.
+Here is another line.
+Here is another line.
+
+Case 3:24-cv-00304-MCR-ZCB Document 13 Filed 01/27/25 Page 2 of 2
+Some more content here.
+Some more content here.
+Some more content here.
+"""
+        self.assertFalse(
+            needs_ocr(good_text), msg="Should not need OCR with good content"
+        )
+
+    def test_needs_ocr_only_standard_headers(self):
+        """Test needs_ocr returns True for text with only basic headers/pagination.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page X of Y' lines are present. Should return True (needs OCR).
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.mdb.775852/gov.uscourts.mdb.775852..0.pdf
+        """
+        header_text = """
+Case 23-15304   Doc   Filed 07/25/24   Page 1 of 8
+Case 23-15304   Doc   Filed 07/25/24   Page 2 of 8
+ 0123ÿ567ÿ5859
+Case 23-15304   Doc   Filed 07/25/24   Page 4 of 8
+Case 23-15304   Doc   Filed 07/25/24   Page 5 of 8
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_page_of_no_content(self):
+        """Test needs_ocr returns True for pages with no content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page X of Y' lines are present and no good content between pages lines.
+        Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.cacb.1850012/gov.uscourts.cacb.1850012..0.pdf
+        """
+        header_text = """
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 1 of 9
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 2 of 9
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 3 of 9
+
+                                 April 3, 2024
+
+                                             Person Name
+Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc Main
+                              Document      Page 4 of 9
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_pg_of_no_content(self):
+        """Test needs_ocr returns True for pages with no content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Pg X of Y' lines are present and no good content between pages lines.
+        Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.nysb.312902/gov.uscourts.nysb.312902.78.3.pdf
+        """
+        header_text = """
+22-10964-mg   Doc 78-3   Filed 07/21/22 Entered 07/21/22 09:17:08   Attachment 3
+                                     Pg 1 of 2
+                                     Bad line 1
+                                     Bad line 2
+22-10964-mg   Doc 78-3   Filed 07/21/22 Entered 07/21/22 09:17:08   Attachment 3
+                                     Pg 2 of 2
+                                     Bad line 1
+                                     Bad line 2
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_good_content_page_colon(self):
+        """Test needs_ocr returns False for pages with good content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page:Y' lines are present and good content between pages lines is present.
+        Should return False (doesn't need OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
+        """
+        header_text = """
+Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Line 3
+Case: 08-9007   Document: 00115928542   Page: 2   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Line 3
+Case: 08-9007   Document: 00115928542   Page: 3   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Line 3
+"""
+        self.assertFalse(
+            needs_ocr(header_text),
+            msg="Should not need OCR with good content",
+        )
+
+    def test_needs_ocr_under_threshold_page_colon(self):
+        """Test needs_ocr returns True for text with for pages with no good
+        content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Page: Y' lines are present and good content between pages lines is
+        present. Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
+        """
+        header_text = """
+Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
+Line 1
+Line 2
+Case: 08-9007   Document: 00115928542   Page: 2   Date Filed: 07/30/2009   Entry ID: 5364336
+Case: 08-9007   Document: 00115928542   Page: 3   Date Filed: 07/30/2009   Entry ID: 5364336
+"""
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_empty_string(self):
+        """Test needs_ocr returns True when the input content is an empty string."""
+        self.assertTrue(needs_ocr(""), msg="Empty content should need OCR")
+
+    def test_needs_ocr_only_whitespace(self):
+        """Test needs_ocr returns True for content containing only whitespace.
+
+        The function should strip lines, so whitespace-only lines are treated
+        as empty, resulting in True (needs OCR).
+        """
+        self.assertTrue(
+            needs_ocr("  \n\t\n  "),
+            msg="Whitespace-only content should need OCR",
+        )

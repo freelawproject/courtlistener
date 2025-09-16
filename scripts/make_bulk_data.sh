@@ -4,7 +4,7 @@ set -e
 echo "Installing utilities"
 
 # Make sure the sudo package is installed
-apt install -y sudo
+apt-get update && apt-get install -y sudo
 
 # Set up Sentry
 curl -sL https://sentry.io/get-cli/ | bash
@@ -14,8 +14,15 @@ eval "$(sentry-cli bash-hook)"
 apt install -y awscli gnupg
 
 # Install latest version of pg_dump (else we get an error about version mismatch
-echo "deb http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-curl --silent 'https://www.postgresql.org/media/keys/ACCC4CF8.asc' |  apt-key add -
+install -d /etc/apt/keyrings
+
+curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+  | gpg --dearmor \
+  -o /etc/apt/keyrings/postgresql.gpg
+
+echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+  > /etc/apt/sources.list.d/pgdg.list
+
 apt-get update
 apt-get install -y postgresql-client
 
@@ -337,7 +344,7 @@ echo "Streaming ${lst[0]} to S3"
 psql \
 	--command \
 	  "set statement_timeout to 0;
-	   COPY ${lst[0]} ${lst[1]} TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, QUOTE \"\`\", FORCE_QUOTE *)" \
+	   COPY ${lst[0]} ${lst[1]} TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, ESCAPE '\\', FORCE_QUOTE *)" \
 	--quiet \
 	--host "$DB_HOST" \
 	--username "$DB_USER" \
@@ -418,7 +425,7 @@ declare -a lst="$group"
 cat >> "$OUT" <<- EOF
 echo "Loading ${lst[2]} to database"
 psql --command \
-"\COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, QUOTE \'\`\', HEADER)" \
+"\COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, ESCAPE '\\', HEADER)" \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME"

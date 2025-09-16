@@ -37,9 +37,12 @@
         <i class="fa fa-info-circle"></i> There was a problem. Try again later.
       </span>
       &nbsp;
-      <a hx-get="{% url 'view_download_docket' docket.id %}"
-        hx-swap="none" hx-indicator="#export-csv-spinner" hx-trigger="click"
-        class="btn btn-default hidden-xs export-csv">
+      <a {% if user.is_authenticated %}
+        hx-get="{% url 'view_download_docket' docket.id %}"
+        hx-swap="none" hx-indicator="#export-csv-spinner"
+        hx-trigger="click"
+        {% endif %}
+        class="btn btn-default hidden-xs export-csv {% if not user.is_authenticated %} logged-out-modal-trigger {% endif %}">
         <div class="flex align-items-center">
           <i class="fa fa-download gray hidden-lg"></i>
           <i class="fa fa-download fa-lg gray visible-lg"></i>&nbsp;
@@ -158,24 +161,53 @@
                   {% else %}
                     {# We don't have it #}
                     {% if rd.is_sealed %}
-                      <span class="btn btn-primary btn-xs disabled">Sealed on PACER</span>
+                      <div class="btn-group btn-group-xs flex">
+                        <button type="button" class="btn btn-primary btn-xs btn-sealed" disabled>
+                          Unavailable
+                        </button>
+                        {% if rd.pacer_url %}
+                          <button type="button"
+                                  class="btn btn-primary toggle-disable btn-xs dropdown-toggle dropdown-toggle-split"
+                                  data-toggle="dropdown"
+                                  aria-haspopup="true"
+                                  aria-expanded="false">
+                            <span class="caret"></span>
+                            <span class="sr-only">Toggle Dropdown</span>
+                          </button>
+                          <ul class="dropdown-menu">
+                            <li>
+                              <a href="{{ rd.pacer_url }}"
+                                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                                  data-toggle="modal"
+                                  data-target="#modal-buy-pacer"
+                                  class="open_buy_pacer_modal"
+                                {% endif %}
+                                target="_blank"
+                                rel="nofollow">
+                                <i class="fa fa-external-link"></i> Check Availability on PACER
+                              </a>
+                            </li>
+                          </ul>
+                        {% endif %}
+                      </div>
+                      <div class="prayer-button" data-gap-size="{% if rd.pacer_url %}small{% else %}large{% endif %}">
+                        {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count %}
+                      </div>
                     {% else %}
                       {% if rd.pacer_url %}
                         <a href="{{ rd.pacer_url }}"
                           {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                             class="open_buy_pacer_modal btn btn-default btn-xs"
                             data-toggle="modal" data-target="#modal-buy-pacer"
-                          {% else%}
+                          {% else %}
                             class="btn btn-default btn-xs"
                           {% endif %}
                             target="_blank"
                             rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
                         </a>
-                        {% flag "pray-and-pay" %}
                           <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
-                            {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
+                            {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count %}
                           </div>
-                        {% endflag %}
                       {% endif %}
                     {% endif %}
                   {% endif %}
@@ -192,7 +224,7 @@
                     {# We don't have it #}
                     {% if rd.is_sealed %}
                       <span class="btn btn-default btn-xs disabled"
-                            title="Sealed on PACER">
+                            title="Unavailable on PACER">
                               <i class="fa fa-ban"></i>
                             </span>
                     {% else %}

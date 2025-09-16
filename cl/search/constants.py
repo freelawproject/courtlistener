@@ -1,6 +1,5 @@
 # fields that are used for highlighting or other output in the search results
 import re
-from typing import Dict
 
 from cl.search.models import SEARCH_TYPES, Opinion
 
@@ -115,6 +114,7 @@ SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = {
     "text": 100,
 }
 SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = {
+    "caseName": 0,
     "text": 100,
     "docketNumber": 0,
     "judge": 0,
@@ -212,7 +212,7 @@ opinion_boosts_es = {
     "caseName.exact": 4.0,
     "docketNumber": 2.0,
 }
-BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
+BOOSTS: dict[str, dict[str, dict[str, float]]] = {
     "qf": {
         SEARCH_TYPES.OPINION: {
             "text": 1.0,
@@ -274,4 +274,38 @@ cardinality_query_unique_ids = {
     SEARCH_TYPES.PEOPLE: "id",
     SEARCH_TYPES.ORAL_ARGUMENT: "id",
     SEARCH_TYPES.PARENTHETICAL: "id",
+}
+
+
+date_decay_relevance_types = {
+    SEARCH_TYPES.OPINION: {
+        "field": "dateFiled",
+        "scale": 50,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.RECAP: {
+        "field": "dateFiled",
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.DOCKETS: {
+        "field": "dateFiled",
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.RECAP_DOCUMENT: {
+        "field": "dateFiled",
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
+    SEARCH_TYPES.ORAL_ARGUMENT: {
+        "field": "dateArgued",
+        "scale": 50,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
 }

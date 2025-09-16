@@ -1,5 +1,3 @@
-from typing import Dict, Tuple
-
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -14,9 +12,9 @@ from cl.users.models import UserProfile
 
 
 def create_stub_account(
-    user_data: Dict[str, str],
-    profile_data: Dict[str, str],
-) -> Tuple[User, UserProfile]:
+    user_data: dict[str, str],
+    profile_data: dict[str, str],
+) -> tuple[User, UserProfile]:
     """Create a minimal user account in CL
 
     This can be helpful when receiving anonymous donations, payments from
@@ -109,7 +107,7 @@ def delete_user_assets(user: User) -> None:
     WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
 
 
-emails: Dict[str, EmailType] = {
+emails: dict[str, EmailType] = {
     "account_deleted": {
         "subject": "User deleted their account on CourtListener!",
         "body": "Sad day indeed. Somebody deleted their account completely, "
@@ -258,6 +256,48 @@ emails: Dict[str, EmailType] = {
         "The CourtListener Bots",
         "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
+    },
+    "not_valid_edu_account": {
+        "subject": "Request for a .edu Membership",
+        "body": "Hello, %s,\n\n"
+        "Thank you for your interest.\n\n"
+        "We’ve reviewed your request and, unfortunately, it looks like you "
+        "don’t meet the eligibility requirements for a .edu membership. These "
+        "accounts are reserved for users with verified affiliations to "
+        "accredited educational institutions.\n\n"
+        "That said, we’d still love to have you as part of our community. You "
+        "can sign up for a regular membership here: https://donate.free.law/forms/membership.\n\n"
+        "------------------\n\n"
+        "If you have any questions or believe this decision was made in error, "
+        "please see our contact page, https://www.courtlistener.com/contact/",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+    },
+    "not_confirmed_edu_account": {
+        "subject": "Confirm Your .edu Membership Email",
+        "body": "Hello,\n\n"
+        "Thank you for requesting a .edu membership.\n\n"
+        "We noticed that your email address has not yet been confirmed in "
+        "CourtListener.com. To complete your membership request, please "
+        "confirm your email address by clicking the following link:\n\n"
+        "   https://www.courtlistener.com/email/confirm/%s\n\n"
+        "------------------\n\n"
+        "Need help? Please visit our contact page: https://www.courtlistener.com/contact/",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+    },
+    "not_edu_account_in_system": {
+        "subject": "Complete Your .edu Membership Registration",
+        "body": "Hello,\n\n"
+        "We received your request for a .edu membership, but it looks like "
+        "there is no account in CourtListener.com with this email address.\n\n"
+        "To proceed, use your .edu address to create an account here:\n\n"
+        "   https://www.courtlistener.com/register/ \n\n"
+        "Once your account is created and confirmed, you’ll be all set with "
+        "your .edu membership!\n\n"
+        "------------------\n\n"
+        "If you already have an account but are still seeing this message, please "
+        "reach out through our contact page:\n\n"
+        "   https://www.courtlistener.com/contact/",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
 }
 

@@ -5,12 +5,12 @@ import logging
 import re
 from calendar import SATURDAY, SUNDAY
 from datetime import datetime, timedelta
-from typing import Optional
 
 import requests
 from asgiref.sync import async_to_sync
 from celery import Task
 from dateparser import parse
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
@@ -29,6 +29,7 @@ from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
     add_docket_entries,
     find_docket_object,
+    set_skip_percolation_if_bankruptcy_data,
     update_docket_metadata,
 )
 from cl.recap_rss.models import RssFeedData, RssFeedStatus, RssItemCache
@@ -57,7 +58,7 @@ def update_entry_types(court_pk: str, description: str) -> None:
         m = re.search(r"entries of type: (.+)", description)
         if not m:
             logger.error(
-                f"Unable to parse PACER RSS description: {description}"
+                "Unable to parse PACER RSS description: %s", description
             )
             return
         new_entry_types = m.group(1)
@@ -77,7 +78,7 @@ def update_entry_types(court_pk: str, description: str) -> None:
         court.save()
 
 
-def get_last_build_date(b: bytes) -> Optional[datetime]:
+def get_last_build_date(b: bytes) -> datetime | None:
     """Get the last build date for an RSS feed
 
     In this case we considered using lxml & xpath, which was 1000× faster than
@@ -161,8 +162,14 @@ def abort_task(task: Task, feed_status: RssFeedStatus):
     return
 
 
-@app.task(bind=True, max_retries=0)
-def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
+@app.task(
+    bind=True,
+    max_retries=0,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
+def check_if_feed_changed(
+    self: Task, court_pk: str, feed_status_pk: int, date_last_built: datetime
+):
     """Check if the feed changed
 
     For now, we do this in a very simple way, by using the lastBuildDate field
@@ -199,7 +206,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         rss_feed.query()
     except requests.RequestException:
         logger.warning(
-            f"Network error trying to get RSS feed at {rss_feed.url}"
+            "Network error trying to get RSS feed at %s", rss_feed.url
         )
         abort_task(self, feed_status)
         return
@@ -219,8 +226,10 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         rss_feed.response.raise_for_status()
     except HTTPError as exc:
         logger.warning(
-            f"RSS feed down at '{court_pk}' "
-            f"({rss_feed.response.status_code}). {exc}"
+            "RSS feed down at '%s' (%s). %s",
+            court_pk,
+            rss_feed.response.status_code,
+            exc,
         )
         abort_task(self, feed_status)
         return
@@ -236,7 +245,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         try:
             raise Exception(
                 "No last build date in RSS document returned by "
-                "PACER: %s" % feed_status.court_id
+                f"PACER: {feed_status.court_id}"
             )
         except Exception as exc:
             logger.warning(str(exc))
@@ -256,11 +265,14 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         return
 
     logger.info(
-        f"{feed_status.court_id}: Feed changed or doing a sweep. Moving on to the merge."
+        "%s: Feed changed or doing a sweep. Moving on to the merge.",
+        feed_status.court_id,
     )
     rss_feed.parse()
     logger.info(
-        f"{feed_status.court_id}: Got {len(rss_feed.data)} results to merge."
+        "%s: Got %s results to merge.",
+        feed_status.court_id,
+        len(rss_feed.data),
     )
 
     # Update RSS entry types in Court table
@@ -289,12 +301,12 @@ def hash_item(item):
     return item_hash
 
 
-async def is_cached(item_hash):
+async def is_cached(item_hash: str) -> bool:
     """Check if a hash is in the RSS Item Cache"""
     return await RssItemCache.objects.filter(hash=item_hash).aexists()
 
 
-async def cache_hash(item_hash):
+async def cache_hash(item_hash: str) -> bool:
     """Add a new hash to the RSS Item Cache
 
     :param item_hash: A SHA1 hash you wish to cache.
@@ -310,7 +322,11 @@ async def cache_hash(item_hash):
         return True
 
 
-@app.task(bind=True, max_retries=1)
+@app.task(
+    bind=True,
+    max_retries=1,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
 def merge_rss_feed_contents(
     self, feed_data, court_pk, metadata_only=False
 ) -> list[tuple[int, datetime]]:
@@ -352,6 +368,10 @@ def merge_rss_feed_contents(
             async_to_sync(update_docket_metadata)(d, docket)
             if not d.pacer_case_id:
                 d.pacer_case_id = docket["pacer_case_id"]
+
+            # Skip the percolator request for this save if bankruptcy data will
+            # be merged afterward.
+            set_skip_percolation_if_bankruptcy_data(docket, d)
             try:
                 d.save()
                 add_bankruptcy_data_to_docket(d, docket)
@@ -383,15 +403,23 @@ def merge_rss_feed_contents(
     return d_pks_to_alert
 
 
-@app.task
-def mark_status_successful(feed_status_pk):
+@app.task(
+    bind=True,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
+def mark_status_successful(self: Task, feed_status_pk: int) -> None:
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
-    logger.info(f"Marking {feed_status.court_id} as a success.")
+    logger.info("Marking %s as a success.", feed_status.court_id)
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)
 
 
-@app.task
-def trim_rss_data(cache_days=2, status_days=14):
+@app.task(
+    bind=True,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
+def trim_rss_data(
+    self: Task, cache_days: int = 2, status_days: int = 14
+) -> None:
     """Trim the various tracking objects used during RSS parsing
 
     :param cache_days: RssItemCache objects older than this number of days will

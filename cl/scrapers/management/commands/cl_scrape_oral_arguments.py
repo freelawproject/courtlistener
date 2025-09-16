@@ -1,7 +1,8 @@
 from datetime import date
-from typing import Any, Dict, Tuple, Union
+from typing import Any
 
 from asgiref.sync import async_to_sync
+from celery.canvas import chain
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils.encoding import force_bytes
@@ -9,6 +10,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
+from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.import_lib import get_scotus_judges
@@ -18,6 +20,7 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.tasks import process_audio_file
 from cl.scrapers.utils import (
+    check_duplicate_ingestion,
     get_binary_content,
     get_extension,
     update_or_create_docket,
@@ -29,7 +32,7 @@ cnt = CaseNameTweaker()
 
 @transaction.atomic
 def save_everything(
-    items: Dict[str, Union[Docket, Audio]],
+    items: dict[str, Docket | Audio],
     backscrape: bool = False,
 ) -> None:
     docket, af = items["docket"], items["audio_file"]
@@ -55,11 +58,11 @@ def save_everything(
 
 @transaction.atomic
 def make_objects(
-    item: Dict[str, Any],
+    item: dict[str, Any],
     court: Court,
     sha1_hash: str,
     content: bytes,
-) -> Tuple[Docket, Audio]:
+) -> tuple[Docket, Audio]:
     blocked = item["blocked_statuses"]
     if blocked:
         date_blocked = date.today()
@@ -100,7 +103,7 @@ def make_objects(
     file_name = trunc(item["case_names"].lower(), 75) + extension
     audio_file.file_with_date = docket.date_argued
     audio_file.local_path_original_file.save(file_name, cf, save=False)
-
+    check_duplicate_ingestion(audio_file.local_path_original_file.name)
     return docket, audio_file
 
 
@@ -144,7 +147,10 @@ class Command(cl_scrape_opinions.Command):
             items={"docket": docket, "audio_file": audio_file},
             backscrape=backscrape,
         )
-        process_audio_file.delay(audio_file.pk)
+        chain(
+            process_audio_file.si(audio_file.pk),
+            transcribe_from_open_ai_api.si(audio_file.pk),
+        ).apply_async()
 
         logger.info(
             "Successfully added audio file %s: %s",

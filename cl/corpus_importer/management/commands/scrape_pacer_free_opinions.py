@@ -2,8 +2,10 @@ import argparse
 import datetime
 import inspect
 import math
+import random
 import time
-from typing import Callable, Dict, List, Optional, cast
+from collections.abc import Callable
+from typing import cast
 
 from celery.canvas import chain
 from django.db.models import F, Q, Window
@@ -36,7 +38,7 @@ from cl.search.models import Court, RECAPDocument
 
 def get_last_complete_date(
     court_id: str,
-) -> Optional[datetime.date]:
+) -> datetime.date | None:
     """Get the next start query date for a court.
 
     Check the DB for the last date for a court that was completed. Return the
@@ -117,7 +119,9 @@ def fetch_doc_report(
         end,
     )
     try:
-        status, rows_to_create = get_and_save_free_document_report(pacer_court_id, start, end, log.pk)  # type: ignore
+        status, rows_to_create = get_and_save_free_document_report(
+            pacer_court_id, start, end, log.pk
+        )  # type: ignore
     except (
         RequestException,
         ReadTimeoutError,
@@ -126,11 +130,11 @@ def fetch_doc_report(
         PacerLoginException,
         ValueError,
     ) as exc:
-        if isinstance(exc, (RequestException, ReadTimeoutError)):
+        if isinstance(exc, (RequestException | ReadTimeoutError)):
             reason = "network error."
         elif isinstance(exc, IndexError):
             reason = "PACER 6.3 bug."
-        elif isinstance(exc, (TypeError, ValueError)):
+        elif isinstance(exc, (TypeError | ValueError)):
             reason = "failing PACER website."
         elif isinstance(exc, PacerLoginException):
             reason = "PACER login issue."
@@ -151,7 +155,7 @@ def fetch_doc_report(
 
     if not exception_raised:
         logger.info(
-            "Got %s document references for " "%s between %s and %s",
+            "Got %s document references for %s between %s and %s",
             rows_to_create,
             pacer_court_id,
             start,
@@ -164,9 +168,9 @@ def fetch_doc_report(
 
 
 def get_and_save_free_document_reports(
-    courts: list[Optional[str]],
-    date_start: Optional[datetime.date],
-    date_end: Optional[datetime.date],
+    courts: list[str | None],
+    date_start: datetime.date | None,
+    date_end: datetime.date | None,
 ) -> None:
     """Query the Free Doc Reports on PACER and get a list of all the free
     documents. Do not download those items, as that step is done later. For now
@@ -232,7 +236,9 @@ def get_and_save_free_document_reports(
         # Iterate through the gap in dates either short or long
         for _start, _end in dates:
             exc = fetch_doc_report(
-                pacer_court_id, _start, _end  # type: ignore
+                pacer_court_id,
+                _start,
+                _end,  # type: ignore
             )
             if exc:
                 # Something happened with the queried date range, abort process for
@@ -249,7 +255,7 @@ def get_and_save_free_document_reports(
 
 
 def get_pdfs(
-    courts: list[Optional[str]],
+    courts: list[str | None],
     date_start: datetime.date,
     date_end: datetime.date,
     queue: str,
@@ -330,6 +336,7 @@ def get_pdfs(
                 f"before starting the next cycle."
             )
             time.sleep(1)
+
         logger.info(f"Processing row id: {row.id} from {row.court_id}")
         c = chain(
             process_free_opinion_result.si(
@@ -346,8 +353,12 @@ def get_pdfs(
             delete_pacer_row.s(row.pk).set(queue=q),
         )
 
-        c.apply_async()
+        # we accept same hash RecapDocuments; but we don't want duplicates in
+        # Opinions. Introduce some time variability between consecutive tasks
+        # to help the hash checks in `recap_document_into_opinions` work
+        c.apply_async(countdown=random.uniform(3, 10))
         completed += 1
+
         if completed % 1000 == 0:
             logger.info(
                 f"Sent {completed}/{count} tasks to celery for {task_name} so far."
@@ -400,8 +411,9 @@ class Command(VerboseCommand):
     def valid_actions(self, s: str) -> Callable:
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
-                "Unable to parse action. Valid actions are: %s"
-                % (", ".join(self.VALID_ACTIONS.keys()))
+                "Unable to parse action. Valid actions are: {}".format(
+                    ", ".join(self.VALID_ACTIONS.keys())
+                )
             )
 
         return self.VALID_ACTIONS[s]
@@ -443,8 +455,9 @@ class Command(VerboseCommand):
             "--action",
             type=self.valid_actions,
             required=True,
-            help="The action you wish to take. Valid choices are: %s"
-            % (", ".join(self.VALID_ACTIONS.keys())),
+            help="The action you wish to take. Valid choices are: {}".format(
+                ", ".join(self.VALID_ACTIONS.keys())
+            ),
         )
         parser.add_argument(
             "--queue",
@@ -474,7 +487,7 @@ class Command(VerboseCommand):
             help="Date when the query should end.",
         )
 
-    def handle(self, *args: List[str], **options: OptionsType) -> None:
+    def handle(self, *args: list[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
 
         if not self.validate_date_args(options):
@@ -484,7 +497,7 @@ class Command(VerboseCommand):
         filtered_kwargs = self.filter_kwargs(action, options)
         action(**filtered_kwargs)
 
-    VALID_ACTIONS: Dict[str, Callable] = {
+    VALID_ACTIONS: dict[str, Callable] = {
         "do-everything": do_everything,
         "get-report-results": get_and_save_free_document_reports,
         "get-pdfs": get_pdfs,

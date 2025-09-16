@@ -1,0 +1,52 @@
+/* Styles for Transcript Display */
+.transcript-segment { /* Changed from transcript-word */
+  cursor: pointer;
+  padding: 5px 2px; /* Add vertical padding for paragraphs */
+  margin-bottom: 5px; /* Add space between segments */
+  transition: background-color 0.2s ease-in-out;
+  display: flex; /* Use flexbox for layout */
+  align-items: baseline; /* Align timestamp and text nicely */
+}
+.transcript-timestamp {
+  min-width: 55px; /* Ensure space for HH:MM:SS */
+  margin-right: 10px;
+  font-family: monospace; /* Monospaced font for consistent width */
+  font-size: 0.9em;
+  color: #555; /* Dim the timestamp slightly */
+}
+.transcript-segment-text { /* New class for text part */
+  flex-grow: 1; /* Allow text to take remaining space */
+}
+.transcript-segment:hover {
+  background-color: #e0e0e0; /* Light gray highlight on hover */
+}
+.transcript-current-segment { /* Changed class name */
+   background-color: #ffec8b; /* Yellow highlight for current word */
+   font-weight: bold;
+}
+#transcript-container {
+  width: 100%; /* Ensure it fills parent column */
+  margin-top: 32px;
+}
+
+#transcript-container h3 {
+  padding-left: 0;
+}
+
+#transcript-text {
+    white-space: pre-wrap; /* Respect spaces and wrap text */
+    /* Apply scrolling and styling here */
+    max-height: 400px; /* Or desired height */
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    line-height: 1.6;
+}
+
+.transcript-disclaimer {
+  text-align: right;
+  margin-top: 10px;
+  font-style: italic;
+  color: #555;
+  font-size: 0.9em;
+}

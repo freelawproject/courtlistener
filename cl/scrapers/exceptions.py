@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 from cl.lib.command_utils import logger
 
@@ -22,9 +21,9 @@ class AutoLoggingException(Exception):
     def __init__(
         self,
         message: str = "",
-        logger: Optional[logging.Logger] = None,
-        logging_level: Optional[int] = None,
-        fingerprint: Optional[list[str]] = None,
+        logger: logging.Logger | None = None,
+        logging_level: int | None = None,
+        fingerprint: list[str] | None = None,
     ):
         if not message:
             message = self.message
@@ -78,5 +77,11 @@ class NoDownloadUrlError(BadContentError):
 
 class EmptyFileError(BadContentError):
     """Occurs when the content of the response has lenght 0"""
+
+    logging_level = logging.ERROR
+
+
+class MergingError(AutoLoggingException):
+    """Raised when metadata merging finds different values"""
 
     logging_level = logging.ERROR

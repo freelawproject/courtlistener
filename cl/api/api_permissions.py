@@ -20,7 +20,6 @@ class IsOwner(permissions.BasePermission):
 
 
 class V3APIPermission(permissions.BasePermission):
-
     r = get_redis_interface("STATS")
     v3_blocked_message = (
         "As a new user, you don't have permission to access V3 of the API. "
@@ -81,8 +80,7 @@ class V3APIPermission(permissions.BasePermission):
         if isinstance(user, AnonymousUser):
             # Block V3 for all Anonymous users.
             raise PermissionDenied(
-                "Anonymous users don't have permission to access V3 of the API. "
-                "Please use V4 instead."
+                "Anonymous users don't have permission to access the API. "
             )
 
         if self.is_user_v3_blocked(user):

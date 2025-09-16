@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% load extras %}
+{% load text_filters %}
+{% load static %}
+{% load pacer %}
+{% load tz %}
+{% load humanize %}
+
+{% block title %}{% if is_page_owner %}Your PACER document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block og_title %}{% if is_page_owner %}Your PACER document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block description %}CourtListener lets you request the purchase of legal documents. View the documents requested by {{ requested_user }}.{% endblock %}
+{% block og_description %}CourtListener lets you request the purchase of legal documents. View the documents requested by {{ requested_user }}.{% endblock %}
+
+{% block head %}
+  <link type="text/css" href="{% static "css/prayer-public-switch.css" %}"
+          rel="stylesheet"/>
+{% endblock %}
+
+{% block content %}
+
+  {% with view_name=request.resolver_match.view_name %}
+  <div class="col-xs-12 hidden-sm hidden-md hidden-lg flex justify-content-around v-offset-below-2">
+    {% include "includes/prayers_leaderboard_button.html" %}
+    <a href="{% url "pray_and_pay_help" %}">
+      <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
+    </a>
+    {% if is_page_owner and view_name == 'user_prayers' %}
+      <div>
+        {% include "includes/public_prayers_switch.html" with page_public=page_public %}
+      </div>
+    {% endif %}
+  </div>
+  {% endwith %}
+  {% with view_name=request.resolver_match.view_name %}
+  <div class="col-xs-12 flex {% if is_page_owner %} justify-content-between {% else %} justify-content-end {% endif %} hidden-xs">
+    {% if is_page_owner %}
+    <ul class="prayer-top-buttons nav navbar-nav navbar-left">
+      <li>
+        {% include "includes/prayers_leaderboard_button.html" %}
+      </li>
+    </ul>
+    {% endif %}
+    <ul class="prayer-top-buttons nav navbar-nav navbar-right">
+      {% include 'includes/remind_me_modal.html' %}
+      <li class="hidden-xs">
+        <a href="#" class="donate" data-toggle="modal" data-target="#remindMeModal">
+          <i class="fa fa-heart-o"></i>&nbsp;Remind Me to Help
+        </a>
+      </li>
+      {% if not is_page_owner %}
+      <li>
+        {% include "includes/prayers_leaderboard_button.html" %}
+      </li>
+      {% endif %}
+      <li>
+        <a href="{% url "pray_and_pay_help" %}">
+          <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
+        </a>
+      </li>
+      {% if is_page_owner and view_name == 'user_prayers' %}
+      <li>
+        {% include "includes/public_prayers_switch.html" with page_public=page_public %}
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+  {% endwith %}
+
+  <div class="col-xs-12">
+    <h1 class="text-center v-offset-below-3">{% if is_page_owner %}Your PACER Document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %}</h1>
+    {% if is_page_owner %}<h3 class="text-center v-offset-below-3"><b>{{ user_history.prayer_count|intcomma }}</b> {{ user_history.prayer_count|pluralize:"prayer,prayers" }} granted totaling <b>${{ user_history.total_cost }}</b> (<b>{{ num_remaining }}</b> remaining today)</h3>{% endif %}
+  </div>
+
+  <div class="col-xs-12" id="prayer_summary" hx-swap-oob="true"
+    {% if request.user.is_authenticated and is_page_owner %}
+    hx-get="{% url 'user_prayers' request.user.username %}"
+    hx-trigger="prayersListChanged from:body" hx-swap="none"
+    {% endif %}
+  >
+  </div>
+
+  {% if is_page_owner %}
+    {% block nav-prayer %}
+      <div class="col-xs-12 v-offset-below-2 v-offset-above-3">
+          <ul class="nav nav-tabs nav-justified" role="tablist">
+              <li class="{% block nav-prayer-pending %}inactive{% endblock %}" role="presentation">
+                  <a href="{% url "user_prayers" user.username %}">
+                    <i class="fa fa-list"></i>&nbsp;Pending Requests
+                  </a>
+              </li>
+              <li class="{% block nav-prayer-granted %}inactive{% endblock %}" role="presentation">
+                  <a href="{% url "user_prayers_granted" user.username %}">
+                    <i class="fa fa-check"></i>&nbsp;Granted Requests
+                  </a>
+              </li>
+          </ul>
+      </div>
+    {% endblock %}
+  {% endif %}
+
+  {% block prayer_list %}  {% endblock %}
+
+{% endblock %}
+
+{% block footer-scripts %}
+  <script defer type="text/javascript"
+            src="{% static "js/buy_pacer_modal.js" %}"></script>
+  {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
+  {% include "includes/buy_pacer_modal.html" %}
+{% endblock %}

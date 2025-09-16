@@ -33,6 +33,10 @@
         Did you forget to close one or more parentheses?
       {% elif error_message == "unbalanced_quotes" %}
         Did you forget to close one or more quotes?
+      {% elif error_message == "disallowed_wildcard_pattern" %}
+         The query contains a <a href="{% url "advanced_search" %}#disallowed-wildcards">disallowed wildcard</a> pattern.
+      {% elif error_message == "invalid_relative_date_syntax" %}
+         The date entered has an invalid format.
       {% endif %}
     {% else %}
       encountered an error.
@@ -41,7 +45,7 @@
   {% if error_message %}
     {% if suggested_query == "proximity_query" %}
       <h4 class="text-danger" >Are you attempting to perform a proximity search?</h4>
-      <p>Try using this format: <code>term~</code> or <code>term~2</code>. For more details, visit our <a href="{% url "advanced_search" %}#proximity">advance search documentation</a>.</p>
+      <p>Try using this format: <code>"lorem term"~50</code>. For more details, visit our <a href="{% url "advanced_search" %}#proximity">advance search documentation</a>.</p>
     {% elif suggested_query == "proximity_filter" %}
       <h4 class="text-danger" >Are you attempting to perform a proximity search within a filter?</h4>
       <p>Proximity queries do not work in filters. Consider using the main search box. For more details, visit our <a href="{% url "advanced_search" %}#proximity">advance search documentation</a>.</p>
@@ -49,6 +53,8 @@
       <div class="flex">
         <h4 class="text-danger" >Did you mean:&nbsp;<a href="{% url 'show_results' %}{% querystring q=suggested_query %}">{{suggested_query}}</a></h4>
       </div>
+    {% elif error_message == "invalid_relative_date_syntax" %}
+      <p><a href="{% url "relative_dates" %}">See Relative Date Queries documentation for help.</a></p>
     {% endif %}
 
     <p>Search tips:</p>

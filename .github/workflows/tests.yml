@@ -1,12 +1,10 @@
 name: docker build and test
 
 on:
+  pull_request:
   push:
     branches:
-      - "**"
-  pull_request:
-    branches:
-      - "main"
+      - main
 
 jobs:
   build:
@@ -49,23 +47,6 @@ jobs:
       matrix:
         tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
-      - name: Check out solr
-        uses: actions/checkout@v4
-        with:
-          repository: freelawproject/courtlistener-solr-server
-          ref: main
-          path: courtlistener-solr-server
-      - name: Set up solr permissions
-        run: |
-          cd courtlistener-solr-server
-          sudo chown -R :1024 data
-          sudo chown -R :1024 solr
-          sudo find data -type d -exec chmod g+s {} \;
-          sudo find solr -type d -exec chmod g+s {} \;
-          sudo find data -type d -exec chmod 775 {} \;
-          sudo find solr -type d -exec chmod 775 {} \;
-          sudo find data -type f -exec chmod 664 {} \;
-          sudo find solr -type f -exec chmod 664 {} \;
       - name: Check out CourtListener
         uses: actions/checkout@v4
         with:
@@ -120,11 +101,11 @@ jobs:
 
       # Run the checks and tests
       - name: Check if migrations are missing
-        run: docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
+        run: docker exec cl-django ./manage.py makemigrations --check --dry-run
       - name: Run the tests!
         run: >
           docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
-          python /opt/courtlistener/manage.py test
+          ./manage.py test
           cl --verbosity=2 ${{ matrix.tag_flags }} --parallel
       - name: Export selenium results from docker to host
         if: failure()

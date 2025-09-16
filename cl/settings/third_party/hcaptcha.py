@@ -1,8 +1,8 @@
 import environ
 
-env = environ.FileAwareEnv()
-
 from ..django import TESTING
+
+env = environ.FileAwareEnv()
 
 if TESTING:
     HCAPTCHA_SITEKEY = "10000000-ffff-ffff-ffff-000000000001"

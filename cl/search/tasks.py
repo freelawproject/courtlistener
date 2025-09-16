@@ -1,15 +1,30 @@
+import asyncio
+import concurrent.futures
+import csv
+import io
+import json
 import logging
-from datetime import date
+import uuid
+from collections.abc import Generator
+from datetime import UTC, date, datetime
 from importlib import import_module
+from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Generator
+from typing import Any
 
+from botocore import exceptions as botocore_exception
 from celery import Task
 from celery.canvas import chain
 from django.apps import apps
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.files.base import ContentFile
+from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
+from django.http import QueryDict
+from django.template import loader
 from elasticsearch.exceptions import (
     ApiError,
     ConflictError,
@@ -18,13 +33,15 @@ from elasticsearch.exceptions import (
     NotFoundError,
     RequestError,
 )
-from elasticsearch.helpers import (
-    BulkIndexError,
-    bulk,
-    parallel_bulk,
-    streaming_bulk,
-)
+from elasticsearch.helpers import parallel_bulk, streaming_bulk
 from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
+from httpx import (
+    HTTPStatusError,
+    NetworkError,
+    ReadError,
+    RemoteProtocolError,
+    TimeoutException,
+)
 
 from cl.alerts.tasks import (
     percolator_response_processing,
@@ -32,8 +49,21 @@ from cl.alerts.tasks import (
 )
 from cl.audio.models import Audio
 from cl.celery_init import app
+from cl.corpus_importer.utils import is_bankruptcy_court
+from cl.lib.db_tools import log_db_connection_info
 from cl.lib.elasticsearch_utils import build_daterange_query
-from cl.lib.search_index_utils import get_parties_from_case_name
+from cl.lib.microservice_utils import microservice
+from cl.lib.search_index_utils import (
+    get_parties_from_case_name,
+    get_parties_from_case_name_bankr,
+    index_documents_in_bulk,
+)
+from cl.lib.search_utils import (
+    fetch_es_results_for_csv,
+    get_headers_and_transformations_for_search_export,
+)
+from cl.lib.storage import AWSMediaStorage, S3IntelligentTieringStorage
+from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
@@ -45,11 +75,11 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
     Docket,
     DocketEntry,
-    DocketEvent,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -130,9 +160,11 @@ def get_instance_from_db(
         return model.objects.get(pk=instance_id)
     except ObjectDoesNotExist:
         logger.warning(
-            f"The {model.__name__} with ID {instance_id} doesn't exists and it"
-            "cannot be updated in ES."
+            "The %s with ID %s doesn't exists and it cannot be updated in ES.",
+            model.__name__,
+            instance_id,
         )
+        log_db_connection_info(model.__name__, instance_id)
         return None
 
 
@@ -151,6 +183,7 @@ def es_save_document(
     instance_id: int,
     app_label: str,
     es_document_name: ESDocumentNameType,
+    skip_percolator_request: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Save a document in Elasticsearch using a provided callable.
 
@@ -159,6 +192,8 @@ def es_save_document(
     :param app_label: The app label and model that belongs to the document
     being added.
     :param es_document_name: A Elasticsearch DSL document name.
+    :param skip_percolator_request: Whether to skip the subsequent percolator
+    request.
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None.
@@ -242,6 +277,7 @@ def es_save_document(
     if (
         type(instance) in percolator_alerts_models_supported
         and response["_version"] == 1
+        and not skip_percolator_request
     ):
         # Only send search alerts when a new instance of a model that support
         # Alerts is indexed in ES _version:1
@@ -316,8 +352,14 @@ def document_fields_to_update(
                             # parties are available.
                             if main_instance.parties.exists():
                                 continue
-                            field_value = get_parties_from_case_name(
-                                main_instance.case_name
+                            field_value = (
+                                get_parties_from_case_name_bankr(
+                                    main_instance.case_name
+                                )
+                                if is_bankruptcy_court(main_instance.court_id)
+                                else get_parties_from_case_name(
+                                    main_instance.case_name
+                                )
                             )
                         else:
                             field_value = getattr(related_instance, field)
@@ -334,11 +376,102 @@ def document_fields_to_update(
 
     if fields_to_update:
         # If fields to update, append the timestamp to be updated too.
-        prepare_timestamp = getattr(es_document(), f"prepare_timestamp", None)
+        prepare_timestamp = getattr(es_document(), "prepare_timestamp", None)
         if prepare_timestamp:
             field_value = prepare_timestamp(main_instance)
             fields_to_update["timestamp"] = field_value
     return fields_to_update
+
+
+@app.task(
+    bind=True,
+    max_retries=3,
+    ignore_result=True,
+)
+def email_search_results(self: Task, user_id: int, query: str):
+    """Sends an email to the user with their search results as a CSV attachment.
+
+    :param user_id: The ID of the user to send the email to.
+    :param query: The user's search query string.
+    """
+    user = User.objects.get(pk=user_id)
+    # Parse the query string into a dictionary
+    qd = QueryDict(query.encode(), mutable=True)
+
+    # Create a search form instance and validate the query data
+    search_form = SearchForm(qd)
+    if not search_form.is_valid():
+        return
+
+    # Get the cleaned data from the validated form
+    cd = search_form.cleaned_data
+
+    # Fetch search results from Elasticsearch based on query and search type
+    search_results, error = fetch_es_results_for_csv(
+        queryset=qd, search_type=cd["type"]
+    )
+
+    # Retry task if an error occurred and retry limit not reached.
+    if error:
+        if self.request.retries == self.max_retries:
+            return None
+        raise self.retry()
+
+    if not search_results:
+        return
+
+    # Get the headers and basic transformation for the CSV file based on the
+    # search type
+    csv_headers, csv_transformations = (
+        get_headers_and_transformations_for_search_export(cd["type"])
+    )
+    if not csv_headers:
+        return
+
+    # Create the CSV content and store in a StringIO object
+    with io.StringIO() as output:
+        csvwriter = csv.DictWriter(
+            output,
+            fieldnames=csv_headers,
+            extrasaction="ignore",
+            quotechar='"',
+            quoting=csv.QUOTE_ALL,
+        )
+        csvwriter.writeheader()
+        for row in search_results:
+            if csv_transformations:
+                for key, function in csv_transformations.items():
+                    row[key] = function(row[key] if key in row else row)
+
+            clean_dict = {
+                camel_to_snake(key): value for key, value in row.items()
+            }
+            csvwriter.writerow(clean_dict)
+
+        csv_content: str = output.getvalue()
+
+    # Prepare email content
+    txt_template = loader.get_template("search_results_email.txt")
+    email_context = {
+        "username": user.username,
+        "query_link": f"https://www.courtlistener.com/?{query}",
+    }
+
+    # Create email object
+    message = EmailMessage(
+        subject="Your Search Results are Ready!",
+        body=txt_template.render(email_context),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+
+    # Generate a filename for the CSV attachment with timestamp
+    now = datetime.now()
+    filename = f"search_results_{now.strftime('%Y%m%d_%H%M%S')}.csv"
+
+    # Send email with attachments
+    message.attach(filename, csv_content, "text/csv")
+    message.send(fail_silently=False)
 
 
 @app.task(
@@ -358,6 +491,7 @@ def update_es_document(
     main_instance_data: tuple[str, int],
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
+    skip_percolator_request: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
@@ -370,6 +504,7 @@ def update_es_document(
     update doesn't involve a related instance.
     :param fields_map: A dict containing fields that can be updated or None if
     mapping is not required for the update.
+    :param skip_percolator_request: Whether to skip the subsequent percolator request
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None
@@ -417,9 +552,18 @@ def update_es_document(
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
     if (
-        main_app_label in ["search.RECAPDocument", "search.Docket"]
-        and not related_instance_app_label == "search.DocketEntry"
-        or related_instance_app_label in ["search.BankruptcyInformation"]
+        (
+            related_instance_app_label == "search.BankruptcyInformation"
+            or (
+                main_app_label in ("search.RECAPDocument", "search.Docket")
+                and related_instance_app_label != "search.DocketEntry"
+                and not {"plain_text", "filepath_local"}
+                & set(
+                    fields_to_update
+                )  # Percolation upon plain_text extraction will be delayed until citation matching completes.
+            )
+        )
+        and not skip_percolator_request
     ):
         doc = es_doc.prepare(main_model_instance)
         return SaveESDocumentReturn(
@@ -498,8 +642,10 @@ def get_doc_from_es(
             )
         except (ConflictError, RequestError) as exc:
             logger.error(
-                f"Error indexing the {es_document.Django.model.__name__.capitalize()} with ID: {instance_id}. "
-                f"Exception was: {type(exc).__name__}"
+                "Error indexing the %s with ID: %s. Exception was: %s",
+                es_document.Django.model.__name__.capitalize(),
+                instance_id,
+                type(exc).__name__,
             )
 
         return None
@@ -768,7 +914,7 @@ def bulk_indexing_generator(
     base_doc: dict[str, str],
     child_id_property: str | None = None,
     parent_id: int | None = None,
-) -> Generator[ESDictDocument, None, None]:
+) -> Generator[ESDictDocument]:
     """Generate ES documents for bulk indexing.
 
     :param docs_query_set: The queryset of model instances to be indexed.
@@ -819,7 +965,7 @@ def index_documents_in_bulk_from_queryset(
     base_doc: dict[str, str],
     child_id_property: str | None = None,
     parent_instance_id: int | None = None,
-    testing_mode: bool = False,
+    use_streaming_bulk: bool = False,
 ) -> list[str]:
     """Index documents in bulk from a queryset into ES. Indexes documents
     using either streaming or parallel bulk  operations, depending on the mode.
@@ -832,8 +978,9 @@ def index_documents_in_bulk_from_queryset(
     :param base_doc: The base ES document fields.
     :param parent_instance_id: Optional, the parent instance ID used for
     routing in ES.
-    :param testing_mode: Set to True to enable streaming bulk, which is used in
+    :param use_streaming_bulk: Set to True to enable streaming bulk, which is used in
      TestCase-based tests because parallel_bulk is incompatible with them.
+     Or force the use of streaming_bulk to reduce memory usage.
     https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
     Default is False.
     :return: A list of IDs of documents that failed to index.
@@ -842,9 +989,10 @@ def index_documents_in_bulk_from_queryset(
     client = connections.get_connection()
     failed_child_docs = []
 
-    if testing_mode:
+    if use_streaming_bulk:
         # Use streaming_bulk in TestCase based tests. Since parallel_bulk
-        # doesn't work on them.
+        # doesn't work on them. Or force the use of streaming_bulk to reduce
+        # memory usage.
         for success, info in streaming_bulk(
             client,
             bulk_indexing_generator(
@@ -889,15 +1037,16 @@ def index_parent_and_child_docs(
     self: Task,
     instance_ids: list[int],
     search_type: str,
-    testing_mode: bool = False,
+    use_streaming_bulk: bool = False,
 ) -> None:
     """Index parent and child documents in Elasticsearch.
 
     :param self: The Celery task instance
     :param instance_ids: The parent instance IDs to index.
     :param search_type: The Search Type to index parent and child docs.
-    :param testing_mode: Set to True to enable streaming bulk, which is used in
+    :param use_streaming_bulk: Set to True to enable streaming bulk, which is used in
      TestCase-based tests because parallel_bulk is incompatible with them.
+     Or force the use of streaming_bulk to reduce memory usage.
     https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
     Default is False.
     :return: None
@@ -951,8 +1100,10 @@ def index_parent_and_child_docs(
                 )
             except (ConflictError, RequestError) as exc:
                 logger.error(
-                    f"Error indexing the {model_label} with ID: {instance_id}. "
-                    f"Exception was: {type(exc).__name__}"
+                    "Error indexing the %s with ID: %s. Exception was: %s",
+                    model_label,
+                    instance_id,
+                    type(exc).__name__,
                 )
                 continue
 
@@ -968,13 +1119,15 @@ def index_parent_and_child_docs(
             base_doc,
             child_id_property=child_id_property,
             parent_instance_id=instance_id,
-            testing_mode=testing_mode,
+            use_streaming_bulk=use_streaming_bulk,
         )
 
         if failed_child_docs:
             logger.error(
-                f"Error indexing child documents from the {model_label}"
-                f" with ID: {instance_id}. Child IDs are: {failed_child_docs}"
+                "Error indexing child documents from the %s with ID: %s. Child IDs are: %s",
+                model_label,
+                instance_id,
+                failed_child_docs,
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -989,12 +1142,12 @@ def index_parent_and_child_docs(
     interval_start=5,
     ignore_result=True,
 )
-def index_parent_or_child_docs(
+def index_parent_or_child_docs_in_es(
     self: Task,
     instance_ids: list[int],
     search_type: str,
     document_type: str | None,
-    testing_mode: bool = False,
+    use_streaming_bulk: bool = False,
 ) -> None:
     """Index parent or child documents in Elasticsearch.
 
@@ -1002,8 +1155,9 @@ def index_parent_or_child_docs(
     :param instance_ids: The parent instance IDs to index.
     :param search_type: The Search Type to index parent and child docs.
     :param document_type: The document type to index, 'parent' or 'child' documents
-    :param testing_mode: Set to True to enable streaming bulk, which is used in
+    :param use_streaming_bulk: Set to True to enable streaming bulk, which is used in
      TestCase-based tests because parallel_bulk is incompatible with them.
+     Or force the use of streaming_bulk to reduce memory usage.
     https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
     Default is False.
     :return: None
@@ -1050,14 +1204,15 @@ def index_parent_or_child_docs(
             child_es_document,
             base_doc,
             child_id_property=child_id_property,
-            testing_mode=testing_mode,
+            use_streaming_bulk=use_streaming_bulk,
         )
 
         if failed_docs:
             model_label = child_es_document.Django.model.__name__.capitalize()
             logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
+                "Error indexing documents from %s, Failed Doc IDs are: %s",
+                model_label,
+                failed_docs,
             )
 
     if document_type == "parent":
@@ -1066,13 +1221,14 @@ def index_parent_or_child_docs(
             parent_instances,
             parent_es_document,
             base_doc,
-            testing_mode=testing_mode,
+            use_streaming_bulk=use_streaming_bulk,
         )
         if failed_docs:
             model_label = parent_es_document.Django.model.__name__.capitalize()
             logger.error(
-                f"Error indexing documents from {model_label}, "
-                f"Failed Doc IDs are: {failed_docs}"
+                "Error indexing documents from %s, Failed Doc IDs are: %s",
+                model_label,
+                failed_docs,
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -1121,8 +1277,8 @@ def remove_document_from_es_index(
             es_document._index.refresh()
     except NotFoundError:
         logger.info(
-            f"The document with ID: %s can't be deleted from the %s index,"
-            f" it doesn't exist.",
+            "The document with ID: %s can't be deleted from the %s index,"
+            " it doesn't exist.",
             instance_id,
             es_document._index._name,
         )
@@ -1187,7 +1343,7 @@ def index_dockets_in_bulk(
                 failed_docs.append(info["index"]["_id"])
 
     if failed_docs:
-        logger.error(f"Error indexing Dockets in bulk IDs are: {failed_docs}")
+        logger.error("Error indexing Dockets in bulk IDs are: %s", failed_docs)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -1198,19 +1354,20 @@ def build_bulk_cites_doc(
     es_child_doc_class: ESDocumentClassType,
     child_id: int,
     child_doc_model: ESModelClassType,
-) -> ESDictDocument:
+) -> tuple[ESDictDocument, ESModelType | None]:
     """Builds a bulk document for updating cites field in an ES document.
 
     :param es_child_doc_class: The ES child document class to update.
     :param child_id: The child document ID to update.
     :param child_doc_model: The child document to update model class.
-    :return: A dictionary representing the ES update operation if the document
-    exists, otherwise, it returns an empty dictionary.
+    :return: A two-tuple: a dictionary representing the ES update operation if
+    the document exists; otherwise an empty dictionary and the related
+    document’s instance if available.
     """
 
     child_instance = get_instance_from_db(child_id, child_doc_model)
     if not child_instance:
-        return {}
+        return {}, None
 
     match child_doc_model.__name__:
         case "RECAPDocument":
@@ -1220,7 +1377,7 @@ def build_bulk_cites_doc(
             parent_document_id = child_instance.cluster.pk
             child_id_property = "OPINION"
         case _:
-            return {}
+            return {}, None
 
     cites_prepared = es_child_doc_class().prepare_cites(child_instance)
     doc_id = getattr(ES_CHILD_ID(child_id), child_id_property)
@@ -1239,24 +1396,95 @@ def build_bulk_cites_doc(
         "_routing": parent_document_id,
         "doc": {"cites": cites_prepared},
     }
-    return doc_to_update
+    return doc_to_update, child_instance
 
 
-def check_bulk_indexing_exception(
-    errors: list[dict[str, Any]], exception: str
-) -> bool:
-    """Check for a specific exception type in bulk indexing errors.
-    :param errors: A list of dictionaries representing errors from a bulk
-    indexing operation.
-    :param exception: The exception type string to check for in the error
-    details.
-    :return: True if the specified exception is found in any of the error
-    dictionaries; otherwise, returns False.
+def percolate_document(
+    es_doc_class: ESDocumentClassType, document_id: int, instance: ESModelType
+) -> None:
+    """Percolate a document by preparing it and sending it for alert matching.
+
+    :param es_doc_class: The ES document class used to prepare the document.
+    :param document_id: The ID of the document in DB.
+    :param instance: The model instance to be prepared and percolated.
+    :return: None
     """
-    for error in errors:
-        if error.get("update", {}).get("error", {}).get("type") == exception:
-            return True
-    return False
+    doc = es_doc_class().prepare(instance)
+    chain(
+        send_or_schedule_search_alerts.s(
+            SaveESDocumentReturn(
+                document_id=str(document_id),
+                document_content=doc,
+                app_label=f"{instance._meta.app_label}.{instance.__class__.__name__}",
+            )
+        ),
+        percolator_response_processing.s(),
+    ).apply_async()
+
+
+def build_cite_count_update(cluster_ids_to_update: list[int]) -> list[dict]:
+    """Create update documents for OpinionClusterDocument.citeCount
+
+    :param cluster_ids_to_update: the cluster ids to update
+    :return: the dicts / documents defining the updates
+    """
+
+    # Query all clusters to update and retrieve only their sub_opinions
+    # with the necessary fields.
+    prefetch = Prefetch("sub_opinions", queryset=Opinion.objects.only("pk"))
+    clusters_with_sub_opinions = (
+        OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
+        .only("pk", "citation_count")
+        .prefetch_related(prefetch)
+    )
+
+    documents_to_update = []
+    base_doc = {
+        "_op_type": "update",
+        "_index": OpinionClusterDocument._index._name,
+    }
+    for cluster in clusters_with_sub_opinions:
+        if not OpinionClusterDocument.exists(id=cluster.pk):
+            # If the OpinionClusterDocument does not exist, it might
+            # not be indexed yet. Raise a NotFoundError to retry the
+            # task; hopefully, it will be indexed soon.
+            raise NotFoundError(
+                f"The OpinionCluster {cluster.pk} is not indexed.",
+                "",
+                {"id": cluster.pk},
+            )
+
+        # Build the OpinionCluster dicts for updating the citeCount.
+        doc_to_update = {
+            "_id": cluster.pk,
+            "doc": {"citeCount": cluster.citation_count},
+        }
+        doc_to_update.update(base_doc)
+        documents_to_update.append(doc_to_update)
+
+        for opinion in cluster.sub_opinions.all():
+            if not OpinionClusterDocument.exists(
+                id=ES_CHILD_ID(opinion.pk).OPINION, routing=cluster.pk
+            ):
+                # If the OpinionDocument does not exist, it might
+                # not be indexed yet. Raise a NotFoundError to retry the
+                # task; hopefully, it will be indexed soon.
+                raise NotFoundError(
+                    f"The Opinion {opinion.pk} is not indexed.",
+                    "",
+                    {"id": opinion.pk},
+                )
+
+            # Build the Opinion dicts for updating the citeCount.
+            doc_to_update = {
+                "_id": ES_CHILD_ID(opinion.pk).OPINION,
+                "_routing": cluster.pk,
+                "doc": {"citeCount": cluster.citation_count},
+            }
+            doc_to_update.update(base_doc)
+            documents_to_update.append(doc_to_update)
+
+    return documents_to_update
 
 
 @app.task(
@@ -1288,72 +1516,25 @@ def index_related_cites_fields(
     should be updated.
     :return: None.
     """
-
     documents_to_update = []
     cites_doc_to_update = {}
     base_doc = {}
+    recap_document = None
+    es_child_doc_class = None
     match model_name:
         case OpinionsCited.__name__:
-            # Query all clusters to update and retrieve only their sub_opinions
-            # with the necessary fields.
-            prefetch = Prefetch(
-                "sub_opinions", queryset=Opinion.objects.only("pk")
-            )
-            clusters_with_sub_opinions = (
-                OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
-                .only("pk", "citation_count")
-                .prefetch_related(prefetch)
-            )
-
             base_doc = {
                 "_op_type": "update",
                 "_index": OpinionClusterDocument._index._name,
             }
-            for cluster in clusters_with_sub_opinions:
-                if not OpinionClusterDocument.exists(id=cluster.pk):
-                    # If the OpinionClusterDocument does not exist, it might
-                    # not be indexed yet. Raise a NotFoundError to retry the
-                    # task; hopefully, it will be indexed soon.
-                    raise NotFoundError(
-                        f"The OpinionCluster {cluster.pk} is not indexed.",
-                        "",
-                        {"id": cluster.pk},
-                    )
-
-                # Build the OpinionCluster dicts for updating the citeCount.
-                doc_to_update = {
-                    "_id": cluster.pk,
-                    "doc": {"citeCount": cluster.citation_count},
-                }
-                doc_to_update.update(base_doc)
-                documents_to_update.append(doc_to_update)
-
-                for opinion in cluster.sub_opinions.all():
-                    if not OpinionClusterDocument.exists(
-                        id=ES_CHILD_ID(opinion.pk).OPINION, routing=cluster.pk
-                    ):
-                        # If the OpinionDocument does not exist, it might
-                        # not be indexed yet. Raise a NotFoundError to retry the
-                        # task; hopefully, it will be indexed soon.
-                        raise NotFoundError(
-                            f"The Opinion {opinion.pk} is not indexed.",
-                            "",
-                            {"id": opinion.pk},
-                        )
-
-                    # Build the Opinion dicts for updating the citeCount.
-                    doc_to_update = {
-                        "_id": ES_CHILD_ID(opinion.pk).OPINION,
-                        "_routing": cluster.pk,
-                        "doc": {"citeCount": cluster.citation_count},
-                    }
-                    doc_to_update.update(base_doc)
-                    documents_to_update.append(doc_to_update)
+            documents_to_update.extend(
+                build_cite_count_update(cluster_ids_to_update)
+            )
 
             # Finally build the Opinion dict for updating the cites.
             child_doc_model = Opinion
             es_child_doc_class = OpinionDocument
-            cites_doc_to_update = build_bulk_cites_doc(
+            cites_doc_to_update, _ = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
 
@@ -1366,7 +1547,7 @@ def index_related_cites_fields(
 
             child_doc_model = RECAPDocument
             es_child_doc_class = ESRECAPDocument
-            cites_doc_to_update = build_bulk_cites_doc(
+            cites_doc_to_update, recap_document = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
 
@@ -1377,30 +1558,23 @@ def index_related_cites_fields(
     if not documents_to_update:
         return
 
-    client = connections.get_connection(alias="no_retry_connection")
-    # Execute the bulk update
-    try:
-        bulk(client, documents_to_update)
-    except BulkIndexError as exc:
-        # Catch any BulkIndexError exceptions to handle specific error message.
-        # If the error is a version conflict, raise a ConflictError for retrying it.
-        if check_bulk_indexing_exception(
-            exc.errors, "version_conflict_engine_exception"
-        ):
-            raise ConflictError(
-                "ConflictError indexing cites.",
-                "",
-                {"id": child_id},
-            )
-        else:
-            # If the error is of any other type, raises the original
-            # BulkIndexError for debugging.
-            raise exc
+    index_documents_in_bulk(documents_to_update)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         OpinionClusterDocument._index.refresh()
         DocketDocument._index.refresh()
+
+    if all(
+        [
+            model_name == OpinionsCitedByRECAPDocument.__name__,
+            recap_document,
+            es_child_doc_class,
+        ]
+    ):
+        # Percolate the related RECAPDocument to match queries that involve the
+        # cites field.
+        percolate_document(es_child_doc_class, child_id, recap_document)
 
 
 @app.task(
@@ -1564,3 +1738,291 @@ def remove_documents_by_query(
         es_document._index.refresh()
 
     return response
+
+
+def inception_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the inception batch microservice.
+
+    param batch: A list of dictionaries, where each dictionary represents an
+    opinion document with the following keys:
+    "id": The Opinion ID.
+    "text": The content of the opinion.
+    :return: A list of dictionaries, each containing the embeddings for the
+    corresponding opinion document as returned  by the inception microservice.
+    """
+
+    data = json.dumps(batch)
+    response = asyncio.run(
+        microservice(
+            service="inception-batch",
+            method="POST",
+            data=data,
+        )
+    )
+    return response.json()
+
+
+def embeddings_cache_key():
+    return "embeddings:"
+
+
+def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
+    return f"{embeddings_cache_key()}{batch_uuid}-{batch_range}"
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+        ReadError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
+def create_opinion_text_embeddings(
+    self, batch: list[int], database
+) -> str | None:
+    """Get embeddings for Opinion texts from inception.
+
+    :param self: The Celery task.
+    :param batch: A list of Opinion IDs representing the batch to process.
+    :param database: The database to be used during processing.
+    :return: The cache key used to temporarily store embeddings.
+    """
+    opinions = (
+        Opinion.objects.filter(id__in=batch).with_best_text().using(database)
+    )
+    opinions_to_vectorize = [
+        {"id": opinion.pk, "text": opinion.clean_text} for opinion in opinions
+    ]
+    if not opinions_to_vectorize:
+        self.request.chain = None
+        return None
+
+    batch_range = f"{batch[0]}_{batch[-1]}"
+    batch_request = {"documents": opinions_to_vectorize}
+    embeddings = inception_batch_request(batch_request)
+    # Use a UUID to guarantee the uniqueness of this batch of stored embeddings
+    batch_uuid = str(uuid.uuid4().hex)
+    cache_key = get_embeddings_cache_key(batch_uuid, batch_range)
+    cache.set(cache_key, embeddings, 60 * 30)
+    return cache_key
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
+def save_embeddings(
+    self,
+    cache_key: str,
+    directory: str = "opinions",
+) -> None:
+    """Save embeddings to S3.
+
+    The embeddings list is the response from a batch request to the
+    inception microservice, which has the following structure:
+
+    [
+        {
+            'id': 1,
+            'embeddings': [
+                {
+                    'chunk_number': 1,
+                    'chunk': 'search_document: First test document',
+                    'embedding': [-0.01209942298567295...]
+                },
+                {
+                    'chunk_number': 2,
+                    'chunk': 'search_document: First test document',
+                    'embedding': [-1.01200886298552476...]
+                },
+            ]
+        },
+        {
+            'id': 2,
+            'embeddings': [
+                {
+                    'chunk_number': 1,
+                    'chunk': 'search_document: Second test document',
+                    'embedding': [0.07617326825857162...]
+                },
+            ]
+        },
+    ]
+
+    Each object uploaded to S3 is a JSON file containing one of the items
+    in the previous list.
+
+    For example, if uploading a batch of opinion embeddings, each file will
+    be stored embeddings/opinions/freelawproject/modernbert-embed-base_finetune_512/{opinion_id}.json
+
+    :param self: The Celery task.
+    :param cache_key: The cache key used to temporarily store the embeddings.
+    :param directory: The directory where the embeddings will be stored.
+    :return: None.
+    """
+
+    embeddings = cache.get(cache_key, None)
+    if embeddings is None:
+        batch_range = cache_key.rsplit("-", 1)[-1]
+        logger.error(
+            "Embeddings for the opinion range %s are missing from Redis",
+            batch_range,
+        )
+        return None
+
+    if not isinstance(embeddings, list):
+        if isinstance(embeddings, dict):
+            logger.error(
+                "Received API error response in embeddings: %s",
+                json.dumps(embeddings, default=str),
+            )
+        else:
+            logger.error(
+                "Unexpected data type for embeddings: %s (%s)",
+                str(embeddings)[:200],
+                type(embeddings),
+            )
+        return None
+
+    storage = S3IntelligentTieringStorage()
+    for embedding_record in embeddings:
+        record_id = embedding_record["id"]
+        file_contents = json.dumps(embedding_record)
+        file_path = str(
+            PurePosixPath(
+                "embeddings",
+                directory,
+                settings.NLP_EMBEDDING_MODEL,
+                f"{record_id}.json",
+            )
+        )
+        storage.save(file_path, ContentFile(file_contents))
+
+    # Delete the cache key after the saving process is complete.
+    cache.delete(cache_key)
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+def retrieve_embeddings(
+    self,
+    opinion_ids: list[int],
+    directory: str = "opinions",
+) -> list[dict] | None:
+    """Download opinion embeddings from S3 for the given opinion IDs.
+
+    :param self: The Celery task instance.
+    :param opinion_ids: A list of opinion IDs for which to retrieve embeddings.
+    :param directory: The directory where the embeddings are stored.
+    :return: A list of dictionaries containing the embeddings.
+    """
+
+    storage = AWSMediaStorage()
+
+    def download_embedding(opinion_id: int) -> dict | None:
+        file_path = str(
+            PurePosixPath(
+                "embeddings",
+                directory,
+                settings.NLP_EMBEDDING_MODEL,
+                f"{opinion_id}.json",
+            )
+        )
+        logger.info("Attempting to retrieve embedding from: %s", file_path)
+        try:
+            with storage.open(file_path, "rb") as f:
+                file_contents = f.read().decode("utf-8")
+            embedding_data = json.loads(file_contents)
+            return embedding_data
+        except FileNotFoundError:
+            logger.error(
+                "Embeddings for opinion ID:%s doesn't exist.", opinion_id
+            )
+            return None
+
+    embeddings: list[dict] = []
+    # Download embeddings concurrently.
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [
+            executor.submit(download_embedding, opinion_id)
+            for opinion_id in opinion_ids
+        ]
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result:
+                embeddings.append(result)
+    return embeddings
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError, ConflictError, ConnectionTimeout),
+    max_retries=5,
+    retry_backoff=1 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
+    ignore_result=True,
+)
+def index_embeddings(
+    self: Task,
+    embeddings: list[dict],
+) -> None:
+    """Update opinion documents in bulk with embeddings.
+
+    :param self: The Celery task instance.
+    :param embeddings: A list of dictionaries, each containing the opinion ID
+    and its corresponding embeddings to update.
+    :return: None if there are no documents to update.
+    """
+
+    base_doc = {
+        "_op_type": "update",
+        "_index": OpinionClusterDocument._index._name,
+    }
+    documents_to_update = []
+    for embeddings in embeddings:
+        opinion_id = embeddings["id"]
+        opinion_instance = (
+            Opinion.objects.filter(id=opinion_id).only("pk", "cluster").first()
+        )
+        if not opinion_instance:
+            # The opinion has been removed from the DB
+            continue
+
+        doc_to_update = {
+            "_id": ES_CHILD_ID(opinion_id).OPINION,
+            "_routing": opinion_instance.cluster_id,
+            "doc": {
+                "embeddings": embeddings["embeddings"],
+                "timestamp": datetime.now(UTC),
+            },
+        }
+        doc_to_update.update(base_doc)
+        documents_to_update.append(doc_to_update)
+
+    if not documents_to_update:
+        return None
+
+    index_documents_in_bulk(documents_to_update)
+
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        OpinionClusterDocument._index.refresh()

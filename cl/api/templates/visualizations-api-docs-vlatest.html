@@ -75,6 +75,18 @@
   <p>Similar commands can be used to update other non-readonly fields.</p>
   <p>To soft-delete a visualization, flip the <code>deleted</code> field to <code>True</code>. To hard-delete, send an HTTP <code>DELETE</code> request.
   </p>
+
+  <h2 id="deprecation-notice">Deprecation Notice</h2>
+    <p>Unfortunately, our system for visualizing Supreme Court networks has not gotten much traction among users, and is partially deprecated as of early 2025.</p>
+    <p>If you are interested in creating, deleting, or updating visualizations, you can still do so through our APIs, but it is no longer possible to display visualizations on CourtListener.com itself. Moving forward, to support existing users, the only way to display visualizations is through their embed links.</p>
+    <p>To embed a visualization on a website you control, use code like the following on your site:
+    <pre><code>{% spaceless %}
+    {% filter force_escape %}
+    <iframe height="540" width="560" src="https://www.courtlistener.com/visualizations/scotus-mapper/YOUR_ID_HERE/embed/" frameborder="0" allowfullscreen></iframe>
+    {% endfilter %}
+    {% endspaceless %}</code></pre>
+    <p>Just replace YOUR_ID_HERE with the ID of your visualization and it should work on your website.</p>
+    <p>We apologize for this deprecation and hope you understand that we cannot always maintain all the features and experiments we undertake.</p>
   {% include "includes/donate_footer_plea.html" %}
 </div>
 {% endblock %}

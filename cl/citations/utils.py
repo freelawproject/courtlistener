@@ -1,19 +1,63 @@
 from datetime import date
+from typing import TYPE_CHECKING
 
 from django.apps import (  # Must use apps.get_model() to avoid circular import issue
     apps,
 )
 from django.db.models import Sum
 from django.template.defaultfilters import slugify
+from django.utils.functional import keep_lazy_text
 from django.utils.safestring import SafeString
 from eyecite.models import CitationBase, FullCaseCitation, ShortCaseCitation
 from eyecite.utils import strip_punct
-from reporters_db import EDITIONS, VARIATIONS_ONLY
+from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
+
+if TYPE_CHECKING:
+    from cl.search.models import Opinion, RECAPDocument
 
 QUERY_LENGTH = 10
-SLUGIFIED_EDITIONS: dict[str, str] = {
-    str(slugify(item)): item for item in EDITIONS.keys()
-}
+NAIVE_SLUGIFIED_EDITIONS = {str(slugify(item)): item for item in EDITIONS}
+
+
+@keep_lazy_text
+def slugify_reporter(reporter: str) -> str:
+    """Slugify reporters preventing slug collision
+
+    Some different reporter abbreviations may have their naive slug collide
+    Examples where  one is the state reporter, the other a neutral reporter
+    - 'Vt.' and 'VT': naive slug 'vt'
+    - 'La.' and 'LA': naive slug 'la'
+
+    Others: 'CIT' 'C.I.T.'; 'Day.' 'Day'; 'MSPB' 'M.S.P.B.'; 'Me.' 'ME';
+    'ND' 'N.D.'; 'NM' 'N.M.'; 'Pa.' 'PA'; 'SD' 'S.D.'
+
+    :param reporter: the reporter abbreviation, or a slug, or an user input
+    :return: the collision-aware slug
+    """
+    slug = str(slugify(reporter))
+    if slug == reporter:
+        # return the already slugified reporter; this may happen on redirected
+        # cl.opinion_page.views.citation_redirector
+        return slug
+
+    if NAIVE_SLUGIFIED_EDITIONS.get(slug, "") == reporter:
+        # the slug and reporter match the naive mapper
+        return slug
+
+    # if the input string is actually a reporter, return a collision-aware slug
+    if reporter in REPORTERS:
+        return str(
+            slugify(f"{reporter} {REPORTERS[reporter][0]['cite_type']}")
+        )
+
+    # final fallback check for known variations
+    if reporter in VARIATIONS_ONLY and len(VARIATIONS_ONLY[reporter]) == 1:
+        return slugify(VARIATIONS_ONLY[reporter][0])
+
+    return slug
+
+
+SLUGIFIED_EDITIONS = {slugify_reporter(item): item for item in EDITIONS}
 
 
 def map_reporter_db_cite_type(citation_type: str) -> int:
@@ -71,7 +115,7 @@ def get_years_from_reporter(
         if hasattr(edition_guess.start, "year"):
             start_year = edition_guess.start.year
         if hasattr(edition_guess.end, "year"):
-            start_year = edition_guess.end.year
+            end_year = edition_guess.end.year
     return start_year, end_year
 
 
@@ -89,7 +133,7 @@ def make_name_param(
     return " ".join(query_words), len(query_words)
 
 
-def get_canonicals_from_reporter(reporter_slug: str) -> list[SafeString]:
+def get_canonicals_from_reporter(reporter_or_slug: str) -> list[SafeString]:
     """
     Disambiguates a reporter slug using a list of variations.
 
@@ -97,16 +141,17 @@ def get_canonicals_from_reporter(reporter_slug: str) -> list[SafeString]:
     to a list of reporters that it could be possibly referring to.
 
     Args:
-        reporter_slug (str): The reporter's name in slug format
+        reporter_or_slug: The reporter's name, which may be in slug format
 
     Returns:
         list[str]: A list of potential canonical names for the reporter
     """
+    reporter_slug = slugify_reporter(reporter_or_slug)
     slugified_variations = {}
     for variant, canonicals in VARIATIONS_ONLY.items():
         slugged_canonicals = []
         for canonical in canonicals:
-            slugged_canonicals.append(slugify(canonical))
+            slugged_canonicals.append(slugify_reporter(canonical))
         slugified_variations[str(slugify(variant))] = slugged_canonicals
 
     return slugified_variations.get(reporter_slug, [])
@@ -127,7 +172,7 @@ def filter_out_non_case_law_citations(
     return [
         c
         for c in citations
-        if isinstance(c, (FullCaseCitation, ShortCaseCitation))
+        if isinstance(c, (FullCaseCitation | ShortCaseCitation))
     ]
 
 
@@ -147,7 +192,95 @@ def filter_out_non_case_law_and_non_valid_citations(
     return [
         c
         for c in citations
-        if isinstance(c, (FullCaseCitation, ShortCaseCitation))
+        if isinstance(c, (FullCaseCitation | ShortCaseCitation))
         and c.groups.get("volume", None)
         and c.groups.get("page", None)
     ]
+
+
+def chunk_text(text: str, chunk_size: int):
+    """Chunk text with overlapping chunks to avoid misses
+
+    :param text: Text to chunk
+    :param chunk_size: The chunk size
+    :return: Chunks of text
+    """
+    if len(text) <= chunk_size:
+        yield text
+        return
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        if end >= len(text):
+            yield text[start:]
+            break
+        yield text[start:end]
+        start += chunk_size
+
+
+def make_get_citations_kwargs(
+    document: "RECAPDocument | Opinion", chunk_size: int = 200_000
+) -> list[dict]:
+    """Prepare markup kwargs for `get_citations` - chunked
+
+    This is done outside `get_citations` because it uses specific Opinion
+    attributes used are set in Courtlistener, not in eyecite.
+
+    :param document: The Opinion or RECAPDocument whose text should be parsed
+    :param chunk_size: The chunk size
+    :return: a list dict kwargs for `get_citations`
+    """
+    segments = []
+    for attr in [
+        "xml_harvard",
+        "html_anon_2020",
+        "html_columbia",
+        "html_lawbox",
+        "html",
+        "plain_text",
+    ]:
+        text = getattr(document, attr, None)
+        if not text:
+            continue
+        for chunk in chunk_text(text, chunk_size=chunk_size):
+            if attr == "plain_text":
+                kwargs = {
+                    "plain_text": chunk,
+                    "clean_steps": ["all_whitespace"],
+                }
+            else:
+                kwargs = {
+                    "markup_text": chunk,
+                    "clean_steps": ["xml", "html", "all_whitespace"],
+                }
+            segments.append(kwargs)
+        break
+    return segments
+
+
+def get_cited_clusters_ids_to_update(
+    resolutions, citing_opinion_id: int
+) -> list[int]:
+    """Get ids for clusters that need their `citation_count` updated
+
+    Increase the citation count for the cluster of each matched opinion
+    if that cluster has not already been cited by this opinion.
+
+    :param resolutions: an iterable of opinion objects
+    :param citing_opinion_id: the citing opinion
+
+    :return: the list of OpinionCluster ids for update
+    """
+    # prevent circular imports
+    OpinionsCited = apps.get_model("search.OpinionsCited")
+
+    currently_cited_opinions = OpinionsCited.objects.filter(
+        citing_opinion_id=citing_opinion_id
+    ).values_list("cited_opinion_id", flat=True)
+
+    cluster_ids_to_update = {
+        o.cluster.pk
+        for o in resolutions
+        if o.pk not in currently_cited_opinions
+    }
+    return list(cluster_ids_to_update)

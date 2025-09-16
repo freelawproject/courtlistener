@@ -1,6 +1,7 @@
 from enum import Enum
 from http import HTTPStatus
 
+from django.conf import settings
 from elasticsearch.exceptions import SerializationError
 from rest_framework.exceptions import APIException
 
@@ -56,3 +57,24 @@ class ElasticBadRequestError(APIException):
         "Elasticsearch Bad request error. Please review your query."
     )
     default_code = "bad_request"
+
+
+class DisallowedWildcardPattern(SyntaxQueryError):
+    """Query contains a disallowed wildcard pattern"""
+
+    message = "The query contains a disallowed wildcard pattern."
+
+
+class InvalidRelativeDateSyntax(SyntaxQueryError):
+    """The date entered has an invalid format."""
+
+    message = "The date entered has an invalid format."
+
+
+class InputTooLongError(SyntaxQueryError):
+    """The input text is too long to be processed for embedding."""
+
+    message = (
+        "The input is too long to process. The maximum allowed is "
+        f"{settings.MAX_EMBEDDING_CHAR_LENGTH} characters."
+    )

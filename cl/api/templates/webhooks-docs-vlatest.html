@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load extras %}
+{% load waffle_tags %}
 
 {% block title %}Webhook API &ndash; CourtListener.com{% endblock %}
 {% block description %}
@@ -17,7 +18,7 @@
 <div class="col-xs-12 hidden-md hidden-lg">
   <h4 class="v-offset-below-2">
     <i class="fa fa-arrow-circle-o-left gray"></i>
-    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    <a href="{% url "rest_docs" version="v4" %}">Back to API Docs</a>
   </h4>
 </div>
 
@@ -25,7 +26,7 @@
   <div id="toc">
     <h4 class="v-offset-below-3">
       <i class="fa fa-arrow-circle-o-left gray"></i>
-      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+      <a href="{% url "rest_docs" version="v4" %}">Back to API Docs</a>
     </h4>
     <h3>Table of Contents</h3>
     <ul>
@@ -216,7 +217,7 @@
   <p>Fixed webhook endpoints can be re-enabled in the webhooks panel.
   </p>
   <p>
-    <img src="{% static "png/re-enable-webhook.png" %}"
+    <img src="{% static "png/re-enable-webhook-v2.png" %}"
        alt="screenshot of how to re-enable a webhook endpoint"
        class="img-responsive img-rounded shadow center-block"
        height="261"
@@ -238,11 +239,11 @@
       <p><strong>For servers</strong>, the best way is to use the <a href="{% url 'alert_api_help' %}#dockets">Docket Alert API</a>.</p>
       <p>For example, this shell code searches for the <a href="{% url 'view_docket' '64911367' 'trump-v-united-states' %}">Trump Mar-A-Lago</a> case and then subscribes your account to it:</p>
       <pre class="v-offset-below-1 scrollable" >curl --silent \
-  --url '{% get_full_host %}{% url "search-list" version="v3" %}?type=d&docket_number=22-cv-81294&case_name=trump' \
+  --url '{% get_full_host %}{% url "search-list" version="v4" %}?type=d&docket_number=22-cv-81294&case_name=trump' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' | \
 jq '.results[0].docket_id' | \
 xargs -I % curl -X POST \
-  --url 'https://www.courtlistener.com/api/rest/v3/docket-alerts/' \
+  --url 'https://www.courtlistener.com/api/rest/v4/docket-alerts/' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'docket=%' </pre>
     </li>
@@ -270,10 +271,10 @@ xargs -I % curl -X POST \
 }
   </pre>
   <p>
-    The <code>results</code> key is based on the  <a href="{% url 'pacer_api_help' %}#docket-entry-endpoint">Docket Entry API</a>. It has all the same fields except for the <code>resource_uri</code> and <code>tags</code> fields, which are omitted, and the <code>docket</code> field is an <code>ID</code> instead of a URL. If you already have access to that API, you can <a href="{% url "docketentry-detail" version="v3" pk=20615503 %}">see an example object here</a>, and do an HTTP OPTIONS request to get a description of the fields:
+    The <code>results</code> key is based on the  <a href="{% url 'pacer_api_help' %}#docket-entry-endpoint">Docket Entry API</a>. It has all the same fields except for the <code>resource_uri</code> and <code>tags</code> fields, which are omitted, and the <code>docket</code> field is an <code>ID</code> instead of a URL. If you already have access to that API, you can <a href="{% url "docketentry-detail" version="v4" pk=20615503 %}">see an example object here</a>, and do an HTTP OPTIONS request to get a description of the fields:
   </p>
   <pre class="v-offset-below-1 scrollable" >curl -X OPTIONS \
-  --url '{% get_full_host %}{% url "docketentry-list" version="v3" %}' \
+  --url '{% get_full_host %}{% url "docketentry-list" version="v4" %}' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
   <p>
     If you do not yet have access to the Docket Entry API, please <a href="{% url "contact" %}">let us know</a>. In the meantime, another way to see an example event is via <a href="{% url "webhooks_getting_started" %}#testing">the webhook testing tool</a>.
@@ -292,7 +293,7 @@ xargs -I % curl -X POST \
       </p>
       <p>For example, this shell code creates a Search Alert for new legal decisions mentioning the <a href="{% url "view_case" 2812209 "obergefell-v-hodges" %}">Obergefell v. Hodges case</a>:</p>
       <pre class="v-offset-below-1 scrollable" >curl -X POST \
-  --url {% get_full_host %}{% url "alert-list" version="v3" %} \
+  --url {% get_full_host %}{% url "alert-list" version="v4" %} \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'name=My Obergefell Alert' \
   --data 'query=q=Obergefell+v.+Hodges&type=o&order_by=score+desc&stat_Precedential=on&docket_number=14-556' \
@@ -318,7 +319,7 @@ xargs -I % curl -X POST \
   </p>
   <p>To get a description of the Search Alert object, do an HTTP <code>OPTIONS</code> request to the API endpoint:</p>
   <pre>curl -X OPTIONS \
-  --url '{% get_full_host %}{% url "alert-list" version="v3" %}' \
+  --url '{% get_full_host %}{% url "alert-list" version="v4" %}' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' </pre>
 
   <h3 id="old-da-alerts-report">Old Docket Alert Events</h3>
@@ -376,7 +377,7 @@ xargs -I % curl -X POST \
   <pre>curl -X PATCH \
   --data 'alert_type=1' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}{id}/"
+  "{% get_full_host %}{% url "docket-alert-list" version="v4" %}{id}/"
 </pre>
   <p>Doing the above will tell our system that the alert was recently modified and thus should not be disabled for another six months.
   </p>
@@ -384,7 +385,7 @@ xargs -I % curl -X POST \
   <pre>curl -X PATCH \
   --data 'alert_type=0' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}{id}/"
+  "{% get_full_host %}{% url "docket-alert-list" version="v4" %}{id}/"
 </pre>
 
   <h3 id="recap-fetch">RECAP Fetch Events</h3>
@@ -402,7 +403,7 @@ xargs -I % curl -X POST \
   </p>
   <p>To get a description of the <code>payload</code> object, do an HTTP <code>OPTIONS</code> request to the API endpoint:</p>
   <pre>curl -X OPTIONS \
-  --url '{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}' \
+  --url '{% get_full_host %}{% url "pacerfetchqueue-list" version="v4" %}' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' </pre>
   <p>After you set up this endpoint, you will be notified whenever one of your fetch requests terminates in success or failure.
   </p>
@@ -418,6 +419,13 @@ xargs -I % curl -X POST \
     <li>
       <p><strong>v1</strong> First release
       </p>
+    </li>
+    <li>
+      <p><strong>v2</strong> - This release introduces support for Case Law Search Alerts results with nested documents.</p>
+      <p>You can now select the webhook version when configuring an endpoint. For most webhook event types, there are no differences between <code>v1</code> and <code>v2</code>, as the payload remains unchanged.
+      </p>
+      <p>In the Search Alert webhook event type, the Oral Arguments search response remains identical between <code>v1</code> and <code>v2</code>.</p>
+      <p>For Case Law {% flag "recap-alerts-active" %}and RECAP{% endflag %} <code>v2</code> now includes nested results, which are based on the new changes introduced in <code>v4</code> of the <a href="{% url "search_api_help" version="v4" %}">Search API.</a></p>
     </li>
   </ul>
 </div>

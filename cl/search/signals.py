@@ -1,12 +1,17 @@
+import logging
+
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from cl.audio.models import Audio
+from cl.citations.models import UnmatchedCitation
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
 from cl.favorites.utils import send_prayer_emails
+from cl.lib.courts import get_cache_key_for_court_list
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
@@ -35,12 +40,13 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
-    OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
 )
+from cl.settings import DEVELOPMENT, TESTING
 
+logger = logging.getLogger(__name__)
 # This field mapping is used to define which fields should be updated in the
 # Elasticsearch index document when they change in the DB. The outer keys
 # represent the actions that will trigger signals:
@@ -175,8 +181,10 @@ p_field_mapping = {
     "save": {
         Person: {
             "self": {
-                "name_full": ["name"],
-                "name_full_reverse": ["name_reverse"],
+                "name_first": ["name", "name_reverse"],
+                "name_middle": ["name", "name_reverse"],
+                "name_last": ["name", "name_reverse"],
+                "name_suffix": ["name", "name_reverse"],
                 "religion": ["religion"],
                 "gender": ["gender"],
                 "dob_city": ["dob_city"],
@@ -216,16 +224,28 @@ position_field_mapping = {
     "save": {
         Person: {
             "appointer__person": {
-                "name_full_reverse": ["appointer"],
+                "name_first": ["appointer"],
+                "name_middle": ["appointer"],
+                "name_last": ["appointer"],
+                "name_suffix": ["appointer"],
             },
             "predecessor": {
-                "name_full_reverse": ["predecessor"],
+                "name_first": ["predecessor"],
+                "name_middle": ["predecessor"],
+                "name_last": ["predecessor"],
+                "name_suffix": ["predecessor"],
             },
             "supervisor": {
-                "name_full_reverse": ["supervisor"],
+                "name_first": ["supervisor"],
+                "name_middle": ["supervisor"],
+                "name_last": ["supervisor"],
+                "name_suffix": ["supervisor"],
             },
             "person": {
-                "name_full": ["name"],
+                "name_first": ["name"],
+                "name_middle": ["name"],
+                "name_last": ["name"],
+                "name_suffix": ["name"],
                 "religion": ["religion"],
                 "gender": ["gender"],
                 "dob_city": ["dob_city"],
@@ -303,10 +323,16 @@ docket_field_mapping = {
         },
         Person: {
             "assigned_to": {
-                "name_full": ["assignedTo"],
+                "name_first": ["assignedTo"],
+                "name_middle": ["assignedTo"],
+                "name_last": ["assignedTo"],
+                "get_name_suffix_display": ["assignedTo"],
             },
             "referred_to": {
-                "name_full": ["referredTo"],
+                "name_first": ["referredTo"],
+                "name_middle": ["referredTo"],
+                "name_last": ["referredTo"],
+                "get_name_suffix_display": ["referredTo"],
             },
         },
     },
@@ -365,15 +391,20 @@ recap_document_field_mapping = {
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
                 "pacer_case_id": ["pacer_case_id"],
-                "slug": ["absolute_url"],
             }
         },
         Person: {
             "assigned_to": {
-                "name_full": ["assignedTo"],
+                "name_first": ["assignedTo"],
+                "name_middle": ["assignedTo"],
+                "name_last": ["assignedTo"],
+                "get_name_suffix_display": ["assignedTo"],
             },
             "referred_to": {
-                "name_full": ["referredTo"],
+                "name_first": ["referredTo"],
+                "name_middle": ["referredTo"],
+                "name_last": ["referredTo"],
+                "get_name_suffix_display": ["referredTo"],
             },
         },
     },
@@ -425,6 +456,7 @@ o_field_mapping = {
                 "html": ["text"],
                 "plain_text": ["text"],
                 "sha1": ["sha1"],
+                "ordering_key": ["ordering_key"],
             },
         },
     },
@@ -504,7 +536,7 @@ o_cluster_field_mapping = {
 
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
-_pa_signal_processor = ESSignalProcessor(
+pa_signal_processor = ESSignalProcessor(
     ParentheticalGroup,
     ParentheticalGroupDocument,
     pa_field_mapping,
@@ -572,6 +604,54 @@ def handle_recap_doc_change(
 
     if (
         instance.es_rd_field_tracker.has_changed("is_available")
-        and instance.is_available == True
+        and instance.is_available
     ):
         send_prayer_emails(instance)
+
+
+@receiver(
+    post_save,
+    sender=Citation,
+    dispatch_uid="handle_citation_save_uid",
+)
+def update_unmatched_citation(
+    sender, instance: Citation, created: bool, **kwargs
+):
+    """Updates UnmatchedCitation.status to MATCHED, if found"""
+    if not created:
+        return
+    UnmatchedCitation.objects.filter(
+        volume=instance.volume,
+        reporter=instance.reporter,
+        page=instance.page,
+    ).update(status=UnmatchedCitation.FOUND)
+
+
+@receiver(
+    post_save,
+    sender=Court,
+    dispatch_uid="handle_court_changes_uid",
+)
+def update_court_cache(sender, instance: Court, created: bool, **kwargs):
+    """
+    Invalidates the cached court list to ensure data consistency when a Court
+    instance is created or updated.
+    """
+    cache.delete(get_cache_key_for_court_list())
+
+
+@receiver(
+    post_save,
+    sender=Court,
+    dispatch_uid="handle_new_court_needs_courthouse",
+)
+def update_court_cache(sender, instance: Court, created: bool, **kwargs):
+    """
+    A new courthouse should be created alongside a new court. Send a warning
+    to Sentry for someone to look at it
+    """
+    if TESTING or DEVELOPMENT:
+        return
+
+    if created:
+        logger.error("Create a courthouse for new court '%s'", instance.id)

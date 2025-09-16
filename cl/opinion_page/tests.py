@@ -7,22 +7,27 @@ from datetime import date
 from http import HTTPStatus
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from urllib.parse import urlencode
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import AnonymousUser, Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import connection
-from django.test import AsyncRequestFactory, RequestFactory, override_settings
+from django.test import (
+    AsyncRequestFactory,
+    RequestFactory,
+    SimpleTestCase,
+    override_settings,
+)
 from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils.text import slugify
 from factory import RelatedFactory
-from waffle.testutils import override_flag
 
+from cl.citations.utils import slugify_reporter
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -46,9 +51,9 @@ from cl.opinion_page.utils import (
     make_docket_title,
 )
 from cl.opinion_page.views import (
-    download_docket_entries_csv,
     fetch_docket_entries,
     get_prev_next_volumes,
+    view_recap_document,
 )
 from cl.people_db.factories import (
     PersonFactory,
@@ -68,23 +73,26 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
+    RECAPAttachmentFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
+    ClusterRedirection,
     Docket,
     DocketEntry,
     Opinion,
     OpinionCluster,
     RECAPDocument,
 )
-from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -113,7 +121,6 @@ class SimpleLoadTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
-@override_flag("ui_flag_for_o", False)
 class OpinionPageLoadTest(
     ESIndexTestCase,
     CourtTestCase,
@@ -216,19 +223,188 @@ class OpinionPageLoadTest(
         self.assertEqual(count, len(expected_clusters))
 
 
-class DocumentPageRedirection(TestCase):
+class ViewRecapDocumentTest(TestCase):
     """
-    Test to make sure the document page of appellate entries redirect users
-    to the attachment page if the main document got converted into an attachment
+    Tests for view_recap_document
     """
 
     @classmethod
     def setUpTestData(cls):
-        cls.court = CourtFactory(id="ca1", jurisdiction="F")
-        cls.docket = DocketFactory(
-            court=cls.court, source=Docket.RECAP, pacer_case_id="104490"
+        cls.docket = DocketFactory()
+
+    async def get(self, follow=False, params=None, **kwargs):
+        kwargs["slug"] = ""
+        if "att_num" in kwargs:
+            path = reverse(
+                "view_recap_attachment",
+                kwargs=kwargs,
+            )
+        else:
+            path = reverse(
+                "view_recap_document",
+                kwargs=kwargs,
+            )
+        if params:
+            path += f"?{urlencode(params)}"
+
+        return await self.async_client.get(path, follow=follow)
+
+    async def test_invalid_docket(self) -> None:
+        r = await self.get(docket_id=0, doc_num=0)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_invalid_document(self) -> None:
+        r = await self.get(docket_id=self.docket.id, doc_num=0)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_valid_document(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
         )
-        cls.de_data = DocketEntriesDataFactory(
+        r = await self.get(
+            docket_id=self.docket.id, doc_num=rd.document_number
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(rd, c["rd"])
+        self.assertIsNotNone(c["title"])
+        self.assertIsNone(c["og_file_path"])
+        self.assertIsNotNone(c["note_form"])
+        self.assertTrue(c["private"])
+        self.assertIsNotNone(c["timezone"])
+        self.assertFalse(c["redirect_to_pacer_modal"])
+        self.assertFalse(c["authorities"])
+        self.assertFalse(c["attachments"])
+
+    async def test_invalid_attachment(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        r = await self.get(
+            docket_id=self.docket.id, doc_num=rd.document_number, att_num=1
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_attachment(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        ra = await sync_to_async(RECAPAttachmentFactory)(
+            docket_entry=rd.docket_entry
+        )
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=ra.document_number,
+            att_num=ra.attachment_number,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(ra, c["rd"])
+        self.assertEqual(
+            set([rd.attachment_number, ra.attachment_number]),
+            {x["attachment_number"] for x in c["attachments"]},
+        )
+        self.assertEqual(
+            set([rd.description, ra.description]),
+            {x["description"] for x in c["attachments"]},
+        )
+        self.assertEqual(
+            set([rd.get_absolute_url(), ra.get_absolute_url()]),
+            {x["url"] for x in c["attachments"]},
+        )
+
+    async def test_redirect_to_attachment(self) -> None:
+        # Check redirect if main doc converted to attachment
+        ra_nodoc = await sync_to_async(RECAPAttachmentFactory)(
+            attachment_number=1, docket_entry__docket=self.docket
+        )
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=ra_nodoc.document_number,
+            follow=True,
+        )
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(ra_nodoc, c["rd"])
+
+    async def test_download_redirect(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        rd.is_available = True
+        rd.filepath_local = "/tmp/test.pdf"
+        await sync_to_async(rd.save)()
+        with self.subTest("Check download_redirect download"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_to_download": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.FOUND)
+            self.assertEqual(r["Location"], rd.filepath_local.url)
+
+        with self.subTest("Check redirect_or_modal download"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_or_modal": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.FOUND)
+            self.assertEqual(r["Location"], rd.filepath_local.url)
+
+        rd.is_available = False
+        await sync_to_async(rd.save)()
+        with self.subTest("Check download_redirect to PACER"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_to_download": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.FOUND)
+            self.assertEqual(r["Location"], rd.pacer_url)
+
+        with self.subTest("Check redirect_or_modal flag"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_or_modal": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            c = r.context
+            self.assertEqual(rd, c["rd"])
+            self.assertTrue(c["redirect_to_pacer_modal"])
+
+    async def test_og_override(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        req = AsyncRequestFactory().get(
+            reverse(
+                "view_recap_document",
+                kwargs={"docket_id": 1, "doc_num": 1, "slug": ""},
+            )
+        )
+        req.user = AnonymousUser()
+        req.auser = AsyncMock(return_value=req.user)
+        r = await view_recap_document(
+            req, self.docket.id, rd.document_number, is_og_bot=True
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context_data
+        self.assertEqual(rd, c["rd"])
+        self.assertIsNotNone(c["og_file_path"])
+
+    async def test_appellate_redirect_to_attachment_page(self) -> None:
+        """
+        Test to make sure the document page of appellate entries redirect users
+        to the attachment page if the main document got converted into an attachment
+        """
+        court = await sync_to_async(CourtFactory)(id="ca1", jurisdiction="F")
+        docket = await sync_to_async(DocketFactory)(
+            court=court, source=Docket.RECAP, pacer_case_id="104490"
+        )
+        de_data = await sync_to_async(DocketEntriesDataFactory)(
             docket_entries=[
                 DocketEntryDataFactory(
                     pacer_doc_id="288651",
@@ -236,11 +412,9 @@ class DocumentPageRedirection(TestCase):
                 )
             ],
         )
-        async_to_sync(add_docket_entries)(
-            cls.docket, cls.de_data["docket_entries"]
-        )
+        await add_docket_entries(docket, de_data["docket_entries"])
 
-        cls.att_data = AppellateAttachmentPageFactory(
+        att_data = await sync_to_async(AppellateAttachmentPageFactory)(
             attachments=[
                 AppellateAttachmentFactory(
                     attachment_number=1, pacer_doc_id="288651"
@@ -250,26 +424,18 @@ class DocumentPageRedirection(TestCase):
             pacer_doc_id="288651",
             pacer_case_id="104490",
         )
-        async_to_sync(merge_attachment_page_data)(
-            cls.court,
-            cls.att_data["pacer_case_id"],
-            cls.att_data["pacer_doc_id"],
+        await merge_attachment_page_data(
+            court,
+            att_data["pacer_case_id"],
+            att_data["pacer_doc_id"],
             None,
             "",
-            cls.att_data["attachments"],
+            att_data["attachments"],
         )
 
-    async def test_redirect_to_attachment_page(self) -> None:
-        """Does the page redirect to the attachment page?"""
-        path = reverse(
-            "view_recap_document",
-            kwargs={
-                "docket_id": self.docket.pk,
-                "doc_num": 1,
-                "slug": self.docket.slug,
-            },
+        r = await self.get(
+            docket_id=docket.pk, doc_num=1, slug=docket.slug, follow=True
         )
-        r = await self.async_client.get(path, follow=True)
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
@@ -307,7 +473,7 @@ class CitationRedirectorTest(TestCase):
         f2_cite.cluster_id = 3
         await f2_cite.asave()
 
-        self.citation["reporter"] = slugify(self.citation["reporter"])
+        self.citation["reporter"] = slugify_reporter(self.citation["reporter"])
         r = await self.async_client.get(
             reverse("citation_redirector", kwargs=self.citation)
         )
@@ -501,6 +667,24 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
+    async def test_slugifying_reporters_collision(self) -> None:
+        """Test reporter collision-aware slugification"""
+        test_pairs = [("Vt.", "VT"), ("La.", "LA"), ("MSPB", "M.S.P.B.")]
+        for r1, r2 in test_pairs:
+            response1 = await self.async_client.get(
+                reverse(
+                    "citation_redirector",
+                    kwargs={"reporter": r1},
+                )
+            )
+            response2 = await self.async_client.get(
+                reverse(
+                    "citation_redirector",
+                    kwargs={"reporter": r2},
+                )
+            )
+            self.assertNotEqual(response1.url, response2.url)
+
     async def test_reporter_variation_just_reporter(self) -> None:
         """Do we redirect properly when we get reporter variations?"""
         r = await self.async_client.get(
@@ -555,7 +739,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -570,7 +754,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="3",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -585,7 +769,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -600,7 +784,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -633,7 +817,7 @@ class CitationRedirectorTest(TestCase):
             reporter="U.S.",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="scotus")
@@ -650,7 +834,6 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
 
-    @override_flag("ui_flag_for_o", False)
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
@@ -662,7 +845,7 @@ class CitationRedirectorTest(TestCase):
             follow=True,
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        self.assertTemplateUsed(r, "opinion.html")
+        self.assertTemplateUsed(r, "opinions.html")
         self.assertEqual(
             r.context["cluster"].get_absolute_url(),
             "/opinion/2/case-name-cluster/",
@@ -685,7 +868,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="40M",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=df,
                 case_name="People v. Davis",
@@ -752,6 +935,87 @@ class CitationRedirectorTest(TestCase):
         self.assertIn("No Citations Detected", r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
+    async def test_disambiguated_reporter_variants_redirect_properly(self):
+        """Can we resolve correctly some reporter variants with collisions to slug?"""
+
+        test_pairs = [
+            ("Vr.", "vroom"),
+            ("V.R.", "vt"),
+            ("Black Rep.", "black"),
+            ("Black. Rep.", "blackf"),
+            ("Cal. App. 2d Supp", "cal-app-2d"),
+            ("Cal. App. 2d Supp.", "cal-app-supp-2d"),
+            ("CLR", "conn-l-rptr"),
+            ("Cl.R.", "cl-ch"),
+            ("Dec. Commr. Pat.", "dec-com-pat"),
+            ("Dec. Comm'r Pat.", "dec-commr-pat"),
+            ("Hayw. & H.", "hayw-hdc"),
+            ("Hayw.& H.", "hay-haz"),
+            ("Johns.(N.Y.)", "johns-ch"),
+            ("Johns.N.Y.", "johns"),
+            ("Mt.", "mont"),
+            ("mt", "mt"),
+            ("Pa.C.", "pa-commw"),
+            ("Pac.", "p"),
+            ("Sc.", "scam"),
+        ]
+
+        for variation, expected_slug in test_pairs:
+            with self.subTest(variation=variation):
+                r = await self.async_client.get(
+                    reverse(
+                        "citation_redirector",
+                        kwargs={"reporter": variation},
+                    ),
+                    follow=True,
+                )
+                if r.redirect_chain:
+                    # Get path from the redirection from string to slug reporter
+                    path = r.redirect_chain[-1][0]
+                else:
+                    # No redirect, mt is a variation but matches its slug
+                    path = r.asgi_request.path
+                expected_path = f"/c/{expected_slug}/"
+                self.assertEqual(
+                    expected_path,
+                    path,
+                    msg=f"Expected path: {expected_path} is different from the obtained path: {path}",
+                )
+
+    async def test_too_ambiguous_reporter_variations(self):
+        """Some abbreviations are too ambiguous to resolve safely"""
+
+        test_pairs = [
+            ("B.R.", "br"),
+            ("BR", "br"),
+            ("Wash.", "wash"),
+            ("WASH", "wash"),
+            ("HOW", "how"),
+            ("How.", "how"),
+            ("OKla.", "okla"),
+            ("Okla.", "okla"),
+            ("S.C.", "sc"),
+        ]
+
+        for variation, expected_slug in test_pairs:
+            with self.subTest(variation=variation):
+                r = await self.async_client.get(
+                    reverse(
+                        "citation_redirector",
+                        kwargs={"reporter": variation},
+                    ),
+                    follow=True,
+                )
+                # Get path from the redirection from string to slug reporter
+                path = r.redirect_chain[-1][0] if r.redirect_chain else None
+
+                expected_path = f"/c/{expected_slug}/"
+                self.assertEqual(
+                    expected_path,
+                    path,
+                    msg=f"Expected path: {expected_path} is different from the obtained path: {path}",
+                )
+
 
 class ViewRecapDocketTest(TestCase):
     @classmethod
@@ -760,6 +1024,24 @@ class ViewRecapDocketTest(TestCase):
         cls.docket = DocketFactory(
             court=cls.court,
             source=Docket.RECAP,
+        )
+        cls.de_1 = DocketEntryFactory(
+            docket=cls.docket,
+            entry_number=11,
+            date_filed=date(2025, 1, 15),
+            description="Lorem ipsum description.",
+        )
+        cls.de_2 = DocketEntryFactory(
+            docket=cls.docket,
+            entry_number=11,
+            date_filed=date(2025, 1, 17),
+            description="Entry outside the range.",
+        )
+        RECAPDocumentFactory(
+            docket_entry=cls.de_1,
+            pacer_doc_id="005065812111",
+            document_number="005065281111",
+            document_type=RECAPDocument.PACER_DOCUMENT,
         )
         cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
         cls.docket_appellate = DocketFactory(
@@ -790,39 +1072,6 @@ class ViewRecapDocketTest(TestCase):
         )
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
-    async def test_docket_view_counts_increment_by_one(self) -> None:
-        """Test the view count for a Docket increments on page view"""
-
-        old_view_count = self.docket.view_count
-        r = await self.async_client.get(
-            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
-        )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        await self.docket.arefresh_from_db(fields=["view_count"])
-        self.assertEqual(old_view_count + 1, self.docket.view_count)
-
-    async def test_appellate_docket_no_pacer_case_id_increment_view_count(
-        self,
-    ) -> None:
-        """Test the view count for a RECAP Docket without pacer_case_id
-        increments on page view
-        """
-
-        # Set pacer_case_id blank
-        await Docket.objects.filter(pk=self.docket_appellate.pk).aupdate(
-            pacer_case_id=None
-        )
-        old_view_count = self.docket_appellate.view_count
-        r = await self.async_client.get(
-            reverse(
-                "view_docket",
-                args=[self.docket_appellate.pk, self.docket_appellate.slug],
-            )
-        )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        await self.docket_appellate.arefresh_from_db(fields=["view_count"])
-        self.assertEqual(old_view_count + 1, self.docket_appellate.view_count)
-
     async def test_pagination_returns_last_page_if_page_out_of_range(self):
         """
         Verify that the Docket view handles out-of-range page requests by returning
@@ -840,6 +1089,35 @@ class ViewRecapDocketTest(TestCase):
         self.assertEqual(
             response.context["docket_entries"].number,
             response.context["docket_entries"].paginator.num_pages,
+        )
+
+    async def test_recap_docket_entry_filed_filter(self) -> None:
+        """Can we properly filter docket entries by date filed?"""
+        params = {
+            "filed_after": "01/15/2025",
+            "filed_before": "01/16/2025",
+            "order_by": "asc",
+        }
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        r = await self.async_client.get(url, query_params=params)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn(self.de_1.description, r.content.decode())
+        self.assertNotIn(self.de_2.description, r.content.decode())
+
+    async def test_recap_docket_invalid_entry_filed_filter(self) -> None:
+        """Confirm that invalid date values in the docket entry filed filter
+        produce a validation error for users.
+        """
+        params = {
+            "filed_after": "02/10/2025",
+            "filed_before": ".",
+            "order_by": "asc",
+        }
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        r = await self.async_client.get(url, query_params=params)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn(
+            "There were errors applying your filters", r.content.decode()
         )
 
 
@@ -999,13 +1277,82 @@ class DocketSitemapTest(SitemapTest):
         )
 
     def setUp(self) -> None:
+        self.setUpSiteDomain()
+
         self.sitemap_url = reverse(
-            "sitemaps", kwargs={"section": SEARCH_TYPES.RECAP}
+            "sitemaps-pregenerated", kwargs={"section": SEARCH_TYPES.RECAP}
         )
         self.expected_item_count = 2
 
+    def test_is_the_sitemap_generated_and_have_content(self) -> None:
+        """Is content generated and read properly from the cache into the sitemap?"""
+
+        with self.assertRaises(
+            NotImplementedError,
+            msg="Did not get a NotImplementedError exception before generating the sitemap.",
+        ):
+            _ = self.client.get(self.sitemap_url)
+
+        generate_urls_chunk()
+
+        response = self.client.get(self.sitemap_url)
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get a 200 OK status code after generating the sitemap.",
+        )
+
     def test_does_the_sitemap_have_content(self) -> None:
+        generate_urls_chunk()
         super().assert_sitemap_has_content()
+
+
+class DocketEmptySitemapTest(SitemapTest):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Excluded b/c old
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=False,
+            view_count=0,
+            date_filed=datetime.date.today() - datetime.timedelta(days=60),
+        )
+        # Excluded b/c blocked
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=True,
+            view_count=50,
+            date_filed=datetime.date.today(),
+        )
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=True,
+        )
+
+    def setUp(self) -> None:
+        self.setUpSiteDomain()
+
+        self.sitemap_url = reverse(
+            "sitemaps-pregenerated", kwargs={"section": SEARCH_TYPES.RECAP}
+        )
+
+    def test_is_the_sitemap_generated_and_have_content(self) -> None:
+        """Is content generated and read properly from the cache into the sitemap?"""
+
+        with self.assertRaises(
+            NotImplementedError,
+            msg="Did not get a NotImplementedError exception before generating the sitemap.",
+        ):
+            _ = self.client.get(self.sitemap_url)
+
+        generate_urls_chunk()
+
+        response = self.client.get(self.sitemap_url)
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get a 200 OK status code after generating the sitemap.",
+        )
 
 
 class BlockedSitemapTest(SitemapTest):
@@ -1478,7 +1825,7 @@ class TestBlockSearchItemAjax(TestCase):
         # Courts
         court_ca2 = CourtFactory(id="ca2")
         # cluster
-        cls.cluster = OpinionClusterFactoryWithChildrenAndParents(
+        cls.cluster = OpinionClusterWithChildrenAndParentsFactory(
             docket=DocketFactory(court=court_ca2),
             case_name="Fisher v. SD Protection Inc.",
             date_filed=date(2020, 1, 1),
@@ -1711,10 +2058,24 @@ class DocketEntryFileDownload(TestCase):
                 "private": True,
             },
         )
-        response = download_docket_entries_csv(
-            self.request, self.mocked_docket.id
+
+        self.client.login(username=self.user.username, password="password")
+
+        response = self.client.get(
+            reverse(
+                "view_download_docket",
+                kwargs={"docket_id": self.mocked_docket.id},
+            )
         )
         self.assertEqual(response["Content-Type"], "text/csv")
+
+    def test_redirect_anonymous_users(self):
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.mocked_docket.id}
+        )
+        redirect_path = f"{reverse('sign-in')}?next={download_path}"
+        response = self.client.get(download_path)
+        self.assertRedirects(response, redirect_path)
 
 
 class CachePageIgnoreParamsTest(TestCase):
@@ -1777,3 +2138,38 @@ class CachePageIgnoreParamsTest(TestCase):
         self.assertEqual(response.headers["Cache-Control"], "max-age=300")
         self.assertIn("Expires", response.headers)
         self.assertIn(self.docket.case_name, response.content.decode())
+
+
+class ClusterRedirectionTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.deleted_cluster_id = 99999999
+        cls.redirected_cluster = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=1,
+            date_filed=datetime.date.today(),
+        )
+        ClusterRedirection.objects.create(
+            cluster=cls.redirected_cluster,
+            deleted_cluster_id=cls.deleted_cluster_id,
+            reason=ClusterRedirection.DUPLICATE,
+        )
+
+    def test_cluster_redirection(self):
+        """Can we permanently redirect a deleted cluster to an existing one?"""
+        deleted_cluster_url = reverse(
+            "view_case", kwargs={"pk": self.deleted_cluster_id, "_": "test"}
+        )
+
+        response = self.client.get(deleted_cluster_url)
+
+        expected_redirect_url = reverse(
+            "view_case",
+            kwargs={"pk": self.redirected_cluster.pk, "_": "test"},
+        )
+
+        self.assertRedirects(
+            response,
+            expected_redirect_url,
+            status_code=301,
+        )
