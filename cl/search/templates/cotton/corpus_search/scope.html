@@ -15,7 +15,7 @@
     aria-label="Select the scope of your search"
     class="w-full gap-1 items-stretch {{ class }}"
     x-data="focus"
-    x-bind:aria-activedescendant="selectedScope"
+    x-bind:aria-activedescendant="selectedScope.label"
     x-on:keydown.left="focusPrevious"
     x-on:keydown.right="focusNext"
     x-on:keydown.home.prevent="focusFirst"
@@ -66,7 +66,7 @@
     class="h-[--corpus-search-height] btn-outline hover:text-greyscale-900 hover:border-greyscale-300 hover:bg-greyscale-50 justify-between rounded-xl border-greyscale-200 {{ class }}"
     aria-label="Open menu to select the scope of your search"
   >
-    <span class="text-sm" x-text="selectedScope"></span>
+    <span class="text-sm" x-text="selectedScope.label"></span>
     <span
       x-bind:class="scopeCaretClass"
       class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
