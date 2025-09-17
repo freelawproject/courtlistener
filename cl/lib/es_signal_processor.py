@@ -200,6 +200,10 @@ def update_es_documents(
             ) if mapping_fields.get("self", None):  # type: ignore
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
+                should_compute_embeddings = (
+                    isinstance(instance, Opinion)
+                    and "html_with_citations" in fields_to_update
+                )
                 c = chain(
                     update_es_document.si(
                         es_document.__name__,
@@ -211,16 +215,14 @@ def update_es_documents(
                         (compose_app_label(instance), instance.pk),
                         fields_map,
                         getattr(instance, "skip_percolator_request", False),
+                        should_compute_embeddings,
                     ),
                     send_or_schedule_search_alerts.s(),
                     percolator_response_processing.s(),
                 )
                 # Prepend embedding computation task when html_with_citations
                 # is updated
-                if (
-                    isinstance(instance, Opinion)
-                    and "html_with_citations" in fields_to_update
-                ):
+                if should_compute_embeddings:
                     c = compute_single_opinion_embeddings.si(instance.pk) | c
                 transaction.on_commit(partial(c.apply_async))
             case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
