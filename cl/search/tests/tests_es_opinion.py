@@ -4190,6 +4190,71 @@ class EsOpinionsIndexingTest(
         # check the cache entry is removed after updating the ES document
         self.assertFalse(cache.has_key(f"embeddings:o_{opinion.pk}"))
 
+    @mock.patch("cl.search.tasks.logging.error")
+    @mock.patch("cl.search.tasks.cache.get")
+    @mock.patch("cl.search.tasks.microservice")
+    def test_missing_embeddings_log_error(
+        self, inception_mock, cache_mock, logger_mock
+    ):
+        cluster = OpinionClusterFactory.create(
+            case_name_full="Paul Debbas v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=self.docket,
+        )
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person,
+            plain_text="my plain text secret word for queries",
+            cluster=cluster,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+        )
+
+        # Mock the response from the microservice
+        test_dir = (
+            Path(settings.INSTALL_ROOT) / "cl" / "search" / "test_assets"
+        )
+        with open(
+            test_dir / "opinion_1_embeddings.json", encoding="utf-8"
+        ) as f:
+            expected_embeddings = json.load(f)
+        inception_mock.return_value = self._get_mock_for_inception(
+            expected_embeddings
+        )
+
+        # Simulate cache miss (embeddings not found)
+        cache_mock.return_value = None
+
+        # Updating `html_with_citations` should trigger embeddings generation
+        opinion.html_with_citations = "HTML with citations content"
+        opinion.per_curiam = True
+        opinion.save()
+
+        # Verify the microservice was called with the cleaned opinion text
+        inception_mock.assert_called_once_with(
+            service="inception-text", data=opinion.clean_text
+        )
+
+        # Verify cache lookup for the opinion embeddings was attempted
+        cache_mock.assert_called_once_with(f"embeddings:o_{opinion.pk}")
+
+        # Verify that we log an error if embeddings are missing
+        logger_mock.assert_called_once()
+
+        # Ensure ES document still gets updated even without embeddings
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertTrue(es_doc.per_curiam)
+
 
 class OpinionFeedTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
