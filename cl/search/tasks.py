@@ -546,6 +546,14 @@ def update_es_document(
         # Abort, avoid updating not indexed fields, like "source" in Docket.
         return
 
+    embeddings = None
+    if es_document_name == "OpinionDocument":
+        cache_key = f"{embeddings_cache_key()}o_{main_instance_id}"
+        embeddings = cache.get(cache_key)
+
+    if embeddings:
+        fields_values_to_update["embeddings"] = embeddings
+
     Document.update(
         es_doc,
         **fields_values_to_update,
@@ -1816,7 +1824,7 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     cache_key = f"{cache_prefix}o_{pk}"
 
     # Store the embeddings JSON in cache for 30 minutes
-    cache.set(cache_key, embeddings.json()['embeddings'], 60 * 30)
+    cache.set(cache_key, embeddings.json()["embeddings"], 60 * 30)
 
 
 @app.task(
