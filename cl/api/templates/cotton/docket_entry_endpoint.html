@@ -1,0 +1,76 @@
+{% load extras %}
+
+{# docket_entry_endpoint.html #}
+<c-callout type="default" title="">
+  <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain one or more nested documents. This follows the design on PACER, in which a single row on a docket represents a document with its associated attachments.
+  </p>
+  <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.
+  </p>
+  <p>To filter to the docket entries for a particular docket use the <code>docket</code>filter:
+  </p>
+
+  <c-code disable_copy>
+   curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docketentry-list" version=version %}?docket=4214664"
+  </c-code>
+
+  <p class="mt-2.5">Such a request will return up to 20 docket entries per page. Each docket entry returned can contain a number of nested documents in the <code>recap_document</code> key, including their full extracted text (see details in the next section below). As a result, this response can be quite large.
+  </p>
+  <p>If you don’t need the <code>plain_text</code> content, consider using  <a href="{% url "rest_docs" version=version %}#field-selection" class="underline">Field Selection</a> to omit or filter out the document <code>plain_text</code> field for a much smaller and faster response.</p>
+  <p>You can also order the results using specific fields. To order results, use the <code>order_by</code> query parameter. For example, to order docket entries by their filing date in ascending order:
+  </p>
+
+  <c-code disable_copy>
+   curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docketentry-list" version=version %}?order_by=date_filed"
+  </c-code>
+
+  <p class="mt-2.5">To order in descending order, prepend a <code>-</code> to the field name. For example, <code>?order_by=-date_filed</code> will order by filing date in descending order.
+  </p>
+  <p>The following fields can be used for ordering:</p>
+  <ul>
+    <li><code>id</code></li>
+    <li><code>date_created</code></li>
+    <li><code>date_modified</code></li>
+    <li><code>date_filed</code></li>
+    <li><code>recap_sequence_number</code></li>
+    <li><code>entry_number</code></li>
+  </ul>
+  <p>To order using multiple fields simultaneously, separate the field names with commas. For example, <code>?order_by=recap_sequence_number,entry_number</code> will use the default website order for Docket Entries.</p>
+  <p class="mt-2.5">A few field-level notes:</p>
+  <c-data-table
+  safe
+  caption="Docket entry field notes"
+  :columns="[
+    { 'label': 'Field', 'field': 'field' },
+    { 'label': 'Notes', 'field': 'notes' }
+  ]"
+  :rows="[
+    {
+      'field': '<code>entry_number</code>',
+      'notes': '<p>In district courts, this field is usually a number between zero and the low thousands (depending on the length of the case).</p><p>Some appellate courts do not provide this number, in which case we use the internal PACER document ID to populate this field.</p>'
+    },
+    {
+      'field': '<code>description</code>',
+      'notes': 'This field contains the description of the docket entry, if we have it. A second, shorter description is also available on the document itself.'
+    },
+    {
+      'field': '<code>recap_documents</code>',
+      'notes': 'This field contains all the documents associated with the docket entry. In general, this is only one or two items, but it can be more in complex litigation. See below for details.'
+    },
+    {
+      'field': '<code>recap_sequence_number</code><br><code>pacer_sequence_number</code>',
+      'notes': 'Use the RECAP sequence number to sort dockets in your system. It is based on the PACER sequence number when we have it, plus some heuristics to order content as accurately as possible. In rare cases, docket entry numbers are not sequential, and these fields are preferred.'
+    }
+  ]"
+></c-data-table>
+
+  {% if not perms.search.has_recap_api_access %}
+    <p class="mt-2.5">This endpoint is only available to select users. Please <a href="{% url "contact" %}" class="underline">get in touch</a> to access this API.
+    </p>
+  {% endif %}
+
+</c-callout>
+

@@ -1,0 +1,101 @@
+{% extends "new_base.html" %}
+{% load extras static humanize %}
+
+{% block title %}PACER Data APIs – CourtListener.com{% endblock %}
+{% block og_title %}PACER Data APIs – CourtListener.com{% endblock %}
+{% block description %}Use these APIs to query parties, dockets, and filings in the RECAP Archive of PACER data. This is sourced from federal district, appellate, and bankruptcy courts.{% endblock %}
+{% block og_description %}Use these APIs to query parties, dockets, and filings in the RECAP Archive of PACER data. This is sourced from federal district, appellate, and bankruptcy courts.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#apis', 'text': 'APIs', 'children': [
+        {'href': '#docket-endpoint', 'text': 'Dockets'},
+        {'href': '#court-endpoint', 'text': 'Court'},
+        {'href': '#docket-entry-endpoint', 'text': 'Docket Entries'},
+        {'href': '#recap-document-endpoint', 'text': 'Documents'},
+        {'href': '#party-endpoint', 'text': 'Parties'},
+        {'href': '#attorney-endpoint', 'text': 'Attorneys'},
+        {'href': '#og-court-info-endpoint', 'text': 'Originating Court Info'},
+        {'href': '#idb-data-endpoint', 'text': 'Integrated Database'}
+    ]},
+    {'href': '#recap-query', 'text': 'Fast Document Lookup'},
+  ]"
+>
+
+<c-layout-with-navigation.section id="about">
+    {% if version == "v3" %}
+     <c-v3_deprecated_warning></c-v3_deprecated_warning>
+    {% endif %}
+
+    <h1>PACER Data&nbsp;APIs</h1>
+    <p>Use these APIs to access almost half a billion items we have in our collection of PACER data.
+    </p>
+    <p>To learn more about what's in the collection and how we gather PACER data each day, see <a href="{% url "coverage_recap" %}" class="underline">our coverage page on the topic</a>.
+    </p>
+    <p>This data is organized into a number of objects. An overview of these objects is described in this section, and greater detail is provided for each, below.
+    </p>
+    <p>In any legal proceeding, there are roughly three things: Documents, people, and organizations. Documents are grouped together into docket entries, which are grouped together into dockets. People and organizations are examples of parties. Parties have attorneys who act on their behalf in particular ways, which we call the attorney's role in the case.
+    </p>
+    <p>Each of these relationships is interlinked and has metadata that describes it. Use these APIs to explore this data.
+    </p>
+</c-layout-with-navigation.section>
+
+<c-layout-with-navigation.section id="apis">
+    <h2>Dockets, Courts, Docket Entries, and&nbsp;Documents</h2>
+    <p>A docket is a list of docket entries and some metadata. Each docket entry is a collection of documents that is uploaded to the court by a party or their attorney at a given time.
+    </p>
+    <p>The endpoints described in this section explain these objects and how they can be accessed in our system.
+    </p>
+</c-layout-with-navigation.section>
+
+<c-layout-with-navigation.section id="docket-endpoint">
+    <h3>Dockets <small> — <code>{% url "docket-list" version=version %}</code></small></h3>
+    <c-docket-endpoint></c-docket-endpoint>
+</c-layout-with-navigation.section>
+
+<c-layout-with-navigation.section id="court-endpoint">
+    <h3>Courts <small> — <code>{% url "court-list" version=version %}</code></small></h3>
+    <c-court-endpoint></c-court-endpoint>
+</c-layout-with-navigation.section>
+
+<c-layout-with-navigation.section id="docket-entry-endpoint">
+  <h3>Docket Entries <small> — <code>{% url "docketentry-list" version=version %}</code></small></h3>
+  <c-docket_entry_endpoint></c-docket_entry_endpoint>
+</c-layout-with-navigation.section>
+
+<c-layout-with-navigation.section id="recap-document-endpoint">
+  <h3>Documents <small> — <code>{% url "recapdocument-list" version=version %}</code></small></h3>
+  <c-recap_document_endpoint></c-recap_document_endpoint>
+</c-layout-with-navigation.section>
+
+<c-layout-with-navigation.section id="party-endpoint">
+  <h2>Parties <small> — <code>{% url "party-list" version=version %}</code></small></h2>
+  <c-party_endpoint></c-party_endpoint>
+</c-layout-with-navigation.section>
+
+<c-layout-with-navigation.section id="attorney-endpoint">
+  <h2>Attorneys <small> — <code>{% url "attorney-list" version=version %}</code></small></h2>
+  <c-attorney_endpoint></c-attorney_endpoint>
+</c-layout-with-navigation.section>
+
+<c-layout-with-navigation.section id="og-court-info-endpoint">
+    <h2>Originating Court <small> — <code><nobr>{% url 'originatingcourtinformation-list' version=version %}</nobr></code></small></h2>
+    <c-og_court_endpoint></c-og_court_endpoint>
+</c-layout-with-navigation.section>
+
+<c-layout-with-navigation.section id="idb-data-endpoint">
+  <h2>Integrated Database <small> — <code><nobr>{% url 'fjcintegrateddatabase-list' version=version %}</nobr></code></small></h2>
+  <c-idb_endpoint></c-idb_endpoint>
+</c-layout-with-navigation.section>
+
+<c-layout-with-navigation.section id="recap-query">
+  <h2>Fast Document Lookup <small> — <code>{% url "fast-recapdocument-list" version=version %}</code></small></h2>
+  <c-recap_query></c-recap_query>
+  <c-support_card></c-support_card>
+</c-layout-with-navigation.section>
+
+</c-layout-with-navigation>
+{% endblock %}
