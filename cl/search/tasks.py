@@ -492,6 +492,7 @@ def update_es_document(
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
     skip_percolator_request: bool = False,
+    should_check_for_embeddings: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
@@ -505,6 +506,8 @@ def update_es_document(
     :param fields_map: A dict containing fields that can be updated or None if
     mapping is not required for the update.
     :param skip_percolator_request: Whether to skip the subsequent percolator request
+    :param should_check_for_embeddings: If True and the document is an OpinionDocument,
+    attempts to fetch cached embeddings and include them in the update.
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None
@@ -548,9 +551,15 @@ def update_es_document(
 
     embeddings = None
     cache_key = None
-    if es_document_name == "OpinionDocument":
+    if should_check_for_embeddings and es_document_name == "OpinionDocument":
         cache_key = f"{embeddings_cache_key()}o_{main_instance_id}"
         embeddings = cache.get(cache_key)
+
+        if not embeddings:
+            logging.error(
+                "Expected cached embeddings for OpinionDocument %s, but none found",
+                main_instance_id,
+            )
 
     if embeddings:
         fields_values_to_update["embeddings"] = embeddings
