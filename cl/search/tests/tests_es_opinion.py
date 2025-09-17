@@ -4187,6 +4187,9 @@ class EsOpinionsIndexingTest(
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.embeddings, expected_embeddings["embeddings"])
 
+        # check the cache entry is removed after updating the ES document
+        self.assertFalse(cache.has_key(f"embeddings:o_{opinion.pk}"))
+
 
 class OpinionFeedTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase

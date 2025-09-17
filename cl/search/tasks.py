@@ -547,6 +547,7 @@ def update_es_document(
         return
 
     embeddings = None
+    cache_key = None
     if es_document_name == "OpinionDocument":
         cache_key = f"{embeddings_cache_key()}o_{main_instance_id}"
         embeddings = cache.get(cache_key)
@@ -559,6 +560,10 @@ def update_es_document(
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
+
+    if embeddings and cache_key:
+        cache.delete(cache_key)
+
     if (
         (
             related_instance_app_label == "search.BankruptcyInformation"
