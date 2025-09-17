@@ -40,6 +40,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.tasks import (
+    compute_single_opinion_embeddings,
     es_save_document,
     get_es_doc_id_and_parent_id,
     remove_document_from_es_index,
@@ -199,27 +200,29 @@ def update_es_documents(
             ) if mapping_fields.get("self", None):  # type: ignore
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
-                transaction.on_commit(
-                    partial(
-                        chain(
-                            update_es_document.si(
-                                es_document.__name__,
-                                fields_to_update,
-                                (
-                                    compose_app_label(instance),
-                                    instance.pk,
-                                ),
-                                (compose_app_label(instance), instance.pk),
-                                fields_map,
-                                getattr(
-                                    instance, "skip_percolator_request", False
-                                ),
-                            ),
-                            send_or_schedule_search_alerts.s(),
-                            percolator_response_processing.s(),
-                        ).apply_async
-                    )
+                c = chain(
+                    update_es_document.si(
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                        getattr(instance, "skip_percolator_request", False),
+                    ),
+                    send_or_schedule_search_alerts.s(),
+                    percolator_response_processing.s(),
                 )
+                # Prepend embedding computation task when html_with_citations
+                # is updated
+                if (
+                    isinstance(instance, Opinion)
+                    and "html_with_citations" in fields_to_update
+                ):
+                    c = compute_single_opinion_embeddings.si(instance.pk) | c
+                transaction.on_commit(partial(c.apply_async))
             case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
                 transaction.on_commit(
                     partial(
