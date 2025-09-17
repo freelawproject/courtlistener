@@ -1782,6 +1782,55 @@ def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
     max_retries=5,
     retry_backoff=10,
 )
+def compute_single_opinion_embeddings(self, pk: int) -> None:
+    """
+    Celery task to compute and cache text embeddings for a single opinion.
+
+    This task fetches the opinion record, extracts its best available text,
+    and sends it to the `inception-text` microservice to generate embeddings.
+    If embeddings are successfully computed, the results are cached for 30
+    minutes.
+
+    Automatically retries up to 5 times with exponential backoff (10s base)
+    in case of network or protocol-related errors.
+
+    :param self: The Celery task.
+    :param pk: The primary key of the opinion to process.
+    """
+    opinion = Opinion.objects.filter(id=pk).with_best_text().first()
+    if not opinion:
+        return None
+
+    embeddings = asyncio.run(
+        microservice(
+            service="inception-text",
+            data=opinion.clean_text,
+        )
+    )
+    # Exit early if the microservice call failed
+    if not embeddings.is_success:
+        return None
+
+    # Build a namespaced cache key for this opinion's embeddings
+    cache_prefix = embeddings_cache_key()
+    cache_key = f"{cache_prefix}o_{pk}"
+
+    # Store the embeddings JSON in cache for 30 minutes
+    cache.set(cache_key, embeddings.json()['embeddings'], 60 * 30)
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+        ReadError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
 def create_opinion_text_embeddings(
     self, batch: list[int], database
 ) -> str | None:
