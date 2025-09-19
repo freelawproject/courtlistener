@@ -68,6 +68,8 @@ WEBHOOK_V1_DEPRECATION_DATE = env(
 )
 
 # OCR extraction
-# Minimum number of valid lines between common headers to consider that the page
+# Minimum number of characters between common headers to consider that the page
 # does not need OCR.
-LINE_THRESHOLD_OCR_PER_PAGE = env.int("LINE_THRESHOLD_OCR_PER_PAGE", default=5)
+CHARS_THRESHOLD_OCR_PER_PAGE = env.int(
+    "CHARS_THRESHOLD_OCR_PER_PAGE", default=200
+)
