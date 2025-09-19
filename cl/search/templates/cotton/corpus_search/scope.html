@@ -3,7 +3,7 @@
 {% require_script "js/alpine/composables/focus.js" %}
 {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 
-<c-vars class="" menu_class="" item_class="" variant="menu"></c-vars>
+<c-vars class="" menu_class="" item_class="" variant="menu" verbose></c-vars>
 
 <div class="relative">
 
@@ -15,7 +15,7 @@
     aria-label="Select the scope of your search"
     class="w-full gap-1 items-stretch {{ class }}"
     x-data="focus"
-    x-bind:aria-activedescendant="selectedScope"
+    x-bind:aria-activedescendant="selectedScope.label"
     x-on:keydown.left="focusPrevious"
     x-on:keydown.right="focusNext"
     x-on:keydown.home.prevent="focusFirst"
@@ -66,10 +66,17 @@
     class="h-[--corpus-search-height] btn-outline hover:text-greyscale-900 hover:border-greyscale-300 hover:bg-greyscale-50 justify-between rounded-xl border-greyscale-200 {{ class }}"
     aria-label="Open menu to select the scope of your search"
   >
-    <span class="text-sm" x-text="selectedScope"></span>
+    {% if verbose %}
+    <span class="flex flex-col items-start">
+      <span x-text="selectedScope.label" class="font-semibold text-greyscale-900"></span>
+      <span x-text="selectedScope.shortDescription" class="text-xs text-greyscale-500"></span>
+    </span>
+    {% else %}
+      <span x-text="selectedScope.label" class="text-sm"></span>
+    {% endif %}
     <span
       x-bind:class="scopeCaretClass"
-      class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+      class="transition-transform duration-200 flex justify-center items-center {% if verbose %}w-6 h-6{% else %}w-4 h-4{% endif %}"
       aria-hidden="true"
     >{% svg 'chevron' class="w-full h-full text-greyscale-400" aria_hidden="true" %}
     </span>
