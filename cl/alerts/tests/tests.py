@@ -65,7 +65,11 @@ from cl.api.models import (
 from cl.api.utils import get_webhook_deprecation_date
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
-from cl.donate.models import MembershipPaymentStatus, NeonMembership
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
+)
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
 from cl.people_db.factories import PersonFactory
@@ -119,7 +123,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
 
         cls.membership_termination_date = now() + timedelta(days=1)
         NeonMembership.objects.create(
-            level=NeonMembership.LEGACY,
+            level=NeonMembershipLevel.LEGACY,
             user=cls.user_member.user,
             termination_date=cls.membership_termination_date,
             payment_status=MembershipPaymentStatus.SUCCEEDED,
@@ -129,7 +133,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         cls.user_member_tier_1.user.password = make_password("password")
         cls.user_member_tier_1.user.save()
         NeonMembership.objects.create(
-            level=NeonMembership.TIER_1,
+            level=NeonMembershipLevel.TIER_1,
             user=cls.user_member_tier_1.user,
             termination_date=cls.membership_termination_date,
             payment_status=MembershipPaymentStatus.SUCCEEDED,
@@ -1585,7 +1589,7 @@ class SearchAlertsWebhooksTest(
         cls.user_profile = UserProfileWithParentsFactory()
         cls.user_profile_1 = UserProfileWithParentsFactory()
         NeonMembership.objects.create(
-            level=NeonMembership.LEGACY,
+            level=NeonMembershipLevel.LEGACY,
             user=cls.user_profile.user,
             payment_status=MembershipPaymentStatus.SUCCEEDED,
         )
@@ -3475,13 +3479,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         )
         cls.user_profile = UserProfileWithParentsFactory()
         NeonMembership.objects.create(
-            level=NeonMembership.LEGACY,
+            level=NeonMembershipLevel.LEGACY,
             user=cls.user_profile.user,
             payment_status=MembershipPaymentStatus.SUCCEEDED,
         )
         cls.user_profile_2 = UserProfileWithParentsFactory()
         NeonMembership.objects.create(
-            level=NeonMembership.LEGACY,
+            level=NeonMembershipLevel.LEGACY,
             user=cls.user_profile_2.user,
             payment_status=MembershipPaymentStatus.SUCCEEDED,
         )
@@ -4303,7 +4307,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 # RT Alert is not sent.
                 NeonMembership.objects.create(
                     user=user_profile.user,
-                    level=NeonMembership.LEGACY,
+                    level=NeonMembershipLevel.LEGACY,
                     payment_status=MembershipPaymentStatus.SUCCEEDED,
                 )
             WebhookFactory(
