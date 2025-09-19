@@ -15,7 +15,7 @@
   method="get"
   class="relative flex flex-row flex-nowrap {{ class }}"
 >
-  <input type="hidden" name="type" x-bind:value="selectedScopeType">
+  <input type="hidden" name="type" x-bind:value="selectedScope.type">
   <input type="hidden" name="q" x-bind:value="keywordQuery">
   {{ slot }}
 </form>

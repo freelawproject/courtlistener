@@ -57,13 +57,10 @@ document.addEventListener('alpine:init', () => {
       return this.$store.corpusSearch.scopeMenuExpanded;
     },
     get selectedScope() {
-      return this.$store.corpusSearch.selected;
+      return this.$store.corpusSearch.selectedScope;
     },
     get keywordQuery() {
       return this.$store.corpusSearch.keywordQuery;
-    },
-    get selectedScopeType() {
-      return this.$store.corpusSearch.selectedScope.type;
     },
     get searchScopes() {
       return this.$store.corpusSearch.searchScopes;
@@ -182,7 +179,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     init() {
-      this.$watch('selectedScope', (newVal) => this.updateFieldsets(newVal));
+      this.$watch('selectedScope', (newVal) => this.updateFieldsets(newVal.label));
       this.onBreakpointChange(() => {
         this.advancedFiltersExpandedDesktop = false;
       });
