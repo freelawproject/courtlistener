@@ -50,6 +50,14 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
+from openai import (
+    APIConnectionError,
+    APIError,
+    ConflictError,
+    InternalServerError,
+    RateLimitError,
+)
+from pydantic import ValidationError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
 from requests.exceptions import (
@@ -59,6 +67,7 @@ from requests.exceptions import (
     RequestException,
 )
 from rest_framework.renderers import JSONRenderer
+from sentry_sdk import capture_exception
 from urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
@@ -69,6 +78,9 @@ from cl.citations.tasks import (
 )
 from cl.citations.utils import filter_out_non_case_law_citations
 from cl.corpus_importer.api_serializers import IADocketSerializer
+from cl.corpus_importer.llm_models import CaseNameExtractionResponse
+from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
+from cl.corpus_importer.prompts.user import CASE_NAME_EXTRACT_USER
 from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
@@ -82,6 +94,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry
+from cl.lib.llm import call_llm
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import (
     get_blocked_status,
@@ -3053,6 +3066,9 @@ def recap_document_into_opinions(
             cluster.id,
         )
 
+    # Update case name using llm
+    classify_case_name_by_llm.delay(cluster.pk, recap_document_id)
+
     if not skip_citation_finding:
         find_citations_and_parentheticals_for_opinion_by_pks.delay(
             [opinion.pk]
@@ -3060,3 +3076,134 @@ def recap_document_into_opinions(
 
     # Return input task data to preserve the chain in scrape_pacer_free_opinion
     return task_data
+
+
+@app.task(
+    bind=True,
+    max_retries=5,
+    retry_backoff=True,
+    autoretry_for=(
+        RateLimitError,
+        APIConnectionError,
+        ConflictError,
+        InternalServerError,
+        APIError,
+    ),
+    retry_kwargs={"max_retries": 5},
+)
+def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
+    """Use LLM to extract and verify the correct case name for an opinion ingested from Recap
+
+    This task fetches an OpinionCluster instance, extracts the first 2000 characters of the first
+    related sub_opinion's text, and obtains the docket title from the associated docket
+    object. It sends this data to a shared LLM call function using a cached prompt template
+
+    Upon receiving the LLM json response, it verifies if the document is an opinion and extracts
+    normalized case name information. If valid, it updates the OpinionCluster object with the
+    extracted case name.
+
+    :param self: The Celery task instance
+    :param pk: Primary key of the OpinionCluster object to process
+    :param recap_document_id: RECAPDocument id
+    """
+
+    system_prompt = CASE_NAME_EXTRACT_SYSTEM
+    user_prompt = CASE_NAME_EXTRACT_USER
+
+    try:
+        obj = (
+            OpinionCluster.objects.select_related("docket")
+            .prefetch_related("sub_opinions")
+            .get(pk=pk)
+        )
+    except OpinionCluster.DoesNotExist:
+        return
+
+    sub_opinion = obj.sub_opinions.all().first()
+    if not sub_opinion or not sub_opinion.plain_text:
+        return
+    plain_text = sub_opinion.plain_text[:2000]
+
+    docket = obj.docket
+    docket_name = docket.case_name or docket.case_name_full
+
+    user_message = f"{plain_text}\n\n DOCKET TITLE: `{docket_name}`"
+
+    try:
+        llm_response = call_llm(
+            system_prompt,
+            user_prompt,
+            user_message,
+            response_model=CaseNameExtractionResponse,
+        )
+    except ValidationError as e:
+        logger.error(
+            "LLM response validation error for cluster_id=%s, recap_document_id=%s",
+            pk,
+            recap_document_id,
+            extra={
+                "validation_errors": e.errors(),
+                "fingerprint": ["llm-casenames-validation-error"],
+            },
+        )
+        return
+    except Exception as e:
+        # Only expect to get instructr exceptions here to track them
+        capture_exception(e)
+        raise
+
+    if not isinstance(llm_response, CaseNameExtractionResponse):
+        # Added this to avoid mypy errors
+        logger.error("Invalid llm_response type: %s", type(llm_response))
+        return
+
+    if llm_response.needs_ocr:
+        llm_response["recap_document_id"] = recap_document_id
+        logger.error(
+            "Probably recap document needs OCR", llm_response.model_dump()
+        )
+        return
+
+    if llm_response.error:
+        logger.error(
+            "LLM error for cluster_id=%s, recap_document_id=%s: %s",
+            pk,
+            recap_document_id,
+            llm_response.error,
+            extra={
+                "error_detail": llm_response.error,
+                "raw_response": llm_response.model_dump(),
+                "fingerprint": ["llm-casenames-llm-error"],
+            },
+        )
+        return
+
+    if not llm_response.case_name_match:
+        # The name of the docket case and the opinion do not necessarily match, we log it for manual review
+        llm_response["recap_document_id"] = recap_document_id
+        logger.error("Case name did not match", llm_response.model_dump())
+
+    case_name = llm_response.case_name or obj.case_name
+    case_name_full = llm_response.case_name_full or obj.case_name_full
+    case_name_short = llm_response.case_name_short or obj.case_name_short
+
+    # Check if any of the values changed before updating the cluster
+    changed = any(
+        new_val not in (None, "") and old_val != new_val
+        for old_val, new_val in [
+            (obj.case_name_short, case_name_short),
+            (obj.case_name_full, case_name_full),
+            (obj.case_name, case_name),
+        ]
+    )
+
+    if changed:
+        with transaction.atomic():
+            obj.case_name_short = case_name_short
+            obj.case_name_full = case_name_full
+            obj.case_name = case_name
+            obj.save()
+            logger.info(
+                "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
+                obj.id,
+            )
