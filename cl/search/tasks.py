@@ -1831,6 +1831,18 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     )
     # Exit early if the microservice call failed
     if not embeddings.is_success:
+        if not isinstance(embeddings, list):
+            if isinstance(embeddings, dict):
+                logger.error(
+                    "Received API error response in embeddings: %s",
+                    json.dumps(embeddings, default=str),
+                )
+            else:
+                logger.error(
+                    "Unexpected data type for embeddings: %s (%s)",
+                    str(embeddings)[:200],
+                    type(embeddings),
+                )
         return None
 
     # Build a namespaced cache key for this opinion's embeddings
