@@ -2980,7 +2980,7 @@ class BaseCitation(models.Model):
             "72 Soc.Sec.Rep.Serv. 318)",
         ),
     )
-    volume = models.SmallIntegerField(help_text="The volume of the reporter")
+    volume = models.TextField(help_text="The volume of the reporter")
     reporter = models.TextField(
         help_text="The abbreviation for the reporter",
         # To generate lists of volumes for a reporter we need everything in a
@@ -3009,7 +3009,7 @@ class BaseCitation(models.Model):
 
 
 @pghistory.track()
-class Citation(BaseCitation):
+class Citation(BaseCitation, AbstractDateTimeModel):
     """A citation to an OpinionCluster"""
 
     cluster = models.ForeignKey(
