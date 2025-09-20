@@ -3311,6 +3311,7 @@ class IndexOpinionDocumentsCommandTest(
         self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
 
 
+@override_settings(ENABLE_EMBEDDING_COMPUTATION=True)
 class EsOpinionsIndexingTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
 ):

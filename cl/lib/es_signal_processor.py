@@ -1,6 +1,7 @@
 from functools import partial
 
 from celery.canvas import chain
+from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db import transaction
 from django.db.models.signals import m2m_changed, post_delete, post_save
@@ -203,6 +204,7 @@ def update_es_documents(
                 should_compute_embeddings = (
                     isinstance(instance, Opinion)
                     and "html_with_citations" in fields_to_update
+                    and settings.ENABLE_EMBEDDING_COMPUTATION
                 )
                 c = chain(
                     update_es_document.si(
