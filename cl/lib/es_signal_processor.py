@@ -797,6 +797,13 @@ class ESSignalProcessor:
             # RECAP.
             return
 
+        if isinstance(instance, Opinion) and instance.main_version:
+            # Skip indexing for opinion versions.
+            # These records remain in the database but should not exist in
+            # Elasticsearch, since they are linked to a main opinion (via
+            # `main_version`).
+            return
+
         if (
             created
             and mapping_fields.get("self", None)
