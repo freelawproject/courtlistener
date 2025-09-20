@@ -3311,6 +3311,7 @@ class Opinion(AbstractDateTimeModel):
             "html_anon_2020",
             "html",
             "plain_text",
+            "html_with_citations",
             "sha1",
             "ordering_key",
         ]
