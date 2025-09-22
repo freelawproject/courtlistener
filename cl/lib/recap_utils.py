@@ -83,7 +83,7 @@ def get_document_filename(
 PAGINATION_RE = re.compile(r"\b(?:Page|Pg)\s+\d+", re.I)
 PAGINATION_COLON_RE = re.compile(r"\bPage:\s*\d+\b", re.I)
 PAGINATION_PAGE_ID_RE = re.compile(r"\bPageID\s+#:\s*\d+\b", re.I)
-PAGINATION_OF = re.compile(r"^\d+\s+of\s+\d+", re.I)
+PAGINATION_OF = re.compile(r"^\d+\s+of\s+\d+$", re.I)
 
 
 def is_page_line(line: str) -> bool:
@@ -120,7 +120,7 @@ def is_doc_common_header(line: str) -> bool:
         "USCA",
     )
     doc_filed_re = re.compile(r"\b(Filed|Date Filed)\b")
-    date_re = re.compile(r"\b\d{2}/\d{2}/\d{4}\b")
+    date_re = re.compile(r"\b\d{2}/\d{2}/(?:\d{2}|\d{4})\b")
     time_re = re.compile(r"\b\d{2}:\d{2}:\d{2}\b")
     received_re = re.compile(r"\bReceived:\s*\d{2}/\d{2}/\d{2}(?:\d{2})?\b")
 
@@ -169,7 +169,7 @@ def needs_ocr(content, page_count: int | None = None) -> bool:
     is no content, or it’s too short, we can say that at least that page
     requires OCR, so this method returns True.
 
-    For example, with a line_count_threshold of 3, the following document will
+    For example, with a CHARS_THRESHOLD_OCR_PER_PAGE of 200, the following document will
     return True.
 
     Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
@@ -212,6 +212,7 @@ def needs_ocr(content, page_count: int | None = None) -> bool:
             in_page = True
             saw_any_page = True
             other_content_chars_count = 0
+            content_in_page = ""
             continue
 
         if not in_page:

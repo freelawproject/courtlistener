@@ -1772,9 +1772,7 @@ Line 3
         )
 
     def test_needs_ocr_under_threshold_page_colon(self):
-        """Test needs_ocr returns True for t
-
-        This tests the original scenario where only 'Case...' lines and
+        """Test the original scenario where only 'Case...' lines and
         'Page: Y' lines are present and good content between pages lines is
         present. Should return True (needs OCR).
         Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
@@ -1848,11 +1846,10 @@ Case No. 1:22-cv-00369-NYW-TPO   Document 1   filed 02/09/22   USDC Colorado   p
 
     def test_needs_ocr_caeb(self):
         """Test needs_ocr function with multi-line headers from caeb
-
-        Date includes year with 4 digits.
         Example: https://storage.courtlistener.com/recap/gov.uscourts.caeb.656273/gov.uscourts.caeb.656273.19.0.pdf
         """
 
+        # Date includes year with 4 digits.
         caeb_text = """
     Filed 11/02/21   Case 21-23295                Doc 19
 
@@ -1860,6 +1857,20 @@ Case No. 1:22-cv-00369-NYW-TPO   Document 1   filed 02/09/22   USDC Colorado   p
 Filed 11/02/21   Case 21-23295   Doc 19
 Filed 11/02/21   Case 21-23295   Doc 19
         """
+
+        # Date includes year with 2 digits.
+        self.assertTrue(
+            needs_ocr(caeb_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+        caeb_text = """
+            Filed 11/02/21   Case 21-23295                Doc 19
+
+                                         12/15/21
+        Filed 11/02/21   Case 21-23295   Doc 19
+        Filed 11/02/21   Case 21-23295   Doc 19
+                """
 
         self.assertTrue(
             needs_ocr(caeb_text),
@@ -1915,7 +1926,7 @@ Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 1
     def test_needs_ocr_exhibit_exception(self):
         """Test needs_ocr returns False for pages with good content.
 
-        Exception: if the page contains the word "Exhibit", we assume
+        Exception: if the first page contains the word "Exhibit", we assume
         it may be a valid exhibit cover page with little text, so we
         do not flag it for OCR.
         """
@@ -1933,6 +1944,30 @@ Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 1
         Line 3
             """
         self.assertFalse(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_exhibit_exception_true(self):
+        """Test that needs_ocr returns True for pages that require OCR.
+
+        Exception: If the first page contains the word "Exhibit," we assume
+        it may be a valid exhibit cover page with little text, so we
+        do not flag it for OCR. However, subsequent pages that match
+        the criteria should still be flagged.
+        """
+        header_text = """
+        Case 1:25-cv-02000   Document 1-1   Filed 06/26/25   Page 1 of 7
+                     Exhibit
+                       A
+        Case 1:25-cv-02000   Document 1-1   Filed 06/26/25   Page 2 of 7
+        Line 3
+        Case 1:25-cv-02000   Document 1-1   Filed 06/26/25   Page 3 of 7
+        Good content 1
+        Pursuant to Rule 26.1 of the Fed. R. App. P. amici curiae herein state
+        Line 3
+            """
+        self.assertTrue(
             needs_ocr(header_text),
             msg="Should need OCR with only headers/pagination",
         )
