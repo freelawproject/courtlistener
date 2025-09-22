@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
 from unittest import TestCase, mock
+from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -1121,7 +1122,8 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         cls.rebuild_index("search.OpinionCluster")
         cls.rebuild_index("search.Docket")
 
-    def test_merge_versions_by_download_url(self):
+    @patch("cl.lib.es_signal_processor.compute_single_opinion_embeddings.si")
+    def test_merge_versions_by_download_url(self, compute_embeddings_mock):
         """Can we merge opinion versions and delete ES documents correctly?
 
         This a end to end test. It's testing

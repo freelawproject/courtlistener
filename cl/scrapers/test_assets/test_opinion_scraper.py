@@ -94,6 +94,7 @@ class Site(OpinionSite):
 
         return metadata
 
+    @staticmethod
     def cleanup_content(content):
         """Implemented just to override OpinionSite.cleanup_content for tests"""
         return content
