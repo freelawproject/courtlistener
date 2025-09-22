@@ -1643,10 +1643,11 @@ class DeleteDuplicatesTest(TestCase):
             "precedential_status": "Precedential",
             "date_filed": "2019-01-01",
         }
+        cls.hash = "xxxxxxxx"
         same_opinion_fields = {
             "author": None,
             "plain_text": "Something....",
-            "sha1": "xxxxxxxx",
+            "sha1": cls.hash,
             "download_url": "https://something.com/a_pdf.pdf",
         }
         cls.author = "Some author"  # to check metadata propagation
@@ -1667,6 +1668,17 @@ class DeleteDuplicatesTest(TestCase):
                 docket=docket2, source=SOURCES.COURT_WEBSITE
             ),
             **same_opinion_fields,
+        )
+
+        # the same, but with a different hash
+        cls.different_hash_cluster_id = 123976
+        cls.different_hash_cluster = OpinionClusterFactory.create(
+            id=cls.different_hash_cluster_id, **same_cluster_fields
+        )
+        opinion_fields = {**same_opinion_fields}
+        opinion_fields["sha1"] = "yyyyyyyyy"
+        cls.different_hash_duplicate = OpinionFactory.create(
+            cluster=cls.different_hash_cluster, **opinion_fields
         )
 
         cls.cluster_to_keep = OpinionClusterFactory.create(
@@ -1714,3 +1726,40 @@ class DeleteDuplicatesTest(TestCase):
             self.should_not_merge.refresh_from_db()
         except Opinion.DoesNotExist:
             self.fail("`should_not_merge` should still exist")
+
+    def test_cleanup_content_method(self):
+        """Can we delete different hash duplicates using the `cleanup_content` method"""
+        stats = defaultdict(lambda: 0)
+        site = test_opinion_scraper.Site()
+        with mock.patch(
+            "cl.scrapers.management.commands.delete_duplicates.get_cleaned_content_hash"
+        ) as patched_get_cleaned_content_hash:
+            patched_get_cleaned_content_hash.return_value = self.hash
+            delete_duplicates.delete_cleaned_up_content_duplicates(
+                stats, "nev", site
+            )
+
+        try:
+            self.different_hash_cluster.refresh_from_db()
+            self.fail(
+                "`different_hash_cluster` should be deleted as a duplicate"
+            )
+        except OpinionCluster.DoesNotExist:
+            pass
+
+        try:
+            self.different_hash_duplicate.refresh_from_db()
+            self.fail(
+                "`different_hash_duplicate` should be deleted as a duplicate"
+            )
+        except Opinion.DoesNotExist:
+            pass
+
+        self.assertTrue(
+            ClusterRedirection.objects.filter(
+                deleted_cluster_id=self.different_hash_cluster_id,
+                cluster=self.cluster_to_keep,
+                reason=ClusterRedirection.DUPLICATE,
+            ).exists(),
+            "ClusterRedirection with proper values was not created",
+        )
