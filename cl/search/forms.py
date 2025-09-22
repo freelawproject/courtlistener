@@ -1134,6 +1134,14 @@ class CorpusSearchForm(forms.Form):
     )
     cause.as_str_types = [SEARCH_TYPES.RECAP]
 
+    available_only = forms.BooleanField(
+        label="Only show results with PDFs",
+        label_suffix="",
+        required=False,
+        widget=forms.CheckboxInput(),
+    )
+    available_only.as_str_types = [SEARCH_TYPES.RECAP]
+
 
 def clean_up_date_formats(
     cd: dict[str, any], date_field: str, get_params: dict[str, any]
