@@ -359,7 +359,7 @@ async def extract_recap_pdf_base(
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
-        ocr_needed = needs_ocr(content)
+        ocr_needed = needs_ocr(content, page_count=rd.page_count)
         if ocr_available and ocr_needed:
             response = await microservice(
                 service="document-extract-ocr",
