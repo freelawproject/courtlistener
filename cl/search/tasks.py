@@ -52,7 +52,10 @@ from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.lib.db_tools import log_db_connection_info
 from cl.lib.elasticsearch_utils import build_daterange_query
-from cl.lib.microservice_utils import microservice
+from cl.lib.microservice_utils import (
+    log_invalid_embedding_errors,
+    microservice,
+)
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
@@ -1832,17 +1835,7 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     # Exit early if the microservice call failed
     if not embeddings.is_success:
         if not isinstance(embeddings, list):
-            if isinstance(embeddings, dict):
-                logger.error(
-                    "Received API error response in embeddings: %s",
-                    json.dumps(embeddings, default=str),
-                )
-            else:
-                logger.error(
-                    "Unexpected data type for embeddings: %s (%s)",
-                    str(embeddings)[:200],
-                    type(embeddings),
-                )
+            log_invalid_embedding_errors(embeddings)
         return None
 
     # Build a namespaced cache key for this opinion's embeddings
@@ -1964,17 +1957,7 @@ def save_embeddings(
         return None
 
     if not isinstance(embeddings, list):
-        if isinstance(embeddings, dict):
-            logger.error(
-                "Received API error response in embeddings: %s",
-                json.dumps(embeddings, default=str),
-            )
-        else:
-            logger.error(
-                "Unexpected data type for embeddings: %s (%s)",
-                str(embeddings)[:200],
-                type(embeddings),
-            )
+        log_invalid_embedding_errors(embeddings)
         return None
 
     storage = S3IntelligentTieringStorage()
