@@ -282,6 +282,7 @@ dependencies = [
     { name = "django-permissions-policy" },
     { name = "django-pghistory" },
     { name = "django-ratelimit" },
+    { name = "django-s3-express-cache" },
     { name = "django-ses", extra = ["events"] },
     { name = "django-storages" },
     { name = "django-tailwind" },
@@ -393,6 +394,7 @@ requires-dist = [
     { name = "django-permissions-policy", specifier = ">=4.25.0" },
     { name = "django-pghistory", specifier = ">=3.5.4" },
     { name = "django-ratelimit", specifier = ">=4.1.0" },
+    { name = "django-s3-express-cache", specifier = ">=0.1.0" },
     { name = "django-ses", extras = ["events"], specifier = ">=0.44.0" },
     { name = "django-storages", specifier = ">=1.14.5" },
     { name = "django-tailwind", specifier = ">=3.8.0" },
@@ -948,6 +950,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6f/8f/94038fe739b095aca3e4708ecc8a4e77f1fcfd87bed5d6baff43d4c80bc4/django-ratelimit-4.1.0.tar.gz", hash = "sha256:555943b283045b917ad59f196829530d63be2a39adb72788d985b90c81ba808b", size = 11551, upload-time = "2023-07-24T20:34:32.374Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/78/2c59b30cd8bc8068d02349acb6aeed5c4e05eb01cdf2107ccd76f2e81487/django_ratelimit-4.1.0-py2.py3-none-any.whl", hash = "sha256:d047a31cf94d83ef1465d7543ca66c6fc16695559b5f8d814d1b51df15110b92", size = 11608, upload-time = "2023-07-24T20:34:31.362Z" },
+]
+
+[[package]]
+name = "django-s3-express-cache"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "boto3" },
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/60/3e/2a1a092c6c7d7f13172bb6c61b86a0136338c4772e664d06808573c2ca60/django_s3_express_cache-0.1.0.tar.gz", hash = "sha256:de993257e79161e3ccb95d7f8cd54db50d329347524a97a23d1484c528c65541", size = 23642, upload-time = "2025-09-21T21:37:30.204Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2f/7a/ffad8e5118a11da20b8398bb38732167110da8cdfb0f2c47366c44faaaa2/django_s3_express_cache-0.1.0-py3-none-any.whl", hash = "sha256:4afdcf962c8c7001d39ba0fb1db2e1ed2fb755b5aead35c75d87e2675bdabfd6", size = 13121, upload-time = "2025-09-21T21:37:29.242Z" },
 ]
 
 [[package]]
