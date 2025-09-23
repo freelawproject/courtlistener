@@ -510,7 +510,7 @@ def update_es_document(
     mapping is not required for the update.
     :param skip_percolator_request: Whether to skip the subsequent percolator request
     :param should_check_for_embeddings: If True and the document is an OpinionDocument,
-    attempts to fetch cached embeddings and include them in the update.
+    attempts to fetch cached embeddings and include them in the document update.
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None
