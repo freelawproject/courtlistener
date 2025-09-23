@@ -64,7 +64,7 @@ CACHES = {
 
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 if not DEVELOPMENT:
-    CACHES["s3_cache"] = {
+    CACHES["s3"] = {
         "BACKEND": "django_s3_express_cache.S3ExpressCacheBackend",
         "LOCATION": "com-courtlistener-cache--usw2-az1--x-s3",
     }
