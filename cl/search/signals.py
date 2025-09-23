@@ -455,6 +455,7 @@ o_field_mapping = {
                 "html_anon_2020": ["text"],
                 "html": ["text"],
                 "plain_text": ["text"],
+                "html_with_citations": ["text"],
                 "sha1": ["sha1"],
                 "ordering_key": ["ordering_key"],
             },
