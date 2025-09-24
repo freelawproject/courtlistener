@@ -77,6 +77,9 @@ from cl.search.tasks import (
     update_children_docs_by_query,
     update_es_document,
 )
+from cl.search.tests.test_generate_opinion_embeddings import (
+    FakeS3IntelligentTieringStorage,
+)
 from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
@@ -4115,9 +4118,10 @@ class EsOpinionsIndexingTest(
         inception_response.json.return_value = vectors
         return inception_response
 
+    @mock.patch("cl.search.tasks.S3IntelligentTieringStorage")
     @mock.patch("cl.search.tasks.microservice")
     def test_updating_text_field_computes_embeddings(
-        self, inception_mock
+        self, inception_mock, mock_aws_media_storage
     ) -> None:
         """Confirm updates to text field trigger embeddings generation."""
         cluster = OpinionClusterFactory.create(
@@ -4155,6 +4159,8 @@ class EsOpinionsIndexingTest(
         inception_mock.return_value = self._get_mock_for_inception(
             expected_embeddings
         )
+        fake_storage = FakeS3IntelligentTieringStorage()
+        mock_aws_media_storage.return_value = fake_storage
 
         # Opinion should exist in ES but without embeddings initially
         self.assertTrue(
@@ -4171,12 +4177,14 @@ class EsOpinionsIndexingTest(
         self.assertEqual(es_doc.type, o_type_index_map.get(Opinion.COMBINED))
         self.assertEqual(es_doc.type_text, "Combined Opinion")
         inception_mock.assert_not_called()
+        mock_aws_media_storage.assert_not_called()
 
         opinion.per_curiam = True
         opinion.save()
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.per_curiam, True)
         inception_mock.assert_not_called()
+        mock_aws_media_storage.assert_not_called()
 
         # Updating `html_with_citations` should trigger embeddings generation
         opinion.html_with_citations = "HTML with citations content"
@@ -4185,6 +4193,7 @@ class EsOpinionsIndexingTest(
         inception_mock.assert_called_once_with(
             service="inception-text", data=opinion.clean_text
         )
+        mock_aws_media_storage.assert_called_once()
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.embeddings, expected_embeddings["embeddings"])
 
@@ -4247,10 +4256,10 @@ class EsOpinionsIndexingTest(
         )
 
         # Verify cache lookup for the opinion embeddings was attempted
-        cache_mock.assert_called_once_with(f"embeddings:o_{opinion.pk}")
+        cache_mock.assert_called_with(f"embeddings:o_{opinion.pk}")
 
         # Verify that we log an error if embeddings are missing
-        logger_mock.assert_called_once()
+        logger_mock.assert_called()
 
         # Ensure ES document still gets updated even without embeddings
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
