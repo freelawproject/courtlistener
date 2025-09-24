@@ -3970,7 +3970,6 @@ class LlmTest(TestCase):
         self, mock_call_llm
     ):
         """Verifies that the classify_opinion_case_name_task updates OpinionCluster fields correctly"""
-        # mock_response = json.dumps(self.valid_response)
         mock_call_llm.return_value = self.valid_response
 
         classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)

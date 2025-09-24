@@ -3148,7 +3148,7 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         )
         return
     except Exception as e:
-        # Only expect to get instructr exceptions here to track them
+        # Only expect to get instructor exceptions here to track them
         capture_exception(e)
         raise
 
@@ -3160,7 +3160,7 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     if llm_response.needs_ocr:
         llm_response["recap_document_id"] = recap_document_id
         logger.error(
-            "Probably recap document needs OCR", llm_response.model_dump()
+            "LLM - RECAPDocument may need OCR", llm_response.model_dump()
         )
         return
 
@@ -3181,7 +3181,9 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     if not llm_response.case_name_match:
         # The name of the docket case and the opinion do not necessarily match, we log it for manual review
         llm_response["recap_document_id"] = recap_document_id
-        logger.error("Case name did not match", llm_response.model_dump())
+        logger.error(
+            "LLM - Case name did not match", llm_response.model_dump()
+        )
 
     case_name = llm_response.case_name or obj.case_name
     case_name_full = llm_response.case_name_full or obj.case_name_full
