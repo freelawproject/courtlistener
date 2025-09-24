@@ -4,6 +4,9 @@ from math import ceil
 from unittest import mock
 
 import openai
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from factory.django import FileField
 from lxml import etree
@@ -21,6 +24,7 @@ from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 from cl.tests.utils import MockResponse
+from cl.users.factories import UserProfileWithParentsFactory
 
 
 class PodcastTest(ESIndexTestCase, TestCase):
@@ -569,3 +573,64 @@ class TranscriptionTest(TestCase):
                 self.transcripted_audio_not_hallucinated
             )
         )
+
+
+class AudioTranscriptPermissionTests(TestCase):
+    """
+    Verifies that `stt_transcript` is only included for users with
+    'audio.can_view_oa_transcript' permission.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court_1 = CourtFactory()
+        cls.audio = AudioFactory.create(
+            docket=DocketFactory(
+                court=cls.court_1,
+                date_argued=datetime.date(2014, 8, 14),
+            ),
+            duration=1497,
+            stt_transcript=(
+                "United States of America v. Sean Kerwin Bindranauth. "
+                "And Anshu Bhudrani is here for the appellant."
+            ),
+            stt_status=Audio.STT_COMPLETE,
+        )
+        ct = ContentType.objects.get_for_model(Audio)
+        cls.view_perm, _ = Permission.objects.get_or_create(
+            codename="can_view_oa_transcript",
+            name="Can view transcript",
+            content_type=ct,
+        )
+        cls.audio_path = reverse("audio-list", kwargs={"version": "v4"})
+
+    def setUp(self) -> None:
+        up = UserProfileWithParentsFactory.create(
+            user__username="audio-user",
+            user__password=make_password("password"),
+        )
+        self.assertTrue(
+            self.client.login(username="audio-user", password="password")
+        )
+        self.user = up.user
+
+    def test_user_without_transcript_permission_does_not_see_field(self):
+        """Test the stt_transcript is not included for users without the
+        can_view_oa_transcript permission
+        """
+        response = self.client.get(self.audio_path)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        results = data["results"]
+        self.assertNotIn("stt_transcript", results[0])
+
+    def test_user_with_transcript_permission_sees_field(self):
+        """Test the stt_transcript is included for users with the
+        can_view_oa_transcript permission
+        """
+        self.user.user_permissions.add(self.view_perm)
+        response = self.client.get(self.audio_path)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        results = data["results"]
+        self.assertIn("stt_transcript", results[0])

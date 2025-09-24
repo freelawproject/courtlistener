@@ -2,7 +2,7 @@ import random
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from rest_framework import permissions
+from rest_framework import permissions, serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.views import APIView
@@ -95,3 +95,33 @@ class V3APIPermission(permissions.BasePermission):
             self.r.sadd(self.v3_blocked_list_key, user.id)
             raise PermissionDenied(self.v3_blocked_message)
         return True
+
+
+class RestrictedReadOnlyField(serializers.ReadOnlyField):
+    """
+    Read-only field that is omitted from the response unless the user
+    has the given Django permission. Permission check is cached per request.
+    """
+
+    def __init__(self, *args, permission: str, **kwargs):
+        self.permission = permission
+        self._allowed_cache = None
+        super().__init__(*args, **kwargs)
+
+    def _is_allowed(self) -> bool:
+        if self._allowed_cache is not None:
+            return self._allowed_cache
+
+        request = None
+        if hasattr(self, "parent") and hasattr(self.parent, "context"):
+            request = self.parent.context.get("request")
+
+        self._allowed_cache = bool(
+            request and request.user.has_perm(self.permission)
+        )
+        return self._allowed_cache
+
+    def get_attribute(self, instance):
+        if not self._is_allowed():
+            raise serializers.SkipField()
+        return super().get_attribute(instance)

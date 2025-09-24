@@ -1,5 +1,6 @@
 from rest_framework.serializers import CharField, HyperlinkedRelatedField
 
+from cl.api.api_permissions import RestrictedReadOnlyField
 from cl.api.utils import (
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
@@ -29,6 +30,9 @@ class AudioSerializer(
         view_name="docket-detail",
         queryset=Docket.objects.all(),
         style={"base_template": "input.html"},
+    )
+    stt_transcript = RestrictedReadOnlyField(
+        permission="audio.can_view_oa_transcript"
     )
 
     class Meta:
