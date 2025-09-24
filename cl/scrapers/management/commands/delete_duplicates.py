@@ -1,12 +1,17 @@
+import importlib
 from collections import defaultdict
 
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
+from django.utils.encoding import force_bytes
+from juriscraper.OpinionSite import OpinionSite
 
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.crypto import sha1
 from cl.scrapers.exceptions import MergingError
 from cl.scrapers.management.commands.merge_opinion_versions import (
     comparable_dockets,
+    get_query_from_url,
     merge_metadata,
     update_referencing_objects,
 )
@@ -172,6 +177,96 @@ def delete_same_hash_duplicates(
                 stats["merging error"] += 1
 
 
+def get_cleaned_content_hash(opinion: Opinion, site: OpinionSite) -> str:
+    """Computes the hash over the cleaned up opinion content
+
+    :param opinion: the opinion
+    :param site: the juriscraper site
+    :return: the sha1 hash
+    """
+    content = opinion.local_path.read()
+    return sha1(force_bytes(site.cleanup_content(content)))
+
+
+def delete_cleaned_up_content_duplicates(
+    stats: defaultdict, court_id: str, site: OpinionSite
+) -> None:
+    """Get duplicate candidate groups and check if their hashes are the same
+    after applying `Site.cleanup_content` from the proper juriscraper module
+
+    This is mostly reusing logic from `merge_opinion_versions_by_download_url`.
+    Since this are different hash duplicates, they sort of look like versions,
+    since they have different hashes. However, once `Site.cleanup_content` is
+    applied, they will be identical, which is the difference
+
+    We filter by `download_url` because grouping by local path will need
+    `local_path` string manipulation to drop the index _1, _2, _3 which may
+    become costy
+
+    :param stats: stats dictionary for reporting
+    :param court_id: a court id to group opinions by
+    :param site: a juriscraper Site with a `cleanup_content` method
+    """
+    qs = (
+        Opinion.objects.filter(
+            cluster__docket__court_id=court_id,
+            cluster__source=SOURCES.COURT_WEBSITE,
+        )
+        .exclude(Q(download_url="") | Q(download_url__isnull=True))
+        .values("download_url")
+        .annotate(
+            number_of_rows=Count("download_url"),
+            number_of_hashes=Count("sha1", distinct=True),
+        )
+        .order_by()
+        .filter(number_of_rows__gte=2, number_of_hashes__gte=2)
+    )
+
+    seen_urls = set()
+
+    for group in qs:
+        standard_url = group["download_url"].replace("https", "http")
+        if standard_url in seen_urls:
+            continue
+        seen_urls.add(standard_url)
+
+        logger.info("Processing group %s", group)
+
+        download_url_query = get_query_from_url(group["download_url"], "exact")
+
+        # keep the latest opinion and delete the older ones as duplicates
+        main_opinion, *duplicate_candidates = (
+            Opinion.objects.filter(download_url_query)
+            .filter(cluster__source=SOURCES.COURT_WEBSITE)
+            .select_related("cluster", "cluster__docket")
+            .order_by("-date_created")
+        )
+
+        main_hash = get_cleaned_content_hash(main_opinion, site)
+
+        for duplicate_candidate in duplicate_candidates:
+            duplicate_candidate_hash = get_cleaned_content_hash(
+                duplicate_candidate, site
+            )
+
+            if main_hash != duplicate_candidate_hash:
+                stats["different hash after cleanup"] += 1
+                logger.info(
+                    "Different hash after cleanup %s %s",
+                    main_opinion.id,
+                    duplicate_candidate.id,
+                )
+                continue
+
+            try:
+                with transaction.atomic():
+                    delete_duplicate_opinion(
+                        main_opinion, duplicate_candidate, True, stats
+                    )
+            except MergingError:
+                stats["merging error"] += 1
+
+
 class Command(VerboseCommand):
     help = "Find and merge Opinion objects that are versions of each other"
 
@@ -179,8 +274,13 @@ class Command(VerboseCommand):
         super().add_arguments(parser)
         parser.add_argument(
             "method",
-            choices=["same_hash"],
-            help="""Currently we only support deleting same-hash duplicates
+            choices=["same_hash", "cleanup_content"],
+            help="""Supported duplicate finding methods:
+            - 'same_hash' will look for opinions with the exact same hash.
+            - 'cleanup_content' will group opinions by `court_id` and `download_url`
+            and use the `Site.cleanup_content` in the `juriscraper_module` to
+            cleanup the raw content and recompute the hash. If they are the same
+            and other checks are OK, it will delete the duplicates.
             """,
         )
         parser.add_argument(
@@ -191,16 +291,50 @@ class Command(VerboseCommand):
             help="""`OpinionCluster.source` values to include when finding
             duplicate groups. Pass `ALL` if you want to include all sources.""",
         )
+        parser.add_argument(
+            "--court-id",
+            default="",
+            help="""`Docket.court_id` to find duplicate candidate groups when
+            using the `cleanup_content` method""",
+        )
+        parser.add_argument(
+            "--juriscraper-module",
+            default="",
+            help="""Juriscraper path of the `Site.cleanup_content` method that
+            will be used when using the `cleanup_content` method""",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
         stats = defaultdict(lambda: 0)
-
-        if options["method"] == "same_hash":
+        method = options["method"]
+        if method == "same_hash":
             try:
                 delete_same_hash_duplicates(stats, options["cluster_sources"])
             finally:
                 logger.info(stats)
 
+        elif method == "cleanup_content":
+            juriscraper_module = options["juriscraper_module"]
+            court_id = options["court_id"]
+            if not (juriscraper_module and court_id):
+                raise ValueError(
+                    "Both `juriscraper-path` and `court-id` should have values when using `cleanup_content`"
+                )
+
+            # check that the module path is valid
+            site = importlib.import_module(juriscraper_module).Site()
+
+            # check that `cleanup_content` is implemented
+            if site.cleanup_content == OpinionSite.cleanup_content:
+                raise ValueError(
+                    f"`cleanup_content` is not implemented for {juriscraper_module}"
+                )
+
+            try:
+                delete_cleaned_up_content_duplicates(stats, court_id, site)
+            finally:
+                logger.info(stats)
+
         else:
-            raise ValueError("Only `same_hash` method is supported, for now")
+            raise ValueError(f"Unsupported `method` value {method}")
