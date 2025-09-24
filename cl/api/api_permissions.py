@@ -104,8 +104,8 @@ class RestrictedReadOnlyField(serializers.ReadOnlyField):
     """
 
     def __init__(self, *args, permission: str, **kwargs):
-        self.permission = permission
-        self._allowed_cache = None
+        self.permission: str = permission
+        self._allowed_cache: bool | None = None
         super().__init__(*args, **kwargs)
 
     def _is_allowed(self) -> bool:
