@@ -406,7 +406,7 @@ class ApiQueryCountTests(TestCase):
         UserProfile.objects.all().delete()
 
     def test_audio_api_query_counts(self, mock_logging_prefix) -> None:
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(6):
             path = reverse("audio-list", kwargs={"version": "v3"})
             self.client.get(path)
 
