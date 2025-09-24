@@ -573,9 +573,6 @@ def update_es_document(
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
 
-    if embeddings and cache_key:
-        cache.delete(cache_key)
-
     if (
         (
             related_instance_app_label == "search.BankruptcyInformation"
@@ -1928,6 +1925,9 @@ def save_single_opinion_embeddings(
         )
     )
     storage.save(file_path, ContentFile(file_contents))
+
+    if embeddings:
+        cache.delete(cache_key)
 
 
 @app.task(
