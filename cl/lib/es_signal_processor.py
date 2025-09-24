@@ -1,5 +1,6 @@
 from functools import partial
 
+from celery import group
 from celery.canvas import chain
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
@@ -45,6 +46,7 @@ from cl.search.tasks import (
     es_save_document,
     get_es_doc_id_and_parent_id,
     remove_document_from_es_index,
+    save_single_opinion_embeddings,
     update_children_docs_by_query,
     update_es_document,
 )
@@ -206,27 +208,44 @@ def update_es_documents(
                     and "html_with_citations" in fields_to_update
                     and settings.ENABLE_EMBEDDING_COMPUTATION
                 )
-                c = chain(
-                    update_es_document.si(
-                        es_document.__name__,
-                        fields_to_update,
-                        (
-                            compose_app_label(instance),
-                            instance.pk,
-                        ),
-                        (compose_app_label(instance), instance.pk),
-                        fields_map,
-                        getattr(instance, "skip_percolator_request", False),
-                        should_compute_embeddings,
-                    ),
-                    send_or_schedule_search_alerts.s(),
-                    percolator_response_processing.s(),
+
+                # Base chain: update ES document
+                base_chain = update_es_document.si(
+                    es_document.__name__,
+                    fields_to_update,
+                    (compose_app_label(instance), instance.pk),
+                    (compose_app_label(instance), instance.pk),
+                    fields_map,
+                    getattr(instance, "skip_percolator_request", False),
+                    should_compute_embeddings,
                 )
                 # Prepend embedding computation task when html_with_citations
                 # is updated
                 if should_compute_embeddings:
-                    c = compute_single_opinion_embeddings.si(instance.pk) | c
-                transaction.on_commit(partial(c.apply_async))
+                    # Chain embedding computation -> ES update
+                    base_chain = (
+                        compute_single_opinion_embeddings.si(instance.pk)
+                        | base_chain
+                    )
+
+                    # Parallel tasks after update:
+                    # 1) save_single_opinion_embeddings
+                    # 2) send_or_schedule_search_alerts -> percolator_response_processing
+                    post_update_group = group(
+                        save_single_opinion_embeddings.si(instance.pk),
+                        chain(
+                            send_or_schedule_search_alerts.s(),
+                            percolator_response_processing.s(),
+                        ),
+                    )
+                    final_workflow = base_chain | post_update_group
+                else:
+                    # Default: ES update + alerts + percolator
+                    final_workflow = base_chain | chain(
+                        send_or_schedule_search_alerts.s(),
+                        percolator_response_processing.s(),
+                    )
+                transaction.on_commit(partial(final_workflow.apply_async))
             case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
                 transaction.on_commit(
                     partial(
