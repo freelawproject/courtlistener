@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('search', '0041_add_cluster_redirection'),
+        ('search', '0042_add_docket_number_raw_field'),
     ]
 
     operations = [
