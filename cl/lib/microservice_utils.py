@@ -1,4 +1,7 @@
+import json
+import logging
 from io import BufferedReader
+from typing import Any
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -6,6 +9,26 @@ from httpx import AsyncClient, Response
 
 from cl.audio.models import Audio
 from cl.search.models import Opinion, RECAPDocument
+
+logger = logging.getLogger(__name__)
+
+
+def log_invalid_embedding_errors(embeddings: Any):
+    """Log an error when the embeddings response is not a list.
+
+    :param embeddings: The embeddings object to validate and log.
+    """
+    if isinstance(embeddings, dict):
+        logger.error(
+            "Received API error response in embeddings: %s",
+            json.dumps(embeddings, default=str),
+        )
+    else:
+        logger.error(
+            "Unexpected data type for embeddings: %s (%s)",
+            str(embeddings)[:200],
+            type(embeddings),
+        )
 
 
 async def clean_up_recap_document_file(item: RECAPDocument) -> None:

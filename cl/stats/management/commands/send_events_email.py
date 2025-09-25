@@ -10,7 +10,7 @@ from cl.stats.models import Event
 
 
 class Command(VerboseCommand):
-    help = "Send an email to the admins with any events from the past day."
+    help = """Send an email to partnership managers with usage statistics"""
 
     def handle(self, *args, **options) -> None:
         super().handle(*args, **options)
@@ -23,5 +23,5 @@ class Command(VerboseCommand):
                 subject=f"CourtListener events email for {today.date().isoformat()}",
                 message=template.render({"events": events}),
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[a[1] for a in settings.MANAGERS],
+                recipient_list=[settings.PARTNERSHIP_EMAIL_ADDRESS],
             )

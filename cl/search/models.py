@@ -1965,7 +1965,12 @@ class FederalCourtsQuerySet(models.QuerySet):
 @pghistory.track()
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
-    as needed."""
+    as needed.
+
+    Note that a Courthouse object should be created alongside each new Court.
+    Even if this is not enforced by the data model, there is some logic tied
+    to that relation. Examples in `find_citations` and `coverage_utils`
+    """
 
     # Note that spaces cannot be used in the keys, or else the SearchForm won't
     # work
@@ -3306,6 +3311,7 @@ class Opinion(AbstractDateTimeModel):
             "html_anon_2020",
             "html",
             "plain_text",
+            "html_with_citations",
             "sha1",
             "ordering_key",
         ]

@@ -28,12 +28,11 @@
       </div>
 
       <div class="flex flex-col max-h-[--mobile-dialog-panel-height]">
-        <div class="flex flex-col gap-2 px-4">
+        <div class="flex flex-col gap-2 px-4 pt-1">
           <c-corpus-search.mobile.top-controls :request="request" />
           <button
             type="button"
             x-on:click="toggleAdvancedFilters"
-            x-show="advancedFiltersCollapsed"
             class="btn-outline w-full justify-center"
           >
             {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
@@ -43,9 +42,8 @@
         <div
           class="flex-shrink overflow-auto border-b border-greyscale-200 border-t-4 mt-4"
           x-show="advancedFiltersExpanded"
-          x-collapse
         >
-          <div class="p-4">
+          <div class="p-4 max-w-[100vw]">
             <c-corpus-search.filters :request="request" :search_form="search_form"/>
           </div>
         </div>
