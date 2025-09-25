@@ -602,6 +602,14 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         db_index=True,
     )
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            "with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     federal_dn_office_code = models.CharField(
         help_text="A one digit statistical code (either alphabetic or numeric) "
         "of the office within the federal district. In this "
