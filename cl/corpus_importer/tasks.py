@@ -80,7 +80,6 @@ from cl.citations.utils import filter_out_non_case_law_citations
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
-from cl.corpus_importer.prompts.user import CASE_NAME_EXTRACT_USER
 from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
@@ -89,6 +88,7 @@ from cl.corpus_importer.utils import (
     is_long_appellate_document_number,
     make_iquery_probing_key,
     mark_ia_upload_needed,
+    winnow_case_name,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
@@ -3108,7 +3108,6 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     """
 
     system_prompt = CASE_NAME_EXTRACT_SYSTEM
-    user_prompt = CASE_NAME_EXTRACT_USER
 
     try:
         obj = (
@@ -3124,21 +3123,20 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         return
     plain_text = sub_opinion.plain_text[:2000]
 
-    docket = obj.docket
-    docket_name = docket.case_name or docket.case_name_full
+    cluster_name = obj.case_name or obj.case_name_full
 
-    user_message = f"{plain_text}\n\n DOCKET TITLE: `{docket_name}`"
+    user_message = f"{plain_text}"
 
     try:
         llm_response = call_llm(
             system_prompt,
-            user_prompt,
             user_message,
             response_model=CaseNameExtractionResponse,
+            max_completion_tokens=300,
         )
     except ValidationError as e:
         logger.error(
-            "LLM response validation error for cluster_id=%s, recap_document_id=%s",
+            "LLM - Response validation error for cluster_id=%s, recap_document_id=%s",
             pk,
             recap_document_id,
             extra={
@@ -3154,56 +3152,40 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
 
     if not isinstance(llm_response, CaseNameExtractionResponse):
         # Added this to avoid mypy errors
-        logger.error("Invalid llm_response type: %s", type(llm_response))
+        logger.error("LLM - Invalid response type: %s", type(llm_response))
         return
-
-    if llm_response.needs_ocr:
-        llm_response["recap_document_id"] = recap_document_id
-        logger.error(
-            "LLM - RECAPDocument may need OCR", llm_response.model_dump()
-        )
-        return
-
-    if llm_response.error:
-        logger.error(
-            "LLM error for cluster_id=%s, recap_document_id=%s: %s",
-            pk,
-            recap_document_id,
-            llm_response.error,
-            extra={
-                "error_detail": llm_response.error,
-                "raw_response": llm_response.model_dump(),
-                "fingerprint": ["llm-casenames-llm-error"],
-            },
-        )
-        return
-
-    if not llm_response.case_name_match:
-        # The name of the docket case and the opinion do not necessarily match, we log it for manual review
-        llm_response["recap_document_id"] = recap_document_id
-        logger.error(
-            "LLM - Case name did not match", llm_response.model_dump()
-        )
 
     case_name = llm_response.case_name or obj.case_name
     case_name_full = llm_response.case_name_full or obj.case_name_full
-    case_name_short = llm_response.case_name_short or obj.case_name_short
 
-    # Check if any of the values changed before updating the cluster
-    changed = any(
-        new_val not in (None, "") and old_val != new_val
-        for old_val, new_val in [
-            (obj.case_name_short, case_name_short),
-            (obj.case_name_full, case_name_full),
-            (obj.case_name, case_name),
-        ]
-    )
+    case_names_pairs = [
+        ("case_name_full", obj.case_name_full, case_name_full),
+        ("case_name", obj.case_name, case_name),
+    ]
 
-    if changed:
+    # Check which values changed before updating the cluster
+    changed_fields = {
+        name: new
+        for name, old, new in case_names_pairs
+        if new not in (None, "") and old != new
+    }
+
+    if changed_fields:
         with transaction.atomic():
-            obj.case_name_short = case_name_short
-            obj.case_name_full = case_name_full
-            obj.case_name = case_name
+            for field_name, new_case_name in changed_fields.items():
+                # Update only necessary fields
+                setattr(obj, field_name, new_case_name)
+                # Check for overlap between cluster case name and extracted case name
+                overlap = winnow_case_name(new_case_name) & winnow_case_name(
+                    cluster_name
+                )
+                if not overlap:
+                    # The name of the docket case and the opinion do not necessarily match, we log it for manual review
+                    dict_llm_response = llm_response.model_dump()
+                    dict_llm_response["recap_document_id"] = recap_document_id
+                    logger.error(
+                        "LLM - Case name did not match", dict_llm_response
+                    )
             obj.save()
             logger.info(
                 "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
