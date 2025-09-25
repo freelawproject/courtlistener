@@ -3009,7 +3009,7 @@ class BaseCitation(models.Model):
 
 
 @pghistory.track()
-class Citation(BaseCitation):
+class Citation(BaseCitation, AbstractDateTimeModel):
     """A citation to an OpinionCluster"""
 
     cluster = models.ForeignKey(
