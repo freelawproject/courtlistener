@@ -19,6 +19,7 @@ else:
 EMAIL_BCC_COPY_RATE = 0.1
 
 BCC_EMAIL_ADDRESS = "bcc@free.law"
+PARTNERSHIP_EMAIL_ADDRESS = "partnerships@free.law"
 
 # Hours after a bounce notification is considered a new failure event.
 BACKOFF_THRESHOLD = 36

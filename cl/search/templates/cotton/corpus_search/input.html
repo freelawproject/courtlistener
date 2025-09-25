@@ -7,7 +7,7 @@
 >
   {% svg "magnifier" class="text-greyscale-400 flex-grow-0 h-5 w-5" aria_hidden="true" %}
   <div class="bg-greyscale-200 flex-grow" x-id="corpusInputIdGroup">
-    <label x-bind:for="inputId" class="sr-only" type="text">Search <span x-text="selectedScope"></span></label>
+    <label x-bind:for="inputId" class="sr-only" type="text">Search <span x-text="selectedScope.label"></span></label>
     <input
       x-bind:id="inputId"
       x-bind:value="keywordQuery"
@@ -18,6 +18,8 @@
       placeholder="Enter keyword(s)"
     >
   </div>
+
+  {{ slot }}
 
   {# OPERATORS MODAL #}
   <c-dialog
