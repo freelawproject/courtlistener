@@ -217,9 +217,9 @@ def update_es_documents(
                     getattr(instance, "skip_percolator_request", False),
                     should_compute_embeddings,
                 )
-                # Prepend embedding computation task when html_with_citations
-                # is updated
                 if should_compute_embeddings:
+                    # Prepend embedding computation task when
+                    # html_with_citations is updated:
                     # Chain embedding computation -> ES update
                     base_chain = (
                         compute_single_opinion_embeddings.si(instance.pk)

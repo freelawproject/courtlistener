@@ -553,19 +553,17 @@ def update_es_document(
         return
 
     embeddings = None
-    cache_key = None
     if should_check_for_embeddings and es_document_name == "OpinionDocument":
-        cache_key = f"{embeddings_cache_key()}o_{main_instance_id}"
-        embeddings = cache.get(cache_key)
-
+        storage = AWSMediaStorage()
+        embeddings = download_embedding(storage, main_instance_id)
         if not embeddings:
             logging.error(
-                "Expected cached embeddings for OpinionDocument %s, but none found",
+                "Expected embeddings for OpinionDocument %s, but none found",
                 main_instance_id,
             )
 
     if embeddings:
-        fields_values_to_update["embeddings"] = embeddings
+        fields_values_to_update["embeddings"] = embeddings["embeddings"]
 
     Document.update(
         es_doc,

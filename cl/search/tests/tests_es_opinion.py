@@ -4,7 +4,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 from unittest import mock
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytz
 import time_machine
@@ -4118,10 +4118,11 @@ class EsOpinionsIndexingTest(
         inception_response.json.return_value = vectors
         return inception_response
 
+    @mock.patch("cl.search.tasks.download_embedding")
     @mock.patch("cl.search.tasks.S3IntelligentTieringStorage")
     @mock.patch("cl.search.tasks.microservice")
     def test_updating_text_field_computes_embeddings(
-        self, inception_mock, mock_aws_media_storage
+        self, inception_mock, mock_aws_media_storage, mock_download_embeddings
     ) -> None:
         """Confirm updates to text field trigger embeddings generation."""
         cluster = OpinionClusterFactory.create(
@@ -4162,6 +4163,8 @@ class EsOpinionsIndexingTest(
         fake_storage = FakeS3IntelligentTieringStorage()
         mock_aws_media_storage.return_value = fake_storage
 
+        mock_download_embeddings.return_value = expected_embeddings
+
         # Opinion should exist in ES but without embeddings initially
         self.assertTrue(
             OpinionDocument.exists(id=ES_CHILD_ID(opinion.pk).OPINION)
@@ -4178,6 +4181,7 @@ class EsOpinionsIndexingTest(
         self.assertEqual(es_doc.type_text, "Combined Opinion")
         inception_mock.assert_not_called()
         mock_aws_media_storage.assert_not_called()
+        mock_download_embeddings.assert_not_called()
 
         opinion.per_curiam = True
         opinion.save()
@@ -4185,6 +4189,7 @@ class EsOpinionsIndexingTest(
         self.assertEqual(es_doc.per_curiam, True)
         inception_mock.assert_not_called()
         mock_aws_media_storage.assert_not_called()
+        mock_download_embeddings.assert_not_called()
 
         # Updating `html_with_citations` should trigger embeddings generation
         opinion.html_with_citations = "HTML with citations content"
@@ -4201,10 +4206,10 @@ class EsOpinionsIndexingTest(
         self.assertFalse(cache.has_key(f"embeddings:o_{opinion.pk}"))
 
     @mock.patch("cl.search.tasks.logging.error")
-    @mock.patch("cl.search.tasks.cache.get")
+    @mock.patch("cl.search.tasks.download_embedding")
     @mock.patch("cl.search.tasks.microservice")
     def test_missing_embeddings_log_error(
-        self, inception_mock, cache_mock, logger_mock
+        self, inception_mock, download_mock, logger_mock
     ):
         cluster = OpinionClusterFactory.create(
             case_name_full="Paul Debbas v. Franklin",
@@ -4231,19 +4236,12 @@ class EsOpinionsIndexingTest(
         )
 
         # Mock the response from the microservice
-        test_dir = (
-            Path(settings.INSTALL_ROOT) / "cl" / "search" / "test_assets"
-        )
-        with open(
-            test_dir / "opinion_1_embeddings.json", encoding="utf-8"
-        ) as f:
-            expected_embeddings = json.load(f)
-        inception_mock.return_value = self._get_mock_for_inception(
-            expected_embeddings
-        )
+        inception_response_mock = MagicMock
+        inception_response_mock.is_success = False
+        inception_mock.return_value = inception_response_mock
 
-        # Simulate cache miss (embeddings not found)
-        cache_mock.return_value = None
+        # Simulate embeddings not found
+        download_mock.return_value = None
 
         # Updating `html_with_citations` should trigger embeddings generation
         opinion.html_with_citations = "HTML with citations content"
@@ -4255,8 +4253,8 @@ class EsOpinionsIndexingTest(
             service="inception-text", data=opinion.clean_text
         )
 
-        # Verify cache lookup for the opinion embeddings was attempted
-        cache_mock.assert_called_with(f"embeddings:o_{opinion.pk}")
+        # Verify download lookup for the opinion embeddings was attempted
+        download_mock.assert_called_with(ANY, opinion.pk)
 
         # Verify that we log an error if embeddings are missing
         logger_mock.assert_called()
@@ -4264,6 +4262,7 @@ class EsOpinionsIndexingTest(
         # Ensure ES document still gets updated even without embeddings
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertTrue(es_doc.per_curiam)
+        self.assertFalse(es_doc.embeddings)
 
 
 class OpinionFeedTest(
