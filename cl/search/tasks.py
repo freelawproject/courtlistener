@@ -1800,6 +1800,8 @@ def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
         RemoteProtocolError,
         HTTPStatusError,
         ReadError,
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
     ),
     max_retries=5,
     retry_backoff=10,
