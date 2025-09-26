@@ -1893,51 +1893,6 @@ def create_opinion_text_embeddings(
     ),
     max_retries=5,
     retry_backoff=10,
-    ignore_result=False,
-)
-def save_single_opinion_embeddings(
-    self, pk: str, directory: str = "opinions"
-) -> None:
-    """
-    Save cached embeddings for a single OpinionDocument to S3.
-
-    :param pk: Primary key of the OpinionDocument.
-    :param directory: Directory in S3 to store the embeddings (default: "opinions").
-    """
-    cache_key = f"{embeddings_cache_key()}o_{pk}"
-    embeddings = cache.get(cache_key)
-
-    if not embeddings:
-        logging.error(
-            "Expected cached embeddings for OpinionDocument %s, but none found",
-            pk,
-        )
-        return None
-
-    storage = S3IntelligentTieringStorage()
-    file_contents = json.dumps({"id": pk, "embeddings": embeddings})
-    file_path = str(
-        PurePosixPath(
-            "embeddings",
-            directory,
-            settings.NLP_EMBEDDING_MODEL,
-            f"{pk}.json",
-        )
-    )
-    storage.save(file_path, ContentFile(file_contents))
-
-    if embeddings:
-        cache.delete(cache_key)
-
-
-@app.task(
-    bind=True,
-    autoretry_for=(
-        botocore_exception.HTTPClientError,
-        botocore_exception.ConnectionError,
-    ),
-    max_retries=5,
-    retry_backoff=10,
 )
 def save_embeddings(
     self,

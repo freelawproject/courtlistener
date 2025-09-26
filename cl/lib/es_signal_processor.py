@@ -1,6 +1,5 @@
 from functools import partial
 
-from celery import group
 from celery.canvas import chain
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
@@ -46,7 +45,6 @@ from cl.search.tasks import (
     es_save_document,
     get_es_doc_id_and_parent_id,
     remove_document_from_es_index,
-    save_single_opinion_embeddings,
     update_children_docs_by_query,
     update_es_document,
 )
@@ -228,17 +226,13 @@ def update_es_documents(
                         | base_chain
                     )
 
-                    # Parallel tasks after update:
-                    # 1) save_single_opinion_embeddings
-                    # 2) send_or_schedule_search_alerts -> percolator_response_processing
-                    post_update_group = group(
-                        save_single_opinion_embeddings.si(instance.pk),
-                        chain(
-                            send_or_schedule_search_alerts.s(),
-                            percolator_response_processing.s(),
-                        ),
+                    # tasks after update:
+                    # send_or_schedule_search_alerts -> percolator_response_processing
+                    post_update = chain(
+                        send_or_schedule_search_alerts.s(),
+                        percolator_response_processing.s(),
                     )
-                    final_workflow = base_chain | post_update_group
+                    final_workflow = base_chain | post_update
                 else:
                     # Default: ES update + alerts + percolator
                     final_workflow = base_chain | chain(
