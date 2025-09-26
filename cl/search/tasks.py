@@ -1985,6 +1985,35 @@ def save_embeddings(
     cache.delete(cache_key)
 
 
+def download_embedding(
+    storage: AWSMediaStorage, pk: int, directory: str = "opinions"
+) -> list[dict] | None:
+    """Download a single embedding from S3.
+
+    :param storage: Storage backend instance.
+    :param pk: The record ID.
+    :param directory: Directory where the embedding is stored.
+    :return: The embedding data as a dict, or None if not found.
+    """
+    file_path = str(
+        PurePosixPath(
+            "embeddings",
+            directory,
+            settings.NLP_EMBEDDING_MODEL,
+            f"{pk}.json",
+        )
+    )
+    logger.info("Attempting to retrieve embedding from: %s", file_path)
+    try:
+        with storage.open(file_path, "rb") as f:
+            file_contents = f.read().decode("utf-8")
+        embedding_data = json.loads(file_contents)
+        return embedding_data
+    except FileNotFoundError:
+        logger.error("Embeddings for opinion ID:%s doesn't exist.", pk)
+        return None
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -2007,35 +2036,12 @@ def retrieve_embeddings(
     :param directory: The directory where the embeddings are stored.
     :return: A list of dictionaries containing the embeddings.
     """
-
     storage = AWSMediaStorage()
-
-    def download_embedding(opinion_id: int) -> dict | None:
-        file_path = str(
-            PurePosixPath(
-                "embeddings",
-                directory,
-                settings.NLP_EMBEDDING_MODEL,
-                f"{opinion_id}.json",
-            )
-        )
-        logger.info("Attempting to retrieve embedding from: %s", file_path)
-        try:
-            with storage.open(file_path, "rb") as f:
-                file_contents = f.read().decode("utf-8")
-            embedding_data = json.loads(file_contents)
-            return embedding_data
-        except FileNotFoundError:
-            logger.error(
-                "Embeddings for opinion ID:%s doesn't exist.", opinion_id
-            )
-            return None
-
     embeddings: list[dict] = []
     # Download embeddings concurrently.
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
-            executor.submit(download_embedding, opinion_id)
+            executor.submit(download_embedding, storage, opinion_id, directory)
             for opinion_id in opinion_ids
         ]
         for future in concurrent.futures.as_completed(futures):
