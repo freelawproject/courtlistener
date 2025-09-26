@@ -1835,12 +1835,20 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
             log_invalid_embedding_errors(embeddings)
         return None
 
-    # Build a namespaced cache key for this opinion's embeddings
-    cache_prefix = embeddings_cache_key()
-    cache_key = f"{cache_prefix}o_{pk}"
-
-    # Store the embeddings JSON in cache for 30 minutes
-    cache.set(cache_key, embeddings.json()["embeddings"], 60 * 30)
+    # Save embeddings to S3.
+    storage = S3IntelligentTieringStorage()
+    file_contents = json.dumps(
+        {"id": pk, "embeddings": embeddings.json()["embeddings"]}
+    )
+    file_path = str(
+        PurePosixPath(
+            "embeddings",
+            "opinions",
+            settings.NLP_EMBEDDING_MODEL,
+            f"{pk}.json",
+        )
+    )
+    storage.save(file_path, ContentFile(file_contents))
 
 
 @app.task(
