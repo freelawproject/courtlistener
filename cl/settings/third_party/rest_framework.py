@@ -130,6 +130,8 @@ REST_FRAMEWORK = {
         "testname2024": "1/hour",
         "cadebe2258": "1/hour",
         "NicolasMadan": "10/hour",
+        # Running bad queries
+        "tannero20": "1/hour",
         # Too difficult
         "aanshshah": "1/hour",
         # Made 1M requests for commercial enterprise
