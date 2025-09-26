@@ -41,23 +41,35 @@ from cl.search.models import (
 )
 from cl.search.tasks import remove_document_from_es_index
 
-MIN_SEQUENCE_SIMILARITY = 0.9
+MIN_SEQUENCE_SIMILARITY_STRICT = 0.9
+MIN_SEQUENCE_SIMILARITY_LOOSE = 0.7
 DRY_RUN = False
 
 
-def explain_version_differences(opinions: list[Opinion | int]) -> None:
+def explain_version_differences(
+    opinions: list[Opinion | int],
+    text_field: str = "plain_text",
+    verbose: bool = False,
+) -> None:
     """Debugging function to inspect version differences
 
     :param opinions: a list of Opinion objects or ids
+    :param text_field: the field that holds the opinion's content
+    :param verbose: pass True to print all the differences between texts
     :return None
     """
     if isinstance(opinions[0], int):
         opinions = [
             Opinion.objects.get(id=opinion_id) for opinion_id in opinions
         ]
+    id_to_op = {op.id: op for op in opinions}
 
     text_combinations = itertools.combinations(
-        [(opinion.id, opinion.plain_text.strip()) for opinion in opinions], 2
+        [
+            (opinion.id, getattr(opinion, text_field).strip())
+            for opinion in opinions
+        ],
+        2,
     )
     for (op1, text1), (op2, text2) in text_combinations:
         if text1 == text2:
@@ -70,17 +82,29 @@ def explain_version_differences(opinions: list[Opinion | int]) -> None:
         prev_key = ""
         diff = ""
         print(f"Difference between {op1} {op2}")
-        for index, i in enumerate(differ.compare(text1, text2)):
-            if i[0] in "-+?":
-                if prev_index == index - 1 and prev_key == i[0]:
-                    diff += i[-1]
-                else:
+        base_cl_url = "https://www.courtlistener.com/opinion/"
+        print(f"{base_cl_url}{id_to_op[op1].cluster_id}/x/")
+        print(f"{base_cl_url}{id_to_op[op2].cluster_id}/x/")
+
+        if verbose:
+            for index, i in enumerate(differ.compare(text1, text2)):
+                if i[0] in "-+?":
+                    if not prev_index or (
+                        prev_index == index - 1 and prev_key == i[0]
+                    ):
+                        diff += i[-1]
+                    else:
+                        print(
+                            f"difference at index {index} is {prev_key} {repr(diff)}"
+                        )
+                        diff = ""
+                    prev_key = i[0]
+                    prev_index = index
+                elif diff:
                     print(
                         f"difference at index {index} is {prev_key} {repr(diff)}"
                     )
                     diff = ""
-                prev_key = i[0]
-                prev_index = index
 
         sm = SequenceMatcher(None, text1, text2)
         print("SequenceMatcher.ratio(text1, text2)", sm.ratio())
@@ -314,30 +338,47 @@ def clean_opinion_text(opinion: Opinion) -> str:
     return re.sub(r"\s+", " ", opinion.plain_text)
 
 
-def text_is_similar(text1: str, text2: str) -> bool:
+def get_text_similarity(text1: str, text2: str) -> tuple[bool, float, float]:
     """Check if the text from both opinions is the same or very similar
+
+    A single character difference yields a 0.999 ratio
+    A single word difference may reduce the similarity a few points,
+    depending on how long the sequence is, and if it is an addition/removal
+    or a correction. In general, a 0.9 MIN value should tolerate a difference
+    of a few words between versions, which is what we expect
+    Note that this in sensible to argument order, so we retry with inverted
+    order if the first run fails
 
     :param text1: a cleaned opinion's text
     :param text2: another cleaned opinion's text
+    :return: a tuple with:
+        True in the first member if any of the text similarity ratios was
+            greater than the strict threshold
+        True in the second member if any of the ratios was greater than the
+            loose threshold
+        the ratios in the third and fourth member
     """
     if text1 == text2:
-        return True
+        return True, True, 1.0, 1.0
 
-    # a single character difference yields a 0.999 ratio
-    # a single word difference may reduce the similarity a few points,
-    # depending on how long the sequence is, and if it is an addition/removal
-    # or a correction. In general, a 0.9 MIN value should tolerate a difference
-    # of a few words between versions, which is what we expect
-    # Note that this in sensible to argument order, so we retry with inverted
-    # order if the first run fails
-    sm = SequenceMatcher(None, text1, text2)
-    ratio = sm.ratio()
-    if ratio < MIN_SEQUENCE_SIMILARITY:
-        return (
-            SequenceMatcher(None, text2, text1).ratio()
-            >= MIN_SEQUENCE_SIMILARITY
-        )
-    return ratio >= MIN_SEQUENCE_SIMILARITY
+    ratio2 = 1.0
+
+    ratio1 = SequenceMatcher(None, text1, text2).ratio()
+    if ratio1 >= MIN_SEQUENCE_SIMILARITY_STRICT:
+        return True, True, ratio1, ratio2
+
+    ratio2 = SequenceMatcher(None, text2, text1).ratio()
+
+    if ratio2 >= MIN_SEQUENCE_SIMILARITY_STRICT:
+        return True, True, ratio1, ratio2
+
+    return (
+        False,
+        ratio1 > MIN_SEQUENCE_SIMILARITY_LOOSE
+        or ratio2 > MIN_SEQUENCE_SIMILARITY_LOOSE,
+        ratio1,
+        ratio2,
+    )
 
 
 def update_referencing_objects(
@@ -543,7 +584,9 @@ def delete_version_related_objects(version: Opinion) -> None:
 
 
 def merge_opinion_versions(
-    main_opinion: Opinion, version_opinion: Opinion
+    main_opinion: Opinion,
+    version_opinion: Opinion,
+    strict_merging: bool = False,
 ) -> None:
     """Merge the version opinion and related objects into the main opinion
 
@@ -553,12 +596,16 @@ def merge_opinion_versions(
 
     :param main_opinion: the main version
     :param version_opinion: the secondary version
+    :param strict_merging: all metadata fields should be the same on the
+        opinion and cluster for the merge to succeed
     :return None
     """
     logger.info("Merging %s %s", main_opinion, version_opinion)
-    update_main_opinion = merge_metadata(main_opinion, version_opinion)
+    update_main_opinion = merge_metadata(
+        main_opinion, version_opinion, strict_merging
+    )
     updated_main_cluster = merge_metadata(
-        main_opinion.cluster, version_opinion.cluster
+        main_opinion.cluster, version_opinion.cluster, strict_merging
     )
     version_cluster = version_opinion.cluster
 
@@ -733,11 +780,27 @@ def merge_versions_by_text_similarity(
             continue
 
         version_text = clean_opinion_text(version)
-        if text_is_similar(main_text, version_text):
+        text_is_strictly_similar, text_is_loosely_similar, ratio1, ratio2 = (
+            get_text_similarity(main_text, version_text)
+        )
+
+        if text_is_strictly_similar or text_is_loosely_similar:
+            if text_is_loosely_similar:
+                stats["loose text similarity"] += 1
+
             stats["success"] += 1
             if DRY_RUN:
                 continue
-            merge_opinion_versions(main_opinion, version)
+
+            # if the text_is_loosely_similar, all opinion and cluster metadata
+            # fields must be the same for 2 versions to be merged
+            try:
+                merge_opinion_versions(
+                    main_opinion, version, not text_is_strictly_similar
+                )
+            except MergingError:
+                stats["merging error"] += 1
+                continue
 
             if not version.versions.exists():
                 continue
@@ -754,6 +817,7 @@ def merge_versions_by_text_similarity(
                 "Opinions grouped by URL have dissimilar text. Main: %s. Version %s",
                 main_opinion.id,
                 version.id,
+                extra={"ratio1": ratio1, "ratio2": ratio2},
             )
 
 
