@@ -536,7 +536,7 @@ def send_search_alert_emails(
     connection.send_messages(messages)
 
 
-@app.task(ignore_result=True)
+@app.task(ignore_result=False)
 def percolator_response_processing(response: SendAlertsResponse) -> None:
     """Process the response from the percolator and handle alerts triggered by
      the percolator query.
@@ -703,6 +703,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
+    ignore_result=False,
 )
 def send_or_schedule_search_alerts(
     self: Task, response: SaveESDocumentReturn | None
