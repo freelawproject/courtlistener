@@ -1,7 +1,7 @@
 # fields that are used for highlighting or other output in the search results
 import re
 
-from cl.search.models import SEARCH_TYPES, Opinion
+from cl.search.models import SEARCH_TYPES, Court, Opinion
 
 PEOPLE_ES_HL_FIELDS = {
     "name": 0,
@@ -308,4 +308,34 @@ date_decay_relevance_types = {
         "decay": 0.2,
         "min_score": 0.1,
     },
+}
+
+
+jurisdiction_relevance_multipliers = {
+    # 0.8
+    Court.FEDERAL_APPELLATE: 0.8,
+    Court.STATE_SUPREME: 0.8,
+    Court.TRIBAL_SUPREME: 0.8,
+    Court.TERRITORY_SUPREME: 0.8,
+    # 0.6
+    Court.FEDERAL_DISTRICT: 0.6,
+    Court.FEDERAL_BANKRUPTCY_PANEL: 0.6,
+    Court.STATE_APPELLATE: 0.6,
+    Court.TRIBAL_APPELLATE: 0.6,
+    Court.TERRITORY_APPELLATE: 0.6,
+    Court.STATE_ATTORNEY_GENERAL: 0.6,
+    Court.MILITARY_APPELLATE: 0.6,
+    # 0.4
+    Court.FEDERAL_SPECIAL: 0.4,
+    Court.FEDERAL_BANKRUPTCY: 0.4,
+    Court.STATE_TRIAL: 0.4,
+    Court.STATE_SPECIAL: 0.4,
+    Court.TRIBAL_TRIAL: 0.4,
+    Court.TRIBAL_SPECIAL: 0.4,
+    Court.TERRITORY_TRIAL: 0.4,
+    Court.TERRITORY_SPECIAL: 0.4,
+    Court.MILITARY_TRIAL: 0.4,
+    Court.COMMITTEE: 0.4,
+    # 0.2
+    Court.INTERNATIONAL: 0.2,
 }

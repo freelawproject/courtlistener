@@ -80,6 +80,9 @@ opinion_cluster_v3_v4_common_fields = {
         else x["result"].cluster.docket.court.citation_string
     ),
     "court_id": lambda x: x["result"].cluster.docket.court_id,
+    "court_jurisdiction": lambda x: x[
+        "result"
+    ].cluster.docket.court.jurisdiction,
     "cluster_id": lambda x: x["result"].cluster_id,
     "docketNumber": lambda x: (
         x["docketNumber"]
