@@ -4115,6 +4115,7 @@ class EsOpinionsIndexingTest(
     def _get_mock_for_inception(self, vectors: dict[str, Any] | None = None):
         """Return a mocked Inception response with the given vectors."""
         inception_response = MagicMock()
+        inception_response.is_success = True
         inception_response.json.return_value = vectors
         return inception_response
 
