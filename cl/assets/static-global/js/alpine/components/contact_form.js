@@ -37,6 +37,8 @@ document.addEventListener('alpine:init', () => {
     },
     onUpdate() {
       this.issueType = this.$el.value;
+      if (!this.issue.hasAdditionalFields) this.$refs.message.setAttribute('required', '');
+      else this.$refs.message.removeAttribute('required');
     },
     init() {
       // Fetch backend information: issue type options and Terms URL
