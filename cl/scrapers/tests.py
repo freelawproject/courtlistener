@@ -1629,6 +1629,58 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             "Existing re-direction was not re-assigned to new cluster",
         )
 
+    def test_loose_text_similarity_merging(self):
+        """Can we attempt merges with a loose text similarity threshold?"""
+        court_id = "nev"
+        court = CourtFactory.create(id=court_id)
+        docket_number = "CV-22222"
+        main_docket = DocketFactory.create(
+            court=court, docket_number=docket_number
+        )
+        download_url = "http://somethingelse.court/111.pdf"
+
+        version_candidate = OpinionFactory.create(
+            cluster=OpinionClusterFactory(
+                docket=main_docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text="something else...",
+            html="",
+            author_str="Some Author",
+            sha1="yyy",
+        )
+
+        opinion = OpinionFactory.create(
+            cluster=OpinionClusterFactory(
+                docket=main_docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text="something...",
+            html="",
+            author_str="Another Author",
+            sha1="xxx",
+        )
+        base_path = "cl.scrapers.management.commands.merge_opinion_versions"
+        with (
+            mock.patch(
+                f"{base_path}.get_text_similarity"
+            ) as patched_get_text_similarity,
+            mock.patch(
+                f"{base_path}.merge_opinion_versions"
+            ) as patched_merge_opinion_versions,
+        ):
+            patched_get_text_similarity.return_value = (False, True, 0.75, 0.8)
+            merge_versions_by_download_url(download_url.rsplit("/", 1)[0])
+            # assert that merging was attempted
+            patched_get_text_similarity.assert_called()
+            patched_merge_opinion_versions.assert_called()
+
+        version_candidate.refresh_from_db()
+        self.assertTrue(
+            version_candidate.main_version_id is None,
+            "Loose versioning should not pass when metadata differs ",
+        )
+
 
 class DeleteDuplicatesTest(TestCase):
     @classmethod
