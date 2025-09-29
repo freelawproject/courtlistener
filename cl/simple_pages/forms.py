@@ -232,7 +232,7 @@ class ContactForm(forms.Form):
             if not cleaned_data.get("partner_ideal_outcome"):
                 self.add_error(
                     "partner_ideal_outcome",
-                    " What are your expectations from contacting us?",
+                    "What are your expectations from contacting us?",
                 )
             if not cleaned_data.get("partner_funding_total"):
                 self.add_error(
@@ -290,25 +290,17 @@ class ContactForm(forms.Form):
         value = self.cleaned_data.get("issue_type", "")
         return dict(self.ISSUE_TYPE_CHOICES).get(value, "Unidentified Type")
 
-    def label_for(
-        self, field_name: str, value: str | None = None
-    ) -> str | None:
-        """Return the human label for a ChoiceField value (or None)."""
-        val = self.cleaned_data.get(field_name) if value is None else value
-        if not val:
+    def label_for(self, field_name: str, separator: str = ", ") -> str | None:
+        """Return the human label for a ChoiceField/MultipleChoiceField value (or None)."""
+        value = self.cleaned_data.get(field_name)
+        if not value:
             return None
-        choices = dict(self.fields[field_name].choices)
-        return choices.get(val)
-
-    def labels_for_many(
-        self, field_name: str, values: list[str] | None = None
-    ) -> list[str]:
-        """Return human labels for a MultipleChoiceField list of values (skip unknowns)."""
-        vals = self.cleaned_data.get(field_name) if values is None else values
-        if not vals:
-            return []
-        choices = dict(self.fields[field_name].choices)
-        return [choices[v] for v in vals if v in choices]
+        choices = dict(getattr(self.fields[field_name], "choices", {}))
+        return (
+            separator.join([choices[v] for v in value if v in choices])
+            if type(value) is list
+            else choices.get(value)
+        )
 
     def email_subject(self) -> str:
         """Subject line for this submission."""
@@ -329,8 +321,8 @@ class ContactForm(forms.Form):
 
         # Partnerships
         if cd.get("issue_type") == self.PARTNERSHIPS:
-            bg_labels = self.labels_for_many("partner_background")
-            lines.append(f"Background: {', '.join(bg_labels)}")
+            bg_labels = self.label_for("partner_background", separator=", ")
+            lines.append(f"Background: {bg_labels}")
             lines.append(
                 f"Background (other): {cd.get('partner_background_other', '')}"
             )
