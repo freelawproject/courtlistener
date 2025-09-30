@@ -1088,7 +1088,11 @@ def build_custom_relevance_score(
                     def decay_score = Math.exp(lambda * diff);
 
                     // Adjust the decay score to have a minimum value
-                    double relevance_score = min_score + ((1.0 - min_score) * decay_score);
+                    double date_relevance_score = min_score + ((1.0 - min_score) * decay_score);
+
+                    // Tune the influence of date_relevance_score based on
+                    // DATE_DECAY_FACTOR
+                    double tuned_date_decay_factor = (1 - {settings.DATE_DECAY_BOOST}) + (date_relevance_score * {settings.DATE_DECAY_BOOST});
 
                     // Jurisdiction relevance only for Case Law Search.
                     if ((boolean)params.jurisdiction_relevancy) {{
@@ -1106,10 +1110,13 @@ def build_custom_relevance_score(
                             }}
                         }}
 
-                    return relevance_score * jurisdiction_factor;
+                    // Tune the influence of jurisdiction_factor based on
+                    // JURISDICTION_FACTOR
+                    double tuned_jurisdiction_factor = (1 - {settings.JURISDICTION_BOOST}) + (jurisdiction_factor * {settings.JURISDICTION_BOOST});
+                    return tuned_date_decay_factor * tuned_jurisdiction_factor;
                     }}
 
-                    return relevance_score;
+                    return tuned_date_decay_factor;
                     """,
                 "params": {
                     "default_missing_date": default_missing_date,

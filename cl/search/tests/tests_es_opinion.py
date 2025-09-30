@@ -2675,12 +2675,18 @@ class OpinionSearchJurisdictionRelevancyTest(
             jurisdiction="FB",
             citation_string="cacb",
         )
+        cls.international = CourtFactory(
+            id="cit",
+            full_name="Court of International Trade",
+            jurisdiction="I",
+            citation_string="cit",
+        )
 
         cls.opinion_scotus = OpinionClusterFactory.create(
             case_name="Keyword Match",
             case_name_full="",
             case_name_short="",
-            date_filed=datetime.date(2024, 2, 23),
+            date_filed=datetime.date(2018, 2, 23),
             procedural_history="",
             source="C",
             attorneys="",
@@ -2704,7 +2710,7 @@ class OpinionSearchJurisdictionRelevancyTest(
             case_name="Keyword Match",
             case_name_full="",
             case_name_short="",
-            date_filed=datetime.date(2024, 2, 23),
+            date_filed=datetime.date(2018, 2, 23),
             procedural_history="More Highly Relevant Keywords Relevant Keywords",
             source="C",
             judges="Highly Relevant Keywords",
@@ -2730,7 +2736,7 @@ class OpinionSearchJurisdictionRelevancyTest(
             case_name="Keyword Match",
             case_name_full="",
             case_name_short="",
-            date_filed=datetime.date(2024, 2, 23),
+            date_filed=datetime.date(2018, 2, 23),
             procedural_history="More Highly Relevant Keywords Relevant Keywords",
             source="C",
             judges="Highly Relevant Keywords",
@@ -2749,6 +2755,33 @@ class OpinionSearchJurisdictionRelevancyTest(
         )
         cls.child_opinion_fd = OpinionFactory.create(
             cluster=cls.opinion_federal_bankruptcy,
+            plain_text="Highly Relevant Keywords Lorem Ipsum Highly Relevant Keywords",
+            author_str="",
+        )
+
+        cls.opinion_international = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2025, 2, 23),
+            procedural_history="More Highly Relevant Keywords Relevant Keywords",
+            source="C",
+            judges="Highly Relevant Keywords",
+            attorneys="More Highly Relevant Keywords Relevant Keywords",
+            nature_of_suit="Highly Relevant Keywords",
+            posture="Highly Relevant Keywords",
+            slug="opinion-high-rel",
+            precedential_status="Published",
+            docket=DocketFactory(
+                court_id=cls.international.pk,
+                case_name="Base Docket",
+                docket_number="1:21-bk-1260",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_i = OpinionFactory.create(
+            cluster=cls.opinion_international,
             plain_text="Highly Relevant Keywords Lorem Ipsum Highly Relevant Keywords",
             author_str="",
         )
@@ -2774,11 +2807,13 @@ class OpinionSearchJurisdictionRelevancyTest(
                     cls.opinion_scotus.docket.docket_number,
                     cls.opinion_federal_appellate.docket.docket_number,
                     cls.opinion_federal_bankruptcy.docket.docket_number,
+                    cls.opinion_international.docket.docket_number,
                 ],
                 "expected_order": [  # API
                     cls.opinion_scotus.pk,
                     cls.opinion_federal_appellate.pk,
                     cls.opinion_federal_bankruptcy.pk,
+                    cls.opinion_international.pk,
                 ],
             },
             {
@@ -2792,14 +2827,37 @@ class OpinionSearchJurisdictionRelevancyTest(
                     cls.opinion_federal_appellate.docket.docket_number,
                     cls.opinion_scotus.docket.docket_number,
                     cls.opinion_federal_bankruptcy.docket.docket_number,
+                    cls.opinion_international.docket.docket_number,
                 ],
                 "expected_order": [  # API
                     cls.opinion_federal_appellate.pk,
                     cls.opinion_scotus.pk,
                     cls.opinion_federal_bankruptcy.pk,
+                    cls.opinion_international.pk,
                 ],
             },
         ]
+
+        cls.tune_factor_case = {
+            "name": "Same keywords, different jurisdiction. Tune boost factor.",
+            "search_params": {
+                "q": "Match",
+                "order_by": "score desc",
+                "type": SEARCH_TYPES.OPINION,
+            },
+            "expected_order_frontend": [
+                cls.opinion_international.docket.docket_number,
+                cls.opinion_scotus.docket.docket_number,
+                cls.opinion_federal_appellate.docket.docket_number,
+                cls.opinion_federal_bankruptcy.docket.docket_number,
+            ],
+            "expected_order": [  # API
+                cls.opinion_international.pk,
+                cls.opinion_scotus.pk,
+                cls.opinion_federal_appellate.pk,
+                cls.opinion_federal_bankruptcy.pk,
+            ],
+        }
 
     def test_relevancy_jurisdiction_scoring_frontend(self) -> None:
         """Test jurisdiction relevancy scoring for Opinion search Frontend"""
@@ -2826,6 +2884,34 @@ class OpinionSearchJurisdictionRelevancyTest(
 
         for test in self.test_cases:
             self._test_results_ordering(test, "cluster_id", version="v3")
+
+    @override_settings(JURISDICTION_BOOST=0.1)
+    def test_tune_jurisdiction_factor_frontend(self) -> None:
+        """Test tuning the jurisdiction boost for Opinion search Frontend
+        JURISDICTION_BOOST = 0.1
+        This means that the jurisdiction weight is less significant, so the
+        date decay relevance becomes more important.
+        """
+
+        r = async_to_sync(self._test_article_count)(
+            self.tune_factor_case["search_params"],
+            len(self.tune_factor_case["expected_order_frontend"]),
+            f"Failed count {self.tune_factor_case['name']}",
+        )
+        self._assert_order_in_html(
+            r.content.decode(),
+            self.tune_factor_case["expected_order_frontend"],
+        )
+
+    @override_settings(JURISDICTION_BOOST=0.1)
+    def test_tune_jurisdiction_factor_api(self) -> None:
+        """Test tuning the jurisdiction boost for Opinion search API
+        JURISDICTION_BOOST = 0.1
+        This means that the jurisdiction weight is less significant, so the
+        date decay relevance becomes more important.
+        """
+
+        self._test_results_ordering(self.tune_factor_case, "cluster_id")
 
 
 @override_settings(RELATED_MLT_MINTF=1)
