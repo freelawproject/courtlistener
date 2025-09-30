@@ -1093,20 +1093,20 @@ def build_custom_relevance_score(
                     // Jurisdiction relevance only for Case Law Search.
                     if ((boolean)params.jurisdiction_relevancy) {{
                         String courtId = doc['court_id.raw'].value;
-                        String jurisdictionCode = doc['court_jurisdiction'].value;
-
-                        double jurisdiction_factor;
-                        // SCOTUS special case
-                        if (courtId.equals("scotus")) {{
-                            jurisdiction_factor = 1.0;
-                        }} else {{
-                            // Apply jurisdiction multiplier if mapped, otherwise default 1.0
-                            jurisdiction_factor = params.jurisdiction_multipliers.containsKey(jurisdictionCode)
-                                ? (double)params.jurisdiction_multipliers.get(jurisdictionCode)
-                                : 1.0;
+                        // Default factor for SCOTUS and for docs with no
+                        // court_jurisdiction set.
+                        double jurisdiction_factor = 1.0;
+                        if (doc['court_jurisdiction'].size() > 0) {{
+                            String jurisdictionCode = doc['court_jurisdiction'].value;
+                            // Get jurisdiction factor for non-SCOTUS courts.
+                            if (!courtId.equals("scotus")) {{
+                                if (params.jurisdiction_multipliers.containsKey(jurisdictionCode)) {{
+                                    jurisdiction_factor = (double)params.jurisdiction_multipliers.get(jurisdictionCode);
+                                }}
+                            }}
                         }}
 
-                        return relevance_score * jurisdiction_factor;
+                    return relevance_score * jurisdiction_factor;
                     }}
 
                     return relevance_score;
