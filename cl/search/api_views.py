@@ -441,53 +441,62 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         },
     }
 
+    def execute_es_search(self, cleaned_data, request) -> Response:
+        """
+        Execute Elasticsearch search for the given cleaned data and request
+        object.
+
+        :param cleaned_data: Validated and cleaned data from the request query
+            parameters.
+        :param request: The request object.
+        :return: Response object with paginated search results or validation
+            errors.
+        """
+        search_type = cleaned_data["type"]
+        supported_search_type = self.supported_search_types.get(search_type)
+        if not supported_search_type:
+            raise NotFound(detail="Search type not found or not supported.")
+        search_query = supported_search_type["document_class"].search()
+
+        paginator = ESCursorPagination()
+        cleaned_data["request_date"] = (
+            paginator.initialize_context_from_request(request, search_type)
+        )
+        highlighting_fields = {}
+        main_query, child_docs_query = do_es_api_query(
+            search_query,
+            cleaned_data,
+            highlighting_fields,
+            SEARCH_HL_TAG,
+            request.version,
+        )
+        es_list_instance = api_utils.CursorESList(
+            main_query, child_docs_query, None, None, cleaned_data, request
+        )
+        results_page, cached_response = paginator.paginate_queryset(
+            es_list_instance, request
+        )
+
+        # Avoid displaying the extra document used to determine if more
+        # documents remain.
+        results_page = api_utils.limit_api_results_to_page(
+            results_page, paginator.cursor, cached_response
+        )
+
+        serializer_class = supported_search_type["serializer_class"]
+        serializer = serializer_class(
+            results_page, many=True, context={"request": request}
+        )
+        return paginator.get_paginated_response(
+            serializer.data, cached_response
+        )
+
     def list(self, request, *args, **kwargs):
         search_form = SearchForm(request.GET, request=request)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            search_type = cd["type"]
+            return self.execute_es_search(cd, request)
 
-            supported_search_type = self.supported_search_types.get(
-                search_type
-            )
-            if not supported_search_type:
-                raise NotFound(
-                    detail="Search type not found or not supported."
-                )
-            search_query = supported_search_type["document_class"].search()
-
-            paginator = ESCursorPagination()
-            cd["request_date"] = paginator.initialize_context_from_request(
-                request, search_type
-            )
-            highlighting_fields = {}
-            main_query, child_docs_query = do_es_api_query(
-                search_query,
-                cd,
-                highlighting_fields,
-                SEARCH_HL_TAG,
-                request.version,
-            )
-            es_list_instance = api_utils.CursorESList(
-                main_query, child_docs_query, None, None, cd, request
-            )
-            results_page, cached_response = paginator.paginate_queryset(
-                es_list_instance, request
-            )
-
-            # Avoid displaying the extra document used to determine if more
-            # documents remain.
-            results_page = api_utils.limit_api_results_to_page(
-                results_page, paginator.cursor, cached_response
-            )
-
-            serializer_class = supported_search_type["serializer_class"]
-            serializer = serializer_class(
-                results_page, many=True, context={"request": request}
-            )
-            return paginator.get_paginated_response(
-                serializer.data, cached_response
-            )
         # Invalid search.
         return response.Response(
             search_form.errors, status=HTTPStatus.BAD_REQUEST
