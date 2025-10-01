@@ -509,7 +509,11 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         # Check if waffle flag is enabled for this account
         if not flag_is_active(request, "enable_semantic_search"):
             raise ValidationError(
-                "This feature is currently disabled for your account."
+                {
+                    "non_field_errors": [
+                        "This feature is currently disabled for your account."
+                    ]
+                }
             )
 
         # Validate query parameters (from URL) and request body (JSON)
@@ -528,13 +532,23 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         # Enforce semantic search flag in query params
         if not cd["semantic"]:
             raise ValidationError(
-                "Semantic search requires `semantic=true` in the query string."
+                {
+                    "semantic": [
+                        "Semantic search requires `semantic=true` in the query string."
+                    ]
+                }
             )
         # Ensure the request body includes a valid embedding/vector
         if not data:
             raise ValidationError(
-                "You must provide an embedding vector in the request body when "
-                "using semantic search."
+                {
+                    "embedding": [
+                        (
+                            "You must provide an embedding vector in the request body when "
+                            "using semantic search."
+                        )
+                    ]
+                }
             )
 
         # Attach embedding to query params and run the actual ES query
