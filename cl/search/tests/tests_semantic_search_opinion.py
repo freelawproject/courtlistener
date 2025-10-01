@@ -540,11 +540,16 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             "Semantic search requires `semantic=true` in the query string.",
         )
 
-    def test_can_reject_post_request_when_embedding_missing(self, client):
+    def test_can_reject_post_request_when_embedding_missing(
+        self, inception_mock
+    ):
         """Should reject request if semantic search is requested without an embedding."""
         api_url = reverse("search-list", kwargs={"version": "v4"})
         r = self.client.post(
-            f"{api_url}?semantic=true", data={}, format="json"
+            f"{api_url}",
+            data={},
+            format="json",
+            query_params={"semantic": True},
         )
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         data = r.json()
@@ -553,3 +558,64 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             data["embedding"][0],
             "You must provide an embedding vector in the request body when using semantic search.",
         )
+
+    def test_rejects_request_with_unsupported_type(self, inception_mock):
+        """Should return an error if semantic search is requested with an unsupported type."""
+        api_url = reverse("search-list", kwargs={"version": "v4"})
+
+        # Send a valid vector but with an unsupported type
+        r = self.client.post(
+            f"{api_url}",
+            data=self.situational_query_vectors,
+            format="json",
+            query_params={"semantic": True, "type": "r"},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        data = r.json()
+        self.assertIn("type", data)
+        error_message = data["type"][0]
+        self.assertIn("Unsupported search type 'r'", error_message)
+        self.assertIn(
+            "Semantic search is only supported for type", error_message
+        )
+
+    def test_valid_post_request_skips_computing_embeddings(
+        self, inception_mock
+    ):
+        """Should pass query params and embedding to Elasticsearch query runner."""
+        api_url = reverse("search-list", kwargs={"version": "v4"})
+        r = self.client.post(
+            f"{api_url}",
+            data=self.situational_query_vectors,
+            format="json",
+            query_params={"semantic": True},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(r.data["results"]), 2)
+
+        content = r.content.decode()
+        # Check that the expected clusters appear in the results
+        self.assertIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
+        self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
+
+        # Check the inception microservice was not called
+        inception_mock.assert_not_called()
+
+        # mock a hybrid search query
+        r = self.client.post(
+            f"{api_url}",
+            data=self.situational_query_vectors,
+            format="json",
+            query_params={"semantic": True, "q": self.hybrid_query},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(r.data["results"]), 3)
+
+        # Should include the two opinions with embeddings
+        self.assertIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
+        self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
+
+        # Should also include the keyword-only match (no embeddings)
+        self.assertIn(f'"cluster_id":{self.opinion_5.cluster.id}', content)

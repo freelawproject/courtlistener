@@ -529,6 +529,16 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         # Extract validated data
         cd = query_params.cleaned_data
         data = request_body.validated_data
+        # Restrict semantic search to supported types (currently only OPINION).
+        if cd["type"] not in [SEARCH_TYPES.OPINION]:
+            raise ValidationError(
+                {
+                    "type": [
+                        f"Unsupported search type '{cd['type']}'. "
+                        f"Semantic search is only supported for type '{SEARCH_TYPES.OPINION}'."
+                    ]
+                }
+            )
         # Enforce semantic search flag in query params
         if not cd["semantic"]:
             raise ValidationError(
@@ -553,4 +563,4 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
 
         # Attach embedding to query params and run the actual ES query
         cd["embedding"] = data["embedding"]
-        return self.execute_es_search(request, cd)
+        return self.execute_es_search(cd, request)
