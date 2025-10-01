@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = "==3.13.*"
 
 [[package]]
@@ -1585,8 +1585,8 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.84"
-source = { git = "https://github.com/freelawproject/juriscraper.git?rev=1535-add-download-content-method-to-abstractsite#5cde4967599eea46deb832bf54a08a9bf5bd59ff" }
+version = "2.6.91"
+source = { git = "https://github.com/freelawproject/juriscraper.git?rev=1535-add-download-content-method-to-abstractsite#8144ebd835781571c2f904ed104f8b7358619710" }
 dependencies = [
     { name = "certifi" },
     { name = "chardet" },
