@@ -602,6 +602,14 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         db_index=True,
     )
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            "with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     federal_dn_office_code = models.CharField(
         help_text="A one digit statistical code (either alphabetic or numeric) "
         "of the office within the federal district. In this "
@@ -1965,7 +1973,12 @@ class FederalCourtsQuerySet(models.QuerySet):
 @pghistory.track()
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
-    as needed."""
+    as needed.
+
+    Note that a Courthouse object should be created alongside each new Court.
+    Even if this is not enforced by the data model, there is some logic tied
+    to that relation. Examples in `find_citations` and `coverage_utils`
+    """
 
     # Note that spaces cannot be used in the keys, or else the SearchForm won't
     # work
@@ -3004,7 +3017,7 @@ class BaseCitation(models.Model):
 
 
 @pghistory.track()
-class Citation(BaseCitation):
+class Citation(BaseCitation, AbstractDateTimeModel):
     """A citation to an OpinionCluster"""
 
     cluster = models.ForeignKey(
@@ -3306,6 +3319,7 @@ class Opinion(AbstractDateTimeModel):
             "html_anon_2020",
             "html",
             "plain_text",
+            "html_with_citations",
             "sha1",
             "ordering_key",
         ]

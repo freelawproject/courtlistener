@@ -52,6 +52,7 @@ from cl.alerts.utils import (
 from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
+    download_acms_pdf_by_rd,
     download_pacer_pdf_by_rd,
     download_pdf_by_magic_number,
     get_att_report_by_rd,
@@ -1967,11 +1968,6 @@ def fetch_pacer_doc_by_rd_base(
         self.request.chain = None
         return
 
-    if rd.is_acms_document():
-        msg = "ACMS documents are not currently supported"
-        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
-        return
-
     session_data = get_pacer_cookie_from_cache(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
@@ -1981,15 +1977,24 @@ def fetch_pacer_doc_by_rd_base(
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     de_seq_num = rd.docket_entry.pacer_sequence_number
+    court_id = rd.docket_entry.docket.court_id
     try:
-        r, r_msg = download_pacer_pdf_by_rd(
-            rd.pk,
-            pacer_case_id,
-            pacer_doc_id,
-            session_data,
-            magic_number,
-            de_seq_num=de_seq_num,
-        )
+        if rd.is_acms_document():
+            r, r_msg = download_acms_pdf_by_rd(
+                court_id=court_id,
+                acms_entry_id=rd.pacer_doc_id,
+                acms_doc_id=rd.acms_document_guid,
+                session_data=session_data,
+            )
+        else:
+            r, r_msg = download_pacer_pdf_by_rd(
+                rd.pk,
+                pacer_case_id,
+                pacer_doc_id,
+                session_data,
+                magic_number,
+                de_seq_num=de_seq_num,
+            )
     except (requests.RequestException, HTTPError):
         msg = "Failed to get PDF from network."
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
@@ -2006,8 +2011,6 @@ def fetch_pacer_doc_by_rd_base(
             fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
         )
         raise self.retry(exc=exc)
-
-    court_id = rd.docket_entry.docket.court_id
 
     pdf_bytes = None
     if r:

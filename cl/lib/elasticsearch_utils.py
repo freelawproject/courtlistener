@@ -2298,7 +2298,7 @@ def clean_count_query(search_query: Search) -> SearchDSL:
 
 
 def fetch_es_results(
-    get_params: QueryDict,
+    clean_params: dict,
     search_query: Search,
     child_docs_count_query: Search | None,
     page: int = 1,
@@ -2306,7 +2306,7 @@ def fetch_es_results(
 ) -> tuple[Response | list, int, bool, int | None, int | None]:
     """Fetch elasticsearch results with pagination.
 
-    :param get_params: The user get params.
+    :param clean_params: The user’s cleaned search parameters.
     :param search_query: Elasticsearch DSL Search object
     :param child_docs_count_query: The ES Search object to perform the count
     for child documents if required, otherwise None.
@@ -2331,7 +2331,7 @@ def fetch_es_results(
         )
         main_doc_count_query = clean_count_query(search_query)
 
-        search_type = get_params.get("type", SEARCH_TYPES.OPINION)
+        search_type = clean_params.get("type", SEARCH_TYPES.OPINION)
         parent_unique_field = cardinality_query_unique_ids[search_type]
         main_doc_count_query = build_cardinality_count(
             main_doc_count_query, parent_unique_field
@@ -2363,7 +2363,7 @@ def fetch_es_results(
             )
 
         query_time = main_response.took
-        search_type = get_params.get("type", SEARCH_TYPES.OPINION)
+        search_type = clean_params.get("type", SEARCH_TYPES.OPINION)
         if (
             main_response.aggregations
             and search_type == SEARCH_TYPES.PARENTHETICAL
@@ -2373,7 +2373,7 @@ def fetch_es_results(
         return main_response, query_time, error, parent_total, child_total
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            "Error loading search page with request: %s", dict(get_params)
+            "Error loading search page with request: %s", dict(clean_params)
         )
         logger.warning("Error was: %s", e)
         if settings.DEBUG is True:

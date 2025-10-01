@@ -6,7 +6,10 @@ from django.urls import reverse
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.permissions import (
+    DjangoModelPermissions,
+    DjangoModelPermissionsOrAnonReadOnly,
+)
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 
@@ -102,7 +105,7 @@ class DocketViewSet(
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -232,7 +235,7 @@ class OpinionClusterViewSet(
     serializer_class = OpinionClusterSerializer
     filterset_class = OpinionClusterFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -303,7 +306,7 @@ class OpinionViewSet(
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     # keep the order as in `settings.rest_framework.DEFAULT_RENDERER_CLASSES`
@@ -468,21 +471,23 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             es_list_instance = api_utils.CursorESList(
                 main_query, child_docs_query, None, None, cd, request
             )
-            results_page = paginator.paginate_queryset(
+            results_page, cached_response = paginator.paginate_queryset(
                 es_list_instance, request
             )
 
             # Avoid displaying the extra document used to determine if more
             # documents remain.
             results_page = api_utils.limit_api_results_to_page(
-                results_page, paginator.cursor
+                results_page, paginator.cursor, cached_response
             )
 
             serializer_class = supported_search_type["serializer_class"]
             serializer = serializer_class(
                 results_page, many=True, context={"request": request}
             )
-            return paginator.get_paginated_response(serializer.data)
+            return paginator.get_paginated_response(
+                serializer.data, cached_response
+            )
         # Invalid search.
         return response.Response(
             search_form.errors, status=HTTPStatus.BAD_REQUEST

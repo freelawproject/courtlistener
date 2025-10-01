@@ -66,6 +66,14 @@ def rerun_extract_from_text(
 
         logger.info("Processing opinion %s", opinion.id)
 
+        if changes.get("OriginatingCourtInformation"):
+            opinion.cluster.docket.originating_court_information.save()
+            logger.info(
+                "OriginatingCourtInformation created or updated with data %s",
+                changes["OriginatingCourtInformation"],
+            )
+            stats["OriginatingCourtInformation"] += 1
+
         # Check if changes exist before saving, to prevent unnecessary DB queries
         if changes.get("Docket"):
             opinion.cluster.docket.save()
@@ -115,6 +123,7 @@ class Command(ScraperCommand):
         "OpinionCluster": 0,
         "Opinion": 0,
         "Citation": 0,
+        "OriginatingCourtInformation": 0,
         "No text to extract from": 0,
         "No metadata extracted": 0,
         "Error": 0,

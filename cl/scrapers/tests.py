@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
 from unittest import TestCase, mock
+from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -978,7 +979,9 @@ class UpdateFromTextCommandTest(TestCase):
             ),
             plain_text="""Docket Number: 2020-12
             Disposition: Affirmed
-            2020 VT 11""",
+            2020 VT 11
+            Originating Court Docket Number: 18-2222
+            """,
         )
         self.opinion_2020_unpub = OpinionFactory(
             cluster=OpinionClusterFactory(
@@ -1077,6 +1080,11 @@ class UpdateFromTextCommandTest(TestCase):
             "13",
             "Unpublished docket should not be modified",
         )
+        self.assertEqual(
+            self.opinion_2020.cluster.docket.originating_court_information.docket_number,
+            "18-2222",
+            "Originating Court Information was not created",
+        )
 
 
 class CommandInputTest(TestCase):
@@ -1112,7 +1120,8 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         cls.rebuild_index("search.OpinionCluster")
         cls.rebuild_index("search.Docket")
 
-    def test_merge_versions_by_download_url(self):
+    @patch("cl.lib.es_signal_processor.compute_single_opinion_embeddings.si")
+    def test_merge_versions_by_download_url(self, compute_embeddings_mock):
         """Can we merge opinion versions and delete ES documents correctly?
 
         This a end to end test. It's testing
@@ -1618,6 +1627,58 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             "Existing re-direction was not re-assigned to new cluster",
         )
 
+    def test_loose_text_similarity_merging(self):
+        """Can we attempt merges with a loose text similarity threshold?"""
+        court_id = "nev"
+        court = CourtFactory.create(id=court_id)
+        docket_number = "CV-22222"
+        main_docket = DocketFactory.create(
+            court=court, docket_number=docket_number
+        )
+        download_url = "http://somethingelse.court/111.pdf"
+
+        version_candidate = OpinionFactory.create(
+            cluster=OpinionClusterFactory(
+                docket=main_docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text="something else...",
+            html="",
+            author_str="Some Author",
+            sha1="yyy",
+        )
+
+        opinion = OpinionFactory.create(
+            cluster=OpinionClusterFactory(
+                docket=main_docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text="something...",
+            html="",
+            author_str="Another Author",
+            sha1="xxx",
+        )
+        base_path = "cl.scrapers.management.commands.merge_opinion_versions"
+        with (
+            mock.patch(
+                f"{base_path}.get_text_similarity"
+            ) as patched_get_text_similarity,
+            mock.patch(
+                f"{base_path}.merge_opinion_versions"
+            ) as patched_merge_opinion_versions,
+        ):
+            patched_get_text_similarity.return_value = (False, True, 0.75, 0.8)
+            merge_versions_by_download_url(download_url.rsplit("/", 1)[0])
+            # assert that merging was attempted
+            patched_get_text_similarity.assert_called()
+            patched_merge_opinion_versions.assert_called()
+
+        version_candidate.refresh_from_db()
+        self.assertTrue(
+            version_candidate.main_version_id is None,
+            "Loose versioning should not pass when metadata differs ",
+        )
+
 
 class DeleteDuplicatesTest(TestCase):
     @classmethod
@@ -1634,10 +1695,11 @@ class DeleteDuplicatesTest(TestCase):
             "precedential_status": "Precedential",
             "date_filed": "2019-01-01",
         }
+        cls.hash = "xxxxxxxx"
         same_opinion_fields = {
             "author": None,
             "plain_text": "Something....",
-            "sha1": "xxxxxxxx",
+            "sha1": cls.hash,
             "download_url": "https://something.com/a_pdf.pdf",
         }
         cls.author = "Some author"  # to check metadata propagation
@@ -1658,6 +1720,17 @@ class DeleteDuplicatesTest(TestCase):
                 docket=docket2, source=SOURCES.COURT_WEBSITE
             ),
             **same_opinion_fields,
+        )
+
+        # the same, but with a different hash
+        cls.different_hash_cluster_id = 123976
+        cls.different_hash_cluster = OpinionClusterFactory.create(
+            id=cls.different_hash_cluster_id, **same_cluster_fields
+        )
+        opinion_fields = {**same_opinion_fields}
+        opinion_fields["sha1"] = "yyyyyyyyy"
+        cls.different_hash_duplicate = OpinionFactory.create(
+            cluster=cls.different_hash_cluster, **opinion_fields
         )
 
         cls.cluster_to_keep = OpinionClusterFactory.create(
@@ -1705,3 +1778,40 @@ class DeleteDuplicatesTest(TestCase):
             self.should_not_merge.refresh_from_db()
         except Opinion.DoesNotExist:
             self.fail("`should_not_merge` should still exist")
+
+    def test_cleanup_content_method(self):
+        """Can we delete different hash duplicates using the `cleanup_content` method"""
+        stats = defaultdict(lambda: 0)
+        site = test_opinion_scraper.Site()
+        with mock.patch(
+            "cl.scrapers.management.commands.delete_duplicates.get_cleaned_content_hash"
+        ) as patched_get_cleaned_content_hash:
+            patched_get_cleaned_content_hash.return_value = self.hash
+            delete_duplicates.delete_cleaned_up_content_duplicates(
+                stats, "nev", site
+            )
+
+        try:
+            self.different_hash_cluster.refresh_from_db()
+            self.fail(
+                "`different_hash_cluster` should be deleted as a duplicate"
+            )
+        except OpinionCluster.DoesNotExist:
+            pass
+
+        try:
+            self.different_hash_duplicate.refresh_from_db()
+            self.fail(
+                "`different_hash_duplicate` should be deleted as a duplicate"
+            )
+        except Opinion.DoesNotExist:
+            pass
+
+        self.assertTrue(
+            ClusterRedirection.objects.filter(
+                deleted_cluster_id=self.different_hash_cluster_id,
+                cluster=self.cluster_to_keep,
+                reason=ClusterRedirection.DUPLICATE,
+            ).exists(),
+            "ClusterRedirection with proper values was not created",
+        )
