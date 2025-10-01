@@ -34,7 +34,7 @@ from cl.users.models import UserProfile
 
 
 class CitationRedirectorForm(forms.Form):
-    volume = forms.IntegerField(
+    volume = forms.CharField(
         widget=forms.TextInput(
             attrs={"class": "form-control input-lg", "placeholder": "Volume"}
         ),

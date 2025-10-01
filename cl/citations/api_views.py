@@ -88,7 +88,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
             volume = data.get("volume")
             page = data.get("page")
 
-            citation_str = " ".join([str(volume), reporter, page])
+            citation_str = " ".join([volume, reporter, page])
             citation_data = {
                 "citation": citation_str,
                 "start_index": 0,
@@ -130,7 +130,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         return potential_canonicals
 
     def _citation_handler(
-        self, request: Request, reporter: str, volume: int, page: str
+        self, request: Request, reporter: str, volume: str, page: str
     ) -> CitationAPIResponse:
         """
         This method retrieves opinion clusters that match a citation string.
@@ -139,7 +139,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
             request (Request): The HTTP object containing information
                 about the request.
             reporter (str): The name of the reporter.
-            volume (int): The volume number of citation.
+            volume (str): The volume number of citation.
             page (str): The page number where the citation is located.
 
         Raises:
@@ -166,11 +166,11 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
             # We retrieved the proper_reporter directly from the
             # SLUGIFIED_EDITIONS dictionary.
             normalized_citations.append(
-                " ".join([str(volume), proper_reporter, page])
+                " ".join([volume, proper_reporter, page])
             )
             clusters, cluster_count = async_to_sync(
                 get_clusters_from_citation_str
-            )(proper_reporter, str(volume), page)
+            )(proper_reporter, volume, page)
         else:
             clusters, cluster_count, normalized_citations = (
                 self._get_clusters_for_canonical_list(
@@ -179,7 +179,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
             )
 
         if not cluster_count:
-            citation_str = " ".join([str(volume), reporter, page])
+            citation_str = " ".join([volume, reporter, page])
             return {
                 "normalized_citations": normalized_citations,
                 "status": HTTPStatus.NOT_FOUND,
@@ -192,7 +192,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         }
 
     def _get_clusters_for_canonical_list(
-        self, reporters: list[SafeString], volume: int, page: str
+        self, reporters: list[SafeString], volume: str, page: str
     ) -> tuple[
         QuerySet[OpinionCluster, OpinionCluster] | None, int, list[str]
     ]:
@@ -205,7 +205,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         Args:
             reporters (list[SafeString]): A list of strings representing the reporter
                                   slugs.
-            volume (int): The volume number of citation.
+            volume (str): The volume number of citation.
             page (str): The page number where the citation is located.
 
         Returns:
@@ -220,9 +220,9 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
             reporter = SLUGIFIED_EDITIONS.get(canonical, None)
             if not reporter:
                 continue
-            citations.append(" ".join([str(volume), reporter, page]))
+            citations.append(" ".join([volume, reporter, page]))
             opinions, _count = async_to_sync(get_clusters_from_citation_str)(
-                reporter, str(volume), page
+                reporter, volume, page
             )
 
             if not _count:

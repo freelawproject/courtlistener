@@ -1758,7 +1758,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
 
         # Citation filters
         self.q = {
-            "citations__volume": 56,
+            "citations__volume": "56",
             "citations__reporter": "F.2d",
             "citations__page": "9",
         }
