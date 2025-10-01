@@ -90,6 +90,13 @@ class EmptyOpinionException(Exception):
         self.message = message
 
 
+class CitationException(Exception):
+    """Error found in cite."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
 async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
     """Mark the docket as needing upload if it's not already marked.
 
