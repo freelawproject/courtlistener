@@ -1542,7 +1542,7 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                 )
 
 
-@override_settings(LINE_THRESHOLD_OCR_PER_PAGE=3)
+@override_settings(CHARS_THRESHOLD_OCR_PER_PAGE=50)
 class TestRecapUtils(SimpleTestCase):
     def test_needs_ocr_cacb_example(self):
         """Test needs_ocr function with multi-line headers from cacb example provided in issue #598
@@ -1755,15 +1755,15 @@ Case 8:19-bk-10049-TA   Doc    Filed 04/03/24 Entered 04/03/24 10:58:09   Desc M
         header_text = """
 Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
 Line 1
-Line 2
+Pursuant to Rule 26.1 of the Fed. R. App. P. amici curiae herein state
 Line 3
 Case: 08-9007   Document: 00115928542   Page: 2   Date Filed: 07/30/2009   Entry ID: 5364336
 Line 1
-Line 2
+Pursuant to Rule 26.1 of the Fed. R. App. P. amici curiae herein state
 Line 3
 Case: 08-9007   Document: 00115928542   Page: 3   Date Filed: 07/30/2009   Entry ID: 5364336
 Line 1
-Line 2
+Pursuant to Rule 26.1 of the Fed. R. App. P. amici curiae herein state
 Line 3
 """
         self.assertFalse(
@@ -1772,10 +1772,7 @@ Line 3
         )
 
     def test_needs_ocr_under_threshold_page_colon(self):
-        """Test needs_ocr returns True for text with for pages with no good
-        content.
-
-        This tests the original scenario where only 'Case...' lines and
+        """Test the original scenario where only 'Case...' lines and
         'Page: Y' lines are present and good content between pages lines is
         present. Should return True (needs OCR).
         Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
@@ -1805,4 +1802,172 @@ Case: 08-9007   Document: 00115928542   Page: 3   Date Filed: 07/30/2009   Entry
         self.assertTrue(
             needs_ocr("  \n\t\n  "),
             msg="Whitespace-only content should need OCR",
+        )
+
+    def test_needs_ocr_small_text_no_header(self):
+        """Test needs_ocr function when the document has minimal text and no
+        meaningful headers.
+
+        When the average number of characters per page
+        is below CHARS_THRESHOLD_OCR_PER_PAGE, the function should return True,
+        indicating that OCR may be required.
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.51598/gov.uscourts.ca1.51598.108160115.0.pdf
+        """
+        text = """
+        Missing Case Number:
+         24-1442
+        """
+        self.assertTrue(
+            needs_ocr(text, page_count=1),
+            msg="small text example should need OCR",
+        )
+
+    def test_needs_ocr_pg_of_new_line_no_content(self):
+        """Test needs_ocr returns True for pages with no content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Pg X of Y' lines are present and no good content between pages lines.
+        Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.nysb.312902/gov.uscourts.nysb.312902.78.3.pdf
+        """
+        header_text = """
+Case No. 1:22-cv-00369-NYW-TPO   Document 1   filed 02/09/22   USDC Colorado   pg
+                                    1 of 31
+Case No. 1:22-cv-00369-NYW-TPO   Document 1   filed 02/09/22   USDC Colorado   pg
+                                    2 of 31
+Case No. 1:22-cv-00369-NYW-TPO   Document 1   filed 02/09/22   USDC Colorado   pg
+                                    3 of 31
+    """
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_caeb(self):
+        """Test needs_ocr function with multi-line headers from caeb
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.caeb.656273/gov.uscourts.caeb.656273.19.0.pdf
+        """
+
+        # Date includes year with 4 digits.
+        caeb_text = """
+    Filed 11/02/21   Case 21-23295                Doc 19
+
+                                 12/15/2021
+Filed 11/02/21   Case 21-23295   Doc 19
+Filed 11/02/21   Case 21-23295   Doc 19
+        """
+
+        # Date includes year with 2 digits.
+        self.assertTrue(
+            needs_ocr(caeb_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+        caeb_text = """
+            Filed 11/02/21   Case 21-23295                Doc 19
+
+                                         12/15/21
+        Filed 11/02/21   Case 21-23295   Doc 19
+        Filed 11/02/21   Case 21-23295   Doc 19
+                """
+
+        self.assertTrue(
+            needs_ocr(caeb_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_pawd(self):
+        """Test needs_ocr function with multi-line headers from pawd
+
+        In this case, the content belongs to a seal whose character count is
+        below CHARS_THRESHOLD_OCR_PER_PAGE.
+
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.pawb.358488/gov.uscourts.pawb.358488.28.0.pdf
+        """
+
+        caeb_text = """
+        Case 18-24646-CMB   Doc 28   Filed 06/13/19 Entered 06/13/19 15:56:16   Desc Main
+                                 Document     Page 1 of 1
+
+        FILED
+        6/13/19 3:55 pm
+        CLERK
+        U.S. BANKRUPTCY
+        COURT - WDPA
+            """
+
+        self.assertTrue(
+            needs_ocr(caeb_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_pg_number_line_no_content(self):
+        """Test needs_ocr returns True for pages with no content.
+
+        This tests the original scenario where only 'Case...' lines and
+        'Pg X of Y' lines are present and no good content between pages lines.
+        Should return True (needs OCR).
+        Example: https://storage.courtlistener.com/recap/gov.uscourts.cod.243547/gov.uscourts.cod.243547.1.0.pdf
+        """
+        header_text = """
+Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 1
+                                   of 20
+Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 2
+                                   of 20
+Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 3
+                                   of 20
+    """
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_exhibit_exception(self):
+        """Test needs_ocr returns False for pages with good content.
+
+        Exception: if the first page contains the word "Exhibit", we assume
+        it may be a valid exhibit cover page with little text, so we
+        do not flag it for OCR.
+        """
+        header_text = """
+        Case 1:25-cv-02000   Document 1-1   Filed 06/26/25   Page 1 of 7
+                     Exhibit
+                       A
+        Case 1:25-cv-02000   Document 1-1   Filed 06/26/25   Page 2 of 7
+        Good content 1
+        Pursuant to Rule 26.1 of the Fed. R. App. P. amici curiae herein state
+        Line 3
+        Case 1:25-cv-02000   Document 1-1   Filed 06/26/25   Page 3 of 7
+        Good content 1
+        Pursuant to Rule 26.1 of the Fed. R. App. P. amici curiae herein state
+        Line 3
+            """
+        self.assertFalse(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
+        )
+
+    def test_needs_ocr_exhibit_exception_true(self):
+        """Test that needs_ocr returns True for pages that require OCR.
+
+        Exception: If the first page contains the word "Exhibit," we assume
+        it may be a valid exhibit cover page with little text, so we
+        do not flag it for OCR. However, subsequent pages that match
+        the criteria should still be flagged.
+        """
+        header_text = """
+        Case 1:25-cv-02000   Document 1-1   Filed 06/26/25   Page 1 of 7
+                     Exhibit
+                       A
+        Case 1:25-cv-02000   Document 1-1   Filed 06/26/25   Page 2 of 7
+        Line 3
+        Case 1:25-cv-02000   Document 1-1   Filed 06/26/25   Page 3 of 7
+        Good content 1
+        Pursuant to Rule 26.1 of the Fed. R. App. P. amici curiae herein state
+        Line 3
+            """
+        self.assertTrue(
+            needs_ocr(header_text),
+            msg="Should need OCR with only headers/pagination",
         )

@@ -2,7 +2,8 @@ from datetime import UTC, date, datetime, timedelta
 
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Value
+from django.db.models.functions import Coalesce, Floor
 from django.utils.timezone import make_aware
 
 from cl.audio.models import Audio
@@ -25,13 +26,19 @@ def get_v2_homepage_stats():
         for x in range(0, 10)
     ]
 
-    alerts_in_last_ten = Stat.objects.filter(
-        name__contains="alerts.sent", date_logged__gte=ten_days_ago
-    ).aggregate(Sum("count"))["count__sum"]
+    alerts_in_last_ten = (
+        Stat.objects.filter(
+            name__contains="alerts.sent", date_logged__gte=ten_days_ago
+        ).aggregate(Sum("count"))["count__sum"]
+        or 0
+    )
 
-    queries_in_last_ten = Stat.objects.filter(
-        name="search.results", date_logged__gte=ten_days_ago
-    ).aggregate(Sum("count"))["count__sum"]
+    queries_in_last_ten = (
+        Stat.objects.filter(
+            name="search.results", date_logged__gte=ten_days_ago
+        ).aggregate(Sum("count"))["count__sum"]
+        or 0
+    )
 
     r = get_redis_interface("STATS")
     api_in_last_ten = sum(
@@ -42,15 +49,16 @@ def get_v2_homepage_stats():
         ]
     )
 
-    minutes_of_oa = (
-        Audio.objects.aggregate(Sum("duration"))["duration__sum"] // 60
-    )
+    # Let the DB calculate total minutes and default to 0 if no rows exist
+    minutes_of_oa = Audio.objects.aggregate(
+        minutes=Floor(Coalesce(Sum("duration"), Value(0)) / Value(60.0))
+    )["minutes"]
 
     homepage_stats = {
         "alerts_in_last_ten": alerts_in_last_ten,
         "queries_in_last_ten": queries_in_last_ten,
         "api_in_last_ten": api_in_last_ten,
-        "minutes_of_oa": minutes_of_oa,
+        "minutes_of_oa": int(minutes_of_oa),
         "opinion_count": get_total_estimate_count("search_opinion"),
         "docket_count": get_total_estimate_count("search_docket"),
         "recap_doc_count": get_total_estimate_count("search_recapdocument"),

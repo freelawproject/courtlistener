@@ -36,6 +36,7 @@
       <ul>
         <li><a href="#monitoring">Monitoring</a></li>
         <li><a href="#security">Security</a></li>
+        <li><a href="#known-issues">Known Issues</a></li>
         <li><a href="#pdf">Purchasing PDFs</a></li>
         <li><a href="#attachment-pages">Scraping Attachment Page</a></li>
         <li><a href="#dockets">Purchasing Dockets</a></li>
@@ -139,6 +140,13 @@
   </p>
   <p>If you have questions about our approach, please see <a href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.
   </p>
+
+  <h3 id="known-issues">Known Issues</h3>
+  <h4>PACER login may fail with missing cookie error</h4>
+  <p>Some users have experienced the following error when using the RECAP Fetch API to log in to PACER:</p>
+  <pre class="scrollable">PacerLoginException: Did not get NextGenCSO cookie when attempting PACER login.</pre>
+  <p>This issue appears to be related to recent changes in PACER's password requirements and how it handles multi-factor authentication (MFA).</p>
+  <p>If you encounter this error, temporarily disabling multi-factor authentication on your PACER account may resolve the issue and allow the RECAP Fetch to complete the login successfully.</p>
 
   <h3 id="examples">API Examples</h3>
   <h4 id="pdf"> Purchasing PDFs</h4>

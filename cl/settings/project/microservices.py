@@ -86,4 +86,8 @@ MICROSERVICE_URLS = {
         "url": f"{INCEPTION_CPU_HOST}/api/v1/embed/query",
         "timeout": INCEPTION_TIMEOUT,
     },
+    "inception-text": {
+        "url": f"{INCEPTION_CPU_HOST}/api/v1/embed/text",
+        "timeout": INCEPTION_TIMEOUT,
+    },
 }

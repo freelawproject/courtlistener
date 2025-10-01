@@ -80,9 +80,10 @@ def get_document_filename(
     )
 
 
-PAGINATION_RE = re.compile(r"\b(?:Page|Pg)\s+\d+\s+of\s+\d+\b", re.I)
+PAGINATION_RE = re.compile(r"\b(?:Page|Pg)\s+\d+", re.I)
 PAGINATION_COLON_RE = re.compile(r"\bPage:\s*\d+\b", re.I)
 PAGINATION_PAGE_ID_RE = re.compile(r"\bPageID\s+#:\s*\d+\b", re.I)
+PAGINATION_OF = re.compile(r"^\d+\s+of\s+\d+$", re.I)
 
 
 def is_page_line(line: str) -> bool:
@@ -95,6 +96,7 @@ def is_page_line(line: str) -> bool:
         PAGINATION_RE.search(line)
         or PAGINATION_COLON_RE.search(line)
         or PAGINATION_PAGE_ID_RE.search(line)
+        or PAGINATION_OF.search(line)
     )
 
 
@@ -118,7 +120,7 @@ def is_doc_common_header(line: str) -> bool:
         "USCA",
     )
     doc_filed_re = re.compile(r"\b(Filed|Date Filed)\b")
-    date_re = re.compile(r"\b\d{2}/\d{2}/\d{2}\b")
+    date_re = re.compile(r"\b\d{2}/\d{2}/(?:\d{2}|\d{4})\b")
     time_re = re.compile(r"\b\d{2}:\d{2}:\d{2}\b")
     received_re = re.compile(r"\bReceived:\s*\d{2}/\d{2}/\d{2}(?:\d{2})?\b")
 
@@ -138,7 +140,7 @@ def is_doc_common_header(line: str) -> bool:
     return False
 
 
-def needs_ocr(content):
+def needs_ocr(content, page_count: int | None = None) -> bool:
     """Determines if OCR is needed for a PACER PDF.
 
     Every document in PACER (pretty much) has the case number written on the
@@ -167,7 +169,7 @@ def needs_ocr(content):
     is no content, or it’s too short, we can say that at least that page
     requires OCR, so this method returns True.
 
-    For example, with a line_count_threshold of 3, the following document will
+    For example, with a CHARS_THRESHOLD_OCR_PER_PAGE of 200, the following document will
     return True.
 
     Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
@@ -175,27 +177,42 @@ def needs_ocr(content):
     Case: 08-9007   Document: 00115928542   Page: 2   Date Filed: 07/30/2009   Entry ID: 5364336
     Line 1
 
+    - Character-per-page threshold: If `page_count` is provided,
+    normalize the content (remove extra spaces/newlines) and divide the
+    character count by the number of pages. If the result is less than
+    `CHARS_THRESHOLD_OCR_PER_PAGE`, OCR is needed.
 
     As a fallback it removes these common headers so that if no text remains,
     we can be sure that the PDF needs OCR.
 
-    :param content: The content of a PDF.
-    :return: boolean indicating if OCR is needed.
+    :param content: The text content to check if OCR is needed.
+    :param page_count: The number of pages of the document.
+    :return: True if OCR is needed, False otherwise.
     """
     lines = (ln.strip() for ln in content.splitlines())
     in_page = False
-    other_content_count = 0
+    other_content_chars_count = 0
     saw_any_page = False
+    content_in_page = ""
     for line in lines:
         if is_page_line(line):
             if (
                 in_page
-                and other_content_count < settings.LINE_THRESHOLD_OCR_PER_PAGE
+                and other_content_chars_count
+                < settings.CHARS_THRESHOLD_OCR_PER_PAGE
+                and "Exhibit" not in content_in_page
             ):
+                # If we reached the end of a page and the amount of non-header
+                # content is below the configured threshold, then this page
+                # likely needs OCR.
+                # Exception: if the page contains the word "Exhibit", we assume
+                # it may be a valid exhibit cover page with little text, so we
+                # do not flag it for OCR.
                 return True
             in_page = True
             saw_any_page = True
-            other_content_count = 0
+            other_content_chars_count = 0
+            content_in_page = ""
             continue
 
         if not in_page:
@@ -203,11 +220,26 @@ def needs_ocr(content):
 
         # inside a page, count only non-common header lines
         if not is_doc_common_header(line):
-            other_content_count += 1
+            cleaned_line = "".join(line.split())
+            content_in_page += " " + cleaned_line
+            chars_in_line = len(cleaned_line)
+            other_content_chars_count += chars_in_line
 
     # end of document, close the trailing page
-    if in_page and other_content_count < settings.LINE_THRESHOLD_OCR_PER_PAGE:
+    if (
+        in_page
+        and other_content_chars_count < settings.CHARS_THRESHOLD_OCR_PER_PAGE
+    ):
         return True
+
+    # If page_count is provided, use it to evaluate whether the document
+    # requires OCR. If the average number of characters per page is less than
+    # CHARS_THRESHOLD_OCR_PER_PAGE, then OCR may be required.
+    if page_count is not None:
+        cleaned_content = "".join(content.split())
+        avg_chars_per_page = len(cleaned_content) / max(page_count, 1)
+        if avg_chars_per_page < settings.CHARS_THRESHOLD_OCR_PER_PAGE:
+            return True
 
     # If no pages were found, fall back to the regular behavior of checking whether
     # any content remains after removing common headers.

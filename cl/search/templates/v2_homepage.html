@@ -33,10 +33,10 @@
     </div>
 
     {#  SEARCH TABS  #}
-    <div class="p-10 max-md:px-4">
+    <div class="md:p-10 px-4 py-5">
       {#   MOBILE SEARCH   #}
       <div class="md:hidden bg-white rounded-2xl flex flex-col">
-        <c-corpus-search class="p-4 w-full !flex-col" only>
+        <c-corpus-search class="p-4 pt-2 w-full !flex-col" only>
           <c-corpus-search.mobile.top-controls :request="request" only />
           <c-corpus-search.mobile.dialog class="w-full mt-2" :request="request" :search_form="search_form" only>
             <c-slot name="trigger_button">
