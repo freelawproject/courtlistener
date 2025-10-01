@@ -10,7 +10,7 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
-from juriscraper.lib.exceptions import InvalidDocumentError
+from juriscraper.lib.exceptions import BadContentError, InvalidDocumentError
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
@@ -23,7 +23,6 @@ from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
-    BadContentError,
     ConsecutiveDuplicatesError,
     SingleDuplicateError,
 )
@@ -317,9 +316,8 @@ class Command(ScraperCommand):
         if item.get("content"):
             content = item.pop("content")
         else:
-            media_root = settings.MEDIA_ROOT
             content = site.download_content(
-                item["download_urls"], media_root=media_root
+                item["download_urls"], media_root=settings.MEDIA_ROOT
             )
 
         # request.content is sometimes a str, sometimes unicode, so

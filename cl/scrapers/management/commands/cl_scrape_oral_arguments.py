@@ -121,9 +121,8 @@ class Command(cl_scrape_opinions.Command):
         court: Court,
         backscrape: bool = False,
     ):
-        media_root = settings.MEDIA_ROOT
         content = site.download_content(
-            item["download_urls"], media_root=media_root
+            item["download_urls"], media_root=settings.MEDIA_ROOT
         )
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.

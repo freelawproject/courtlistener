@@ -1586,7 +1586,7 @@ wheels = [
 [[package]]
 name = "juriscraper"
 version = "2.6.91"
-source = { git = "https://github.com/freelawproject/juriscraper.git?rev=1535-add-download-content-method-to-abstractsite#8144ebd835781571c2f904ed104f8b7358619710" }
+source = { git = "https://github.com/freelawproject/juriscraper.git?rev=1535-add-download-content-method-to-abstractsite#bce4c538c73f0a1d643dd0082298d25c9524f640" }
 dependencies = [
     { name = "certifi" },
     { name = "chardet" },
