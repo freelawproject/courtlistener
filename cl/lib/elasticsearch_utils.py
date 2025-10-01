@@ -2752,7 +2752,9 @@ def apply_custom_score_to_main_query(
 
 
 def build_semantic_query(
-    text_query: str, filters: list[QueryString | Range]
+    text_query: str,
+    filters: list[QueryString | Range],
+    embedding: list[float] | None = None,
 ) -> tuple[str, list[Query]]:
     """
     Build a hybrid Elasticsearch query using both exact keyword matching and
@@ -2762,6 +2764,8 @@ def build_semantic_query(
         phrases for exact matching.
     :param filters: A list of filter clauses to apply as pre-filtering to the
         semantic KNN search query.
+    :param embedding: Optional precomputed embedding vector. If not provided,
+        the function generates embeddings from the `text_query`.
     :return: A two-tuple:
         - keyword_query: A string representing the AND-joined quoted phrases, if any.
         - semantic_query: A list of Elasticsearch Q objects, including the KNN vector search
@@ -2775,21 +2779,23 @@ def build_semantic_query(
 
     # Join extracted phrases to form a keyword query string
     keyword_query = " ".join([f'"{s}"' for s in exact_keywords])
+    if not embedding:
+        # Remove quotes from the query to prepare for embedding
+        cleaned_text_query = text_query.replace('"', "")
 
-    # Remove quotes from the query to prepare for embedding
-    cleaned_text_query = text_query.replace('"', "")
+        # Enforce character limit to avoid exceeding embedding constraints
+        if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
+            raise InputTooLongError(QueryType.QUERY_STRING)
 
-    # Enforce character limit to avoid exceeding embedding constraints
-    if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
-        raise InputTooLongError(QueryType.QUERY_STRING)
-
-    # Generate embedding vector using external microservice
-    embedding_request = async_to_sync(microservice)(
-        service="inception-query",
-        data=json.dumps({"text": cleaned_text_query}),
-    )
-    embedding_request.raise_for_status()
-    vectors = embedding_request.json()["embedding"]
+        # Generate embedding vector using external microservice
+        embedding_request = async_to_sync(microservice)(
+            service="inception-query",
+            data=json.dumps({"text": cleaned_text_query}),
+        )
+        embedding_request.raise_for_status()
+        vectors = embedding_request.json()["embedding"]
+    else:
+        vectors = embedding
 
     # If exact keyword query exists, build and add full-text query to results
     # This enables hybrid search by combining keyword and semantic results
@@ -2860,8 +2866,10 @@ def build_full_join_es_queries(
     ]
 
     # True if semantic search is enabled and the query has content to generate
-    # an embedding
-    has_valid_semantic_query = semantic_search_enabled and cd.get("q", "")
+    # an embedding or embedding is provided,
+    has_valid_semantic_query = semantic_search_enabled and (
+        cd.get("q", "") or cd.get("embedding", None)
+    )
     keyword_text_query = ""
     match cd["type"]:
         case (
@@ -2925,10 +2933,10 @@ def build_full_join_es_queries(
             child_text_query = [mlt_query]
         else:
             string_query = cd.get("q", "")
+            embeddings = cd.get("embedding", None)
             if has_valid_semantic_query:
                 keyword_text_query, child_text_query = build_semantic_query(
-                    string_query,
-                    child_filters,
+                    string_query, child_filters, embeddings
                 )
                 if not keyword_text_query:
                     child_filters = []
