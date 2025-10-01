@@ -613,6 +613,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(len(r.data["results"]), 3)
 
+        content = r.content.decode()
         # Should include the two opinions with embeddings
         self.assertIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
         self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
