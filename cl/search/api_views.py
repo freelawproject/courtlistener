@@ -12,6 +12,8 @@ from rest_framework.permissions import (
 )
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
+from rest_framework.serializers import ValidationError
+from waffle import flag_is_active
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
@@ -44,6 +46,7 @@ from cl.search.api_serializers import (
     V3OAESResultSerializer,
     V3OpinionESResultSerializer,
     V3RECAPDocumentESResultSerializer,
+    VectorSerializer,
 )
 from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
@@ -501,3 +504,39 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         return response.Response(
             search_form.errors, status=HTTPStatus.BAD_REQUEST
         )
+
+    def create(self, request, *args, **kwargs):
+        # Check if waffle flag is enabled for this account
+        if not flag_is_active(request, "enable_semantic_search"):
+            raise ValidationError(
+                "This feature is currently disabled for your account."
+            )
+
+        # Validate query parameters (from URL) and request body (JSON)
+        query_params = SearchForm(request.GET, request=request)
+        request_body = VectorSerializer(data=request.data)
+        if not all([query_params.is_valid(), request_body.is_valid()]):
+            # Merge validation errors from both sources
+            combined_errors = query_params.errors | request_body.errors
+            return response.Response(
+                combined_errors, status=HTTPStatus.BAD_REQUEST
+            )
+
+        # Extract validated data
+        cd = query_params.cleaned_data
+        data = request_body.validated_data
+        # Enforce semantic search flag in query params
+        if not cd["semantic"]:
+            raise ValidationError(
+                "Semantic search requires `semantic=true` in the query string."
+            )
+        # Ensure the request body includes a valid embedding/vector
+        if not data:
+            raise ValidationError(
+                "You must provide an embedding vector in the request body when "
+                "using semantic search."
+            )
+
+        # Attach embedding to query params and run the actual ES query
+        cd["embedding"] = data["embedding"]
+        return self.execute_es_search(request, cd)
