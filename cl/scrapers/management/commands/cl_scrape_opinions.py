@@ -10,11 +10,12 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
-from juriscraper.lib.exceptions import InvalidDocumentError
+from juriscraper.lib.exceptions import BadContentError, InvalidDocumentError
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
+from cl import settings
 from cl.alerts.models import RealTimeQueue
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
@@ -22,14 +23,12 @@ from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
-    BadContentError,
     ConsecutiveDuplicatesError,
     SingleDuplicateError,
 )
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
-    get_binary_content,
     get_child_court,
     get_extension,
     make_citation,
@@ -317,7 +316,9 @@ class Command(ScraperCommand):
         if item.get("content"):
             content = item.pop("content")
         else:
-            content = get_binary_content(item["download_urls"], site)
+            content = site.download_content(
+                item["download_urls"], media_root=settings.MEDIA_ROOT
+            )
 
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
