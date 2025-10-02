@@ -2786,20 +2786,26 @@ class OpinionCluster(AbstractDateTimeModel):
         #    list.
         #  - QuerySets are lazy by default, so we need to call list() on the
         #    queryset object to evaluate it here and now.
-        return OpinionCluster.objects.filter(
-            sub_opinions__in=sum(
-                [
+        #  - We explicitly exclude self (self.pk) from the results to avoid
+        #    a cluster being listed as its own authority.
+        return (
+            OpinionCluster.objects.filter(
+                sub_opinions__in=sum(
                     [
-                        i
-                        async for i in sub_opinion.opinions_cited.all().only(
-                            "pk"
-                        )
-                    ]
-                    async for sub_opinion in self.sub_opinions.all()
-                ],
-                [],
+                        [
+                            i
+                            async for i in sub_opinion.opinions_cited.all().only(
+                                "pk"
+                            )
+                        ]
+                        async for sub_opinion in self.sub_opinions.all()
+                    ],
+                    [],
+                )
             )
-        ).order_by("-citation_count", "-date_filed")
+            .exclude(pk=self.pk)
+            .order_by("-citation_count", "-date_filed")
+        )
 
     @property
     def parentheticals(self):
