@@ -794,6 +794,23 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ),
         )
 
+        # It includes a self citation in the title (like lawbox opinions)
+        cls.citation5a = CitationWithParentsFactory.create(
+            volume="123",
+            reporter="U.S.",
+            page="123",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=cls.court_scotus),
+                case_name="Bush v. Gore",
+                date_filed=date.today(),  # Must be later than any cited opinion
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="123 U.S. 123 Bush v. Gore America v. Maxwell, Bush v. John, Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                ),
+            ),
+        )
+
         cls.citation6 = CitationWithParentsFactory.create(
             volume="114",
             reporter="F.3d",
@@ -1458,6 +1475,30 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                         ).count(),
                         1,
                     )
+
+    def test_opinionscited_no_self_creation(self) -> None:
+        """Make sure no OpinionsCited have been created when self citation is included in opinion
+        content from cluster"""
+        opinion5a = Opinion.objects.get(cluster__pk=self.citation5a.cluster_id)
+
+        citing = opinion5a
+        find_citations_and_parentheticals_for_opinion_by_pks.delay(
+            [opinion5a.pk]
+        )
+
+        # Verify that self citation is in opinion text
+        citation_str = f"{self.citation5a.volume} {self.citation5a.reporter} {self.citation5a.page}"
+        self.assertIn(
+            citation_str,
+            opinion5a.plain_text,
+            "Self citation is not in plain text object",
+        )
+
+        # Verify no OpinionsCited was created to self opinion form same cluster
+        results = OpinionsCited.objects.filter(cited_opinion=citing)
+        self.assertEqual(
+            results.count(), 0, "OpinionsCited created to self opinion"
+        )
 
     def test_no_duplicate_parentheticals_from_parallel_cites(self) -> None:
         citing = Opinion.objects.get(cluster__pk=self.citation4.cluster_id)

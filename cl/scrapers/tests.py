@@ -13,6 +13,7 @@ from django.test import SimpleTestCase
 from django.test.utils import override_settings
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
+from juriscraper.lib.exceptions import UnexpectedContentTypeError
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
@@ -29,7 +30,6 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
     SingleDuplicateError,
-    UnexpectedContentTypeError,
 )
 from cl.scrapers.management.commands import (
     cl_back_scrape_citations,
@@ -52,7 +52,6 @@ from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
     case_names_are_too_different,
     check_duplicate_ingestion,
-    get_binary_content,
     get_existing_docket,
     get_extension,
     update_or_create_docket,
@@ -735,9 +734,8 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = ["text/html"]
         self.assertRaises(
             UnexpectedContentTypeError,
-            get_binary_content,
+            self.site.download_content,
             "/dummy/url/",
-            self.site,
         )
 
     @mock.patch("requests.Session.get")
@@ -747,13 +745,13 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = ["application/pdf"]
 
         with mock.patch.object(self.logger, "error") as error_mock:
-            _ = get_binary_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/")
 
             self.mock_response.headers = {
                 "Content-Type": "application/pdf;charset=utf-8"
             }
             mock_get.return_value = self.mock_response
-            _ = get_binary_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/")
             error_mock.assert_not_called()
 
     @mock.patch("requests.Session.get")
@@ -763,7 +761,7 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = None
 
         with mock.patch.object(self.logger, "error") as error_mock:
-            _ = get_binary_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/")
             error_mock.assert_not_called()
 
 
@@ -811,8 +809,8 @@ class ScrapeCitationsTest(TestCase):
         cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
         with (
             mock.patch(f"{cmd}.sha1", side_effect=self.hashes),
-            mock.patch(
-                f"{cmd}.get_binary_content", return_value="placeholder"
+            mock.patch.object(
+                self.mock_site, "download_content", return_value="placeholder"
             ),
         ):
             cl_back_scrape_citations.Command().scrape_court(self.mock_site)
@@ -1627,6 +1625,58 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
                 reason=ClusterRedirection.DUPLICATE,
             ).exists(),
             "Existing re-direction was not re-assigned to new cluster",
+        )
+
+    def test_loose_text_similarity_merging(self):
+        """Can we attempt merges with a loose text similarity threshold?"""
+        court_id = "nev"
+        court = CourtFactory.create(id=court_id)
+        docket_number = "CV-22222"
+        main_docket = DocketFactory.create(
+            court=court, docket_number=docket_number
+        )
+        download_url = "http://somethingelse.court/111.pdf"
+
+        version_candidate = OpinionFactory.create(
+            cluster=OpinionClusterFactory(
+                docket=main_docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text="something else...",
+            html="",
+            author_str="Some Author",
+            sha1="yyy",
+        )
+
+        opinion = OpinionFactory.create(
+            cluster=OpinionClusterFactory(
+                docket=main_docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text="something...",
+            html="",
+            author_str="Another Author",
+            sha1="xxx",
+        )
+        base_path = "cl.scrapers.management.commands.merge_opinion_versions"
+        with (
+            mock.patch(
+                f"{base_path}.get_text_similarity"
+            ) as patched_get_text_similarity,
+            mock.patch(
+                f"{base_path}.merge_opinion_versions"
+            ) as patched_merge_opinion_versions,
+        ):
+            patched_get_text_similarity.return_value = (False, True, 0.75, 0.8)
+            merge_versions_by_download_url(download_url.rsplit("/", 1)[0])
+            # assert that merging was attempted
+            patched_get_text_similarity.assert_called()
+            patched_merge_opinion_versions.assert_called()
+
+        version_candidate.refresh_from_db()
+        self.assertTrue(
+            version_candidate.main_version_id is None,
+            "Loose versioning should not pass when metadata differs ",
         )
 
 
