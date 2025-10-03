@@ -11,6 +11,7 @@ from re import Pattern
 from tempfile import NamedTemporaryFile
 from typing import Any
 
+import environ
 import eyecite
 import internetarchive as ia
 import requests
@@ -154,6 +155,8 @@ from cl.search.models import (
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 logger = logging.getLogger(__name__)
+
+env = environ.FileAwareEnv()
 
 
 def increment_failure_count(obj: Audio | Docket | RECAPDocument) -> None:
@@ -3107,6 +3110,9 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     :param recap_document_id: RECAPDocument id
     """
 
+    OPENAI_CASE_LAW_INFERENCE_KEY = env(
+        "OPENAI_CASE_LAW_INFERENCE_KEY", default=None
+    )
     system_prompt = CASE_NAME_EXTRACT_SYSTEM
 
     try:
@@ -3133,6 +3139,7 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
             user_message,
             response_model=CaseNameExtractionResponse,
             max_completion_tokens=300,
+            api_key=OPENAI_CASE_LAW_INFERENCE_KEY,
         )
     except ValidationError as e:
         logger.error(
