@@ -3169,25 +3169,25 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         for name, old, new in case_names_pairs
         if new not in (None, "") and old != new
     }
+    if not changed_fields:
+        return
 
-    if changed_fields:
-        with transaction.atomic():
-            for field_name, new_case_name in changed_fields.items():
-                # Update only necessary fields
-                setattr(obj, field_name, new_case_name)
-                # Check for overlap between cluster case name and extracted case name
-                overlap = winnow_case_name(new_case_name) & winnow_case_name(
-                    cluster_name
+    cluster_case_name_set = winnow_case_name(cluster_name)
+    with transaction.atomic():
+        for field_name, new_case_name in changed_fields.items():
+            # Update only necessary fields
+            setattr(obj, field_name, new_case_name)
+            # Check for overlap between cluster case name and extracted case name
+            overlap = winnow_case_name(new_case_name) & cluster_case_name_set
+            if not overlap:
+                # The name of the docket case and the opinion do not necessarily match, we log it for manual review
+                dict_llm_response = llm_response.model_dump()
+                dict_llm_response["recap_document_id"] = recap_document_id
+                logger.error(
+                    "LLM - Case name did not match", dict_llm_response
                 )
-                if not overlap:
-                    # The name of the docket case and the opinion do not necessarily match, we log it for manual review
-                    dict_llm_response = llm_response.model_dump()
-                    dict_llm_response["recap_document_id"] = recap_document_id
-                    logger.error(
-                        "LLM - Case name did not match", dict_llm_response
-                    )
-            obj.save()
-            logger.info(
-                "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
-                obj.id,
-            )
+        obj.save()
+        logger.info(
+            "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
+            obj.id,
+        )
