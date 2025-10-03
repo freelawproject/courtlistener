@@ -3964,7 +3964,9 @@ class LlmTest(TestCase):
             error=None,
         )
 
-    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "123"}, clear=True)
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
     @mock.patch("cl.corpus_importer.tasks.call_llm")
     def test_classify_opinion_case_name_task_updates_fields(
         self, mock_call_llm
@@ -3982,7 +3984,9 @@ class LlmTest(TestCase):
         )
 
     @mock.patch("cl.corpus_importer.tasks.call_llm")
-    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "123"}, clear=True)
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
     @mock.patch.object(classify_case_name_by_llm, "retry", autospec=True)
     def test_classify_opinion_case_name_task_retries_on_ratelimit(
         self, mock_retry, mock_call_llm
@@ -4038,7 +4042,9 @@ class LlmTest(TestCase):
 
     @mock.patch("cl.corpus_importer.tasks.call_llm")
     @mock.patch("cl.corpus_importer.tasks.logger")
-    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "123"}, clear=True)
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
     def test_classify_case_name_by_llm_handles_validation_error(
         self, mock_logger, mock_call_llm
     ):
