@@ -1,52 +1,53 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static text_filters %}
 
 {% block title %}Contact Us – CourtListener.com{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
+{% block head %}
+  {# Fetch issue types and terms URL #}
+  {{ form.TECH_ISSUE_TYPES|uniq|json_script:"tech-types" }}
+  <script id="terms-url">{% url "terms" %}#removal</script>
+
+  <style>
+    [x-cloak]{ display: none !important } /* Prevent "blip" on first load */
+
+    /* Add a red asterisk to labels of required inputs */
+    label:has(+ input[data-required-contextually])::after,
+    label:has(+ select[data-required-contextually])::after,
+    label:has(+ textarea[data-required-contextually])::after,
+    label:has(+ input[required])::after,
+    label:has(+ select[required])::after,
+    label:has(+ textarea[required])::after {
+      content: " *";
+      color: red;
+    }
+  </style>
+{% endblock %}
+
+{% block footer-scripts %}
+  <script src="{% static 'js/alpine/components/contact_form.js' %}" nonce="{{ request.csp_nonce }}"></script>
+  {% if DEBUG %}
+  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  {% else %}
+  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  {% endif %}
+{% endblock %}
+
 {% block content %}
   <div class="col-xs-1 col-sm-2 col-md-3"></div>
   <div class="col-sm-9 col-md-6" id="sidebar">
     <h1 class="text-center v-offset-below-2">Contact Us</h1>
-    <p><strong>We do not provide legal help</strong>. You may wish to contact a qualified attorney, reach out to your local bar association to see if they operate a lawyer referral service, or try <a href="https://www.justia.com/lawyers">Justia's lawyer directory</a>. Additionally, many counties and law schools operate law libraries open to the general public, where you can conduct general legal research.
-    </p>
-    <p><strong>If you want something taken off of our website</strong>, please see our <a href="{% url "terms" %}#removal">removal policy</a> for how to proceed. You <em>must</em> provide a link of the item you need reviewed.
-    </p>
-    <p><strong>Finally</strong>, <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">we use GitHub Discussions</a>, where you can ask questions and search past ones if you prefer to discuss your message in public.</p>
 
     {% if form.errors %}
       <div class="alert alert-danger">
-        <p class="bottom">There were errors with your submission.</p>
+        <p class="bottom">There were errors with your submission. See below for details.</p>
       </div>
     {% endif %}
 
-    <form action="" method="post">{% csrf_token %}
+    <form x-data="contactForm" action="" method="post">{% csrf_token %}
       <div class="form-group">
-        <label for="id_name">Name</label>
-        {{ form.name }}
-        {% if form.name.errors %}
-          <p class="help-block">
-            {% for error in form.name.errors %}
-              {{ error|escape }}
-            {% endfor %}
-          </p>
-        {% endif %}
-      </div>
-
-      <div class="form-group">
-        <label for="id_email">Email</label>
-        {{ form.email }}
-        {% if form.email.errors %}
-          <p class="help-block">
-            {% for error in form.email.errors %}
-              {{ error|escape }}
-            {% endfor %}
-          </p>
-        {% endif %}
-      </div>
-
-      <div class="form-group">
-        <label for="id_issue_type">Issue Type</label>
+        {{ form.issue_type.label_tag }}
         {{ form.issue_type }}
         {% if form.issue_type.errors %}
           <p class="help-block">
@@ -55,45 +56,208 @@
             {% endfor %}
           </p>
         {% endif %}
+
+        {#   Hint based on issue type (see contact_form.js)   #}
+        <div x-show="hint" x-html="hint" style="margin-top: 8px"></div>
       </div>
 
-      {# We use the phone_number field as the subject field to defeat spam #}
-      <div class="form-group">
-        <label for="id_phone_number">Subject</label>
-        {{ form.phone_number }}
-        {% if form.phone_number.errors %}
-          <p class="help-block">
-            {% for error in form.phone_number.errors %}
-              {{ error|escape }}
-            {% endfor %}
-          </p>
-        {% endif %}
-      </div>
+      <div x-show="issue.isValidType">
+        {#   NAME   #}
+        <div class="form-group">
+          {{ form.name.label_tag }}
+          {{ form.name }}
+          {% if form.name.errors %}
+            <p class="help-block">
+              {% for error in form.name.errors %}
+                {{ error|escape }}
+              {% endfor %}
+            </p>
+          {% endif %}
+        </div>
 
-      <div class="form-group">
-        <label for="id_message">Message</label>
-        {{ form.message }}
-        {% if form.message.errors %}
-          <p class="help-block">
-            {% for error in form.message.errors %}
-              {{ error|escape }}
-            {% endfor %}
-          </p>
-        {% endif %}
-      </div>
+        {#   EMAIL   #}
+        <div class="form-group">
+          {{ form.email.label_tag }}
+          {{ form.email }}
+          {% if form.email.errors %}
+            <p class="help-block">
+              {% for error in form.email.errors %}
+                {{ error|escape }}
+              {% endfor %}
+            </p>
+          {% endif %}
+        </div>
 
-      <div class="form-group">
-        {{ form.hcaptcha }}
-        {% if form.hcaptcha.errors %}
-          <p class="help-block">
-            {% for error in form.hcaptcha.errors %}
-              {{ error|escape }}
-            {% endfor %}
-          </p>
-        {% endif %}
-      </div>
+        {#   SUBJECT   #}
+        {# We use the phone_number field as the subject field to defeat spam #}
+        <div class="form-group">
+          {{ form.phone_number.label_tag }}
+          {{ form.phone_number }}
+          {% if form.phone_number.errors %}
+            <p class="help-block">
+              {% for error in form.phone_number.errors %}
+                {{ error|escape }}
+              {% endfor %}
+            </p>
+          {% endif %}
+        </div>
 
-      <button type="submit" class="btn btn-primary btn-lg pull-right">Send Message</button>
+        {#   PARTNERSHIPS FIELDSET   #}
+        <div x-show="issue.isPartnershipsInquiry" x-cloak>
+          <fieldset
+            data-type="partnerships"
+            x-bind:disabled="issue.isNotPartnershipsInquiry"
+            x-bind:aria-hidden="issue.isNotPartnershipsInquiry"
+          >
+            <legend class="sr-only">Partnership details</legend>
+
+            {#   Partnerships: BACKGROUND   #}
+            <div class="form-group">
+              <label for="id_partner_background">What's your background?<span style="color: red" aria-hidden="true"> *</span></label>
+              <div style="padding-left:16px">
+                {{ form.partner_background }}
+                <label for="id_partner_background_other" class="sr-only">Other background</label>
+                {{ form.partner_background_other }}
+                {% if form.partner_background_other.errors %}
+                  <p class="help-block">
+                    {% for e in form.partner_background_other.errors %}{{ e|escape }}{% endfor %}</p>
+                {% endif %}
+              </div>
+              {% if form.partner_background.errors %}
+                <p class="help-block">
+                  {% for e in form.partner_background.errors %}{{ e|escape }}{% endfor %}
+                </p>
+              {% endif %}
+            </div>
+
+            {#   Partnerships: CURRENT WORK   #}
+            <div class="form-group">
+              {{ form.partner_current_work.label_tag }}
+              {{ form.partner_current_work }}
+              {% if form.partner_current_work.errors %}<p class="help-block">
+                {% for e in form.partner_current_work.errors %}{{ e|escape }}{% endfor %}</p>{% endif %}
+            </div>
+
+            {#   Partnerships: PRIOR OUTREACH   #}
+            <div class="form-group">
+              {{ form.partner_prior_outreach.label_tag }}
+              {{ form.partner_prior_outreach }}
+              {% if form.partner_prior_outreach.errors %}<p class="help-block">
+                {% for e in form.partner_prior_outreach.errors %}{{ e|escape }}{% endfor %}</p>{% endif %}
+            </div>
+
+            {#   Partnerships: TEAM SIZE   #}
+            <div class="form-group">
+              {{ form.partner_team_size.label_tag }}
+              {{ form.partner_team_size }}
+              {% if form.partner_team_size.errors %}<p class="help-block">
+                {% for e in form.partner_team_size.errors %}{{ e|escape }}{% endfor %}</p>{% endif %}
+            </div>
+
+            {#   Partnerships: YEAR FOUNDED   #}
+            <div class="form-group">
+              {{ form.partner_founded_year.label_tag }}
+              {{ form.partner_founded_year }}
+              {% if form.partner_founded_year.errors %}<p class="help-block">
+                {% for e in form.partner_founded_year.errors %}{{ e|escape }}{% endfor %}</p>{% endif %}
+            </div>
+
+            {#   Partnerships: TOTAL FUNDING   #}
+            <div class="form-group">
+              {{ form.partner_funding_total.label_tag }}
+              {{ form.partner_funding_total }}
+              {% if form.partner_funding_total.errors %}<p class="help-block">
+                {% for e in form.partner_funding_total.errors %}{{ e|escape }}{% endfor %}</p>{% endif %}
+            </div>
+
+            {#   Partnerships: VC FUNDING STAGE   #}
+            <div class="form-group">
+              {{ form.partner_funding_stage.label_tag }}
+              {{ form.partner_funding_stage }}
+              {% if form.partner_funding_stage.errors %}<p class="help-block">
+                {% for e in form.partner_funding_stage.errors %}{{ e|escape }}{% endfor %}</p>{% endif %}
+            </div>
+
+            {#   Partnerships: IDEAL OUTCOME   #}
+            <div class="form-group">
+              {{ form.partner_ideal_outcome.label_tag }}
+              {{ form.partner_ideal_outcome }}
+              {% if form.partner_ideal_outcome.errors %}<p class="help-block">
+                {% for e in form.partner_ideal_outcome.errors %}{{ e|escape }}{% endfor %}</p>{% endif %}
+            </div>
+          </fieldset>
+        </div>
+
+        {#   TECH SUPPORT FIELDSET   #}
+        <div x-show="issue.isTechnicalSupport" x-cloak>
+          <fieldset x-bind:disabled="issue.isNotTechnicalSupport" x-bind:aria-hidden="issue.isNotTechnicalSupport">
+            <legend class="sr-only">Technical details</legend>
+
+            {#   Tech Support: DESCRIPTION   #}
+            <div class="form-group">
+              {{ form.tech_description.label_tag }}
+              {{ form.tech_description }}
+              {% if form.tech_description.errors %}
+                <p class="help-block">
+                  {% for e in form.tech_description.errors %}{{ e|escape }}{% endfor %}</p>{% endif %}
+            </div>
+
+            {#   Tech Support: STARTED   #}
+            <div class="form-group">
+              {{ form.tech_started_at.label_tag }}
+              {{ form.tech_started_at }}
+            </div>
+
+            {#   Tech Support: STEPS TRIED   #}
+            <div class="form-group">
+              {{ form.tech_steps_tried.label_tag }}
+              {{ form.tech_steps_tried }}
+            </div>
+
+            {#   Tech Support: LINKS   #}
+            <div class="form-group">
+              {{ form.tech_links.label_tag }}
+              {{ form.tech_links }}
+            </div>
+          </fieldset>
+        </div>
+
+
+        <div class="form-group" style="margin-top: 16px">
+          <label for="id_message" x-text="messageLabel">Message</label>
+          {{ form.message }}
+          {% if form.message.errors %}
+            <p class="help-block">
+              {% for error in form.message.errors %}
+                {{ error|escape }}
+              {% endfor %}
+            </p>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          {{ form.hcaptcha }}
+          {% if form.hcaptcha.errors %}
+            <p class="help-block">
+              {% for error in form.hcaptcha.errors %}
+                {{ error|escape }}
+              {% endfor %}
+            </p>
+          {% endif %}
+        </div>
+
+        <div class="flex flex-column" style="align-items: end">
+          <button
+            type="submit"
+            style="width: fit-content"
+            class="btn btn-primary btn-lg pull-right"
+            x-bind:disabled="issue.noType"
+          >
+            Send Message
+          </button>
+          <p class="help-block pull-right" x-show="issue.noType" x-cloak>Please select an issue type</p>
+        </div>
+      </div>
     </form>
   </div>
 {% endblock %}
