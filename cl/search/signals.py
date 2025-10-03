@@ -13,6 +13,7 @@ from cl.citations.tasks import (
 from cl.favorites.utils import send_prayer_emails
 from cl.lib.courts import get_cache_key_for_court_list
 from cl.lib.es_signal_processor import ESSignalProcessor
+from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import (
     ABARating,
     Education,
@@ -21,6 +22,7 @@ from cl.people_db.models import (
     Position,
     School,
 )
+from cl.search.docket_number_cleaner import clean_docket_number_raw
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
@@ -656,3 +658,45 @@ def update_court_cache(sender, instance: Court, created: bool, **kwargs):
 
     if created:
         logger.error("Create a courthouse for new court '%s'", instance.id)
+
+
+def clean_docket_number_raw_and_update_redis_cache(
+    docket: Docket,
+):
+    r = get_redis_interface("CACHE")
+
+    docket_number, docket_id_llm = clean_docket_number_raw(
+        docket_id=docket.id,
+        docket_number_raw=docket.docket_number_raw,
+        court_id=docket.court_id,
+    )
+    docket.docket_number = docket_number
+
+    # Add llm_batch to redis cache for later processing
+    if docket_id_llm:
+        r.sadd("docket_number_cleaning:llm_batch", docket_id_llm)
+
+    # Log the redis size for monitoring
+    llm_batch_size = r.scard("docket_number_cleaning:llm_batch")
+    logger.info(f"LLM batch size in Redis: {llm_batch_size}")
+
+
+@receiver(
+    post_save,
+    sender=Docket,
+    dispatch_uid="handle_docket_number_raw_cleaning",
+)
+def handle_docket_number_raw_cleaning(
+    sender, instance: Docket, created=False, **kwargs
+):
+    if not settings.DOCKET_NUMBER_CLEANING_ENABLED:
+        # Only perform cleaning if enabled
+        return
+
+    # Only clean if the docket was was non-recap source and newly created or docket_number_raw has changed
+    changed = not created and instance.es_dn_field_tracker.has_changed(
+        "docket_number_raw"
+    )
+    non_recap_sources = instance.source in instance.DOCKET_NUM_CLEAN_SOURCES()
+    if (created or changed) and non_recap_sources:
+        clean_docket_number_raw_and_update_redis_cache(instance)
