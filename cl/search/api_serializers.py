@@ -789,3 +789,12 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
             "pacer_doc_id",
             "trustee_str",
         )
+
+
+class VectorSerializer(serializers.Serializer):
+    embedding = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=1,
+        max_length=768,
+        required=False,
+    )
