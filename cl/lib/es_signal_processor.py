@@ -206,40 +206,27 @@ def update_es_documents(
                     and "html_with_citations" in fields_to_update
                     and settings.ENABLE_EMBEDDING_COMPUTATION
                 )
-
-                # Base chain: update ES document
-                base_chain = update_es_document.si(
-                    es_document.__name__,
-                    fields_to_update,
-                    (compose_app_label(instance), instance.pk),
-                    (compose_app_label(instance), instance.pk),
-                    fields_map,
-                    getattr(instance, "skip_percolator_request", False),
-                    should_compute_embeddings,
+                c = chain(
+                    update_es_document.si(
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                        getattr(instance, "skip_percolator_request", False),
+                        should_compute_embeddings,
+                    ),
+                    send_or_schedule_search_alerts.s(),
+                    percolator_response_processing.s(),
                 )
+                # Prepend embedding computation task when html_with_citations
+                # is updated
                 if should_compute_embeddings:
-                    # Prepend embedding computation task when
-                    # html_with_citations is updated:
-                    # Chain embedding computation -> ES update
-                    base_chain = (
-                        compute_single_opinion_embeddings.si(instance.pk)
-                        | base_chain
-                    )
-
-                    # tasks after update:
-                    # send_or_schedule_search_alerts -> percolator_response_processing
-                    post_update = chain(
-                        send_or_schedule_search_alerts.s(),
-                        percolator_response_processing.s(),
-                    )
-                    final_workflow = base_chain | post_update
-                else:
-                    # Default: ES update + alerts + percolator
-                    final_workflow = base_chain | chain(
-                        send_or_schedule_search_alerts.s(),
-                        percolator_response_processing.s(),
-                    )
-                transaction.on_commit(partial(final_workflow.apply_async))
+                    c = compute_single_opinion_embeddings.si(instance.pk) | c
+                transaction.on_commit(partial(c.apply_async))
             case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
                 transaction.on_commit(
                     partial(
