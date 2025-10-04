@@ -6,6 +6,7 @@ class DocketSources:
     _NON_HARVARD_SOURCES_CACHE = None
     _NON_IDB_SOURCES_CACHE = None
     _NON_ANON_2020_SOURCES_CACHE = None
+    _DOCKET_NUM_CLEAN_SOURCES_CACHE = None
 
     # The source values are additive. That is, if you get content from a new
     # source, you can add it to the previous one, and have a combined value.
@@ -633,6 +634,20 @@ class DocketSources:
                 "ANON_2020", exclude=True
             )
         return cls._NON_ANON_2020_SOURCES_CACHE
+
+    @classmethod
+    def DOCKET_NUM_CLEAN_SOURCES(cls) -> list[int]:
+        if cls._DOCKET_NUM_CLEAN_SOURCES_CACHE is None:
+            cls._DOCKET_NUM_CLEAN_SOURCES_CACHE = list(
+                set(
+                    value
+                    for key, value in DocketSources.__dict__.items()
+                    if not key.startswith(("__", "_"))
+                    and isinstance(value, int)
+                )
+                - set([cls.RECAP])
+            )
+        return cls._DOCKET_NUM_CLEAN_SOURCES_CACHE
 
     @classmethod
     def merge_sources(cls, source1: int, source2: int) -> int:
