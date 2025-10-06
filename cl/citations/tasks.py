@@ -157,7 +157,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                     opinion,
                     update_citation_count,
                     disable_parenthetical_groups,
-                    percolate_opinion
+                    percolate_opinion,
                 )
             except ResponseNotReady as e:
                 # Threading problem in httplib.

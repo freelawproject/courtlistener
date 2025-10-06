@@ -1,10 +1,10 @@
 from datetime import UTC
 from typing import Any
 
+from elasticsearch_dsl.response import Hit
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 from waffle import flag_is_active
-from elasticsearch_dsl.response import Hit
 
 from cl.api.utils import (
     DynamicFieldsMixin,
