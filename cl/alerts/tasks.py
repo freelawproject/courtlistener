@@ -680,10 +680,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         # Send real time Webhooks for all users regardless of alert rate and
         # user's donations.
         send_webhook_alert_hits(alert_user, hits)
-
         if (
             alert_triggered.rate == Alert.REAL_TIME
-            and not alert_user.profile.is_member
+            and not alert_user.profile.is_eligible_for_rt_search_alerts
         ):
             # Omit scheduling an RT alert if the user is not a member.
             continue

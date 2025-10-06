@@ -1,0 +1,107 @@
+{% load svg_tags %}
+
+<c-vars request search_form/>
+
+<fieldset x-bind:id="fieldsetIds.recap" class="contents" x-show="isActiveScope" data-scope="RECAP Archive">
+  <legend class="sr-only">RECAP Archive filters</legend>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.case_name.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.case_name }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.docket_number.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.docket_number }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.nature_of_suit.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.nature_of_suit }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.cause.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.cause }}
+    </div>
+  </div>
+
+  <c-corpus-search.date-selector
+    label="Docket Date"
+    relative
+    :request="request"
+    date_after_field_name="filed_after"
+    date_before_field_name="filed_before"
+    only
+  />
+
+  <c-corpus-search.date-selector
+    label="Entry Date"
+    relative
+    :request="request"
+    date_after_field_name="entry_date_filed_after"
+    date_before_field_name="entry_date_filed_before"
+    only
+  />
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.assigned_to.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.assigned_to }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.referred_to.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.referred_to }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.description.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.description }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.document_number.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.document_number }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.attachment_number.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.attachment_number }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.party_name.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.party_name }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.atty_name.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.atty_name }}
+    </div>
+  </div>
+
+  <div class="h-full flex items-center gap-2 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.available_only }}
+    {{ search_form.available_only.label_tag }}
+  </div>
+</fieldset>

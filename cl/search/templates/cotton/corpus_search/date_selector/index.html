@@ -1,0 +1,240 @@
+{% load svg_tags component_tags %}
+{% require_script "js/third_party/flatpickr/flatpickr@4.6.13" %}
+{% require_script "js/third_party/flatpickr/plugins/confirmDate@4.6.13" %}
+{% require_script "js/alpine/components/date_selector.js" %}
+{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+
+{% comment %}
+- This component renders a date range selector with date pickers for calendar dates.
+- Optionally, relative dates can be used if the `relative` prop is passed.
+- When relative dates are disabled, a second label can be introduced for the ending date.
+{% endcomment %}
+
+<c-vars
+  request {# Required to import the scripts. #}
+  label {# For relative dates, this labels the entire widget. Otherwise, it's the initial date. #}
+  second_label {# Only used when relative dates are disabled, and labels the ending date. #}
+  relative
+  date_after_field_name
+  date_before_field_name
+  date_after_placeholder="Filed After"
+  date_before_placeholder="Filed Before"
+></c-vars>
+
+<section
+  x-data="dateSelector"
+  x-id="dateSelectorIdGroup"
+  class="flex flex-col gap-1.5"
+  {% if not relative %}x-bind:aria-labelledby="labelId"{% endif %}
+>
+  <input
+    x-bind:id="flatpickrAfterInputId"
+    type="hidden"
+    data-date="after"
+  >
+  <input
+    x-bind:id="flatpickrBeforeInputId"
+    type="hidden"
+    data-date="before"
+  >
+  {# LABEL + DATE TYPE SELECTOR #}
+  <div class="flex flex-row justify-between">
+    <div class="flex flex-grow items-center justify-start gap-1">
+      <div class="text-sm font-medium text-greyscale-600" x-bind:id="labelId">{{ label }}</div>
+      {% if relative %}
+        <a
+          href="{% url "relative_dates" %}"
+          aria-label="Learn about relative date queries"
+        >
+          {% svg "circle_question_mark" aria_hidden="true" class="text-greyscale-400" %}
+        </a>
+      {% endif %}
+    </div>
+
+    {#   Date Type Selector: Calendar/Relative   #}
+    {% if relative %}
+      <div
+        role="radiogroup"
+        aria-label="Choose between calendar dates and relative dates"
+        class="flex flex-row w-fit items-center gap-2"
+      >
+        <label data-type="calendar" x-on:pointerup="focusFirstInput" class="cursor-pointer group flex gap-2 items-center text-sm font-medium text-greyscale-600">
+          <input
+            x-on:change="selectDateType"
+            type="radio"
+            x-bind:name="typeSelectName"
+            value="calendar"
+            class="cursor-pointer group-hover:shadow-lg"
+            data-ignore-input="true"
+            checked
+          >
+          Calendar
+        </label>
+        <label data-type="relative" x-on:pointerup="focusFirstInput" class="cursor-pointer group flex gap-2 items-center text-sm font-medium text-greyscale-600">
+          <input
+            x-on:change="selectDateType"
+            type="radio"
+            x-bind:name="typeSelectName"
+            value="relative"
+            class="cursor-pointer group-hover:shadow-lg"
+            data-ignore-input="true"
+          >
+          Relative
+        </label>
+      </div>
+    {% elif second_label %}
+      <div class="flex w-1/2 pl-2">
+        <div class="w-full px-1 text-start text-sm font-medium text-greyscale-600">{{ second_label }}</div>
+      </div>
+    {% endif %}
+  </div>
+
+  {# CALENDAR DATES #}
+  <div
+    data-type="calendar"
+    class="grid grid-cols-2 gap-2 items-end"
+    x-show="isSelectedType"
+  >
+    {#  Date After  #}
+    <div data-date="after" x-on:click="openDatePicker" class="focus-container input-text flex justify-stretch items-stretch gap-2">
+      <button
+        type="button"
+        x-on:click="openDatePicker"
+        data-date="after"
+        aria-label="Open date picker"
+      >
+        {% svg "calendar" class="w-5 h-5" aria_hidden="true" %}
+      </button>
+      <input
+        type="text"
+        name="{{ date_after_field_name }}"
+        data-type="calendar"
+        data-date="after"
+        x-bind:disabled="disabled"
+        x-bind:id="calendarAfterInputId"
+        x-on:input="closeDatePicker"
+        placeholder="{{ date_after_placeholder }}"
+        class="focus:ring-0 focus:outline-none w-full"
+        aria-label="Starting date in format MM/DD/YYYY"
+        autocomplete="off">
+    </div>
+
+    {#  Date Before  #}
+    <div data-date="before" x-on:click="openDatePicker" class="focus-container input-text flex justify-stretch items-stretch gap-2">
+      <button
+        type="button"
+        x-on:click="openDatePicker"
+        data-date="before"
+        aria-label="Open date picker"
+      >
+        {% svg "calendar" class="w-5 h-5" aria_hidden="true" %}
+      </button>
+      <input
+        type="text"
+        name="{{ date_before_field_name }}"
+        data-type="calendar"
+        data-date="before"
+        x-bind:disabled="disabled"
+        x-bind:id="calendarBeforeInputId"
+        x-on:input="closeDatePicker"
+        placeholder="{{ date_before_placeholder }}"
+        class="focus:ring-0 focus:outline-none w-full"
+        aria-label="Ending date in format MM/DD/YYYY"
+        autocomplete="off">
+    </div>
+  </div>
+
+  {# RELATIVE DATES #}
+  {% if relative %}
+  <div
+    data-type="relative"
+    class="w-full"
+    x-show="isSelectedType"
+    x-cloak
+    x-on:click.outside="closeDropdownMenu"
+  >
+    <div class="flex w-full relative">
+      {#   Relative date input   #}
+      <div x-on:keydown.down.stop.prevent="enterDropdownFocus" class="focus-container input-text flex justify-stretch items-stretch gap-2 w-full">
+        <label x-bind:for="relativeInputId" class="sr-only">Enter a relative date, for example '1d ago'</label>
+        <input
+          type="text"
+          x-bind:value="dateAfterRelative"
+          x-on:focusin="openDropdownMenu"
+          x-on:input="updateDateAfterRelative"
+          x-bind:id="relativeInputId"
+          x-bind:disabled="disabled"
+          x-on:keyup.esc.stop.prevent="onComboboxEscape"
+          x-on:keydown.shift.tab="closeDropdownMenu"
+          name="{{ date_after_field_name }}"
+          data-type="relative"
+          placeholder="Enter a Relative date"
+          class="focus:ring-0 focus:outline-none w-full"
+          autocomplete="off"
+          role="combobox"
+          x-bind:aria-expanded="dropdownMenuOpen"
+        >
+        {#    Toggle button for relative dates menu    #}
+        <button
+          x-on:click="toggleDropdownMenu"
+          type="button"
+          class="rounded-md text-sm font-medium text-greyscale-900 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none"
+          aria-haspopup="listbox"
+          x-bind:aria-controls="relativeDatesMenuId"
+          x-bind:disabled="disabled"
+          data-type="relative"
+          aria-label="Toggle relative dates menu to autofill the input with common values"
+          x-bind:aria-expanded="dropdownMenuOpen"
+          tabindex="-1"
+        >
+          {% svg "chevron" aria_hidden="true" class="text-greyscale-400" %}
+        </button>
+      </div>
+
+      {#   Relative date menu   #}
+      <ul
+        x-bind:id="relativeDatesMenuId"
+        x-show="dropdownMenuOpen"
+        x-cloak
+        x-on:keyup.esc.stop.prevent="focusRelativeInput"
+        x-on:keydown.down.stop.prevent="focusNext"
+        x-on:keydown.up.stop.prevent="focusPrevious"
+        x-on:keydown.home.stop.prevent="focusFirst"
+        x-on:keydown.end.stop.prevent="focusLast"
+        class="absolute z-20 top-11 w-full overflow-auto rounded-lg bg-white py-1 shadow-lg border border-greyscale-200 focus:outline-hidden list-none pl-0 flex flex-col justify-stretch"
+        tabindex="-1"
+        role="listbox"
+        aria-label="Options to autofill {{ label }} with common Relative Dates"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+      >
+        <c-corpus-search.date-selector.relative-date-option only value="1d ago">
+          Past Day
+        </c-corpus-search.date-selector.relative-date-option>
+        <c-corpus-search.date-selector.relative-date-option only value="7d ago">
+          Past Week
+        </c-corpus-search.date-selector.relative-date-option>
+        <c-corpus-search.date-selector.relative-date-option only value="14d ago">
+          Past 2 Weeks
+        </c-corpus-search.date-selector.relative-date-option>
+        <c-corpus-search.date-selector.relative-date-option only value="1m ago">
+          Past Month
+        </c-corpus-search.date-selector.relative-date-option>
+        <c-corpus-search.date-selector.relative-date-option only value="3m ago">
+          Past 3 Months
+        </c-corpus-search.date-selector.relative-date-option>
+        <c-corpus-search.date-selector.relative-date-option only value="6m ago">
+          Past 6 Months
+        </c-corpus-search.date-selector.relative-date-option>
+        <c-corpus-search.date-selector.relative-date-option only value="1y ago">
+          Past Year
+        </c-corpus-search.date-selector.relative-date-option>
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+</section>

@@ -52,7 +52,10 @@ from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.lib.db_tools import log_db_connection_info
 from cl.lib.elasticsearch_utils import build_daterange_query
-from cl.lib.microservice_utils import microservice
+from cl.lib.microservice_utils import (
+    log_invalid_embedding_errors,
+    microservice,
+)
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
@@ -492,6 +495,7 @@ def update_es_document(
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
     skip_percolator_request: bool = False,
+    should_check_for_embeddings: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
@@ -505,6 +509,8 @@ def update_es_document(
     :param fields_map: A dict containing fields that can be updated or None if
     mapping is not required for the update.
     :param skip_percolator_request: Whether to skip the subsequent percolator request
+    :param should_check_for_embeddings: If True and the document is an OpinionDocument,
+    attempts to fetch cached embeddings and include them in the document update.
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None
@@ -546,11 +552,30 @@ def update_es_document(
         # Abort, avoid updating not indexed fields, like "source" in Docket.
         return
 
+    embeddings = None
+    cache_key = None
+    if should_check_for_embeddings and es_document_name == "OpinionDocument":
+        cache_key = f"{embeddings_cache_key()}o_{main_instance_id}"
+        embeddings = cache.get(cache_key)
+
+        if not embeddings:
+            logging.error(
+                "Expected cached embeddings for OpinionDocument %s, but none found",
+                main_instance_id,
+            )
+
+    if embeddings:
+        fields_values_to_update["embeddings"] = embeddings
+
     Document.update(
         es_doc,
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
+
+    if embeddings and cache_key:
+        cache.delete(cache_key)
+
     fields_to_omit_percolation = {
         "plain_text",
         "filepath_local",
@@ -1426,6 +1451,71 @@ def percolate_document(
     ).apply_async()
 
 
+def build_cite_count_update(cluster_ids_to_update: list[int]) -> list[dict]:
+    """Create update documents for OpinionClusterDocument.citeCount
+
+    :param cluster_ids_to_update: the cluster ids to update
+    :return: the dicts / documents defining the updates
+    """
+
+    # Query all clusters to update and retrieve only their sub_opinions
+    # with the necessary fields.
+    prefetch = Prefetch("sub_opinions", queryset=Opinion.objects.only("pk"))
+    clusters_with_sub_opinions = (
+        OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
+        .only("pk", "citation_count")
+        .prefetch_related(prefetch)
+    )
+
+    documents_to_update = []
+    base_doc = {
+        "_op_type": "update",
+        "_index": OpinionClusterDocument._index._name,
+    }
+    for cluster in clusters_with_sub_opinions:
+        if not OpinionClusterDocument.exists(id=cluster.pk):
+            # If the OpinionClusterDocument does not exist, it might
+            # not be indexed yet. Raise a NotFoundError to retry the
+            # task; hopefully, it will be indexed soon.
+            raise NotFoundError(
+                f"The OpinionCluster {cluster.pk} is not indexed.",
+                "",
+                {"id": cluster.pk},
+            )
+
+        # Build the OpinionCluster dicts for updating the citeCount.
+        doc_to_update = {
+            "_id": cluster.pk,
+            "doc": {"citeCount": cluster.citation_count},
+        }
+        doc_to_update.update(base_doc)
+        documents_to_update.append(doc_to_update)
+
+        for opinion in cluster.sub_opinions.all():
+            if not OpinionClusterDocument.exists(
+                id=ES_CHILD_ID(opinion.pk).OPINION, routing=cluster.pk
+            ):
+                # If the OpinionDocument does not exist, it might
+                # not be indexed yet. Raise a NotFoundError to retry the
+                # task; hopefully, it will be indexed soon.
+                raise NotFoundError(
+                    f"The Opinion {opinion.pk} is not indexed.",
+                    "",
+                    {"id": opinion.pk},
+                )
+
+            # Build the Opinion dicts for updating the citeCount.
+            doc_to_update = {
+                "_id": ES_CHILD_ID(opinion.pk).OPINION,
+                "_routing": cluster.pk,
+                "doc": {"citeCount": cluster.citation_count},
+            }
+            doc_to_update.update(base_doc)
+            documents_to_update.append(doc_to_update)
+
+    return documents_to_update
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -1458,7 +1548,6 @@ def index_related_cites_fields(
     order to trigger search alerts.
     :return: None.
     """
-
     documents_to_update = []
     cites_doc_to_update = {}
     base_doc = {}
@@ -1466,61 +1555,13 @@ def index_related_cites_fields(
     es_child_doc_class = None
     match model_name:
         case OpinionsCited.__name__:
-            # Query all clusters to update and retrieve only their sub_opinions
-            # with the necessary fields.
-            prefetch = Prefetch(
-                "sub_opinions", queryset=Opinion.objects.only("pk")
-            )
-            clusters_with_sub_opinions = (
-                OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
-                .only("pk", "citation_count")
-                .prefetch_related(prefetch)
-            )
-
             base_doc = {
                 "_op_type": "update",
                 "_index": OpinionClusterDocument._index._name,
             }
-            for cluster in clusters_with_sub_opinions:
-                if not OpinionClusterDocument.exists(id=cluster.pk):
-                    # If the OpinionClusterDocument does not exist, it might
-                    # not be indexed yet. Raise a NotFoundError to retry the
-                    # task; hopefully, it will be indexed soon.
-                    raise NotFoundError(
-                        f"The OpinionCluster {cluster.pk} is not indexed.",
-                        "",
-                        {"id": cluster.pk},
-                    )
-
-                # Build the OpinionCluster dicts for updating the citeCount.
-                doc_to_update = {
-                    "_id": cluster.pk,
-                    "doc": {"citeCount": cluster.citation_count},
-                }
-                doc_to_update.update(base_doc)
-                documents_to_update.append(doc_to_update)
-
-                for opinion in cluster.sub_opinions.all():
-                    if not OpinionClusterDocument.exists(
-                        id=ES_CHILD_ID(opinion.pk).OPINION, routing=cluster.pk
-                    ):
-                        # If the OpinionDocument does not exist, it might
-                        # not be indexed yet. Raise a NotFoundError to retry the
-                        # task; hopefully, it will be indexed soon.
-                        raise NotFoundError(
-                            f"The Opinion {opinion.pk} is not indexed.",
-                            "",
-                            {"id": opinion.pk},
-                        )
-
-                    # Build the Opinion dicts for updating the citeCount.
-                    doc_to_update = {
-                        "_id": ES_CHILD_ID(opinion.pk).OPINION,
-                        "_routing": cluster.pk,
-                        "doc": {"citeCount": cluster.citation_count},
-                    }
-                    doc_to_update.update(base_doc)
-                    documents_to_update.append(doc_to_update)
+            documents_to_update.extend(
+                build_cite_count_update(cluster_ids_to_update)
+            )
 
             # Finally build the Opinion dict for updating the cites.
             child_doc_model = Opinion
@@ -1774,6 +1815,57 @@ def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
     max_retries=5,
     retry_backoff=10,
 )
+def compute_single_opinion_embeddings(self, pk: int) -> None:
+    """
+    Celery task to compute and cache text embeddings for a single opinion.
+
+    This task fetches the opinion record, extracts its best available text,
+    and sends it to the `inception-text` microservice to generate embeddings.
+    If embeddings are successfully computed, the results are cached for 30
+    minutes.
+
+    Automatically retries up to 5 times with exponential backoff (10s base)
+    in case of network or protocol-related errors.
+
+    :param self: The Celery task.
+    :param pk: The primary key of the opinion to process.
+    """
+    opinion = Opinion.objects.filter(id=pk).with_best_text().first()
+    if not opinion:
+        return None
+
+    embeddings = asyncio.run(
+        microservice(
+            service="inception-text",
+            data=opinion.clean_text,
+        )
+    )
+    # Exit early if the microservice call failed
+    if not embeddings.is_success:
+        if not isinstance(embeddings, list):
+            log_invalid_embedding_errors(embeddings)
+        return None
+
+    # Build a namespaced cache key for this opinion's embeddings
+    cache_prefix = embeddings_cache_key()
+    cache_key = f"{cache_prefix}o_{pk}"
+
+    # Store the embeddings JSON in cache for 30 minutes
+    cache.set(cache_key, embeddings.json()["embeddings"], 60 * 30)
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+        ReadError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
 def create_opinion_text_embeddings(
     self, batch: list[int], database
 ) -> str | None:
@@ -1873,17 +1965,7 @@ def save_embeddings(
         return None
 
     if not isinstance(embeddings, list):
-        if isinstance(embeddings, dict):
-            logger.error(
-                "Received API error response in embeddings: %s",
-                json.dumps(embeddings, default=str),
-            )
-        else:
-            logger.error(
-                "Unexpected data type for embeddings: %s (%s)",
-                str(embeddings)[:200],
-                type(embeddings),
-            )
+        log_invalid_embedding_errors(embeddings)
         return None
 
     storage = S3IntelligentTieringStorage()

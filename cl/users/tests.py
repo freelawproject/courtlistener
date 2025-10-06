@@ -702,7 +702,12 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                     direction = "-"
                     order_name = "hit"
                 das.sort(key=sorter, reverse=True if direction else False)
-                self.assertEqual(list(c["docket_alerts"]), das)
+                self.assertEqual(
+                    list(c["docket_alerts"]),
+                    das,
+                    f"\nExpected {order_name}: {[sorter(x) for x in das]}\n"
+                    f"Got      {order_name}: {[sorter(x) for x in c['docket_alerts']]}",
+                )
 
                 sorting_fields = c["sorting_fields"]
                 for col, vals in sorting_fields.items():
@@ -3595,6 +3600,54 @@ class WebhooksHTMXTests(APITestCase):
         # Webhook failure count shouldn't be increased by a webhook test event
         self.assertEqual(webhook_event_last.webhook.failure_count, 0)
 
+    async def test_send_webhook_test_all_types(self) -> None:
+        """Can we send a webhook test event for all webhook types?"""
+
+        test_cases = {
+            f"{event_type.label} - {version.label}": {
+                "event_type": event_type,
+                "version": version,
+            }
+            for event_type, version in product(
+                WebhookEventType, WebhookVersions
+            )
+        }
+
+        for label, params in test_cases.items():
+            with self.subTest(label=label):
+                await Webhook.objects.all().adelete()
+                await WebhookEvent.objects.all().adelete()
+                await self.make_a_webhook(
+                    self.client,
+                    event_type=params["event_type"],
+                    version=params["version"],
+                )
+                webhooks = Webhook.objects.all()
+                self.assertEqual(await webhooks.acount(), 1)
+
+                webhooks_first = await webhooks.afirst()
+                webhook_1_path_test = reverse(
+                    "webhooks-test-webhook",
+                    kwargs={"pk": webhooks_first.pk, "format": "json"},
+                )
+                with mock.patch(
+                    "cl.api.webhooks.requests.post",
+                    side_effect=lambda *args, **kwargs: MockPostResponse(
+                        200, mock_raw=True
+                    ),
+                ):
+                    response = await self.client.post(webhook_1_path_test, {})
+                # Compare the test webhook event data.
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                webhook_event = WebhookEvent.objects.all().order_by(
+                    "date_created"
+                )
+                webhook_event_first = await webhook_event.afirst()
+                self.assertEqual(
+                    webhook_event_first.status_code, HTTPStatus.OK
+                )
+                self.assertEqual(webhook_event_first.debug, True)
+
     async def test_list_webhook_events(self) -> None:
         """Can we list the user's webhook events?"""
 
@@ -3859,3 +3912,58 @@ class NeonAccountUpdateTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         create_account_mock.delay.assert_called_once_with(self.up.user.pk)
         update_account_mock.delay.assert_not_called()
+
+
+@patch("cl.users.views.OptInConsentForm.is_valid", new=lambda self: True)
+@patch(
+    "cl.custom_filters.decorators.verify_honeypot_value",
+    new=lambda request, field_name: None,
+)
+class RegisterViewTest(TestCase):
+    async def test_register_with_valid_ascii_username(self) -> None:
+        """Register a user with a valid username."""
+        data = {
+            "username": "admin1",
+            "email": "admin1@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertTrue(await User.objects.filter(username="admin1").aexists())
+
+    async def test_register_rejects_homoglyph_username(self) -> None:
+        """Register a user with an invalid username containing a homoglyph.
+        It must be rejected:
+        """
+
+        invalid_username = "adm" + "\u0456" + "n2"
+        data = {
+            "username": invalid_username,
+            "email": "admin2@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # The user must not be registered.
+        self.assertFalse(
+            await User.objects.filter(username=invalid_username).aexists()
+        )
+
+        form = response.context.get("form")
+        self.assertIsNotNone(form, "Expected 'form' in template context")
+        # The username field should display an error.
+        self.assertIn("username", form.errors)

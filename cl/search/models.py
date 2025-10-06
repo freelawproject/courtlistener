@@ -602,6 +602,14 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         db_index=True,
     )
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            "with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     federal_dn_office_code = models.CharField(
         help_text="A one digit statistical code (either alphabetic or numeric) "
         "of the office within the federal district. In this "
@@ -1546,9 +1554,8 @@ class RECAPDocument(
                         "and we are unable to fix it automatically for "
                         f"rd: {self.pk}"
                     )
-                else:
-                    # Only one duplicate. Attempt auto-resolution.
-                    other = others[0]
+                # Only one duplicate. Attempt auto-resolution.
+                other = others[0]
                 if other.pacer_doc_id == self.pacer_doc_id:
                     # Delete "other"; the new one probably has better data.
                     # Lots of code could be written here to merge "other" into
@@ -1966,7 +1973,12 @@ class FederalCourtsQuerySet(models.QuerySet):
 @pghistory.track()
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
-    as needed."""
+    as needed.
+
+    Note that a Courthouse object should be created alongside each new Court.
+    Even if this is not enforced by the data model, there is some logic tied
+    to that relation. Examples in `find_citations` and `coverage_utils`
+    """
 
     # Note that spaces cannot be used in the keys, or else the SearchForm won't
     # work
@@ -2753,15 +2765,21 @@ class OpinionCluster(AbstractDateTimeModel):
         #    list.
         #  - QuerySets are lazy by default, so we need to call list() on the
         #    queryset object to evaluate it here and now.
-        return OpinionCluster.objects.filter(
-            sub_opinions__in=sum(
-                [
-                    list(sub_opinion.opinions_cited.all().only("pk"))
-                    for sub_opinion in self.sub_opinions.all()
-                ],
-                [],
+        #  - We explicitly exclude self (self.pk) from the results to avoid
+        #    a cluster being listed as its own authority.
+        return (
+            OpinionCluster.objects.filter(
+                sub_opinions__in=sum(
+                    [
+                        list(sub_opinion.opinions_cited.all().only("pk"))
+                        for sub_opinion in self.sub_opinions.all()
+                    ],
+                    [],
+                )
             )
-        ).order_by("-citation_count", "-date_filed")
+            .exclude(pk=self.pk)
+            .order_by("-citation_count", "-date_filed")
+        )
 
     async def aauthorities(self):
         """Returns a queryset that can be used for querying and caching
@@ -2774,20 +2792,26 @@ class OpinionCluster(AbstractDateTimeModel):
         #    list.
         #  - QuerySets are lazy by default, so we need to call list() on the
         #    queryset object to evaluate it here and now.
-        return OpinionCluster.objects.filter(
-            sub_opinions__in=sum(
-                [
+        #  - We explicitly exclude self (self.pk) from the results to avoid
+        #    a cluster being listed as its own authority.
+        return (
+            OpinionCluster.objects.filter(
+                sub_opinions__in=sum(
                     [
-                        i
-                        async for i in sub_opinion.opinions_cited.all().only(
-                            "pk"
-                        )
-                    ]
-                    async for sub_opinion in self.sub_opinions.all()
-                ],
-                [],
+                        [
+                            i
+                            async for i in sub_opinion.opinions_cited.all().only(
+                                "pk"
+                            )
+                        ]
+                        async for sub_opinion in self.sub_opinions.all()
+                    ],
+                    [],
+                )
             )
-        ).order_by("-citation_count", "-date_filed")
+            .exclude(pk=self.pk)
+            .order_by("-citation_count", "-date_filed")
+        )
 
     @property
     def parentheticals(self):
@@ -2878,6 +2902,8 @@ class OpinionCluster(AbstractDateTimeModel):
     def ordered_opinions(self):
         # Fetch all sub-opinions ordered by ordering_key
         sub_opinions = self.sub_opinions.all().order_by("ordering_key")
+        if self.sub_opinions.filter(main_version__isnull=False).exists():
+            sub_opinions = sub_opinions.filter(main_version__isnull=True)
 
         # Check if there is more than one sub-opinion
         if sub_opinions.count() > 1:
@@ -3003,7 +3029,7 @@ class BaseCitation(models.Model):
 
 
 @pghistory.track()
-class Citation(BaseCitation):
+class Citation(BaseCitation, AbstractDateTimeModel):
     """A citation to an OpinionCluster"""
 
     cluster = models.ForeignKey(
@@ -3305,6 +3331,7 @@ class Opinion(AbstractDateTimeModel):
             "html_anon_2020",
             "html",
             "plain_text",
+            "html_with_citations",
             "sha1",
             "ordering_key",
         ]
@@ -3784,3 +3811,77 @@ class SearchQuery(models.Model):
             models.Index(fields=["date_created"]),
         ]
         verbose_name_plural = "Search Queries"
+
+
+class ClusterRedirection(models.Model):
+    """Model to prevent dead /opinion/ links"""
+
+    VERSION = 1
+    DUPLICATE = 2
+    CONSOLIDATION = 3
+    SEALED = 4
+    REDIRECTION_REASON = (
+        (
+            VERSION,
+            "Cluster replaced by a newer version of the same opinion",
+        ),
+        (DUPLICATE, "Cluster removed as a duplicate"),
+        (
+            CONSOLIDATION,
+            "Spread opinions were consolidated in a single cluster (e.g., a dissent opinion added to a cluster containing the majority opinion)",
+        ),
+        (SEALED, "Cluster removed by court order"),
+    )
+    date_created = models.DateTimeField(
+        help_text="Datetime when the record was created.",
+        auto_now_add=True,
+    )
+    deleted_cluster_id = models.IntegerField(unique=True)
+    cluster = models.ForeignKey(
+        OpinionCluster,
+        help_text="The existing cluster the deleted clusters now point to",
+        related_name="merged_clusters",
+        # if a cluster with `merged_cluster` is to be deleted, it will raise
+        # an IntegrityError. User should assign a different cluster before
+        # deleting the current cluster
+        on_delete=models.DO_NOTHING,
+        # need null values for SEALED opinions
+        null=True,
+    )
+    reason = models.SmallIntegerField(
+        help_text="The reason why the old cluster was deleted",
+        choices=REDIRECTION_REASON,
+    )
+
+    @classmethod
+    def create_from_clusters(
+        cls,
+        cluster_to_keep: OpinionCluster,
+        cluster_to_delete: OpinionCluster,
+        reason: int,
+    ):
+        """Create a ClusterRedirection entry from two OpinionCluster objects
+
+        Accounts for redirections pointing to the cluster to delete
+        Deletion of the `cluster_to_delete` is left to the caller
+
+        :param cluster_to_keep: the redirection will point to this cluster
+        :param cluster_to_delete: this id will go into deleted_cluster_id
+        :param reason: one of ClusterRedirection.REDIRECTION_REASON
+        """
+        if reason not in [i[0] for i in cls.REDIRECTION_REASON]:
+            raise ValueError("Invalid value for `ClusterRedirection.reason`")
+
+        with transaction.atomic():
+            # the cluster to delete has ClusterRedirection entries pointing to
+            # it, make them point to the new cluster to keep
+            if cluster_to_delete.merged_clusters.exists():
+                cluster_to_delete.merged_clusters.update(
+                    cluster=cluster_to_keep
+                )
+
+            ClusterRedirection.objects.get_or_create(
+                deleted_cluster_id=cluster_to_delete.id,
+                cluster=cluster_to_keep,
+                reason=reason,
+            )

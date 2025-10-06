@@ -288,7 +288,7 @@ class Command(VerboseCommand):
                 webhook.version for webhook in user_webhooks
             }
             if rate == Alert.REAL_TIME:
-                if not user.profile.is_member:
+                if not user.profile.is_eligible_for_rt_search_alerts:
                     continue
 
             hits = []

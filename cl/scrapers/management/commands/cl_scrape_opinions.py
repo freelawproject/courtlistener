@@ -10,11 +10,12 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
-from juriscraper.lib.exceptions import InvalidDocumentError
+from juriscraper.lib.exceptions import BadContentError, InvalidDocumentError
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
+from cl import settings
 from cl.alerts.models import RealTimeQueue
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
@@ -22,20 +23,19 @@ from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
-    BadContentError,
     ConsecutiveDuplicatesError,
     SingleDuplicateError,
 )
 from cl.scrapers.tasks import extract_opinion_content
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
-    get_binary_content,
     get_child_court,
     get_extension,
     make_citation,
     save_response,
     signal_handler,
     update_or_create_docket,
+    update_or_create_originating_court_information,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -45,6 +45,7 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
 )
 
 # for use in catching the SIGINT (Ctrl+4)
@@ -58,7 +59,13 @@ def make_objects(
     court: Court,
     sha1_hash: str,
     content: bytes,
-) -> tuple[Docket, Opinion, OpinionCluster, list[Citation]]:
+) -> tuple[
+    Docket,
+    Opinion,
+    OpinionCluster,
+    list[Citation],
+    OriginatingCourtInformation,
+]:
     """Takes the meta data from the scraper and associates it with objects.
 
     The keys returned by juriscraper scrapers are defined by `self._all_attrs`
@@ -92,6 +99,12 @@ def make_objects(
         blocked=blocked,
         date_blocked=date_blocked,
         appeal_from_str=item.get("lower_courts", ""),
+        appeal_from_id=item.get("lower_court_ids", ""),
+    )
+    originating_court_info = update_or_create_originating_court_information(
+        docket,
+        item.get("lower_court_numbers", ""),
+        item.get("lower_court_judges", ""),
     )
 
     # Note that if opinion.author_str has no value, and cluster.judges find
@@ -144,7 +157,7 @@ def make_objects(
     opinion.local_path.save(file_name, cf, save=False)
     check_duplicate_ingestion(opinion.local_path.name)
 
-    return docket, opinion, cluster, citations
+    return docket, opinion, cluster, citations, originating_court_info
 
 
 @transaction.atomic
@@ -155,6 +168,14 @@ def save_everything(
     """Saves all the sub items and associates them as appropriate."""
     docket, cluster = items["docket"], items["cluster"]
     opinion, citations = items["opinion"], items["citations"]
+    originating_court_info = items.get("originating_court_information")
+
+    # if the docket already had a related `originating_court_information`
+    # the update was saved in the `make_objects` call
+    if originating_court_info and not docket.originating_court_information:
+        originating_court_info.save()
+        docket.originating_court_information = originating_court_info
+
     docket.save()
     cluster.docket = docket
     cluster.save()
@@ -250,6 +271,9 @@ class Command(ScraperCommand):
 
         logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
 
+        # do not update the site hash on a backscrape or manual full crawl
+        update_site_hash = not full_crawl
+
         added = 0
         for i, item in enumerate(site):
             try:
@@ -264,12 +288,11 @@ class Command(ScraperCommand):
                 added += 1
             except ConsecutiveDuplicatesError:
                 break
-            except (
-                SingleDuplicateError,
-                BadContentError,
-                InvalidDocumentError,
-            ):
+            except SingleDuplicateError:
                 pass
+            except (BadContentError, InvalidDocumentError):
+                # do not update site hash to ensure a retry on the next scrape
+                update_site_hash = False
 
         # Update the hash if everything finishes properly.
         logger.debug(
@@ -279,8 +302,8 @@ class Command(ScraperCommand):
             len(site),
             self.scrape_target_descr,
         )
-        if not full_crawl:
-            # Only update the hash if no errors occurred.
+
+        if update_site_hash:
             dup_checker.update_site_hash(site.hash)
 
     def ingest_a_case(
@@ -295,7 +318,9 @@ class Command(ScraperCommand):
         if item.get("content"):
             content = item.pop("content")
         else:
-            content = get_binary_content(item["download_urls"], site)
+            content = site.download_content(
+                item["download_urls"], media_root=settings.MEDIA_ROOT
+            )
 
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
@@ -334,8 +359,8 @@ class Command(ScraperCommand):
 
         child_court = get_child_court(item.get("child_courts", ""), court.id)
 
-        docket, opinion, cluster, citations = make_objects(
-            item, child_court or court, sha1_hash, content
+        docket, opinion, cluster, citations, originating_court_info = (
+            make_objects(item, child_court or court, sha1_hash, content)
         )
 
         save_everything(
@@ -344,6 +369,7 @@ class Command(ScraperCommand):
                 "opinion": opinion,
                 "cluster": cluster,
                 "citations": citations,
+                "originating_court_information": originating_court_info,
             }
         )
         extract_opinion_content.delay(

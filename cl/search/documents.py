@@ -752,11 +752,9 @@ class PositionDocument(PersonBaseDocument):
         fields={"raw": fields.KeywordField()},
     )
     appointer = fields.TextField(
-        attr="appointer.person.name_full_reverse",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="appointer.person.name_full_reverse",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
             ),
@@ -832,6 +830,18 @@ class PositionDocument(PersonBaseDocument):
     class Django:
         model = Position
         ignore_signals = True
+
+    def prepare_appointer(self, instance):
+        if instance.appointer:
+            return instance.appointer.person.name_full_reverse
+
+    def prepare_predecessor(self, instance):
+        if instance.predecessor:
+            return instance.predecessor.name_full_reverse
+
+    def prepare_supervisor(self, instance):
+        if instance.supervisor:
+            return instance.supervisor.name_full_reverse
 
     def prepare_position_type(self, instance):
         return instance.get_position_type_display()
@@ -918,9 +928,7 @@ class PositionDocument(PersonBaseDocument):
 
 @people_db_index.document
 class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
-    name_reverse = fields.KeywordField(
-        attr="name_full_reverse",
-    )
+    name_reverse = fields.KeywordField()
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
     absolute_url = fields.KeywordField()
@@ -989,6 +997,9 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
             DATE_GRANULARITIES
         ).get(x, x)
         return transformations
+
+    def prepare_name_reverse(self, instance):
+        return instance.name_full_reverse
 
     def prepare_person_child(self, instance):
         return "person"

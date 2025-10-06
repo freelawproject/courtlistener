@@ -1,0 +1,55 @@
+{% load svg_tags %}
+
+<c-vars request search_form/>
+
+<fieldset x-bind:id="fieldsetIds.opinions" class="contents" x-show="isActiveScope" data-scope="Case Law">
+  <legend class="sr-only">Case law filters</legend>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.case_name.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.case_name }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.docket_number.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.docket_number }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.citation.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.citation }}
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    {{ search_form.judge.label_tag }}
+    <div class="focus-container input-text">
+      {{ search_form.judge }}
+    </div>
+  </div>
+
+  <c-corpus-search.date-selector
+    label="Filed After"
+    second_label="Filed Before"
+    :request="request"
+    date_after_field_name="filed_after"
+    date_before_field_name="filed_before"
+    date_after_placeholder="mm/dd/yyyy"
+    date_before_placeholder="mm/dd/yyyy"
+    only
+  />
+
+  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+    <label>Precedential Status</label>
+    <div class="focus-container input-text">
+{#        {% for facet_field in facet_fields %}#}
+{#          <option value=""></option>#}
+{#        {% endfor %}#}
+    </div>
+  </div>
+</fieldset>

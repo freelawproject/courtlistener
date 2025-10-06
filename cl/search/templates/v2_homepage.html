@@ -1,8 +1,9 @@
 {% extends "new_base.html" %}
-{% load svg_tags component_tags %}
+{% load svg_tags component_tags humanize %}
 
 {% block head %}
   {% require_script "js/alpine/components/homepage.js" %}
+  {% require_script "js/alpine/components/corpus_search.js" %}
   {% require_script "js/alpine/composables/focus.js" %}
   {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 {% endblock %}
@@ -21,17 +22,77 @@
 {% block content_wrapper %}
 <div x-data="homepage">
   <div class="w-full flex flex-col bg-greyscale-100">
+    {#  HERO  #}
     <div class="flex flex-col justify-center items-center gap-6 p-5">
       {# CourtListener logo #}
       <div class="md:w-[310px] md:h-35 h-20 w-44">
         {% svg "logos/courtlistener" class="bg-greyscale-800" %}
       </div>
-      <h1 class="w-full text-center lg:text-display-sm-cooper text-xl">Search millions of opinions across hundreds of jurisdictions</h1>
+      {# Tagline #}
+      <h1 class="w-full text-center lg:text-display-sm-cooper text-xl" x-text="tagline"></h1>
+    </div>
+
+    {#  SEARCH TABS  #}
+    <div class="md:p-10 px-4 py-5">
+      {#   MOBILE SEARCH   #}
+      <div class="md:hidden bg-white rounded-2xl flex flex-col">
+        <c-corpus-search class="p-4 pt-2 w-full !flex-col" only>
+          <c-corpus-search.mobile.top-controls :request="request" only />
+          <c-corpus-search.mobile.dialog class="w-full mt-2" :request="request" :search_form="search_form" only>
+            <c-slot name="trigger_button">
+              <button
+                x-on:click="open"
+                x-bind:aria-controls="dialogId"
+                x-bind:aria-expanded="isOpen"
+                x-init="openAdvancedFilters"
+                aria-haspopup="dialog"
+                type="button"
+                class="w-full btn-outline bg-white h-12 justify-center text-md text-greyscale-600 gap-2"
+              >
+                {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
+                Filters
+              </button>
+            </c-slot>
+          </c-corpus-search.mobile.dialog>
+          <div class="md:hidden w-full py-4">
+            <c-corpus-search.button class="w-full justify-center h-12 text-md gap-2">
+              {% svg "magnifier" class="text-white" aria_hidden="true" %} Search
+            </c-corpus-search.button>
+          </div>
+          <a href="{% url "coverage" %}" class="w-full flex items-center justify-center text-sm text-greyscale-600 gap-1 hover:text-greyscale-500">
+            {% svg "circle_question_mark" class="text-greyscale-400 hover:text-greyscale-300 h-4 w-4" %}
+            About This Data
+          </a>
+        </c-corpus-search>
+      </div>
+
+      {#   DESKTOP SEARCH   #}
+      <c-corpus-search class="capped-width max-md:hidden !flex-col" only>
+        {# Scope selector tabs #}
+        <c-corpus-search.scope
+          class="text-greyscale-600 hidden md:flex"
+          variant="tabs"
+          only
+        />
+
+        {# Search panel with advanced filters #}
+        <section class="bg-white flex flex-col rounded-b-2xl rounded-tr-2xl">
+          <div class="p-4 flex flex-row flex-nowrap">
+            <c-corpus-search.input class="rounded-l-xl" :request="request" only/>
+            <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
+              {% svg "magnifier" class="text-white" aria_hidden="true" %}
+            </c-corpus-search.button>
+          </div>
+          <div class="px-4">
+            <c-corpus-search.filters/>
+          </div>
+        </section>
+      </c-corpus-search>
     </div>
   </div>
 
   {# ACTION BUTTONS #}
-  <div class="relative w-full flex flex-row max-w-[1400px] mx-auto">
+  <div class="relative flex flex-row capped-width">
     {#  Left arrow button  #}
     <button
       type="button"
@@ -55,7 +116,7 @@
       aria-label="Homepage actions"
       tabindex="-1"
       style="scrollbar-color: #B5362D #FFFFFF"
-      class="relative w-full flex flex-row gap-2 max-w-[1400px] mx-auto overflow-auto justify-between md:p-10 px-4 py-11"
+      class="relative w-full flex flex-row gap-2 overflow-auto justify-between md:p-10 px-4 py-11"
     >
       <p class="sr-only">
         Use left and right arrow keys to scroll through the actions.
@@ -144,5 +205,67 @@
       {% svg "chevron" class="w-6 h-6 text-greyscale-500 -rotate-90" %}
     </button>
   </div>
+
+  {# PRODUCT STATS #}
+  <section
+    aria-labelledby="stats-title"
+    class="flex flex-row flex-wrap gap-5 capped-width px-4 py-11 justify-center"
+  >
+    <h2 id="stats-title" class="sr-only">CourtListener Statistics</h2>
+    <dl class="flex flex-col md:gap-5 gap-2.5 md:flex-row">
+      <div class="rounded-[20px] border border-greyscale-200 py-7 md:px-8 px-6 md:gap-6 gap-3 flex flex-col md:max-w-96">
+        {% svg "page_search" aria_hidden="true" class="text-greyscale-500" %}
+        <dt class="order-2 text-md text-greyscale-600">Number of decisions in our system</dt>
+        <dd class="order-1">
+          <data class="md:text-display-md text-display-sm font-cooper font-semibold" value="{{ opinion_count }}">{{ opinion_count|intword }}</data>
+        </dd>
+      </div>
+
+      <div class="grid gap-2.5 md:grid-cols-3 grid-cols-2">
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Number of federal cases in the RECAP Archive</dt>
+          <dt class="text-md order-2 text-greyscale-600 sm:hidden">Federal cases in the RECAP Archive</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ docket_count }}">{{ docket_count|intword }}</data>
+          </dd>
+        </div>
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Number of federal filings in the RECAP Archive</dt>
+          <dt class="text-md order-2 text-greyscale-600 sm:hidden">Federal filings in the RECAP Archive</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ recap_doc_count }}">{{ recap_doc_count|intword }}</data>
+          </dd>
+        </div>
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Minutes of oral argument recordings in our system</dt>
+          <dt class="text-md order-2 text-greyscale-600 sm:hidden">Minutes of audio recordings in our system</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ minutes_of_oa }}">{{ minutes_of_oa|intcomma|intword }}</data>
+          </dd>
+        </div>
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Number of searches conducted in the last ten days</dt>
+          <dt class="text-md order-2 text-greyscale-600 sm:hidden">Searches conducted in the last ten days</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ queries_in_last_ten }}">{{ queries_in_last_ten|intcomma }}</data>
+          </dd>
+        </div>
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Number of alert emails sent over the last ten days</dt>
+          <dt class="text-md order-2 text-greyscale-600 sm:hidden">Alert emails sent in the last ten days</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ alerts_in_last_ten }}">{{ alerts_in_last_ten|intcomma }}</data>
+          </dd>
+        </div>
+        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+          <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Number of API calls made in the last ten days</dt>
+          <dt class="text-md order-2 text-greyscale-600 sm:hidden">API calls made in the last ten days</dt>
+          <dd class="order-1">
+            <data class="text-md font-cooper font-semibold" value="{{ api_in_last_ten }}">{{ api_in_last_ten|intcomma }}</data>
+          </dd>
+        </div>
+      </div>
+    </dl>
+  </section>
 </div>
 {% endblock %}

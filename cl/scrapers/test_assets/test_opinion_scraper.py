@@ -55,11 +55,23 @@ class Site(OpinionSite):
         path = "//judge/text()"
         return list(self.html.xpath(path))
 
+    def _get_lower_court_numbers(self):
+        path = "//lower_court_number"
+        return [i.text for i in self.html.xpath(path)]
+
+    def _get_lower_court_judges(self):
+        path = "//lower_court_judge"
+        return [i.text for i in self.html.xpath(path)]
+
     def extract_from_text(self, scraped_text):
         metadata = {}
         docket_regex = r"Docket Number: (?P<docket>\d+-\d+)"
         disposition_regex = r"Disposition: (?P<disposition>\w+)"
         citation_regex = r"20\d{2} VT \d+"
+        originating_court_information_regex = (
+            r"Originating Court Docket Number: (?P<oci_docket_number>\d+-\d+)"
+        )
+
         if docket_match := re.search(docket_regex, scraped_text):
             metadata["Docket"] = {
                 "docket_number": docket_match.group("docket")
@@ -73,4 +85,16 @@ class Site(OpinionSite):
         if citation_match := re.search(citation_regex, scraped_text):
             metadata["Citation"] = citation_match.group(0)
 
+        if oci_match := re.search(
+            originating_court_information_regex, scraped_text
+        ):
+            metadata["OriginatingCourtInformation"] = {
+                "docket_number": oci_match.group("oci_docket_number")
+            }
+
         return metadata
+
+    @staticmethod
+    def cleanup_content(content):
+        """Implemented just to override OpinionSite.cleanup_content for tests"""
+        return content

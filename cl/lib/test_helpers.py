@@ -35,7 +35,7 @@ from cl.search.documents import DocketDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
     OpinionFactory,
@@ -48,7 +48,7 @@ from cl.search.models import (
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
 )
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 opinion_cluster_v3_v4_common_fields = {
@@ -834,7 +834,7 @@ class PrayAndPayTestCase(TestCase):
         super().setUpTestData()
 
 
-class CourtTestCase(SimpleTestCase):
+class CourtTestCase(TestCase):
     """Court test case factories"""
 
     @classmethod
@@ -856,7 +856,7 @@ class CourtTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class PeopleTestCase(SimpleTestCase):
+class PeopleTestCase(TestCase):
     """People test case factories"""
 
     @classmethod
@@ -1002,7 +1002,7 @@ class PeopleTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class SearchTestCase(SimpleTestCase):
+class SearchTestCase(TestCase):
     """Search test case factories"""
 
     @classmethod
@@ -1213,7 +1213,7 @@ class SearchTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class RECAPSearchTestCase(SimpleTestCase):
+class RECAPSearchTestCase(TestCase):
     """RECAP Search test case factories"""
 
     @classmethod
@@ -1226,7 +1226,7 @@ class RECAPSearchTestCase(SimpleTestCase):
         cls.judge_2 = PersonFactory.create(
             name_first="Persephone", name_last="Sinclair"
         )
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 case_name="SUBPOENAS SERVED ON",
@@ -1299,7 +1299,7 @@ class RECAPSearchTestCase(SimpleTestCase):
         cls.judge_4 = PersonFactory.create(
             name_first="Leopold", name_last="Featherstone"
         )
-        cls.de_1 = DocketEntryWithParentsFactory(
+        cls.de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 docket_number="12-1235",
                 court=cls.court_2,
@@ -1333,11 +1333,11 @@ class SerializeLockFileTestMixin(SerializeMixin):
 class SimpleUserDataMixin:
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()  # type: ignore
         UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUpTestData()  # type: ignore
 
 
 class SitemapTest(TestCase):
@@ -1385,11 +1385,12 @@ class SitemapTest(TestCase):
         )
 
 
-class AudioTestCase(SimpleTestCase):
+class AudioTestCase(TestCase):
     """Audio test case factories"""
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.audio_1 = AudioFactory.create(
             docket_id=1,
             duration=420,
@@ -1425,7 +1426,7 @@ class AudioTestCase(SimpleTestCase):
         super().tearDownClass()
 
 
-class AudioESTestCase(SimpleTestCase):
+class AudioESTestCase(TestCase):
     """Audio test case factories for ES"""
 
     fixtures = [
@@ -1436,6 +1437,7 @@ class AudioESTestCase(SimpleTestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.court_1 = CourtFactory(
             id="cabc",
             full_name="Testing Supreme Court",

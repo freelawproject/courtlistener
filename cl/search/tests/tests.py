@@ -3,19 +3,20 @@ import io
 import re
 from http import HTTPStatus
 from unittest import mock
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote_plus
 
 import pytz
 import time_machine
 from asgiref.sync import async_to_sync
 from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
+from django.contrib import admin, messages
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
-from django.test import Client, override_settings
+from django.test import Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
@@ -27,6 +28,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.audio.factories import AudioFactory
+from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.elasticsearch_utils import (
     build_daterange_query,
     simplify_estimated_count,
@@ -34,7 +36,7 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import AudioTestCase, CourtTestCase, PeopleTestCase
+from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -44,6 +46,7 @@ from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
+from cl.search.admin import OpinionClusterAdmin
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
@@ -57,10 +60,11 @@ from cl.search.documents import (
 from cl.search.exception import InvalidRelativeDateSyntax
 from cl.search.factories import (
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
+    OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
@@ -77,6 +81,7 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
+    ClusterRedirection,
     Court,
     Docket,
     DocketEntry,
@@ -92,7 +97,7 @@ from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
-from cl.users.factories import UserProfileWithParentsFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 class ModelTest(TestCase):
@@ -338,7 +343,7 @@ class DocketValidationTest(TestCase):
 class RECAPDocumentValidationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.docket_entry = DocketEntryWithParentsFactory()
+        cls.docket_entry = DocketEntryFactory()
 
     def test_attachment_with_attachment_number(self):
         """Attachments with attachment_number should not raise ValidationError."""
@@ -422,7 +427,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             id="ga_child_l1_1", jurisdiction="FB", parent_court=cls.court_gand
         )
 
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
             docket=DocketFactory(
@@ -436,7 +441,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             docket=DocketFactory(court=cls.court, docket_number="123456"),
@@ -447,7 +452,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 plain_text="Motion",
             ),
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="America vs Bank",
             case_name_full="America vs Bank",
             docket=DocketFactory(
@@ -460,7 +465,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 plain_text="Strickland Motion 247",
             ),
         )
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="Johnson v. National",
             case_name_full="Johnson v. National",
             docket=DocketFactory(
@@ -475,7 +480,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             ),
         )
 
-        OpinionClusterFactoryWithChildrenAndParents(
+        OpinionClusterWithChildrenAndParentsFactory(
             case_name="California v. Nevada",
             case_name_full="California v. Nevada",
             docket=DocketFactory(
@@ -1559,8 +1564,22 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
             r.data["detail"], "The query contains unbalanced parentheses."
         )
 
+    @override_settings(KNN_SEARCH_ENABLED=True)
+    async def test_handle_long_semantic_input(self) -> None:
+        """Can we properly handle the InputTooLongError exception?"""
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "This is a test" * 100,
+            "semantic": True,
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("The input is too long to process.", r.data["detail"])
 
-class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
+
+class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
     These tests should exercise all aspects of using the search box and SERP.
@@ -1574,11 +1593,11 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
+        super().setUp()
         self.pandora_profile = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUp()
 
     def _perform_wildcard_search(self):
         searchbox = self.browser.find_element(By.ID, "id_q")
@@ -1672,7 +1691,6 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
             "Citations:",
             "Docket Number:",
             "Nature of Suit:",
-            "Full Case Name:",
         ]
         for header in headers:
             self.assertIn(header, [meta.text for meta in meta_data])
@@ -1832,7 +1850,8 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         # Dora remembers this Lissner guy and wonders if he's been involved
         # in any litigation. She types his name into the search box and hits
         # Enter
-        search_box.send_keys("lissner")
+        test_query_box = 'lissner OR "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce rutrumd"'
+        search_box.send_keys(test_query_box)
         search_box.submit()
 
         # The browser brings her to a search engine result page with some
@@ -1842,7 +1861,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
 
         self.assertIn("1 Opinion", result_count.text)
         search_box = get_with_wait(wait, (By.ID, "id_q"))
-        self.assertEqual("lissner", search_box.get_attribute("value"))
+        self.assertEqual(test_query_box, search_box.get_attribute("value"))
 
         facet_sidebar = get_with_wait(wait, (By.ID, "extra-search-fields"))
         self.assertIn("Precedential Status", facet_sidebar.text)
@@ -1870,14 +1889,16 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         btn.click()
 
         # After logging in, she goes to the homepage. From there, she goes back
-        # to where she was, which still has "lissner" in the search box.
+        # to where she was, which still has
+        # 'lissner OR "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce rutrumd"'
+        # in the search box.
         self.browser.get(results_url)
         page_text = get_with_wait(wait, (By.TAG_NAME, "body")).text
         self.assertNotIn(
             "Please enter a correct username and password.", page_text
         )
         search_box = get_with_wait(wait, (By.ID, "id_q"))
-        self.assertEqual("lissner", search_box.get_attribute("value"))
+        self.assertEqual(test_query_box, search_box.get_attribute("value"))
 
         # She now opens the modal for the form for creating an alert
         alert_bell = get_with_wait(
@@ -1894,7 +1915,14 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
         self.assertIn("How often should we notify you?", page_text)
-        get_with_wait(wait, (By.ID, "id_name"))
+        alert_name = get_with_wait(wait, (By.ID, "id_name"))
+        # Confirm the Alert name is truncated to 75 chars.
+        self.assertEqual(
+            len(alert_name.get_attribute("value")),
+            75,
+            "The Alert name doesn't match its size.",
+        )
+
         get_with_wait(wait, (By.ID, "id_rate"))
         btn = get_with_wait(wait, (By.ID, "alertSave"))
         self.assertEqual("Create Alert", btn.text)
@@ -1938,7 +1966,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         # We are taking advantage of the queries done with authenticated and
         # anonymous user to see if SearchQuery collection is working
         lookup = {
-            "get_params": "q=lissner",
+            "get_params": f"q={quote_plus(test_query_box)}",
             "user": None,
             "query_time_ms__gte": 0,
         }
@@ -2607,7 +2635,7 @@ class ESIndexingTasksUtils(TestCase):
             how_selected="e_part",
             nomination_process="fed_senate",
         )
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 docket_number="12-09876",
@@ -2767,7 +2795,7 @@ class SweepIndexerCommandTest(
     def setUpTestData(cls):
         super().setUpTestData()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
-        cls.de = DocketEntryWithParentsFactory(
+        cls.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 date_filed=datetime.date(2015, 8, 16),
@@ -2788,7 +2816,7 @@ class SweepIndexerCommandTest(
             attachment_number=2,
             document_type=RECAPDocument.ATTACHMENT,
         )
-        cls.de_1 = DocketEntryWithParentsFactory(
+        cls.de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court,
                 date_filed=datetime.date(2016, 8, 16),
@@ -3498,3 +3526,170 @@ class OpinionQuerySetWithBestTextTest(TestCase):
 
         self.assertEqual(o_plain_text.best_text, "Plain text fallback")
         self.assertEqual(o_plain_text.best_text_source, "plain_text")
+
+
+class AdminActionsTest(TestCase):
+    def setUp(self):
+        self.site = admin.site
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.factory = RequestFactory()
+        cls.court_1 = CourtFactory(id="nyappdiv")
+        cls.court_2 = CourtFactory(id="ca6")
+
+        cls.cluster_1 = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court_1,
+                case_name="Lorem v. Ipsum",
+                case_name_full="Lorem v. Ipsum",
+            ),
+            case_name="Lorem v. Ipsum",
+            date_filed=datetime.date.today(),
+            judges="Doe",
+        )
+
+        cls.docket_1 = DocketFactory(
+            court=cls.court_2,
+            source=Docket.HARVARD_AND_RECAP,
+        )
+        cls.de_1 = DocketEntryFactory(
+            docket=cls.docket_1,
+            entry_number=23,
+            date_filed=datetime.date(2015, 8, 4),
+            description="Main Document",
+        )
+        cls.cluster_2 = OpinionClusterFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            docket=cls.docket_1,
+            date_filed=datetime.date(2024, 8, 23),
+            case_name="Foo v. Bar",
+            source="U",
+        )
+
+        cls.user_1 = UserFactory()
+
+        cls.cluster_3 = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court_1,
+                case_name="Lorem v. Ipsum",
+                case_name_full="Lorem v. Ipsum",
+            ),
+            case_name="Lorem v. Ipsum",
+            date_filed=datetime.date.today(),
+            judges="Doe",
+        )
+
+        # The docket from the associated clusted has an user tag
+        cls.tag_1_user_1 = UserTagFactory(user=cls.user_1, name="tag_1_user_1")
+        cls.tag_1_user_1.dockets.add(cls.cluster_3.docket.pk)
+
+        # The cluster has an user note
+        cls.note_cluster_3_user_1 = NoteFactory(
+            user=cls.user_1,
+            cluster_id=cls.cluster_3,
+            notes="Note Test",
+        )
+
+    def test_seal_cluster_action(self):
+        """Test seal_clusters action in OpinionCluster admin page"""
+        # Test 1: Can we seal cluster without any blockages and create redirection?
+
+        cluster_pk = self.cluster_1.pk
+        docket_pk = self.cluster_1.docket.pk
+
+        # Call seal_clusters action.
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
+        clusters_admin.message_user = mock.Mock()
+        url = reverse("admin:search_opinioncluster_changelist")
+        request = self.factory.post(url)
+
+        queryset = OpinionCluster.objects.filter(pk=cluster_pk)
+        clusters_admin.seal_clusters(request, queryset)
+
+        # Check sealed correctly
+        clusters_admin.message_user.assert_called_once_with(
+            request,
+            "Sealed 1 cluster(s).",
+            messages.SUCCESS,
+        )
+        # Check docket has been removed
+        docket = Docket.objects.filter(pk=docket_pk)
+        self.assertEqual(
+            docket.count(),
+            0,
+            msg="Docket has not been removed after sealing the cluster.",
+        )
+        # Check cluster redirection has been created
+        redirection = ClusterRedirection.objects.filter(
+            reason=ClusterRedirection.SEALED,
+            deleted_cluster_id=cluster_pk,
+            cluster=None,
+        )
+        self.assertEqual(
+            redirection.count(),
+            1,
+            msg="Got incorrect number of ClusterRedirection results",
+        )
+        clusters_admin.message_user.reset_mock()
+
+        # Test 2: Can we seal a cluster but not removing the docket and create redirection?
+        cluster2_pk = self.cluster_2.pk
+        docket2_pk = self.cluster_2.docket.pk
+
+        queryset = OpinionCluster.objects.filter(pk=cluster2_pk)
+        clusters_admin.seal_clusters(request, queryset)
+
+        # Check sealed correctly
+        clusters_admin.message_user.assert_called_once_with(
+            request,
+            "Sealed 1 cluster(s).",
+            messages.SUCCESS,
+        )
+
+        # Check that docket has not been removed
+        docket = Docket.objects.filter(pk=docket2_pk)
+        self.assertEqual(
+            docket.count(),
+            1,
+            msg="Docket shouldn't have been removed after sealing the cluster.",
+        )
+
+        # Check that the cluster redirection was still created.
+        redirection = ClusterRedirection.objects.filter(
+            reason=ClusterRedirection.SEALED,
+            deleted_cluster_id=cluster2_pk,
+            cluster=None,
+        )
+        self.assertEqual(
+            redirection.count(),
+            1,
+            msg="Got more or less ClusterRedirection results",
+        )
+        clusters_admin.message_user.reset_mock()
+
+        # Test 3: Can we block seal if something is related to cluster? No, user related information exists
+        cluster3_pk = self.cluster_3.pk
+
+        queryset = OpinionCluster.objects.filter(pk=cluster3_pk)
+        clusters_admin.seal_clusters(request, queryset)
+
+        # Check cannot be sealed
+        clusters_admin.message_user.assert_called_once_with(
+            request,
+            f'ERROR: Problem sealing cluster id: {cluster3_pk} - <a href="/admin/search/opinioncluster/blocking-confirmation/{cluster3_pk}/" target="_blank">View Dependencies</a>',
+            messages.WARNING,
+        )
+
+        # Check blocking objects:
+        get_blocking_relations = clusters_admin.get_blocking_relations(
+            self.cluster_3
+        )
+
+        user_tag_qs = get_blocking_relations.get("favorites.UserTag")
+        self.assertTrue(user_tag_qs.exists())
+        self.assertIn(self.tag_1_user_1, user_tag_qs)
+
+        note_qs = get_blocking_relations.get("favorites.Note")
+        self.assertTrue(note_qs.exists())
+        self.assertIn(self.note_cluster_3_user_1, note_qs)

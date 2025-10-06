@@ -120,7 +120,8 @@ def import_tn_corpus(
                 op.cluster.case_name,
             )
 
-        docket, opinion, cluster, citations = make_objects(
+        # oci - originating_court_information is always `None`` for this import
+        docket, opinion, cluster, citations, oci = make_objects(
             make_item(case),
             courts[case["court"]],
             sha1_hash,

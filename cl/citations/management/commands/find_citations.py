@@ -102,10 +102,11 @@ class Command(VerboseCommand):
             help="Number of opinions in a single parent task",
         )
         parser.add_argument(
-            "--disconnect-elastic-signals",
+            "--disable-parenthetical-groups",
             action="store_true",
             default=False,
-            help="Disconnect ElasticSearch signals for ParentheticalGroups",
+            help="Do not create ParentheticalGroups and disconnect their "
+            "ElasticSearch signals",
         )
         parser.add_argument(
             "--disable-citation-count-update",
@@ -149,7 +150,9 @@ class Command(VerboseCommand):
             )
 
         # Use query chaining to build the query
-        query = Opinion.objects.all().order_by("pk")
+        query = Opinion.objects.filter(main_version__isnull=True).order_by(
+            "pk"
+        )
         if options.get("state"):
             court_ids = Courthouse.objects.filter(
                 state=options["state"]
@@ -180,13 +183,13 @@ class Command(VerboseCommand):
         if options.get("no_html_with_citations"):
             query = query.filter(html_with_citations="")
         if options.get("all"):
-            query = Opinion.objects.all()
+            query = Opinion.objects.filter(main_version__isnull=True)
             # force disconnection for batch jobs
-            disconnect_elastic_signals = True
+            disable_parenthetical_groups = True
             disable_citation_count_update = True
         else:
-            disconnect_elastic_signals = cast(
-                bool, options["disconnect_elastic_signals"]
+            disable_parenthetical_groups = cast(
+                bool, options["disable_parenthetical_groups"]
             )
             disable_citation_count_update = cast(
                 bool, options["disable_citation_count_update"]
@@ -201,7 +204,7 @@ class Command(VerboseCommand):
             cast(str, options["queue"]),
             cast(int, options["throttle_min_items"]),
             cast(int, options["opinions_per_task"]),
-            disconnect_elastic_signals,
+            disable_parenthetical_groups,
             disable_citation_count_update,
         )
 
@@ -235,7 +238,7 @@ class Command(VerboseCommand):
         queue_name: str,
         throttle_min_items: int = DEFAULT_THROTTLE_MIN_ITEMS,
         opinions_per_task: int = DEFAULT_OPINIONS_PER_TASK,
-        disconnect_elastic_signals: bool = False,
+        disable_parenthetical_groups: bool = False,
         disable_citation_count_update: bool = False,
     ) -> None:
         sys.stdout.write(f"Graph size is {self.count:d} nodes.\n")
@@ -255,7 +258,7 @@ class Command(VerboseCommand):
                 find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
                     args=(
                         chunk,
-                        disconnect_elastic_signals,
+                        disable_parenthetical_groups,
                         disable_citation_count_update,
                     ),
                     queue=queue_name,

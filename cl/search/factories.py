@@ -76,200 +76,6 @@ class CourtFactory(DjangoModelFactory):
                     raise (exp)
 
 
-class ParentheticalFactory(DjangoModelFactory):
-    class Meta:
-        model = Parenthetical
-
-    describing_opinion = SelfAttribute("described_opinion")
-    text = Faker("sentence")
-    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
-
-
-class ParentheticalGroupFactory(DjangoModelFactory):
-    class Meta:
-        model = ParentheticalGroup
-
-    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
-    size = Faker("random_int", min=1, max=100)
-
-
-class ParentheticalWithParentsFactory(ParentheticalFactory):
-    describing_opinion = SubFactory(
-        "cl.search.factories.OpinionWithParentsFactory",
-    )
-    described_opinion = SelfAttribute("describing_opinion")
-
-
-class OpinionFactory(DjangoModelFactory):
-    class Meta:
-        model = Opinion
-
-    author = SubFactory(PersonFactory)
-    author_str = LazyAttribute(
-        lambda self: self.author.name_full if self.author else ""
-    )
-    type = FuzzyChoice(Opinion.OPINION_TYPES, getter=lambda c: c[0])
-    sha1 = Faker("sha1")
-    plain_text = Faker("text", max_nb_chars=2000)
-
-
-class OpinionWithChildrenFactory(OpinionFactory):
-    parentheticals = RelatedFactory(
-        ParentheticalFactory,
-        factory_related_name="described_opinion",
-    )
-
-
-class CitationWithParentsFactory(DjangoModelFactory):
-    class Meta:
-        model = Citation
-
-    volume = Faker("random_int", min=1, max=100)
-    reporter = "U.S."
-    page = Faker("random_int", min=1, max=100)
-    type = 1
-    cluster = SubFactory(
-        "cl.search.factories.OpinionClusterFactoryWithChildrenAndParents",
-    )
-
-
-class OpinionWithParentsFactory(OpinionFactory):
-    cluster = SubFactory(
-        "cl.search.factories.OpinionClusterWithParentsFactory",
-    )
-
-
-class OpinionClusterFactory(DjangoModelFactory):
-    class Meta:
-        model = OpinionCluster
-
-    case_name_short = LazyAttribute(
-        lambda self: cnt.make_case_name_short(self.case_name)
-    )
-    case_name = Faker("case_name")
-    case_name_full = Faker("case_name", full=True)
-    date_filed = Faker("date")
-    slug = Faker("slug")
-    source = FuzzyChoice(SOURCES.NAMES, getter=lambda c: c[0])
-    precedential_status = FuzzyChoice(
-        PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
-    )
-
-
-class OpinionClusterFactoryWithChildren(OpinionClusterFactory):
-    sub_opinions = RelatedFactory(
-        OpinionWithChildrenFactory,
-        factory_related_name="cluster",
-    )
-
-
-class DocketParentMixin(DjangoModelFactory):
-    docket = SubFactory(
-        "cl.search.factories.DocketFactory",
-        # Set the case names on the docket to the ones on this object
-        # if it has them. Else generate the case name values.
-        case_name=LazyAttribute(
-            lambda self: getattr(
-                self.factory_parent,
-                "case_name",
-                Faker("case_name").evaluate(None, None, {"locale": None}),
-            )
-        ),
-        case_name_short=LazyAttribute(
-            lambda self: getattr(
-                self.factory_parent,
-                "case_name_short",
-                cnt.make_case_name_short(self.case_name),
-            )
-        ),
-        case_name_full=LazyAttribute(
-            lambda self: getattr(
-                self.factory_parent,
-                "case_name_full",
-                Faker("case_name", full=True).evaluate(
-                    None, None, {"locale": None}
-                ),
-            )
-        ),
-    )
-
-
-class OpinionClusterFactoryWithChildrenAndParents(
-    OpinionClusterFactory, DocketParentMixin
-):
-    sub_opinions = RelatedFactory(
-        OpinionWithChildrenFactory,
-        factory_related_name="cluster",
-    )
-    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED  # Always precedential
-
-
-class OpinionClusterWithParentsFactory(
-    OpinionClusterFactory,
-    DocketParentMixin,
-):
-    """Make an OpinionCluster with Docket parents"""
-
-    pass
-
-
-class DocketEntryFactory(DjangoModelFactory):
-    class Meta:
-        model = DocketEntry
-
-    description = Faker("text", max_nb_chars=750)
-    docket = SubFactory("cl.search.factories.DocketFactory")
-
-
-class RECAPDocumentFactory(DjangoModelFactory):
-    class Meta:
-        model = RECAPDocument
-
-    description = Faker("text", max_nb_chars=750)
-    docket_entry = SubFactory(DocketEntryFactory)
-    document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
-
-
-class DocketReuseParentMixin(DjangoModelFactory):
-    docket = Iterator(Docket.objects.all())
-
-
-class DocketEntryForDocketFactory(DjangoModelFactory):
-    class Meta:
-        model = DocketEntry
-
-    @classmethod
-    def _create(cls, model_class, *args, **kwargs):
-        """Override default docket"""
-        docket_id = kwargs.pop("parent_id", None)
-        if not docket_id:
-            return None
-        kwargs["docket_id"] = docket_id
-        manager = cls._get_manager(model_class)
-        return manager.create(*args, **kwargs)
-
-    description = Faker("text", max_nb_chars=750)
-
-
-class DocketEntryWithParentsFactory(
-    DocketEntryFactory,
-    DocketParentMixin,
-):
-    """Make a DocketEntry with Docket parents"""
-
-    pass
-
-
-class DocketEntryReuseParentsFactory(
-    DocketEntryFactory,
-    DocketReuseParentMixin,
-):
-    """Make a DocketEntry using existing Dockets as parents"""
-
-    pass
-
-
 class DocketFactory(DjangoModelFactory):
     class Meta:
         model = Docket
@@ -319,15 +125,99 @@ class DocketFactory(DjangoModelFactory):
             )
 
 
-class DocketWithChildrenFactory(DocketFactory):
-    clusters = RelatedFactory(
-        OpinionClusterFactoryWithChildren,
-        factory_related_name="docket",
+class ParentheticalFactory(DjangoModelFactory):
+    class Meta:
+        model = Parenthetical
+
+    describing_opinion = SelfAttribute("described_opinion")
+    text = Faker("sentence")
+    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+
+
+class ParentheticalGroupFactory(DjangoModelFactory):
+    class Meta:
+        model = ParentheticalGroup
+
+    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+    size = Faker("random_int", min=1, max=100)
+
+
+class ParentheticalWithParentsFactory(ParentheticalFactory):
+    describing_opinion = SubFactory(
+        "cl.search.factories.OpinionWithParentsFactory",
+    )
+    described_opinion = SelfAttribute("describing_opinion")
+
+
+class OpinionFactory(DjangoModelFactory):
+    class Meta:
+        model = Opinion
+
+    author = SubFactory(PersonFactory)
+    author_str = LazyAttribute(
+        lambda self: self.author.name_full if self.author else ""
+    )
+    type = FuzzyChoice(Opinion.OPINION_TYPES, getter=lambda c: c[0])
+    sha1 = Faker("sha1")
+    plain_text = Faker("text", max_nb_chars=2000)
+
+
+class OpinionWithChildrenFactory(OpinionFactory):
+    parentheticals = RelatedFactory(
+        ParentheticalFactory,
+        factory_related_name="described_opinion",
     )
 
 
-class OpinionClusterFactoryMultipleOpinions(
-    OpinionClusterFactory, DocketParentMixin
+class OpinionWithParentsFactory(OpinionFactory):
+    cluster = SubFactory(
+        "cl.search.factories.OpinionClusterWithParentsFactory",
+    )
+
+
+class OpinionClusterFactory(DjangoModelFactory):
+    class Meta:
+        model = OpinionCluster
+
+    case_name_short = LazyAttribute(
+        lambda self: cnt.make_case_name_short(self.case_name)
+    )
+    case_name = Faker("case_name")
+    case_name_full = Faker("case_name", full=True)
+    date_filed = Faker("date")
+    slug = Faker("slug")
+    source = FuzzyChoice(SOURCES.NAMES, getter=lambda c: c[0])
+    precedential_status = FuzzyChoice(
+        PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
+    )
+
+
+class OpinionClusterWithChildrenFactory(OpinionClusterFactory):
+    sub_opinions = RelatedFactory(
+        OpinionWithChildrenFactory,
+        factory_related_name="cluster",
+    )
+
+
+class OpinionClusterWithParentsFactory(OpinionClusterFactory):
+    """Make an OpinionCluster with Docket parents"""
+
+    docket = SubFactory(
+        DocketFactory,
+        case_name=SelfAttribute("..case_name"),
+        case_name_full=SelfAttribute("..case_name_full"),
+        case_name_short=SelfAttribute("..case_name_short"),
+    )
+
+
+class OpinionClusterWithChildrenAndParentsFactory(
+    OpinionClusterWithChildrenFactory, OpinionClusterWithParentsFactory
+):
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED  # Always precedential
+
+
+class OpinionClusterWithMultipleOpinionsFactory(
+    OpinionClusterWithParentsFactory
 ):
     """Make an OpinionCluster with Docket parent and multiple opinions"""
 
@@ -342,18 +232,133 @@ class OpinionClusterFactoryMultipleOpinions(
     precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
 
 
+class CitationWithParentsFactory(DjangoModelFactory):
+    class Meta:
+        model = Citation
+
+    volume = Faker("random_int", min=1, max=100)
+    reporter = "U.S."
+    page = Faker("random_int", min=1, max=100)
+    type = 1
+    cluster = SubFactory(OpinionClusterWithChildrenAndParentsFactory)
+
+
+class DocketEntryFactory(DjangoModelFactory):
+    class Meta:
+        model = DocketEntry
+
+    description = Faker("text", max_nb_chars=750)
+    docket = SubFactory(DocketFactory)
+
+
+class RECAPDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = RECAPDocument
+
+    description = Faker("text", max_nb_chars=750)
+    docket_entry = SubFactory(DocketEntryFactory)
+    document_type = RECAPDocument.PACER_DOCUMENT
+    pacer_doc_id = Faker("numerify", text="%#####")
+
+    @classmethod
+    def _generate(cls, strategy, params):
+        """
+        If document_number is specified, also set the DocketEntry's
+        entry_number.
+        """
+        if params.get("document_number", ""):
+            params["docket_entry__entry_number"] = params["document_number"]
+        return super()._generate(strategy, params)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        obj = model_class(*args, **kwargs)
+        cls._fixup(obj)
+        obj.save()
+        return obj
+
+    @classmethod
+    def _fixup(cls, obj):
+        """
+        If the document has a DocketEntry that is part of a Docket and it
+        doesn't have an entry_number, set it to the highest entry in the docket
+        and then set the document_number to match.
+        """
+        if (
+            not obj.document_number
+            and (de := obj.docket_entry)
+            and (d := de.docket)
+        ):
+            if not de.entry_number:
+                de.entry_number = 1
+                if d.docket_entries.exclude(entry_number=None).exists():
+                    de.entry_number += (
+                        d.docket_entries.exclude(entry_number=None)
+                        .order_by("-entry_number")
+                        .values_list("entry_number")[0][0]
+                    )
+                de.save()
+            obj.document_number = str(de.entry_number)
+
+
+class RECAPAttachmentFactory(RECAPDocumentFactory):
+    document_type = RECAPDocument.ATTACHMENT
+
+    @classmethod
+    def _fixup(cls, obj):
+        """
+        If an attachment_number wasn't specificed, then set it to the highest
+        for the docket entry.
+        """
+        super()._fixup(obj)
+        if not obj.attachment_number and (de := obj.docket_entry):
+            obj.attachment_number = 1
+            if de.recap_documents.exclude(attachment_number=None).exists():
+                obj.attachment_number += (
+                    de.recap_documents.exclude(attachment_number=None)
+                    .order_by("-attachment_number")
+                    .values_list("attachment_number")[0][0]
+                )
+
+
+class DocketEntryForDocketFactory(DjangoModelFactory):
+    class Meta:
+        model = DocketEntry
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        """Override default docket"""
+        docket_id = kwargs.pop("parent_id", None)
+        if not docket_id:
+            return None
+        kwargs["docket_id"] = docket_id
+        manager = cls._get_manager(model_class)
+        return manager.create(*args, **kwargs)
+
+    description = Faker("text", max_nb_chars=750)
+
+
+class DocketEntryReuseParentsFactory(DocketEntryFactory):
+    """Make a DocketEntry using existing Dockets as parents"""
+
+    docket = Iterator(Docket.objects.all())
+
+
+class DocketWithChildrenFactory(DocketFactory):
+    clusters = RelatedFactory(
+        OpinionClusterWithChildrenFactory,
+        factory_related_name="docket",
+    )
+
+
 class OpinionsCitedWithParentsFactory(DjangoModelFactory):
     """Make a OpinionCited with Opinion parents"""
 
     class Meta:
         model = OpinionsCited
 
-    citing_opinion = SubFactory(
-        "cl.search.factories.OpinionFactory",
-    )
-    cited_opinion = SubFactory(
-        "cl.search.factories.OpinionFactory",
-    )
+    citing_opinion = SubFactory(OpinionFactory)
+    cited_opinion = SubFactory(OpinionFactory)
 
 
 class BankruptcyInformationFactory(DjangoModelFactory):
@@ -370,12 +375,8 @@ class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
     class Meta:
         model = OpinionsCitedByRECAPDocument
 
-    citing_document = SubFactory(
-        "cl.search.factories.RECAPDocumentFactory",
-    )
-    cited_opinion = SubFactory(
-        "cl.search.factories.OpinionFactory",
-    )
+    citing_document = SubFactory(RECAPDocumentFactory)
+    cited_opinion = SubFactory(OpinionFactory)
 
 
 class EmbeddingDataFactory(DictFactory):

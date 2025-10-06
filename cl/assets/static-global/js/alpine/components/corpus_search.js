@@ -1,25 +1,66 @@
+const fieldsetIdSeeds = {
+  opinions: 'o-fieldset',
+  recap: 'r-fieldset',
+  oralArgs: 'oa-fieldset',
+  judges: 'p-fieldset',
+};
+
 document.addEventListener('alpine:init', () => {
+  /** STORE
+   * Values are shared across component instances.
+   * */
   Alpine.store('corpusSearch', {
     scopeMenuExpanded: false,
     selected: 'Case Law',
+    keywordQuery: '',
     searchScopes: [
-      { label: 'Case Law', type: 'o' },
-      { label: 'RECAP Archive', type: 'r' },
-      { label: 'Oral Arguments', type: 'oa' },
-      { label: 'Judges', type: 'p' },
+      {
+        label: 'Case Law',
+        type: 'o',
+        shortDescription: '10M+ Opinions',
+        fieldset: fieldsetIdSeeds['opinions'],
+      },
+      {
+        label: 'RECAP Archive',
+        type: 'r',
+        shortDescription: '500M+ Records',
+        fieldset: fieldsetIdSeeds['recap'],
+      },
+      {
+        label: 'Oral Arguments',
+        type: 'oa',
+        shortDescription: '90k+ Audio Files',
+        fieldset: fieldsetIdSeeds['oralArgs'],
+      },
+      {
+        label: 'Judges',
+        type: 'p',
+        shortDescription: '15k+ Profiles',
+        fieldset: fieldsetIdSeeds['judges'],
+      },
     ],
+    get selectedScope() {
+      const index = this.searchScopes.findIndex((scope) => scope.label === this.selected);
+      if (index === -1) return 'o';
+      return this.searchScopes[index];
+    },
   });
+
+  /** DATA
+   * Each component instance has its own values.
+   * */
   Alpine.data('search', () => ({
+    ...createUtils(),
+    advancedFiltersExpanded: false,
+    advancedFiltersExpandedDesktop: false,
     get scopeMenuExpanded() {
       return this.$store.corpusSearch.scopeMenuExpanded;
     },
     get selectedScope() {
-      return this.$store.corpusSearch.selected;
+      return this.$store.corpusSearch.selectedScope;
     },
-    get selectedScopeType() {
-      const index = this.searchScopes.findIndex((scope) => scope.label === this.selectedScope);
-      if (index === -1) return 'o';
-      return this.searchScopes[index].type;
+    get keywordQuery() {
+      return this.$store.corpusSearch.keywordQuery;
     },
     get searchScopes() {
       return this.$store.corpusSearch.searchScopes;
@@ -28,7 +69,24 @@ document.addEventListener('alpine:init', () => {
       return this.scopeMenuExpanded ? 'transform rotate-180' : '';
     },
     get corpusSearchIdGroup() {
-      return ['scope-menu', 'corpus-search-input', 'trigger-button'];
+      const fieldsetIdGroup = [
+        fieldsetIdSeeds['opinions'],
+        fieldsetIdSeeds['recap'],
+        fieldsetIdSeeds['oralArgs'],
+        fieldsetIdSeeds['judges'],
+      ];
+      return ['scope-menu', 'trigger-button', ...fieldsetIdGroup];
+    },
+    get corpusInputIdGroup() {
+      return ['corpus-search-input'];
+    },
+    get fieldsetIds() {
+      return {
+        opinions: this.$id(fieldsetIdSeeds['opinions']),
+        recap: this.$id(fieldsetIdSeeds['recap']),
+        oralArgs: this.$id(fieldsetIdSeeds['oralArgs']),
+        judges: this.$id(fieldsetIdSeeds['judges']),
+      };
     },
     get menuId() {
       return this.$id('scope-menu');
@@ -42,11 +100,37 @@ document.addEventListener('alpine:init', () => {
     get inputElement() {
       return document.getElementById(this.inputId);
     },
+    get isActiveScope() {
+      return this.$el.dataset?.scope === this.$store.corpusSearch.selected;
+    },
     get triggerButtonId() {
       return this.$id('trigger-button');
     },
     get triggerButtonElement() {
       return document.getElementById(this.triggerButtonId);
+    },
+    get scopeTabClass() {
+      const baseClass =
+        'min-w-41 h-[58px] text-sm font-normal rounded-t-2xl text-greyscale-600 flex justify-center items-center';
+      return this.isActiveScope ? `${baseClass} bg-white` : `${baseClass} bg-greyscale-50`;
+    },
+    get scopeTabTitleClass() {
+      return this.isActiveScope ? 'font-semibold text-greyscale-900' : 'font-medium text-greyscale-700';
+    },
+    get advancedFiltersCollapsed() {
+      return !this.advancedFiltersExpanded;
+    },
+    updateKeyword(event) {
+      this.$store.corpusSearch.keywordQuery = event.target.value;
+    },
+    toggleAdvancedFiltersDesktop() {
+      this.advancedFiltersExpandedDesktop = !this.advancedFiltersExpandedDesktop;
+    },
+    toggleAdvancedFilters() {
+      this.advancedFiltersExpanded = !this.advancedFiltersExpanded;
+    },
+    openAdvancedFilters() {
+      this.advancedFiltersExpanded = true;
     },
     openScopeMenu() {
       this.$store.corpusSearch.scopeMenuExpanded = true;
@@ -64,8 +148,41 @@ document.addEventListener('alpine:init', () => {
       this.$store.corpusSearch.selected = this.$el.dataset?.scope;
       this.closeScopeMenu();
     },
-    isActiveScope() {
-      return this.$el.dataset?.scope === this.$store.corpusSearch.selected;
+
+    /**
+     * Enable fieldset for selected scope, and disable the rest.
+     *  */
+    updateFieldsets(newSelected) {
+      const updateFieldset = (scope) => {
+        const fieldsetId = this.$id(scope.fieldset);
+        const fieldsetEl = document.getElementById(fieldsetId);
+        if (!fieldsetEl) return;
+        if (newSelected === scope.label) fieldsetEl.removeAttribute('disabled');
+        else fieldsetEl.setAttribute('disabled', 'disabled');
+      };
+      this.searchScopes.forEach((scope) => updateFieldset(scope));
+    },
+
+    /**
+     * Disable empty fields to avoid unnecessary query params in search.
+     * Also disable inputs that are within the form but flagged to be ignored (e.g. date selector radio buttons to select date type)
+     *  */
+    onSubmit() {
+      const formInputs = Array.from(this.$el.elements).filter((el) => ['INPUT', 'SELECT'].includes(el.tagName));
+      formInputs.forEach((el) => {
+        const isEmpty = !el.value.trim();
+        const shouldIgnore = el.dataset?.ignoreInput === 'true';
+        if (isEmpty || shouldIgnore) {
+          el.setAttribute('disabled', 'disabled');
+        }
+      });
+    },
+
+    init() {
+      this.$watch('selectedScope', (newVal) => this.updateFieldsets(newVal.label));
+      this.onBreakpointChange(() => {
+        this.advancedFiltersExpandedDesktop = false;
+      });
     },
   }));
 });

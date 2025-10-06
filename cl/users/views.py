@@ -24,7 +24,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect
 from django.template.defaultfilters import urlencode
-from django.template.response import SimpleTemplateResponse, TemplateResponse
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
@@ -107,7 +107,7 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_docket_alerts(request: HttpRequest) -> HttpResponse:
+def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
     order_by_param = request.GET.get("order_by", "")
     if order_by_param.startswith("-"):
         direction = "-"
@@ -152,7 +152,8 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
         for col in name_map
     }
 
-    return SimpleTemplateResponse(
+    return TemplateResponse(
+        request,
         "profile/alerts.html",
         {
             "docket_alerts": docket_alerts,
@@ -401,6 +402,16 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
             "page": "profile_settings",
             "private": True,
         },
+    )
+
+
+@login_required
+def view_user_id(request: AuthenticatedHttpRequest) -> HttpResponse:
+    user = request.user
+    return TemplateResponse(
+        request,
+        "profile/cl_id.html",
+        {"user_id": user.pk, "private": True},
     )
 
 
