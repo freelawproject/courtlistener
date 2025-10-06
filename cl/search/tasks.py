@@ -553,28 +553,23 @@ def update_es_document(
         return
 
     embeddings = None
-    cache_key = None
     if should_check_for_embeddings and es_document_name == "OpinionDocument":
-        cache_key = f"{embeddings_cache_key()}o_{main_instance_id}"
-        embeddings = cache.get(cache_key)
-
+        storage = AWSMediaStorage()
+        embeddings = download_embedding(storage, main_instance_id)
         if not embeddings:
             logging.error(
-                "Expected cached embeddings for OpinionDocument %s, but none found",
+                "Expected embeddings for OpinionDocument %s, but none found",
                 main_instance_id,
             )
 
     if embeddings:
-        fields_values_to_update["embeddings"] = embeddings
+        fields_values_to_update["embeddings"] = embeddings["embeddings"]
 
     Document.update(
         es_doc,
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
-
-    if embeddings and cache_key:
-        cache.delete(cache_key)
 
     if (
         (
@@ -1803,6 +1798,8 @@ def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
         RemoteProtocolError,
         HTTPStatusError,
         ReadError,
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
     ),
     max_retries=5,
     retry_backoff=10,
@@ -1838,12 +1835,20 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
             log_invalid_embedding_errors(embeddings)
         return None
 
-    # Build a namespaced cache key for this opinion's embeddings
-    cache_prefix = embeddings_cache_key()
-    cache_key = f"{cache_prefix}o_{pk}"
-
-    # Store the embeddings JSON in cache for 30 minutes
-    cache.set(cache_key, embeddings.json()["embeddings"], 60 * 30)
+    # Save embeddings to S3.
+    storage = S3IntelligentTieringStorage()
+    file_contents = json.dumps(
+        {"id": pk, "embeddings": embeddings.json()["embeddings"]}
+    )
+    file_path = str(
+        PurePosixPath(
+            "embeddings",
+            "opinions",
+            settings.NLP_EMBEDDING_MODEL,
+            f"{pk}.json",
+        )
+    )
+    storage.save(file_path, ContentFile(file_contents))
 
 
 @app.task(
@@ -1978,6 +1983,35 @@ def save_embeddings(
     cache.delete(cache_key)
 
 
+def download_embedding(
+    storage: AWSMediaStorage, pk: int, directory: str = "opinions"
+) -> list[dict] | None:
+    """Download a single embedding from S3.
+
+    :param storage: Storage backend instance.
+    :param pk: The record ID.
+    :param directory: Directory where the embedding is stored.
+    :return: The embedding data as a dict, or None if not found.
+    """
+    file_path = str(
+        PurePosixPath(
+            "embeddings",
+            directory,
+            settings.NLP_EMBEDDING_MODEL,
+            f"{pk}.json",
+        )
+    )
+    logger.info("Attempting to retrieve embedding from: %s", file_path)
+    try:
+        with storage.open(file_path, "rb") as f:
+            file_contents = f.read().decode("utf-8")
+        embedding_data = json.loads(file_contents)
+        return embedding_data
+    except FileNotFoundError:
+        logger.error("Embeddings for opinion ID:%s doesn't exist.", pk)
+        return None
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -2000,35 +2034,12 @@ def retrieve_embeddings(
     :param directory: The directory where the embeddings are stored.
     :return: A list of dictionaries containing the embeddings.
     """
-
     storage = AWSMediaStorage()
-
-    def download_embedding(opinion_id: int) -> dict | None:
-        file_path = str(
-            PurePosixPath(
-                "embeddings",
-                directory,
-                settings.NLP_EMBEDDING_MODEL,
-                f"{opinion_id}.json",
-            )
-        )
-        logger.info("Attempting to retrieve embedding from: %s", file_path)
-        try:
-            with storage.open(file_path, "rb") as f:
-                file_contents = f.read().decode("utf-8")
-            embedding_data = json.loads(file_contents)
-            return embedding_data
-        except FileNotFoundError:
-            logger.error(
-                "Embeddings for opinion ID:%s doesn't exist.", opinion_id
-            )
-            return None
-
     embeddings: list[dict] = []
     # Download embeddings concurrently.
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
-            executor.submit(download_embedding, opinion_id)
+            executor.submit(download_embedding, storage, opinion_id, directory)
             for opinion_id in opinion_ids
         ]
         for future in concurrent.futures.as_completed(futures):
