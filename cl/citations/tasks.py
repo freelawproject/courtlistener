@@ -352,7 +352,7 @@ def store_opinion_citations_and_update_parentheticals(
         OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
         Parenthetical.objects.filter(describing_opinion_id=opinion.pk).delete()
 
-        # Create the new ones.
+        # Create the new ones
         OpinionsCited.objects.bulk_create(
             [
                 OpinionsCited(
@@ -361,6 +361,7 @@ def store_opinion_citations_and_update_parentheticals(
                     depth=len(_citations),
                 )
                 for _opinion, _citations in citation_resolutions.items()
+                if opinion.cluster_id != _opinion.cluster_id
             ]
         )
         Parenthetical.objects.bulk_create(parentheticals)

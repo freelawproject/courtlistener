@@ -1,11 +1,13 @@
 import json
 from datetime import date, datetime, timedelta
+from unittest import mock
 from unittest.mock import call, patch
 
 import eyecite
 import pytest
 import time_machine
 from bs4 import BeautifulSoup
+from celery.exceptions import Retry
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import call_command
@@ -16,6 +18,8 @@ from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
+from openai import RateLimitError
+from pydantic import ValidationError
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
@@ -31,6 +35,7 @@ from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
+from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
@@ -69,6 +74,7 @@ from cl.corpus_importer.signals import (
     update_latest_case_id_and_schedule_iquery_sweep,
 )
 from cl.corpus_importer.tasks import (
+    classify_case_name_by_llm,
     generate_ia_json,
     get_and_save_free_document_report,
     probe_or_scrape_iquery_pages,
@@ -138,6 +144,7 @@ from cl.search.models import (
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
+from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -3915,3 +3922,154 @@ class AWSManifestTest(TestCase):
         self.assertIn(old_audio_2.id, record_ids)
         # Verify that the old record that was not updated is NOT included
         self.assertNotIn(old_audio_3.id, record_ids)
+
+
+class LlmTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.court_ga = CourtFactory(id="gasd")
+        cls.opinion_cluster = OpinionClusterWithChildrenAndParentsFactory(
+            docket=DocketFactory(
+                court=cls.court_ga,
+                case_name="Carrecter v. Herrin",
+            ),
+            case_name="Carrecter v. Herrin",
+            case_name_short="Carrecter",
+            date_filed=date.today(),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="IN THE UNITED STATES DISTRICT COURT \nFOR THE SOUTHERN DISTRICT OF GEORGIA \nSTATESBORO DIVISION \n\nJMARKUS CARRECTER, \nPlaintiff,                           CIVIL ACTION NO.: 6:25-cv-17 \n      Vv.\nGEORGE HERRIN, JR., TYRONE OLIVER,  | \nand GREGORY DOZIER, \n            Defendants. \n\nORDER \n     The  Magistrate  Judge  issued  a  Report  and  Recommendation  for the  Court  to  dismiss \nPlaintiff's  cause  of  action.   Doc.  7.   Plaintiff did  not  file  Objections  to  this  Report  and \nRecommendation, and the time to do so has elapsed.  Accordingly, upon review, I find no clear \nerror  in  the  Magistrate  Judge’s  Report  and  Recommendation  and  ADOPT  the  Report  and \nRecommendation as the opinion of the Court.  See Macort v. Prem, Inc., 208 F. App’x 781, 784 \n(11th  Cir,  2006)  (If no  specific  objections  are  made  or  no  objections  are  made  at  all,  “the \nappropriate standard of review for the report and recommendation is clear error.”).  1 DISMISS \nwithout prejudice Plaintiffs Complaint, DIRECT the Clerk of Court to CLOSE this case and \nenter the appropriate judgment of dismissal, and DENY Plaintiff leave to file in forma pauperis. \n     SO ORDERED, this        day of September, 2025. \n\n                                               GL: \n                         /              BOL \n                        /       HONORABLEY’RANDAL HALL \n                        \\     UNITED STATES DISTRICT COURT \n                              SOUTHERN DISTRICT OF GEORGIA ",
+            ),
+        )
+
+        cls.de = DocketEntryFactory(
+            docket=cls.opinion_cluster.docket,
+            entry_number=8,
+        )
+        cls.recap_doc = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            pacer_doc_id="05705053987",
+            document_number="8",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        cls.valid_response = CaseNameExtractionResponse(
+            is_opinion=True,
+            case_name_short="Carrecter",
+            case_name="'Carrecter v. Herri",
+            case_name_full="JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+            case_name_match=True,
+            needs_ocr=False,
+            error=None,
+        )
+
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
+    @mock.patch("cl.corpus_importer.tasks.call_llm")
+    def test_classify_opinion_case_name_task_updates_fields(
+        self, mock_call_llm
+    ):
+        """Verifies that the classify_opinion_case_name_task updates OpinionCluster fields correctly"""
+        mock_call_llm.return_value = self.valid_response
+
+        classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
+
+        self.opinion_cluster.refresh_from_db()
+
+        self.assertEqual(
+            self.opinion_cluster.case_name_full,
+            "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.call_llm")
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
+    @mock.patch.object(classify_case_name_by_llm, "retry", autospec=True)
+    def test_classify_opinion_case_name_task_retries_on_ratelimit(
+        self, mock_retry, mock_call_llm
+    ):
+        """Tests that the task retries once when call_llm raises a RateLimitError,
+        then proceeds successfully with a valid response on retry.
+        """
+
+        error_body = b'{"error":{"message":"Rate limit exceeded","type":"rate_limit_exceeded"}}'
+        mock_response = MockResponse(429, error_body)
+        setattr(mock_response, "request", {})
+        setattr(mock_response, "headers", {"x-request-id": "1"})
+
+        # Side effect list: raise first, then return success json on retry
+        side_effects = [
+            RateLimitError(
+                "Rate limit exceeded", response=mock_response, body=error_body
+            ),
+            self.valid_response,
+        ]
+
+        def call_llm_side_effect(*args, **kwargs):
+            result = side_effects.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        mock_call_llm.side_effect = call_llm_side_effect
+
+        # patch retry so it raises celery.exceptions.Retry
+        mock_retry.side_effect = Retry()
+
+        with self.assertRaises(Retry):
+            # expected retry exception
+            classify_case_name_by_llm(
+                self.opinion_cluster.pk, self.recap_doc.pk
+            )
+
+        mock_retry.assert_called_once()
+
+        # After retry exception, manually call the task again with successful mock response
+        # to simulate the retry handling completing successfully.
+        mock_call_llm.side_effect = None
+        mock_call_llm.return_value = self.valid_response
+
+        classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
+        self.opinion_cluster.refresh_from_db()
+
+        self.assertEqual(
+            self.opinion_cluster.case_name_full,
+            "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.call_llm")
+    @mock.patch("cl.corpus_importer.tasks.logger")
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
+    def test_classify_case_name_by_llm_handles_validation_error(
+        self, mock_logger, mock_call_llm
+    ):
+        """Test that classify_case_name_by_llm catches Pydantic ValidationError from call_llm and handles it correctly
+        by logging and returning without an exception
+        """
+
+        mock_call_llm.side_effect = ValidationError.from_exception_data(
+            "Invalid data", line_errors=[]
+        )
+
+        result = classify_case_name_by_llm(
+            self.opinion_cluster.pk, self.recap_doc.pk
+        )
+
+        self.assertIsNone(result)
+
+        # Logger.error should have been called at least once with validation error message
+        mock_logger.error.assert_called()
+        called_messages = [
+            args[0] for args, _ in mock_logger.error.call_args_list
+        ]
+        self.assertTrue(
+            any(
+                "validation error" in message.lower()
+                for message in called_messages
+            )
+        )

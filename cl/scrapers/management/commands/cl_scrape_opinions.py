@@ -271,6 +271,9 @@ class Command(ScraperCommand):
 
         logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
 
+        # do not update the site hash on a backscrape or manual full crawl
+        update_site_hash = not full_crawl
+
         added = 0
         for i, item in enumerate(site):
             try:
@@ -285,12 +288,11 @@ class Command(ScraperCommand):
                 added += 1
             except ConsecutiveDuplicatesError:
                 break
-            except (
-                SingleDuplicateError,
-                BadContentError,
-                InvalidDocumentError,
-            ):
+            except SingleDuplicateError:
                 pass
+            except (BadContentError, InvalidDocumentError):
+                # do not update site hash to ensure a retry on the next scrape
+                update_site_hash = False
 
         # Update the hash if everything finishes properly.
         logger.debug(
@@ -300,8 +302,8 @@ class Command(ScraperCommand):
             len(site),
             self.scrape_target_descr,
         )
-        if not full_crawl:
-            # Only update the hash if no errors occurred.
+
+        if update_site_hash:
             dup_checker.update_site_hash(site.hash)
 
     def ingest_a_case(
