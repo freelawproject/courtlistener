@@ -20,7 +20,7 @@ from cl.api.models import (
     WebhookEventType,
     WebhookVersions,
 )
-from cl.donate.models import NeonMembership
+from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.lib.date_time import midnight_pt
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
@@ -70,7 +70,7 @@ class OpinionAlertsPercolatorTest(
         cls.rebuild_index("search.OpinionCluster")
         cls.user_profile = UserProfileWithParentsFactory()
         NeonMembership.objects.create(
-            level=NeonMembership.LEGACY, user=cls.user_profile.user
+            level=NeonMembershipLevel.LEGACY, user=cls.user_profile.user
         )
         cls.webhook_enabled = WebhookFactory(
             user=cls.user_profile.user,
