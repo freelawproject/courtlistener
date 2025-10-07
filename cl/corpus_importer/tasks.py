@@ -3187,7 +3187,7 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
 
     cluster_case_name_set = winnow_case_name(cluster_name)
     with transaction.atomic():
-        for field_name, new_case_name in changed_fields.items():
+        for field_name, new_case_name in changed_fields.items():  # type: str, str
             # Update only necessary fields
             setattr(obj, field_name, new_case_name)
             llm_case_name_set = winnow_case_name(new_case_name)
