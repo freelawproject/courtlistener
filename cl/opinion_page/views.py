@@ -868,24 +868,26 @@ async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
     """Generate the context for downloads
 
     :param cluster: The opinion cluster
-    :return: a dict containing a boolean if the cluster has downloads and string gile path to the pdf file
+    :return: a dict containing a boolean if the cluster has downloads and filepath as string
     """
     has_downloads = False
-    pdf_path = None
+    download_file_path = None
     if cluster.filepath_pdf_harvard:
         has_downloads = True
-        pdf_path = cluster.filepath_pdf_harvard.url
+        download_file_path = cluster.filepath_pdf_harvard.url
     else:
         async for sub_opinion in cluster.sub_opinions.all():
-            if str(sub_opinion.local_path).endswith(".pdf"):
+            if sub_opinion.download_url:
                 has_downloads = True
-                pdf_path = sub_opinion.local_path.url
+            if sub_opinion.local_path:
+                download_file_path = sub_opinion.local_path.url
+            if has_downloads and download_file_path:
                 break
-            elif sub_opinion.download_url:
-                has_downloads = True
-                pdf_path = None
 
-    return {"has_downloads": has_downloads, "pdf_path": pdf_path}
+    return {
+        "has_downloads": has_downloads,
+        "download_file_path": download_file_path,
+    }
 
 
 async def setup_opinion_context(

@@ -5,7 +5,7 @@
             aria-expanded="false">
         <i class="fa fa-file-o"></i>
     <span class="hidden-xs">
-        Download {% if "pdf" in pdf_path %}PDF{% elif "html" in pdf_path %}HTML{% elif "docx" in pdf_path %}DOCX{% elif "rtf" in pdf_path %}RTF{% else %} {% endif %} <span class="caret"></span>
+        Download {% if "pdf" in download_file_path %}PDF{% elif "html" in download_file_path %}HTML{% elif "docx" in download_file_path %}DOCX{% elif "rtf" in download_file_path %}RTF{% else %} {% endif %} <span class="caret"></span>
     </span></button>
     <ul class="dropdown-menu">
         {% if cluster.filepath_pdf_harvard %}
@@ -16,7 +16,7 @@
             </a>
           </li>
         {% endif %}
-        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+        {% for sub_opinion in cluster.opinion_main_version|dictsort:"type" %}
             {% if sub_opinion.local_path %}
                 <li>
                     <a href="{{ sub_opinion.local_path.url }}"
@@ -27,7 +27,7 @@
                 </li>
             {% endif %}
         {% endfor %}
-        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+        {% for sub_opinion in cluster.opinion_main_version|dictsort:"type" %}
             {% if sub_opinion.download_url %}
                 {% if forloop.counter == 1 %}
                     <li role="separator" class="divider"></li>
@@ -41,5 +41,14 @@
                 </li>
             {% endif %}
         {% endfor %}
+    {% if cluster.opinions_versions %}
+        <li role="separator" class="divider"></li>
+        <li><a href="#"><b>Versions</b></a></li>
+        {% for sub_opinion in cluster.opinions_versions %}
+            {% if sub_opinion.local_path %}
+                <li><a href="{{ sub_opinion.local_path.url }}" rel="nofollow">{{ sub_opinion.date_created }}</a></li>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
     </ul>
 </div>

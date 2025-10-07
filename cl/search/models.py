@@ -2914,11 +2914,16 @@ class OpinionCluster(AbstractDateTimeModel):
         return sub_opinions
 
     @cached_property
+    def opinion_main_version(self):
+        # Fetch opinion main version of the cluster
+        return self.sub_opinions.filter(main_version__isnull=True)
+
+    @cached_property
     def opinions_versions(self):
-        # Fetch all sub-opinions versions from cluster
+        # Fetch all sub-opinions versions from cluster, limit to 10 versions
         return self.sub_opinions.filter(main_version__isnull=False).order_by(
             "-date_created"
-        )
+        )[:10]
 
     def save(
         self,
