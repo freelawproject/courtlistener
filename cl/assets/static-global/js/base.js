@@ -115,6 +115,90 @@ $(document).ready(function () {
     $('#show-all-statuses').addClass('hidden');
   });
 
+  // Dark mode toggle
+  const COLOR_MODE_STORAGE_KEY = 'cl-color-mode';
+  const themeToggleElements = $('[data-theme-toggle]');
+
+  function readStoredTheme() {
+    try {
+      return window.localStorage.getItem(COLOR_MODE_STORAGE_KEY);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function storeThemePreference(theme) {
+    try {
+      window.localStorage.setItem(COLOR_MODE_STORAGE_KEY, theme);
+    } catch (error) {
+      // Ignore storage errors (e.g., private browsing restrictions)
+    }
+  }
+
+  function syncToggleState(isDark) {
+    themeToggleElements.each(function () {
+      const toggle = $(this);
+      toggle.attr('aria-pressed', isDark ? 'true' : 'false');
+      toggle.toggleClass('dark-mode-toggle--active', isDark);
+
+      const icon = toggle.find('.fa').first();
+      icon.toggleClass('fa-moon-o', !isDark);
+      icon.toggleClass('fa-sun-o', isDark);
+
+      const label = toggle.find('.dark-mode-toggle__label');
+      if (label.length) {
+        label.text(isDark ? 'Light Mode' : 'Dark Mode');
+      }
+    });
+  }
+
+  function applyTheme(theme, persist) {
+    const isDark = theme === 'dark';
+    $('body').toggleClass('dark-mode', isDark);
+    document.documentElement.dataset.colorMode = theme;
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    syncToggleState(isDark);
+    if (persist) {
+      storeThemePreference(theme);
+    }
+  }
+
+  if (themeToggleElements.length) {
+    const prefersDarkQuery = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+    const storedTheme = readStoredTheme();
+    const initialTheme = storedTheme || (prefersDarkQuery && prefersDarkQuery.matches ? 'dark' : 'light');
+
+    applyTheme(initialTheme, false);
+
+    if (prefersDarkQuery) {
+      const handlePreferenceChange = function (event) {
+        if (!readStoredTheme()) {
+          applyTheme(event.matches ? 'dark' : 'light', false);
+        }
+      };
+
+      if (typeof prefersDarkQuery.addEventListener === 'function') {
+        prefersDarkQuery.addEventListener('change', handlePreferenceChange);
+      } else if (typeof prefersDarkQuery.addListener === 'function') {
+        prefersDarkQuery.addListener(handlePreferenceChange);
+      }
+    }
+
+    themeToggleElements.on('click', function (event) {
+      event.preventDefault();
+      const nextTheme = $('body').hasClass('dark-mode') ? 'light' : 'dark';
+      applyTheme(nextTheme, true);
+    });
+
+    themeToggleElements.on('keydown', function (event) {
+      if (event.key === ' ' || event.key === 'Spacebar') {
+        event.preventDefault();
+        const nextTheme = $('body').hasClass('dark-mode') ? 'light' : 'dark';
+        applyTheme(nextTheme, true);
+      }
+    });
+  }
+
   ///////////////////////
   // Search submission //
   ///////////////////////
@@ -351,4 +435,3 @@ if (form && button) {
     button.disabled = true;
   });
 }
-
