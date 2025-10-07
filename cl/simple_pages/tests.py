@@ -184,7 +184,6 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             # Info pages
             {"viewname": "faq"},
             {"viewname": "feeds_info"},
-            {"viewname": "contribute"},
             {"viewname": "replication_docs"},
             {"viewname": "terms"},
             {"viewname": "robots"},

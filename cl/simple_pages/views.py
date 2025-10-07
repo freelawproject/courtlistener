@@ -401,10 +401,6 @@ async def podcasts(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def contribute(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "contribute.html", {"private": False})
-
-
 async def contact(
     request: HttpRequest,
     template_path: str = "contact_form.html",
