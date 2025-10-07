@@ -3162,19 +3162,25 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         logger.error("LLM - Invalid response type: %s", type(llm_response))
         return
 
-    case_name = llm_response.case_name or obj.case_name
-    case_name_full = llm_response.case_name_full or obj.case_name_full
+    llm_case_name = llm_response.case_name
+    llm_case_name_full = llm_response.case_name_full
+    dict_llm_response = llm_response.model_dump()
+    dict_llm_response["recap_document_id"] = recap_document_id
+
+    if not llm_case_name or not llm_case_name_full:
+        # We want to know when the LLM doesn't return a case name
+        logger.error("LLM - One case name is None", dict_llm_response)
 
     case_names_pairs = [
-        ("case_name_full", obj.case_name_full, case_name_full),
-        ("case_name", obj.case_name, case_name),
+        ("case_name_full", obj.case_name_full, llm_case_name_full),
+        ("case_name", obj.case_name, llm_case_name),
     ]
 
     # Check which values changed before updating the cluster
     changed_fields = {
-        name: new
-        for name, old, new in case_names_pairs
-        if new not in (None, "") and old != new
+        field_name: new_name
+        for field_name, old_name, new_name in case_names_pairs
+        if new_name not in (None, "") and old_name != new_name
     }
     if not changed_fields:
         return
@@ -3184,12 +3190,11 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         for field_name, new_case_name in changed_fields.items():
             # Update only necessary fields
             setattr(obj, field_name, new_case_name)
+            llm_case_name_set = winnow_case_name(new_case_name)
             # Check for overlap between cluster case name and extracted case name
-            overlap = winnow_case_name(new_case_name) & cluster_case_name_set
+            overlap = llm_case_name_set & cluster_case_name_set
             if not overlap:
                 # The name of the docket case and the opinion do not necessarily match, we log it for manual review
-                dict_llm_response = llm_response.model_dump()
-                dict_llm_response["recap_document_id"] = recap_document_id
                 logger.error(
                     "LLM - Case name did not match", dict_llm_response
                 )
