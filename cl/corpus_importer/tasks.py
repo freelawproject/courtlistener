@@ -3177,10 +3177,12 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     ]
 
     # Check which values changed before updating the cluster
-    changed_fields = {
+    changed_fields: dict[str, str] = {
         field_name: new_name
         for field_name, old_name, new_name in case_names_pairs
-        if new_name not in (None, "") and old_name != new_name
+        if isinstance(new_name, str)
+        and new_name != ""
+        and old_name != new_name
     }
     if not changed_fields:
         return
