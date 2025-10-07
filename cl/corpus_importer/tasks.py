@@ -3166,6 +3166,8 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     llm_case_name_full = llm_response.case_name_full
     dict_llm_response = llm_response.model_dump()
     dict_llm_response["recap_document_id"] = recap_document_id
+    dict_llm_response["cluster_case_name"] = obj.case_name
+    dict_llm_response["cluster_case_name_full"] = obj.case_name_full
 
     if not llm_case_name or not llm_case_name_full:
         # We want to know when the LLM doesn't return a case name
