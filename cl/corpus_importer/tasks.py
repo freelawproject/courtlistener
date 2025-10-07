@@ -3162,7 +3162,8 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         logger.error("LLM - Invalid response type: %s", type(llm_response))
         return
 
-    llm_case_name = llm_response.case_name
+    # Fallback to case_name_full if llm doesn't return case_name
+    llm_case_name = llm_response.case_name or llm_response.case_name_full
     llm_case_name_full = llm_response.case_name_full
     dict_llm_response = llm_response.model_dump()
     dict_llm_response["recap_document_id"] = recap_document_id
