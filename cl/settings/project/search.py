@@ -76,3 +76,10 @@ KNN_OVERSAMPLE = env.float("KNN_OVERSAMPLE", default=3.0)
 DOCKET_NUMBER_CLEANING_ENABLED = env.bool(
     "DOCKET_NUMBER_CLEANING_ENABLED", default=False
 )
+
+############################
+# CUSTOM RELEVANCE FACTORS #
+############################
+
+DATE_DECAY_BOOST = env.float("DATE_DECAY_FACTOR", default=1.0)
+JURISDICTION_BOOST = env.float("JURISDICTION_FACTOR", default=1.0)
