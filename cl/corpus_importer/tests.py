@@ -997,6 +997,61 @@ label="194">*194</page-number>
         )
         self.assertEqual(len(overlap), 0)
 
+    def test_winnow_case_name_function(self):
+        """Test winnow_case_name function to see if it can handle different case names
+
+        This function helps us to extract meaningful words from the case name so we can
+        compare against other case names and check for overlaps
+        """
+        test_pairs = [
+            ("D.L.M. v. T.J.S.", {"dlm", "tjs"}),
+            ("In the Matter of E. B.", {"eb"}),
+            ("R. L. C. R. v. L. Z. S.", {"rlcr", "lzs"}),
+            ("County v. A. D. B. County", {"adb"}),
+            (
+                "CATHERINE CHAN v. BELTON TECHNOLOGY INC.",
+                {"catherine", "chan", "belton", "technology"},
+            ),
+            (
+                "REHOBOTH Petroleum INC. v. PETROLEUM MARKETING GROUP, INC.",
+                {"rehoboth", "petroleum", "marketing", "group"},
+            ),
+            ("Langevin v. Andersen", {"langevin", "andersen"}),
+            (
+                "In re: Matter of Nicholas M. Wajda",
+                {"re", "nicholas", "wajda"},
+            ),
+            ("People v. Andersen", {"people", "andersen"}),
+            (
+                "MU TECH, INC. v. BELTON TECHNOLOGY INC. and CATHERINE CHAN KOK YIN and THOMAS LESS CHEUK WAI and MAJESTIC PLAN INVESTMENTS LIMITED and DOES 1 THRU 50",
+                {
+                    "mu",
+                    "tech",
+                    "belton",
+                    "technology",
+                    "catherine",
+                    "chan",
+                    "kok",
+                    "yin",
+                    "thomas",
+                    "less",
+                    "cheuk",
+                    "wai",
+                    "majestic",
+                    "plan",
+                    "investments",
+                    "limited",
+                    "does",
+                    "thru",
+                    "50",
+                },
+            ),
+        ]
+
+        for string, expected in test_pairs:
+            with self.subTest(case_name=string):
+                self.assertEqual(winnow_case_name(string), expected)
+
     def test_case_names_with_abbreviations(self):
         """
         Test what happens when the case name contains abbreviations
