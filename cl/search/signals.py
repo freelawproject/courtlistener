@@ -13,7 +13,11 @@ from cl.citations.tasks import (
 from cl.favorites.utils import send_prayer_emails
 from cl.lib.courts import get_cache_key_for_court_list
 from cl.lib.es_signal_processor import ESSignalProcessor
-from cl.lib.redis_utils import get_redis_interface
+from cl.lib.redis_utils import (
+    acquire_redis_lock,
+    get_redis_interface,
+    release_redis_lock,
+)
 from cl.people_db.models import (
     ABARating,
     Education,
@@ -672,13 +676,18 @@ def clean_docket_number_raw_and_update_redis_cache(
     )
     docket.docket_number = docket_number
 
-    # Add llm_batch to redis cache for later processing
+    # Add to redis cache for later processing
     if docket_id_llm:
-        r.sadd("docket_number_cleaning:llm_batch", docket_id_llm)
+        # Use a Redis lock to avoid race conditions when getting and updating the llm_batch.
+        key = "docket_number_cleaning:llm_batch"
+        lock_key = f"{key}:lock"
+        set_key = f"{key}:set"
 
-    # Log the redis size for monitoring
-    llm_batch_size = r.scard("docket_number_cleaning:llm_batch")
-    logger.info(f"LLM batch size in Redis: {llm_batch_size}")
+        lock_value = acquire_redis_lock(r, lock_key, 60 * 1000)
+        r.sadd(set_key, docket_id_llm)
+
+        # Release the lock once the whole process is complete.
+        release_redis_lock(r, lock_key, lock_value)
 
 
 @receiver(
