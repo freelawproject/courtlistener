@@ -35,6 +35,7 @@
       <li><a href="#pacer-fetch">PACER Fetch API</a></li>
       <ul>
         <li><a href="#monitoring">Monitoring</a></li>
+        <li><a href="#password-rotation">Password Rotation Requirement</a></li>
         <li><a href="#security">Security</a></li>
         <li><a href="#known-issues">Known Issues</a></li>
         <li><a href="#pdf">Purchasing PDFs</a></li>
@@ -126,6 +127,19 @@
   <p>To monitor your request, poll the API for your request, or use our <a href="{% url "webhooks_docs" %}#recap-fetch">Fetch Webhook</a> to get immediate updates without polling.</p>
   <p>We recommend using the webhook endpoint, since it reduces load on our servers.
   </p>
+
+  <h3 id="password-rotation">PACER Password Rotation Requirement</h3>
+  <p>
+    As of 2025, the federal judiciary requires that <strong>all PACER accounts change their passwords every 180 days.</strong>
+    Because the RECAP Fetch API uses your PACER credentials to log in and retrieve documents, this policy affects all Fetch API users.
+  </p>
+  <p>This means:</p>
+  <ul>
+    <li>You'll need to <strong>update your PACER password at least once every 180 days</strong>.
+    </li>
+    <li>If your password expires, the Fetch API will no longer be able to log in on your behalf until you update it.
+    </li>
+  </ul>
 
   <h3 id="security">Security of RECAP Fetch API</h3>
   <p>A security maxim is to never share your password. This API requires that you violate this maxim. Why should you do so, and how do we handle your password securely?
