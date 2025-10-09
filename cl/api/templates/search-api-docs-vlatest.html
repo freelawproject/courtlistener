@@ -153,19 +153,20 @@
   </p>
 
   <h3 id="semantic-search">Semantic Search vs. Keyword Search</h3>
-  <p>By default, queries will be sent to our keyword search engine. To use semantic search, special  <code>GET</code> parameters or <code>POST</code> requests are needed. Whether to use <code>GET</code> or <code>POST</code> depends on the privacy requirements of your application:
+  <p>By default, API requests will be handled by our keyword search engine.</p>
+  <p>To use semantic search instead, special <code>GET</code> parameters or <code>POST</code> requests are needed. Whether to use <code>GET</code> or <code>POST</code> depends on the privacy requirements of your application:
   </p>
   <ul>
     <li>
       <p><strong>GET</strong> — If you are able to send search queries to CourtListener, using a <code>GET</code> request is best and simplest.
       </p>
-      <p>To use it, add <code>semantic=true</code> to your request, and you will place a semantic query instead of a keyword query. It's that simple.
+      <p>To use semantic search with a <code>GET</code> request, add <code>semantic=true</code> to your request, and you will place a semantic query instead of a keyword query. It's that simple.
       </p>
     </li>
     <li>
       <p><strong>POST</strong> — If regulatory or privacy requirements prevent you from sending search queries to CourtListener — or if you just prefer a more private approach — we have another solution.
       </p>
-      <p>When you use a <code>GET</code> request, we receive the query, embed it on our system and calculate results. If you use a <code>POST</code> request, you can do the embedding in your system and send us only the resulting embedding, instead of sending the query.
+      <p>When you use a <code>GET</code> request, we receive the query, embed it on our system and calculate results. If you use a <code>POST</code> request, you can do the embedding in your system and send us <em>only</em> the resulting embedding, instead of sending the query.
       </p>
       <p>To <code>POST</code> pre-computed embeddings to this endpoint, include a JSON body in the POST request:
       </p>
