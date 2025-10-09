@@ -13,7 +13,7 @@ from cl.recap_rss.tasks import (
     check_if_feed_changed,
     mark_status_successful,
     merge_rss_feed_contents,
-    trim_rss_data,
+    trim_rss_feed_status,
 )
 from cl.search.models import Court
 
@@ -165,7 +165,7 @@ class Command(VerboseCommand):
                 seconds=self.DELAY_BETWEEN_CACHE_TRIMS
             )
             if last_trim_date is None or trim_cutoff_date > last_trim_date:
-                trim_rss_data.delay()
+                trim_rss_feed_status.delay()
                 last_trim_date = now()
 
             # Wait, then attempt the courts again if iterations not exceeded or
