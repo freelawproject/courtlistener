@@ -17,6 +17,7 @@ from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 from pytz import timezone
+from redis import Redis
 from requests import HTTPError
 
 from cl.alerts.tasks import enqueue_docket_alert
@@ -334,14 +335,13 @@ def get_rss_cache_key(item_hash: str) -> str:
     return f"{rss_cache_prefix()}:{item_hash}"
 
 
-def claim_item_hash(item_hash: str) -> bool:
+def claim_item_hash(r: Redis, item_hash: str) -> bool:
     """Attempt to claim an RSS item by its hash atomically.
 
+    :param r: Redis client instance.
     :param item_hash: A SHA1 hash you wish to cache.
     :return: True if this call claimed it, False if it was already claimed.
     """
-    r = get_redis_interface("CACHE")
-
     # Set expiration time to 2 days.
     return bool(
         r.set(get_rss_cache_key(item_hash), "", nx=True, ex=2 * 24 * 60 * 60)
@@ -370,9 +370,10 @@ def merge_rss_feed_contents(
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
     d_pks_to_alert = []
+    r = get_redis_interface("CACHE")
     for docket in feed_data:
         item_hash = hash_item(docket)
-        if not claim_item_hash(item_hash):
+        if not claim_item_hash(r, item_hash):
             # Omit the item. It's already in the cache (already seen).
             continue
 
