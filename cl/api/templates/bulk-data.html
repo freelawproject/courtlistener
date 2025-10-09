@@ -41,6 +41,7 @@
           <li><a href="#people-db">Judge Data</a></li>
           <li><a href="#audio-db">Oral Argument Data</a></li>
         </ul>
+        <li><a href="#embeddings">Embeddings</a></li>
         <li><a href="#odds-and-ends">Odds and Ends</a></li>
         <ul>
           <li><a href="#schedule">Data Generation Schedule</a></li>
@@ -165,6 +166,23 @@
 
     <h3 id="audio-db">Oral Argument Data</h3>
     <p>Our database of oral arguments is the largest in the world, but has a very simple structure consisting of only a single table that we export. That said, it relies on our court, judge, and docket data, so before you can import the oral argument data, you will likely want to import those other sources.
+    </p>
+
+
+    <h2 id="embeddings">Embeddings</h2>
+    <p>To encourage innovation, the embeddings for our semantic search engine are available for download.
+    </p>
+    <p>These embeddings are about 2TB in size and can be downloaded from our AWS S3 bucket with a command like:
+    </p>
+    <pre class="scrollable">aws s3 sync s3://com-courtlistener-storage/embeddings/opinions/ . --no-sign-request</pre>
+    <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-inventory.html">S3 Inventory files</a> are also available in the bucket:</p>
+    <pre class="scrollable">aws s3 sync s3://com-courtlistener-storage/embeddings/inventories/ . --no-sign-request</pre>
+    <p>These are generated nightly and can be used to identify new embeddings.</p>
+    <p>Embeddings are organized into directories named after the model used to generate them:</p>
+    <ul>
+      <li><code>modernbert-embed-base_finetune_512</code> — This uses <a href="https://free.law/2025/03/11/semantic-search">our fine-tuned ModernBERT model</a>.</li>
+    </ul>
+    <p>Please note that downloading these embeddings incurs about $200 in AWS fees upon Free Law Project. Donations <a href="https://free.law/donate">are highly encouraged</a> to offset such costs.
     </p>
 
 
