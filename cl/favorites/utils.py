@@ -271,6 +271,16 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
     ]
     open_prayers.update(status=Prayer.GRANTED)
 
+    # Send webhooks for all granted prayers
+    from cl.api.webhooks import send_pray_and_pay_webhooks
+
+    # Refresh the queryset to get updated status
+    granted_prayers = Prayer.objects.filter(
+        recap_document=instance, status=Prayer.GRANTED
+    ).select_related("user")
+    for prayer in granted_prayers:
+        send_pray_and_pay_webhooks(prayer)
+
     # copying code from cl/favorites/tasks.py to account for circumstance where
     # someone buys a document from PACER despite it being marked sealed on RECAP
     PrayerAvailability.objects.filter(recap_document=instance).delete()
