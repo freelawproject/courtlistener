@@ -679,15 +679,13 @@ def clean_docket_number_raw_and_update_redis_cache(
     # Add to redis cache for later processing
     if docket_id_llm:
         # Use a Redis lock to avoid race conditions when getting and updating the llm_batch.
-        key = "docket_number_cleaning:llm_batch"
-        lock_key = f"{key}:lock"
-        set_key = f"{key}:set"
-
+        set_key = "docket_number_cleaning:llm_batch"
+        lock_key = f"{set_key}:lock"
         lock_value = acquire_redis_lock(r, lock_key, 60 * 1000)
-        r.sadd(set_key, docket_id_llm)
-
-        # Release the lock once the whole process is complete.
-        release_redis_lock(r, lock_key, lock_value)
+        try:
+            r.sadd(set_key, docket_id_llm)
+        finally:
+            release_redis_lock(r, lock_key, lock_value)
 
 
 @receiver(

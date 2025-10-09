@@ -97,7 +97,7 @@ class TestHandleDocketNumberRawCleaning(TestCase):
 
     def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
-        key_to_clean = "docket_number_cleaning:llm_batch:set"
+        key_to_clean = "docket_number_cleaning:llm_batch"
         key = self.r.keys(key_to_clean)
         if key:
             self.r.delete(*key)
@@ -112,12 +112,12 @@ class TestHandleDocketNumberRawCleaning(TestCase):
             docket.docket_number, "12-1234-AG", "Docket number doesn't match"
         )
         self.assertEqual(
-            self.r.scard("docket_number_cleaning:llm_batch:set"),
+            self.r.scard("docket_number_cleaning:llm_batch"),
             0,
             "Redis cache count doesn't match",
         )
         self.assertEqual(
-            self.r.smembers("docket_number_cleaning:llm_batch:set"),
+            self.r.smembers("docket_number_cleaning:llm_batch"),
             set(),
             "Redis cache set doesn't match",
         )
@@ -128,12 +128,12 @@ class TestHandleDocketNumberRawCleaning(TestCase):
             docket.docket_number, "12-1234-AG", "Docket number doesn't match"
         )
         self.assertEqual(
-            self.r.scard("docket_number_cleaning:llm_batch:set"),
+            self.r.scard("docket_number_cleaning:llm_batch"),
             0,
             "Redis cache count doesn't match",
         )
         self.assertEqual(
-            self.r.smembers("docket_number_cleaning:llm_batch:set"),
+            self.r.smembers("docket_number_cleaning:llm_batch"),
             set(),
             "Redis cache set doesn't match",
         )
@@ -151,12 +151,12 @@ class TestHandleDocketNumberRawCleaning(TestCase):
             "Docket number doesn't match",
         )
         self.assertEqual(
-            self.r.scard("docket_number_cleaning:llm_batch:set"),
+            self.r.scard("docket_number_cleaning:llm_batch"),
             0,
             "Redis cache count doesn't match",
         )
         self.assertEqual(
-            self.r.smembers("docket_number_cleaning:llm_batch:set"),
+            self.r.smembers("docket_number_cleaning:llm_batch"),
             set(),
             "Redis cache set doesn't match",
         )
@@ -173,12 +173,12 @@ class TestHandleDocketNumberRawCleaning(TestCase):
             "Docket number doesn't match",
         )
         self.assertEqual(
-            self.r.scard("docket_number_cleaning:llm_batch:set"),
+            self.r.scard("docket_number_cleaning:llm_batch"),
             0,
             "Redis cache count doesn't match",
         )
         self.assertEqual(
-            self.r.smembers("docket_number_cleaning:llm_batch:set"),
+            self.r.smembers("docket_number_cleaning:llm_batch"),
             set(),
             "Redis cache set doesn't match",
         )
@@ -192,12 +192,12 @@ class TestHandleDocketNumberRawCleaning(TestCase):
             "Docket number doesn't match",
         )
         self.assertEqual(
-            self.r.scard("docket_number_cleaning:llm_batch:set"),
+            self.r.scard("docket_number_cleaning:llm_batch"),
             1,
             "Redis cache count doesn't match",
         )
         self.assertEqual(
-            self.r.smembers("docket_number_cleaning:llm_batch:set"),
+            self.r.smembers("docket_number_cleaning:llm_batch"),
             set([str(docket.id)]),
             "Redis cache set doesn't match",
         )
@@ -224,12 +224,12 @@ class TestHandleDocketNumberRawCleaning(TestCase):
             "Docket number doesn't match",
         )
         self.assertEqual(
-            self.r.scard("docket_number_cleaning:llm_batch:set"),
+            self.r.scard("docket_number_cleaning:llm_batch"),
             2,
             "Redis cache count doesn't match",
         )
         self.assertEqual(
-            self.r.smembers("docket_number_cleaning:llm_batch:set"),
+            self.r.smembers("docket_number_cleaning:llm_batch"),
             set([str(docket_1.id), str(docket_2.id)]),
             "Redis cache set doesn't match",
         )
