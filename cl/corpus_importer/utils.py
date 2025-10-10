@@ -828,9 +828,9 @@ def winnow_case_name(case_name: str) -> set:
     # "In the Matter of E. B." -> "In the Matter of EB"
     # "R. L. C. R. v. L. Z. S." -> "RLCR v. LZS"
     # "J. B. v. C. E." -> "JB v. CE"
-    # "CATHERINE CHAN v. BELTON TECHNOLOGY INC." -> "CATHERINE CHAN v. BELTON TECHNOLOGY INC."
+    # "County v. A. D. B. County" -> "County v. ADB County"
     case_name = re.sub(
-        r"\b(?![A-Z]{2})[A-Z][A-Z\.\s]*[A-Z]\b\.?",
+        r"\b[A-Z][A-Z\.\s]*[A-Z]\b\.?",
         lambda m: m.group().replace(".", "").replace(" ", ""),
         case_name,
     )

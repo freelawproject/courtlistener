@@ -89,7 +89,6 @@ from cl.corpus_importer.utils import (
     is_long_appellate_document_number,
     make_iquery_probing_key,
     mark_ia_upload_needed,
-    winnow_case_name,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
@@ -157,6 +156,8 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 logger = logging.getLogger(__name__)
 
 env = environ.FileAwareEnv()
+
+cnt = CaseNameTweaker()
 
 
 def increment_failure_count(obj: Audio | Docket | RECAPDocument) -> None:
@@ -3094,7 +3095,7 @@ def recap_document_into_opinions(
     ),
     retry_kwargs={"max_retries": 5},
 )
-def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
+def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
     """Use LLM to extract and verify the correct case name for an opinion ingested from Recap
 
     This task fetches an OpinionCluster instance, extracts the first 2000 characters of the first
@@ -3106,7 +3107,7 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     extracted case name.
 
     :param self: The Celery task instance
-    :param pk: Primary key of the OpinionCluster object to process
+    :param cluster_pk: Primary key of the OpinionCluster object to process
     :param recap_document_id: RECAPDocument id
     """
 
@@ -3119,7 +3120,7 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         obj = (
             OpinionCluster.objects.select_related("docket")
             .prefetch_related("sub_opinions")
-            .get(pk=pk)
+            .get(pk=cluster_pk)
         )
     except OpinionCluster.DoesNotExist:
         return
@@ -3144,7 +3145,7 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     except ValidationError as e:
         logger.error(
             "LLM - Response validation error for cluster_id=%s, recap_document_id=%s",
-            pk,
+            cluster_pk,
             recap_document_id,
             extra={
                 "validation_errors": e.errors(),
@@ -3162,17 +3163,19 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         logger.error("LLM - Invalid response type: %s", type(llm_response))
         return
 
-    # Fallback to case_name_full if llm doesn't return case_name
-    llm_case_name = llm_response.case_name or llm_response.case_name_full
+    llm_case_name = llm_response.case_name
     llm_case_name_full = llm_response.case_name_full
     dict_llm_response = llm_response.model_dump()
+    # Add extra data to the dict for debugging purposes
     dict_llm_response["recap_document_id"] = recap_document_id
+    dict_llm_response["cluster"] = cluster_pk
     dict_llm_response["cluster_case_name"] = obj.case_name
     dict_llm_response["cluster_case_name_full"] = obj.case_name_full
 
-    if not llm_case_name or not llm_case_name_full:
-        # We want to know when the LLM doesn't return a case name
-        logger.error("LLM - One case name is None", dict_llm_response)
+    if not llm_case_name and not llm_case_name_full:
+        # The LLM did not return any names
+        logger.error("LLM - No case name returned", dict_llm_response)
+        return
 
     case_names_pairs = [
         ("case_name_full", obj.case_name_full, llm_case_name_full),
@@ -3188,21 +3191,16 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         and old_name != new_name
     }
     if not changed_fields:
+        # Nothing changed, exit
         return
 
-    cluster_case_name_set = winnow_case_name(cluster_name)
     with transaction.atomic():
-        for field_name, new_case_name in changed_fields.items():  # type: str, str
-            # Update only necessary fields
-            setattr(obj, field_name, new_case_name)
-            llm_case_name_set = winnow_case_name(new_case_name)
-            # Check for overlap between cluster case name and extracted case name
-            overlap = llm_case_name_set & cluster_case_name_set
-            if not overlap:
-                # The name of the docket case and the opinion do not necessarily match, we log it for manual review
-                logger.error(
-                    "LLM - Case name did not match", dict_llm_response
-                )
+        # A field changed
+        obj.case_name_short = (
+            cnt.make_case_name_short(llm_case_name) if llm_case_name else ""
+        )
+        obj.case_name = llm_case_name or ""
+        obj.case_name_full = llm_case_name_full or ""
         obj.save()
         logger.info(
             "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
