@@ -30,14 +30,14 @@
 >
   <c-layout-with-navigation.section id="about">
     <h1>Bulk Legal Data</h1>
-    <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general the files that are available correspond to the major types of data we have in our database, such as case law, oral arguments, dockets, and judges.</p>
+    <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general, the files that are available correspond to the major types of data we have in our database, such as case law, case law embeddings, oral arguments, dockets, and judges.</p>
     <p><a class="underline" href="{% url "contact" %}">Get in touch</a> if you're interested in types of data not provided here.</p>
     <p>If you have questions about the data, <a class="underline" href="https://github.com/freelawproject/courtlistener/discussions">please use our forum</a> and we'll get back to you as soon as possible.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="browse">
     <h2>Browse the Data Files</h2>
-    <p>As they are generated, files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type.</p>
+    <p>As they are generated, bulk data files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type.</p>
     <p><strong>Important:</strong> Files are snapshots, not deltas, meaning each file contains everything in our database at the time of generation.</p>
     <p><a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/" class="btn-primary">Browse Bulk Data</a></p>
   </c-layout-with-navigation.section>
@@ -99,8 +99,8 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="embeddings">
-    <h2 id="embeddings">Embeddings</h2>
-    <p>To encourage innovation, the embeddings for <a href="{% url "citegeist_help" %}" class="underline">our semantic search engine</a> are available for download.
+    <h2 id="embeddings">Case Law Embeddings</h2>
+    <p>To encourage innovation, the case law embeddings for <a href="{% url "citegeist_help" %}" class="underline">our semantic search engine</a> are available for download.
     </p>
     <p>These embeddings are about 2TB in size and can be downloaded from our AWS S3 bucket with a command like:
     </p>
