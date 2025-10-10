@@ -22,9 +22,9 @@ from cl.api.utils import (
     generate_webhook_key_content,
     update_webhook_event_after_request,
 )
-from cl.lib.string_utils import trunc
 from cl.favorites.api_serializers import PrayerSerializer
 from cl.favorites.models import Prayer
+from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
 from cl.search.api_serializers import (

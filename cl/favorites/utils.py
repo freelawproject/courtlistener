@@ -272,9 +272,11 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
     from cl.api.webhooks import send_pray_and_pay_webhooks
 
     # Fetch granted prayers with related user and their webhooks
-    granted_prayers = Prayer.objects.filter(
-        recap_document=instance, status=Prayer.GRANTED
-    ).select_related("user").prefetch_related("user__webhooks")
+    granted_prayers = (
+        Prayer.objects.filter(recap_document=instance, status=Prayer.GRANTED)
+        .select_related("user")
+        .prefetch_related("user__webhooks")
+    )
 
     for prayer in granted_prayers:
         # Send webhook for each enabled webhook
