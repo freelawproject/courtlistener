@@ -46,7 +46,11 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
 
 
 class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
-    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    # Use HiddenField for API creation, but still include in serialized output
+    # by setting it in fields. This allows webhooks to include the user ID.
+    user = serializers.PrimaryKeyRelatedField(
+        read_only=True, default=serializers.CurrentUserDefault()
+    )
 
     class Meta:
         model = Prayer
