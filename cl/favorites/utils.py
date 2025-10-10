@@ -258,69 +258,70 @@ async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
-    open_prayers = Prayer.objects.filter(
+    # Update prayers to GRANTED status and check if any were updated
+    updated_count = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
-    ).select_related("user")
-    # Retrieve email recipients before updating granted prayers.
-    email_recipients = [
-        {
-            "email": prayer["user__email"],
-            "date_created": prayer["date_created"],
-        }
-        for prayer in open_prayers.values("user__email", "date_created")
-    ]
-    open_prayers.update(status=Prayer.GRANTED)
+    ).update(status=Prayer.GRANTED)
+
+    # Early return if no prayers were granted
+    if not updated_count:
+        return
 
     # Send webhooks for all granted prayers
+    from cl.api.models import WebhookEventType
     from cl.api.webhooks import send_pray_and_pay_webhooks
 
-    # Refresh the queryset to get updated status
+    # Fetch granted prayers with related user and their webhooks
     granted_prayers = Prayer.objects.filter(
         recap_document=instance, status=Prayer.GRANTED
-    ).select_related("user")
+    ).select_related("user").prefetch_related("user__webhooks")
+
     for prayer in granted_prayers:
-        send_pray_and_pay_webhooks(prayer)
+        # Send webhook for each enabled webhook
+        for webhook in prayer.user.webhooks.filter(
+            event_type=WebhookEventType.PRAY_AND_PAY, enabled=True
+        ):
+            send_pray_and_pay_webhooks(prayer, webhook)
 
     # copying code from cl/favorites/tasks.py to account for circumstance where
     # someone buys a document from PACER despite it being marked sealed on RECAP
     PrayerAvailability.objects.filter(recap_document=instance).delete()
 
     # Send email notifications in bulk.
-    if email_recipients:
-        subject = "A document you requested is now on CourtListener"
-        txt_template = loader.get_template("prayer_email.txt")
-        html_template = loader.get_template("prayer_email.html")
+    subject = "A document you requested is now on CourtListener"
+    txt_template = loader.get_template("prayer_email.txt")
+    html_template = loader.get_template("prayer_email.html")
 
-        docket = instance.docket_entry.docket
-        docket_entry = instance.docket_entry
-        document_url = instance.get_absolute_url()
-        num_waiting = len(email_recipients)
-        doc_price = price(instance)
+    docket = instance.docket_entry.docket
+    docket_entry = instance.docket_entry
+    document_url = instance.get_absolute_url()
+    num_waiting = granted_prayers.count()
+    doc_price = price(instance)
 
-        messages = []
-        for email_recipient in email_recipients:
-            context = {
-                "docket": docket,
-                "docket_entry": docket_entry,
-                "rd": instance,
-                "document_url": document_url,
-                "num_waiting": num_waiting,
-                "price": doc_price,
-                "date_created": email_recipient["date_created"],
-            }
-            txt = txt_template.render(context)
-            html = html_template.render(context)
-            msg = EmailMultiAlternatives(
-                subject=subject,
-                body=txt,
-                from_email=settings.DEFAULT_ALERTS_EMAIL,
-                to=[email_recipient["email"]],
-                headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
-            )
-            msg.attach_alternative(html, "text/html")
-            messages.append(msg)
-        connection = get_connection()
-        connection.send_messages(messages)
+    messages = []
+    for prayer in granted_prayers:
+        context = {
+            "docket": docket,
+            "docket_entry": docket_entry,
+            "rd": instance,
+            "document_url": document_url,
+            "num_waiting": num_waiting,
+            "price": doc_price,
+            "date_created": prayer.date_created,
+        }
+        txt = txt_template.render(context)
+        html = html_template.render(context)
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=txt,
+            from_email=settings.DEFAULT_ALERTS_EMAIL,
+            to=[prayer.user.email],
+            headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
+        )
+        msg.attach_alternative(html, "text/html")
+        messages.append(msg)
+    connection = get_connection()
+    connection.send_messages(messages)
 
 
 @dataclass
