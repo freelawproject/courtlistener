@@ -1888,13 +1888,15 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     retry_backoff=10,
 )
 def create_opinion_text_embeddings(
-    self, batch: list[int], database
+    self, batch: list[int], database: str, device: str = "cpu"
 ) -> str | None:
     """Get embeddings for Opinion texts from inception.
 
     :param self: The Celery task.
     :param batch: A list of Opinion IDs representing the batch to process.
     :param database: The database to be used during processing.
+    :param device: The device to run the embedding generation on (e.g., 'cpu'
+        or 'gpu'). Defaults to 'cpu'.
     :return: The cache key used to temporarily store embeddings.
     """
     opinions = (
@@ -1909,7 +1911,12 @@ def create_opinion_text_embeddings(
 
     batch_range = f"{batch[0]}_{batch[-1]}"
     batch_request = {"documents": opinions_to_vectorize}
-    embeddings = inception_batch_request(batch_request)
+    inception_service = (
+        inception_batch_request
+        if device == "gpu"
+        else inception_cpu_batch_request
+    )
+    embeddings = inception_service(batch_request)
     # Use a UUID to guarantee the uniqueness of this batch of stored embeddings
     batch_uuid = str(uuid.uuid4().hex)
     cache_key = get_embeddings_cache_key(batch_uuid, batch_range)
