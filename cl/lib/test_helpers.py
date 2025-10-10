@@ -11,6 +11,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.testcases import SerializeMixin
 from django.utils import timezone
 from lxml import etree
+from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
@@ -1581,3 +1582,11 @@ def generate_docket_target_sources(
             ]
 
     return target_sources
+
+
+def new_design_enabled(value=True):
+    """Helper decorator to enable new templates in tests.
+    It accepts an optional argument to explicitly disable new templates. This is useful when
+    the test class has the flag enabled, but we need to disable it for a specific test method.
+    """
+    return override_flag("use_new_design", active=value)
