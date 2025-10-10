@@ -1782,6 +1782,30 @@ def inception_batch_request(batch: dict) -> list[dict]:
     return response.json()
 
 
+def inception_cpu_batch_request(batch: dict) -> list[dict]:
+    """
+    Fetch embeddings for a batch of opinion documents using the CPU version of
+    the Inception microservice.
+
+    param batch: A list of dictionaries, where each dictionary represents an
+    opinion document with the following keys:
+    "id": The Opinion ID.
+    "text": The content of the opinion.
+    :return: A list of dictionaries, each containing the embeddings for the
+    corresponding opinion document as returned  by the inception microservice.
+    """
+
+    data = json.dumps(batch)
+    response = asyncio.run(
+        microservice(
+            service="inception-cpu-batch",
+            method="POST",
+            data=data,
+        )
+    )
+    return response.json()
+
+
 def embeddings_cache_key():
     return "embeddings:"
 
