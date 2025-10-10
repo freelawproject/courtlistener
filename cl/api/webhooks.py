@@ -206,31 +206,30 @@ def send_search_alert_webhook(
     send_webhook_event(webhook_event, json_bytes)
 
 
-def send_pray_and_pay_webhooks(prayer: Prayer) -> None:
+def send_pray_and_pay_webhooks(prayer: Prayer, webhook: Webhook) -> None:
     """Send webhook event when a pray-and-pay request is granted.
 
     :param prayer: The Prayer object representing the granted prayer.
+    :param webhook: The Webhook object to send the event to.
     :return: None
     """
 
     # Only send webhook for granted prayers
-    if prayer.status == Prayer.GRANTED:
-        user_webhooks = prayer.user.webhooks.filter(
-            event_type=WebhookEventType.PRAY_AND_PAY, enabled=True
-        )
-        for webhook in user_webhooks:
-            payload = PrayerSerializer(prayer).data
-            post_content = {
-                "webhook": generate_webhook_key_content(webhook),
-                "payload": payload,
-            }
-            renderer = JSONRenderer()
-            json_bytes = renderer.render(
-                post_content,
-                accepted_media_type="application/json;",
-            )
-            webhook_event = WebhookEvent.objects.create(
-                webhook=webhook,
-                content=post_content,
-            )
-            send_webhook_event(webhook_event, json_bytes)
+    if prayer.status != Prayer.GRANTED:
+        return
+
+    payload = PrayerSerializer(prayer).data
+    post_content = {
+        "webhook": generate_webhook_key_content(webhook),
+        "payload": payload,
+    }
+    renderer = JSONRenderer()
+    json_bytes = renderer.render(
+        post_content,
+        accepted_media_type="application/json;",
+    )
+    webhook_event = WebhookEvent.objects.create(
+        webhook=webhook,
+        content=post_content,
+    )
+    send_webhook_event(webhook_event, json_bytes)
