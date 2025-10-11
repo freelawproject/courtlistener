@@ -545,6 +545,13 @@ Sample code here.
       </c-library.item>
 
       <c-library.item optional only>
+        <c-slot name="label"><code>align</code></c-slot>
+        <c-slot name="description">
+          Default is to align table contents to the left. Use <code>center</code> to align everything in the middle. Use <code>data-center</code> to keep the first column left, but center the rest of the table.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
         <c-slot name="label"><code>footer</code></c-slot>
         <c-slot name="description">
           List of rows in the <code>&lt;tfoot&gt;</code>.<br>Same structure as <code>rows</code>.
@@ -569,6 +576,7 @@ Sample code here.
       <c-code>
 &lt;c-data-table
   safe
+  align="data-center"
   caption="Usage example of data table component"
   :columns="[
     {'label': 'First header', 'field': 'first'},

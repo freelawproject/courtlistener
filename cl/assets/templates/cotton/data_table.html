@@ -1,16 +1,24 @@
 {% load extras %}
 
-<c-vars columns rows footer caption="Data table" safe></c-vars>
+<c-vars columns rows footer align caption="Data table" safe></c-vars>
 
-<div class="w-full overflow-auto">
-  <table>
+<div class="overflow-auto">
+  <table class="w-full">
     <caption class="sr-only">{{ caption }}</caption>
     <thead>
     <tr class="border-none">
       {% for column in columns %}
         <th
-          class="text-nowrap text-start text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal {% if forloop.first %}rounded-l-lg{% elif forloop.last  %}rounded-r-lg{% endif %}"
-        >
+          class="text-nowrap text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal
+            {% if forloop.first %}rounded-l-lg{% elif forloop.last  %}rounded-r-lg{% endif %}
+            {% if align == "data-center" and not forloop.first %}
+              text-center
+            {% elif align == "center" %}
+              text-center
+            {% else %}
+              text-start
+            {% endif %}
+        ">
           {{ column.label }}
         </th>
       {% endfor %}
@@ -20,7 +28,15 @@
     {% for row in rows %}
       <tr class="border-b-greyscale-200 border-b">
         {% for column in columns %}
-          <td class="text-start align-top text-sm font-normal p-2">
+          <td class="align-top text-sm font-normal p-2
+            {% if align == "data-center" and not forloop.first %}
+              text-center
+            {% elif align == "center" %}
+              text-center
+            {% else %}
+              text-start
+            {% endif %}
+          ">
             {% if safe %}
               {{ row|get:column.field|safe }}
             {% else %}
@@ -35,7 +51,15 @@
       {% for item in footer %}
         <tr>
           {% for column in columns %}
-            <td class="text-start align-top text-sm p-2">
+            <td class="align-top text-sm p-2
+              {% if align == "data-center" and not forloop.first %}
+                text-center
+              {% elif align == "center" %}
+                text-center
+              {% else %}
+                text-start
+              {% endif %}
+            ">
               <strong>
                 {% if safe %}
                   {{ item|get:column.field|safe }}
