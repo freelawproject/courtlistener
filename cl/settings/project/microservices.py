@@ -82,6 +82,10 @@ MICROSERVICE_URLS = {
         "url": f"{INCEPTION_GPU_HOST}/api/v1/embed/batch",
         "timeout": INCEPTION_TIMEOUT,
     },
+    "inception-cpu-batch": {
+        "url": f"{INCEPTION_CPU_HOST}/api/v1/embed/batch",
+        "timeout": INCEPTION_TIMEOUT,
+    },
     "inception-query": {
         "url": f"{INCEPTION_CPU_HOST}/api/v1/embed/query",
         "timeout": INCEPTION_TIMEOUT,
