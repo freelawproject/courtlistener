@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = "==3.13.*"
 
 [[package]]
@@ -2691,11 +2691,11 @@ wheels = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.58"
+version = "3.2.59"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/16/b9/8ab93fceec43db806a93508b895e230b41f41818a4c6f3be6c441b8cc28c/reporters_db-3.2.58.tar.gz", hash = "sha256:3ac8234b4bf55ee2fe65090f3a8bab05098bb633d1fbc58fd2f79fe8a4eaacc7", size = 171526, upload-time = "2025-08-27T21:30:32.559Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/77/69/f81e2ca2157a58fc694d4b51bba594e781cb1f6127f571cf148d4a9f06f8/reporters_db-3.2.59.tar.gz", hash = "sha256:32f778aa70de11ad9320ac325a794bd3ff5cbc554d9c6572bc246f4917226ce0", size = 186089, upload-time = "2025-10-08T23:18:06.305Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d5/2e/6ad1eb8fbcc09e85ae2bf43d7b8968b22bf4f2b818e7d5263e26d289b719/reporters_db-3.2.58-py3-none-any.whl", hash = "sha256:6f62858e62a5efc5184eec3326b2a3e1890915f9cdb1b8a738c2707e15c03c69", size = 171573, upload-time = "2025-08-27T21:30:30.614Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/c8/a849232966607adcf5ef3efb27024ac71d9daec1ab919195c474126929f6/reporters_db-3.2.59-py3-none-any.whl", hash = "sha256:708c28964cad0acf8b38f8c0b0cca45277b01c79c95627ee087c544017bfd08c", size = 186167, upload-time = "2025-10-08T23:18:04.695Z" },
 ]
 
 [[package]]
