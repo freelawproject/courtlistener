@@ -121,7 +121,7 @@ class Command(VerboseCommand):
 
         opinions = (
             Opinion.objects.using(database)
-            .filter(id__gte=start_id)
+            .filter(id__gte=start_id, main_version__isnull=True)
             .order_by("pk")
         )
         # Limit opinions to retrieve if count was provided.
