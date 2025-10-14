@@ -1760,50 +1760,37 @@ def remove_documents_by_query(
     return response
 
 
-def inception_batch_request(batch: dict) -> list[dict]:
-    """Get embeddings from the inception batch microservice.
+def request_embeddings_for_batch(batch: dict, service_name: str) -> list[dict]:
+    """Get embeddings from the specified Inception batch microservice.
 
     param batch: A list of dictionaries, where each dictionary represents an
     opinion document with the following keys:
-    "id": The Opinion ID.
-    "text": The content of the opinion.
+        "id": The Opinion ID.
+        "text": The content of the opinion.
+    param service_name: The name of the Inception microservice to use, e.g.,
+        "inception-batch" or "inception-cpu-batch".
     :return: A list of dictionaries, each containing the embeddings for the
     corresponding opinion document as returned  by the inception microservice.
     """
-
     data = json.dumps(batch)
     response = asyncio.run(
         microservice(
-            service="inception-batch",
+            service=service_name,
             method="POST",
             data=data,
         )
     )
     return response.json()
+
+
+def inception_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the GPU version of the inception microservice."""
+    return request_embeddings_for_batch(batch, "inception-batch")
 
 
 def inception_cpu_batch_request(batch: dict) -> list[dict]:
-    """
-    Fetch embeddings for a batch of opinion documents using the CPU version of
-    the Inception microservice.
-
-    param batch: A list of dictionaries, where each dictionary represents an
-    opinion document with the following keys:
-    "id": The Opinion ID.
-    "text": The content of the opinion.
-    :return: A list of dictionaries, each containing the embeddings for the
-    corresponding opinion document as returned  by the inception microservice.
-    """
-
-    data = json.dumps(batch)
-    response = asyncio.run(
-        microservice(
-            service="inception-cpu-batch",
-            method="POST",
-            data=data,
-        )
-    )
-    return response.json()
+    """Get embeddings from the CPU version of the inception microservice."""
+    return request_embeddings_for_batch(batch, "inception-cpu-batch")
 
 
 def embeddings_cache_key():
