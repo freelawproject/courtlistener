@@ -3114,30 +3114,24 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
     OPENAI_CASE_LAW_INFERENCE_KEY = env(
         "OPENAI_CASE_LAW_INFERENCE_KEY", default=None
     )
-    system_prompt = CASE_NAME_EXTRACT_SYSTEM
 
-    try:
-        obj = (
-            OpinionCluster.objects.select_related("docket")
-            .prefetch_related("sub_opinions")
-            .get(pk=cluster_pk)
-        )
-    except OpinionCluster.DoesNotExist:
-        return
+    cluster = OpinionCluster.objects.prefetch_related("sub_opinions").get(
+        pk=cluster_pk
+    )
+    sub_opinion = cluster.sub_opinions.all().first()
 
-    sub_opinion = obj.sub_opinions.all().first()
     if not sub_opinion or not sub_opinion.plain_text:
+        logger.error(
+            "No content extracted to find case names for cluster_id=%s, recap_document_id=%s",
+            cluster_pk,
+            recap_document_id,
+        )
         return
-    plain_text = sub_opinion.plain_text[:2000]
-
-    cluster_name = obj.case_name or obj.case_name_full
-
-    user_message = f"{plain_text}"
 
     try:
         llm_response = call_llm(
-            system_prompt,
-            user_message,
+            system_prompt=CASE_NAME_EXTRACT_SYSTEM,
+            user_prompt=sub_opinion.plain_text[:2000],
             response_model=CaseNameExtractionResponse,
             max_completion_tokens=300,
             api_key=OPENAI_CASE_LAW_INFERENCE_KEY,
@@ -3163,46 +3157,25 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
         logger.error("LLM - Invalid response type: %s", type(llm_response))
         return
 
-    llm_case_name = llm_response.case_name
-    llm_case_name_full = llm_response.case_name_full
-    dict_llm_response = llm_response.model_dump()
-    # Add extra data to the dict for debugging purposes
-    dict_llm_response["recap_document_id"] = recap_document_id
-    dict_llm_response["cluster"] = cluster_pk
-    dict_llm_response["cluster_case_name"] = obj.case_name
-    dict_llm_response["cluster_case_name_full"] = obj.case_name_full
+    llm_case_name = llm_response.case_name or ""
+    llm_case_name_full = llm_response.case_name_full or ""
 
     if not llm_case_name and not llm_case_name_full:
-        # The LLM did not return any names
+        # The LLM did not return any names, add extra data to the dict for debugging purposes
+        dict_llm_response = llm_response.model_dump()
+        dict_llm_response["recap_document_id"] = recap_document_id
+        dict_llm_response["cluster"] = cluster_pk
+        dict_llm_response["cluster_case_name"] = cluster.case_name
+        dict_llm_response["cluster_case_name_full"] = cluster.case_name_full
         logger.error("LLM - No case name returned", dict_llm_response)
         return
 
-    case_names_pairs = [
-        ("case_name_full", obj.case_name_full, llm_case_name_full),
-        ("case_name", obj.case_name, llm_case_name),
-    ]
-
-    # Check which values changed before updating the cluster
-    changed_fields: dict[str, str] = {
-        field_name: new_name
-        for field_name, old_name, new_name in case_names_pairs
-        if isinstance(new_name, str)
-        and new_name != ""
-        and old_name != new_name
-    }
-    if not changed_fields:
-        # Nothing changed, exit
-        return
-
     with transaction.atomic():
-        # A field changed
-        obj.case_name_short = (
-            cnt.make_case_name_short(llm_case_name) if llm_case_name else ""
-        )
-        obj.case_name = llm_case_name or ""
-        obj.case_name_full = llm_case_name_full or ""
-        obj.save()
+        # Update cluster names
+        cluster.case_name = llm_case_name
+        cluster.case_name_full = llm_case_name_full
+        cluster.save()
         logger.info(
             "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
-            obj.id,
+            cluster.id,
         )
