@@ -157,8 +157,6 @@ logger = logging.getLogger(__name__)
 
 env = environ.FileAwareEnv()
 
-cnt = CaseNameTweaker()
-
 
 def increment_failure_count(obj: Audio | Docket | RECAPDocument) -> None:
     if obj.ia_upload_failure_count is None:
