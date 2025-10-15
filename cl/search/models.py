@@ -1249,8 +1249,7 @@ class DocketEntryTags(DocketEntry.tags.through):
 
 
 class Proceeding(AbstractDateTimeModel):
-    """A model class to track proceedings and link them with Dockets
-    """
+    """A model class to track proceedings and link them with Dockets"""
 
     docket = models.ForeignKey(
         Docket,
@@ -1267,7 +1266,7 @@ class Proceeding(AbstractDateTimeModel):
     court = models.ForeignKey(
         "Court",
         help_text="The court this proceeding takes place in",
-        on_delete=models.RESTRICT
+        on_delete=models.RESTRICT,
     )
     proceeding_room = models.TextField(
         help_text="The court room of the proceeding",
@@ -1287,6 +1286,7 @@ class Proceeding(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         return f"{self.event} for {self.docket.docket_number}"
+
 
 class AbstractPacerDocument(models.Model):
     date_upload = models.DateTimeField(
