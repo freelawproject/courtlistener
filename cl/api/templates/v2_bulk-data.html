@@ -113,6 +113,7 @@
 
   <c-layout-with-navigation.section id="old">
     <h3>Release Notes</h3>
+    <p><strong>2025-10-15</strong>: Added <code>search_proceeding</code> table to better support state-level court data.</p>
     <p><strong>2025-01-24</strong>: Improved PostgreSQL bulk data export by defaulting to double quotes for quoting instead of backticks, resolving parsing errors. Added the <code>ESCAPE</code> option to handle embedded double quotes, ensuring reliable exports and data integrity. Updated the generated import shell script to include this option.</p>
     <p><strong>2024-08-07</strong>: Added <code>filepath_pdf_harvard</code> field to OpinionCluster data in bulk exports. This field contains the path to the PDF file from the Harvard Caselaw Access Project for the given case.</p>
     <p><strong>2024-08-02</strong>: Add new fields to the bulk data files for the <code>Docket</code> object: <code>federal_dn_case_type</code>, <code>federal_dn_office_code</code>, <code>federal_dn_judge_initials_assigned</code>, <code>federal_dn_judge_initials_referred</code>, <code>federal_defendant_number</code>, <code>parent_docket_id</code>.</p>
