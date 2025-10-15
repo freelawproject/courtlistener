@@ -1,6 +1,7 @@
 from datetime import UTC
 from typing import Any
 
+from django.conf import settings
 from elasticsearch_dsl.response import Hit
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
@@ -824,3 +825,12 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
             "pacer_doc_id",
             "trustee_str",
         )
+
+
+class VectorSerializer(serializers.Serializer):
+    embedding = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=settings.EMBEDDING_DIMENSIONS,
+        max_length=settings.EMBEDDING_DIMENSIONS,
+        required=False,
+    )

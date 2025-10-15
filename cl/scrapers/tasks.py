@@ -528,7 +528,11 @@ async def extract_recap_pdf_base(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(
+        requests.ConnectionError,
+        requests.ReadTimeout,
+        httpx.TimeoutException,
+    ),
     max_retries=3,
     retry_backoff=10,
 )
