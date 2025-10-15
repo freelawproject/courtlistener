@@ -2081,10 +2081,12 @@ def index_embeddings(
     for embeddings in embeddings:
         opinion_id = embeddings["id"]
         opinion_instance = (
-            Opinion.objects.filter(id=opinion_id).only("pk", "cluster").first()
+            Opinion.objects.filter(id=opinion_id)
+            .only("pk", "cluster", "main_version")
+            .first()
         )
-        if not opinion_instance:
-            # The opinion has been removed from the DB
+        if not opinion_instance or opinion_instance.main_version:
+            # The opinion has been removed from the DB or has a main version
             continue
 
         doc_to_update = {
