@@ -1968,7 +1968,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
                 search_analyzer="search_analyzer",
             ),
             "embedding": DenseVector(
-                dims=768,
+                dims=settings.EMBEDDING_DIMENSIONS,
                 index=True,
                 similarity="dot_product",
             ),
