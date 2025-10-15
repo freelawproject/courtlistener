@@ -11,6 +11,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Document
 
+from cl.lib.search_index_utils import index_documents_in_bulk
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.factories import (
     CourtFactory,
@@ -137,6 +138,79 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
                     id=ES_CHILD_ID(opinion.pk).OPINION
                 ).embeddings
             )
+
+    @mock.patch(
+        "cl.search.tasks.index_documents_in_bulk",
+        wraps=index_documents_in_bulk,
+    )
+    def test_cl_index_embeddings_skip_versioned_opinion(
+        self, bulk_index_mock
+    ) -> None:
+        """Ensure versioned opinions are skipped during embeddings indexing."""
+        # Create two opinions: one main and one versioned
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_2 = OpinionFactory(
+                cluster=self.opinion_cluster_2,
+                html_columbia=("<p>Sed ut perspiciatis</p>"),
+            )
+            opinion_3 = OpinionFactory(
+                cluster=self.opinion_cluster_2,
+                html_columbia=("<p>Sed ut perspiciatis</p>"),
+                main_version=opinion_2,
+            )
+
+        # Assert initial state
+        self.assertEqual(
+            OpinionDocument.get(
+                id=ES_CHILD_ID(opinion_2.pk).OPINION
+            ).embeddings,
+            [],
+        )
+        # Versioned opinion should not exist in Elasticsearch
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(opinion_3.pk).OPINION)
+        )
+
+        # Single opinion processing: versioned opinion should NOT trigger bulk
+        # indexing
+        with mock.patch(
+            "cl.search.tasks.AWSMediaStorage.open",
+            side_effect=mock_read_from_s3,
+        ):
+            call_command(
+                "cl_index_embeddings",
+                batch_size=1,
+                indexing_queue="celery",
+                start_id=opinion_3.id,
+            )
+
+        bulk_index_mock.assert_not_called()
+
+        # processing a batch including a versioned opinion should trigger bulk
+        # indexing but the versioned opinion itself should not be added to
+        # Elasticsearch
+        with mock.patch(
+            "cl.search.tasks.AWSMediaStorage.open",
+            side_effect=mock_read_from_s3,
+        ):
+            call_command(
+                "cl_index_embeddings",
+                batch_size=2,
+                indexing_queue="celery",
+                start_id=0,
+            )
+
+        # Assert main opinion now has embeddings
+        self.assertTrue(
+            OpinionDocument.get(
+                id=ES_CHILD_ID(opinion_2.pk).OPINION
+            ).embeddings,
+        )
+
+        # Assert versioned opinion is still not indexed
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(opinion_3.pk).OPINION)
+        )
 
     def test_cl_index_embeddings_from_inventory(self):
         """Test cl_index_embeddings command using an S3 inventory file."""
