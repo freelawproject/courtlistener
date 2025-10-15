@@ -1,5 +1,6 @@
 from datetime import UTC
 
+from django.conf import settings
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 from waffle import flag_is_active
@@ -794,7 +795,7 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
 class VectorSerializer(serializers.Serializer):
     embedding = serializers.ListField(
         child=serializers.FloatField(),
-        min_length=1,
-        max_length=768,
+        min_length=settings.EMBEDDING_DIMENSIONS,
+        max_length=settings.EMBEDDING_DIMENSIONS,
         required=False,
     )
