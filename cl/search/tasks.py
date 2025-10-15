@@ -1823,6 +1823,9 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     if not opinion:
         return None
 
+    if opinion.token_count < settings.MIN_OPINION_SIZE:
+        return None
+
     embeddings = asyncio.run(
         microservice(
             service="inception-text",
