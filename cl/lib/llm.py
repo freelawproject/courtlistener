@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 def call_llm(
     system_prompt: str,
-    prompt: str | list[str] | list[dict],
+    user_prompt: str | list[str] | list[dict],
     model: str = "openai/gpt-4o-mini",
     response_model: type[BaseModel] | None = None,
     temperature: float = 0.0,
@@ -17,7 +17,7 @@ def call_llm(
     OPENAI_API_KEY, ANTHROPIC_API_KEY or MISTRAL_API_KEY
 
     :param system_prompt: Instructions as system prompt for the LLM
-    :param prompt: Task-specific prompt content, it may be: a single string, a list of strings, a list of prebuilt
+    :param user_prompt: Task-specific prompt content, it may be: a single string, a list of strings, a list of prebuilt
     content parts like {"type": "text", "text": "..."}
     :param model: Instructor provider/model identifier (e.g., "openai/gpt-4o-mini")
     :param response_model: Optional Pydantic model to validate and return typed output
@@ -36,10 +36,10 @@ def call_llm(
         # Assume already a valid content part dict, e.g. {"type": "text", "text": "..."}
         return x
 
-    if isinstance(prompt, str):
-        user_content = [to_content_part(prompt)]
+    if isinstance(user_prompt, str):
+        user_content = [to_content_part(user_prompt)]
     else:
-        user_content = [to_content_part(p) for p in prompt]
+        user_content = [to_content_part(p) for p in user_prompt]
 
     messages = [
         {"role": "system", "content": system_prompt},
