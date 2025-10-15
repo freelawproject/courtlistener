@@ -1760,26 +1760,37 @@ def remove_documents_by_query(
     return response
 
 
-def inception_batch_request(batch: dict) -> list[dict]:
-    """Get embeddings from the inception batch microservice.
+def request_embeddings_for_batch(batch: dict, service_name: str) -> list[dict]:
+    """Get embeddings from the specified Inception batch microservice.
 
     param batch: A list of dictionaries, where each dictionary represents an
     opinion document with the following keys:
-    "id": The Opinion ID.
-    "text": The content of the opinion.
+        "id": The Opinion ID.
+        "text": The content of the opinion.
+    param service_name: The name of the Inception microservice to use, e.g.,
+        "inception-batch" or "inception-cpu-batch".
     :return: A list of dictionaries, each containing the embeddings for the
     corresponding opinion document as returned  by the inception microservice.
     """
-
     data = json.dumps(batch)
     response = asyncio.run(
         microservice(
-            service="inception-batch",
+            service=service_name,
             method="POST",
             data=data,
         )
     )
     return response.json()
+
+
+def inception_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the GPU version of the inception microservice."""
+    return request_embeddings_for_batch(batch, "inception-batch")
+
+
+def inception_cpu_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the CPU version of the inception microservice."""
+    return request_embeddings_for_batch(batch, "inception-cpu-batch")
 
 
 def embeddings_cache_key():
@@ -1867,13 +1878,15 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     retry_backoff=10,
 )
 def create_opinion_text_embeddings(
-    self, batch: list[int], database
+    self, batch: list[int], database: str, device: str = "cpu"
 ) -> str | None:
     """Get embeddings for Opinion texts from inception.
 
     :param self: The Celery task.
     :param batch: A list of Opinion IDs representing the batch to process.
     :param database: The database to be used during processing.
+    :param device: The device to run the embedding generation on (e.g., 'cpu'
+        or 'gpu'). Defaults to 'cpu'.
     :return: The cache key used to temporarily store embeddings.
     """
     opinions = (
@@ -1888,7 +1901,12 @@ def create_opinion_text_embeddings(
 
     batch_range = f"{batch[0]}_{batch[-1]}"
     batch_request = {"documents": opinions_to_vectorize}
-    embeddings = inception_batch_request(batch_request)
+    inception_service = (
+        inception_batch_request
+        if device == "gpu"
+        else inception_cpu_batch_request
+    )
+    embeddings = inception_service(batch_request)
     # Use a UUID to guarantee the uniqueness of this batch of stored embeddings
     batch_uuid = str(uuid.uuid4().hex)
     cache_key = get_embeddings_cache_key(batch_uuid, batch_range)
