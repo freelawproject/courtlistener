@@ -703,6 +703,6 @@ def handle_docket_number_raw_cleaning(
 
     # Only clean if the docket was was non-recap source and newly created or docket_number_raw has changed
     changed = not created and "docket_number_raw" in update_fields
-    non_recap_sources = instance.source in instance.DOCKET_NUM_CLEAN_SOURCES()
+    non_recap_sources = instance.source != Docket.RECAP
     if (created or changed) and non_recap_sources:
         clean_docket_number_raw_and_update_redis_cache(instance)

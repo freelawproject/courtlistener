@@ -31,6 +31,21 @@ generic_patterns = {
 }
 
 
+def get_clean_methods(court_type: str) -> tuple:
+    """
+    Returns cleaning methods for docket numbers based on the court type.
+
+    :param court_type: The type of court, used to determine which cleaning methods to return.
+    :return: A tuple containing two functions for cleaning docket numbers corresponding to the given court type.
+               If the court type is not recognized, returns (None, None).
+    """
+    match court_type.lower():
+        case "f":
+            return prelim_clean_F, regex_clean_F
+        case _:
+            return None, None
+
+
 def is_generic(s: str, court_map: str) -> bool:
     """
     Determines if the given string `s` matches any generic pattern associated with the specified `court_map`.
@@ -144,14 +159,12 @@ def clean_docket_number_raw(
     :param docket_id: The unique identifier for the docket.
     :param docket_number_raw: The raw docket number string to be cleaned.
     :param court_id: The identifier for the court, used to select cleaning logic.
-    :param docket_id_llm: The docket_id to be stored for downstream LLM processing if cannot be cleaned with regex. Defaults to None.
     :return: A tuple containing the cleaned docket number and the docket_id for downstream LLM processing, if applicable.
     """
     court_type = court_map.get(court_id)
 
     if court_type:
-        prelim_func = globals().get(f"prelim_clean_{court_type}")
-        regex_func = globals().get(f"regex_clean_{court_type}")
+        prelim_func, regex_func = get_clean_methods(court_type)
 
         if prelim_func:
             prelim_cleaned = prelim_func(docket_number_raw)

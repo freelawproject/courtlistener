@@ -128,10 +128,8 @@ def normalize_dashes(text: str) -> str:
     non_breaking_hyphen = "‑"
     figure_dash = "‒"
     horizontal_bar = "―"
-    text = re.sub(r"——+", normal_dash, text)  # handle long dashes
-    text = re.sub(r"--+", normal_dash, text)  # handle consecutive dashes
     return re.sub(
-        rf"[{en_dash}{em_dash}{hyphen}{non_breaking_hyphen}{figure_dash}{horizontal_bar}]",
+        rf"[{normal_dash}{en_dash}{em_dash}{hyphen}{non_breaking_hyphen}{figure_dash}{horizontal_bar}]+",
         normal_dash,
         text,
     )
