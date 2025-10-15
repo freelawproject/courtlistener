@@ -1248,6 +1248,7 @@ class DocketEntryTags(DocketEntry.tags.through):
         proxy = True
 
 
+@pghistory.track()
 class Proceeding(AbstractDateTimeModel):
     """A model class to track proceedings and link them with Dockets"""
 
