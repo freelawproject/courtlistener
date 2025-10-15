@@ -144,37 +144,49 @@ def delete_same_hash_duplicates(
     )
     logger.info("Groups to process %s for sources %s", qs.count(), sources)
 
-    # for each group, we will keep a single opinion; let's prefer the latest
     for group in qs:
         logger.info("Processing group %s", group)
 
-        op_to_keep, *to_delete = (
+        duplicate_candidates = list(
             Opinion.objects.filter(sha1=group["sha1"])
             .filter(**source_filter)
             .order_by("-date_created")
             .select_related("cluster", "cluster__docket")
         )
 
-        for op_to_delete in to_delete:
-            # check that they have the me docket
-            if not comparable_dockets(
-                op_to_keep.cluster.docket, op_to_delete.cluster.docket
-            ):
-                logger.info(
-                    "Not the same docket. Docket to keep: %s. Docket to delete: %s",
-                    op_to_keep.cluster.docket.id,
-                    op_to_delete.cluster.docket.id,
-                )
-                stats["not comparable docket"] += 1
-                continue
+        # for each hash group, try to compare all opinions with the latest
+        # opinion. If they are duplicates, delete them. If not, put them apart
+        # so they are compared amongst them
+        while duplicate_candidates:
+            op_to_keep = duplicate_candidates[0]
+            candidates_left = []
 
-            try:
-                with transaction.atomic():
-                    delete_duplicate_opinion(
-                        op_to_keep, op_to_delete, True, stats
+            for op_to_delete in duplicate_candidates[1:]:
+                if not comparable_dockets(
+                    op_to_keep.cluster.docket, op_to_delete.cluster.docket
+                ):
+                    logger.info(
+                        "Not the same docket. Docket to keep: %s. Docket to delete: %s",
+                        op_to_keep.cluster.docket.id,
+                        op_to_delete.cluster.docket.id,
                     )
-            except MergingError:
-                stats["merging error"] += 1
+                    stats["not comparable docket"] += 1
+                    candidates_left.append(op_to_delete)
+                    continue
+
+                try:
+                    with transaction.atomic():
+                        delete_duplicate_opinion(
+                            op_to_keep, op_to_delete, True, stats
+                        )
+                except MergingError:
+                    stats["merging error"] += 1
+                    candidates_left.append(op_to_delete)
+
+            # if nothing was put into `candidates_left`, while loop will exit
+            duplicate_candidates = candidates_left
+
+    return op_to_delete
 
 
 def get_cleaned_content_hash(opinion: Opinion, site: OpinionSite) -> str:
@@ -234,37 +246,48 @@ def delete_cleaned_up_content_duplicates(
 
         download_url_query = get_query_from_url(group["download_url"], "exact")
 
-        # keep the latest opinion and delete the older ones as duplicates
-        main_opinion, *duplicate_candidates = (
+        duplicate_candidates = (
             Opinion.objects.filter(download_url_query)
             .filter(cluster__source=SOURCES.COURT_WEBSITE)
             .select_related("cluster", "cluster__docket")
             .order_by("-date_created")
         )
 
-        main_hash = get_cleaned_content_hash(main_opinion, site)
-
-        for duplicate_candidate in duplicate_candidates:
-            duplicate_candidate_hash = get_cleaned_content_hash(
-                duplicate_candidate, site
-            )
-
-            if main_hash != duplicate_candidate_hash:
-                stats["different hash after cleanup"] += 1
-                logger.info(
-                    "Different hash after cleanup %s %s",
-                    main_opinion.id,
-                    duplicate_candidate.id,
-                )
-                continue
-
+        # iteration is ordered by descending date; the first element in each
+        # hash group is the most recent opinion and duplicates should be
+        # collapsed into it
+        hash_groups = defaultdict(lambda: [])
+        file_errors = 0
+        for opinion in duplicate_candidates:
             try:
-                with transaction.atomic():
-                    delete_duplicate_opinion(
-                        main_opinion, duplicate_candidate, True, stats
-                    )
-            except MergingError:
-                stats["merging error"] += 1
+                sha1 = get_cleaned_content_hash(opinion, site)
+                hash_groups[sha1].append(opinion)
+            except FileNotFoundError:
+                # See #6400
+                logger.error(
+                    "Opinion file not found %s '%s'",
+                    opinion.id,
+                    opinion.local_path,
+                    exc_info=True,
+                )
+                file_errors += 1
+
+        logger.info("%s hash groups", len(hash_groups))
+        # log the whole group for debugging different hashes after cleanup
+        logger.debug(hash_groups)
+
+        if file_errors:
+            logger.info("%s file errors", file_errors)
+
+        for main_opinion, *duplicate_opinions in hash_groups.values():
+            for duplicate in duplicate_opinions:
+                try:
+                    with transaction.atomic():
+                        delete_duplicate_opinion(
+                            main_opinion, duplicate, True, stats
+                        )
+                except MergingError:
+                    stats["merging error"] += 1
 
 
 class Command(VerboseCommand):
