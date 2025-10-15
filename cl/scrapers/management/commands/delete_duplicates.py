@@ -186,8 +186,6 @@ def delete_same_hash_duplicates(
             # if nothing was put into `candidates_left`, while loop will exit
             duplicate_candidates = candidates_left
 
-    return op_to_delete
-
 
 def get_cleaned_content_hash(opinion: Opinion, site: OpinionSite) -> str:
     """Computes the hash over the cleaned up opinion content
