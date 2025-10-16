@@ -45,7 +45,7 @@ document.addEventListener('alpine:init', () => {
       const issueTypeInput = this.$el.elements['issue_type'];
       if (issueTypeInput) this.issueType = issueTypeInput.value;
       this.techTypes = JSON.parse(document.getElementById('tech-types').textContent);
-      this.termsURL = document.getElementById('terms-url').textContent;
+      this.termsURL = JSON.parse(document.getElementById('terms-url').textContent);
     },
   }));
 });

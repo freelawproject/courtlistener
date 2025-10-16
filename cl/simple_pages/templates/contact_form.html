@@ -7,7 +7,8 @@
 {% block head %}
   {# Fetch issue types and terms URL #}
   {{ form.TECH_ISSUE_TYPES|uniq|json_script:"tech-types" }}
-  <script id="terms-url">{% url "terms" %}#removal</script>
+  {% url "terms" as terms_url %}
+  {{ terms_url|add:"#removal"|json_script:"terms-url" }}
 
   <style>
     [x-cloak]{ display: none !important } /* Prevent "blip" on first load */
