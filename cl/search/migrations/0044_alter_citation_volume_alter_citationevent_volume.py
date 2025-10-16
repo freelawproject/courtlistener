@@ -38,8 +38,16 @@ class Migration(migrations.Migration):
         # Recreate constraint and indexes concurrently
         migrations.RunSQL(
             sql="""
-                    ALTER TABLE search_citation ADD CONSTRAINT search_citation_cluster_id_7a668830aad411f5_uniq
-                        UNIQUE (cluster_id, volume, reporter, page);
+                    CREATE UNIQUE INDEX CONCURRENTLY search_citation_cluster_id_uniq_idx
+                        ON search_citation (cluster_id, volume, reporter, page);
+                """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.RunSQL(
+            sql="""
+                    ALTER TABLE search_citation
+                        ADD CONSTRAINT search_citation_cluster_id_7a668830aad411f5_uniq
+                        UNIQUE USING INDEX search_citation_cluster_id_uniq_idx;
                     """,
             reverse_sql=migrations.RunSQL.noop,
         ),

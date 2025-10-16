@@ -17,9 +17,16 @@ ALTER TABLE "citations_unmatchedcitation" ALTER COLUMN "volume" TYPE text USING 
 -- Raw SQL operation
 --
 
+                CREATE UNIQUE INDEX CONCURRENTLY citations_unmatchedcitation_citing_opinion_id_volume_uniq_idx
+                    ON citations_unmatchedcitation (citing_opinion_id, volume, reporter, page);
+
+--
+-- Raw SQL operation
+--
+
                 ALTER TABLE citations_unmatchedcitation
                     ADD CONSTRAINT citations_unmatchedcitat_citing_opinion_id_volume_ca9f46d3_uniq
-                    UNIQUE (citing_opinion_id, volume, reporter, page);
+                    UNIQUE USING INDEX citations_unmatchedcitation_citing_opinion_id_volume_uniq_idx;
 
 --
 -- Raw SQL operation

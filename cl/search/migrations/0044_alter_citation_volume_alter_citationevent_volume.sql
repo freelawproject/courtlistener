@@ -22,9 +22,17 @@ ALTER TABLE "search_citationevent" ALTER COLUMN "volume" TYPE text USING "volume
 -- Raw SQL operation
 --
 
-                    ALTER TABLE search_citation ADD CONSTRAINT search_citation_cluster_id_7a668830aad411f5_uniq
-                        UNIQUE (cluster_id, volume, reporter, page);
-                    
+                    CREATE UNIQUE INDEX CONCURRENTLY search_citation_cluster_id_uniq_idx
+                        ON search_citation (cluster_id, volume, reporter, page);
+
+--
+-- Raw SQL operation
+--
+
+                    ALTER TABLE search_citation
+                        ADD CONSTRAINT search_citation_cluster_id_7a668830aad411f5_uniq
+                        UNIQUE USING INDEX search_citation_cluster_id_uniq_idx;
+
 --
 -- Raw SQL operation
 --
