@@ -133,6 +133,7 @@ class SOURCES:
     COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD = "ZRU"
     COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
     RECAP = "G"
+    TAMES = "TAMES"
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
@@ -237,6 +238,9 @@ class SOURCES:
             RECAP,
             "recap",
         ),
+        (   TAMES,
+            "Texas courts public court records at search.txcourts.gov",
+         ),
     )
 
     # use a frozenset since the order of characters is arbitrary
@@ -361,6 +365,18 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         blank=True,
         null=True,
     )
+    sentence = models.TextField(
+        help_text="The punishment or sentence determined by the originating court",
+        blank=True,
+        null=True
+    )
+    county = models.CharField(
+        help_text="The name of the county of the originating court, if available",
+        max_length=100,
+        blank=True,
+        null=True
+    )
+
 
     @property
     def administrative_link(self):
@@ -422,6 +438,26 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         null=True,
         related_name="child_dockets",
+    )
+    transfer_date = models.DateField(
+        help_text="The date the case was transfered to another court if applicable",
+        db_index=True,
+        blank=True,
+        null=True,
+    )
+    transfer_to = models.ForeignKey(
+        "self",
+        help_text="This case was granted a motion to transfer venue, and was "
+        "assigned a new docket in another court.",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="transfer_from",
+    )
+    is_original_proceeding = models.BooleanField(
+        help_text="Whether this is an original proceeding rather than an appeal, if known",
+        default=None,
+        null=True
     )
     appeal_from_str = models.TextField(
         help_text=(
@@ -1176,6 +1212,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
         ),
         blank=True,
     )
+
     es_rd_field_tracker = FieldTracker(
         fields=[
             "description",
@@ -1677,6 +1714,121 @@ class RECAPDocumentTags(RECAPDocument.tags.through):
 
     class Meta:
         proxy = True
+
+@pghistory.track()
+class AppellateBrief(AbstractDateTimeModel, AbstractPDF):
+    """The model class for tracking Appellate Briefs"""
+
+    APPELLANT_BRIEF = 1
+    APPELLEE_BRIEF = 2
+    BRIEF_SOURCE = (
+        (APPELLANT_BRIEF, "appellant"),
+        (APPELLEE_BRIEF, "appellee"),
+    )
+
+    REPLY_BRIEF = 101
+    BRIEF = 102
+    NOTICE = 103
+    BRIEF_TYPES = (
+        (REPLY_BRIEF, "Reply Brief"),
+        (BRIEF, "Brief"),
+        (NOTICE, "Notice"),
+    )
+
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket for this brief",
+        related_name="appellate_briefs",
+        on_delete=models.CASCADE,
+    )
+
+    brief_source = models.IntegerField(
+        help_text="The source of appellate brief",
+        choices=BRIEF_SOURCE,
+    )
+
+    brief_type = models.IntegerField(
+        help_text="The type of appellate brief",
+        choices=BRIEF_TYPES,
+    )
+
+    date_filed = models.DateField(
+        help_text="The filing date for the brief",
+        db_index=True,
+    )
+
+    filing_party = models.ForeignKey(
+        "people_db.Party",
+        help_text="The party filing this brief",
+        related_name="briefs_filed",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    description = models.CharField(
+        help_text="Description of the brief (or missing brief)",
+        max_length=100,
+        blank=True
+    )
+
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_id",
+            "brief_type",
+            "date_filed",
+            "filepath_local",
+        ]
+    )
+
+    def __str__(self) -> str:
+        return f"{self.get_brief_type_display()} from {self.get_brief_source_display()} for Docket {self.docket_id} filed {self.date_filed}"
+
+    def get_absolute_url(self) -> str:
+        if self.filepath_local:
+            return f"https://storage.courtlistener.com/{self.filepath_local}"
+        return ""
+
+    class Meta:
+        ordering = ["-date_filed"]
+        indexes = [
+            models.Index(fields=["docket_id", "date_filed"]),
+        ]
+
+
+@pghistory.track()
+class CalendarEntry(AbstractDateTimeModel):
+    """The model class for tracking Calendar Entries"""
+
+    entry_type = models.CharField(
+        help_text="The type of calendar entry",
+        max_length=100,
+    )
+    entry_date = models.DateField(
+        help_text="The date of the calendar entry",
+    )
+
+    reason_set = models.CharField(
+        help_text="The reason set for the calendar entry",
+        max_length=100,
+    )
+
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket for this calendar entry",
+        related_name="calendar_events",
+        on_delete=models.CASCADE,
+    )
+
+    def __str__(self) -> str:
+        return f"{self.entry_type} of {self.reason_set} on {self.entry_date} for Docket {self.docket_id}"
+
+    class Meta:
+        verbose_name_plural = "Calendar Entries"
+        ordering = ["entry_date"]
+        indexes = [
+            models.Index(fields=["docket_id", "entry_date"])
+        ]
 
 
 @pghistory.track()
