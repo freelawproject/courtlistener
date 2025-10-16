@@ -4,12 +4,27 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    atomic = False
 
     dependencies = [
         ('search', '0043_add_date_fields_citation_model'),
     ]
 
     operations = [
+        # Drop indexes and unique constraint
+        migrations.RunSQL(
+            sql='DROP INDEX CONCURRENTLY IF EXISTS search_citation_volume_ae340b5b02e8912_idx;',
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.RunSQL(
+            sql='DROP INDEX CONCURRENTLY IF EXISTS search_citation_volume_251bc1d270a8abee_idx;',
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.RunSQL(
+            sql='ALTER TABLE search_citation DROP CONSTRAINT IF EXISTS search_citation_cluster_id_7a668830aad411f5_uniq;',
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        # Change field type
         migrations.AlterField(
             model_name='citation',
             name='volume',
@@ -19,5 +34,27 @@ class Migration(migrations.Migration):
             model_name='citationevent',
             name='volume',
             field=models.TextField(help_text='The volume of the reporter'),
+        ),
+        # Recreate constraint and indexes concurrently
+        migrations.RunSQL(
+            sql="""
+                    ALTER TABLE search_citation ADD CONSTRAINT search_citation_cluster_id_7a668830aad411f5_uniq
+                        UNIQUE (cluster_id, volume, reporter, page);
+                    """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.RunSQL(
+            sql="""
+                    CREATE INDEX CONCURRENTLY search_citation_volume_ae340b5b02e8912_idx
+                        ON search_citation (volume, reporter, page);
+                    """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.RunSQL(
+            sql="""
+                    CREATE INDEX CONCURRENTLY search_citation_volume_251bc1d270a8abee_idx
+                        ON search_citation (volume, reporter);
+                    """,
+            reverse_sql=migrations.RunSQL.noop,
         ),
     ]

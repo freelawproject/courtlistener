@@ -4,15 +4,45 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    atomic = False
 
     dependencies = [
         ('citations', '0001_add_unmatched_citation'),
     ]
 
     operations = [
+        # Drop indexes and unique constraint
+        migrations.RunSQL(
+            sql="DROP INDEX CONCURRENTLY IF EXISTS citations_u_volume_da4d25_idx;",
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.RunSQL(
+            sql="""
+                ALTER TABLE citations_unmatchedcitation
+                DROP CONSTRAINT IF EXISTS citations_unmatchedcitat_citing_opinion_id_volume_ca9f46d3_uniq;
+                """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        # Change field type
         migrations.AlterField(
             model_name='unmatchedcitation',
             name='volume',
             field=models.TextField(help_text='The volume of the reporter'),
+        ),
+        # Recreate constraint and index concurrently
+        migrations.RunSQL(
+            sql="""
+                ALTER TABLE citations_unmatchedcitation
+                    ADD CONSTRAINT citations_unmatchedcitat_citing_opinion_id_volume_ca9f46d3_uniq
+                    UNIQUE (citing_opinion_id, volume, reporter, page);
+                """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.RunSQL(
+            sql="""
+                CREATE INDEX CONCURRENTLY citations_u_volume_da4d25_idx
+                    ON citations_unmatchedcitation (volume, reporter, page);
+                """,
+            reverse_sql=migrations.RunSQL.noop,
         ),
     ]
