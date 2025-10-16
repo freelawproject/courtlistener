@@ -762,6 +762,22 @@ class Docket(AbstractDateTimeModel, DocketSources):
         ),
         default=False,
     )
+    case_status = models.CharField(
+        help_text="The status of the case (e.g. Active, Disposed)",
+        max_length=100,
+        blank=True,
+    )
+    efile_status = models.CharField(
+        help_text="How complete is the efile account for the case",
+        max_length=100,
+        blank=True,
+    )
+    case_source_url = models.URLField(
+        help_text="URL for the source page of the case details",
+        max_length=500,
+        blank=True,
+        null=True,
+    )
     es_pa_field_tracker = FieldTracker(fields=["docket_number", "court_id"])
     es_oa_field_tracker = FieldTracker(
         fields=[
@@ -2193,7 +2209,12 @@ class Court(models.Model):
         "raw)",
         blank=True,
     )
-
+    state = USPostalCodeField(
+        help_text="The two-letter USPS postal abbreviation for the state "
+        "the court is in",
+        choices=USPS_CHOICES + OBSOLETE_STATES,
+        blank=True,
+    )
     objects = models.Manager()
     federal_courts = FederalCourtsQuerySet.as_manager()
 
