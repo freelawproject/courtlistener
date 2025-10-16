@@ -151,8 +151,8 @@ def regex_clean_F(s: str) -> str:
 
 
 def clean_docket_number_raw(
-    docket_id: str, docket_number_raw: str, court_id: str
-) -> tuple[str, str]:
+    docket_id: int, docket_number_raw: str, court_id: str
+) -> tuple[str, int | None]:
     """
     Cleans a raw docket number string based on the court's specific cleaning logic and identifies those that need LLM cleaning.
 

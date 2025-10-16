@@ -14,9 +14,7 @@ from cl.favorites.utils import send_prayer_emails
 from cl.lib.courts import get_cache_key_for_court_list
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.lib.redis_utils import (
-    acquire_redis_lock,
     get_redis_interface,
-    release_redis_lock,
 )
 from cl.people_db.models import (
     ABARating,
@@ -679,14 +677,8 @@ def clean_docket_number_raw_and_update_redis_cache(
 
     # Add to redis cache for later processing
     if docket_id_llm:
-        # Use a Redis lock to avoid race conditions when getting and updating the llm_batch.
-        set_key = "docket_number_cleaning:llm_batch"
-        lock_key = f"{set_key}:lock"
-        lock_value = acquire_redis_lock(r, lock_key, 60 * 1000)
-        try:
-            r.sadd(set_key, docket_id_llm)
-        finally:
-            release_redis_lock(r, lock_key, lock_value)
+        redis_key = "docket_number_cleaning:llm_batch"
+        r.sadd(redis_key, docket_id_llm)
 
 
 @receiver(
@@ -702,7 +694,9 @@ def handle_docket_number_raw_cleaning(
         return
 
     # Only clean if the docket was was non-recap source and newly created or docket_number_raw has changed
-    changed = not created and "docket_number_raw" in update_fields
+    changed = bool(
+        update_fields and not created and "docket_number_raw" in update_fields
+    )
     non_recap_sources = instance.source != Docket.RECAP
     if (created or changed) and non_recap_sources:
         clean_docket_number_raw_and_update_redis_cache(instance)
