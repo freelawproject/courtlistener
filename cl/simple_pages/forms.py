@@ -210,40 +210,19 @@ class ContactForm(forms.Form):
 
         # Partnerships: check for required fields
         if issue == self.PARTNERSHIPS:
-            if not cleaned_data.get("partner_current_work"):
-                self.add_error(
-                    "partner_current_work",
-                    "Please tell us what you're working on.",
-                )
-            if not cleaned_data.get("partner_prior_outreach"):
-                self.add_error(
-                    "partner_prior_outreach",
-                    "Please tell us what you've tried and/or who you've contacted about this.",
-                )
-            if not cleaned_data.get("partner_team_size"):
-                self.add_error(
-                    "partner_team_size", "Please select your team size."
-                )
-            if not cleaned_data.get("partner_founded_year"):
-                self.add_error(
-                    "partner_founded_year",
-                    "Please tell us when your organization was founded.",
-                )
-            if not cleaned_data.get("partner_ideal_outcome"):
-                self.add_error(
-                    "partner_ideal_outcome",
-                    "What are your expectations from contacting us?",
-                )
-            if not cleaned_data.get("partner_funding_total"):
-                self.add_error(
-                    "partner_funding_total",
-                    "Please tell us how much funding you've raised so far.",
-                )
-            if not cleaned_data.get("partner_funding_stage"):
-                self.add_error(
-                    "partner_funding_stage",
-                    "Please tell us the status of your VC funding if any.",
-                )
+            required_partnership_fields = {
+                "partner_current_work": "Please tell us what you're working on.",
+                "partner_prior_outreach": "Please tell us what you've tried and/or who you've contacted about this.",
+                "partner_team_size": "Please select your team size.",
+                "partner_founded_year": "Please tell us when your organization was founded.",
+                "partner_ideal_outcome": "What are your expectations from contacting us?",
+                "partner_funding_total": "Please tell us how much funding you've raised so far.",
+                "partner_funding_stage": "Please tell us the status of your VC funding if any.",
+            }
+            for field, message in required_partnership_fields.items():
+                if not cleaned_data.get(field):
+                    self.add_error(field, message)
+
             backgrounds = cleaned_data.get("partner_background", []) or []
             if len(backgrounds) == 0:
                 self.add_error(
