@@ -120,7 +120,7 @@ class AbstractPDF(models.Model):
         help_text="The URL this PDF was stored at before import, if known and public",
         max_length=1000,
         null=True,
-        blank=True
+        blank=True,
     )
 
     class Meta:

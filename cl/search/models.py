@@ -238,9 +238,10 @@ class SOURCES:
             RECAP,
             "recap",
         ),
-        (   TAMES,
+        (
+            TAMES,
             "Texas courts public court records at search.txcourts.gov",
-         ),
+        ),
     )
 
     # use a frozenset since the order of characters is arbitrary
@@ -368,15 +369,14 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     sentence = models.TextField(
         help_text="The punishment or sentence determined by the originating court",
         blank=True,
-        null=True
+        null=True,
     )
     county = models.CharField(
         help_text="The name of the county of the originating court, if available",
         max_length=100,
         blank=True,
-        null=True
+        null=True,
     )
-
 
     @property
     def administrative_link(self):
@@ -457,7 +457,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     is_original_proceeding = models.BooleanField(
         help_text="Whether this is an original proceeding rather than an appeal, if known",
         default=None,
-        null=True
+        null=True,
     )
     appeal_from_str = models.TextField(
         help_text=(
@@ -1715,6 +1715,7 @@ class RECAPDocumentTags(RECAPDocument.tags.through):
     class Meta:
         proxy = True
 
+
 @pghistory.track()
 class AppellateBrief(AbstractDateTimeModel, AbstractPDF):
     """The model class for tracking Appellate Briefs"""
@@ -1763,13 +1764,13 @@ class AppellateBrief(AbstractDateTimeModel, AbstractPDF):
         related_name="briefs_filed",
         on_delete=models.SET_NULL,
         null=True,
-        blank=True
+        blank=True,
     )
 
     description = models.CharField(
         help_text="Description of the brief (or missing brief)",
         max_length=100,
-        blank=True
+        blank=True,
     )
 
     es_rd_field_tracker = FieldTracker(
@@ -1826,9 +1827,7 @@ class CalendarEntry(AbstractDateTimeModel):
     class Meta:
         verbose_name_plural = "Calendar Entries"
         ordering = ["entry_date"]
-        indexes = [
-            models.Index(fields=["docket_id", "entry_date"])
-        ]
+        indexes = [models.Index(fields=["docket_id", "entry_date"])]
 
 
 @pghistory.track()
