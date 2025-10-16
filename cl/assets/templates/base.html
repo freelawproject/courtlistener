@@ -1,6 +1,6 @@
 {% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}{% load svg_tags %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-color-mode="light">
 <head>
   <meta charset="utf-8"/>
   <meta http-equiv="Content-Language" content="en"/>
@@ -163,6 +163,16 @@
                     </li>
                   </ul>
                 </li>
+                <li class="visible-xs">
+                  <a href="#"
+                     class="dark-mode-toggle dark-mode-toggle--mobile"
+                     data-theme-toggle
+                     role="button"
+                     tabindex="209"
+                     aria-pressed="false">
+                    <i class="fa fa-moon-o" aria-hidden="true"></i>&nbsp;<span class="dark-mode-toggle__label">Dark Mode</span>
+                  </a>
+                </li>
               </ul>
             {% else %}
               <ul class="nav navbar-nav navbar-right">
@@ -172,12 +182,22 @@
                   <a href="https://donate.free.law/forms/membership"
                      tabindex="203">Become a Member</a>
                 </li>
+                <li class="visible-xs">
+                  <a href="#"
+                     class="dark-mode-toggle dark-mode-toggle--mobile"
+                     data-theme-toggle
+                     role="button"
+                     tabindex="204"
+                     aria-pressed="false">
+                    <i class="fa fa-moon-o" aria-hidden="true"></i>&nbsp;<span class="dark-mode-toggle__label">Dark Mode</span>
+                  </a>
+                </li>
                 <li>
                   {% if request.path != "/sign-out/" %}
                     <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}"
-                       tabindex="204">Sign in / Register</a>
+                       tabindex="205">Sign in / Register</a>
                   {% else %}
-                      <a href="{% url "sign-in" %}" tabindex="204">Sign in / Register</a>
+                      <a href="{% url "sign-in" %}" tabindex="205">Sign in / Register</a>
                   {% endif %}
                 </li>
               </ul>
@@ -318,6 +338,17 @@
               <a href="https://donate.free.law/forms/membership"
                  tabindex="600"
                  class="donate"><i class="fa fa-heart-o"></i>&nbsp;Donate</a>
+            </li>
+            <li class="hidden-xs">
+              <a href="#"
+                 id="dark-mode-toggle"
+                 class="dark-mode-toggle"
+                 data-theme-toggle
+                 role="button"
+                 tabindex="601"
+                 aria-pressed="false">
+                <i class="fa fa-moon-o" aria-hidden="true"></i>&nbsp;<span class="dark-mode-toggle__label">Dark Mode</span>
+              </a>
             </li>
           </ul>
         </div>
