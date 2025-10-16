@@ -4478,7 +4478,7 @@ class EsOpinionsIndexingTest(
         mock_download_embeddings.assert_not_called()
 
         # Updating `html_with_citations` should trigger embeddings generation
-        opinion.html_with_citations = "HTML with citations content"
+        opinion.html_with_citations = "HTML with citations content" * 100
         opinion.save()
 
         inception_mock.assert_called_once_with(
@@ -4530,7 +4530,7 @@ class EsOpinionsIndexingTest(
         download_mock.return_value = None
 
         # Updating `html_with_citations` should trigger embeddings generation
-        opinion.html_with_citations = "HTML with citations content"
+        opinion.html_with_citations = "HTML with citations content" * 100
         opinion.per_curiam = True
         opinion.save()
 
@@ -4546,6 +4546,52 @@ class EsOpinionsIndexingTest(
         logger_mock.assert_called()
 
         # Ensure ES document still gets updated even without embeddings
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertTrue(es_doc.per_curiam)
+        self.assertFalse(es_doc.embeddings)
+
+    @mock.patch("cl.search.tasks.download_embedding")
+    @mock.patch("cl.search.tasks.microservice")
+    def test_skip_computing_embedding_for_opinion_below_token_threshold(
+        self, inception_mock, download_mock
+    ):
+        """Check embeddings are not computed for opinions that fall below the token threshold."""
+        cluster = OpinionClusterFactory.create(
+            case_name_full="Paul Debbas v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=self.docket,
+        )
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person,
+            plain_text="my plain text secret word for queries",
+            cluster=cluster,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+        )
+
+        # Simulate missing embeddings
+        download_mock.return_value = None
+
+        # Saving the opinion should not trigger embedding generation
+        opinion.html_with_citations = "<div></div>"
+        opinion.per_curiam = True
+        opinion.save()
+
+        # Verify the embedding microservice was not called
+        inception_mock.assert_not_called()
+
+        # Ensure ES document was still updated without embeddings
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertTrue(es_doc.per_curiam)
         self.assertFalse(es_doc.embeddings)
