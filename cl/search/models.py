@@ -1328,6 +1328,10 @@ class RECAPDocument(
         related_name="recap_documents",
         blank=True,
     )
+    document_status = models.TextField(
+        help_text="Reflects the document's current status as shown in the courts' page",
+        blank=True,
+    )
     document_type = models.IntegerField(
         help_text="Whether this is a regular document or an attachment.",
         choices=DOCUMENT_TYPES,
