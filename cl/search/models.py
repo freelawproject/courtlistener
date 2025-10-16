@@ -1353,6 +1353,7 @@ class RECAPDocument(
         fields=[
             "docket_entry_id",
             "document_type",
+            "document_status",
             "document_number",
             "description",
             "pacer_doc_id",
