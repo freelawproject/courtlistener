@@ -9,10 +9,9 @@
     <tr class="border-none">
       {% for column in columns %}
         <th
-          class="text-nowrap text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal
-            {% if forloop.first %}rounded-l-lg{% elif forloop.last  %}rounded-r-lg{% endif %}
-            {% if align == "data-center" and not forloop.first %}
-              text-center
+          class="text-nowrap text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal first:rounded-l-lg last:rounded-r-lg
+            {% if align == "data-center" %}
+              text-center first:text-start
             {% elif align == "center" %}
               text-center
             {% else %}
@@ -29,8 +28,8 @@
       <tr class="border-b-greyscale-200 border-b">
         {% for column in columns %}
           <td class="align-top text-sm font-normal p-2
-            {% if align == "data-center" and not forloop.first %}
-              text-center
+            {% if align == "data-center" %}
+              text-center first:text-start
             {% elif align == "center" %}
               text-center
             {% else %}
@@ -52,8 +51,8 @@
         <tr>
           {% for column in columns %}
             <td class="align-top text-sm p-2
-              {% if align == "data-center" and not forloop.first %}
-                text-center
+              {% if align == "data-center" %}
+                text-center first:text-start
               {% elif align == "center" %}
                 text-center
               {% else %}
