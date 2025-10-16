@@ -1615,7 +1615,7 @@ class AttorneyOrganization(AbstractDateTimeModel):
 
 
 class AuthorizedAgent(AbstractDateTimeModel):
-    """Links authorized agents to docket and attorney"""
+    """Links authorized agents to a docket and an attorney."""
 
     docket = models.ForeignKey(
         "search.Docket",
@@ -1640,15 +1640,15 @@ class AuthorizedAgent(AbstractDateTimeModel):
         null=True,
     )
     agent_name = models.CharField(
-        help_text="Name of the agent",
+        help_text="Name of the agent.",
         max_length=100,
         blank=True,
     )
     authorization_date = models.DateTimeField(
-        help_text="Date the agent was authorized", blank=True, null=True
+        help_text="Date the agent was authorized.", blank=True, null=True
     )
     revocation_date = models.DateTimeField(
-        help_text="Date the authorization was revoked", blank=True, null=True
+        help_text="Date the authorization was revoked.", blank=True, null=True
     )
 
     class Meta:
