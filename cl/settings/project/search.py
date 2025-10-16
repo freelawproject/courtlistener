@@ -60,6 +60,7 @@ PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES = env(
 #################
 # VECTOR SEARCH #
 #################
+EMBEDDING_DIMENSIONS = env("EMBEDDING_DIMENSIONS", default=768)
 MAX_EMBEDDING_CHAR_LENGTH = env("MAX_EMBEDDING_CHAR_LENGTH", default=1000)
 ENABLE_EMBEDDING_COMPUTATION = env(
     "ENABLE_EMBEDDING_COMPUTATION", default=False
@@ -69,3 +70,11 @@ KNN_SEARCH_BOOST = env("KNN_SEARCH_BOOST", default=150)
 KNN_SEARCH_K = env("KNN_SEARCH_K", default=5)
 KNN_SIMILARITY = env("KNN_SIMILARITY", default=0.8)
 KNN_OVERSAMPLE = env.float("KNN_OVERSAMPLE", default=3.0)
+
+
+############################
+# CUSTOM RELEVANCE FACTORS #
+############################
+
+DATE_DECAY_BOOST = env.float("DATE_DECAY_FACTOR", default=1.0)
+JURISDICTION_BOOST = env.float("JURISDICTION_FACTOR", default=1.0)
