@@ -217,6 +217,9 @@ def extract_opinion_content(
     # Save item
     # noinspection PyBroadException
     try:
+        if opinion.cluster.docket.originating_court_information:
+            opinion.cluster.docket.originating_court_information.save()
+
         opinion.cluster.docket.save()
         opinion.cluster.save()
         opinion.save()
@@ -228,6 +231,8 @@ def extract_opinion_content(
         )
         return
 
+    find_and_merge_versions.delay(pk=opinion.id)
+
     # Identify and link citations within the document content
     find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
         ([opinion.pk], False, False, percolate_opinion),
@@ -235,6 +240,7 @@ def extract_opinion_content(
     )
 
 
+# TODO: Remove after the new extract_opinion_content is deployed.
 @app.task(
     bind=True,
     autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
@@ -378,7 +384,7 @@ def find_and_merge_versions(self, pk: int) -> None:
     """Find versions of the `pk` opinion, and try to merge them
 
     Since this relies on text similarity, we are calling it from
-    `extract_doc_content`
+    `extract_opinion_content`
 
     Currently only checks for exact `download_url` match, update this when
     different strategies are implemented
