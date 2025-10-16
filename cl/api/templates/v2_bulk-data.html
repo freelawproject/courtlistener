@@ -11,7 +11,7 @@
   data-first-active="about"
   :nav_items="[
     {'href': '#about', 'text': 'Overview'},
-    {'href': '#Browse', 'text': 'Browse the Files'},
+    {'href': '#browse', 'text': 'Browse the Files'},
     {'href': '#formats', 'text': 'Data Definitions'},
     {'href': '#schemas', 'text': 'Schema Diagrams', 'children': [
         {'href': '#opinions-db', 'text': 'Case Law Data'},
@@ -19,6 +19,7 @@
         {'href': '#people-db', 'text': 'Judge Data'},
         {'href': '#audio-db', 'text': 'Oral Argument Data'}
     ]},
+    {'href': '#embeddings', 'text': 'Embeddings'},
     {'href': '#odds-and-ends', 'text': 'Odds and Ends', 'children': [
         {'href': '#schedule', 'text': 'Data Generation Schedule'},
         {'href': '#contributing', 'text': 'Contributions'},
@@ -29,14 +30,14 @@
 >
   <c-layout-with-navigation.section id="about">
     <h1>Bulk Legal Data</h1>
-    <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general the files that are available correspond to the major types of data we have in our database, such as case law, oral arguments, dockets, and judges.</p>
+    <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general, the files that are available correspond to the major types of data we have in our database, such as case law, case law embeddings, oral arguments, dockets, and judges.</p>
     <p><a class="underline" href="{% url "contact" %}">Get in touch</a> if you're interested in types of data not provided here.</p>
     <p>If you have questions about the data, <a class="underline" href="https://github.com/freelawproject/courtlistener/discussions">please use our forum</a> and we'll get back to you as soon as possible.</p>
   </c-layout-with-navigation.section>
 
-  <c-layout-with-navigation.section id="Browse">
+  <c-layout-with-navigation.section id="browse">
     <h2>Browse the Data Files</h2>
-    <p>As they are generated, files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type.</p>
+    <p>As they are generated, bulk data files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type.</p>
     <p><strong>Important:</strong> Files are snapshots, not deltas, meaning each file contains everything in our database at the time of generation.</p>
     <p><a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/" class="btn-primary">Browse Bulk Data</a></p>
   </c-layout-with-navigation.section>
@@ -95,6 +96,26 @@
   <c-layout-with-navigation.section id="audio-db">
     <h3>Oral Argument Data</h3>
     <p>Our database of oral arguments is the largest in the world, but has a very simple structure consisting of only a single table that we export. That said, it relies on our court, judge, and docket data, so before you can import the oral argument data, you will likely want to import those other sources.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="embeddings">
+    <h2>Case Law Embeddings</h2>
+    <p>To encourage innovation, the case law embeddings for <a href="{% url "citegeist_help" %}" class="underline">our semantic search engine</a> are available for download.
+    </p>
+    <p>These embeddings are about 2TB in size and can be downloaded from our AWS S3 bucket with a command like:
+    </p>
+    <c-code>aws s3 sync s3://com-courtlistener-storage/embeddings/opinions/ . \
+      --no-sign-request</c-code>
+    <p><a class="underline" href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-inventory.html">S3 Inventory files</a> are also available in the bucket:</p>
+    <c-code>aws s3 sync s3://com-courtlistener-storage/embeddings/inventories/ . \
+      --no-sign-request</c-code>
+    <p>These are generated nightly and can be used to identify new embeddings.</p>
+    <p>Embeddings are organized into directories named after the model used to generate them:</p>
+    <ul>
+      <li><code>modernbert-embed-base_finetune_512</code> — This uses <a class="underline" href="https://free.law/2025/03/11/semantic-search">our fine-tuned ModernBERT model</a>.</li>
+    </ul>
+    <p>Please note that downloading these embeddings incurs about $200 in AWS fees upon Free Law Project. Donations <a href="https://free.law/donate" class="underline">are highly encouraged</a> to offset such costs.
+    </p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="odds-and-ends">
