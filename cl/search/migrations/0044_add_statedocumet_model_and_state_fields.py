@@ -12,7 +12,6 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('people_db', '0021_authorizedagent'),
         ('pghistory', '0006_delete_aggregateevent'),
         ('search', '0043_add_date_fields_citation_model'),
     ]
