@@ -10,7 +10,6 @@ from cl.simple_pages.views import (
     components,
     contact,
     contact_thanks,
-    contribute,
     coverage,
     coverage_fds,
     coverage_oa,
@@ -36,7 +35,6 @@ urlpatterns = [
     path("faq/", faq, name="faq"),  # type: ignore[arg-type]
     path("feeds/", feeds, name="feeds_info"),  # type: ignore[arg-type]
     path("podcasts/", podcasts, name="podcasts"),  # type: ignore[arg-type]
-    path("contribute/", contribute, name="contribute"),  # type: ignore[arg-type]
     path("contact/", contact, name="contact"),  # type: ignore[arg-type]
     path("contact/thanks/", contact_thanks, name="contact_thanks"),  # type: ignore[arg-type]
     # Help pages
