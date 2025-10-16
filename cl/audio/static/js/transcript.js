@@ -18,8 +18,7 @@ function formatTime(totalSeconds) {
 $(document).ready(function() {
     // --- Transcript Handling ---
     const transcriptContainer = $('#transcript-container');
-    // If transcript container doesn't exist (controlled by the 'transcript_feature' Waffle flag in the template),
-    // don't run any transcript logic.
+    // If transcript container doesn't exist, don't run any transcript logic.
     if (!transcriptContainer.length) {
         return;
     }

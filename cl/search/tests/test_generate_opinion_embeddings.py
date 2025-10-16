@@ -266,6 +266,41 @@ class GenerateOpinionEmbeddingTest(TestCase):
                 self.assertIn(embedding_dict, expected_embeddings)
 
     @patch("cl.search.tasks.S3IntelligentTieringStorage")
+    @patch(
+        "cl.search.tasks.inception_batch_request",
+        side_effect=inception_batch_request_mock,
+    )
+    @patch(
+        "cl.search.tasks.inception_cpu_batch_request",
+        side_effect=inception_batch_request_mock,
+    )
+    def test_can_pick_cpu_inception_using_argument(
+        self,
+        mock_inception_cpu_batch_request,
+        mock_inception_batch_request,
+        mock_aws_media_storage,
+        mock_embeddings_cache_key,
+    ):
+        """
+        The command uses the CPU version of inception when --device=cpu is passed.
+        """
+        # Setup: replace S3IntelligentTieringStorage with a fake implementation
+        mock_aws_media_storage.return_value = FakeS3IntelligentTieringStorage()
+
+        # Execute the command with device="cpu"
+        call_command(
+            "generate_opinion_embeddings",
+            token_count=10000,
+            start_id=0,
+            count=3,
+            device="cpu",
+        )
+
+        # Verify that the CPU-specific batch request was used
+        mock_inception_cpu_batch_request.assert_called_once()
+        mock_inception_batch_request.assert_not_called()
+
+    @patch("cl.search.tasks.S3IntelligentTieringStorage")
     @patch("cl.search.management.commands.generate_opinion_embeddings.logger")
     def test_log_long_documents(
         self, mock_logger, mock_aws_media_storage, mock_embeddings_cache_key
