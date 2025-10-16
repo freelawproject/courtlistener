@@ -483,6 +483,10 @@ async def advanced_search(request: HttpRequest) -> HttpResponse:
     )
 
 
+async def citegeist_help(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "citegeist.html", {"private": False})
+
+
 async def old_terms(request: HttpRequest, v: str) -> HttpResponse:
     return TemplateResponse(
         request,
