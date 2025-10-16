@@ -239,11 +239,16 @@ class ContactForm(forms.Form):
                 )
 
         # Technical support: always require a description
-        if issue in self.TECH_ISSUE_TYPES:
+        elif issue in self.TECH_ISSUE_TYPES:
             if not cleaned_data.get("tech_description"):
                 self.add_error(
                     "tech_description", "Please describe the issue."
                 )
+
+        # Neither Partnership inquiry nor Tech support => no additional fields so message is required:
+        else:
+            if not cleaned_data.get("message"):
+                self.add_error("message", "Please include a message.")
 
         message = cleaned_data.get("message", "")
         regex = re.compile(
