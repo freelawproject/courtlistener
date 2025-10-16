@@ -1315,6 +1315,78 @@ class AbstractPacerDocument(models.Model):
         abstract = True
 
 
+class StateDocument(AbstractPDF, AbstractDateTimeModel, CSVExportMixin):
+    "Model for e-filed documents and metadata"
+
+    docket = models.ForeignKey(
+        Docket,
+        help_text=(
+            "Foreign key to the Docket this document belongs to"
+            "Multiple documents can be belong to a docket"
+        ),
+        related_name="efiled_documents",
+        on_delete=models.CASCADE,
+    )
+    tags = models.ManyToManyField(
+        "search.Tag",
+        help_text="The tags associated with the document.",
+        related_name="recap_documents",
+        blank=True,
+    )
+    document_number = models.IntegerField(
+        help_text="Document number assigned by the state"
+    )
+    document_name = models.CharField(
+        help_text="Assigned name of the document", max_length=100, blank=True
+    )
+    description = models.CharField(
+        help_text="Description of document provided in the sub-header",
+        max_length=100,
+        blank=True,
+    )
+    filed_by = models.ForeignKey(
+        "people_db.Person",
+        related_name="filed_by",
+        help_text="The person who filed the document in the system",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+    )
+    filed_by_str = models.CharField(
+        help_text="Person who filed the document as a string",
+        max_length=100,
+        blank=True,
+    )
+    filed_status = models.CharField(
+        help_text="Status of the document filed (e.g. Processed)",
+        max_length=True,
+        blank=True,
+    )
+    # Confirmation Notices are PDFs that could also be collected and
+    # represented as on object. For simplicity the are currently stored
+    # by their url.
+    confirmation_notice_url = models.URLField(
+        help_text="URL to the confirmation notice of the document", blank=True
+    )
+    doucment_source_url = models.URLField(
+        help_text="URL for the online PDF of the document", blank=True
+    )
+    # Assumes fields inherited by AbstractDateTimeModel denote when
+    # the object was created in the database
+    date_filed = models.DateTimeField(
+        help_text="The date the document was filed", blank=True, null=True
+    )
+    date_received = models.DateTimeField(
+        help_text="The date the file was recevied", blank=True, null=True
+    )
+
+    class Meta:
+        unique_together = (
+            "docket",
+            "document_number",
+        )
+
+
 @pghistory.track()
 class RECAPDocument(
     AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel, CSVExportMixin
