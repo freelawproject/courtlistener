@@ -61,8 +61,8 @@ class Command(VerboseCommand):
             if testing_iterations:
                 iterations_completed += 1
             if (
-                    testing_iterations
-                    and iterations_completed >= testing_iterations
-                ):
-                    # Perform only the indicated iterations for testing purposes.
-                    break
+                testing_iterations
+                and iterations_completed >= testing_iterations
+            ):
+                # Perform only the indicated iterations for testing purposes.
+                break

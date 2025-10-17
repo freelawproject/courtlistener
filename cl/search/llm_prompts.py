@@ -1,4 +1,4 @@
-F_EXAMPLES = '''
+F_EXAMPLES = """
 - "no. 8,' -> ['8']
 - 'Case Nos. 15 - 3751_1, et al.' -> ['15-3751']
 - 'Docket 08-1886-cr (L)' -> ['08-1886-cr']
@@ -53,9 +53,9 @@ F_EXAMPLES = '''
 - 'BOCKET. CIV.A.04-526 HHK/JMF & CASE.: 10-FS-124 AND Case No. 16-mc-2581 (RC/GMH)' -> ['04-526', '10-fs-124', '16-mc-2581']
 - (District Court No. 80-3684 and related District Court Nos. 80-4016, 81-951 and 81-3616.) No. 84-3695 -> ['80-3684', '80-4016', '81-951', '81-3616', '84-3695']
 - 'Nos. 85-5263/5378, 85-5412' -> ['85-5263', '85-5378', '85-5412']
-'''
+"""
 
-F_GENERAL_GUIDELINES = '''
+F_GENERAL_GUIDELINES = """
 1. Remove any leading 'No.', 'Nos.', 'No', 'Case No.', 'Case No', 'Docket No.', 'Docket No', 'Docket', 'Case', or similar prefixes.
 2. Remove any leading or trailing whitespaces, periods, underscores, words, or phrases.
 3. If dash is used as a separator, standardize it as a single hyphen ('-').
@@ -65,19 +65,19 @@ F_GENERAL_GUIDELINES = '''
 7. Docket number formatted as "D-NNNN" or "A-NNNN" where "D" or "A" is a letter prefix/separator and "NNNN" is a sequence of 1 to 6 digits, or any other format similar to this, should be kept as is.
 8. If the word “Docket” or “Dockets” appears in the middle of the string, ignore and exclude all numbers that occur before it. Only extract numbers that occur after 'Docket' or 'Dockets'. Any number before 'Docket' or 'Dockets' must never be treated as a docket number.
 9. Unless special instructions are provided, do not change the format of a docket number to another format. Letters, dashes, and numbers within the docket number should be preserved without modification, omission, or addition.
-'''
+"""
 
-OUTPUT_FORMAT = '''
+OUTPUT_FORMAT = """
 Output should be a json array of objects, each with the following keys:
 - unique_id: The unique identifier for the case.
 - cleaned_nums: An array of cleaned and standardized docket numbers. If no docket numbers can be extracted, return an empty array.
-'''
+"""
 
 
-F_PROMPT = f'''
+F_PROMPT = f"""
 You are an expert assistant that cleans and standardizes legal case docket numbers.
 
-You will receive an array of json with unique_id as key and docket number string as value, the docket number string may contain one or more docket numbers. 
+You will receive an array of json with unique_id as key and docket number string as value, the docket number string may contain one or more docket numbers.
 Your task is to extract and standardize each docket number. You are to then output an array of json objects, each with the unique_id and cleaned_nums keys.
 You should followed the general cleaning guidelines and refer to the examples when cleaning and standardizing the docket numbers, however, the examples are not exhaustive, you should use your judgment and expertise to handle any edge cases or variations.
 
@@ -89,10 +89,10 @@ You should followed the general cleaning guidelines and refer to the examples wh
 
 ## Examples:
 {F_EXAMPLES}
-'''
+"""
 
 
-F_TIE_BREAKER = f'''
+F_TIE_BREAKER = f"""
 You are an expert assistant that cleans and standardizes legal case docket numbers.
 
 You will receive an array of json with unique_id as key and docket_number string as value, the docket_number string may contain one or more docket numbers.
@@ -116,4 +116,4 @@ You should pay special attention to the special cleaning guidelines as it emphas
 
 ## Examples:
 {F_EXAMPLES}
-'''
+"""
