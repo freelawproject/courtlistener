@@ -57,7 +57,9 @@ class Address(models.Model):
     zip_code = models.CharField(max_length=10)
 
     def __str__(self):
-        return f"{self.address_line1}, {self.city}, {self.state} {self.zip_code}"
+        return (
+            f"{self.address_line1}, {self.city}, {self.state} {self.zip_code}"
+        )
 
 
 class TrialCourt(models.Model):
@@ -91,12 +93,16 @@ class Opinion(models.Model):
 
     pdf_file = models.FileField(upload_to="opinions/pdf/%Y/%m/", null=True)
     pdf_uri = models.URLField(
-        max_length=500, null=True, help_text="External PDF URL if hosted elsewhere"
+        max_length=500,
+        null=True,
+        help_text="External PDF URL if hosted elsewhere",
     )
 
     docx_file = models.FileField(upload_to="opinions/docx/%Y/%m/", null=True)
     docx_uri = models.URLField(
-        max_length=500, null=True, help_text="External DOCX URL if hosted elsewhere"
+        max_length=500,
+        null=True,
+        help_text="External DOCX URL if hosted elsewhere",
     )
 
 
