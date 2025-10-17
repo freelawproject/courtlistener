@@ -803,6 +803,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             "date_reargument_denied",
         ]
     )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -3888,20 +3889,28 @@ class ClusterRedirection(models.Model):
 
 # ---------- New model for documents coming from California Supreme Court ----------
 
+
 class CaseIdentifier(models.Model):
     """Model to store alternate/legacy identifiers for cases."""
-    docket = models.ForeignKey('Docket', on_delete=models.CASCADE, related_name='identifiers')
-    id_type = models.CharField(max_length=64, db_index=True,
-                               help_text="Type of identifier (e.g., 'S', 'LA', 'Crim', 'CalReporter')")
+
+    docket = models.ForeignKey(
+        "Docket", on_delete=models.CASCADE, related_name="identifiers"
+    )
+    id_type = models.CharField(
+        max_length=64,
+        db_index=True,
+        help_text="Type of identifier (e.g., 'S', 'LA', 'Crim', 'CalReporter')",
+    )
     identifier = models.CharField(max_length=128, db_index=True)
     note = models.CharField(max_length=255, null=True, blank=True)
     first_seen = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = (('id_type', 'identifier'),)
+        unique_together = (("id_type", "identifier"),)
         indexes = [
-            models.Index(fields=['id_type', 'identifier']),
+            models.Index(fields=["id_type", "identifier"]),
         ]
+
 
 class StateCourtDocument(AbstractPDF, AbstractDateTimeModel, CSVExportMixin):
     """Documents and attachments from state court dockets."""
@@ -3952,9 +3961,15 @@ class StateCourtDocument(AbstractPDF, AbstractDateTimeModel, CSVExportMixin):
         ),
         blank=True,
     )
-    source = models.CharField(max_length=64, default='acis', db_index=True,
-                              help_text="Source system name, e.g., 'acis', 'findlaw'")
-    source_url = models.TextField(null=True, blank=True, help_text="Original public URL to the document")
+    source = models.CharField(
+        max_length=64,
+        default="acis",
+        db_index=True,
+        help_text="Source system name, e.g., 'acis', 'findlaw'",
+    )
+    source_url = models.TextField(
+        null=True, blank=True, help_text="Original public URL to the document"
+    )
     is_available = models.BooleanField(
         help_text="True if the item is available in RECAP",
         blank=True,
@@ -3986,13 +4001,18 @@ class StateCourtDocument(AbstractPDF, AbstractDateTimeModel, CSVExportMixin):
                 fields=["filepath_local"],
                 name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
             ),
-            models.Index(fields=['source', 'source_url'], name='search_statecourtdocument_source_url_idx'),
+            models.Index(
+                fields=["source", "source_url"],
+                name="search_statecourtdocument_source_url_idx",
+            ),
         ]
 
 
 class OpinionsCitedByStateCourtDocument(models.Model):
     citing_document = models.ForeignKey(
-        StateCourtDocument, related_name="cited_opinions", on_delete=models.CASCADE
+        StateCourtDocument,
+        related_name="cited_opinions",
+        on_delete=models.CASCADE,
     )
     cited_opinion = models.ForeignKey(
         Opinion, related_name="citing_documents", on_delete=models.CASCADE
