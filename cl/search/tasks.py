@@ -553,28 +553,23 @@ def update_es_document(
         return
 
     embeddings = None
-    cache_key = None
     if should_check_for_embeddings and es_document_name == "OpinionDocument":
-        cache_key = f"{embeddings_cache_key()}o_{main_instance_id}"
-        embeddings = cache.get(cache_key)
-
+        storage = AWSMediaStorage()
+        embeddings = download_embedding(storage, main_instance_id)
         if not embeddings:
             logging.error(
-                "Expected cached embeddings for OpinionDocument %s, but none found",
+                "Expected embeddings for OpinionDocument %s, but none found",
                 main_instance_id,
             )
 
     if embeddings:
-        fields_values_to_update["embeddings"] = embeddings
+        fields_values_to_update["embeddings"] = embeddings["embeddings"]
 
     Document.update(
         es_doc,
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
-
-    if embeddings and cache_key:
-        cache.delete(cache_key)
 
     if (
         (
@@ -1765,26 +1760,37 @@ def remove_documents_by_query(
     return response
 
 
-def inception_batch_request(batch: dict) -> list[dict]:
-    """Get embeddings from the inception batch microservice.
+def request_embeddings_for_batch(batch: dict, service_name: str) -> list[dict]:
+    """Get embeddings from the specified Inception batch microservice.
 
     param batch: A list of dictionaries, where each dictionary represents an
     opinion document with the following keys:
-    "id": The Opinion ID.
-    "text": The content of the opinion.
+        "id": The Opinion ID.
+        "text": The content of the opinion.
+    param service_name: The name of the Inception microservice to use, e.g.,
+        "inception-batch" or "inception-cpu-batch".
     :return: A list of dictionaries, each containing the embeddings for the
     corresponding opinion document as returned  by the inception microservice.
     """
-
     data = json.dumps(batch)
     response = asyncio.run(
         microservice(
-            service="inception-batch",
+            service=service_name,
             method="POST",
             data=data,
         )
     )
     return response.json()
+
+
+def inception_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the GPU version of the inception microservice."""
+    return request_embeddings_for_batch(batch, "inception-batch")
+
+
+def inception_cpu_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the CPU version of the inception microservice."""
+    return request_embeddings_for_batch(batch, "inception-cpu-batch")
 
 
 def embeddings_cache_key():
@@ -1803,6 +1809,8 @@ def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
         RemoteProtocolError,
         HTTPStatusError,
         ReadError,
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
     ),
     max_retries=5,
     retry_backoff=10,
@@ -1826,6 +1834,9 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     if not opinion:
         return None
 
+    if opinion.token_count < settings.MIN_OPINION_SIZE:
+        return None
+
     embeddings = asyncio.run(
         microservice(
             service="inception-text",
@@ -1838,12 +1849,20 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
             log_invalid_embedding_errors(embeddings)
         return None
 
-    # Build a namespaced cache key for this opinion's embeddings
-    cache_prefix = embeddings_cache_key()
-    cache_key = f"{cache_prefix}o_{pk}"
-
-    # Store the embeddings JSON in cache for 30 minutes
-    cache.set(cache_key, embeddings.json()["embeddings"], 60 * 30)
+    # Save embeddings to S3.
+    storage = S3IntelligentTieringStorage()
+    file_contents = json.dumps(
+        {"id": pk, "embeddings": embeddings.json()["embeddings"]}
+    )
+    file_path = str(
+        PurePosixPath(
+            "embeddings",
+            "opinions",
+            settings.NLP_EMBEDDING_MODEL,
+            f"{pk}.json",
+        )
+    )
+    storage.save(file_path, ContentFile(file_contents))
 
 
 @app.task(
@@ -1859,13 +1878,15 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     retry_backoff=10,
 )
 def create_opinion_text_embeddings(
-    self, batch: list[int], database
+    self, batch: list[int], database: str, device: str = "cpu"
 ) -> str | None:
     """Get embeddings for Opinion texts from inception.
 
     :param self: The Celery task.
     :param batch: A list of Opinion IDs representing the batch to process.
     :param database: The database to be used during processing.
+    :param device: The device to run the embedding generation on (e.g., 'cpu'
+        or 'gpu'). Defaults to 'cpu'.
     :return: The cache key used to temporarily store embeddings.
     """
     opinions = (
@@ -1880,7 +1901,12 @@ def create_opinion_text_embeddings(
 
     batch_range = f"{batch[0]}_{batch[-1]}"
     batch_request = {"documents": opinions_to_vectorize}
-    embeddings = inception_batch_request(batch_request)
+    inception_service = (
+        inception_batch_request
+        if device == "gpu"
+        else inception_cpu_batch_request
+    )
+    embeddings = inception_service(batch_request)
     # Use a UUID to guarantee the uniqueness of this batch of stored embeddings
     batch_uuid = str(uuid.uuid4().hex)
     cache_key = get_embeddings_cache_key(batch_uuid, batch_range)
@@ -1978,6 +2004,35 @@ def save_embeddings(
     cache.delete(cache_key)
 
 
+def download_embedding(
+    storage: AWSMediaStorage, pk: int, directory: str = "opinions"
+) -> list[dict] | None:
+    """Download a single embedding from S3.
+
+    :param storage: Storage backend instance.
+    :param pk: The record ID.
+    :param directory: Directory where the embedding is stored.
+    :return: The embedding data as a dict, or None if not found.
+    """
+    file_path = str(
+        PurePosixPath(
+            "embeddings",
+            directory,
+            settings.NLP_EMBEDDING_MODEL,
+            f"{pk}.json",
+        )
+    )
+    logger.info("Attempting to retrieve embedding from: %s", file_path)
+    try:
+        with storage.open(file_path, "rb") as f:
+            file_contents = f.read().decode("utf-8")
+        embedding_data = json.loads(file_contents)
+        return embedding_data
+    except FileNotFoundError:
+        logger.error("Embeddings for opinion ID:%s doesn't exist.", pk)
+        return None
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -2000,35 +2055,12 @@ def retrieve_embeddings(
     :param directory: The directory where the embeddings are stored.
     :return: A list of dictionaries containing the embeddings.
     """
-
     storage = AWSMediaStorage()
-
-    def download_embedding(opinion_id: int) -> dict | None:
-        file_path = str(
-            PurePosixPath(
-                "embeddings",
-                directory,
-                settings.NLP_EMBEDDING_MODEL,
-                f"{opinion_id}.json",
-            )
-        )
-        logger.info("Attempting to retrieve embedding from: %s", file_path)
-        try:
-            with storage.open(file_path, "rb") as f:
-                file_contents = f.read().decode("utf-8")
-            embedding_data = json.loads(file_contents)
-            return embedding_data
-        except FileNotFoundError:
-            logger.error(
-                "Embeddings for opinion ID:%s doesn't exist.", opinion_id
-            )
-            return None
-
     embeddings: list[dict] = []
     # Download embeddings concurrently.
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
-            executor.submit(download_embedding, opinion_id)
+            executor.submit(download_embedding, storage, opinion_id, directory)
             for opinion_id in opinion_ids
         ]
         for future in concurrent.futures.as_completed(futures):
@@ -2067,10 +2099,12 @@ def index_embeddings(
     for embeddings in embeddings:
         opinion_id = embeddings["id"]
         opinion_instance = (
-            Opinion.objects.filter(id=opinion_id).only("pk", "cluster").first()
+            Opinion.objects.filter(id=opinion_id)
+            .only("pk", "cluster", "main_version")
+            .first()
         )
-        if not opinion_instance:
-            # The opinion has been removed from the DB
+        if not opinion_instance or opinion_instance.main_version:
+            # The opinion has been removed from the DB or has a main version
             continue
 
         doc_to_update = {

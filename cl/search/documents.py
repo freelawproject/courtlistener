@@ -1676,6 +1676,7 @@ class OpinionBaseDocument(Document):
         search_analyzer="search_analyzer",
         term_vector="with_positions_offsets",
     )
+    court_jurisdiction = fields.KeywordField()
     judge = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -1816,6 +1817,9 @@ class OpinionBaseDocument(Document):
 
     def prepare_court_citation_string(self, instance):
         return instance.docket.court.citation_string
+
+    def prepare_court_jurisdiction(self, instance):
+        return instance.docket.court.jurisdiction
 
     def prepare_judge(self, instance):
         return instance.judges
@@ -1964,7 +1968,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
                 search_analyzer="search_analyzer",
             ),
             "embedding": DenseVector(
-                dims=768,
+                dims=settings.EMBEDDING_DIMENSIONS,
                 index=True,
                 similarity="dot_product",
             ),
@@ -2152,6 +2156,9 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
 
     def prepare_court_citation_string(self, instance):
         return instance.cluster.docket.court.citation_string
+
+    def prepare_court_jurisdiction(self, instance):
+        return instance.cluster.docket.court.jurisdiction
 
     def prepare_judge(self, instance):
         return instance.cluster.judges

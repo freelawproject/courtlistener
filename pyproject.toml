@@ -113,6 +113,8 @@ dependencies = [
   "django-cursor-pagination>=0.3.0",
   "django-elasticsearch-dsl>=8.0",
   "juriscraper>=2.6.68",
+  "instructor>=1.11.3",
+  "django-s3-express-cache>=0.1.0",
 ]
 
 [dependency-groups]

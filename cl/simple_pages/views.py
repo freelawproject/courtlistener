@@ -401,10 +401,6 @@ async def podcasts(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def contribute(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "contribute.html", {"private": False})
-
-
 async def contact(
     request: HttpRequest,
     template_path: str = "contact_form.html",
@@ -479,6 +475,10 @@ async def advanced_search(request: HttpRequest) -> HttpResponse:
         "help/advanced_search.html",
         {"private": False, "data": data, "types": types},
     )
+
+
+async def citegeist_help(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "citegeist.html", {"private": False})
 
 
 async def old_terms(request: HttpRequest, v: str) -> HttpResponse:
