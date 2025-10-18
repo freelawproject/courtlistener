@@ -3693,3 +3693,38 @@ class AdminActionsTest(TestCase):
         note_qs = get_blocking_relations.get("favorites.Note")
         self.assertTrue(note_qs.exists())
         self.assertIn(self.note_cluster_3_user_1, note_qs)
+
+
+@override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+class LLMCleanDocketNumberTests(TestCase):
+    """Tests related to llm_clean_docket_number_daemon command."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.r = get_redis_interface("CACHE")
+        key_to_clean = "docket_number_cleaning:llm_batch"
+        self.r.delete(key_to_clean)
+
+    @mock.patch("cl.search.docket_number_cleaner.llm_clean_docket_numbers")
+    def test_llm_clean_docket_number_daemon(self, mock_llm_clean):
+        """Test the llm_clean_docket_number_daemon command in testing mode."""
+        r = self.r
+        redis_key = "docket_number_cleaning:llm_batch"
+        docket_ids = [1, 2, 3, 4, 5]
+        r.sadd(redis_key, *docket_ids)
+
+        mock_llm_clean.return_value = docket_ids
+
+        with mock.patch("cl.lib.decorators.time.sleep") as mock_sleep:
+            call_command(
+                "llm_clean_docket_number_daemon",
+                testing_iterations=1,
+            )
+
+        # After processing, the Redis set should be empty.
+        remaining_ids = r.smembers(redis_key)
+        self.assertEqual(len(remaining_ids), 0)
