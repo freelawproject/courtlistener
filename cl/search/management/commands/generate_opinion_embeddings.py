@@ -74,6 +74,13 @@ class Command(VerboseCommand):
             default=5,
             help="The celery throttle min items.",
         )
+        parser.add_argument(
+            "--device",
+            type=str,
+            choices=["cpu", "gpu"],
+            default="gpu",
+            help="Which device to use for running the Inception service (CPU or GPU).",
+        )
 
     def send_batch(
         self,
@@ -81,6 +88,7 @@ class Command(VerboseCommand):
         embedding_queue: str,
         upload_queue: str,
         database: str,
+        device: str,
     ) -> None:
         """Send a batch of items for embedding creation and saving to S3.
 
@@ -92,7 +100,7 @@ class Command(VerboseCommand):
         """
         self.throttle.maybe_wait()
         chain(
-            create_opinion_text_embeddings.si(batch, database).set(
+            create_opinion_text_embeddings.si(batch, database, device).set(
                 queue=embedding_queue
             ),
             save_embeddings.s().set(queue=upload_queue),
@@ -108,6 +116,7 @@ class Command(VerboseCommand):
         min_opinion_size = settings.MIN_OPINION_SIZE
         start_id = options["start_id"]
         throttle_min_items = options["throttle_min_items"]
+        device = options["device"]
         self.throttle = CeleryThrottle(
             queue_name=embedding_queue, min_items=throttle_min_items
         )
@@ -121,7 +130,7 @@ class Command(VerboseCommand):
 
         opinions = (
             Opinion.objects.using(database)
-            .filter(id__gte=start_id)
+            .filter(id__gte=start_id, main_version__isnull=True)
             .order_by("pk")
         )
         # Limit opinions to retrieve if count was provided.
@@ -156,7 +165,11 @@ class Command(VerboseCommand):
             if current_batch_size + token_count > token_count_limit:
                 # Send the current batch since adding this opinion would break the limit.
                 self.send_batch(
-                    current_batch, embedding_queue, upload_queue, database
+                    current_batch,
+                    embedding_queue,
+                    upload_queue,
+                    database,
+                    device,
                 )
                 current_batch = []
                 current_batch_size = 0
@@ -177,7 +190,7 @@ class Command(VerboseCommand):
         # Send any remainder
         if current_batch:
             self.send_batch(
-                current_batch, embedding_queue, upload_queue, database
+                current_batch, embedding_queue, upload_queue, database, device
             )
 
         logger.info(
