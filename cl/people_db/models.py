@@ -1612,3 +1612,44 @@ class AttorneyOrganization(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}, {self.address1}, {self.address2}, {self.city}, {self.state}, {self.zip_code}"
+
+
+class AuthorizedAgent(AbstractDateTimeModel):
+    """Links authorized agents to a docket and an attorney."""
+
+    docket = models.ForeignKey(
+        "search.Docket",
+        related_name="authorized_agents",
+        on_delete=models.CASCADE,
+    )
+    attorney = models.ForeignKey(
+        Attorney,
+        related_name="authorized_agents",
+        on_delete=models.CASCADE,
+    )
+    party = models.ForeignKey(
+        Party,
+        related_name="authorized_agents",
+        on_delete=models.CASCADE,
+        null=True,
+    )
+    agent = models.ForeignKey(
+        Person,
+        related_name="authorized_agents",
+        on_delete=models.CASCADE,
+        null=True,
+    )
+    agent_name = models.CharField(
+        help_text="Name of the agent.",
+        max_length=100,
+        blank=True,
+    )
+    authorization_date = models.DateTimeField(
+        help_text="Date the agent was authorized.", blank=True, null=True
+    )
+    revocation_date = models.DateTimeField(
+        help_text="Date the authorization was revoked.", blank=True, null=True
+    )
+
+    class Meta:
+        unique_together = ("docket", "attorney", "agent_name")
