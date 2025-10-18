@@ -1,0 +1,33 @@
+# Scraping Texas Second Court of Appeals Dockets
+
+## A very high level scraper overview
+The Texas Court of Appeals search site at https://search.txcourts.gov/ (TAMES) provides a fairly natural interface for scraping the cases and their dockets, as well as other documents of interest (like oral arguments which aren't covered in this document). The search interface allows for searching for all cases filed within a given time range. This is going to be the primary entrypoint for spidering/scraping. We can enumerate weeks/months/years of time from the present back as far as the electronic records are available (I could not find records earlier than 1981 for the second court with my initial searches) for backfill, and regularly check the last days/weeks/months of records on an ongoing basis to keep up to date. The search results table will yield some metadata about each case, as well as a total number of cases within a given time period, a useful check. By following the link to each of the cases (including the potentially multiple pages of search results) we get access to a convenient collection of more metadata (case events, originating court, parties, calendar) for cases and documents, which we can enqueue to be saved before downloading documents. The texas courts search page also allows for searching directly by case number, and to take advantage of this, the scraper should be written in such a way as to allow that as an entrypoint.
+
+## Verifying completeness of the scrape
+In an ideal world with perfect data, this basic scraper should get us everything that Texas has for the second court of appeals. We would be wise to double check though. We should check for both internal consistency and external consistency.
+- For internal consistency, TAMES provides facilities for searching through documents and events in a similar, date based, manner. The search result tables will allow us a double check to make sure we haven't missed any cases, documents or events. If we have, we can attempt the direct search by case number mentioned above. TAMES wouldn't be the first public database with missing dates that meant missing search results.
+- For external consistency, the first dataset I would look at would be the reporter citations at https://www.courtlistener.com/c/sw3d/ , which should include docket numbers for many cases in Texas Second Court of appeals. Pulling these out and directly searching for them should be a good source of historical cases that are more likely to be of interest to free.law users, and absence of a lot of these (from after 1981) would imply that there are some gaps in the TAMES search approach that I'd need to address. Searching directly by case number in TAMES will work even if the wrong court is selected, so we might find cases assigned to the wrong court, by reporter or TAMES this way.
+- A second source of external consistency checks is CourtListener searches without results. If we don't have something that someone expects to find, we should capture the details of that search and see if TAMES has it. If this results in too many failed searches to TAMES, it's worth readdressing, but as a starting point, I think it's reasonable.
+- A third will be references within court documents. We should ideally be able to link up most new citations with dockets, though this may be a stretch goal, as it were.
+- A fourth option is speculative case enumeration. Direct search for cases of the form 02-(YY)-(i)-(CR|CV) where YY is the last 2 digits of the year, and i is a 0 padded 5 digit integer. This might be a useful test for small gaps in the sequence found by date search, or some small number of possible docket numbers greater than the last one found for any given year.
+
+
+## Other considerations
+
+### robots.txt
+https://search.txcourts.gov/robots.txt does request that robots not visit any page on the site. The state of Texas says it's fine to copy these records. Just noting these here as considerations.
+
+### Texas Linking policy
+The "Copying or Reproducing Information from State Agency Websites" section of the [State Website Linking and Privacy Policy](https://dir.texas.gov/sites/default/files/2024-08/State%20Website%20Linking%20and%20Privacy%20Policy.2024.pdf) states that we must link to the original, and not present it in a misleading way, and can't claim that anything we do is endorsed by the state of Texas.
+
+### Rate limits
+The scraping will need to be done mindfully of load on TAMES. Particularly in the context of many scrapers, I would recommend using a centralized http request system that is capable of rate-limiting effectively across distributed workers, URLs, and managing backoff if there's a spike in errors. Centralizing http requests in this fashion also allows for managing duplicate requests and preventing scraper infinite cycles. If it is possible to speak with someone in charge of maintaining TAMES about what rate limits they think are reasonable, I would do that and attempt to adhere to them. The size of date ranges in the enumeration will also play into the load we place on TAMES, and may need to be adjusted if TAMES introduces a cap on the number of results it will return.
+
+### Corruption/Missing/Duplicates
+It is quite likely that some of the documents will be missing/corrupted/duplicates. When documents are downloaded, they should be stored with a content-addressable filename for quick detection of exact duplicates. It looks like TAMES search results contains content-length verification in headers, but no integrity check, so verifying pdf readability upon download would be a good sanity check. Enough metadata should be kept on files to quickly identify the dockets that have duplicate/missing/corrupt files for further verification and possibly troubleshooting.
+
+### Online Scraping
+An additional html consistency check can serve as a useful alert. Saving a few copies of historical search and case pages and periodically comparing them to fresh versions can alert for changed html page structure that might throw the scraper off. Providing a report with the number of new cases and documents gathered within the last month with a historic trendline can also serve as a useful confirmation that the scraping is working as expected.
+Including at least the date of the most recently fetched case in the search for recently added cases can help ensure that there aren't time periods that are inadvertently skipped. For example, if we're rechecking the last month of cases on each run of the scraper, but the last case we successfully scraped was 2 months ago, then 2 months is the search window. The starting length of the lookback window is something I'd likely leave configurable and determine based on observation.
+
+
