@@ -1,0 +1,19 @@
+curl --request POST \
+  --url '{{ endpoint_url }}' \
+  --header 'Content-Type: application/json' \
+  --header 'Idempotency-Key: 59f1be59-e428-427a-a346-9cacded5c1d4' \
+  --data '{
+   "payload":{
+      "id":1234,
+      "date_created":"2025-04-16T21:24:18.879312-07:00",
+      "status":2,
+      "recap_document":436149610,
+      "user":456
+   },
+   "webhook":{
+      "version":{{ webhook_version }},
+      "event_type":5,
+      "date_created":"2025-04-16T14:21:40.855097-07:00",
+      "deprecation_date":null
+   }
+}'
