@@ -79,6 +79,7 @@ from cl.search.constants import (
     cardinality_query_unique_ids,
     date_decay_relevance_types,
     jurisdiction_relevance_multipliers,
+    opinion_boosts_es,
     recap_boosts_es,
 )
 from cl.search.exception import (
@@ -1446,12 +1447,7 @@ def build_es_base_query(
             child_fields.extend(
                 add_fields_boosting(
                     cd,
-                    [
-                        "type",
-                        "text",
-                        "caseName.exact",
-                        "docketNumber",
-                    ],
+                    list(opinion_boosts_es.keys()),
                 ),
             )
             child_query_fields = {"opinion": child_fields}
