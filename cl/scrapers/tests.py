@@ -1872,10 +1872,6 @@ class ScotusMatchingTest(TestCase):
         ):
             cl_back_scrape_citations.Command().scrape_court(self.mock_site)
 
-        # The citation should have been attached to cluster1 (the opinion
-        # whose sha1 we returned from the patched sha1 function).
-        from cl.search.models import Citation
-
         citations_for_cluster1 = Citation.objects.filter(cluster=self.cluster1).count()
         citations_for_cluster2 = Citation.objects.filter(cluster=self.cluster2).count()
 
