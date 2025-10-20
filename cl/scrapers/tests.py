@@ -1816,12 +1816,14 @@ class DeleteDuplicatesTest(TestCase):
             "ClusterRedirection with proper values was not created",
         )
 
-class ScotusMatchingTest(TestCase):
 
+class ScotusMatchingTest(TestCase):
     def setUp(self):
         # Create a SCOTUS court and a docket used by both clusters
         self.court_scotus = CourtFactory(id="scotus")
-        self.docket = DocketFactory(docket_number="19-123", court=self.court_scotus)
+        self.docket = DocketFactory(
+            docket_number="19-123", court=self.court_scotus
+        )
 
         # Two clusters that intentionally share the same identifying fields
         # so the SCOTUS-specific filter will return more than one Opinion.
@@ -1839,8 +1841,12 @@ class ScotusMatchingTest(TestCase):
         )
 
         # Create one Opinion per cluster with distinct sha1s
-        self.opinion1 = OpinionFactory(sha1="sha1-for-cluster1", cluster=self.cluster1)
-        self.opinion2 = OpinionFactory(sha1="sha2-for-cluster2", cluster=self.cluster2)
+        self.opinion1 = OpinionFactory(
+            sha1="sha1-for-cluster1", cluster=self.cluster1
+        )
+        self.opinion2 = OpinionFactory(
+            sha1="sha2-for-cluster2", cluster=self.cluster2
+        )
 
         # Prepare a mock site that yields one case matching the clusters'
         # identifying metadata. The scraper will call get_binary_content and
@@ -1856,7 +1862,20 @@ class ScotusMatchingTest(TestCase):
             "case_dates",
             "judges",
         ]
-        case = dict(zip(keys, ["", "Test Case", "482 U.S. 1", "", self.docket.docket_number, date(2020, 1, 1), "Justice A"]))
+        case = dict(
+            zip(
+                keys,
+                [
+                    "",
+                    "Test Case",
+                    "482 U.S. 1",
+                    "",
+                    self.docket.docket_number,
+                    date(2020, 1, 1),
+                    "Justice A",
+                ],
+            )
+        )
         self.mock_site = mock.MagicMock()
         self.mock_site.__iter__.return_value = [case]
         self.mock_site.court_id = "juriscraper.scotus"
@@ -1868,12 +1887,18 @@ class ScotusMatchingTest(TestCase):
         # content by patching get_binary_content.
         with (
             mock.patch(f"{cmd}.sha1", return_value=self.opinion1.sha1),
-            mock.patch(f"{cmd}.get_binary_content", return_value=b"placeholder"),
+            mock.patch(
+                f"{cmd}.get_binary_content", return_value=b"placeholder"
+            ),
         ):
             cl_back_scrape_citations.Command().scrape_court(self.mock_site)
 
-        citations_for_cluster1 = Citation.objects.filter(cluster=self.cluster1).count()
-        citations_for_cluster2 = Citation.objects.filter(cluster=self.cluster2).count()
+        citations_for_cluster1 = Citation.objects.filter(
+            cluster=self.cluster1
+        ).count()
+        citations_for_cluster2 = Citation.objects.filter(
+            cluster=self.cluster2
+        ).count()
 
         self.assertEqual(
             citations_for_cluster1,
@@ -1885,4 +1910,3 @@ class ScotusMatchingTest(TestCase):
             0,
             "No citation should have been saved for the other duplicate cluster",
         )
-
