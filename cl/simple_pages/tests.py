@@ -198,6 +198,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "advanced_search"},
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
+            {"viewname": "citegeist_help"},
             # API help pages
             {"viewname": "case_law_api_help"},
             {"viewname": "citation_api_help"},
