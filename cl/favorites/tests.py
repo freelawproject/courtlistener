@@ -17,10 +17,15 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.custom_filters.templatetags.pacer import price
-from cl.donate.models import NeonMembership
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
+)
 from cl.favorites.factories import NoteFactory, PrayerFactory
 from cl.favorites.models import (
     DocketTag,
+    GenericCount,
     Note,
     Prayer,
     PrayerAvailability,
@@ -46,7 +51,7 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
 )
 from cl.search.factories import RECAPDocumentFactory
-from cl.search.views import get_homepage_stats
+from cl.search.utils import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.fakes import FakeAvailableConfirmationPage, FakeConfirmationPage
@@ -54,22 +59,24 @@ from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
-class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
+class NoteTest(SimpleUserDataMixin, AudioTestCase):
     fixtures = [
         "test_court.json",
         "test_objects_search.json",
         "judge_judy.json",
     ]
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
         # Set up some handy variables
-        self.note_cluster_params = {
+        cls.note_cluster_params = {
             "cluster_id": 1,
             "name": "foo",
             "notes": "testing notes",
         }
-        self.note_audio_params = {
-            "audio_id": self.audio_1.pk,
+        cls.note_audio_params = {
+            "audio_id": cls.audio_1.pk,
             "name": "foo",
             "notes": "testing notes",
         }
@@ -114,12 +121,12 @@ class UserNotesTest(BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
+        super().setUp()
         get_homepage_stats.invalidate()
         self.f = NoteFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(
@@ -423,6 +430,7 @@ class APITests(APITestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.pandora = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
@@ -434,14 +442,16 @@ class APITests(APITestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.tag_path = reverse("UserTag-list", kwargs={"version": "v3"})
         self.docket_path = reverse("DocketTag-list", kwargs={"version": "v3"})
         self.client = make_client(self.pandora.user.pk)
         self.client2 = make_client(self.unconfirmed.user.pk)
 
-    def tearDown(cls):
+    def tearDown(self):
         UserTag.objects.all().delete()
         DocketTag.objects.all().delete()
+        super().tearDown()
 
     async def make_a_good_tag(self, client, tag_name="taggy-tag"):
         data = {
@@ -665,7 +675,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         """Does the prayer_eligible method work properly?"""
         # Create a membership for one of the users
         await sync_to_async(NeonMembership.objects.create)(
-            level=NeonMembership.LEGACY, user=self.user_2
+            level=NeonMembershipLevel.LEGACY,
+            user=self.user_2,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
         )
         current_time = now()
         with time_machine.travel(current_time, tick=False):
@@ -783,13 +795,15 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         """Does the get_top_prayers method work properly?"""
 
         # Test top documents based on docket views.
-        self.rd_2.docket_entry.docket.view_count = 4
-        self.rd_3.docket_entry.docket.view_count = 12
-        self.rd_4.docket_entry.docket.view_count = 6
-
-        await self.rd_2.docket_entry.docket.asave()
-        await self.rd_3.docket_entry.docket.asave()
-        await self.rd_4.docket_entry.docket.asave()
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_3.docket_entry.docket_id}:view", value=12
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_4.docket_entry.docket_id}:view", value=6
+        )
 
         await create_prayer(self.user, self.rd_4)
         await create_prayer(self.user, self.rd_2)
@@ -809,17 +823,19 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
     async def test_get_top_prayers_by_number_and_views(self) -> None:
         """Does the get_top_prayers method work properly?"""
 
-        self.rd_2.docket_entry.docket.view_count = 4
-        self.rd_3.docket_entry.docket.view_count = 1
-        self.rd_4.docket_entry.docket.view_count = 6
-        self.rd_5.docket_entry.docket.view_count = 8
-
-        await self.rd_2.docket_entry.docket.asave()
-        await self.rd_3.docket_entry.docket.asave()
-        await self.rd_4.docket_entry.docket.asave()
-        await self.rd_5.docket_entry.docket.asave()
-
         # Create prayers with different counts and views
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_3.docket_entry.docket_id}:view", value=1
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_4.docket_entry.docket_id}:view", value=6
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_5.docket_entry.docket_id}:view", value=8
+        )
 
         await create_prayer(self.user, self.rd_5)
         await create_prayer(self.user, self.rd_2)
@@ -925,17 +941,21 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             recap_document=self.rd_4, last_checked=dt_3
         )
 
-        self.rd_2.docket_entry.docket.view_count = 4
-        self.rd_3.docket_entry.docket.view_count = 1
-        self.rd_4.docket_entry.docket.view_count = 6
-        self.rd_5.docket_entry.docket.view_count = 8
-        self.rd_6.docket_entry.docket.view_count = 15
-
-        await self.rd_2.docket_entry.docket.asave()
-        await self.rd_3.docket_entry.docket.asave()
-        await self.rd_4.docket_entry.docket.asave()
-        await self.rd_5.docket_entry.docket.asave()
-        await self.rd_6.docket_entry.docket.asave()
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_3.docket_entry.docket_id}:view", value=1
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_4.docket_entry.docket_id}:view", value=6
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_5.docket_entry.docket_id}:view", value=8
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_6.docket_entry.docket_id}:view", value=15
+        )
 
         await create_prayer(self.user, self.rd_3)
         await create_prayer(self.user, self.rd_2)
@@ -1703,6 +1723,7 @@ class PrayerAPITests(PrayAndPayTestCase):
     """Check that Prayer API operations work as expected."""
 
     def setUp(self) -> None:
+        super().setUp()
         self.prayer_path = reverse("prayer-list", kwargs={"version": "v4"})
         self.client = make_client(self.user.pk)
         self.client_2 = make_client(self.user_2.pk)

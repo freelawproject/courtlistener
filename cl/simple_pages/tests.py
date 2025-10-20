@@ -184,7 +184,6 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             # Info pages
             {"viewname": "faq"},
             {"viewname": "feeds_info"},
-            {"viewname": "contribute"},
             {"viewname": "replication_docs"},
             {"viewname": "terms"},
             {"viewname": "robots"},
@@ -199,6 +198,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "advanced_search"},
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
+            {"viewname": "citegeist_help"},
             # API help pages
             {"viewname": "case_law_api_help"},
             {"viewname": "citation_api_help"},
@@ -218,6 +218,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
             # Monitoring pages
+            {"viewname": "celery_queue_lengths"},
             {"viewname": "heartbeat"},
             {"viewname": "health_check"},
             {"viewname": "check_redis_writes"},

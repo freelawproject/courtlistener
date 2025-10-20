@@ -30,6 +30,7 @@ https://github.com/freelawproject/courtlistener/pull/1941
 """
 
 import re
+from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass
 from math import ceil
@@ -167,24 +168,20 @@ def get_graph_component(
         processing
     :return: A list of all nodes in param :node's component
     """
+    if node in visited:
+        return []
+
     cluster = []
-    queue = [node]
+    queue = deque([node])
+    visited.add(node)
 
     while queue:
-        # Queue (FIFO) for DFS
-        current_node = queue.pop(0)
-
-        if current_node in visited:
-            continue
-
-        visited.add(current_node)
-        cluster.append(current_node)
-
-        # Add all unvisited neighbors to the queue
-        for neighbor in graph.get(current_node, []):
-            if neighbor not in visited:
-                queue.append(neighbor)
-
+        current = queue.popleft()
+        cluster.append(current)
+        for nbr in graph.get(current, []):
+            if nbr not in visited:
+                visited.add(nbr)
+                queue.append(nbr)
     return cluster
 
 

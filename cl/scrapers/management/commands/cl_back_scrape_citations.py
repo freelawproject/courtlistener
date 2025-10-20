@@ -11,14 +11,15 @@ we ingest it as in a regular scrape
 
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
+from juriscraper.lib.exceptions import BadContentError
 
+from cl import settings
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.scrapers.DupChecker import DupChecker
-from cl.scrapers.exceptions import BadContentError
 from cl.scrapers.management.commands import cl_back_scrape_opinions
 from cl.scrapers.management.commands.cl_scrape_opinions import make_citation
-from cl.scrapers.utils import citation_is_duplicated, get_binary_content
+from cl.scrapers.utils import citation_is_duplicated
 from cl.search.models import Court, Opinion
 
 
@@ -61,7 +62,9 @@ class Command(cl_back_scrape_opinions.Command):
                 continue
 
             try:
-                content = get_binary_content(case["download_urls"], site)
+                content = site.download_content(
+                    case["download_urls"], media_root=settings.MEDIA_ROOT
+                )
             except BadContentError:
                 continue
 
