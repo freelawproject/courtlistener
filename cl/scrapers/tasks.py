@@ -34,7 +34,13 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_versions_by_text_similarity,
 )
 from cl.scrapers.utils import citation_is_duplicated, make_citation
-from cl.search.models import Docket, Opinion, RECAPDocument
+from cl.search.models import (
+    SOURCES,
+    Docket,
+    Opinion,
+    OriginatingCourtInformation,
+    RECAPDocument,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,15 +52,8 @@ def update_document_from_text(
 ) -> dict:
     """Extract additional metadata from document text
 
-    We use this code with BIA decisions. Previously Tax.
-    I think it is not unlikely that we will use or need this in the future.
-
-    Use functions from Juriscraper to pull metadata out of opinion
-    text. Formerly implemented in only Tax Court, but functional in all
-    scrapers via AbstractSite object.
-
-    Note that this updates the values but does not save them for
-    Docket, OpinionCluster and Opinion. Saving is left to
+    Note that this updates the values but does not save them for Docket,
+    OpinionCluster, Opinion and OriginatingCourtInformation. Saving is left to
     the calling function. It does save Citations
 
     :param opinion: Opinion object
@@ -82,6 +81,15 @@ def update_document_from_text(
             citation_created = True
         elif model_name == "Opinion":
             opinion.__dict__.update(data)
+        elif model_name == "OriginatingCourtInformation":
+            docket = opinion.cluster.docket
+            if docket.originating_court_information:
+                docket.originating_court_information.__dict__.update(data)
+            else:
+                docket.originating_court_information = (
+                    OriginatingCourtInformation(**data)
+                )
+
         else:
             raise NotImplementedError(
                 f"Object type of {model_name} not yet supported."
@@ -209,6 +217,9 @@ def extract_doc_content(
     # Save item
     # noinspection PyBroadException
     try:
+        if opinion.cluster.docket.originating_court_information:
+            opinion.cluster.docket.originating_court_information.save()
+
         opinion.cluster.docket.save()
         opinion.cluster.save()
         opinion.save()
@@ -248,6 +259,7 @@ def find_and_merge_versions(self, pk: int) -> None:
     query = get_query_from_url(recently_scraped_opinion.download_url, "exact")
     versions = (
         Opinion.objects.filter(query)
+        .filter(cluster__source=SOURCES.COURT_WEBSITE)
         .exclude(id=pk)
         .exclude(main_version__isnull=False)
         .order_by("-date_created")
@@ -347,7 +359,7 @@ async def extract_recap_pdf_base(
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
-        ocr_needed = needs_ocr(content)
+        ocr_needed = needs_ocr(content, page_count=rd.page_count)
         if ocr_available and ocr_needed:
             response = await microservice(
                 service="document-extract-ocr",
@@ -382,10 +394,15 @@ async def extract_recap_pdf_base(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(
+        requests.ConnectionError,
+        requests.ReadTimeout,
+        httpx.TimeoutException,
+    ),
     max_retries=3,
     retry_backoff=10,
 )
+@throttle_task("1/3m")
 def process_audio_file(self, pk) -> None:
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.

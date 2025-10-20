@@ -47,6 +47,7 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+from cl.search.selectors import get_available_documents_estimate_count
 from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
 
@@ -67,6 +68,9 @@ async def faq(request: HttpRequest) -> HttpResponse:
             "scraped_court_count": await Court.objects.filter(
                 in_use=True, has_opinion_scraper=True
             ).acount(),
+            "total_recap_count": await sync_to_async(
+                get_available_documents_estimate_count
+            )(),
             "total_oa_minutes": (
                 (await Audio.objects.aaggregate(Sum("duration")))[
                     "duration__sum"
@@ -397,10 +401,6 @@ async def podcasts(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def contribute(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "contribute.html", {"private": False})
-
-
 async def contact(
     request: HttpRequest,
     template_path: str = "contact_form.html",
@@ -429,21 +429,15 @@ async def contact(
                 logger.info("Detected spam message. Not sending email.")
                 return HttpResponseRedirect(reverse("contact_thanks"))
 
-            issue_type_label = form.get_issue_type_display()
-
             default_from = settings.DEFAULT_FROM_EMAIL
+            subject = form.email_subject()
+            body = form.render_email_body(
+                user_agent=request.META.get("HTTP_USER_AGENT", "Unknown")
+            )
+
             message = EmailMessage(
-                subject="[CourtListener] Contact: {phone_number}".format(**cd),
-                body="Subject: {phone_number}\n"
-                "From: {name}\n"
-                "User Email: <{email}>\n"
-                "Issue Type: {issue_type_label}\n\n"
-                "{message}\n\n"
-                "Browser: {browser}".format(
-                    browser=request.META.get("HTTP_USER_AGENT", "Unknown"),
-                    issue_type_label=issue_type_label,
-                    **cd,
-                ),
+                subject=subject,
+                body=body,
                 to=["support@freelawproject.atlassian.net"],
                 reply_to=[cd.get("email", default_from) or default_from],
             )
@@ -481,6 +475,10 @@ async def advanced_search(request: HttpRequest) -> HttpResponse:
         "help/advanced_search.html",
         {"private": False, "data": data, "types": types},
     )
+
+
+async def citegeist_help(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "citegeist.html", {"private": False})
 
 
 async def old_terms(request: HttpRequest, v: str) -> HttpResponse:

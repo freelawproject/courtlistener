@@ -2,7 +2,11 @@ from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
 from cl.api.api_permissions import V3APIPermission
-from cl.api.utils import LoggingMixin, NoFilterCacheListMixin
+from cl.api.utils import (
+    DeferredFieldsMixin,
+    LoggingMixin,
+    NoFilterCacheListMixin,
+)
 from cl.disclosures.api_serializers import (
     AgreementSerializer,
     DebtSerializer,
@@ -38,7 +42,9 @@ from cl.disclosures.models import (
 )
 
 
-class AgreementViewSet(LoggingMixin, viewsets.ModelViewSet):
+class AgreementViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = Agreement.objects.all().order_by("-id")
     serializer_class = AgreementSerializer
     permission_classes = [
@@ -57,7 +63,7 @@ class AgreementViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class DebtViewSet(LoggingMixin, viewsets.ModelViewSet):
+class DebtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     queryset = Debt.objects.all().order_by("-id")
     serializer_class = DebtSerializer
     permission_classes = [
@@ -76,7 +82,9 @@ class DebtViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class FinancialDisclosureViewSet(LoggingMixin, viewsets.ModelViewSet):
+class FinancialDisclosureViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = (
         FinancialDisclosure.objects.all()
         .prefetch_related(
@@ -109,7 +117,7 @@ class FinancialDisclosureViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class GiftViewSet(LoggingMixin, viewsets.ModelViewSet):
+class GiftViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     queryset = Gift.objects.all().order_by("-id")
     serializer_class = GiftSerializer
     filterset_class = GiftFilter
@@ -129,7 +137,10 @@ class GiftViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class InvestmentViewSet(
-    LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
 ):
     queryset = Investment.objects.all().order_by("-id")
     serializer_class = InvestmentSerializer
@@ -149,7 +160,9 @@ class InvestmentViewSet(
     ]
 
 
-class NonInvestmentIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
+class NonInvestmentIncomeViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = NonInvestmentIncome.objects.all().order_by("-id")
     serializer_class = NonInvestmentIncomeSerializer
     filterset_class = NonInvestmentIncomeFilter
@@ -168,7 +181,9 @@ class NonInvestmentIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
+class PositionViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = Position.objects.all().order_by("-id")
     serializer_class = PositionSerializer
     filterset_class = PositionFilter
@@ -187,7 +202,9 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class ReimbursementViewSet(LoggingMixin, viewsets.ModelViewSet):
+class ReimbursementViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = Reimbursement.objects.all().order_by("-id")
     serializer_class = ReimbursementSerializer
     filterset_class = ReimbursementFilter
@@ -206,7 +223,9 @@ class ReimbursementViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class SpouseIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
+class SpouseIncomeViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = SpouseIncome.objects.all().order_by("-id")
     serializer_class = SpouseIncomeSerializer
     filterset_class = SpouseIncomeFilter

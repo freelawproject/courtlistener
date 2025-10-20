@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models.signals import post_save
@@ -11,6 +13,9 @@ from cl.citations.tasks import (
 from cl.favorites.utils import send_prayer_emails
 from cl.lib.courts import get_cache_key_for_court_list
 from cl.lib.es_signal_processor import ESSignalProcessor
+from cl.lib.redis_utils import (
+    get_redis_interface,
+)
 from cl.people_db.models import (
     ABARating,
     Education,
@@ -19,6 +24,7 @@ from cl.people_db.models import (
     Position,
     School,
 )
+from cl.search.docket_number_cleaner import clean_docket_number_raw
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
@@ -42,7 +48,9 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
+from cl.settings import DEVELOPMENT, TESTING
 
+logger = logging.getLogger(__name__)
 # This field mapping is used to define which fields should be updated in the
 # Elasticsearch index document when they change in the DB. The outer keys
 # represent the actions that will trigger signals:
@@ -177,8 +185,10 @@ p_field_mapping = {
     "save": {
         Person: {
             "self": {
-                "name_full": ["name"],
-                "name_full_reverse": ["name_reverse"],
+                "name_first": ["name", "name_reverse"],
+                "name_middle": ["name", "name_reverse"],
+                "name_last": ["name", "name_reverse"],
+                "name_suffix": ["name", "name_reverse"],
                 "religion": ["religion"],
                 "gender": ["gender"],
                 "dob_city": ["dob_city"],
@@ -218,16 +228,28 @@ position_field_mapping = {
     "save": {
         Person: {
             "appointer__person": {
-                "name_full_reverse": ["appointer"],
+                "name_first": ["appointer"],
+                "name_middle": ["appointer"],
+                "name_last": ["appointer"],
+                "name_suffix": ["appointer"],
             },
             "predecessor": {
-                "name_full_reverse": ["predecessor"],
+                "name_first": ["predecessor"],
+                "name_middle": ["predecessor"],
+                "name_last": ["predecessor"],
+                "name_suffix": ["predecessor"],
             },
             "supervisor": {
-                "name_full_reverse": ["supervisor"],
+                "name_first": ["supervisor"],
+                "name_middle": ["supervisor"],
+                "name_last": ["supervisor"],
+                "name_suffix": ["supervisor"],
             },
             "person": {
-                "name_full": ["name"],
+                "name_first": ["name"],
+                "name_middle": ["name"],
+                "name_last": ["name"],
+                "name_suffix": ["name"],
                 "religion": ["religion"],
                 "gender": ["gender"],
                 "dob_city": ["dob_city"],
@@ -305,10 +327,16 @@ docket_field_mapping = {
         },
         Person: {
             "assigned_to": {
-                "name_full": ["assignedTo"],
+                "name_first": ["assignedTo"],
+                "name_middle": ["assignedTo"],
+                "name_last": ["assignedTo"],
+                "get_name_suffix_display": ["assignedTo"],
             },
             "referred_to": {
-                "name_full": ["referredTo"],
+                "name_first": ["referredTo"],
+                "name_middle": ["referredTo"],
+                "name_last": ["referredTo"],
+                "get_name_suffix_display": ["referredTo"],
             },
         },
     },
@@ -371,10 +399,16 @@ recap_document_field_mapping = {
         },
         Person: {
             "assigned_to": {
-                "name_full": ["assignedTo"],
+                "name_first": ["assignedTo"],
+                "name_middle": ["assignedTo"],
+                "name_last": ["assignedTo"],
+                "get_name_suffix_display": ["assignedTo"],
             },
             "referred_to": {
-                "name_full": ["referredTo"],
+                "name_first": ["referredTo"],
+                "name_middle": ["referredTo"],
+                "name_last": ["referredTo"],
+                "get_name_suffix_display": ["referredTo"],
             },
         },
     },
@@ -425,6 +459,7 @@ o_field_mapping = {
                 "html_anon_2020": ["text"],
                 "html": ["text"],
                 "plain_text": ["text"],
+                "html_with_citations": ["text"],
                 "sha1": ["sha1"],
                 "ordering_key": ["ordering_key"],
             },
@@ -608,3 +643,60 @@ def update_court_cache(sender, instance: Court, created: bool, **kwargs):
     instance is created or updated.
     """
     cache.delete(get_cache_key_for_court_list())
+
+
+@receiver(
+    post_save,
+    sender=Court,
+    dispatch_uid="handle_new_court_needs_courthouse",
+)
+def update_court_cache(sender, instance: Court, created: bool, **kwargs):
+    """
+    A new courthouse should be created alongside a new court. Send a warning
+    to Sentry for someone to look at it
+    """
+    if TESTING or DEVELOPMENT:
+        return
+
+    if created:
+        logger.error("Create a courthouse for new court '%s'", instance.id)
+
+
+def clean_docket_number_raw_and_update_redis_cache(
+    docket: Docket,
+):
+    r = get_redis_interface("CACHE")
+
+    docket_number, docket_id_llm = clean_docket_number_raw(
+        docket_id=docket.id,
+        docket_number_raw=docket.docket_number_raw,
+        court_id=docket.court_id,
+    )
+    docket.docket_number = docket_number
+    docket.save(update_fields=["docket_number"])
+
+    # Add to redis cache for later processing
+    if docket_id_llm:
+        redis_key = "docket_number_cleaning:llm_batch"
+        r.sadd(redis_key, docket_id_llm)
+
+
+@receiver(
+    post_save,
+    sender=Docket,
+    dispatch_uid="handle_docket_number_raw_cleaning",
+)
+def handle_docket_number_raw_cleaning(
+    sender, instance: Docket, created=False, update_fields=None, **kwargs
+):
+    if not settings.DOCKET_NUMBER_CLEANING_ENABLED:
+        # Only perform cleaning if enabled
+        return
+
+    # Only clean if the docket was was non-recap source and newly created or docket_number_raw has changed
+    changed = bool(
+        update_fields and not created and "docket_number_raw" in update_fields
+    )
+    non_recap_sources = instance.source != Docket.RECAP
+    if (created or changed) and non_recap_sources:
+        clean_docket_number_raw_and_update_redis_cache(instance)

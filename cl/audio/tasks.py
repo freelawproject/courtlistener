@@ -28,6 +28,7 @@ from cl.audio.utils import make_af_filename, transcription_was_hallucinated
 from cl.celery_init import app
 from cl.corpus_importer.tasks import increment_failure_count, upload_to_ia
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.celery_utils import throttle_task
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
@@ -105,8 +106,10 @@ def downsize_audio_file(audio: Audio) -> Response:
     bind=True,
     max_retries=3,
     retry_backoff=1 * 60,
-    retry_backoff_max=10 * 60,
 )
+# Rate limit transcription requests to prevent overloading transcription API
+# and getting errors. See #6123
+@throttle_task("1/3m")
 def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
     """Get transcription from OpenAI API whisper-1 model
 

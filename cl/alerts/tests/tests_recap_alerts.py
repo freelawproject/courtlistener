@@ -33,7 +33,11 @@ from cl.alerts.utils import (
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.api.utils import get_webhook_deprecation_date
-from cl.donate.models import NeonMembership
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
+)
 from cl.lib.date_time import midnight_pt
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
@@ -56,7 +60,7 @@ from cl.search.documents import (
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CitationWithParentsFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
     OpinionFactory,
@@ -100,13 +104,20 @@ class RECAPAlertsSweepIndexTest(
 
             cls.user_profile = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY, user=cls.user_profile.user
+                level=NeonMembershipLevel.LEGACY,
+                user=cls.user_profile.user,
+                payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
             cls.user_profile_2 = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY, user=cls.user_profile_2.user
+                level=NeonMembershipLevel.LEGACY,
+                user=cls.user_profile_2.user,
+                payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
             cls.user_profile_no_member = UserProfileWithParentsFactory()
+            cls.user_profile_unlimited_alerts = UserProfileWithParentsFactory(
+                unlimited_docket_alerts=True
+            )
             cls.webhook_enabled = WebhookFactory(
                 user=cls.user_profile.user,
                 event_type=WebhookEventType.SEARCH_ALERT,
@@ -125,13 +136,21 @@ class RECAPAlertsSweepIndexTest(
         """Test filter RECAP alerts that met the conditions to be sent:
         - RECAP type alert.
         - RT or DLY rate
-        - For RT rate the user must have an active membership.
+        - RT alerts require the user to have an active membership or the
+        unlimited search alerts flag.
         """
 
         rt_recap_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test RT RECAP Alert",
+            query="docket_number=1:21-bk-1234&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        rt_recap_alert_unlimited_flag = AlertFactory(
+            user=self.user_profile_unlimited_alerts.user,
+            rate=Alert.REAL_TIME,
+            name="Unlimited Search - Test RT RECAP Alert",
             query="docket_number=1:21-bk-1234&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
@@ -162,9 +181,9 @@ class RECAPAlertsSweepIndexTest(
             call_command("cl_send_recap_alerts", testing_mode=True)
             alerts_runtime_naive = datetime.datetime.now()
 
-        # Only the RECAP RT alert for a member and the RECAP DLY alert are sent.
+        # Validate that 3 emails were sent: one for each valid alert above.
         self.assertEqual(
-            len(mail.outbox), 2, msg="Outgoing emails don't match."
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
         )
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(rt_recap_alert.name, html_content)
@@ -187,6 +206,9 @@ class RECAPAlertsSweepIndexTest(
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
+        self.assertIn(rt_recap_alert_unlimited_flag.name, html_content)
+
+        html_content = self.get_html_content_from_email(mail.outbox[-1])
         # Confirm that query overridden in the 'View Full Results' URL to
         # include a filter by timestamp.
         self._assert_timestamp_filter(
@@ -268,7 +290,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(mock_two_days_before, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -313,7 +335,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de_2 = DocketEntryWithParentsFactory(
+            alert_de_2 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -352,7 +374,7 @@ class RECAPAlertsSweepIndexTest(
                 docket_number="1:21-bk-1254",
                 source=Docket.RECAP,
             )
-            alert_de_old = DocketEntryWithParentsFactory(
+            alert_de_old = DocketEntryFactory(
                 docket=docket_old,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -390,7 +412,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_old_2.document_number = 3
+            rd_old_2.document_number = "3"
             rd_old_2.save()
 
         # Run the indexer. No new documents re_indexed.
@@ -524,7 +546,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -914,7 +936,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1272,7 +1294,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=self.de.docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1366,7 +1388,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=self.de.docket,
                 entry_number=2,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1533,7 +1555,7 @@ class RECAPAlertsSweepIndexTest(
                 )
                 dockets_created.append(docket_created)
 
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1942,7 +1964,7 @@ class RECAPAlertsSweepIndexTest(
             # RECAPDocument filed today that belongs to a docket filed outside
             # the estimation range.
             date_outside_range = now() - datetime.timedelta(days=102)
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Frequency Test RECAP",
@@ -1984,7 +2006,7 @@ class RECAPAlertsSweepIndexTest(
             # RECAPDocument filed today that belongs to a docket filed outside
             # the estimation range.
             date_outside_range = now() - datetime.timedelta(days=102)
-            alert_de_2 = DocketEntryWithParentsFactory(
+            alert_de_2 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Frequency Test RECAP 2",
@@ -2109,7 +2131,7 @@ class RECAPAlertsSweepIndexTest(
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -2413,7 +2435,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -2690,7 +2712,9 @@ class RECAPAlertsPercolatorTest(
 
             cls.user_profile = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY, user=cls.user_profile.user
+                level=NeonMembershipLevel.LEGACY,
+                user=cls.user_profile.user,
+                payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
             cls.webhook_enabled = WebhookFactory(
                 user=cls.user_profile.user,
@@ -2700,7 +2724,9 @@ class RECAPAlertsPercolatorTest(
             )
             cls.user_profile_2 = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY, user=cls.user_profile_2.user
+                level=NeonMembershipLevel.LEGACY,
+                user=cls.user_profile_2.user,
+                payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
             cls.user_profile_no_member = UserProfileWithParentsFactory()
             cls.webhook_enabled = WebhookFactory(
@@ -3282,7 +3308,7 @@ class RECAPAlertsPercolatorTest(
             time_machine.travel(self.mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="SUBPOENAS SERVED OFF",
@@ -3351,7 +3377,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de_2 = DocketEntryWithParentsFactory(
+            alert_de_2 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="SUBPOENAS SERVED ON",
@@ -3437,7 +3463,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_2.document_number = 1
+            rd_2.document_number = "2"
             rd_2.save()
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
@@ -3631,7 +3657,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="SUBPOENAS SERVED OFF",
@@ -3699,7 +3725,7 @@ class RECAPAlertsPercolatorTest(
                 if i < 2:
                     docket_case_names.append(docket_created.case_name)
 
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -4067,7 +4093,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -4540,7 +4566,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),

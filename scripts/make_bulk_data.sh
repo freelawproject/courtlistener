@@ -14,10 +14,17 @@ eval "$(sentry-cli bash-hook)"
 apt install -y awscli gnupg
 
 # Install latest version of pg_dump (else we get an error about version mismatch
-echo "deb http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-curl --silent 'https://www.postgresql.org/media/keys/ACCC4CF8.asc' |  apt-key add -
+install -d /etc/apt/keyrings
+
+curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+  | gpg --dearmor \
+  -o /etc/apt/keyrings/postgresql.gpg
+
+echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+  > /etc/apt/sources.list.d/pgdg.list
+
 apt-get update
-apt-get install -y postgresql-client
+apt-get install -y postgresql-client-17
 
 # We only need to set PGPASSWORD once
 export PGPASSWORD=$DB_PASSWORD

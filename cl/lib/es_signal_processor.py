@@ -1,6 +1,7 @@
 from functools import partial
 
 from celery.canvas import chain
+from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db import transaction
 from django.db.models.signals import m2m_changed, post_delete, post_save
@@ -40,6 +41,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.tasks import (
+    compute_single_opinion_embeddings,
     es_save_document,
     get_es_doc_id_and_parent_id,
     remove_document_from_es_index,
@@ -199,27 +201,32 @@ def update_es_documents(
             ) if mapping_fields.get("self", None):  # type: ignore
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
-                transaction.on_commit(
-                    partial(
-                        chain(
-                            update_es_document.si(
-                                es_document.__name__,
-                                fields_to_update,
-                                (
-                                    compose_app_label(instance),
-                                    instance.pk,
-                                ),
-                                (compose_app_label(instance), instance.pk),
-                                fields_map,
-                                getattr(
-                                    instance, "skip_percolator_request", False
-                                ),
-                            ),
-                            send_or_schedule_search_alerts.s(),
-                            percolator_response_processing.s(),
-                        ).apply_async
-                    )
+                should_compute_embeddings = (
+                    isinstance(instance, Opinion)
+                    and "html_with_citations" in fields_to_update
+                    and settings.ENABLE_EMBEDDING_COMPUTATION
                 )
+                c = chain(
+                    update_es_document.si(
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                        getattr(instance, "skip_percolator_request", False),
+                        should_compute_embeddings,
+                    ),
+                    send_or_schedule_search_alerts.s(),
+                    percolator_response_processing.s(),
+                )
+                # Prepend embedding computation task when html_with_citations
+                # is updated
+                if should_compute_embeddings:
+                    c = compute_single_opinion_embeddings.si(instance.pk) | c
+                transaction.on_commit(partial(c.apply_async))
             case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
                 transaction.on_commit(
                     partial(
@@ -788,6 +795,13 @@ class ESSignalProcessor:
         ):
             # Avoid saving or updating the Docket in ES if it doesn't belong to
             # RECAP.
+            return
+
+        if isinstance(instance, Opinion) and instance.main_version:
+            # Skip indexing for opinion versions.
+            # These records remain in the database but should not exist in
+            # Elasticsearch, since they are linked to a main opinion (via
+            # `main_version`).
             return
 
         if (

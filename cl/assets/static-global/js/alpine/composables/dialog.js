@@ -1,5 +1,6 @@
 document.addEventListener('alpine:init', () => {
   Alpine.data('dialog', () => ({
+    ...createUtils(),
     isOpen: false,
     open() {
       this.isOpen = true;
@@ -18,6 +19,14 @@ document.addEventListener('alpine:init', () => {
     },
     get dialogIdGroup() {
       return ['dialog'];
+    },
+    init() {
+      const callback = (e) => {
+        if (e.matches && this.isOpen) {
+          this.close();
+        }
+      };
+      this.onBreakpointChange(callback);
     },
   }));
 });

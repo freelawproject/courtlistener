@@ -1,5 +1,3 @@
-import waffle
-from asgiref.sync import sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
@@ -29,23 +27,19 @@ async def view_audio_file(
 
     # --- Fetch transcript metadata ---
     segments_list = []
-    # Check if the 'transcript_feature' Waffle flag is active for the current request
-    transcript_active = await sync_to_async(
-        waffle.flag_is_active, thread_sensitive=True
-    )(request, "transcript_feature")
-    if transcript_active:
-        try:
-            metadata_obj = await AudioTranscriptionMetadata.objects.aget(
-                audio=af
-            )
-            # Extract the 'segments' list instead of 'words'
-            segments_list = metadata_obj.metadata.get("segments", [])
-            # Validate if segments_list is actually a list
-            if not isinstance(segments_list, list):
-                segments_list = []  # Reset to empty list if format is unexpected
+    # Get the latest metadata. There can be many metadata rows for a single
+    # audio, if the transcription failed as hallucinated and was retried
+    metadata_qs = AudioTranscriptionMetadata.objects.filter(audio=af).order_by(
+        "-id"
+    )
+    metadata_obj = await metadata_qs.afirst()
 
-        except AudioTranscriptionMetadata.DoesNotExist:
-            pass
+    if metadata_obj:
+        # Extract the 'segments' list instead of 'words'
+        segments_list = metadata_obj.metadata.get("segments", [])
+        # Validate if segments_list is actually a list
+        if not isinstance(segments_list, list):
+            segments_list = []  # Reset to empty list if format is unexpected
 
     # --- End transcript metadata fetch ---
 
@@ -76,6 +70,5 @@ async def view_audio_file(
             "get_string": get_string,
             "private": af.blocked,
             "transcript_segments_data": segments_list,
-            "transcript_feature_active": transcript_active,
         },
     )

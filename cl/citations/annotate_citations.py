@@ -90,6 +90,7 @@ def create_cited_html(
         MatchedResourceType, list[SupportedCitationType]
     ],
     get_citations_kwargs: dict[str, str],
+    single_doc: bool = True,
 ) -> str:
     """Using the opinion itself and a list of citations found within it, make
     the citations into links to the correct citations.
@@ -97,6 +98,8 @@ def create_cited_html(
     :param citation_resolutions: A map of lists of citations in the opinion
     :param get_citations_kwargs: contains the original citation text,
         used as a fallback when there were no resolutions
+    :param single_doc: anything under 200k characters is a single document
+        this is 99.9% of all opinions.
 
     :return The new HTML containing citations
     """
@@ -105,7 +108,12 @@ def create_cited_html(
             new_html = get_citations_kwargs["markup_text"]
         else:
             plain_text = get_citations_kwargs.get("plain_text") or ""
-            new_html = f'<pre class="inline">{html.escape(plain_text)}</pre>'
+            if single_doc:
+                new_html = (
+                    f'<pre class="inline">{html.escape(plain_text)}</pre>'
+                )
+            else:
+                new_html = html.escape(plain_text)
         return new_html
 
     document = list(citation_resolutions.values())[0][0].document
@@ -119,13 +127,17 @@ def create_cited_html(
             offset_updater=document.plain_to_markup,
         )
     else:  # Else, present `source_text` wrapped in <pre> HTML tags...
+        if single_doc:
+            source_text = f'<pre class="inline">{html.escape(document.source_text)}</pre>'
+        else:
+            source_text = html.escape(document.source_text)
         new_html = annotate_citations(
             plain_text=document.plain_text,
             annotations=[
                 [a[0], f"</pre>{a[1]}", f'{a[2]}<pre class="inline">']
                 for a in generate_annotations(citation_resolutions)
             ],
-            source_text=f'<pre class="inline">{html.escape(document.source_text)}</pre>',
+            source_text=source_text,
         )
 
     # Return the newly-annotated text

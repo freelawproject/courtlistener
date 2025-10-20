@@ -1,21 +1,25 @@
 import json
 from datetime import date, datetime, timedelta
+from unittest import mock
 from unittest.mock import call, patch
 
 import eyecite
 import pytest
 import time_machine
 from bs4 import BeautifulSoup
+from celery.exceptions import Retry
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
+from openai import RateLimitError
+from pydantic import ValidationError
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
@@ -31,6 +35,7 @@ from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
+from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
@@ -69,6 +74,7 @@ from cl.corpus_importer.signals import (
     update_latest_case_id_and_schedule_iquery_sweep,
 )
 from cl.corpus_importer.tasks import (
+    classify_case_name_by_llm,
     generate_ia_json,
     get_and_save_free_document_report,
     probe_or_scrape_iquery_pages,
@@ -119,8 +125,8 @@ from cl.search.factories import (
     DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionClusterFactoryMultipleOpinions,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
+    OpinionClusterWithMultipleOpinionsFactory,
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
@@ -130,15 +136,15 @@ from cl.search.models import (
     SEARCH_TYPES,
     SOURCES,
     Citation,
-    Court,
     Docket,
     Opinion,
     OpinionCluster,
     RECAPDocument,
 )
 from cl.settings import MEDIA_ROOT
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
+from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -627,6 +633,7 @@ class HarvardTests(TestCase):
         Each one can be used or turned off.  See the teardown for more.
         :return:
         """
+        super().setUp()
         self.make_filepath_patch = patch(
             "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
         )
@@ -659,8 +666,8 @@ class HarvardTests(TestCase):
         self.make_filepath_patch.stop()
         self.read_json_patch.stop()
         self.find_court_patch.stop()
-        Docket.objects.all().delete()
-        Court.objects.all().delete()
+        self.get_fix_list_patch.stop()
+        super().tearDown()
 
     def _get_cite(self, case_law) -> Citation:
         """Fetch first citation added to case
@@ -1071,7 +1078,7 @@ class CorpusImporterManagementCommmandsTests(TestCase):
 
         # Create opinion cluster with opinion and docket
         cluster = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Foo v. Bar",
@@ -1148,7 +1155,7 @@ class CleanUpMisMatchedDockets(TestCase):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         # Opinion cluster with mis matched docket.
         cls.cluster = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=cls.court,
                     source=Docket.HARVARD,
@@ -1166,7 +1173,7 @@ class CleanUpMisMatchedDockets(TestCase):
 
         # Opinion cluster with correct docket
         cluster_2 = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=cls.court,
                     source=Docket.HARVARD,
@@ -1252,7 +1259,7 @@ class HarvardMergerTests(TestCase):
             (<cross_reference><span class="citation no-link">137 S.E. 791</span></cross_reference>), and cit.; <em>Kuck</em> v. <em>State,</em> <cross_reference><span class="citation" data-id="5582722"><a href="/opinion/5732248/kuck-v-state/">149 Ga. 191</a></span></cross_reference>
             (<cross_reference><span class="citation no-link">99 S.E. 622</span></cross_reference>). I concur in the reversal for this additional reason.</p>"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -1313,7 +1320,7 @@ class HarvardMergerTests(TestCase):
         }
         self.read_json_func.return_value = case_data
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(),
             attorneys="B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
         )
@@ -1330,7 +1337,7 @@ class HarvardMergerTests(TestCase):
         )
 
         # Test that we can ignore matching fields
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(),
             attorneys="B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
         )
@@ -1429,7 +1436,7 @@ class HarvardMergerTests(TestCase):
     def test_add_opinions_without_authors_in_cl(self):
         """Can we add opinion and update authors"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -1495,7 +1502,7 @@ class HarvardMergerTests(TestCase):
         """Can we update an opinion and leave author_str alone if already
         assigned"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -2009,7 +2016,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
         )
 
         # Factory create cluster, data from cluster id: 1589121
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             case_name="Mendoza v. State",
             case_name_full="Pioquinto MENDOZA, III, Appellant, v. the STATE of Texas, "
             "Appellee",
@@ -2091,7 +2098,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        Court.objects.all().delete()
+        super().setUpTestData()
         cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FB")
         cls.court_txed = CourtFactory(id="txed", jurisdiction="FB")
@@ -2105,6 +2112,7 @@ class ScrapeIqueryPagesTest(TestCase):
         cls.court_mowd = CourtFactory(id="mowd", jurisdiction="FB")
 
     def setUp(self) -> None:
+        super().setUp()
         self.r = get_redis_interface("CACHE")
         keys_to_clean = [
             "iquery:highest_known_pacer_case_id",
@@ -2898,10 +2906,17 @@ class ScrapeIqueryPagesTest(TestCase):
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
         self.assertEqual(court_wait_cacd, None)
 
+        monday = datetime(2025, 7, 21)
+        monday_local = timezone.make_aware(
+            monday, timezone.get_default_timezone()
+        )
         for test in range(1, 5):
             with self.subTest(test=test):
                 r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with (
+                    time_machine.travel(monday_local, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -2922,7 +2937,10 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with (
+            time_machine.travel(monday_local, tick=False),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -2979,10 +2997,17 @@ class ScrapeIqueryPagesTest(TestCase):
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_vib.pk}")
         self.assertEqual(court_wait_cacd, None)
 
+        monday = datetime(2025, 7, 21)
+        monday_local = timezone.make_aware(
+            monday, timezone.get_default_timezone()
+        )
         for test in range(1, 30):
             with self.subTest(test=test):
                 r.delete(f"iquery:court_wait:{self.court_vib.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with (
+                    time_machine.travel(monday_local, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -2999,7 +3024,10 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_vib.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with (
+            time_machine.travel(monday_local, tick=False),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -3018,6 +3046,80 @@ class ScrapeIqueryPagesTest(TestCase):
             f"iquery:court_empty_probe_attempts:{self.court_vib.pk}"
         )
         self.assertEqual(int(court_empty_attempts), 0)
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    @patch("cl.corpus_importer.tasks.logger")
+    @patch(
+        "cl.corpus_importer.management.commands.probe_iquery_pages_daemon.logger"
+    )
+    @override_settings(
+        IQUERY_EMPTY_PROBES_LIMIT_HOURS={
+            "default": 0.41,
+        },
+        IQUERY_PROBE_WAIT=300,
+    )
+    def test_probe_iquery_pages_daemon_ignores_empty_probes_on_weekends(
+        self, mock_logger_daemon, mock_logger, mock_cookies
+    ):
+        """Test probe_iquery_pages_daemon ignores empty probes on weekends.
+        Courts typically do not publish new cases on weekends.
+        """
+
+        r = get_redis_interface("CACHE")
+        r.hset("iquery:highest_known_pacer_case_id", self.court_cacd.pk, 0)
+
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 100, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
+
+        court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
+        self.assertEqual(court_wait_cacd, None)
+
+        saturday = datetime(2025, 7, 19)
+        saturday_local = timezone.make_aware(
+            saturday, timezone.get_default_timezone()
+        )
+        sunday = datetime(2025, 7, 20)
+        sunday_local = timezone.make_aware(
+            sunday, timezone.get_default_timezone()
+        )
+        for test in range(1, 6):
+            with self.subTest(test=test):
+                r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
+                weekend_day = sunday_local if test % 2 == 0 else saturday_local
+                with (
+                    time_machine.travel(weekend_day, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
+                    call_command(
+                        "probe_iquery_pages_daemon",
+                        testing_iterations=1,
+                    )
+
+                # court_empty_probe_attempts for court 'cacd' shouldn't be
+                # incremented, since all empty probes are occurring over the
+                # weekend.
+                empty_probe_attempts = r.get(
+                    f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
+                )
+                self.assertEqual(empty_probe_attempts, None)
+                mock_logger.info.assert_called_with(
+                    "Ignoring empty probe over the weekend for court %s - case IDs from %s to %s.",
+                    self.court_cacd.pk,
+                    str(0),
+                    str(416),
+                )
 
     @patch(
         "cl.scrapers.tasks.CaseQuery",
@@ -3820,3 +3922,154 @@ class AWSManifestTest(TestCase):
         self.assertIn(old_audio_2.id, record_ids)
         # Verify that the old record that was not updated is NOT included
         self.assertNotIn(old_audio_3.id, record_ids)
+
+
+class LlmTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.court_ga = CourtFactory(id="gasd")
+        cls.opinion_cluster = OpinionClusterWithChildrenAndParentsFactory(
+            docket=DocketFactory(
+                court=cls.court_ga,
+                case_name="Carrecter v. Herrin",
+            ),
+            case_name="Carrecter v. Herrin",
+            case_name_short="Carrecter",
+            date_filed=date.today(),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="IN THE UNITED STATES DISTRICT COURT \nFOR THE SOUTHERN DISTRICT OF GEORGIA \nSTATESBORO DIVISION \n\nJMARKUS CARRECTER, \nPlaintiff,                           CIVIL ACTION NO.: 6:25-cv-17 \n      Vv.\nGEORGE HERRIN, JR., TYRONE OLIVER,  | \nand GREGORY DOZIER, \n            Defendants. \n\nORDER \n     The  Magistrate  Judge  issued  a  Report  and  Recommendation  for the  Court  to  dismiss \nPlaintiff's  cause  of  action.   Doc.  7.   Plaintiff did  not  file  Objections  to  this  Report  and \nRecommendation, and the time to do so has elapsed.  Accordingly, upon review, I find no clear \nerror  in  the  Magistrate  Judge’s  Report  and  Recommendation  and  ADOPT  the  Report  and \nRecommendation as the opinion of the Court.  See Macort v. Prem, Inc., 208 F. App’x 781, 784 \n(11th  Cir,  2006)  (If no  specific  objections  are  made  or  no  objections  are  made  at  all,  “the \nappropriate standard of review for the report and recommendation is clear error.”).  1 DISMISS \nwithout prejudice Plaintiffs Complaint, DIRECT the Clerk of Court to CLOSE this case and \nenter the appropriate judgment of dismissal, and DENY Plaintiff leave to file in forma pauperis. \n     SO ORDERED, this        day of September, 2025. \n\n                                               GL: \n                         /              BOL \n                        /       HONORABLEY’RANDAL HALL \n                        \\     UNITED STATES DISTRICT COURT \n                              SOUTHERN DISTRICT OF GEORGIA ",
+            ),
+        )
+
+        cls.de = DocketEntryFactory(
+            docket=cls.opinion_cluster.docket,
+            entry_number=8,
+        )
+        cls.recap_doc = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            pacer_doc_id="05705053987",
+            document_number="8",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        cls.valid_response = CaseNameExtractionResponse(
+            is_opinion=True,
+            case_name_short="Carrecter",
+            case_name="'Carrecter v. Herri",
+            case_name_full="JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+            case_name_match=True,
+            needs_ocr=False,
+            error=None,
+        )
+
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
+    @mock.patch("cl.corpus_importer.tasks.call_llm")
+    def test_classify_opinion_case_name_task_updates_fields(
+        self, mock_call_llm
+    ):
+        """Verifies that the classify_opinion_case_name_task updates OpinionCluster fields correctly"""
+        mock_call_llm.return_value = self.valid_response
+
+        classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
+
+        self.opinion_cluster.refresh_from_db()
+
+        self.assertEqual(
+            self.opinion_cluster.case_name_full,
+            "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.call_llm")
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
+    @mock.patch.object(classify_case_name_by_llm, "retry", autospec=True)
+    def test_classify_opinion_case_name_task_retries_on_ratelimit(
+        self, mock_retry, mock_call_llm
+    ):
+        """Tests that the task retries once when call_llm raises a RateLimitError,
+        then proceeds successfully with a valid response on retry.
+        """
+
+        error_body = b'{"error":{"message":"Rate limit exceeded","type":"rate_limit_exceeded"}}'
+        mock_response = MockResponse(429, error_body)
+        setattr(mock_response, "request", {})
+        setattr(mock_response, "headers", {"x-request-id": "1"})
+
+        # Side effect list: raise first, then return success json on retry
+        side_effects = [
+            RateLimitError(
+                "Rate limit exceeded", response=mock_response, body=error_body
+            ),
+            self.valid_response,
+        ]
+
+        def call_llm_side_effect(*args, **kwargs):
+            result = side_effects.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        mock_call_llm.side_effect = call_llm_side_effect
+
+        # patch retry so it raises celery.exceptions.Retry
+        mock_retry.side_effect = Retry()
+
+        with self.assertRaises(Retry):
+            # expected retry exception
+            classify_case_name_by_llm(
+                self.opinion_cluster.pk, self.recap_doc.pk
+            )
+
+        mock_retry.assert_called_once()
+
+        # After retry exception, manually call the task again with successful mock response
+        # to simulate the retry handling completing successfully.
+        mock_call_llm.side_effect = None
+        mock_call_llm.return_value = self.valid_response
+
+        classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
+        self.opinion_cluster.refresh_from_db()
+
+        self.assertEqual(
+            self.opinion_cluster.case_name_full,
+            "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.call_llm")
+    @mock.patch("cl.corpus_importer.tasks.logger")
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
+    def test_classify_case_name_by_llm_handles_validation_error(
+        self, mock_logger, mock_call_llm
+    ):
+        """Test that classify_case_name_by_llm catches Pydantic ValidationError from call_llm and handles it correctly
+        by logging and returning without an exception
+        """
+
+        mock_call_llm.side_effect = ValidationError.from_exception_data(
+            "Invalid data", line_errors=[]
+        )
+
+        result = classify_case_name_by_llm(
+            self.opinion_cluster.pk, self.recap_doc.pk
+        )
+
+        self.assertIsNone(result)
+
+        # Logger.error should have been called at least once with validation error message
+        mock_logger.error.assert_called()
+        called_messages = [
+            args[0] for args, _ in mock_logger.error.call_args_list
+        ]
+        self.assertTrue(
+            any(
+                "validation error" in message.lower()
+                for message in called_messages
+            )
+        )

@@ -52,7 +52,10 @@ from cl.celery_init import app
 from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.lib.db_tools import log_db_connection_info
 from cl.lib.elasticsearch_utils import build_daterange_query
-from cl.lib.microservice_utils import microservice
+from cl.lib.microservice_utils import (
+    log_invalid_embedding_errors,
+    microservice,
+)
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
@@ -492,6 +495,7 @@ def update_es_document(
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
     skip_percolator_request: bool = False,
+    should_check_for_embeddings: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
@@ -505,6 +509,8 @@ def update_es_document(
     :param fields_map: A dict containing fields that can be updated or None if
     mapping is not required for the update.
     :param skip_percolator_request: Whether to skip the subsequent percolator request
+    :param should_check_for_embeddings: If True and the document is an OpinionDocument,
+    attempts to fetch cached embeddings and include them in the document update.
     :return: `SaveESDocumentReturn` object containing the ID of the document
     saved in the ES index, the content of the document and the app label
     associated with the document or None
@@ -546,11 +552,25 @@ def update_es_document(
         # Abort, avoid updating not indexed fields, like "source" in Docket.
         return
 
+    embeddings = None
+    if should_check_for_embeddings and es_document_name == "OpinionDocument":
+        storage = AWSMediaStorage()
+        embeddings = download_embedding(storage, main_instance_id)
+        if not embeddings:
+            logging.error(
+                "Expected embeddings for OpinionDocument %s, but none found",
+                main_instance_id,
+            )
+
+    if embeddings:
+        fields_values_to_update["embeddings"] = embeddings["embeddings"]
+
     Document.update(
         es_doc,
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
+
     if (
         (
             related_instance_app_label == "search.BankruptcyInformation"
@@ -1422,6 +1442,71 @@ def percolate_document(
     ).apply_async()
 
 
+def build_cite_count_update(cluster_ids_to_update: list[int]) -> list[dict]:
+    """Create update documents for OpinionClusterDocument.citeCount
+
+    :param cluster_ids_to_update: the cluster ids to update
+    :return: the dicts / documents defining the updates
+    """
+
+    # Query all clusters to update and retrieve only their sub_opinions
+    # with the necessary fields.
+    prefetch = Prefetch("sub_opinions", queryset=Opinion.objects.only("pk"))
+    clusters_with_sub_opinions = (
+        OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
+        .only("pk", "citation_count")
+        .prefetch_related(prefetch)
+    )
+
+    documents_to_update = []
+    base_doc = {
+        "_op_type": "update",
+        "_index": OpinionClusterDocument._index._name,
+    }
+    for cluster in clusters_with_sub_opinions:
+        if not OpinionClusterDocument.exists(id=cluster.pk):
+            # If the OpinionClusterDocument does not exist, it might
+            # not be indexed yet. Raise a NotFoundError to retry the
+            # task; hopefully, it will be indexed soon.
+            raise NotFoundError(
+                f"The OpinionCluster {cluster.pk} is not indexed.",
+                "",
+                {"id": cluster.pk},
+            )
+
+        # Build the OpinionCluster dicts for updating the citeCount.
+        doc_to_update = {
+            "_id": cluster.pk,
+            "doc": {"citeCount": cluster.citation_count},
+        }
+        doc_to_update.update(base_doc)
+        documents_to_update.append(doc_to_update)
+
+        for opinion in cluster.sub_opinions.all():
+            if not OpinionClusterDocument.exists(
+                id=ES_CHILD_ID(opinion.pk).OPINION, routing=cluster.pk
+            ):
+                # If the OpinionDocument does not exist, it might
+                # not be indexed yet. Raise a NotFoundError to retry the
+                # task; hopefully, it will be indexed soon.
+                raise NotFoundError(
+                    f"The Opinion {opinion.pk} is not indexed.",
+                    "",
+                    {"id": opinion.pk},
+                )
+
+            # Build the Opinion dicts for updating the citeCount.
+            doc_to_update = {
+                "_id": ES_CHILD_ID(opinion.pk).OPINION,
+                "_routing": cluster.pk,
+                "doc": {"citeCount": cluster.citation_count},
+            }
+            doc_to_update.update(base_doc)
+            documents_to_update.append(doc_to_update)
+
+    return documents_to_update
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -1451,7 +1536,6 @@ def index_related_cites_fields(
     should be updated.
     :return: None.
     """
-
     documents_to_update = []
     cites_doc_to_update = {}
     base_doc = {}
@@ -1459,61 +1543,13 @@ def index_related_cites_fields(
     es_child_doc_class = None
     match model_name:
         case OpinionsCited.__name__:
-            # Query all clusters to update and retrieve only their sub_opinions
-            # with the necessary fields.
-            prefetch = Prefetch(
-                "sub_opinions", queryset=Opinion.objects.only("pk")
-            )
-            clusters_with_sub_opinions = (
-                OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
-                .only("pk", "citation_count")
-                .prefetch_related(prefetch)
-            )
-
             base_doc = {
                 "_op_type": "update",
                 "_index": OpinionClusterDocument._index._name,
             }
-            for cluster in clusters_with_sub_opinions:
-                if not OpinionClusterDocument.exists(id=cluster.pk):
-                    # If the OpinionClusterDocument does not exist, it might
-                    # not be indexed yet. Raise a NotFoundError to retry the
-                    # task; hopefully, it will be indexed soon.
-                    raise NotFoundError(
-                        f"The OpinionCluster {cluster.pk} is not indexed.",
-                        "",
-                        {"id": cluster.pk},
-                    )
-
-                # Build the OpinionCluster dicts for updating the citeCount.
-                doc_to_update = {
-                    "_id": cluster.pk,
-                    "doc": {"citeCount": cluster.citation_count},
-                }
-                doc_to_update.update(base_doc)
-                documents_to_update.append(doc_to_update)
-
-                for opinion in cluster.sub_opinions.all():
-                    if not OpinionClusterDocument.exists(
-                        id=ES_CHILD_ID(opinion.pk).OPINION, routing=cluster.pk
-                    ):
-                        # If the OpinionDocument does not exist, it might
-                        # not be indexed yet. Raise a NotFoundError to retry the
-                        # task; hopefully, it will be indexed soon.
-                        raise NotFoundError(
-                            f"The Opinion {opinion.pk} is not indexed.",
-                            "",
-                            {"id": opinion.pk},
-                        )
-
-                    # Build the Opinion dicts for updating the citeCount.
-                    doc_to_update = {
-                        "_id": ES_CHILD_ID(opinion.pk).OPINION,
-                        "_routing": cluster.pk,
-                        "doc": {"citeCount": cluster.citation_count},
-                    }
-                    doc_to_update.update(base_doc)
-                    documents_to_update.append(doc_to_update)
+            documents_to_update.extend(
+                build_cite_count_update(cluster_ids_to_update)
+            )
 
             # Finally build the Opinion dict for updating the cites.
             child_doc_model = Opinion
@@ -1724,26 +1760,37 @@ def remove_documents_by_query(
     return response
 
 
-def inception_batch_request(batch: dict) -> list[dict]:
-    """Get embeddings from the inception batch microservice.
+def request_embeddings_for_batch(batch: dict, service_name: str) -> list[dict]:
+    """Get embeddings from the specified Inception batch microservice.
 
     param batch: A list of dictionaries, where each dictionary represents an
     opinion document with the following keys:
-    "id": The Opinion ID.
-    "text": The content of the opinion.
+        "id": The Opinion ID.
+        "text": The content of the opinion.
+    param service_name: The name of the Inception microservice to use, e.g.,
+        "inception-batch" or "inception-cpu-batch".
     :return: A list of dictionaries, each containing the embeddings for the
     corresponding opinion document as returned  by the inception microservice.
     """
-
     data = json.dumps(batch)
     response = asyncio.run(
         microservice(
-            service="inception-batch",
+            service=service_name,
             method="POST",
             data=data,
         )
     )
     return response.json()
+
+
+def inception_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the GPU version of the inception microservice."""
+    return request_embeddings_for_batch(batch, "inception-batch")
+
+
+def inception_cpu_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the CPU version of the inception microservice."""
+    return request_embeddings_for_batch(batch, "inception-cpu-batch")
 
 
 def embeddings_cache_key():
@@ -1762,18 +1809,84 @@ def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
         RemoteProtocolError,
         HTTPStatusError,
         ReadError,
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+)
+def compute_single_opinion_embeddings(self, pk: int) -> None:
+    """
+    Celery task to compute and cache text embeddings for a single opinion.
+
+    This task fetches the opinion record, extracts its best available text,
+    and sends it to the `inception-text` microservice to generate embeddings.
+    If embeddings are successfully computed, the results are cached for 30
+    minutes.
+
+    Automatically retries up to 5 times with exponential backoff (10s base)
+    in case of network or protocol-related errors.
+
+    :param self: The Celery task.
+    :param pk: The primary key of the opinion to process.
+    """
+    opinion = Opinion.objects.filter(id=pk).with_best_text().first()
+    if not opinion:
+        return None
+
+    if opinion.token_count < settings.MIN_OPINION_SIZE:
+        return None
+
+    embeddings = asyncio.run(
+        microservice(
+            service="inception-text",
+            data=opinion.clean_text,
+        )
+    )
+    # Exit early if the microservice call failed
+    if not embeddings.is_success:
+        if not isinstance(embeddings, list):
+            log_invalid_embedding_errors(embeddings)
+        return None
+
+    # Save embeddings to S3.
+    storage = S3IntelligentTieringStorage()
+    file_contents = json.dumps(
+        {"id": pk, "embeddings": embeddings.json()["embeddings"]}
+    )
+    file_path = str(
+        PurePosixPath(
+            "embeddings",
+            "opinions",
+            settings.NLP_EMBEDDING_MODEL,
+            f"{pk}.json",
+        )
+    )
+    storage.save(file_path, ContentFile(file_contents))
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+        ReadError,
     ),
     max_retries=5,
     retry_backoff=10,
 )
 def create_opinion_text_embeddings(
-    self, batch: list[int], database
+    self, batch: list[int], database: str, device: str = "cpu"
 ) -> str | None:
     """Get embeddings for Opinion texts from inception.
 
     :param self: The Celery task.
     :param batch: A list of Opinion IDs representing the batch to process.
     :param database: The database to be used during processing.
+    :param device: The device to run the embedding generation on (e.g., 'cpu'
+        or 'gpu'). Defaults to 'cpu'.
     :return: The cache key used to temporarily store embeddings.
     """
     opinions = (
@@ -1788,7 +1901,12 @@ def create_opinion_text_embeddings(
 
     batch_range = f"{batch[0]}_{batch[-1]}"
     batch_request = {"documents": opinions_to_vectorize}
-    embeddings = inception_batch_request(batch_request)
+    inception_service = (
+        inception_batch_request
+        if device == "gpu"
+        else inception_cpu_batch_request
+    )
+    embeddings = inception_service(batch_request)
     # Use a UUID to guarantee the uniqueness of this batch of stored embeddings
     batch_uuid = str(uuid.uuid4().hex)
     cache_key = get_embeddings_cache_key(batch_uuid, batch_range)
@@ -1865,17 +1983,7 @@ def save_embeddings(
         return None
 
     if not isinstance(embeddings, list):
-        if isinstance(embeddings, dict):
-            logger.error(
-                "Received API error response in embeddings: %s",
-                json.dumps(embeddings, default=str),
-            )
-        else:
-            logger.error(
-                "Unexpected data type for embeddings: %s (%s)",
-                str(embeddings)[:200],
-                type(embeddings),
-            )
+        log_invalid_embedding_errors(embeddings)
         return None
 
     storage = S3IntelligentTieringStorage()
@@ -1894,6 +2002,35 @@ def save_embeddings(
 
     # Delete the cache key after the saving process is complete.
     cache.delete(cache_key)
+
+
+def download_embedding(
+    storage: AWSMediaStorage, pk: int, directory: str = "opinions"
+) -> list[dict] | None:
+    """Download a single embedding from S3.
+
+    :param storage: Storage backend instance.
+    :param pk: The record ID.
+    :param directory: Directory where the embedding is stored.
+    :return: The embedding data as a dict, or None if not found.
+    """
+    file_path = str(
+        PurePosixPath(
+            "embeddings",
+            directory,
+            settings.NLP_EMBEDDING_MODEL,
+            f"{pk}.json",
+        )
+    )
+    logger.info("Attempting to retrieve embedding from: %s", file_path)
+    try:
+        with storage.open(file_path, "rb") as f:
+            file_contents = f.read().decode("utf-8")
+        embedding_data = json.loads(file_contents)
+        return embedding_data
+    except FileNotFoundError:
+        logger.error("Embeddings for opinion ID:%s doesn't exist.", pk)
+        return None
 
 
 @app.task(
@@ -1918,35 +2055,12 @@ def retrieve_embeddings(
     :param directory: The directory where the embeddings are stored.
     :return: A list of dictionaries containing the embeddings.
     """
-
     storage = AWSMediaStorage()
-
-    def download_embedding(opinion_id: int) -> dict | None:
-        file_path = str(
-            PurePosixPath(
-                "embeddings",
-                directory,
-                settings.NLP_EMBEDDING_MODEL,
-                f"{opinion_id}.json",
-            )
-        )
-        logger.info("Attempting to retrieve embedding from: %s", file_path)
-        try:
-            with storage.open(file_path, "rb") as f:
-                file_contents = f.read().decode("utf-8")
-            embedding_data = json.loads(file_contents)
-            return embedding_data
-        except FileNotFoundError:
-            logger.error(
-                "Embeddings for opinion ID:%s doesn't exist.", opinion_id
-            )
-            return None
-
     embeddings: list[dict] = []
     # Download embeddings concurrently.
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
-            executor.submit(download_embedding, opinion_id)
+            executor.submit(download_embedding, storage, opinion_id, directory)
             for opinion_id in opinion_ids
         ]
         for future in concurrent.futures.as_completed(futures):
@@ -1985,10 +2099,12 @@ def index_embeddings(
     for embeddings in embeddings:
         opinion_id = embeddings["id"]
         opinion_instance = (
-            Opinion.objects.filter(id=opinion_id).only("pk", "cluster").first()
+            Opinion.objects.filter(id=opinion_id)
+            .only("pk", "cluster", "main_version")
+            .first()
         )
-        if not opinion_instance:
-            # The opinion has been removed from the DB
+        if not opinion_instance or opinion_instance.main_version:
+            # The opinion has been removed from the DB or has a main version
             continue
 
         doc_to_update = {

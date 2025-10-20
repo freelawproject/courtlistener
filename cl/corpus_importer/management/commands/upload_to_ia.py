@@ -178,7 +178,7 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--queue",
-            default="batch1",
+            default="ia_uploads",
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(
