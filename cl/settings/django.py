@@ -61,6 +61,14 @@ CACHES = {
         "OPTIONS": {"MAX_ENTRIES": 2.5e5},
     },
 }
+
+DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
+if not DEVELOPMENT:
+    CACHES["s3"] = {
+        "BACKEND": "django_s3_express_cache.S3ExpressCacheBackend",
+        "LOCATION": "com-courtlistener-cache--usw2-az1--x-s3",
+    }
+
 # This sets Redis as the session backend. This is often advised against, but we
 # have pretty good persistency in Redis, so it's fairly well backed up.
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"

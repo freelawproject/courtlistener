@@ -8,8 +8,10 @@ from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models import (
     Case,
+    CharField,
     Count,
     F,
+    OuterRef,
     Q,
     QuerySet,
     Subquery,
@@ -17,12 +19,12 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Least
+from django.db.models.functions import Concat, Least
 from django.template import loader
 from django.utils import timezone
 
 from cl.custom_filters.templatetags.pacer import price
-from cl.favorites.models import Prayer, PrayerAvailability
+from cl.favorites.models import GenericCount, Prayer, PrayerAvailability
 from cl.search.models import RECAPDocument
 
 
@@ -125,6 +127,18 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
         "recap_document_id"
     )
 
+    # Subquery to fetch the view_count from GenericCount
+    view_count_subquery = Subquery(
+        GenericCount.objects.filter(
+            label=Concat(
+                Value("d."),
+                OuterRef("docket_entry__docket_id"),
+                Value(":view"),
+                output_field=CharField(),
+            )
+        ).values("value")[:1]
+    )
+
     # Annotate each RECAPDocument with the number of prayers and the number of docket views, plus whether it is currently unavailable
     documents = (
         RECAPDocument.objects.filter(id__in=Subquery(waiting_prayers))
@@ -161,7 +175,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
             prayer_count=Count(
                 "prayers", filter=Q(prayers__status=Prayer.WAITING)
             ),
-            view_count=F("docket_entry__docket__view_count"),
+            view_count=view_count_subquery,
             doc_unavailable=Case(
                 When(prayeravailability__id__isnull=False, then=Value(True)),
                 default=Value(False),
