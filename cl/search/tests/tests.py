@@ -70,6 +70,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
+from cl.search.management.commands import populate_docket_number_raw
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
 )
@@ -3693,3 +3694,23 @@ class AdminActionsTest(TestCase):
         note_qs = get_blocking_relations.get("favorites.Note")
         self.assertTrue(note_qs.exists())
         self.assertIn(self.note_cluster_3_user_1, note_qs)
+
+
+class PopulateDocketNumberRawCommandTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.dn = "1111"
+        cls.docket = DocketFactory(docket_number=cls.dn, docket_number_raw="")
+
+    def test_populate_docket_number_raw(self):
+        """Does the command properly copies docket_number_raw into docket number?"""
+        populate_docket_number_raw.Command().handle(
+            start_id=self.docket.id,
+            end_id=self.docket.id + 10,
+        )
+        self.docket.refresh_from_db()
+        self.assertEqual(
+            self.docket.docket_number_raw,
+            self.dn,
+            "docket number raw was not updated",
+        )
