@@ -32,6 +32,8 @@ document.addEventListener('alpine:init', () => {
         legal:
           '<strong>We do not provide legal help</strong>. You may wish to contact a qualified attorney, reach out to your local bar association to see if they operate a lawyer referral service, or try <a href="https://www.justia.com/lawyers">Justia\'s lawyer directory</a>. Additionally, many counties and law schools operate law libraries open to the general public, where you can conduct general legal research.',
         removal: `<strong>If you want something taken off of our website</strong>, please see our <a href="${this.termsURL}">removal policy</a> for how to proceed. You <em>must</em> provide a link of the item you need reviewed.`,
+        volunteering:
+          '<strong>Want to support our work in other ways?</strong> Let us know your skills and time availability and we will think of a project that would be right for you. You can also check out our <a href="https://free.law/volunteer">Volunteering page</a> for some general information about ways to contribute your time.<br><br>If you are a software developer, feel free to check out our <a href="https://github.com/orgs/freelawproject/projects/31/views/1/">volunteer board</a> in GitHub and share a link to whatever issue you would like to tackle.',
       };
       return this.issue.noType ? 'Please select an option above to get started.' : hints[this.issueType] ?? '';
     },

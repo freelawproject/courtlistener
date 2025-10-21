@@ -13,6 +13,7 @@ class ContactForm(forms.Form):
     RECAP_BUG = "recap"
     REMOVAL_REQUEST = "removal"
     MEMBERSHIPS = "memberships"
+    VOLUNTEERING = "volunteering"
 
     ISSUE_TYPE_CHOICES = [
         (SUPPORT_REQUEST, "General Support"),
@@ -22,6 +23,7 @@ class ContactForm(forms.Form):
         (RECAP_BUG, "RECAP Extension Bug"),
         (REMOVAL_REQUEST, "Case Removal Request"),
         (MEMBERSHIPS, "Memberships or Donations"),
+        (VOLUNTEERING, "Volunteering"),
     ]
 
     VALID_ISSUE_TYPES = [choice[0] for choice in ISSUE_TYPE_CHOICES]
