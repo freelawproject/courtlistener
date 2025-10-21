@@ -82,12 +82,16 @@ class ContactForm(forms.Form):
     partner_background = forms.MultipleChoiceField(
         required=False,
         choices=PARTNER_BACKGROUND_CHOICES,
-        widget=forms.CheckboxSelectMultiple,
+        widget=forms.CheckboxSelectMultiple(
+            attrs={"x-on:change": "onUpdatePartnerBackground"}
+        ),
     )
     partner_background_other = forms.CharField(
         required=False,
         max_length=120,
-        widget=forms.TextInput(attrs={"class": "form-control"}),
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "x-ref": "otherBackground"},
+        ),
     )
 
     partner_current_work = forms.CharField(

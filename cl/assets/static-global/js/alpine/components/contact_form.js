@@ -40,6 +40,9 @@ document.addEventListener('alpine:init', () => {
       if (!this.issue.hasAdditionalFields) this.$refs.message.setAttribute('required', '');
       else this.$refs.message.removeAttribute('required');
     },
+    onUpdatePartnerBackground() {
+      if (this.$el.checked && this.$el.value === 'other') this.$refs.otherBackground.focus();
+    },
     init() {
       // Fetch backend information: issue type options and Terms URL
       const issueTypeInput = this.$el.elements['issue_type'];
