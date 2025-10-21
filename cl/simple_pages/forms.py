@@ -90,7 +90,11 @@ class ContactForm(forms.Form):
         required=False,
         max_length=120,
         widget=forms.TextInput(
-            attrs={"class": "form-control", "x-ref": "otherBackground"},
+            attrs={
+                "class": "form-control",
+                "x-ref": "otherBackground",
+                "x-on:click": "checkOtherBackground",
+            },
         ),
     )
 

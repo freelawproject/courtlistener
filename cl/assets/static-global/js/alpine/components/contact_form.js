@@ -43,6 +43,10 @@ document.addEventListener('alpine:init', () => {
     onUpdatePartnerBackground() {
       if (this.$el.checked && this.$el.value === 'other') this.$refs.otherBackground.focus();
     },
+    checkOtherBackground() {
+      const otherCheckbox = document.getElementById('id_partner_background').querySelectorAll('[value="other"]')[0];
+      otherCheckbox.checked = true;
+    },
     init() {
       // Fetch backend information: issue type options and Terms URL
       const issueTypeInput = this.$el.elements['issue_type'];
