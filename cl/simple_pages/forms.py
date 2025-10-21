@@ -45,7 +45,7 @@ class ContactForm(forms.Form):
     issue_type = forms.ChoiceField(
         choices=ISSUE_TYPE_FORM_CHOICES,
         widget=forms.Select(
-            attrs={"class": "form-control", "x-on:change": "onUpdate"}
+            attrs={"class": "form-control", "x-on:change": "onUpdateIssueType"}
         ),
         label="How can we help?",
     )

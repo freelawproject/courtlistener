@@ -35,7 +35,7 @@ document.addEventListener('alpine:init', () => {
       };
       return this.issue.noType ? 'Please select an option above to get started.' : hints[this.issueType] ?? '';
     },
-    onUpdate() {
+    onUpdateIssueType() {
       this.issueType = this.$el.value;
       if (!this.issue.hasAdditionalFields) this.$refs.message.setAttribute('required', '');
       else this.$refs.message.removeAttribute('required');
