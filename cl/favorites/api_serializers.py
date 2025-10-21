@@ -8,7 +8,7 @@ from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import DynamicFieldsMixin
 from cl.favorites.models import DocketTag, Prayer, UserTag
-from cl.favorites.utils import prayer_eligible
+from cl.favorites.selectors import prayer_eligible
 from cl.search.models import Docket
 
 

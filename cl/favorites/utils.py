@@ -1,7 +1,5 @@
 from dataclasses import dataclass
-from datetime import timedelta
 
-from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -21,34 +19,13 @@ from django.db.models import (
 )
 from django.db.models.functions import Concat, Least
 from django.template import loader
-from django.utils import timezone
 
+from cl.api.models import WebhookEventType
+from cl.api.webhooks import send_pray_and_pay_webhooks
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.models import GenericCount, Prayer, PrayerAvailability
+from cl.favorites.selectors import prayer_eligible
 from cl.search.models import RECAPDocument
-
-
-async def prayer_eligible(user: User) -> tuple[bool, int]:
-    allowed_prayer_count = settings.ALLOWED_PRAYER_COUNT
-
-    @sync_to_async
-    def is_FLP_member():
-        return user.profile.is_member
-
-    if await is_FLP_member():
-        allowed_prayer_count *= 3
-
-    now = timezone.now()
-    last_24_hours = now - timedelta(hours=24)
-
-    # Count the number of prayers made by this user in the last 24 hours
-    prayer_count = await Prayer.objects.filter(
-        user=user, date_created__gte=last_24_hours
-    ).acount()
-
-    return prayer_count < allowed_prayer_count, (
-        allowed_prayer_count - prayer_count
-    )
 
 
 async def create_prayer(
@@ -280,10 +257,6 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
     # Early return if no prayers were granted
     if not updated_count:
         return
-
-    # Send webhooks for all granted prayers
-    from cl.api.models import WebhookEventType
-    from cl.api.webhooks import send_pray_and_pay_webhooks
 
     # Fetch granted prayers with related user and their webhooks
     granted_prayers = (

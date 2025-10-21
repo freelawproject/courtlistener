@@ -31,6 +31,7 @@ from cl.favorites.models import (
     PrayerAvailability,
     UserTag,
 )
+from cl.favorites.selectors import prayer_eligible
 from cl.favorites.tasks import check_prayer_pacer
 from cl.favorites.utils import (
     compute_prayer_total_cost,
@@ -42,7 +43,6 @@ from cl.favorites.utils import (
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
-    prayer_eligible,
     prayer_unavailable,
 )
 from cl.lib.test_helpers import (
