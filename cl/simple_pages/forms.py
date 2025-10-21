@@ -119,7 +119,11 @@ class ContactForm(forms.Form):
         ("solo", "Solo"),
         ("2_5", "2–5"),
         ("6_10", "6–10"),
-        ("11_plus", "11+"),
+        ("11_25", "11-25"),
+        ("26_100", "26-100"),
+        ("101_1000", "101-1,000"),
+        ("1001_10000", "1,001-10,000"),
+        ("10001_plus", "10,001+"),
     ]
     partner_team_size = forms.ChoiceField(
         required=False,
@@ -143,10 +147,10 @@ class ContactForm(forms.Form):
     PARTNER_FUNDING_TOTAL_CHOICES = [
         ("", "Select an option"),
         ("none", "None"),
-        ("lt_50k", "<50k"),
-        ("50_250k", "50k–250k"),
-        ("250k_1m", "250k–1m"),
-        ("gt_1m", "1m+"),
+        ("lt_50k", "< $50k"),
+        ("50_250k", "$50k–$250k"),
+        ("250k_1m", "$250k–$1m"),
+        ("gt_1m", "$1m+"),
     ]
     partner_funding_total = forms.ChoiceField(
         required=False,
