@@ -22,8 +22,6 @@ from cl.api.utils import (
     generate_webhook_key_content,
     update_webhook_event_after_request,
 )
-from cl.favorites.api_serializers import PrayerSerializer
-from cl.favorites.models import Prayer
 from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
@@ -193,35 +191,6 @@ def send_search_alert_webhook(
             "results": serialized_results,
             "alert": serialized_alert,
         },
-    }
-    renderer = JSONRenderer()
-    json_bytes = renderer.render(
-        post_content,
-        accepted_media_type="application/json;",
-    )
-    webhook_event = WebhookEvent.objects.create(
-        webhook=webhook,
-        content=post_content,
-    )
-    send_webhook_event(webhook_event, json_bytes)
-
-
-def send_pray_and_pay_webhooks(prayer: Prayer, webhook: Webhook) -> None:
-    """Send webhook event when a pray-and-pay request is granted.
-
-    :param prayer: The Prayer object representing the granted prayer.
-    :param webhook: The Webhook object to send the event to.
-    :return: None
-    """
-
-    # Only send webhook for granted prayers
-    if prayer.status != Prayer.GRANTED:
-        return
-
-    payload = PrayerSerializer(prayer).data
-    post_content = {
-        "webhook": generate_webhook_key_content(webhook),
-        "payload": payload,
     }
     renderer = JSONRenderer()
     json_bytes = renderer.render(
