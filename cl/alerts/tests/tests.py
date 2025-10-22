@@ -2321,7 +2321,6 @@ class SearchAlertsWebhooksTest(
         self.assertIn("...", subject)
 
 
-@mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 class PrayAndPayAlertsWebhooksTest(TestCase):
     """Test Pray and Pay Webhooks
 
