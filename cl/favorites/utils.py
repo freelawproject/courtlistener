@@ -22,7 +22,7 @@ from django.db.models.functions import Concat, Least
 from django.template import loader
 
 from cl.api.models import Webhook, WebhookEventType
-from cl.api.webhooks import send_pray_and_pay_webhooks
+from cl.api.tasks import send_pray_and_pay_webhooks
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.models import GenericCount, Prayer, PrayerAvailability
 from cl.favorites.selectors import prayer_eligible
@@ -277,7 +277,7 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
     for prayer in granted_prayers:
         # Send webhook for each enabled webhook
         for webhook in prayer.user.granted_prayer_webhooks:
-            send_pray_and_pay_webhooks(prayer, webhook)
+            send_pray_and_pay_webhooks.delay(prayer.pk, webhook.pk)
 
     # copying code from cl/favorites/tasks.py to account for circumstance where
     # someone buys a document from PACER despite it being marked sealed on RECAP
