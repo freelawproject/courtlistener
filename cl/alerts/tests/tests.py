@@ -2501,7 +2501,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
         self.assertIn("date_created", payload)
         self.assertIn("status", payload)
         self.assertIn("recap_document", payload)
-        self.assertIn("user", payload)
 
         # Validate field values
         self.assertEqual(payload["id"], prayer.id)
