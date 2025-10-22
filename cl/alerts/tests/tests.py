@@ -70,7 +70,8 @@ from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
 )
-from cl.favorites.factories import NoteFactory, UserTagFactory
+from cl.favorites.factories import NoteFactory, PrayerFactory, UserTagFactory
+from cl.favorites.models import Prayer
 from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
@@ -2385,8 +2386,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
         2. Make document available (triggers signal)
         3. Prayers are granted and webhooks sent
         """
-        from cl.favorites.factories import PrayerFactory
-        from cl.favorites.models import Prayer
 
         # Create unavailable RECAP document
         de = DocketEntryFactory(docket__court=self.court, entry_number=1)
