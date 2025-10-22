@@ -10,6 +10,7 @@ from django.db.models import (
     Count,
     F,
     OuterRef,
+    Prefetch,
     Q,
     QuerySet,
     Subquery,
@@ -20,7 +21,7 @@ from django.db.models import (
 from django.db.models.functions import Concat, Least
 from django.template import loader
 
-from cl.api.models import WebhookEventType
+from cl.api.models import Webhook, WebhookEventType
 from cl.api.webhooks import send_pray_and_pay_webhooks
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.models import GenericCount, Prayer, PrayerAvailability
@@ -262,14 +263,20 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
     granted_prayers = (
         Prayer.objects.filter(recap_document=instance, status=Prayer.GRANTED)
         .select_related("user")
-        .prefetch_related("user__webhooks")
+        .prefetch_related(
+            Prefetch(
+                "user__webhooks",
+                queryset=Webhook.objects.filter(
+                    event_type=WebhookEventType.PRAY_AND_PAY, enabled=True
+                ),
+                to_attr="granted_prayer_webhooks",
+            )
+        )
     )
 
     for prayer in granted_prayers:
         # Send webhook for each enabled webhook
-        for webhook in prayer.user.webhooks.filter(
-            event_type=WebhookEventType.PRAY_AND_PAY, enabled=True
-        ):
+        for webhook in prayer.user.granted_prayer_webhooks:
             send_pray_and_pay_webhooks(prayer, webhook)
 
     # copying code from cl/favorites/tasks.py to account for circumstance where
