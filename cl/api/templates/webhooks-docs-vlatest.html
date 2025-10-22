@@ -115,6 +115,7 @@
           <li>DOCKET_ALERT = 1</li>
           <li>SEARCH_ALERT = 2</li>
           <li>RECAP_FETCH = 3</li>
+          <li>OLD_DOCKET_ALERTS_REPORT = 4</li>
           <li>PRAY_AND_PAY = 5</li>
         </ul>
         <hr>
@@ -413,7 +414,7 @@ xargs -I % curl -X POST \
   <h3 id="pray-and-pay">Pray And Pay Events</h3>
   <p>The <a href="{% url 'view_prayers' %}">Pray and Pay system</a> allows users to request PACER documents that are not yet available in CourtListener's RECAP Archive. When a requested document becomes available, users who requested it are notified via email.
   </p>
-  <p>By subscribing to this webhook endpoint, your server can be notified when a pray-and-pay request you made has been granted and the document is now available.
+  <p>By subscribing to this webhook endpoint, your server can be notified when a Pray and Pay request you made has been granted and the document is now available.
   </p>
   <p>As with our other events, this webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>.</p>
   <p>The shape of the data is thus:</p>
