@@ -429,21 +429,15 @@ async def contact(
                 logger.info("Detected spam message. Not sending email.")
                 return HttpResponseRedirect(reverse("contact_thanks"))
 
-            issue_type_label = form.get_issue_type_display()
-
             default_from = settings.DEFAULT_FROM_EMAIL
+            subject = form.email_subject()
+            body = form.render_email_body(
+                user_agent=request.META.get("HTTP_USER_AGENT", "Unknown")
+            )
+
             message = EmailMessage(
-                subject="[CourtListener] Contact: {phone_number}".format(**cd),
-                body="Subject: {phone_number}\n"
-                "From: {name}\n"
-                "User Email: <{email}>\n"
-                "Issue Type: {issue_type_label}\n\n"
-                "{message}\n\n"
-                "Browser: {browser}".format(
-                    browser=request.META.get("HTTP_USER_AGENT", "Unknown"),
-                    issue_type_label=issue_type_label,
-                    **cd,
-                ),
+                subject=subject,
+                body=body,
                 to=["support@freelawproject.atlassian.net"],
                 reply_to=[cd.get("email", default_from) or default_from],
             )
@@ -481,6 +475,10 @@ async def advanced_search(request: HttpRequest) -> HttpResponse:
         "help/advanced_search.html",
         {"private": False, "data": data, "types": types},
     )
+
+
+async def citegeist_help(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "citegeist.html", {"private": False})
 
 
 async def old_terms(request: HttpRequest, v: str) -> HttpResponse:
