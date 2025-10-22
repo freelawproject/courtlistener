@@ -98,46 +98,17 @@ class Migration(migrations.Migration):
         # Readd triggers after changes
         pgtrigger.migrations.AddTrigger(
             model_name='citation',
-            trigger=pgtrigger.compiler.Trigger(
-                name='update_update',
-                sql=pgtrigger.compiler.UpsertTriggerSql(
-                    condition=(
-                        'WHEN (OLD."cluster_id" IS DISTINCT FROM (NEW."cluster_id") OR '
-                        'OLD."id" IS DISTINCT FROM (NEW."id") OR '
-                        'OLD."page" IS DISTINCT FROM (NEW."page") OR '
-                        'OLD."reporter" IS DISTINCT FROM (NEW."reporter") OR '
-                        'OLD."type" IS DISTINCT FROM (NEW."type") OR '
-                        'OLD."volume" IS DISTINCT FROM (NEW."volume"))'
-                    ),
-                    func=(
-                        'INSERT INTO "search_citationevent" '
-                        '("cluster_id","date_created","date_modified","id","page","pgh_context_id","pgh_created_at","pgh_label","pgh_obj_id","reporter","type","volume") '
-                        'VALUES (OLD."cluster_id", OLD."date_created", OLD."date_modified", OLD."id", OLD."page", _pgh_attach_context(), NOW(), \'update\', OLD."id", OLD."reporter", OLD."type", OLD."volume"); RETURN NULL;'
-                    ),
-                    hash='67f49dac0438e0bbed0fe935c7135731cb6d0f2d',
-                    operation='UPDATE',
-                    pgid='pgtrigger_update_update_8c292',
-                    table='search_citation',
-                    when='AFTER',
-                )
-            ),
+            trigger=pgtrigger.compiler.Trigger(name='update_update', sql=pgtrigger.compiler.UpsertTriggerSql(
+                condition='WHEN (OLD."cluster_id" IS DISTINCT FROM (NEW."cluster_id") OR OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."page" IS DISTINCT FROM (NEW."page") OR OLD."reporter" IS DISTINCT FROM (NEW."reporter") OR OLD."type" IS DISTINCT FROM (NEW."type") OR OLD."volume" IS DISTINCT FROM (NEW."volume"))',
+                func='INSERT INTO "search_citationevent" ("cluster_id", "date_created", "date_modified", "id", "page", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "reporter", "type", "volume") VALUES (OLD."cluster_id", OLD."date_created", OLD."date_modified", OLD."id", OLD."page", _pgh_attach_context(), NOW(), \'update\', OLD."id", OLD."reporter", OLD."type", OLD."volume"); RETURN NULL;',
+                hash='67f49dac0438e0bbed0fe935c7135731cb6d0f2d', operation='UPDATE',
+                pgid='pgtrigger_update_update_8c292', table='search_citation', when='AFTER')),
         ),
         pgtrigger.migrations.AddTrigger(
             model_name='citation',
-            trigger=pgtrigger.compiler.Trigger(
-                name='delete_delete',
-                sql=pgtrigger.compiler.UpsertTriggerSql(
-                    func=(
-                        'INSERT INTO "search_citationevent" '
-                        '("cluster_id","date_created","date_modified","id","page","pgh_context_id","pgh_created_at","pgh_label","pgh_obj_id","reporter","type","volume") '
-                        'VALUES (OLD."cluster_id", OLD."date_created", OLD."date_modified", OLD."id", OLD."page", _pgh_attach_context(), NOW(), \'delete\', OLD."id", OLD."reporter", OLD."type", OLD."volume"); RETURN NULL;'
-                    ),
-                    hash='1b1d26be5f3161f19fbd77bb5782c733e5015fc9',
-                    operation='DELETE',
-                    pgid='pgtrigger_delete_delete_58ea6',
-                    table='search_citation',
-                    when='AFTER',
-                )
-            ),
+            trigger=pgtrigger.compiler.Trigger(name='delete_delete', sql=pgtrigger.compiler.UpsertTriggerSql(
+                func='INSERT INTO "search_citationevent" ("cluster_id", "date_created", "date_modified", "id", "page", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "reporter", "type", "volume") VALUES (OLD."cluster_id", OLD."date_created", OLD."date_modified", OLD."id", OLD."page", _pgh_attach_context(), NOW(), \'delete\', OLD."id", OLD."reporter", OLD."type", OLD."volume"); RETURN NULL;',
+                hash='1b1d26be5f3161f19fbd77bb5782c733e5015fc9', operation='DELETE',
+                pgid='pgtrigger_delete_delete_58ea6', table='search_citation', when='AFTER')),
         ),
     ]
