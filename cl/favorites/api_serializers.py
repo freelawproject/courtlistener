@@ -46,19 +46,12 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
 
 
 class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
-    # Use HiddenField for API creation, but still include in serialized output
-    # by setting it in fields. This allows webhooks to include the user ID.
-    user = serializers.PrimaryKeyRelatedField(
-        read_only=True, default=serializers.CurrentUserDefault()
-    )
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
         model = Prayer
         fields = "__all__"
-        read_only_fields = (
-            "date_created",
-            "user",
-        )
+        read_only_fields = ("date_created",)
 
     def validate(self, data):
         user = self.context["request"].user
