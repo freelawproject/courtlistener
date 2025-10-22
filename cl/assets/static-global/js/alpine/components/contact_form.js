@@ -23,7 +23,7 @@ document.addEventListener('alpine:init', () => {
       const discussionsLink =
         'For community help and to see what others are discussing, visit the <a href="https://github.com/freelawproject/courtlistener/discussions">CourtListener Discussion</a> forum.';
       const hints = {
-        support: `Need a hand with CourtListener? First, check the other options above to make sure your question gets to the right team. Then, tell us what you’re trying to do and include the exact page link(s).<br><br>${discussionsLink}`,
+        support: `<strong>Need a hand with CourtListener?</strong> First, check the other options above to make sure your question gets to the right team. Then, tell us what you’re trying to do and include the exact page link(s).<br><br>${discussionsLink}`,
         api: `<a href="https://free.law">Free Law Project</a> makes it possible for you and your team to access our data. ${discussionsLink}`,
         recap:
           'Having trouble with the <a href="https://free.law/recap">RECAP extension</a>? Include your browser and version, the page/court link you were on, what you expected, and what happened instead.',
