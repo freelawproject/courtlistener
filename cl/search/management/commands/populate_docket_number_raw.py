@@ -1,5 +1,7 @@
 import time
 
+import pgtrigger
+from django.db import IntegrityError, transaction
 from django.db.models import F
 
 from cl.lib.command_utils import CommandError, VerboseCommand, logger
@@ -61,7 +63,16 @@ class Command(VerboseCommand):
                 batch_start,
                 batch_end,
             )
-            qs.update(docket_number_raw=F("docket_number"))
+
+            with pgtrigger.ignore("search.Docket:update_update"):
+                with transaction.atomic():
+                    try:
+                        qs.update(docket_number_raw=F("docket_number"))
+                    except IntegrityError:
+                        logger.error(
+                            "Docket.docket_number_raw population failed",
+                            exc_info=True,
+                        )
 
             # prevent affecting all tests with this sleep
             if not TESTING:

@@ -3714,3 +3714,16 @@ class PopulateDocketNumberRawCommandTest(TestCase):
             self.dn,
             "docket number raw was not updated",
         )
+
+        self.assertTrue(
+            self.docket.events.all().last() is None,
+            "pghistory event saving should be disabled by `populate_docket_number_raw`",
+        )
+
+        # see that regular pghistory trigger behavior is still working
+        self.docket.docket_number = "xxxx"
+        self.docket.save()
+        self.assertTrue(
+            self.docket.events.all().last() is not None,
+            "Event saving trigger is not working",
+        )
