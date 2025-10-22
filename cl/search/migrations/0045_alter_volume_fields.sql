@@ -30,8 +30,12 @@ END
 $$;
 
 
-                        ALTER TABLE search_citation DROP COLUMN volume;
-                        ALTER TABLE search_citation RENAME COLUMN volume_new TO volume;
+ALTER TABLE search_citation DROP COLUMN volume;
+ALTER TABLE search_citation RENAME COLUMN volume_new TO volume;
+
+COMMIT;
+
+BEGIN;
 
 ALTER TABLE search_citationevent ALTER COLUMN volume TYPE text USING volume::text;
 
