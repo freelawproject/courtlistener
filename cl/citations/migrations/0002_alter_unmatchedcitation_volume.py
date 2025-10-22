@@ -11,45 +11,57 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Drop indexes and unique constraint
-        migrations.RunSQL(
-            sql="DROP INDEX CONCURRENTLY IF EXISTS citations_u_volume_da4d25_idx;",
-            reverse_sql=migrations.RunSQL.noop,
-        ),
-        migrations.RunSQL(
-            sql="""
-                ALTER TABLE citations_unmatchedcitation
-                DROP CONSTRAINT IF EXISTS citations_unmatchedcitat_citing_opinion_id_volume_ca9f46d3_uniq;
-                """,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
-        # Change field type
-        migrations.AlterField(
-            model_name='unmatchedcitation',
-            name='volume',
-            field=models.TextField(help_text='The volume of the reporter'),
-        ),
-        # Recreate constraint and index concurrently
-        migrations.RunSQL(
-            sql="""
-                CREATE UNIQUE INDEX CONCURRENTLY citations_unmatchedcitation_citing_opinion_id_volume_uniq_idx
-                    ON citations_unmatchedcitation (citing_opinion_id, volume, reporter, page);
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                # Drop indexes and constraints
+                migrations.RunSQL(
+                    sql="DROP INDEX CONCURRENTLY IF EXISTS citations_u_volume_da4d25_idx;",
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+                migrations.RunSQL(
+                    sql="""
+                        ALTER TABLE citations_unmatchedcitation
+                        DROP CONSTRAINT IF EXISTS citations_unmatchedcitat_citing_opinion_id_volume_ca9f46d3_uniq;
                     """,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
-        migrations.RunSQL(
-            sql="""
-                ALTER TABLE citations_unmatchedcitation
-                    ADD CONSTRAINT citations_unmatchedcitat_citing_opinion_id_volume_ca9f46d3_uniq
-                    UNIQUE USING INDEX citations_unmatchedcitation_citing_opinion_id_volume_uniq_idx;
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+
+                # Change column type in DB
+                migrations.RunSQL(
+                    sql='ALTER TABLE citations_unmatchedcitation ALTER COLUMN volume TYPE text USING volume::text;',
+                    reverse_sql='ALTER TABLE citations_unmatchedcitation ALTER COLUMN volume TYPE integer USING volume::integer;',
+                ),
+
+                # Recreate constraint and indexes
+                migrations.RunSQL(
+                    sql="""
+                        CREATE UNIQUE INDEX CONCURRENTLY citations_unmatchedcitation_citing_opinion_id_volume_uniq_idx
+                        ON citations_unmatchedcitation (citing_opinion_id, volume, reporter, page);
                     """,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
-        migrations.RunSQL(
-            sql="""
-                CREATE INDEX CONCURRENTLY citations_u_volume_da4d25_idx
-                    ON citations_unmatchedcitation (volume, reporter, page);
-                """,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+                migrations.RunSQL(
+                    sql="""
+                        ALTER TABLE citations_unmatchedcitation
+                        ADD CONSTRAINT citations_unmatchedcitat_citing_opinion_id_volume_ca9f46d3_uniq
+                        UNIQUE USING INDEX citations_unmatchedcitation_citing_opinion_id_volume_uniq_idx;
+                    """,
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+                migrations.RunSQL(
+                    sql="""
+                        CREATE INDEX CONCURRENTLY citations_u_volume_da4d25_idx
+                        ON citations_unmatchedcitation (volume, reporter, page);
+                    """,
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+            ],
+            state_operations=[
+                migrations.AlterField(
+                    model_name='unmatchedcitation',
+                    name='volume',
+                    field=models.TextField(help_text='The volume of the reporter'),
+                ),
+            ],
+        )
     ]
