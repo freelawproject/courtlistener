@@ -3,8 +3,7 @@
       "id":1234,
       "date_created":"2025-04-16T21:24:18.879312-07:00",
       "status":2,
-      "recap_document":436149610,
-      "user":456
+      "recap_document":436149610
    },
    "webhook":{
       "version":{{ webhook_version }},

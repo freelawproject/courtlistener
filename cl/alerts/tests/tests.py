@@ -2507,7 +2507,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
         self.assertEqual(payload["id"], prayer.id)
         self.assertEqual(payload["status"], Prayer.GRANTED)
         self.assertEqual(payload["recap_document"], rd.id)
-        self.assertEqual(payload["user"], self.user_profile.user.id)
 
         # Validate webhook metadata
         self.assertEqual(
