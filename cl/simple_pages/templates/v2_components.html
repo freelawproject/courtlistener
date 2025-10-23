@@ -12,6 +12,7 @@
         {'href': '#code-block', 'text': 'Code blocks'},
         {'href': '#two-column-list', 'text': 'Two column list'},
         {'href': '#eyebrow', 'text': 'Eyebrow'},
+        {'href': '#banner', 'text': 'Banner'},
         {'href': '#copy', 'text': 'Copy to clipboard'},
       ]},
       {'href': '#layout-components', 'text': 'Layout components', 'children': [
@@ -185,7 +186,7 @@ Sample code here.
   </section>
 
   {# BANNER #}
-  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="eyebrow">
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="banner">
     <h2 class="mt-6 mb-3">Banner</h2>
     <h4 class="mt-3">Demo</h4>
     <c-banner
@@ -218,10 +219,7 @@ Sample code here.
     </c-library.list>
 
     <c-library.list title="Slots" only>
-      <c-library.item only>
-        <c-slot name="label">image</c-slot>
-        <c-slot name="description">Image tag</c-slot>
-      </c-library.item>
+      <p>No slots</p>
     </c-library.list>
 
     <c-expansion-panel title="Code">
