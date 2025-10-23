@@ -2465,8 +2465,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
         Verifies the payload matches the expected structure through the
         complete signal flow.
         """
-        from cl.favorites.factories import PrayerFactory
-        from cl.favorites.models import Prayer
 
         # Create unavailable document and waiting prayer
         de = DocketEntryFactory(docket__court=self.court, entry_number=2)
@@ -2519,8 +2517,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
         Documents that are already available should not trigger webhooks
         when prayers are created.
         """
-        from cl.favorites.factories import PrayerFactory
-        from cl.favorites.models import Prayer
 
         # Create document that's already available
         de = DocketEntryFactory(docket__court=self.court, entry_number=3)
@@ -2553,8 +2549,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
 
     def test_pray_and_pay_webhook_disabled(self):
         """Verify that webhooks are not sent to disabled webhook endpoints."""
-        from cl.favorites.factories import PrayerFactory
-        from cl.favorites.models import Prayer
 
         # Create unavailable document
         de = DocketEntryFactory(docket__court=self.court, entry_number=4)
