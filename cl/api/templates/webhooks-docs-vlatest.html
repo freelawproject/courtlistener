@@ -423,8 +423,7 @@ xargs -I % curl -X POST \
       "id": 1,
       "date_created": "2025-04-16T21:24:18.879312-07:00",
       "status": 2,
-      "recap_document": 436149610,
-      "user": 123
+      "recap_document": 436149610
    },
    "webhook":{...}
 }</pre>
@@ -434,7 +433,6 @@ xargs -I % curl -X POST \
     <li><strong>date_created</strong> - When the prayer was originally created</li>
     <li><strong>status</strong> - The status of the prayer (1 = Waiting, 2 = Granted)</li>
     <li><strong>recap_document</strong> - The ID of the RECAP document that was requested</li>
-    <li><strong>user</strong> - The ID of the user who made the request</li>
   </ul>
   <p>Webhook events are only sent when a prayer's status changes to <code>GRANTED</code> (status = 2), indicating the document is now available in the RECAP Archive.
   </p>
