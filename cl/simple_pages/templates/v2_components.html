@@ -211,6 +211,10 @@ Sample code here.
         <c-slot name="label"><code>buttons</code></c-slot>
         <c-slot name="description">List of dicts of button properties</c-slot>
       </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>image_source</code></c-slot>
+        <c-slot name="description">URL for image</c-slot>
+      </c-library.item>
     </c-library.list>
 
     <c-library.list title="Slots" only>
@@ -226,10 +230,6 @@ Sample code here.
       eyebrow_text="RECAP Suite"
       title_text="Turning PACER Around Since 2009"
       paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
-    &gt;
-    &lt;c-slot name="image"&gt;
-        &lt;img class="place-content-center" src="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png"&gt;
-      &lt;/c-slot>
       :buttons="[{'dropdown': 'True', 'style': 'btn-primary', 'name': 'Add to Chrome'}, {'style': 'btn-grey', 'name': 'Learn more'}]"
       image_source="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png"
       &gt;
