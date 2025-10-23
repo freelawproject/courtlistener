@@ -13,6 +13,7 @@ class ContactForm(forms.Form):
     RECAP_BUG = "recap"
     REMOVAL_REQUEST = "removal"
     MEMBERSHIPS = "memberships"
+    VOLUNTEERING = "volunteering"
 
     ISSUE_TYPE_CHOICES = [
         (SUPPORT_REQUEST, "General Support"),
@@ -22,6 +23,7 @@ class ContactForm(forms.Form):
         (RECAP_BUG, "RECAP Extension Bug"),
         (REMOVAL_REQUEST, "Case Removal Request"),
         (MEMBERSHIPS, "Memberships or Donations"),
+        (VOLUNTEERING, "Volunteering"),
     ]
 
     VALID_ISSUE_TYPES = [choice[0] for choice in ISSUE_TYPE_CHOICES]
@@ -45,7 +47,7 @@ class ContactForm(forms.Form):
     issue_type = forms.ChoiceField(
         choices=ISSUE_TYPE_FORM_CHOICES,
         widget=forms.Select(
-            attrs={"class": "form-control", "x-on:change": "onUpdate"}
+            attrs={"class": "form-control", "x-on:change": "onUpdateIssueType"}
         ),
         label="How can we help?",
     )
@@ -82,12 +84,20 @@ class ContactForm(forms.Form):
     partner_background = forms.MultipleChoiceField(
         required=False,
         choices=PARTNER_BACKGROUND_CHOICES,
-        widget=forms.CheckboxSelectMultiple,
+        widget=forms.CheckboxSelectMultiple(
+            attrs={"x-on:change": "onUpdatePartnerBackground"}
+        ),
     )
     partner_background_other = forms.CharField(
         required=False,
         max_length=120,
-        widget=forms.TextInput(attrs={"class": "form-control"}),
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "x-ref": "otherBackground",
+                "x-on:click": "checkOtherBackground",
+            },
+        ),
     )
 
     partner_current_work = forms.CharField(
@@ -111,7 +121,11 @@ class ContactForm(forms.Form):
         ("solo", "Solo"),
         ("2_5", "2–5"),
         ("6_10", "6–10"),
-        ("11_plus", "11+"),
+        ("11_25", "11-25"),
+        ("26_100", "26-100"),
+        ("101_1000", "101-1,000"),
+        ("1001_10000", "1,001-10,000"),
+        ("10001_plus", "10,001+"),
     ]
     partner_team_size = forms.ChoiceField(
         required=False,
@@ -135,10 +149,10 @@ class ContactForm(forms.Form):
     PARTNER_FUNDING_TOTAL_CHOICES = [
         ("", "Select an option"),
         ("none", "None"),
-        ("lt_50k", "<50k"),
-        ("50_250k", "50k–250k"),
-        ("250k_1m", "250k–1m"),
-        ("gt_1m", "1m+"),
+        ("lt_50k", "< $50k"),
+        ("50_250k", "$50k–$250k"),
+        ("250k_1m", "$250k–$1m"),
+        ("gt_1m", "$1m+"),
     ]
     partner_funding_total = forms.ChoiceField(
         required=False,
