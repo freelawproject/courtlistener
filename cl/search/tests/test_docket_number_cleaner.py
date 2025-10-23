@@ -4,6 +4,7 @@ from unittest import mock
 from django.utils import timezone
 from pydantic import ValidationError
 
+from cl.lib.redis_utils import get_redis_interface
 from cl.search.docket_number_cleaner import (
     call_models_and_compare_results,
     clean_docket_number_raw,
@@ -11,15 +12,15 @@ from cl.search.docket_number_cleaner import (
     extract_with_llm,
     get_docket,
     is_generic,
-    llm_clean_docket_numbers,
     prelim_clean_F,
     process_llm_batches,
     regex_clean_F,
     update_docket_number,
 )
 from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.llm_models import CleanDocketNumber
+from cl.search.llm_models import CleanDocketNumber, DocketItem
 from cl.search.models import Docket
+from cl.search.tasks import clean_docket_number_by_court
 from cl.tests.cases import TestCase
 
 
@@ -116,61 +117,130 @@ class TestCleanDocketNumberRaw(TestCase):
                 )
 
 
+@mock.patch(
+    "cl.search.docket_number_cleaner.get_redis_key_prefix",
+    return_value="docket_number_cleaning_test1",
+)
 class TestLLMCleanDocketNumberRaw(TestCase):
-    def test_get_docket_found(self):
-        docket = DocketFactory()
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket_number = "Old-1234"
+        cls.new_docket_number = "New-5678"
+
+    def setUp(self):
+        self.r = get_redis_interface("CACHE")
+        self.key_to_clean = "docket_number_cleaning_test1:llm_batch"
+        if self.key_to_clean:
+            self.r.delete(self.key_to_clean)
+
+    def test_get_docket_found(self, mock_get_redis_key_prefix):
+        """Tests that get_docket returns the correct docket when it exists."""
+        docket = DocketFactory(docket_number=self.docket_number)
         result = get_docket(docket.id)
         self.assertEqual(result, docket)
 
-    def test_get_docket_not_found(self):
-        result = get_docket(456)
-        self.assertIsNone(result)
+    def test_get_docket_not_found(self, mock_get_redis_key_prefix):
+        """Tests that get_docket returns None when the docket does not exist."""
+        docket = DocketFactory(docket_number=self.docket_number)
+        result = get_docket(docket.id + 999)
+        self.assertIsNone(result, "Docket should be None")
 
-    def test_update_docket_number_updated(self):
-        docket = DocketFactory(docket_number="Old-1234")
+    def test_update_docket_number_updated(self, mock_get_redis_key_prefix):
+        """Tests that the docket number is updated if the docket was not modified after the start timestamp."""
+        docket = DocketFactory(docket_number=self.docket_number)
+        self.r.sadd(self.key_to_clean, docket.id)
         start_timestamp = timezone.now()
-        result = update_docket_number(docket.id, "New-5678", start_timestamp)
-        self.assertEqual(result, docket.id)
+        update_docket_number(
+            docket.id, self.new_docket_number, start_timestamp
+        )
         docket.refresh_from_db()
-        self.assertEqual(docket.docket_number, "New-5678")
+        self.assertEqual(
+            docket.docket_number,
+            self.new_docket_number,
+            "Docket number not updated",
+        )
+        self.assertEqual(
+            self.r.scard(self.key_to_clean),
+            0,
+            "Redis cache count doesn't match",
+        )
+        self.assertEqual(
+            self.r.smembers(self.key_to_clean),
+            set(),
+            "Redis cache set doesn't match",
+        )
 
-    def test_update_docket_number_not_updated_due_to_timestamp(self):
-        docket = DocketFactory(docket_number="Old-1234")
+    def test_update_docket_number_not_updated_due_to_timestamp(
+        self, mock_get_redis_key_prefix
+    ):
+        """Tests that if the docket was modified after the start timestamp, it is not updated."""
+        docket = DocketFactory(docket_number=self.docket_number)
+        self.r.sadd(self.key_to_clean, docket.id)
         start_timestamp = timezone.now()
         # Simulate an update to the docket after the start timestamp
         docket.docket_number = "Intermediate-0000"
         docket.save()
-        result = update_docket_number(docket.id, "New-5678", start_timestamp)
-        self.assertIsNone(result)
+        update_docket_number(
+            docket.id, self.new_docket_number, start_timestamp
+        )
         docket.refresh_from_db()
-        self.assertEqual(docket.docket_number, "Intermediate-0000")
-
-    def test_update_docket_number_docket_deleted(self):
-        docket = DocketFactory(docket_number="Old-1234")
-        start_timestamp = timezone.now()
-        docket_id = docket.id
-        # Delete the docket before calling update_docket_number
-        docket.delete()
-        result = update_docket_number(docket_id, "New-5678", start_timestamp)
         self.assertEqual(
-            result, docket_id
-        )  # Should return the docket_id to be removed from redis cache
+            docket.docket_number,
+            "Intermediate-0000",
+            "Docket number should not have changed",
+        )
+        self.assertEqual(
+            self.r.scard(self.key_to_clean),
+            1,
+            "Redis cache count doesn't match",
+        )
+        self.assertEqual(
+            self.r.smembers(self.key_to_clean),
+            {str(docket.id)},
+            "Redis cache set doesn't match",
+        )
 
-    def test_create_llm_court_batches(self):
-        court_canb = CourtFactory(id="canb", jurisdiction="FB")
-        court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+    def test_update_docket_number_docket_deleted(
+        self, mock_get_redis_key_prefix
+    ):
+        """Tests that if the docket is deleted, the Redis set remains unchanged."""
+        docket = DocketFactory(docket_number=self.docket_number)
+        docket_id = docket.id
+        self.r.sadd(self.key_to_clean, docket.id)
+        start_timestamp = timezone.now()
+        # Simulate deleting the docket before calling update_docket_number
+        docket.delete()
+        update_docket_number(
+            docket.id, self.new_docket_number, start_timestamp
+        )
+        self.assertIsNone(get_docket(docket.id), "Docket should be deleted")
+        self.assertEqual(
+            self.r.scard(self.key_to_clean),
+            1,
+            "Redis cache count doesn't match",
+        )
+        self.assertEqual(
+            self.r.smembers(self.key_to_clean),
+            {str(docket_id)},
+            "Redis cache set doesn't match",
+        )
 
+    def test_create_llm_court_batches(self, mock_get_redis_key_prefix):
+        """Tests the creation of LLM court batches from a set of docket IDs."""
         docket1 = DocketFactory(
-            court=court_canb, docket_number_raw="12-1234-ag"
+            court=self.court_canb, docket_number_raw="12-1234-ag"
         )
         docket2 = DocketFactory(
-            court=court_canb, docket_number_raw="Docket 12-1234-ag"
+            court=self.court_canb, docket_number_raw="Docket 12-1234-ag"
         )
         docket3 = DocketFactory(
-            court=court_scotus, docket_number_raw="34-5678-pr"
+            court=self.court_scotus, docket_number_raw="34-5678-pr"
         )
         docket4 = DocketFactory(
-            court=court_scotus, docket_number_raw="Docket No. 34-5678-pr"
+            court=self.court_scotus, docket_number_raw="Docket No. 34-5678-pr"
         )
         llm_batch = {docket1.id, docket2.id, docket3.id, docket4.id}
         batches = create_llm_court_batches(llm_batch)
@@ -184,9 +254,19 @@ class TestLLMCleanDocketNumberRaw(TestCase):
                 {docket4.id: docket4.docket_number_raw},
             ],
         }
-        self.assertEqual(batches, expected_batches)
+        # Compare batches and expected_batches by checking keys and comparing lists as sets of dicts
+        self.assertEqual(set(batches.keys()), set(expected_batches.keys()))
+        for key in expected_batches:
+            self.assertEqual(
+                {frozenset(d.items()) for d in batches[key]},
+                {frozenset(d.items()) for d in expected_batches[key]},
+                f"Mismatch in batch for key {key}",
+            )
 
 
+@mock.patch.dict(
+    "os.environ", {"DOCKET_NUMBER_CLEANING_API_KEY": "123"}, clear=True
+)
 class TestExtractWithLLM(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -209,14 +289,14 @@ class TestExtractWithLLM(TestCase):
         cls.model_id = "test-model"
         cls.llm_response = CleanDocketNumber(
             docket_numbers=[
-                {
-                    "unique_id": str(cls.docket_1.id),
-                    "cleaned_nums": ["12-1234-AG", "13-5678-PR", "14-9010"],
-                },
-                {
-                    "unique_id": str(cls.docket_2.id),
-                    "cleaned_nums": ["512", "513", "514"],
-                },
+                DocketItem(
+                    unique_id=str(cls.docket_1.id),
+                    cleaned_nums=["12-1234-AG", "13-5678-PR", "14-9010"],
+                ),
+                DocketItem(
+                    unique_id=str(cls.docket_2.id),
+                    cleaned_nums=["512", "513", "514"],
+                ),
             ]
         )
         cls.expected = {
@@ -467,19 +547,10 @@ class TestCallModelsCompareResults(TestCase):
             cls.docket_4.id: "567 - 569",
         }
 
-        cls.expected_agree = (
-            [],
-            [
-                cls.docket_1.id,
-                cls.docket_2.id,
-                cls.docket_3.id,
-                cls.docket_4.id,
-            ],
-        )
-        cls.expected_disagree = (
-            [{cls.docket_4.id: cls.docket_4.docket_number_raw}],
-            [cls.docket_1.id, cls.docket_2.id, cls.docket_3.id],
-        )
+        cls.expected_agree = []
+        cls.expected_disagree = [
+            {cls.docket_4.id: cls.docket_4.docket_number_raw}
+        ]
 
     @mock.patch("cl.search.docket_number_cleaner.process_llm_batches")
     def test_call_models_and_compare_results_agree(
@@ -520,11 +591,14 @@ class TestCallModelsCompareResults(TestCase):
         self.assertEqual(result, self.expected_disagree)
 
 
-class TestLLMCleanDocketNumbers(TestCase):
+@mock.patch(
+    "cl.search.docket_number_cleaner.get_redis_key_prefix",
+    return_value="docket_number_cleaning_test2",
+)
+class TestLLMCleanDocketNumberByCourt(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
-        cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
         cls.docket_1 = DocketFactory(
             court=cls.court_scotus,
             docket_number_raw="Docket numbers 12-1234-ag, 13-5678-pr, 14-9010",
@@ -540,129 +614,142 @@ class TestLLMCleanDocketNumbers(TestCase):
             docket_number_raw="Cases 12-1234 to 12-1236",
             source=Docket.DEFAULT,
         )
-        cls.docket_4 = DocketFactory(
-            court=cls.court_canb,
-            docket_number_raw="Docket Nos. 567-569",
-            source=Docket.DEFAULT,
-        )
-        cls.llm_batch = [
-            cls.docket_1.id,
-            cls.docket_2.id,
-            cls.docket_3.id,
-            cls.docket_4.id,
-        ]
 
-        cls.court_batches = {
-            cls.court_scotus.jurisdiction: [
-                {cls.docket_1.id: cls.docket_1.docket_number_raw},
-                {cls.docket_2.id: cls.docket_2.docket_number_raw},
-                {cls.docket_3.id: cls.docket_3.docket_number_raw},
-            ],
-            cls.court_canb.jurisdiction: [
-                {cls.docket_4.id: cls.docket_4.docket_number_raw},
-            ],
+        cls.court_batch = [
+            {cls.docket_1.id: cls.docket_1.docket_number_raw},
+            {cls.docket_2.id: cls.docket_2.docket_number_raw},
+            {cls.docket_3.id: cls.docket_3.docket_number_raw},
+        ]
+        cls.court_mapping = cls.court_scotus.jurisdiction
+
+        cls.expected = {
+            cls.docket_1.id: "12-1234-AG; 13-5678-PR; 14-9010",
+            cls.docket_2.id: "512; 513; 514",
+            cls.docket_3.id: "12-1234; 12-1235; 12-1236",
         }
 
-        cls.mini_response_agrees = [
-            (
-                [],
-                [cls.docket_1.id, cls.docket_2.id, cls.docket_3.id],
-            ),  # All agree for scotus
-            ([], [cls.docket_4.id]),  # All agree for canb
-        ]
-        cls.mini_response_disagrees_full_response_agrees = [
-            (
-                [{cls.docket_3.id: cls.docket_3.docket_number_raw}],
-                [cls.docket_1.id, cls.docket_2.id],
-            ),  # Disagree for scotus with mini
-            ([], [cls.docket_3.id]),  # All agree for scotus with full
-            ([], [cls.docket_4.id]),  # All agree for canb with mini
-        ]
-        cls.mini_response_disagrees_full_response_disagrees = [
-            (
-                [{cls.docket_3.id: cls.docket_3.docket_number_raw}],
-                [cls.docket_1.id, cls.docket_2.id],
-            ),  # Disagree for scotus with mini
-            (
-                [{cls.docket_3.id: cls.docket_3.docket_number_raw}],
-                [],
-            ),  # Disagree for scotus with full
-            ([], [cls.docket_4.id]),  # All agree for canb with mini
-        ]
-        cls.tie_breaker_response = {
-            cls.docket_3.id: "12-1234; 12-1235; 12-1236"
-        }
+    def setUp(self) -> None:
+        self.r = get_redis_interface("CACHE")
+        self.key_to_clean = "docket_number_cleaning_test2:llm_batch"
+        if self.key_to_clean:
+            self.r.delete(self.key_to_clean)
+            self.r.sadd(self.key_to_clean, self.docket_1.id)
+            self.r.sadd(self.key_to_clean, self.docket_2.id)
+            self.r.sadd(self.key_to_clean, self.docket_3.id)
 
-        cls.expected_agree = [
-            cls.docket_1.id,
-            cls.docket_2.id,
-            cls.docket_3.id,
-            cls.docket_4.id,
-        ]
-
-    @mock.patch("cl.search.docket_number_cleaner.create_llm_court_batches")
-    @mock.patch(
-        "cl.search.docket_number_cleaner.call_models_and_compare_results"
-    )
     @mock.patch("cl.search.docket_number_cleaner.process_llm_batches")
     def test_llm_clean_docket_numbers_mini_agrees(
-        self,
-        mock_process_llm_batches,
-        mock_call_models_and_compare_results,
-        mock_create_llm_court_batches,
+        self, mock_process_llm_batches, mock_get_redis_key_prefix
     ):
-        """Test the end-to-end LLM cleaning process for docket numbers."""
-        mock_create_llm_court_batches.return_value = self.court_batches
-
+        """Test the clean_docket_number_by_court celery task where two mini models agree."""
         # Simulate that both mini models agree on all records for all courts
-        mock_call_models_and_compare_results.side_effect = (
-            self.mini_response_agrees
+        mock_process_llm_batches.side_effect = [
+            self.expected,  # First mini model results
+            self.expected,  # Second mini model results
+        ]
+        clean_docket_number_by_court(
+            self.court_batch, self.court_mapping, timezone.now()
         )
 
-        result = llm_clean_docket_numbers(self.llm_batch)
-        self.assertEqual(result, self.expected_agree)
+        # Verify that docket numbers were updated correctly
+        for docket in [self.docket_1, self.docket_2, self.docket_3]:
+            docket.refresh_from_db()
+            self.assertEqual(
+                docket.docket_number,
+                self.expected[docket.id],
+                "docket number mismatch",
+            )
 
-    @mock.patch("cl.search.docket_number_cleaner.create_llm_court_batches")
-    @mock.patch(
-        "cl.search.docket_number_cleaner.call_models_and_compare_results"
-    )
+        # Verify that Redis set is empty after processing
+        self.assertEqual(
+            self.r.scard(self.key_to_clean),
+            0,
+            "Redis cache count should be 0 after processing",
+        )
+
     @mock.patch("cl.search.docket_number_cleaner.process_llm_batches")
     def test_llm_clean_docket_numbers_full_agrees(
-        self,
-        mock_process_llm_batches,
-        mock_call_models_and_compare_results,
-        mock_create_llm_court_batches,
+        self, mock_process_llm_batches, mock_get_redis_key_prefix
     ):
-        """Test the end-to-end LLM cleaning process for docket numbers."""
-        mock_create_llm_court_batches.return_value = self.court_batches
-
-        # Simulate that mini models agree but full models agree
-        mock_call_models_and_compare_results.side_effect = (
-            self.mini_response_disagrees_full_response_agrees
+        """Test the clean_docket_number_by_court celery task where two full models agree."""
+        # Simulate that both full models agree on all records for all courts
+        mock_process_llm_batches.side_effect = [
+            {
+                self.docket_1.id: self.expected[self.docket_1.id],
+                self.docket_2.id: self.expected[self.docket_2.id],
+                self.docket_3.id: self.docket_3.docket_number_raw,
+            },  # First mini model results
+            self.expected,  # Second mini model results
+            {
+                self.docket_3.id: self.expected[self.docket_3.id]
+            },  # First full model results
+            {
+                self.docket_3.id: self.expected[self.docket_3.id]
+            },  # Second full model results
+        ]
+        clean_docket_number_by_court(
+            self.court_batch, self.court_mapping, timezone.now()
         )
 
-        result = llm_clean_docket_numbers(self.llm_batch)
-        self.assertEqual(sorted(result), self.expected_agree)
+        # Verify that docket numbers were updated correctly
+        for docket in [self.docket_1, self.docket_2, self.docket_3]:
+            docket.refresh_from_db()
+            self.assertEqual(
+                docket.docket_number,
+                self.expected[docket.id],
+                "docket number mismatch",
+            )
 
-    @mock.patch("cl.search.docket_number_cleaner.create_llm_court_batches")
-    @mock.patch(
-        "cl.search.docket_number_cleaner.call_models_and_compare_results"
-    )
+        # Verify that Redis set is empty after processing
+        self.assertEqual(
+            self.r.scard(self.key_to_clean),
+            0,
+            "Redis cache count should be 0 after processing",
+        )
+
+    @mock.patch("cl.search.tasks.process_llm_batches")
     @mock.patch("cl.search.docket_number_cleaner.process_llm_batches")
     def test_llm_clean_docket_numbers_tie_breaker(
         self,
         mock_process_llm_batches,
-        mock_call_models_and_compare_results,
-        mock_create_llm_court_batches,
+        mock_process_llm_batches_tasks,
+        mock_get_redis_key_prefix,
     ):
-        """Test the end-to-end LLM cleaning process for docket numbers."""
-        mock_create_llm_court_batches.return_value = self.court_batches
-
-        # Simulate that mini and full models disagree and tie breaker resolves
-        mock_call_models_and_compare_results.side_effect = (
-            self.mini_response_disagrees_full_response_disagrees
+        """Test the clean_docket_number_by_court celery task where the tie-breaker model is called."""
+        # Simulate that both full models agree on all records for all courts
+        mock_process_llm_batches.side_effect = [
+            {
+                self.docket_1.id: self.expected[self.docket_1.id],
+                self.docket_2.id: self.expected[self.docket_2.id],
+                self.docket_3.id: self.docket_3.docket_number_raw,
+            },  # First mini model results
+            self.expected,  # Second mini model results
+            {
+                self.docket_3.id: self.docket_3.docket_number_raw
+            },  # First full model results
+            {
+                self.docket_3.id: self.expected[self.docket_3.id]
+            },  # Second full model results
+        ]
+        mock_process_llm_batches_tasks.return_value = {
+            self.docket_3.id: self.expected[self.docket_3.id]
+        }  # Tie breaker model results
+        clean_docket_number_by_court(
+            self.court_batch, self.court_mapping, timezone.now()
         )
-        mock_process_llm_batches.return_value = self.tie_breaker_response
 
-        result = llm_clean_docket_numbers(self.llm_batch)
-        self.assertEqual(sorted(result), self.expected_agree)
+        # Verify that docket numbers were updated correctly
+        for docket in [self.docket_1, self.docket_2, self.docket_3]:
+            docket.refresh_from_db()
+            self.assertEqual(
+                docket.docket_number,
+                self.expected[docket.id],
+                "docket number mismatch",
+            )
+
+        # Verify that Redis set is empty after processing
+        self.assertEqual(
+            self.r.scard(self.key_to_clean),
+            0,
+            "Redis cache count should be 0 after processing",
+        )

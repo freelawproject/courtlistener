@@ -25,6 +25,7 @@ from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
 from django.http import QueryDict
 from django.template import loader
+from django.utils import timezone
 from elasticsearch.exceptions import (
     ApiError,
     ConflictError,
@@ -42,6 +43,13 @@ from httpx import (
     RemoteProtocolError,
     TimeoutException,
 )
+from openai import (
+    APIConnectionError,
+    InternalServerError,
+    RateLimitError,
+)
+from openai import APIError as OpenAIApiError
+from openai import ConflictError as OpenAIApiConflictError
 
 from cl.alerts.tasks import (
     percolator_response_processing,
@@ -68,6 +76,12 @@ from cl.lib.search_utils import (
 from cl.lib.storage import AWSMediaStorage, S3IntelligentTieringStorage
 from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
+from cl.search.docket_number_cleaner import (
+    call_models_and_compare_results,
+    process_llm_batches,
+    tie_breaker_prompts,
+    update_docket_number,
+)
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
@@ -2126,3 +2140,73 @@ def index_embeddings(
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         OpinionClusterDocument._index.refresh()
+
+
+@app.task(
+    bind=True,
+    max_retries=5,
+    retry_backoff=True,
+    autoretry_for=(
+        RateLimitError,
+        APIConnectionError,
+        OpenAIApiConflictError,
+        InternalServerError,
+        OpenAIApiError,
+    ),
+    retry_kwargs={"max_retries": 5},
+)
+def clean_docket_number_by_court(
+    self: Task,
+    court_batch: list[dict[int, str]],
+    court_mapping: str,
+    start_timestamp: timezone.datetime,
+) -> None:
+    """
+    Cleans docket numbers for the respective court_mapping using cascading model passes.
+
+    The cleaning process involves:
+    1. Running two mini models to find consensus on cleaned docket numbers.
+    2. For non-consensus results, running two full models for further comparison.
+    3. For remaining ties, using a tie-breaker model to finalize the cleaned docket numbers.
+    4. Updating the docket numbers in the database with the cleaned results.
+
+    :param court_batch: A batch of court records with docket IDs and numbers.
+    :param court_mapping: Identifier for the court mapping used in model prompts.
+    :param start_timestamp: Timestamp marking the start of the daemon job.
+    """
+    if court_mapping:
+        # First pass with two mini models to find consensus
+        next_model_batches = call_models_and_compare_results(
+            court_batch=court_batch,
+            court_mapping=court_mapping,
+            model_one="openai/gpt-4o-mini",
+            model_two="openai/gpt-4.1-mini",
+            start_timestamp=start_timestamp,
+        )
+        # Next pass with two full models for non-consensus
+        if next_model_batches:
+            tie_breaker_batches = call_models_and_compare_results(
+                court_batch=next_model_batches,
+                court_mapping=court_mapping,
+                model_one="openai/gpt-4o",
+                model_two="openai/gpt-4.1",
+                start_timestamp=start_timestamp,
+            )
+            # Third pass with tie-breaker model
+            if tie_breaker_batches:
+                tie_breaker_results = process_llm_batches(
+                    llm_batches=tie_breaker_batches,
+                    system_prompt=tie_breaker_prompts.get(court_mapping, ""),
+                    model_id="openai/gpt-4o",
+                    retry=0,
+                    max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
+                    batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
+                    all_cleaned=dict(),
+                )
+                for (
+                    docket_id,
+                    docket_number,
+                ) in tie_breaker_results.items():
+                    update_docket_number(
+                        docket_id, docket_number, start_timestamp
+                    )

@@ -1,12 +1,15 @@
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import environ
 from django.conf import settings
 from django.utils import timezone
 from pydantic import ValidationError
 from sentry_sdk import capture_exception
 
 from cl.lib.llm import call_llm
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.string_utils import normalize_dashes
 from cl.search.llm_models import CleanDocketNumber
 from cl.search.llm_prompts import F_PROMPT, F_TIE_BREAKER
@@ -14,6 +17,8 @@ from cl.search.models import Court, Docket
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+
+env = environ.FileAwareEnv()
 
 court_map = {
     "scotus": Court.FEDERAL_APPELLATE,
@@ -44,6 +49,54 @@ generic_patterns = {
 
 system_prompts = {Court.FEDERAL_APPELLATE: F_PROMPT}
 tie_breaker_prompts = {Court.FEDERAL_APPELLATE: F_TIE_BREAKER}
+
+
+def get_redis_key_prefix() -> str:
+    """Simple tool for getting the prefix for the redis key prefix.
+    Useful for avoiding test collisions.
+    """
+    return "docket_number_cleaning"
+
+
+def get_redis_key() -> str:
+    """Generate a Redis key for storing docket_number_cleaning llm batches.
+    :return: A Redis key string for the llm batch.
+    """
+    return f"{get_redis_key_prefix()}:llm_batch"
+
+
+def get_docket(docket_id: int) -> Docket | None:
+    """
+    Retrieve a Docket object by its ID.
+
+    :param docket_id: The primary key ID of the Docket to retrieve.
+    :return: The Docket object if found, otherwise None.
+    """
+    try:
+        docket_obj = Docket.objects.filter(id=docket_id).first()
+        return docket_obj
+    except Docket.DoesNotExist:
+        logger.error(f"Docket with id {docket_id} does not exist.")
+        return None
+
+
+def update_docket_number(
+    docket_id: int, docket_number: str, start_timestamp: timezone.datetime
+) -> None:
+    """
+    Update the docket_number field of a Docket object & remove it from the LLM cleaning Redis set if it hasn't been modified since the start timestamp.
+
+    :param docket_id: The primary key ID of the Docket to update.
+    :param docket_number: The new docket number to set.
+    :param start_timestamp: The timestamp marking the start of the daemon job.
+    """
+    docket = get_docket(docket_id)
+    r = get_redis_interface("CACHE")
+    if docket:
+        if docket.date_modified < start_timestamp:
+            docket.docket_number = docket_number
+            docket.save(update_fields=["docket_number"])
+            r.srem(get_redis_key(), str(docket_id))
 
 
 def get_clean_methods(court_type: str) -> tuple:
@@ -193,46 +246,6 @@ def clean_docket_number_raw(
     return docket_number_raw, None
 
 
-def get_docket(docket_id: int) -> Docket | None:
-    """
-    Retrieve a Docket object by its ID.
-
-    :param docket_id: The primary key ID of the Docket to retrieve.
-    :return: The Docket object if found, otherwise None.
-    """
-    try:
-        docket_obj = Docket.objects.filter(id=docket_id).first()
-        return docket_obj
-    except Docket.DoesNotExist:
-        logger.error(f"Docket with id {docket_id} does not exist.")
-        return None
-
-
-def update_docket_number(
-    docket_id: int, docket_number: str, start_timestamp: timezone.datetime
-) -> int | None:
-    """
-    Update the docket_number field of a Docket object.
-
-    :param docket_id: The primary key ID of the Docket to update.
-    :param docket_number: The new docket number to set.
-    :return: docket_id if the docket_number was updated, otherwise None.
-    """
-    docket = get_docket(docket_id)
-    if docket:
-        last_update_timestamp = docket.date_modified
-        # only update if the docket was not modified since the start of the llm cleaning process
-        if last_update_timestamp < start_timestamp:
-            docket.docket_number = docket_number
-            docket.save(update_fields=["docket_number"])
-            return docket_id
-        else:
-            return None
-    else:
-        # return the docket_id to be removed from redis cache if the docket was deleted
-        return docket_id
-
-
 def create_llm_court_batches(
     llm_batch: list[int],
 ) -> dict[str, list[dict[int, str]]]:
@@ -244,7 +257,6 @@ def create_llm_court_batches(
               and each value is a list of dictionaries of {docket_id: docket_number_raw}.
     """
     court_batches = {}
-    # Group batches by court type
     for docket_id in llm_batch:
         docket_obj = get_docket(docket_id)
         if not docket_obj:
@@ -262,7 +274,7 @@ def create_llm_court_batches(
 
 def extract_with_llm(
     batch: list[dict[int, str]], system_prompt: str, model_id: str
-) -> dict[int, str] | None:
+) -> dict[int, str]:
     """
     Extracts and cleans a batch of docket numbers using a Large Language Model (LLM).
 
@@ -277,9 +289,9 @@ def extract_with_llm(
             user_prompt=f"{batch}",
             model=model_id,
             response_model=CleanDocketNumber,
-            temperature=settings.DOCKET_NUMBER_CLEANING_TEMPERATURE,
-            max_completion_tokens=settings.DOCKET_NUMBER_CLEANING_MAX_COMPLETION_TOKENS,
-            api_key=settings.DOCKET_NUMBER_CLEANING_API_KEY,
+            temperature=0.1,
+            max_completion_tokens=1000,
+            api_key=env("DOCKET_NUMBER_CLEANING_API_KEY"),
         )
     except ValidationError as e:
         logger.error(
@@ -327,7 +339,7 @@ def process_llm_batches(
     :param model_id: Identifier for the LLM model to use.
     :param retry: Current retry attempt count.
     :param max_retries: Maximum number of allowed retries for failed batches.
-    :param batch_size: Number of records to process in each batch.
+    :param batch_size: Number of records to process in each model call.
     :param all_cleaned: Accumulator dictionary for all processed records.
     :return: A dictionary mapping record IDs to their cleaned/extracted values, including any unprocessed records after max retries.
     """
@@ -336,11 +348,18 @@ def process_llm_batches(
         llm_batches[i : i + batch_size]
         for i in range(0, len(llm_batches), batch_size)
     ]
-    # Process each batch of batch_size
-    for batch in batches:
-        logger.info(f"Batch size: {len(batch)}")
-        parsed_output = extract_with_llm(batch, system_prompt, model_id)
-        all_cleaned.update(parsed_output or {})
+    with ThreadPoolExecutor(
+        max_workers=settings.DOCKET_NUMBER_CLEANING_MAX_WORKERS
+    ) as executor:
+        future_to_batch = {
+            executor.submit(
+                extract_with_llm, batch, system_prompt, model_id
+            ): batch
+            for batch in batches
+        }
+        for future in as_completed(future_to_batch):
+            parsed_output = future.result()
+            all_cleaned.update(parsed_output or {})
     # Check for any still-unprocessed records (e.g., if LLM failed to extract)
     processed_ids = [k for k in all_cleaned.keys()]
     remaining = [
@@ -348,10 +367,11 @@ def process_llm_batches(
         for batch in llm_batches
         if list(batch.keys())[0] not in processed_ids
     ]
-    logger.info(f"---{len(remaining)} remaining---")
     if remaining and retry < max_retries:
         # Recurse on remaining
-        logger.info(f"---Retry {retry + 1}---")
+        logger.info(
+            f"---Retry {retry + 1}/{max_retries} for {len(remaining)} remaining records---"
+        )
         retry += 1
         return process_llm_batches(
             llm_batches=remaining,
@@ -365,7 +385,7 @@ def process_llm_batches(
     elif remaining and retry >= max_retries:
         unprocessed_ids = [list(batch.keys())[0] for batch in remaining]
         logger.info(
-            f"---Max retries reached. {len(remaining)} unprocessed records assigned raw values: {unprocessed_ids}.---"
+            f"---{max_retries} max retries reached. {len(remaining)} unprocessed records assigned raw values: {unprocessed_ids}.---"
         )
         for batch in remaining:
             docket_id = list(batch.keys())[0]
@@ -381,9 +401,9 @@ def call_models_and_compare_results(
     model_one: str,
     model_two: str,
     start_timestamp: timezone.datetime,
-) -> tuple[list[dict[int, str]], list[int]]:
+) -> list[dict[int, str]]:
     """
-    Calls two language models asynchronously to process a batch of court docket numbers,
+    Calls two language models to process a batch of court docket numbers,
     compares their results, updates docket numbers when both models agree, and collects batches
     for further processing when they disagree.
 
@@ -391,13 +411,9 @@ def call_models_and_compare_results(
     :param court_mapping: A key used to retrieve the appropriate system prompt for the court from the system_prompts dictionary.
     :param model_one: The identifier for the first language model to use for processing.
     :param model_two: The identifier for the second language model to use for processing.
-    :return: A tuple containing:
-             - A list of dictionaries, each containing docket IDs and their corresponding raw docket numbers,
-               representing cases where the two models disagreed or returned empty results, to be processed by a larger or fallback model.
-             - A list of docket IDs that were successfully updated with cleaned docket numbers.
+    :return: A list of dictionaries, each containing docket IDs and their corresponding raw docket numbers,
+             representing cases where the two models disagreed or returned empty results, to be processed by a larger or fallback model.
     """
-    next_model_batches = []
-    # Call both models
     model_one_results = process_llm_batches(
         llm_batches=court_batch,
         system_prompt=system_prompts.get(court_mapping, ""),
@@ -418,17 +434,13 @@ def call_models_and_compare_results(
     )
 
     # Compare results and create batch for prediction with larger model
-    processed_dockets = []
+    next_model_batches = []
     for docket_id, docket_number_one in model_one_results.items():
         docket_number_two = model_two_results.get(docket_id, None)
         if docket_number_one == docket_number_two and docket_number_one != "":
-            processed_dockets.append(
-                update_docket_number(
-                    docket_id, docket_number_one, start_timestamp
-                )
-            )
+            update_docket_number(docket_id, docket_number_one, start_timestamp)
         else:
-            # Find the raw_docket_number from court_batch using docket_id
+            # Find the docket_number_raw from court_batch using docket_id
             docket_number_raw = None
             for batch in court_batch:
                 if docket_id in batch:
@@ -436,78 +448,4 @@ def call_models_and_compare_results(
                     break
             if docket_number_raw is not None:
                 next_model_batches.append({docket_id: docket_number_raw})
-    return next_model_batches, processed_dockets
-
-
-def llm_clean_docket_numbers(
-    llm_batch: list[int],
-) -> list[int]:
-    """
-    Cleans docket numbers for batches of court records using multiple LLM models to reach consensus.
-
-    This function processes each batch of court records by:
-    1. Running two lightweight LLM models to clean docket numbers and comparing their results.
-    2. For records where the two models disagree, running two full LLM models and comparing their results.
-    3. For remaining ties, using a tie-breaker LLM model to finalize the cleaned docket numbers.
-    4. Updating the docket numbers in the database with the cleaned results.
-
-    :param llm_batch: A list of docket IDs to be processed.
-    :return: A list of docket IDs that were successfully updated with cleaned docket numbers.
-    """
-    court_batches = create_llm_court_batches(llm_batch)
-    processed_llm_batch = []
-    # Process each court batch
-    for court_mapping, court_batch in court_batches.items():
-        logger.info(
-            f"Processing court: {court_mapping} with {len(court_batch)} records"
-        )
-
-        if court_mapping:
-            start_timestamp = timezone.now()
-            # First pass with two mini models to find consensus
-            next_model_batches, processed_dockets = (
-                call_models_and_compare_results(
-                    court_batch=court_batch,
-                    court_mapping=court_mapping,
-                    model_one=settings.DOCKET_NUMBER_CLEANING_MINI_MODEL_ONE,
-                    model_two=settings.DOCKET_NUMBER_CLEANING_MINI_MODEL_TWO,
-                    start_timestamp=start_timestamp,
-                )
-            )
-            processed_llm_batch.extend(processed_dockets)
-            # Next pass with two full models for non-consensus
-            if next_model_batches:
-                tie_breaker_batches, processed_dockets = (
-                    call_models_and_compare_results(
-                        court_batch=next_model_batches,
-                        court_mapping=court_mapping,
-                        model_one=settings.DOCKET_NUMBER_CLEANING_FULL_MODEL_ONE,
-                        model_two=settings.DOCKET_NUMBER_CLEANING_FULL_MODEL_TWO,
-                        start_timestamp=start_timestamp,
-                    )
-                )
-                processed_llm_batch.extend(processed_dockets)
-                # Third pass with tie-breaker model
-                if tie_breaker_batches:
-                    tie_breaker_results = process_llm_batches(
-                        llm_batches=tie_breaker_batches,
-                        system_prompt=tie_breaker_prompts.get(
-                            court_mapping, ""
-                        ),
-                        model_id=settings.DOCKET_NUMBER_CLEANING_TIE_BREAKER_MODEL,
-                        retry=0,
-                        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
-                        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
-                        all_cleaned=dict(),
-                    )
-                    for (
-                        docket_id,
-                        docket_number,
-                    ) in tie_breaker_results.items():
-                        processed_llm_batch.append(
-                            update_docket_number(
-                                docket_id, docket_number, start_timestamp
-                            )
-                        )
-
-    return processed_llm_batch
+    return next_model_batches
