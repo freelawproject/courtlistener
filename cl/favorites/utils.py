@@ -1,7 +1,5 @@
 from dataclasses import dataclass
-from datetime import timedelta
 
-from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -12,6 +10,7 @@ from django.db.models import (
     Count,
     F,
     OuterRef,
+    Prefetch,
     Q,
     QuerySet,
     Subquery,
@@ -21,34 +20,13 @@ from django.db.models import (
 )
 from django.db.models.functions import Concat, Least
 from django.template import loader
-from django.utils import timezone
 
+from cl.api.models import Webhook, WebhookEventType
+from cl.api.tasks import send_pray_and_pay_webhooks
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.models import GenericCount, Prayer, PrayerAvailability
+from cl.favorites.selectors import prayer_eligible
 from cl.search.models import RECAPDocument
-
-
-async def prayer_eligible(user: User) -> tuple[bool, int]:
-    allowed_prayer_count = settings.ALLOWED_PRAYER_COUNT
-
-    @sync_to_async
-    def is_FLP_member():
-        return user.profile.is_member
-
-    if await is_FLP_member():
-        allowed_prayer_count *= 3
-
-    now = timezone.now()
-    last_24_hours = now - timedelta(hours=24)
-
-    # Count the number of prayers made by this user in the last 24 hours
-    prayer_count = await Prayer.objects.filter(
-        user=user, date_created__gte=last_24_hours
-    ).acount()
-
-    return prayer_count < allowed_prayer_count, (
-        allowed_prayer_count - prayer_count
-    )
 
 
 async def create_prayer(
@@ -272,59 +250,74 @@ async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
-    open_prayers = Prayer.objects.filter(
+    # Update prayers to GRANTED status and check if any were updated
+    updated_count = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
-    ).select_related("user")
-    # Retrieve email recipients before updating granted prayers.
-    email_recipients = [
-        {
-            "email": prayer["user__email"],
-            "date_created": prayer["date_created"],
-        }
-        for prayer in open_prayers.values("user__email", "date_created")
-    ]
-    open_prayers.update(status=Prayer.GRANTED)
+    ).update(status=Prayer.GRANTED)
+
+    # Early return if no prayers were granted
+    if not updated_count:
+        return
+
+    # Fetch granted prayers with related user and their webhooks
+    granted_prayers = (
+        Prayer.objects.filter(recap_document=instance, status=Prayer.GRANTED)
+        .select_related("user")
+        .prefetch_related(
+            Prefetch(
+                "user__webhooks",
+                queryset=Webhook.objects.filter(
+                    event_type=WebhookEventType.PRAY_AND_PAY, enabled=True
+                ),
+                to_attr="granted_prayer_webhooks",
+            )
+        )
+    )
+
+    for prayer in granted_prayers:
+        # Send webhook for each enabled webhook
+        for webhook in prayer.user.granted_prayer_webhooks:
+            send_pray_and_pay_webhooks.delay(prayer.pk, webhook.pk)
 
     # copying code from cl/favorites/tasks.py to account for circumstance where
     # someone buys a document from PACER despite it being marked sealed on RECAP
     PrayerAvailability.objects.filter(recap_document=instance).delete()
 
     # Send email notifications in bulk.
-    if email_recipients:
-        subject = "A document you requested is now on CourtListener"
-        txt_template = loader.get_template("prayer_email.txt")
-        html_template = loader.get_template("prayer_email.html")
+    subject = "A document you requested is now on CourtListener"
+    txt_template = loader.get_template("prayer_email.txt")
+    html_template = loader.get_template("prayer_email.html")
 
-        docket = instance.docket_entry.docket
-        docket_entry = instance.docket_entry
-        document_url = instance.get_absolute_url()
-        num_waiting = len(email_recipients)
-        doc_price = price(instance)
+    docket = instance.docket_entry.docket
+    docket_entry = instance.docket_entry
+    document_url = instance.get_absolute_url()
+    num_waiting = granted_prayers.count()
+    doc_price = price(instance)
 
-        messages = []
-        for email_recipient in email_recipients:
-            context = {
-                "docket": docket,
-                "docket_entry": docket_entry,
-                "rd": instance,
-                "document_url": document_url,
-                "num_waiting": num_waiting,
-                "price": doc_price,
-                "date_created": email_recipient["date_created"],
-            }
-            txt = txt_template.render(context)
-            html = html_template.render(context)
-            msg = EmailMultiAlternatives(
-                subject=subject,
-                body=txt,
-                from_email=settings.DEFAULT_ALERTS_EMAIL,
-                to=[email_recipient["email"]],
-                headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
-            )
-            msg.attach_alternative(html, "text/html")
-            messages.append(msg)
-        connection = get_connection()
-        connection.send_messages(messages)
+    messages = []
+    for prayer in granted_prayers:
+        context = {
+            "docket": docket,
+            "docket_entry": docket_entry,
+            "rd": instance,
+            "document_url": document_url,
+            "num_waiting": num_waiting,
+            "price": doc_price,
+            "date_created": prayer.date_created,
+        }
+        txt = txt_template.render(context)
+        html = html_template.render(context)
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=txt,
+            from_email=settings.DEFAULT_ALERTS_EMAIL,
+            to=[prayer.user.email],
+            headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
+        )
+        msg.attach_alternative(html, "text/html")
+        messages.append(msg)
+    connection = get_connection()
+    connection.send_messages(messages)
 
 
 @dataclass
