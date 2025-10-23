@@ -70,8 +70,8 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
-from cl.search.management.commands import populate_docket_number_raw
 from cl.search.llm_models import CleanDocketNumber, DocketItem
+from cl.search.management.commands import populate_docket_number_raw
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
 )
