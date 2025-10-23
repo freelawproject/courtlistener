@@ -210,7 +210,10 @@ Sample code here.
     </c-library.list>
     
     <c-library.list title="Slots" only>
-      <p>No slots</p>
+      <c-library.item only>
+        <c-slot name="label">image</c-slot>
+        <c-slot name="description">Image tag</c-slot>
+      </c-library.item>
     </c-library.list>
 
     <c-expansion-panel title="Code">
@@ -219,7 +222,11 @@ Sample code here.
       eyebrow_text="RECAP Suite" 
       title_text="Turning PACER Around Since 2009"
       paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
-    &gt;&lt;/c-banner>
+    &gt;
+    &lt;c-slot name="image"&gt;
+        &lt;img class="place-content-center" src="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png"&gt;
+      &lt;/c-slot>
+    &lt;/c-banner>
       </c-code>
     </c-expansion-panel>
   </section>

@@ -28,7 +28,11 @@
         eyebrow_text="RECAP Suite" 
         title_text="Turning PACER Around Since 2009"
         paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
-      ></c-banner>
+      >
+      <c-slot name="image">
+        <img class="place-content-center" src="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png">
+      </c-slot>
+    </c-banner>
     </div>
     {#  HERO  #}
     <div class="flex flex-col justify-center items-center gap-6 p-5">
