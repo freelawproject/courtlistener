@@ -1815,3 +1815,98 @@ class DeleteDuplicatesTest(TestCase):
             ).exists(),
             "ClusterRedirection with proper values was not created",
         )
+
+
+class ScotusMatchingTest(TestCase):
+    def setUp(self):
+        # Create a SCOTUS court and a docket used by both clusters
+        self.court_scotus = CourtFactory(id="scotus")
+        self.docket = DocketFactory(
+            docket_number="19-123", court=self.court_scotus
+        )
+
+        # Two clusters that intentionally share the same identifying fields
+        # so the SCOTUS-specific filter will return more than one Opinion.
+        self.cluster1 = OpinionClusterFactory(
+            docket=self.docket,
+            case_name="Test Case",
+            date_filed=date(2020, 1, 1),
+            judges="Justice A",
+        )
+        self.cluster2 = OpinionClusterFactory(
+            docket=self.docket,
+            case_name="Test Case",
+            date_filed=date(2020, 1, 1),
+            judges="Justice A",
+        )
+
+        # Create one Opinion per cluster with distinct sha1s
+        self.opinion1 = OpinionFactory(
+            sha1="sha1-for-cluster1", cluster=self.cluster1
+        )
+        self.opinion2 = OpinionFactory(
+            sha1="sha2-for-cluster2", cluster=self.cluster2
+        )
+
+        # Prepare a mock site that yields one case matching the clusters'
+        # identifying metadata. The scraper will call get_binary_content and
+        # sha1(content) — we'll patch sha1 to return the sha of opinion1 so the
+        # code path for len(scotus_opinions) > 1 is exercised and the final
+        # cluster comes from the sha1 lookup.
+        keys = [
+            "download_urls",
+            "case_names",
+            "citations",
+            "parallel_citations",
+            "docket_numbers",
+            "case_dates",
+            "judges",
+        ]
+        case = dict(
+            zip(
+                keys,
+                [
+                    "",
+                    "Test Case",
+                    "482 U.S. 1",
+                    "",
+                    self.docket.docket_number,
+                    date(2020, 1, 1),
+                    "Justice A",
+                ],
+            )
+        )
+        self.mock_site = mock.MagicMock()
+        self.mock_site.__iter__.return_value = [case]
+        self.mock_site.court_id = "juriscraper.scotus"
+
+    def test_scotus_duplicate_opinion_choice(self):
+        """When multiple scotus opinions match, the sha1-based opinion is used."""
+        cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
+        # Patch sha1 to return the sha for opinion1 and avoid downloading real
+        # content by patching get_binary_content.
+        with (
+            mock.patch(f"{cmd}.sha1", return_value=self.opinion1.sha1),
+            mock.patch(
+                f"{cmd}.get_binary_content", return_value=b"placeholder"
+            ),
+        ):
+            cl_back_scrape_citations.Command().scrape_court(self.mock_site)
+
+        citations_for_cluster1 = Citation.objects.filter(
+            cluster=self.cluster1
+        ).count()
+        citations_for_cluster2 = Citation.objects.filter(
+            cluster=self.cluster2
+        ).count()
+
+        self.assertEqual(
+            citations_for_cluster1,
+            1,
+            "Citation should have been saved for the cluster matching the sha1",
+        )
+        self.assertEqual(
+            citations_for_cluster2,
+            0,
+            "No citation should have been saved for the other duplicate cluster",
+        )
