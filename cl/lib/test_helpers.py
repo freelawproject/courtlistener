@@ -1099,42 +1099,42 @@ class SearchTestCase(TestCase):
         )
 
         cls.citation_1 = CitationWithParentsFactory.create(
-            volume=33,
+            volume="33",
             reporter="state",
             page="1",
             type=1,
             cluster=cls.opinion_cluster_1,
         )
         cls.citation_2 = CitationWithParentsFactory.create(
-            volume=22,
+            volume="22",
             reporter="AL",
             page="339",
             type=8,
             cluster=cls.opinion_cluster_2,
         )
         cls.citation_3 = CitationWithParentsFactory.create(
-            volume=33,
+            volume="33",
             reporter="state",
             page="1",
             type=1,
             cluster=cls.opinion_cluster_2,
         )
         cls.citation_4 = CitationWithParentsFactory.create(
-            volume=1,
+            volume="1",
             reporter="Yeates",
             page="1",
             type=5,
             cluster=cls.opinion_cluster_2,
         )
         cls.citation_5 = CitationWithParentsFactory.create(
-            volume=56,
+            volume="56",
             reporter="F.2d",
             page="9",
             type=1,
             cluster=cls.opinion_cluster_2,
         )
         cls.citation_5 = CitationWithParentsFactory.create(
-            volume=56,
+            volume="56",
             reporter="F.2d",
             page="11",
             type=1,
