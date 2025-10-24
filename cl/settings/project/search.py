@@ -71,6 +71,12 @@ KNN_SEARCH_K = env("KNN_SEARCH_K", default=5)
 KNN_SIMILARITY = env("KNN_SIMILARITY", default=0.8)
 KNN_OVERSAMPLE = env.float("KNN_OVERSAMPLE", default=3.0)
 
+#######################
+# CLEAN DOCKET NUMBER #
+#######################
+DOCKET_NUMBER_CLEANING_ENABLED = env.bool(
+    "DOCKET_NUMBER_CLEANING_ENABLED", default=False
+)
 
 ############################
 # CUSTOM RELEVANCE FACTORS #

@@ -19,6 +19,7 @@ from django.views.decorators.http import require_http_methods
 
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, Prayer, UserTag
+from cl.favorites.selectors import prayer_eligible
 from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
@@ -27,7 +28,6 @@ from cl.favorites.utils import (
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
-    prayer_eligible,
 )
 from cl.lib.http import is_ajax
 from cl.search.models import RECAPDocument

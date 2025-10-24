@@ -15,6 +15,8 @@ from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
+from cl.favorites.api_serializers import PrayerSerializer
+from cl.favorites.models import Prayer
 from cl.lib.elasticsearch_utils import set_child_docs_and_score
 from cl.search.api_serializers import (
     OpinionClusterWebhookResultSerializer,
@@ -87,6 +89,38 @@ def send_docket_alert_webhook_events(
             content=post_content,
         )
         send_webhook_event(webhook_event, json_bytes)
+
+
+@app.task()
+def send_pray_and_pay_webhooks(prayer_pk: int, webhook_pk: int) -> None:
+    """Send webhook event when a pray-and-pay request is granted.
+
+    :param prayer_id: Primary key of the granted Prayer instance.
+    :param webhook_id: Primary key of the Webhook to send the event to.
+    :return: None
+    """
+
+    prayer = Prayer.objects.get(pk=prayer_pk)
+    webhook = Webhook.objects.get(pk=webhook_pk)
+    # Only send webhook for granted prayers
+    if prayer.status != Prayer.GRANTED:
+        return
+
+    payload = PrayerSerializer(prayer).data
+    post_content = {
+        "webhook": generate_webhook_key_content(webhook),
+        "payload": payload,
+    }
+    renderer = JSONRenderer()
+    json_bytes = renderer.render(
+        post_content,
+        accepted_media_type="application/json;",
+    )
+    webhook_event = WebhookEvent.objects.create(
+        webhook=webhook,
+        content=post_content,
+    )
+    send_webhook_event(webhook_event, json_bytes)
 
 
 @app.task()
