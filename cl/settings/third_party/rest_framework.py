@@ -87,7 +87,6 @@ REST_FRAMEWORK = {
         "shishir": "10/hour",
         "shishir.kumar": "10/hour",
         # Unresponsive
-        "Ryanh": "1/hour",
         "anthonyrtaboni@gmail.com": "1/hour",
         "lucas.begnini": "1/hour",
         "w": "1/hour",
