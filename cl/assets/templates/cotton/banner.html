@@ -1,3 +1,7 @@
+{% load static svg_tags component_tags %}
+{% require_script "js/alpine/components/expansion_panel.js" %}
+{% require_script "js/alpine/plugins/collapse@3.14.8" defer=True %}
+
 <div class="bg-greyscale-100 border-greyscale-100 p-4 m-8 rounded-lg">
     <!-- Eyebrow -->
     <c-eyebrow class="normal-case m-2">{{ eyebrow_text }}</c-eyebrow>
@@ -11,11 +15,49 @@
     <!-- Buttons -->
      {% for b in buttons %}
         {% if b.dropdown %}
-            <button class={{b.style}}>
+            <button
+                type="button"
+                class="z-10 hover:shadow-md {{b.style}}"
+                x-data="expansionPanel"
+                x-on:click="toggleExpansion"
+                x-bind:aria-expanded="isExpanded"
+                aria-controls="banner-button-menu"
+                aria-haspopup="menu"
+                aria-label="Toggle menu"
+                >
                 {{ b.name }}
+                <span
+                    class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+                    aria-hidden="true"
+                    x-show="isExpanded"
+                    x-cloak
+                >{% svg 'chevron' class="w-full h-full text-white" %}
+                </span>
             </button>
+
+         {#  support menu  #}
+            <menu
+                id="banner-button-menu"
+                class="top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+                role="menu"
+                x-data="expansionPanel"
+                x-show="isExpanded"
+                x-cloak
+                x-bind:area-expanded="isExpanded"
+            >
+                {% for opt in b.options%}
+                    <li
+                        class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
+                    >
+                        <a href="{{ opt.dest }}" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
+                        {% svg opt.icon class="text-greyscale-500" aria_hidden="true" %}
+                        {{ opt.name }}
+                        </a>
+                    </li>
+                {% endfor %}
+                </menu>
         {% else %}
-            <button class={{b.style}}>
+            <button class="inline-block {{b.style}}">
                 {{ b.name }}
             </button>
         {% endif %}
