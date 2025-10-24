@@ -384,6 +384,7 @@ async def update_docket_metadata(
     d = update_case_names(d, docket_data["case_name"])
     await mark_ia_upload_needed(d, save_docket=False)
     d.docket_number = docket_data["docket_number"] or d.docket_number
+    d.docket_number_raw = docket_data["docket_number"] or d.docket_number_raw
     d.pacer_case_id = d.pacer_case_id or docket_data.get("pacer_case_id")
     d.date_filed = docket_data.get("date_filed") or d.date_filed
     d.date_last_filing = (

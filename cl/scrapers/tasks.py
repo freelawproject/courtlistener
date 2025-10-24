@@ -70,6 +70,8 @@ def update_document_from_text(
     metadata_dict = site.extract_from_text(opinion.plain_text or opinion.html)
     for model_name, data in metadata_dict.items():
         if model_name == "Docket":
+            if data.get("docket_number"):
+                data["docket_number_raw"] = data["docket_number"]
             opinion.cluster.docket.__dict__.update(data)
         elif model_name == "OpinionCluster":
             opinion.cluster.__dict__.update(data)
