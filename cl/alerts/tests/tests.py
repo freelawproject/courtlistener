@@ -69,7 +69,7 @@ from cl.donate.models import (
 )
 from cl.favorites.factories import NoteFactory, PrayerFactory, UserTagFactory
 from cl.favorites.models import Prayer
-from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
     AudioDocument,

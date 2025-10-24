@@ -219,8 +219,32 @@ class Command(VerboseCommand):
         super().handle(*args, **options)
         self.options = options
 
-        if settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED:
-            logger.info("cl_send_alerts is disabled.")
+        if (
+            options["rate"] == Alert.REAL_TIME
+            and settings.RT_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        ):
+            logger.info("cl_send_alerts is disabled for RT Alerts.")
+            return
+
+        if (
+            options["rate"] == Alert.DAILY
+            and settings.DLY_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        ):
+            logger.info("cl_send_alerts is disabled for DLY Alerts.")
+            return
+
+        if (
+            options["rate"] == Alert.WEEKLY
+            and settings.WLY_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        ):
+            logger.info("cl_send_alerts is disabled for WLY Alerts.")
+            return
+
+        if (
+            options["rate"] == Alert.MONTHLY
+            and settings.MLY_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        ):
+            logger.info("cl_send_alerts is disabled for MLY Alerts.")
             return
 
         if options["rate"] == Alert.REAL_TIME:
