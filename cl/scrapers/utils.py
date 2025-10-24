@@ -385,6 +385,7 @@ def update_or_create_docket(
             **docket_fields,
             source=source,
             docket_number=docket_number,
+            docket_number_raw=docket_number,
             court_id=court_id,
         )
 
