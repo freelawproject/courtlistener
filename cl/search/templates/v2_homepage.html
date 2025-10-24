@@ -272,8 +272,22 @@
         eyebrow_text="RECAP Suite"
         title_text="Turning PACER Around Since 2009"
         paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
-        :buttons="[{'dropdown': 'True', 'style': 'btn-primary', 'name': 'Add to Chrome', 'options': {1: 'Add to Chrome', 2: 'Add to Edge', 3: 'Add to Safari', 4: 'Add to Firefox'}}, {'style': 'btn-grey', 'name': 'Learn more'}]"
         :buttons="[{'dropdown': 'True', 'style': 'btn-primary', 'name': 'Add to Chrome'}, {'style': 'btn-white', 'name': 'Learn more'}]"
+        :buttons="[
+          {
+            'dropdown': 'True', 
+            'style': 'btn-primary', 
+            'name': 'Add to Chrome', 
+            'options': [{'name': 'Add to Chrome', 'dest': 'https://www.courtlistener.com/', 'icon': 'magnifier'}, {'name': 'Add to Edge', 'dest': 'https://www.courtlistener.com/', 'icon': 'tag'}, {'name': 'Add to Safari', 'dest': 'https://www.courtlistener.com/', 'icon': 'bell'}, {'name': 'Add to Firefox', 'dest': 'https://www.courtlistener.com/', 'icon': 'bookmark'}]
+          }, {
+              'style': 'btn-white', 
+              'name': 'Learn more'
+          }
+        ]"
+        image_source="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png"
+        image_alt="Alt image description must be written when correct image becomes available"
+      >
+  </c-banner>
         image_source="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png"
         image_alt="Alt image description must be written when correct image becomes available"
       >

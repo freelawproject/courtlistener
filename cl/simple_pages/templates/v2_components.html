@@ -232,8 +232,17 @@ Sample code here.
       eyebrow_text="RECAP Suite"
       title_text="Turning PACER Around Since 2009"
       paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
-      :buttons="[{'dropdown': 'True', 'style': 'btn-primary', 'name': 'Add to Chrome'}, {'style': 'btn-grey', 'name': 'Learn more'}]"
-      image_source="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png"
+     :buttons="[
+          {
+            'dropdown': 'True', 
+            'style': 'btn-primary', 
+            'name': 'Add to Chrome', 
+            'options': [{'name': 'Add to Chrome', 'dest': 'https://www.courtlistener.com/', 'icon': 'magnifier'}, {'name': 'Add to Edge', 'dest': 'https://www.courtlistener.com/', 'icon': 'tag'}]
+          }, {
+              'style': 'btn-white', 
+              'name': 'Learn more'
+          }
+        ]"      image_source="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png"
       &gt;
     &lt;/c-banner>
       </c-code>
