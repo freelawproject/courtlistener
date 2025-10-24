@@ -76,7 +76,6 @@ def resolve_fullcase_citation(
             page = full_citation.corrected_page()
             if (
                 volume is not None
-                and volume.isdigit()
                 and reporter is not None
                 and page is not None
             ):

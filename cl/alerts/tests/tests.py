@@ -1739,21 +1739,21 @@ class SearchAlertsWebhooksTest(
             cls.dly_opinion.joined_by.add(cls.person_1)
             cls.dly_opinion.cluster.panel.add(cls.person_1)
             cls.lexis_citation = CitationWithParentsFactory.create(
-                volume=10,
+                volume="10",
                 reporter="Yeates",
                 page="4",
                 type=Citation.LEXIS,
                 cluster=cls.dly_opinion.cluster,
             )
             cls.neutra_citation = CitationWithParentsFactory.create(
-                volume=10,
+                volume="10",
                 reporter="Neutral",
                 page="4",
                 type=Citation.NEUTRAL,
                 cluster=cls.dly_opinion.cluster,
             )
             cls.citation_1 = CitationWithParentsFactory.create(
-                volume=33,
+                volume="33",
                 reporter="state",
                 page="1",
                 type=Citation.FEDERAL,
