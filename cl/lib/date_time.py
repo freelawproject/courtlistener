@@ -2,6 +2,7 @@ from datetime import date, datetime, time
 
 import pytz
 from django.conf import settings
+from django.utils import timezone
 from django.utils.timezone import is_aware
 
 
@@ -13,6 +14,16 @@ def midnight_pt(d: date) -> datetime:
     d = datetime.combine(d, time())
     d = pst.localize(d)
     return d
+
+
+def fixed_midnight_pt(d: date) -> datetime:
+    """Cast a naive date object to midnight Pacific Time, either PST or PDT,
+    according to the date. This method also considers historical timezone
+    offsets, similar to how they are handled in DRF.
+    """
+    time_zone = timezone.get_current_timezone()
+    d = datetime.combine(d, time())
+    return timezone.make_aware(d, time_zone)
 
 
 def dt_as_local_date(dt: datetime) -> date:
