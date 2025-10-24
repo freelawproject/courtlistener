@@ -17,7 +17,7 @@
         {% if b.dropdown %}
             <button
                 type="button"
-                class="z-10 hover:shadow-md {{b.style}}"
+                class="inline-block z-10 hover:shadow-md {{b.style}}"
                 x-data="expansionPanel"
                 x-on:click="toggleExpansion"
                 x-bind:aria-expanded="isExpanded"
