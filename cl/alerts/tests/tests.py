@@ -70,7 +70,8 @@ from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
 )
-from cl.favorites.factories import NoteFactory, UserTagFactory
+from cl.favorites.factories import NoteFactory, PrayerFactory, UserTagFactory
+from cl.favorites.models import Prayer
 from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
@@ -82,10 +83,12 @@ from cl.search.documents import (
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
     OpinionWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -1736,21 +1739,21 @@ class SearchAlertsWebhooksTest(
             cls.dly_opinion.joined_by.add(cls.person_1)
             cls.dly_opinion.cluster.panel.add(cls.person_1)
             cls.lexis_citation = CitationWithParentsFactory.create(
-                volume=10,
+                volume="10",
                 reporter="Yeates",
                 page="4",
                 type=Citation.LEXIS,
                 cluster=cls.dly_opinion.cluster,
             )
             cls.neutra_citation = CitationWithParentsFactory.create(
-                volume=10,
+                volume="10",
                 reporter="Neutral",
                 page="4",
                 type=Citation.NEUTRAL,
                 cluster=cls.dly_opinion.cluster,
             )
             cls.citation_1 = CitationWithParentsFactory.create(
-                volume=33,
+                volume="33",
                 reporter="state",
                 page="1",
                 type=Citation.FEDERAL,
@@ -2317,6 +2320,278 @@ class SearchAlertsWebhooksTest(
         subject = build_alert_email_subject(alerts_hits)
         self.assertEqual(len(subject), 934)
         self.assertIn("...", subject)
+
+
+class PrayAndPayAlertsWebhooksTest(TestCase):
+    """Test Pray and Pay Webhooks
+
+    Integration tests for pray-and-pay webhook functionality. These tests
+    verify the complete signal flow:
+    1. Create prayers for a RECAP document (is_available=False)
+    2. Set RECAPDocument.is_available = True (triggers signal)
+    3. Signal calls send_prayer_emails()
+    4. send_prayer_emails() updates prayers to GRANTED and sends webhooks
+
+    The webhook payload structure:
+    {
+      "webhook": {...},
+      "payload": {
+        "id": 1234,                    // Prayer ID
+        "date_created": "2025-04-16T21:24:18.879312-07:00",
+        "status": 2,                   // Prayer.GRANTED
+        "recap_document": 436149610,   // RECAPDocument ID
+        "user": 456                    // User ID
+      }
+    }
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.user_profile = UserProfileWithParentsFactory()
+
+        # Create webhook for PRAY_AND_PAY event type (v1)
+        cls.webhook_v1_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.PRAY_AND_PAY,
+            url="https://example.com/",
+            enabled=True,
+            version=1,
+        )
+
+        # Create user with v2 webhook
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.webhook_v2_enabled = WebhookFactory(
+            user=cls.user_profile_2.user,
+            event_type=WebhookEventType.PRAY_AND_PAY,
+            url="https://example.com/",
+            enabled=True,
+            version=2,
+        )
+
+        # Create user with disabled webhook
+        cls.user_profile_3 = UserProfileWithParentsFactory()
+        cls.webhook_disabled = WebhookFactory(
+            user=cls.user_profile_3.user,
+            event_type=WebhookEventType.PRAY_AND_PAY,
+            url="https://example.com/",
+            enabled=False,
+        )
+
+    def test_send_pray_and_pay_webhooks_v1_and_v2(self):
+        """Can we send pray-and-pay webhooks when a document becomes available?
+
+        Integration test that verifies the complete flow:
+        1. Create prayers for unavailable document
+        2. Make document available (triggers signal)
+        3. Prayers are granted and webhooks sent
+        """
+
+        # Create unavailable RECAP document
+        de = DocketEntryFactory(docket__court=self.court, entry_number=1)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number=1,
+            is_available=False,
+        )
+
+        # Create WAITING prayers for both users
+        prayer_v1 = PrayerFactory(
+            user=self.user_profile.user,
+            recap_document=rd,
+            status=Prayer.WAITING,
+        )
+        prayer_v2 = PrayerFactory(
+            user=self.user_profile_2.user,
+            recap_document=rd,
+            status=Prayer.WAITING,
+        )
+
+        # Verify prayers start as WAITING
+        self.assertEqual(prayer_v1.status, Prayer.WAITING)
+        self.assertEqual(prayer_v2.status, Prayer.WAITING)
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Trigger the signal by making document available
+            rd.is_available = True
+            rd.save()
+
+        # Refresh prayers from database
+        prayer_v1.refresh_from_db()
+        prayer_v2.refresh_from_db()
+
+        # Verify prayers are now GRANTED
+        self.assertEqual(prayer_v1.status, Prayer.GRANTED)
+        self.assertEqual(prayer_v2.status, Prayer.GRANTED)
+
+        # Two webhook events (v1, v2) should be triggered
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 2)
+
+        # Verify both users received webhooks
+        webhook_users = {event.webhook.user for event in webhook_events}
+        self.assertEqual(
+            webhook_users,
+            {self.user_profile.user, self.user_profile_2.user},
+        )
+
+        # Validate payload structure
+        for event in webhook_events:
+            content = event.content
+            self.assertEqual(
+                content["webhook"]["event_type"],
+                WebhookEventType.PRAY_AND_PAY,
+            )
+            self.assertEqual(content["payload"]["status"], Prayer.GRANTED)
+            self.assertEqual(content["payload"]["recap_document"], rd.id)
+            self.assertIn(
+                content["payload"]["id"], [prayer_v1.id, prayer_v2.id]
+            )
+
+        # Confirm webhooks for V1 and V2 are properly triggered
+        webhook_versions = {
+            event.content["webhook"]["version"] for event in webhook_events
+        }
+        self.assertEqual(webhook_versions, {1, 2})
+
+    def test_pray_and_pay_webhook_payload_fields(self):
+        """Test detailed field validation for pray-and-pay webhooks.
+
+        Verifies the payload matches the expected structure through the
+        complete signal flow.
+        """
+
+        # Create unavailable document and waiting prayer
+        de = DocketEntryFactory(docket__court=self.court, entry_number=2)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number=2,
+            is_available=False,
+        )
+
+        prayer = PrayerFactory(
+            user=self.user_profile.user,
+            recap_document=rd,
+            status=Prayer.WAITING,
+        )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Trigger signal by making document available
+            rd.is_available = True
+            rd.save()
+
+        webhook_event = WebhookEvent.objects.first()
+        content = webhook_event.content
+        payload = content["payload"]
+
+        # Validate all required fields are present
+        self.assertIn("id", payload)
+        self.assertIn("date_created", payload)
+        self.assertIn("status", payload)
+        self.assertIn("recap_document", payload)
+
+        # Validate field values
+        self.assertEqual(payload["id"], prayer.id)
+        self.assertEqual(payload["status"], Prayer.GRANTED)
+        self.assertEqual(payload["recap_document"], rd.id)
+
+        # Validate webhook metadata
+        self.assertEqual(
+            content["webhook"]["event_type"],
+            WebhookEventType.PRAY_AND_PAY,
+        )
+
+    def test_pray_and_pay_webhook_only_granted_status(self):
+        """Test that webhooks are only sent when prayers are granted.
+
+        Documents that are already available should not trigger webhooks
+        when prayers are created.
+        """
+
+        # Create document that's already available
+        de = DocketEntryFactory(docket__court=self.court, entry_number=3)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number=3,
+            is_available=True,  # Already available
+        )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Create a WAITING prayer (shouldn't create webhook)
+            prayer = PrayerFactory(
+                user=self.user_profile.user,
+                recap_document=rd,
+                status=Prayer.WAITING,
+            )
+
+            # Update same document again (should not trigger since already available)
+            rd.description = "Updated description"
+            rd.save()
+
+        # No webhook events should be created
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 0)
+
+    def test_pray_and_pay_webhook_disabled(self):
+        """Verify that webhooks are not sent to disabled webhook endpoints."""
+
+        # Create unavailable document
+        de = DocketEntryFactory(docket__court=self.court, entry_number=4)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number=4,
+            is_available=False,
+        )
+
+        # Create prayer for user with disabled webhook
+        prayer = PrayerFactory(
+            user=self.user_profile_3.user,
+            recap_document=rd,
+            status=Prayer.WAITING,
+        )
+
+        initial_count = WebhookEvent.objects.filter(
+            webhook=self.webhook_disabled
+        ).count()
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Trigger signal by making document available
+            rd.is_available = True
+            rd.save()
+
+        # Verify prayer was granted (email sent)
+        prayer.refresh_from_db()
+        self.assertEqual(prayer.status, Prayer.GRANTED)
+
+        # No webhook event should be created for disabled webhook
+        final_count = WebhookEvent.objects.filter(
+            webhook=self.webhook_disabled
+        ).count()
+        self.assertEqual(
+            final_count,
+            initial_count,
+            msg="Webhook event should not be created for disabled webhook.",
+        )
 
 
 class SearchAlertsUtilsTest(TestCase):

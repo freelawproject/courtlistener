@@ -1187,14 +1187,14 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
 
         main_citation = CitationWithParentsFactory.create(
-            cluster=main_cluster, volume=10000, reporter="U.S.", page="1"
+            cluster=main_cluster, volume="10000", reporter="U.S.", page="1"
         )
         repeated_citation = CitationWithParentsFactory.create(
-            cluster=cluster2, volume=10000, reporter="U.S.", page="1"
+            cluster=cluster2, volume="10000", reporter="U.S.", page="1"
         )
         new_citation = CitationWithParentsFactory.create(
             cluster=cluster2,
-            volume=20,
+            volume="20",
             reporter="Nev.",
             page="20",
             type=Citation.STATE,

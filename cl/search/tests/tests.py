@@ -70,6 +70,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
+from cl.search.management.commands import populate_docket_number_raw
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
 )
@@ -115,7 +116,7 @@ class ModelTest(TestCase):
         self.o = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
         self.c = Citation.objects.create(
             cluster=self.oc,
-            volume=22,
+            volume="22",
             reporter="U.S.",
             page=44,
             type=Citation.FEDERAL,
@@ -2175,7 +2176,7 @@ class CaptionTest(TestCase):
         await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.FEDERAL,
-            volume=22,
+            volume="22",
             reporter="F.2d",
             page="44",
         )
@@ -2195,7 +2196,7 @@ class CaptionTest(TestCase):
         await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.FEDERAL,
-            volume=22,
+            volume="22",
             reporter="U.S.",
             page="44",
         )
@@ -2212,7 +2213,7 @@ class CaptionTest(TestCase):
         await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.NEUTRAL,
-            volume=22,
+            volume="22",
             reporter="IL",
             page="44",
         )
@@ -2222,16 +2223,19 @@ class CaptionTest(TestCase):
         # A list of citations ordered properly
         cs = [
             Citation(
-                volume=22, reporter="IL", page="44", type=Citation.NEUTRAL
+                volume="22", reporter="IL", page="44", type=Citation.NEUTRAL
             ),
             Citation(
-                volume=22, reporter="U.S.", page="44", type=Citation.FEDERAL
+                volume="22", reporter="U.S.", page="44", type=Citation.FEDERAL
             ),
             Citation(
-                volume=22, reporter="S. Ct.", page="33", type=Citation.FEDERAL
+                volume="22",
+                reporter="S. Ct.",
+                page="33",
+                type=Citation.FEDERAL,
             ),
             Citation(
-                volume=22,
+                volume="22",
                 reporter="Alt.",
                 page="44",
                 type=Citation.STATE_REGIONAL,
@@ -3693,3 +3697,36 @@ class AdminActionsTest(TestCase):
         note_qs = get_blocking_relations.get("favorites.Note")
         self.assertTrue(note_qs.exists())
         self.assertIn(self.note_cluster_3_user_1, note_qs)
+
+
+class PopulateDocketNumberRawCommandTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.dn = "1111"
+        cls.docket = DocketFactory(docket_number=cls.dn, docket_number_raw="")
+
+    def test_populate_docket_number_raw(self):
+        """Does the command properly copies docket_number_raw into docket number?"""
+        populate_docket_number_raw.Command().handle(
+            start_id=self.docket.id,
+            end_id=self.docket.id + 10,
+        )
+        self.docket.refresh_from_db()
+        self.assertEqual(
+            self.docket.docket_number_raw,
+            self.dn,
+            "docket number raw was not updated",
+        )
+
+        self.assertTrue(
+            self.docket.events.all().last() is None,
+            "pghistory event saving should be disabled by `populate_docket_number_raw`",
+        )
+
+        # see that regular pghistory trigger behavior is still working
+        self.docket.docket_number = "xxxx"
+        self.docket.save()
+        self.assertTrue(
+            self.docket.events.all().last() is not None,
+            "Event saving trigger is not working",
+        )

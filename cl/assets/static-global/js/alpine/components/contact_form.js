@@ -23,7 +23,7 @@ document.addEventListener('alpine:init', () => {
       const discussionsLink =
         'For community help and to see what others are discussing, visit the <a href="https://github.com/freelawproject/courtlistener/discussions">CourtListener Discussion</a> forum.';
       const hints = {
-        support: `Need a hand with CourtListener? First, check the other options above to make sure your question gets to the right team. Then, tell us what you’re trying to do and include the exact page link(s).<br><br>${discussionsLink}`,
+        support: `<strong>Need a hand with CourtListener?</strong> First, check the other options above to make sure your question gets to the right team. Then, tell us what you’re trying to do and include the exact page link(s).<br><br>${discussionsLink}`,
         api: `<a href="https://free.law">Free Law Project</a> makes it possible for you and your team to access our data. ${discussionsLink}`,
         recap:
           'Having trouble with the <a href="https://free.law/recap">RECAP extension</a>? Include your browser and version, the page/court link you were on, what you expected, and what happened instead.',
@@ -32,13 +32,22 @@ document.addEventListener('alpine:init', () => {
         legal:
           '<strong>We do not provide legal help</strong>. You may wish to contact a qualified attorney, reach out to your local bar association to see if they operate a lawyer referral service, or try <a href="https://www.justia.com/lawyers">Justia\'s lawyer directory</a>. Additionally, many counties and law schools operate law libraries open to the general public, where you can conduct general legal research.',
         removal: `<strong>If you want something taken off of our website</strong>, please see our <a href="${this.termsURL}">removal policy</a> for how to proceed. You <em>must</em> provide a link of the item you need reviewed.`,
+        volunteering:
+          '<strong>Want to support our work in other ways?</strong> Let us know your skills and time availability and we will think of a project that would be right for you. You can also check out our <a href="https://free.law/volunteer">Volunteering page</a> for some general information about ways to contribute your time.<br><br>If you are a software developer, feel free to check out our <a href="https://github.com/orgs/freelawproject/projects/31/views/1/">volunteer board</a> in GitHub and share a link to whatever issue you would like to tackle.',
       };
       return this.issue.noType ? 'Please select an option above to get started.' : hints[this.issueType] ?? '';
     },
-    onUpdate() {
+    onUpdateIssueType() {
       this.issueType = this.$el.value;
       if (!this.issue.hasAdditionalFields) this.$refs.message.setAttribute('required', '');
       else this.$refs.message.removeAttribute('required');
+    },
+    onUpdatePartnerBackground() {
+      if (this.$el.checked && this.$el.value === 'other') this.$refs.otherBackground.focus();
+    },
+    checkOtherBackground() {
+      const otherCheckbox = document.getElementById('id_partner_background').querySelectorAll('[value="other"]')[0];
+      otherCheckbox.checked = true;
     },
     init() {
       // Fetch backend information: issue type options and Terms URL
