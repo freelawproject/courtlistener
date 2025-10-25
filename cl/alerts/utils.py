@@ -424,6 +424,7 @@ def scheduled_alert_hits_limit_reached(
     :return: True if the limit has been reached, otherwise False.
     """
 
+    is_opinion_hit = content_type.model == "opinion" if content_type else False
     if child_document and content_type:
         # To limit child hits in case, count ScheduledAlertHits related to the
         # alert, user and parent document.
@@ -436,7 +437,7 @@ def scheduled_alert_hits_limit_reached(
         ).count()
         hits_per_result = (
             settings.OPINION_HITS_PER_RESULT
-            if content_type.model == "opinion"
+            if is_opinion_hit
             else settings.RECAP_CHILD_HITS_PER_RESULT
         )
         hits_limit = hits_per_result + 1
@@ -457,7 +458,8 @@ def scheduled_alert_hits_limit_reached(
 
     if hits_count >= hits_limit:
         if child_document:
-            logger.error(
+            log_function = logger.error if is_opinion_hit else logger.info
+            log_function(
                 "Skipping child hit for Alert ID: %s and object_id %s, there "
                 "are %s child hits stored for this alert-instance.",
                 alert_pk,
