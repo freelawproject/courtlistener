@@ -188,6 +188,7 @@ INSTALLED_APPS = [
     "cl.search",
     "cl.simple_pages",
     "cl.sitemaps_infinite",
+    "cl.state_appellate",
     "cl.stats",
     "cl.users",
     "cl.visualizations",
