@@ -571,13 +571,17 @@ def update_es_document(
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
 
+    fields_to_omit_percolation = {
+        "plain_text",
+        "filepath_local",
+    }
     if (
         (
             related_instance_app_label == "search.BankruptcyInformation"
             or (
                 main_app_label in ("search.RECAPDocument", "search.Docket")
                 and related_instance_app_label != "search.DocketEntry"
-                and not {"plain_text", "filepath_local"}
+                and not fields_to_omit_percolation
                 & set(
                     fields_to_update
                 )  # Percolation upon plain_text extraction will be delayed until citation matching completes.
@@ -1527,6 +1531,7 @@ def index_related_cites_fields(
     model_name: str,
     child_id: int,
     cluster_ids_to_update: list[int] | None = None,
+    percolate_opinion: bool = False,
 ) -> None:
     """Index 'cites' and 'citeCount' fields in ES documents in a one request.
     :param self: The Celery task instance.
@@ -1534,12 +1539,14 @@ def index_related_cites_fields(
     :param child_id: The child document ID to update with the cites.
     :param cluster_ids_to_update: Optional; the cluster IDs where 'citeCount'
     should be updated.
+    :param percolate_opinion: Whether to percolate the related opinion document in
+    order to trigger search alerts.
     :return: None.
     """
     documents_to_update = []
     cites_doc_to_update = {}
     base_doc = {}
-    recap_document = None
+    citing_doc = None
     es_child_doc_class = None
     match model_name:
         case OpinionsCited.__name__:
@@ -1554,7 +1561,7 @@ def index_related_cites_fields(
             # Finally build the Opinion dict for updating the cites.
             child_doc_model = Opinion
             es_child_doc_class = OpinionDocument
-            cites_doc_to_update, _ = build_bulk_cites_doc(
+            cites_doc_to_update, citing_doc = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
 
@@ -1567,7 +1574,7 @@ def index_related_cites_fields(
 
             child_doc_model = RECAPDocument
             es_child_doc_class = ESRECAPDocument
-            cites_doc_to_update, recap_document = build_bulk_cites_doc(
+            cites_doc_to_update, citing_doc = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
 
@@ -1585,16 +1592,17 @@ def index_related_cites_fields(
         OpinionClusterDocument._index.refresh()
         DocketDocument._index.refresh()
 
-    if all(
-        [
-            model_name == OpinionsCitedByRECAPDocument.__name__,
-            recap_document,
-            es_child_doc_class,
-        ]
+    if (
+        citing_doc
+        and es_child_doc_class
+        and (
+            model_name == OpinionsCitedByRECAPDocument.__name__
+            or percolate_opinion
+        )
     ):
-        # Percolate the related RECAPDocument to match queries that involve the
-        # cites field.
-        percolate_document(es_child_doc_class, child_id, recap_document)
+        # Percolate if it’s the RECAP‐cited‐by document or if percolation is
+        # enabled for opinions.
+        percolate_document(es_child_doc_class, child_id, citing_doc)
 
 
 @app.task(
