@@ -10,6 +10,10 @@ INCEPTION_CPU_HOST = env(
 INCEPTION_GPU_HOST = env(
     "INCEPTION_GPU_HOST", default="http://host.docker.internal:8005"
 )
+INCEPTION_CPU_EMBEDDINGS_HOST = env(
+    "INCEPTION_CPU_EMBEDDINGS_SERVICE_HOST",
+    default="http://host.docker.internal:8005",
+)
 INCEPTION_TIMEOUT = env.int("INCEPTION_TIMEOUT", default=60)
 
 MICROSERVICE_URLS = {
@@ -83,7 +87,7 @@ MICROSERVICE_URLS = {
         "timeout": INCEPTION_TIMEOUT,
     },
     "inception-cpu-batch": {
-        "url": f"{INCEPTION_CPU_HOST}/api/v1/embed/batch",
+        "url": f"{INCEPTION_CPU_EMBEDDINGS_HOST}/api/v1/embed/batch",
         "timeout": INCEPTION_TIMEOUT,
     },
     "inception-query": {
@@ -91,7 +95,7 @@ MICROSERVICE_URLS = {
         "timeout": INCEPTION_TIMEOUT,
     },
     "inception-text": {
-        "url": f"{INCEPTION_CPU_HOST}/api/v1/embed/text",
+        "url": f"{INCEPTION_CPU_EMBEDDINGS_HOST}/api/v1/embed/text",
         "timeout": INCEPTION_TIMEOUT,
     },
 }
