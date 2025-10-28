@@ -15,6 +15,9 @@ INCEPTION_CPU_EMBEDDINGS_HOST = env(
     default="http://host.docker.internal:8005",
 )
 INCEPTION_TIMEOUT = env.int("INCEPTION_TIMEOUT", default=60)
+INCEPTION_EMBEDDING_TIMEOUT_MULTIPLIER = env.int(
+    "INCEPTION_EMBEDDING_TIMEOUT_MULTIPLIER", default=1
+)
 
 MICROSERVICE_URLS = {
     # DOCTOR Endpoints
@@ -88,7 +91,7 @@ MICROSERVICE_URLS = {
     },
     "inception-cpu-batch": {
         "url": f"{INCEPTION_CPU_EMBEDDINGS_HOST}/api/v1/embed/batch",
-        "timeout": INCEPTION_TIMEOUT,
+        "timeout": INCEPTION_TIMEOUT * INCEPTION_EMBEDDING_TIMEOUT_MULTIPLIER,
     },
     "inception-query": {
         "url": f"{INCEPTION_CPU_HOST}/api/v1/embed/query",
@@ -96,6 +99,6 @@ MICROSERVICE_URLS = {
     },
     "inception-text": {
         "url": f"{INCEPTION_CPU_EMBEDDINGS_HOST}/api/v1/embed/text",
-        "timeout": INCEPTION_TIMEOUT,
+        "timeout": INCEPTION_TIMEOUT * INCEPTION_EMBEDDING_TIMEOUT_MULTIPLIER,
     },
 }
