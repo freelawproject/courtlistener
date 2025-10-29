@@ -11,7 +11,7 @@ INCEPTION_GPU_HOST = env(
     "INCEPTION_GPU_HOST", default="http://host.docker.internal:8005"
 )
 INCEPTION_CPU_EMBEDDINGS_HOST = env(
-    "INCEPTION_CPU_EMBEDDINGS_SERVICE_HOST",
+    "INCEPTION_CPU_EMBEDDINGS_HOST",
     default="http://host.docker.internal:8005",
 )
 INCEPTION_TIMEOUT = env.int("INCEPTION_TIMEOUT", default=60)
