@@ -1678,6 +1678,7 @@ async def merge_attachment_page_data(
     attachment_dicts: list[dict[str, int | str]],
     debug: bool = False,
     is_acms_attachment: bool = False,
+    subdocket_replication: bool = False,
 ) -> tuple[list[RECAPDocument], DocketEntry]:
     """Merge attachment page data into the docket
 
@@ -1690,6 +1691,7 @@ async def merge_attachment_page_data(
     attachment.
     :param debug: Whether to do saves during this process.
     :param is_acms_attachment: Whether the attachments come from ACMS.
+    :param subdocket_replication: Whether this process is related to subdocket replication.
     :return: A list of RECAPDocuments modified or created during the process,
     and the DocketEntry object associated with the RECAPDocuments
     :raises: RECAPDocument.MultipleObjectsReturned, RECAPDocument.DoesNotExist
@@ -1799,9 +1801,9 @@ async def merge_attachment_page_data(
     # We got the right item. Update/create all the attachments for
     # the docket entry.
     de = main_rd.docket_entry
-    if document_number is None:
-        # Bankruptcy or Appellate attachment page. Use the document number from
-        # the Main doc
+    if document_number is None or subdocket_replication:
+        # Bankruptcy or Appellate attachment page or attachment page being
+        # replicated to subdockets. Use the document number from the Main doc
         document_number = main_rd.document_number
 
     if debug:
