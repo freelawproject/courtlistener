@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import datetime
 
 from django.conf import settings
 from django.utils import timezone
@@ -45,12 +46,12 @@ class Command(VerboseCommand):
             help="The celery throttle min items.",
         )
 
-    def process_llm_batch(
+    def ll_clean_docket_number(
         self,
         celery_queue: str,
         court_batch: list[dict[int, str]],
         court_mapping: str,
-        start_timestamp: timezone.datetime,
+        start_timestamp: datetime,
     ) -> None:
         """
         Processes a batch of court data for LLM cleaning by using one Celery task per court_mapping.
@@ -91,7 +92,7 @@ class Command(VerboseCommand):
                     start_timestamp = timezone.now()
                     court_batches = create_llm_court_batches(llm_batch)
                     for court_mapping, court_batch in court_batches.items():
-                        self.process_llm_batch(
+                        self.ll_clean_docket_number(
                             celery_queue,
                             court_batch,
                             court_mapping,

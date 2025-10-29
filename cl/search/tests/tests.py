@@ -97,7 +97,7 @@ from cl.search.models import (
 from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -3738,63 +3738,60 @@ class PopulateDocketNumberRawCommandTest(TestCase):
     return_value="docket_number_cleaning_daemon_test",
 )
 @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
-class LLMCleanDocketNumberTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
-        cls.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
-        cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
-        cls.docket_1 = DocketFactory(
-            court=cls.court_scotus,
+class LLMCleanDocketNumberTests(TransactionTestCase):
+    def setUp(self):
+        self.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        self.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
+        self.court_canb = CourtFactory(id="canb", jurisdiction="FB")
+        self.docket_1 = DocketFactory(
+            court=self.court_scotus,
             docket_number_raw="Docket numbers 12-1234-ag, 13-5678-pr, 14-9010",
             docket_number="Docket numbers 12-1234-ag, 13-5678-pr, 14-9010",
             source=Docket.DEFAULT,
         )
-        cls.docket_2 = DocketFactory(
-            court=cls.court_scotus,
+        self.docket_2 = DocketFactory(
+            court=self.court_scotus,
             docket_number_raw="Cases 512 to 514",
             docket_number="Cases 512 to 514",
             source=Docket.DEFAULT,
         )
-        cls.docket_3 = DocketFactory(
-            court=cls.court_ca1,
+        self.docket_3 = DocketFactory(
+            court=self.court_ca1,
             docket_number_raw="Cases 12-1234 to 12-1236",
             docket_number="Cases 12-1234 to 12-1236",
             source=Docket.DEFAULT,
         )
-        cls.docket_4 = DocketFactory(
-            court=cls.court_canb,
+        self.docket_4 = DocketFactory(
+            court=self.court_canb,
             docket_number_raw="Docket Nos. 567-569",
             docket_number="Docket Nos. 567-569",
             source=Docket.DEFAULT,
         )
 
-        cls.model_response = CleanDocketNumber(
+        self.model_response = CleanDocketNumber(
             docket_numbers=[
                 DocketItem(
-                    unique_id=str(cls.docket_1.id),
+                    unique_id=str(self.docket_1.id),
                     cleaned_nums=["12-1234-AG", "13-5678-PR", "14-9010"],
                 ),
                 DocketItem(
-                    unique_id=str(cls.docket_2.id),
+                    unique_id=str(self.docket_2.id),
                     cleaned_nums=["512", "513", "514"],
                 ),
                 DocketItem(
-                    unique_id=str(cls.docket_3.id),
+                    unique_id=str(self.docket_3.id),
                     cleaned_nums=["12-1234", "12-1235", "12-1236"],
                 ),
             ]
         )
 
-        cls.expected = {
-            cls.docket_1.id: "12-1234-AG; 13-5678-PR; 14-9010",
-            cls.docket_2.id: "512; 513; 514",
-            cls.docket_3.id: "12-1234; 12-1235; 12-1236",
-            cls.docket_4.id: "Docket Nos. 567-569",  # No change expected for non-Fed_Appellate dockets
+        self.expected = {
+            self.docket_1.id: "12-1234-AG; 13-5678-PR; 14-9010",
+            self.docket_2.id: "512; 513; 514",
+            self.docket_3.id: "12-1234; 12-1235; 12-1236",
+            self.docket_4.id: "Docket Nos. 567-569",  # No change expected for non-Fed_Appellate dockets
         }
 
-    def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
         self.key_to_clean = "docket_number_cleaning_daemon_test:llm_batch"
         if self.key_to_clean:
@@ -3803,6 +3800,8 @@ class LLMCleanDocketNumberTests(TestCase):
             self.r.sadd(self.key_to_clean, self.docket_2.id)
             self.r.sadd(self.key_to_clean, self.docket_3.id)
             self.r.sadd(self.key_to_clean, self.docket_4.id)
+
+        super().setUp()
 
     @mock.patch("cl.search.docket_number_cleaner.call_llm")
     def test_llm_clean_docket_number_daemon(

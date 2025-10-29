@@ -10,7 +10,6 @@ from cl.search.docket_number_cleaner import (
     clean_docket_number_raw,
     create_llm_court_batches,
     extract_with_llm,
-    get_docket,
     is_generic,
     prelim_clean_F,
     process_llm_batches,
@@ -21,7 +20,7 @@ from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.llm_models import CleanDocketNumber, DocketItem
 from cl.search.models import Docket
 from cl.search.tasks import clean_docket_number_by_court
-from cl.tests.cases import TestCase
+from cl.tests.cases import TestCase, TransactionTestCase
 
 
 @dataclass
@@ -121,32 +120,19 @@ class TestCleanDocketNumberRaw(TestCase):
     "cl.search.docket_number_cleaner.get_redis_key_prefix",
     return_value="docket_number_cleaning_test1",
 )
-class TestLLMCleanDocketNumberRaw(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
-        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
-        cls.docket_number = "Old-1234"
-        cls.new_docket_number = "New-5678"
-
+class TestLLMCleanDocketNumberRaw(TransactionTestCase):
     def setUp(self):
+        self.court_canb = CourtFactory(id="canb", jurisdiction="FB")
+        self.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        self.docket_number = "Old-1234"
+        self.new_docket_number = "New-5678"
+
         self.r = get_redis_interface("CACHE")
         self.key_to_clean = "docket_number_cleaning_test1:llm_batch"
         if self.key_to_clean:
             self.r.delete(self.key_to_clean)
 
-    def test_get_docket_found(self, mock_get_redis_key_prefix):
-        """Tests that get_docket returns the correct docket when it exists."""
-        docket = DocketFactory(docket_number=self.docket_number)
-        result = get_docket(docket.id)
-        self.assertEqual(result, docket)
-
-    def test_get_docket_not_found(self, mock_get_redis_key_prefix):
-        """Tests that get_docket returns None when the docket does not exist."""
-        docket = DocketFactory(docket_number=self.docket_number)
-        result = get_docket(docket.id + 999)
-        self.assertIsNone(result, "Docket should be None")
+        super().setUp()
 
     def test_update_docket_number_updated(self, mock_get_redis_key_prefix):
         """Tests that the docket number is updated if the docket was not modified after the start timestamp."""
@@ -154,7 +140,7 @@ class TestLLMCleanDocketNumberRaw(TestCase):
         self.r.sadd(self.key_to_clean, docket.id)
         start_timestamp = timezone.now()
         update_docket_number(
-            docket.id, self.new_docket_number, start_timestamp
+            docket.id, self.new_docket_number, start_timestamp, self.r
         )
         docket.refresh_from_db()
         self.assertEqual(
@@ -184,7 +170,7 @@ class TestLLMCleanDocketNumberRaw(TestCase):
         docket.docket_number = "Intermediate-0000"
         docket.save()
         update_docket_number(
-            docket.id, self.new_docket_number, start_timestamp
+            docket.id, self.new_docket_number, start_timestamp, self.r
         )
         docket.refresh_from_db()
         self.assertEqual(
@@ -214,9 +200,8 @@ class TestLLMCleanDocketNumberRaw(TestCase):
         # Simulate deleting the docket before calling update_docket_number
         docket.delete()
         update_docket_number(
-            docket.id, self.new_docket_number, start_timestamp
+            docket.id, self.new_docket_number, start_timestamp, self.r
         )
-        self.assertIsNone(get_docket(docket.id), "Docket should be deleted")
         self.assertEqual(
             self.r.scard(self.key_to_clean),
             1,
@@ -245,10 +230,6 @@ class TestLLMCleanDocketNumberRaw(TestCase):
         llm_batch = {docket1.id, docket2.id, docket3.id, docket4.id}
         batches = create_llm_court_batches(llm_batch)
         expected_batches = {
-            None: [
-                {docket1.id: docket1.docket_number_raw},
-                {docket2.id: docket2.docket_number_raw},
-            ],
             "F": [
                 {docket3.id: docket3.docket_number_raw},
                 {docket4.id: docket4.docket_number_raw},
@@ -395,6 +376,12 @@ class TestProcessLLMBatches(TestCase):
         cls.extract_response_3 = {cls.docket_3.id: "12-1234; 12-1235; 12-1236"}
         cls.extract_response_4 = {cls.docket_4.id: "567; 568; 569"}
 
+        cls.expected_none = {
+            cls.docket_1.id: cls.docket_1.docket_number_raw,
+            cls.docket_2.id: cls.docket_2.docket_number_raw,
+            cls.docket_3.id: cls.docket_3.docket_number_raw,
+            cls.docket_4.id: cls.docket_4.docket_number_raw,
+        }
         cls.expected_all = {
             cls.docket_1.id: "12-1234-AG; 13-5678-PR; 14-9010",
             cls.docket_2.id: "512; 513; 514",
@@ -407,6 +394,22 @@ class TestProcessLLMBatches(TestCase):
             cls.docket_3.id: "12-1234; 12-1235; 12-1236",
             cls.docket_4.id: cls.docket_4.docket_number_raw,  # Raw value assigned after max retries
         }
+
+    @mock.patch("cl.search.docket_number_cleaner.extract_with_llm")
+    def test_process_llm_batches_handles_none(self, mock_extract_with_llm):
+        """Test process_llm_batches when all batches succeed (no recursion)."""
+        # Simulate extract_with_llm returning results for each batch
+        mock_extract_with_llm.return_value = None
+        result = process_llm_batches(
+            self.llm_batches,
+            self.system_prompt,
+            self.model_id,
+            self.retry,
+            self.max_retries,
+            self.batch_size,
+            dict(),
+        )
+        self.assertEqual(result, self.expected_none)
 
     @mock.patch("cl.search.docket_number_cleaner.extract_with_llm")
     def test_process_llm_batches_no_recursion(self, mock_extract_with_llm):
@@ -493,6 +496,10 @@ class TestProcessLLMBatches(TestCase):
         self.assertEqual(result, self.expected_after_max_retry)
 
 
+@mock.patch(
+    "cl.search.docket_number_cleaner.get_redis_key_prefix",
+    return_value="docket_number_cleaning_test2",
+)
 class TestCallModelsCompareResults(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -552,9 +559,15 @@ class TestCallModelsCompareResults(TestCase):
             {cls.docket_4.id: cls.docket_4.docket_number_raw}
         ]
 
+    def setUp(self):
+        self.r = get_redis_interface("CACHE")
+        self.key_to_clean = "docket_number_cleaning_test2:llm_batch"
+        if self.key_to_clean:
+            self.r.delete(self.key_to_clean)
+
     @mock.patch("cl.search.docket_number_cleaner.process_llm_batches")
     def test_call_models_and_compare_results_agree(
-        self, mock_process_llm_batches
+        self, mock_process_llm_batches, mock_get_redis_key_prefix
     ):
         """Test call_models_and_compare_results when both models agree on all records."""
         mock_process_llm_batches.side_effect = [
@@ -568,12 +581,13 @@ class TestCallModelsCompareResults(TestCase):
             self.model_one,
             self.model_two,
             self.start_timestamp,
+            self.r,
         )
         self.assertEqual(result, self.expected_agree)
 
     @mock.patch("cl.search.docket_number_cleaner.process_llm_batches")
     def test_call_models_and_compare_results_disagree(
-        self, mock_process_llm_batches
+        self, mock_process_llm_batches, mock_get_redis_key_prefix
     ):
         """Test call_models_and_compare_results when models disagree on some records."""
         mock_process_llm_batches.side_effect = [
@@ -587,55 +601,55 @@ class TestCallModelsCompareResults(TestCase):
             self.model_one,
             self.model_two,
             self.start_timestamp,
+            self.r,
         )
         self.assertEqual(result, self.expected_disagree)
 
 
 @mock.patch(
     "cl.search.docket_number_cleaner.get_redis_key_prefix",
-    return_value="docket_number_cleaning_test2",
+    return_value="docket_number_cleaning_test3",
 )
-class TestLLMCleanDocketNumberByCourt(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
-        cls.docket_1 = DocketFactory(
-            court=cls.court_scotus,
+class TestLLMCleanDocketNumberByCourt(TransactionTestCase):
+    def setUp(self):
+        self.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        self.docket_1 = DocketFactory(
+            court=self.court_scotus,
             docket_number_raw="Docket numbers 12-1234-ag, 13-5678-pr, 14-9010",
             source=Docket.DEFAULT,
         )
-        cls.docket_2 = DocketFactory(
-            court=cls.court_scotus,
+        self.docket_2 = DocketFactory(
+            court=self.court_scotus,
             docket_number_raw="Cases 512 to 514",
             source=Docket.DEFAULT,
         )
-        cls.docket_3 = DocketFactory(
-            court=cls.court_scotus,
+        self.docket_3 = DocketFactory(
+            court=self.court_scotus,
             docket_number_raw="Cases 12-1234 to 12-1236",
             source=Docket.DEFAULT,
         )
-
-        cls.court_batch = [
-            {cls.docket_1.id: cls.docket_1.docket_number_raw},
-            {cls.docket_2.id: cls.docket_2.docket_number_raw},
-            {cls.docket_3.id: cls.docket_3.docket_number_raw},
+        self.court_batch = [
+            {self.docket_1.id: self.docket_1.docket_number_raw},
+            {self.docket_2.id: self.docket_2.docket_number_raw},
+            {self.docket_3.id: self.docket_3.docket_number_raw},
         ]
-        cls.court_mapping = cls.court_scotus.jurisdiction
+        self.court_mapping = self.court_scotus.jurisdiction
 
-        cls.expected = {
-            cls.docket_1.id: "12-1234-AG; 13-5678-PR; 14-9010",
-            cls.docket_2.id: "512; 513; 514",
-            cls.docket_3.id: "12-1234; 12-1235; 12-1236",
+        self.expected = {
+            self.docket_1.id: "12-1234-AG; 13-5678-PR; 14-9010",
+            self.docket_2.id: "512; 513; 514",
+            self.docket_3.id: "12-1234; 12-1235; 12-1236",
         }
 
-    def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
-        self.key_to_clean = "docket_number_cleaning_test2:llm_batch"
+        self.key_to_clean = "docket_number_cleaning_test3:llm_batch"
         if self.key_to_clean:
             self.r.delete(self.key_to_clean)
             self.r.sadd(self.key_to_clean, self.docket_1.id)
             self.r.sadd(self.key_to_clean, self.docket_2.id)
             self.r.sadd(self.key_to_clean, self.docket_3.id)
+
+        super().setUp()
 
     @mock.patch("cl.search.docket_number_cleaner.process_llm_batches")
     def test_llm_clean_docket_numbers_mini_agrees(
@@ -648,7 +662,7 @@ class TestLLMCleanDocketNumberByCourt(TestCase):
             self.expected,  # Second mini model results
         ]
         clean_docket_number_by_court(
-            self.court_batch, self.court_mapping, timezone.now()
+            self.court_batch, self.court_mapping, timezone.now(), self.r
         )
 
         # Verify that docket numbers were updated correctly
@@ -688,7 +702,7 @@ class TestLLMCleanDocketNumberByCourt(TestCase):
             },  # Second full model results
         ]
         clean_docket_number_by_court(
-            self.court_batch, self.court_mapping, timezone.now()
+            self.court_batch, self.court_mapping, timezone.now(), self.r
         )
 
         # Verify that docket numbers were updated correctly
@@ -735,7 +749,7 @@ class TestLLMCleanDocketNumberByCourt(TestCase):
             self.docket_3.id: self.expected[self.docket_3.id]
         }  # Tie breaker model results
         clean_docket_number_by_court(
-            self.court_batch, self.court_mapping, timezone.now()
+            self.court_batch, self.court_mapping, timezone.now(), self.r
         )
 
         # Verify that docket numbers were updated correctly

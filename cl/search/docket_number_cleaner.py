@@ -1,22 +1,24 @@
 import logging
 import re
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+from functools import partial
 
 import environ
 from django.conf import settings
-from django.utils import timezone
+from django.db import transaction
 from pydantic import ValidationError
+from redis import Redis
 from sentry_sdk import capture_exception
 
 from cl.lib.llm import call_llm
-from cl.lib.redis_utils import get_redis_interface
 from cl.lib.string_utils import normalize_dashes
 from cl.search.llm_models import CleanDocketNumber
 from cl.search.llm_prompts import F_PROMPT, F_TIE_BREAKER
 from cl.search.models import Court, Docket
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 env = environ.FileAwareEnv()
 
@@ -65,23 +67,8 @@ def get_redis_key() -> str:
     return f"{get_redis_key_prefix()}:llm_batch"
 
 
-def get_docket(docket_id: int) -> Docket | None:
-    """
-    Retrieve a Docket object by its ID.
-
-    :param docket_id: The primary key ID of the Docket to retrieve.
-    :return: The Docket object if found, otherwise None.
-    """
-    try:
-        docket_obj = Docket.objects.filter(id=docket_id).first()
-        return docket_obj
-    except Docket.DoesNotExist:
-        logger.error(f"Docket with id {docket_id} does not exist.")
-        return None
-
-
 def update_docket_number(
-    docket_id: int, docket_number: str, start_timestamp: timezone.datetime
+    docket_id: int, docket_number: str, start_timestamp: datetime, r: Redis
 ) -> None:
     """
     Update the docket_number field of a Docket object & remove it from the LLM cleaning Redis set if it hasn't been modified since the start timestamp.
@@ -90,13 +77,23 @@ def update_docket_number(
     :param docket_number: The new docket number to set.
     :param start_timestamp: The timestamp marking the start of the daemon job.
     """
-    docket = get_docket(docket_id)
-    r = get_redis_interface("CACHE")
-    if docket:
-        if docket.date_modified < start_timestamp:
-            docket.docket_number = docket_number
-            docket.save(update_fields=["docket_number"])
-            r.srem(get_redis_key(), str(docket_id))
+    with transaction.atomic():
+        docket = (
+            Docket.objects.select_for_update()
+            .only("id", "docket_number", "date_modified")
+            .filter(id=docket_id)
+            .first()
+        )
+        if not docket:
+            return
+
+        if docket.date_modified >= start_timestamp:
+            return
+
+        docket.docket_number = docket_number
+        docket.save(update_fields=["docket_number"])
+
+        transaction.on_commit(partial(r.srem, get_redis_key(), str(docket_id)))
 
 
 def get_clean_methods(court_type: str) -> tuple:
@@ -257,24 +254,19 @@ def create_llm_court_batches(
               and each value is a list of dictionaries of {docket_id: docket_number_raw}.
     """
     court_batches = {}
-    for docket_id in llm_batch:
-        docket_obj = get_docket(docket_id)
-        if not docket_obj:
-            continue
-        court_id, docket_number_raw = (
-            docket_obj.court_id,
-            docket_obj.docket_number_raw,
-        )
-        court_mapping = court_map.get(court_id, None)
-        if court_mapping not in court_batches:
-            court_batches[court_mapping] = []
-        court_batches[court_mapping].append({docket_id: docket_number_raw})
+    dockets = Docket.objects.filter(pk__in=llm_batch).values_list(
+        "id", "court_id", "docket_number_raw"
+    )
+    court_batches = defaultdict(list)
+    for docket_id, court_id, raw in dockets.iterator(chunk_size=2000):
+        if court_map.get(court_id) is not None:
+            court_batches[court_map.get(court_id)].append({docket_id: raw})
     return court_batches
 
 
 def extract_with_llm(
     batch: list[dict[int, str]], system_prompt: str, model_id: str
-) -> dict[int, str]:
+) -> dict[int, str] | None:
     """
     Extracts and cleans a batch of docket numbers using a Large Language Model (LLM).
 
@@ -400,7 +392,8 @@ def call_models_and_compare_results(
     court_mapping: str,
     model_one: str,
     model_two: str,
-    start_timestamp: timezone.datetime,
+    start_timestamp: datetime,
+    r: Redis,
 ) -> list[dict[int, str]]:
     """
     Calls two language models to process a batch of court docket numbers,
@@ -438,7 +431,9 @@ def call_models_and_compare_results(
     for docket_id, docket_number_one in model_one_results.items():
         docket_number_two = model_two_results.get(docket_id, None)
         if docket_number_one == docket_number_two and docket_number_one != "":
-            update_docket_number(docket_id, docket_number_one, start_timestamp)
+            update_docket_number(
+                docket_id, docket_number_one, start_timestamp, r
+            )
         else:
             # Find the docket_number_raw from court_batch using docket_id
             docket_number_raw = None

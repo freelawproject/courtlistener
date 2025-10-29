@@ -25,7 +25,6 @@ from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
 from django.http import QueryDict
 from django.template import loader
-from django.utils import timezone
 from elasticsearch.exceptions import (
     ApiError,
     ConflictError,
@@ -50,6 +49,7 @@ from openai import (
 )
 from openai import APIError as OpenAIApiError
 from openai import ConflictError as OpenAIApiConflictError
+from redis import Redis
 
 from cl.alerts.tasks import (
     percolator_response_processing,
@@ -64,6 +64,7 @@ from cl.lib.microservice_utils import (
     log_invalid_embedding_errors,
     microservice,
 )
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
@@ -2159,7 +2160,8 @@ def clean_docket_number_by_court(
     self: Task,
     court_batch: list[dict[int, str]],
     court_mapping: str,
-    start_timestamp: timezone.datetime,
+    start_timestamp: datetime,
+    r: Redis = get_redis_interface("CACHE"),
 ) -> None:
     """
     Cleans docket numbers for the respective court_mapping using cascading model passes.
@@ -2174,39 +2176,40 @@ def clean_docket_number_by_court(
     :param court_mapping: Identifier for the court mapping used in model prompts.
     :param start_timestamp: Timestamp marking the start of the daemon job.
     """
-    if court_mapping:
-        # First pass with two mini models to find consensus
-        next_model_batches = call_models_and_compare_results(
-            court_batch=court_batch,
-            court_mapping=court_mapping,
-            model_one="openai/gpt-4o-mini",
-            model_two="openai/gpt-4.1-mini",
-            start_timestamp=start_timestamp,
-        )
-        # Next pass with two full models for non-consensus
-        if next_model_batches:
-            tie_breaker_batches = call_models_and_compare_results(
-                court_batch=next_model_batches,
-                court_mapping=court_mapping,
-                model_one="openai/gpt-4o",
-                model_two="openai/gpt-4.1",
-                start_timestamp=start_timestamp,
-            )
-            # Third pass with tie-breaker model
-            if tie_breaker_batches:
-                tie_breaker_results = process_llm_batches(
-                    llm_batches=tie_breaker_batches,
-                    system_prompt=tie_breaker_prompts.get(court_mapping, ""),
-                    model_id="openai/gpt-4o",
-                    retry=0,
-                    max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
-                    batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
-                    all_cleaned=dict(),
-                )
-                for (
-                    docket_id,
-                    docket_number,
-                ) in tie_breaker_results.items():
-                    update_docket_number(
-                        docket_id, docket_number, start_timestamp
-                    )
+    # First pass with two mini models to find consensus
+    next_model_batches = call_models_and_compare_results(
+        court_batch=court_batch,
+        court_mapping=court_mapping,
+        model_one="openai/gpt-4o-mini",
+        model_two="openai/gpt-4.1-mini",
+        start_timestamp=start_timestamp,
+        r=r,
+    )
+    # Next pass with two full models for non-consensus
+    if not next_model_batches:
+        return
+    tie_breaker_batches = call_models_and_compare_results(
+        court_batch=next_model_batches,
+        court_mapping=court_mapping,
+        model_one="openai/gpt-4o",
+        model_two="openai/gpt-4.1",
+        start_timestamp=start_timestamp,
+        r=r,
+    )
+    # Third pass with tie-breaker model
+    if not tie_breaker_batches:
+        return
+    tie_breaker_results = process_llm_batches(
+        llm_batches=tie_breaker_batches,
+        system_prompt=tie_breaker_prompts.get(court_mapping, ""),
+        model_id="openai/gpt-4o",
+        retry=0,
+        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
+        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
+        all_cleaned=dict(),
+    )
+    for (
+        docket_id,
+        docket_number,
+    ) in tie_breaker_results.items():
+        update_docket_number(docket_id, docket_number, start_timestamp, r)
