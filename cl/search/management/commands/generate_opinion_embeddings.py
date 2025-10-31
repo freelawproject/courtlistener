@@ -81,6 +81,14 @@ class Command(VerboseCommand):
             default="gpu",
             help="Which device to use for running the Inception service (CPU or GPU).",
         )
+        parser.add_argument(
+            "--opinion-ids",
+            nargs="+",
+            type=int,
+            help="""The Opinion ids to process.
+            May be more than one. If this argument is used,
+            other filters will be ignored""",
+        )
 
     def send_batch(
         self,
@@ -120,23 +128,33 @@ class Command(VerboseCommand):
         self.throttle = CeleryThrottle(
             queue_name=embedding_queue, min_items=throttle_min_items
         )
-        if auto_resume:
-            start_id = get_last_parent_document_id_processed(
-                compose_redis_key()
-            )
-            self.stdout.write(
-                f"Auto-resume enabled starting embedding from ID: {start_id}."
-            )
 
-        opinions = (
-            Opinion.objects.using(database)
-            .filter(id__gte=start_id, main_version__isnull=True)
-            .order_by("pk")
-        )
-        # Limit opinions to retrieve if count was provided.
-        opinions_to_process = (
-            opinions[:count] if count is not None else opinions
-        )
+        if options["opinion_ids"]:
+            opinions = (
+                Opinion.objects.using(database)
+                .filter(
+                    id__in=options["opinion_ids"], main_version__isnull=True
+                )
+                .order_by("pk")
+            )
+        else:
+            if auto_resume:
+                start_id = get_last_parent_document_id_processed(
+                    compose_redis_key()
+                )
+                self.stdout.write(
+                    f"Auto-resume enabled starting embedding from ID: {start_id}."
+                )
+
+            opinions = (
+                Opinion.objects.using(database)
+                .filter(id__gte=start_id, main_version__isnull=True)
+                .order_by("pk")
+            )
+            # Limit opinions to retrieve if count was provided.
+            opinions_to_process = (
+                opinions[:count] if count is not None else opinions
+            )
         opinions_with_best_text = opinions.with_best_text()
         opinions_with_best_text = (
             opinions_with_best_text[:count] if count is not None else opinions
