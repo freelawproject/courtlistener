@@ -94,7 +94,7 @@ def confirm_docket_number_core_lookup_match(
     validate the match.
     :return: The docket object if both dockets matched or otherwise None.
     """
-    existing_docket_number = clean_docket_number(docket.docket_number)
+    existing_docket_number = clean_docket_number(docket.docket_number_raw)
     incoming_docket_number = clean_docket_number(docket_number)
     if existing_docket_number != incoming_docket_number:
         return None
@@ -383,7 +383,10 @@ async def update_docket_metadata(
     """
     d = update_case_names(d, docket_data["case_name"])
     await mark_ia_upload_needed(d, save_docket=False)
-    d.docket_number = docket_data["docket_number"] or d.docket_number
+    # only overwrite if it's empty
+    if not d.docket_number:
+        d.docket_number = docket_data["docket_number"]
+
     d.docket_number_raw = docket_data["docket_number"] or d.docket_number_raw
     d.pacer_case_id = d.pacer_case_id or docket_data.get("pacer_case_id")
     d.date_filed = docket_data.get("date_filed") or d.date_filed

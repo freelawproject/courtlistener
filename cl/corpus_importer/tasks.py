@@ -1853,7 +1853,9 @@ def get_appellate_docket_by_docket_number(
         return None
 
     try:
-        d = Docket.objects.get(docket_number=docket_number, court_id=court_id)
+        d = Docket.objects.get(
+            docket_number_raw=docket_number, court_id=court_id
+        )
     except Docket.DoesNotExist:
         d = None
     except Docket.MultipleObjectsReturned:
