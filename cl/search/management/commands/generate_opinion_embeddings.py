@@ -161,7 +161,11 @@ class Command(VerboseCommand):
         )
 
         logger.info("Getting count of opinions to process.")
-        count = opinions_to_process.count()
+        count = (
+            opinions.count()
+            if options["opinion_ids"]
+            else opinions_to_process.count()
+        )
         logger.info("Count finished.")
         current_batch: list[int] = []
         current_batch_size = 0
