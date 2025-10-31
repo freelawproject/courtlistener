@@ -88,6 +88,12 @@ class TestCleanDocketNumberRaw(TestCase):
                 court="unknowncourt",
                 expected=("Docket No. 12-1234-ag", None),
             ),
+            CleanDocketNumberTestCase(
+                docket_id="d4",
+                docket_number_raw="",
+                court="scotus",
+                expected=("", None),
+            ),
         ]
 
         for test_case in test_cases:

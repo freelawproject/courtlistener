@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 from cl.audio.models import Audio
 from cl.citations.models import UnmatchedCitation
@@ -673,7 +674,7 @@ def clean_docket_number_raw_and_update_redis_cache(
         court_id=docket.court_id,
     )
     docket.docket_number = docket_number
-    docket.save(update_fields=["docket_number"])
+    docket.save(update_fields=["docket_number", "date_modified"])
 
     # Add to redis cache for later processing
     if docket_id_llm:
