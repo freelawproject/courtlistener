@@ -168,7 +168,7 @@ class TestLLMCleanDocketNumberRaw(TransactionTestCase):
         start_timestamp = timezone.now()
         # Simulate an update to the docket after the start timestamp
         docket.docket_number = "Intermediate-0000"
-        docket.save()
+        docket.save(update_fields=["docket_number", "date_modified"])
         update_docket_number(
             docket.id, self.new_docket_number, start_timestamp, self.r
         )
@@ -200,17 +200,12 @@ class TestLLMCleanDocketNumberRaw(TransactionTestCase):
         # Simulate deleting the docket before calling update_docket_number
         docket.delete()
         update_docket_number(
-            docket.id, self.new_docket_number, start_timestamp, self.r
+            docket_id, self.new_docket_number, start_timestamp, self.r
         )
         self.assertEqual(
             self.r.scard(self.key_to_clean),
-            1,
+            0,
             "Redis cache count doesn't match",
-        )
-        self.assertEqual(
-            self.r.smembers(self.key_to_clean),
-            {str(docket_id)},
-            "Redis cache set doesn't match",
         )
 
     def test_create_llm_court_batches(self, mock_get_redis_key_prefix):
@@ -227,8 +222,24 @@ class TestLLMCleanDocketNumberRaw(TransactionTestCase):
         docket4 = DocketFactory(
             court=self.court_scotus, docket_number_raw="Docket No. 34-5678-pr"
         )
-        llm_batch = {docket1.id, docket2.id, docket3.id, docket4.id}
-        batches = create_llm_court_batches(llm_batch)
+        docket5 = DocketFactory(
+            court=self.court_scotus, docket_number_raw="12-3456"
+        )
+        llm_batch = {
+            docket1.id,
+            docket2.id,
+            docket3.id,
+            docket4.id,
+            docket5.id,
+        }
+        self.r.sadd(
+            self.key_to_clean, *map(str, [docket3.id, docket4.id, docket5.id])
+        )
+
+        # Simulate deleting docket5 to test proper removal from redis set
+        docket5.delete()
+
+        batches = create_llm_court_batches(llm_batch, self.r)
         expected_batches = {
             "F": [
                 {docket3.id: docket3.docket_number_raw},
@@ -243,6 +254,12 @@ class TestLLMCleanDocketNumberRaw(TransactionTestCase):
                 {frozenset(d.items()) for d in expected_batches[key]},
                 f"Mismatch in batch for key {key}",
             )
+
+        self.assertEqual(
+            self.r.scard(self.key_to_clean),
+            2,
+            "Redis cache count doesn't match",
+        )
 
 
 @mock.patch.dict(
@@ -326,6 +343,21 @@ class TestExtractWithLLM(TestCase):
             )
         )
 
+    @mock.patch("cl.search.docket_number_cleaner.call_llm")
+    @mock.patch("cl.search.docket_number_cleaner.capture_exception")
+    def test_extract_with_llm_handles_general_exception(
+        self, mock_capture_exception, mock_call_llm
+    ):
+        """Test that extract_with_llm catches general Exception from call_llm, calls capture_exception, and returns None."""
+        mock_call_llm.side_effect = Exception("Some LLM error")
+
+        result = extract_with_llm(
+            self.batch, self.system_prompt, self.model_id
+        )
+
+        self.assertIsNone(result)
+        mock_capture_exception.assert_called()
+
 
 class TestProcessLLMBatches(TestCase):
     @classmethod
@@ -397,7 +429,7 @@ class TestProcessLLMBatches(TestCase):
 
     @mock.patch("cl.search.docket_number_cleaner.extract_with_llm")
     def test_process_llm_batches_handles_none(self, mock_extract_with_llm):
-        """Test process_llm_batches when all batches succeed (no recursion)."""
+        """Test process_llm_batches when batches return None."""
         # Simulate extract_with_llm returning results for each batch
         mock_extract_with_llm.return_value = None
         result = process_llm_batches(

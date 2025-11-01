@@ -2161,7 +2161,7 @@ def clean_docket_number_by_court(
     court_batch: list[dict[int, str]],
     court_mapping: str,
     start_timestamp: datetime,
-    r: Redis = get_redis_interface("CACHE"),
+    r: Redis | None = None,
 ) -> None:
     """
     Cleans docket numbers for the respective court_mapping using cascading model passes.
@@ -2176,6 +2176,8 @@ def clean_docket_number_by_court(
     :param court_mapping: Identifier for the court mapping used in model prompts.
     :param start_timestamp: Timestamp marking the start of the daemon job.
     """
+    if r is None:
+        r = get_redis_interface("CACHE")
     # First pass with two mini models to find consensus
     next_model_batches = call_models_and_compare_results(
         court_batch=court_batch,

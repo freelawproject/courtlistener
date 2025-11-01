@@ -1,4 +1,3 @@
-import logging
 import time
 from datetime import datetime
 
@@ -14,8 +13,6 @@ from cl.search.docket_number_cleaner import (
     get_redis_key,
 )
 from cl.search.tasks import clean_docket_number_by_court
-
-logger = logging.getLogger(__name__)
 
 
 class Command(VerboseCommand):
@@ -90,7 +87,7 @@ class Command(VerboseCommand):
                 ]  # cast docket_id to int
                 if llm_batch:
                     start_timestamp = timezone.now()
-                    court_batches = create_llm_court_batches(llm_batch)
+                    court_batches = create_llm_court_batches(llm_batch, r)
                     for court_mapping, court_batch in court_batches.items():
                         self.ll_clean_docket_number(
                             celery_queue,

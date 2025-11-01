@@ -76,6 +76,7 @@ def update_docket_number(
     :param docket_id: The primary key ID of the Docket to update.
     :param docket_number: The new docket number to set.
     :param start_timestamp: The timestamp marking the start of the daemon job.
+    :param r: Redis client instance for interacting with Redis.
     """
     with transaction.atomic():
         docket = (
@@ -85,13 +86,14 @@ def update_docket_number(
             .first()
         )
         if not docket:
+            r.srem(get_redis_key(), str(docket_id))
             return
 
         if docket.date_modified >= start_timestamp:
             return
 
         docket.docket_number = docket_number
-        docket.save(update_fields=["docket_number"])
+        docket.save(update_fields=["docket_number", "date_modified"])
 
         transaction.on_commit(partial(r.srem, get_redis_key(), str(docket_id)))
 
@@ -245,22 +247,33 @@ def clean_docket_number_raw(
 
 def create_llm_court_batches(
     llm_batch: list[int],
+    r: Redis,
 ) -> dict[str, list[dict[int, str]]]:
     """
     Groups docket numbers by their associated court type for a given batch of docket_ids.
+    Remove docket_ids that no longer exist, if any, from the Redis set.
 
     :param llm_batch: A list of docket_ids to be processed.
+    :param r: Redis client instance for interacting with Redis.
     :return: A dictionary where each key is a court mapping (as determined by `court_map`),
               and each value is a list of dictionaries of {docket_id: docket_number_raw}.
     """
     court_batches = {}
+    existing_docket_ids = set()
     dockets = Docket.objects.filter(pk__in=llm_batch).values_list(
         "id", "court_id", "docket_number_raw"
     )
     court_batches = defaultdict(list)
     for docket_id, court_id, raw in dockets.iterator(chunk_size=2000):
+        existing_docket_ids.add(docket_id)
         if court_map.get(court_id) is not None:
             court_batches[court_map.get(court_id)].append({docket_id: raw})
+
+    # Remove docket_ids that no longer exist, in case the docket was deleted since the daemon job started
+    deleted_docket_ids = set(llm_batch) - existing_docket_ids
+    if deleted_docket_ids:
+        r.srem(get_redis_key(), *map(str, deleted_docket_ids))
+
     return court_batches
 
 
@@ -298,7 +311,7 @@ def extract_with_llm(
     except Exception as e:
         # Only expect to get instructor exceptions here to track them
         capture_exception(e)
-        raise
+        return
 
     if not isinstance(llm_response, CleanDocketNumber):
         # Added this to avoid mypy errors
@@ -353,7 +366,7 @@ def process_llm_batches(
             parsed_output = future.result()
             all_cleaned.update(parsed_output or {})
     # Check for any still-unprocessed records (e.g., if LLM failed to extract)
-    processed_ids = [k for k in all_cleaned.keys()]
+    processed_ids = set(all_cleaned.keys())
     remaining = [
         batch
         for batch in llm_batches
@@ -404,6 +417,8 @@ def call_models_and_compare_results(
     :param court_mapping: A key used to retrieve the appropriate system prompt for the court from the system_prompts dictionary.
     :param model_one: The identifier for the first language model to use for processing.
     :param model_two: The identifier for the second language model to use for processing.
+    :param start_timestamp: Timestamp marking the start of the daemon job.
+    :param r: Redis client instance for interacting with Redis.
     :return: A list of dictionaries, each containing docket IDs and their corresponding raw docket numbers,
              representing cases where the two models disagreed or returned empty results, to be processed by a larger or fallback model.
     """
@@ -436,11 +451,14 @@ def call_models_and_compare_results(
             )
         else:
             # Find the docket_number_raw from court_batch using docket_id
-            docket_number_raw = None
-            for batch in court_batch:
-                if docket_id in batch:
-                    docket_number_raw = batch[docket_id]
-                    break
+            docket_number_raw = next(
+                (
+                    batch[docket_id]
+                    for batch in court_batch
+                    if docket_id in batch
+                ),
+                None,
+            )
             if docket_number_raw is not None:
                 next_model_batches.append({docket_id: docket_number_raw})
     return next_model_batches
