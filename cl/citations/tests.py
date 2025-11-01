@@ -989,7 +989,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_1_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=307,
+                volume="307",
                 reporter="Ill. Dec.",
                 page=312,
                 type=Citation.STATE,
@@ -998,7 +998,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_2_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=203,
+                volume="203",
                 reporter="N.J.",
                 page=92,
                 type=Citation.STATE,
@@ -1007,7 +1007,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_3_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=172,
+                volume="172",
                 reporter="A.3d",
                 page=459,
                 type=Citation.STATE_REGIONAL,
@@ -1665,6 +1665,25 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             cited_count,
             new_count,
             "citation_count was update even when update was disabled",
+        )
+
+    def test_citation_string_volume(self) -> None:
+        """Can we store volume numbers with letters or additional characters?"""
+
+        self.alphanumeric_citation = CitationWithParentsFactory.create(
+            volume="71A",
+            reporter="A.F.T.R.2d (RIA)",
+            page="3011",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=self.court_scotus),
+                case_name="Foo v. Bar",
+                date_filed=date(2025, 7, 31),
+            ),
+        )
+
+        self.assertEqual(self.alphanumeric_citation.volume, "71A")
+        self.assertEqual(
+            str(self.alphanumeric_citation), "71A A.F.T.R.2d (RIA) 3011"
         )
 
 
@@ -2648,9 +2667,9 @@ class CitationLookUpApiTest(
     ) -> None:
         handy_citation = await sync_to_async(
             CitationWithParentsFactory.create
-        )(volume=1, reporter="Handy", page="150", type=1)
+        )(volume="1", reporter="Handy", page="150", type=1)
         haw_citation = await sync_to_async(CitationWithParentsFactory.create)(
-            volume=1, reporter="Haw.", page="150", type=1
+            volume="1", reporter="Haw.", page="150", type=1
         )
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -2867,7 +2886,7 @@ class CitationLookUpApiTest(
     ) -> None:
         la_rue_citation = await sync_to_async(
             CitationWithParentsFactory.create
-        )(volume=139, reporter="U.S.", page="601", type=1)
+        )(volume="139", reporter="U.S.", page="601", type=1)
 
         text_citation = (
             "the majority of the court was of opinion that the transfer of the "
@@ -3120,6 +3139,24 @@ class CitationLookUpApiTest(
             expected_time = test_date + timedelta(minutes=3)
             self.assertEqual(data["wait_until"], expected_time.isoformat())
 
+    async def test_can_filter_out_citation_with_string_volume(
+        self, cache_key_mock
+    ):
+        """Can we filter using a citation with a character in the volume?"""
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": ("71A A.F.T.R.2d (RIA) 4660")},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(
+            first_citation["citation"], "71A A.F.T.R.2d (RIA) 4660"
+        )
+
 
 class UnmatchedCitationTest(TransactionTestCase):
     """Test UnmatchedCitation model and related logic"""
@@ -3267,6 +3304,28 @@ class UnmatchedCitationTest(TransactionTestCase):
             len(unmatched_citations),
             1,
             "Incorrect number of citations saved",
+        )
+
+    def test_saving_volume_string(self) -> None:
+        """Can we save volume numbers with letters or additional characters?"""
+
+        cluster = OpinionClusterWithChildrenAndParentsFactory()
+        eyecite_citations = get_citations(
+            """71A A.F.T.R.2d (RIA) 3011""",
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
+        opinion = cluster.sub_opinions.first()
+        handle_unmatched_citations(opinion, eyecite_citations, {})
+        unmatched_citations = list(
+            UnmatchedCitation.objects.filter(citing_opinion=opinion).all()
+        )
+        self.assertEqual(
+            len(unmatched_citations),
+            1,
+            "Incorrect number of citations saved",
+        )
+        self.assertEqual(
+            str(unmatched_citations[0]), "71A A.F.T.R.2d (RIA) 3011"
         )
 
 
