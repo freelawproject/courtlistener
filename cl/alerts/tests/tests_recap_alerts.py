@@ -90,9 +90,9 @@ class RECAPAlertsSweepIndexTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
-        # Mock indexing date to the previous day since the command currently
-        # runs early each day.
-        date_now = midnight_pt(now().date())
+        # runs early each day. Use minus two hours to prevent errors caused by
+        # Daylight Saving Time transitions.
+        date_now = midnight_pt(now().date()) - datetime.timedelta(hours=2)
         cls.mock_date_indexing = date_now - datetime.timedelta(days=1)
         cls.mock_date = date_now
         with (
