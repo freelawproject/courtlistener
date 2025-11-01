@@ -3764,7 +3764,9 @@ class RecapEmailContentReplication(TestCase):
             msg="Wrong number of DocketEntries.",
         )
         # 8 RDs in total, 4 mentioned in the notification and 4 that are not.
-        recap_documents = RECAPDocument.objects.all()
+        recap_documents = RECAPDocument.objects.all().select_related(
+            "docket_entry", "docket_entry__docket"
+        )
         self.assertEqual(
             await recap_documents.acount(),
             12,
@@ -3833,6 +3835,9 @@ class RecapEmailContentReplication(TestCase):
                     # Check that every attachment RECAPDocument has the attachment
                     # pacer_doc_id
                     self.assertEqual(rd.pacer_doc_id, "85001321036")
+                    self.assertEqual(
+                        rd.document_number, str(rd.docket_entry.entry_number)
+                    )
 
         # 2 DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 2)

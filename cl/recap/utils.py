@@ -158,7 +158,7 @@ def find_subdocket_atts_rds_from_data(
     pacer_doc_id: str,
     pacer_case_ids: list[str],
     att_bytes: bytes,
-) -> list[int]:
+) -> list[tuple[int, bool]]:
     """Look for RECAP Documents that belong to subdockets and create
      ProcessingQueue instances to handle the Attachment page replication.
 
@@ -167,7 +167,8 @@ def find_subdocket_atts_rds_from_data(
     :param pacer_doc_id: The PACER document ID to look for subdockets.
     :param pacer_case_ids: A list of PACER case IDs to exclude from the lookup.
     :param att_bytes: The attachment page bytes for the document to be replicated.
-    :return: A list of ProcessingQueue PKs.
+    :return: A two-tuple containing a list of ProcessingQueue pks to process,
+    and a boolean indicating whether the PQ belongs to subdocket replication.
     """
     # Logic to replicate the PDF sub-dockets matched by RECAPDocument
     sub_docket_main_rds = list(
@@ -195,6 +196,8 @@ def find_subdocket_atts_rds_from_data(
     if not sub_docket_pqs:
         return []
 
+    subdocket_replication = True
     return [
-        pq.pk for pq in ProcessingQueue.objects.bulk_create(sub_docket_pqs)
+        (pq.pk, subdocket_replication)
+        for pq in ProcessingQueue.objects.bulk_create(sub_docket_pqs)
     ]
