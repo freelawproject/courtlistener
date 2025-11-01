@@ -70,6 +70,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
+from cl.search.llm_models import CleanDocketNumber, DocketItem
 from cl.search.management.commands import populate_docket_number_raw
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
@@ -96,7 +97,7 @@ from cl.search.models import (
 from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -3729,4 +3730,121 @@ class PopulateDocketNumberRawCommandTest(TestCase):
         self.assertTrue(
             self.docket.events.all().last() is not None,
             "Event saving trigger is not working",
+        )
+
+
+@mock.patch.dict(
+    "os.environ", {"DOCKET_NUMBER_CLEANING_API_KEY": "123"}, clear=True
+)
+@mock.patch(
+    "cl.search.docket_number_cleaner.get_redis_key_prefix",
+    return_value="docket_number_cleaning_daemon_test",
+)
+@override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+class LLMCleanDocketNumberTests(TransactionTestCase):
+    def setUp(self):
+        self.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        self.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
+        self.court_canb = CourtFactory(id="canb", jurisdiction="FB")
+        self.docket_1 = DocketFactory(
+            court=self.court_scotus,
+            docket_number_raw="Docket numbers 12-1234-ag, 13-5678-pr, 14-9010",
+            docket_number="Docket numbers 12-1234-ag, 13-5678-pr, 14-9010",
+            source=Docket.DEFAULT,
+        )
+        self.docket_2 = DocketFactory(
+            court=self.court_scotus,
+            docket_number_raw="Cases 512 to 514",
+            docket_number="Cases 512 to 514",
+            source=Docket.DEFAULT,
+        )
+        self.docket_3 = DocketFactory(
+            court=self.court_ca1,
+            docket_number_raw="Cases 12-1234 to 12-1236",
+            docket_number="Cases 12-1234 to 12-1236",
+            source=Docket.DEFAULT,
+        )
+        self.docket_4 = DocketFactory(
+            court=self.court_canb,
+            docket_number_raw="Docket Nos. 567-569",
+            docket_number="Docket Nos. 567-569",
+            source=Docket.DEFAULT,
+        )
+
+        self.model_response = CleanDocketNumber(
+            docket_numbers=[
+                DocketItem(
+                    unique_id=str(self.docket_1.id),
+                    cleaned_nums=["12-1234-AG", "13-5678-PR", "14-9010"],
+                ),
+                DocketItem(
+                    unique_id=str(self.docket_2.id),
+                    cleaned_nums=["512", "513", "514"],
+                ),
+                DocketItem(
+                    unique_id=str(self.docket_3.id),
+                    cleaned_nums=["12-1234", "12-1235", "12-1236"],
+                ),
+            ]
+        )
+
+        self.expected = {
+            self.docket_1.id: "12-1234-AG; 13-5678-PR; 14-9010",
+            self.docket_2.id: "512; 513; 514",
+            self.docket_3.id: "12-1234; 12-1235; 12-1236",
+            self.docket_4.id: "Docket Nos. 567-569",  # No change expected for non-Fed_Appellate dockets
+        }
+
+        self.r = get_redis_interface("CACHE")
+        self.key_to_clean = "docket_number_cleaning_daemon_test:llm_batch"
+        if self.key_to_clean:
+            self.r.delete(self.key_to_clean)
+            self.r.sadd(self.key_to_clean, self.docket_1.id)
+            self.r.sadd(self.key_to_clean, self.docket_2.id)
+            self.r.sadd(self.key_to_clean, self.docket_3.id)
+            self.r.sadd(self.key_to_clean, self.docket_4.id)
+
+        super().setUp()
+
+    @mock.patch("cl.search.docket_number_cleaner.call_llm")
+    def test_llm_clean_docket_number_daemon(
+        self, mock_call_llm, mock_get_redis_key_prefix
+    ):
+        """Test the llm_clean_docket_number_daemon command in testing mode."""
+        mock_call_llm.side_effect = [
+            self.model_response,  # First mini model response
+            self.model_response,  # Second mini model response
+        ]
+
+        with mock.patch("cl.lib.decorators.time.sleep") as mock_sleep:
+            call_command(
+                "llm_clean_docket_number_daemon",
+                testing_iterations=1,
+            )
+
+        # Verify that docket numbers were updated correctly
+        for docket in [
+            self.docket_1,
+            self.docket_2,
+            self.docket_3,
+            self.docket_4,
+        ]:
+            docket.refresh_from_db()
+            self.assertEqual(
+                docket.docket_number,
+                self.expected[docket.id],
+                "docket number mismatch",
+            )
+
+        # Verify that Redis set should contain docket_4 only
+        self.assertEqual(
+            self.r.scard(self.key_to_clean),
+            1,
+            "Redis cache count should be 1 after processing",
+        )
+
+        self.assertEqual(
+            self.r.smembers(self.key_to_clean),
+            {str(self.docket_4.id)},
+            "Redis cache set should contain docket_4 only",
         )
