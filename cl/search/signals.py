@@ -676,8 +676,11 @@ def clean_docket_number_raw_and_update_redis_cache(
         return
 
     docket_number, docket_id_llm = result
-    docket.docket_number = docket_number
-    docket.save(update_fields=["docket_number", "date_modified"])
+
+    # Update docket number if it was cleaned
+    if docket_number:
+        docket.docket_number = docket_number
+        docket.save(update_fields=["docket_number", "date_modified"])
 
     # Add to redis cache for later processing
     if docket_id_llm:

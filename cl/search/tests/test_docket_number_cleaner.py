@@ -74,25 +74,25 @@ class TestCleanDocketNumberRaw(TestCase):
                 docket_id="d1",
                 docket_number_raw="No. 12-1234-ag",
                 court="ca1",
-                expected=("12-1234-AG", None),
+                expected=("12-1234-AG", None),  # cleaned, no LLM needed
             ),
             CleanDocketNumberTestCase(
                 docket_id="d2",
                 docket_number_raw="Docket Nos. 12-1234-ag and 13-5678-pr",
                 court="ca1",
-                expected=("Docket Nos. 12-1234-ag and 13-5678-pr", "d2"),
+                expected=(None, "d2"),  # no cleaning done, LLM needed
             ),
             CleanDocketNumberTestCase(
                 docket_id="d3",
                 docket_number_raw="Docket No. 12-1234-ag",
                 court="unknowncourt",
-                expected=None,
+                expected=None,  # unsupported court
             ),
             CleanDocketNumberTestCase(
                 docket_id="d4",
                 docket_number_raw="",
                 court="scotus",
-                expected=None,
+                expected=None,  # empty docket_number_raw
             ),
         ]
 
