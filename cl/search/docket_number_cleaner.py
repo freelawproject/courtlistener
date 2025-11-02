@@ -163,17 +163,23 @@ def clean_docket_number_raw(
     """
     court_type = court_map.get(court_id)
 
-    if docket_number_raw is not None and docket_number_raw.strip() != "":
-        if court_type:
-            prelim_func, regex_func = get_clean_methods(court_type)
+    if (
+        not court_type
+        or not docket_number_raw
+        or not docket_number_raw.strip()
+    ):
+        return None
 
-            if prelim_func:
-                prelim_cleaned = prelim_func(docket_number_raw)
-                if is_generic(prelim_cleaned, court_type):
-                    if regex_func:
-                        docket_number = regex_func(prelim_cleaned)
-                        return docket_number, None
-                else:
-                    return docket_number_raw, docket_id
+    prelim_func, regex_func = get_clean_methods(court_type)
+    if not prelim_func:
+        return None
 
-    return docket_number_raw, None
+    prelim_cleaned = prelim_func(docket_number_raw)
+    if not is_generic(prelim_cleaned, court_type):
+        return docket_number_raw, docket_id
+
+    if not regex_func:
+        return None
+
+    docket_number = regex_func(prelim_cleaned)
+    return docket_number, None

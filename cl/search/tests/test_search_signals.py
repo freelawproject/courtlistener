@@ -164,7 +164,8 @@ class TestHandleDocketNumberRawCleaning(TestCase):
     def test_docket_number_cleaning_triggered_without_cleaning(self):
         docket = DocketFactory(
             court=self.court_canb,
-            docket_number_raw="12-1234",
+            docket_number_raw="Docket 12-1234",
+            docket_number="12-1234",
             source=Docket.DEFAULT,
         )
         self.assertEqual(

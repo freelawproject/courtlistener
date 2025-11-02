@@ -86,13 +86,13 @@ class TestCleanDocketNumberRaw(TestCase):
                 docket_id="d3",
                 docket_number_raw="Docket No. 12-1234-ag",
                 court="unknowncourt",
-                expected=("Docket No. 12-1234-ag", None),
+                expected=None,
             ),
             CleanDocketNumberTestCase(
                 docket_id="d4",
                 docket_number_raw="",
                 court="scotus",
-                expected=("", None),
+                expected=None,
             ),
         ]
 

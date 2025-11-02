@@ -667,11 +667,15 @@ def clean_docket_number_raw_and_update_redis_cache(
 ):
     r = get_redis_interface("CACHE")
 
-    docket_number, docket_id_llm = clean_docket_number_raw(
+    result = clean_docket_number_raw(
         docket_id=docket.id,
         docket_number_raw=docket.docket_number_raw,
         court_id=docket.court_id,
     )
+    if not result:
+        return
+
+    docket_number, docket_id_llm = result
     docket.docket_number = docket_number
     docket.save(update_fields=["docket_number", "date_modified"])
 
