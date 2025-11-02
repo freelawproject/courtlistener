@@ -152,14 +152,14 @@ def regex_clean_F(s: str) -> str:
 
 def clean_docket_number_raw(
     docket_id: int, docket_number_raw: str, court_id: str
-) -> tuple[str, int | None]:
+) -> tuple[str, int | None] | None:
     """
     Cleans a raw docket number string based on the court's specific cleaning logic and identifies those that need LLM cleaning.
 
     :param docket_id: The unique identifier for the docket.
     :param docket_number_raw: The raw docket number string to be cleaned.
     :param court_id: The identifier for the court, used to select cleaning logic.
-    :return: A tuple containing the cleaned docket number and the docket_id for downstream LLM processing, if applicable.
+    :return: A tuple containing the cleaned docket number and the docket_id for downstream LLM processing, if applicable. Or None.
     """
     court_type = court_map.get(court_id)
 
