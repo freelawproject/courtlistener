@@ -37,6 +37,7 @@ class SearchableModule:
             environment=settings.ZOHO_ENV,
             token=token,
             store=settings.ZOHO_STORE,
+            resource_path=settings.ZOHO_RESOURCE_PATH,
         )
 
     def get_record_by_cl_id_or_email(

@@ -31,6 +31,7 @@ class Command(VerboseCommand):
             ),
             sdk_config=settings.ZOHO_CONFIG,
             store=settings.ZOHO_STORE,
+            resource_path=settings.ZOHO_RESOURCE_PATH,
         )
         init = Initializer.get_initializer()
         token = init.token.get_refresh_token()

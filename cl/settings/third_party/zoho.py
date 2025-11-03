@@ -14,6 +14,7 @@ ZOHO_CRM_API_USER_EMAIL = env("ZOHO_CRM_API_USER_EMAIL", default="")
 ZOHO_STORE = FileStore(
     file_path=os.path.join(tempfile.gettempdir(), Constants.TOKEN_FILE)
 )
+ZOHO_RESOURCE_PATH = tempfile.gettempdir()
 ZOHO_ENV = USDataCenter.PRODUCTION()
 ZOHO_CONFIG = SDKConfig(
     auto_refresh_fields=True,
