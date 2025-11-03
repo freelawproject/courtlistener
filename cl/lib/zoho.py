@@ -33,7 +33,11 @@ class SearchableModule:
             client_secret=settings.ZOHO_CLIENT_SECRET,
             refresh_token=refresh_token,
         )
-        Initializer.initialize(environment=settings.ZOHO_ENV, token=token)
+        Initializer.initialize(
+            environment=settings.ZOHO_ENV,
+            token=token,
+            store=settings.ZOHO_STORE,
+        )
 
     def get_record_by_cl_id_or_email(
         self, cl_ids: list[int], email: list[str]

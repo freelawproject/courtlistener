@@ -30,6 +30,7 @@ class Command(VerboseCommand):
                 grant_token=grant_token,
             ),
             sdk_config=settings.ZOHO_CONFIG,
+            store=settings.ZOHO_STORE,
         )
         init = Initializer.get_initializer()
         token = init.token.get_refresh_token()
