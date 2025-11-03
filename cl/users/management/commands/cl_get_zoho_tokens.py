@@ -33,4 +33,4 @@ class Command(VerboseCommand):
         )
         init = Initializer.get_initializer()
         token = init.token.get_refresh_token()
-        cache.set(f"{get_zoho_cache_key()}:refresh", token)
+        cache.set(f"{get_zoho_cache_key()}:refresh", token, timeout=None)
