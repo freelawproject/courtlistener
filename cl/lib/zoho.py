@@ -9,6 +9,7 @@ from zohocrmsdk.src.com.zoho.crm.api import (
     ParameterMap,
 )
 from zohocrmsdk.src.com.zoho.crm.api.record import (
+    ActionWrapper,
     APIException,
     BodyWrapper,
     Field,
@@ -85,6 +86,43 @@ class ZohoModule:
             resource_path=settings.ZOHO_RESOURCE_PATH,
         )
 
+    @staticmethod
+    def handle_api_response(response):
+        """
+        Handle a Zoho API response, raising exceptions on errors.
+
+        :param response: The response object from a Zoho API call.
+        :return: The data from the response if successful.
+        :raises Exception: if the response is None, empty, or contains an APIException.
+        """
+        if response is None:
+            raise Exception("Received no response from the API.")
+
+        status_code = response.get_status_code()
+        if status_code in [204, 304]:
+            msg = "No Content" if status_code == 204 else "Not Modified"
+            raise Exception(f"Zoho API returned no records ({msg}).")
+
+        response_object = response.get_object()
+        if response_object is None:
+            raise Exception("Zoho API returned an empty response object.")
+
+        if isinstance(response_object, ResponseWrapper | ActionWrapper):
+            return response_object.get_data()
+
+        if isinstance(response_object, APIException):
+            status = response_object.get_status().get_value()
+            code = response_object.get_code().get_value()
+            message = response_object.get_message().get_value()
+            details = response_object.get_details()
+
+            detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
+            raise Exception(
+                f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
+            )
+
+        raise Exception("Unexpected response type received from the Zoho API.")
+
 
 class SearchRecordMixin:
     def get_record_by_cl_id_or_email(
@@ -110,33 +148,7 @@ class SearchRecordMixin:
             param_instance, header_instance
         )
 
-        if response is None:
-            raise Exception("Received no response from the Zoho API.")
-
-        status_code = response.get_status_code()
-        if status_code in [204, 304]:
-            msg = "No Content" if status_code == 204 else "Not Modified"
-            raise Exception(f"Zoho query returned no records ({msg}).")
-
-        response_object = response.get_object()
-        if response_object is None:
-            raise Exception("Zoho API returned an empty response object.")
-
-        if isinstance(response_object, ResponseWrapper):
-            return response_object.get_data()
-
-        elif isinstance(response_object, APIException):
-            status = response_object.get_status().get_value()
-            code = response_object.get_code().get_value()
-            message = response_object.get_message().get_value()
-            details = response_object.get_details()
-
-            detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
-            raise Exception(
-                f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
-            )
-
-        raise Exception("Unexpected response type received from the Zoho API.")
+        return ZohoModule.handle_api_response(response)
 
 
 class UpdateRecordMixin:
@@ -166,7 +178,7 @@ class UpdateRecordMixin:
         response = record_operations.update_record(
             record_id, request, HeaderMap()
         )
-        return response
+        return ZohoModule.handle_api_response(response)
 
 
 class LeadsModule(UpdateRecordMixin, SearchRecordMixin, ZohoModule):
