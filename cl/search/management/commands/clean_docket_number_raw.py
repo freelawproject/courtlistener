@@ -1,6 +1,13 @@
+import time
+
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.redis_utils import (
+    get_redis_interface,
+)
+from cl.search.docket_number_cleaner import (
+    clean_docket_number_raw_and_update_redis_cache,
+)
 from cl.search.models import Docket
-from cl.search.signals import clean_docket_number_raw_and_update_redis_cache
 
 
 class Command(VerboseCommand):
@@ -17,15 +24,60 @@ class Command(VerboseCommand):
             type=str,
             help="The court IDs to filter Dockets to update, may be more than one.",
         )
+        parser.add_argument(
+            "--auto-resume",
+            action="store_true",
+            default=False,
+            help="Auto resume the command using the last docket_id logged in Redis.",
+        )
+        parser.add_argument(
+            "--delay",
+            type=float,
+            default=0.1,
+            help="The delay in seconds between processing each docket.",
+        )
+        parser.add_argument(
+            "--test-mode",
+            action="store_true",
+            default=False,
+            help="Run the command in test mode.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
         court_ids = options.get("court_ids")
-        dockets = (
-            Docket.objects.filter(court_id__in=court_ids)
-            .exclude(source=Docket.RECAP)
-            .order_by("pk")
-        )
+        auto_resume = options["auto_resume"]
+        delay = options.get("delay")
+        test_mode = options.get("test_mode")
+
+        r = get_redis_interface("CACHE")
+        redis_key = "docket_number_cleaning:last_docket_id"
+
+        if auto_resume:
+            start_id = r.get(redis_key)
+            logger.info(
+                "Auto-resume enabled starting docket_number_cleaning for ID: %s for courts %s",
+                start_id,
+                court_ids,
+            )
+            dockets = (
+                Docket.objects.only(
+                    "id", "court_id", "docket_number_raw", "docket_number"
+                )
+                .filter(court_id__in=court_ids)
+                .filter(id__gte=start_id)
+                .exclude(source=Docket.RECAP)
+                .order_by("pk")
+            )
+        else:
+            dockets = (
+                Docket.objects.only(
+                    "id", "court_id", "docket_number_raw", "docket_number"
+                )
+                .filter(court_id__in=court_ids)
+                .exclude(source=Docket.RECAP)
+                .order_by("pk")
+            )
 
         logger.info("Getting count of dockets to process.")
         count = dockets.count()
@@ -33,8 +85,9 @@ class Command(VerboseCommand):
 
         processed_count = 0
         for docket in dockets.iterator(chunk_size=1000):
-            clean_docket_number_raw_and_update_redis_cache(docket)
+            clean_docket_number_raw_and_update_redis_cache(docket, r)
             processed_count += 1
+            r.set(redis_key, docket.id)
 
             if not processed_count % 1000:
                 # Log every 1000 dockets processed.
@@ -46,8 +99,12 @@ class Command(VerboseCommand):
                     docket.id,
                 )
 
+            if not test_mode:
+                # Throttle processing to avoid overwhelming the system.
+                time.sleep(delay)
+
         logger.info(
-            "Successfully requested for embedding %s items for courts %s.",
+            "Successfully cleaned docket_number_raw %s items for courts %s.",
             processed_count,
             court_ids,
         )

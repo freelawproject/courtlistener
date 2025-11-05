@@ -1,7 +1,15 @@
 import re
 
+from redis import Redis
+
+from cl.lib.redis_utils import (
+    get_redis_interface,
+)
 from cl.lib.string_utils import normalize_dashes
-from cl.search.models import Court
+from cl.search.models import (
+    Court,
+    Docket,
+)
 
 court_map = {
     "scotus": Court.FEDERAL_APPELLATE,
@@ -183,3 +191,30 @@ def clean_docket_number_raw(
 
     docket_number = regex_func(prelim_cleaned)
     return docket_number, None
+
+
+def clean_docket_number_raw_and_update_redis_cache(
+    docket: Docket, r: Redis | None = None
+):
+    if not r:
+        r = get_redis_interface("CACHE")
+
+    result = clean_docket_number_raw(
+        docket_id=docket.id,
+        docket_number_raw=docket.docket_number_raw,
+        court_id=docket.court_id,
+    )
+    if not result:
+        return
+
+    docket_number, docket_id_llm = result
+
+    # Update docket number if it was cleaned
+    if docket_number:
+        docket.docket_number = docket_number
+        docket.save(update_fields=["docket_number", "date_modified"])
+
+    # Add to redis cache for later processing
+    if docket_id_llm:
+        redis_key = "docket_number_cleaning:llm_batch"
+        r.sadd(redis_key, docket_id_llm)
