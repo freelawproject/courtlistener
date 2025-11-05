@@ -219,30 +219,37 @@ def regex_clean_F(s: str) -> str:
 
 def clean_docket_number_raw(
     docket_id: int, docket_number_raw: str, court_id: str
-) -> tuple[str, int | None]:
+) -> tuple[str | None, int | None] | None:
     """
     Cleans a raw docket number string based on the court's specific cleaning logic and identifies those that need LLM cleaning.
 
     :param docket_id: The unique identifier for the docket.
     :param docket_number_raw: The raw docket number string to be cleaned.
     :param court_id: The identifier for the court, used to select cleaning logic.
-    :return: A tuple containing the cleaned docket number and the docket_id for downstream LLM processing, if applicable.
+    :return: A tuple containing the cleaned docket number or the docket_id for downstream LLM processing, if applicable. Or None.
     """
     court_type = court_map.get(court_id)
 
-    if court_type:
-        prelim_func, regex_func = get_clean_methods(court_type)
+    if (
+        not court_type
+        or not docket_number_raw
+        or not docket_number_raw.strip()
+    ):
+        return None
 
-        if prelim_func:
-            prelim_cleaned = prelim_func(docket_number_raw)
-            if is_generic(prelim_cleaned, court_type):
-                if regex_func:
-                    docket_number = regex_func(prelim_cleaned)
-                    return docket_number, None
-            else:
-                return docket_number_raw, docket_id
+    prelim_func, regex_func = get_clean_methods(court_type)
+    if not prelim_func:
+        return None
 
-    return docket_number_raw, None
+    prelim_cleaned = prelim_func(docket_number_raw)
+    if not is_generic(prelim_cleaned, court_type):
+        return None, docket_id
+
+    if not regex_func:
+        return None
+
+    docket_number = regex_func(prelim_cleaned)
+    return docket_number, None
 
 
 def create_llm_court_batches(

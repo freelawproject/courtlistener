@@ -17,7 +17,7 @@
   <section id="overview">
     <h1>Data Coverage &mdash; What's in CourtListener?</h1>
     <p class="lead">CourtListener is a vast searchable collection of legal information.</p>
-    <p>We have millions of case law records including <a class="underline" href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, tens of millions of PACER docket entries in the <a class="text-primary-600" href="{% url "advanced_r" %}">RECAP Archive</a>, and <a class="text-primary-600" href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|floatformat:"0"|intcomma }} minutes of recordings (and counting).
+    <p>We have millions of case law records including <a class="underline" href="https://free.law/datasets#supreme-court-data">a detailed collection of SCOTUS opinions</a>, tens of millions of PACER docket entries in the <a class="text-primary-600" href="{% url "advanced_r" %}">RECAP Archive</a>, and <a class="text-primary-600" href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|floatformat:"0"|intcomma }} minutes of recordings (and counting).
     </p>
     <p>The best way to think about our data is to consider where we get it from. The answer to that question depends on which kind of information you are interested in &mdash; PACER data (the RECAP Archive), case law, oral argument recordings, or financial disclosures.
     </p>
@@ -48,7 +48,7 @@
     <h2>Judges</h2>
     <p>We host a structured database of {{ count_people|intcomma|default:"thousands of" }} state and federal judges including their biographical, professional, judicial, and political information.
     </p>
-    <a href="https://free.law/projects/judge-db" class="btn-outline max-md:btn-xl">Learn More on Free.law</a>
+    <a href="https://free.law/datasets#judges-db" class="btn-outline max-md:btn-xl">Learn More on Free.law</a>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="oral-arguments">
