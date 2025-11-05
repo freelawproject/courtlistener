@@ -10,7 +10,9 @@ from zohocrmsdk.src.com.zoho.crm.api import (
 )
 from zohocrmsdk.src.com.zoho.crm.api.record import (
     APIException,
+    BodyWrapper,
     Field,
+    Record,
     RecordOperations,
     ResponseWrapper,
     SearchRecordsParam,
@@ -137,9 +139,39 @@ class SearchRecordMixin:
         raise Exception("Unexpected response type received from the Zoho API.")
 
 
-class LeadsModule(SearchRecordMixin, ZohoModule):
+class UpdateRecordMixin:
+    def update_record(self, record_id: int, fields: dict[str | Field, Any]):
+        """
+        Update a Zoho CRM record with the given field values.
+
+        :param record_id: The Zoho CRM record ID to update.
+        :param fields: A mapping of Zoho fields to their new values. Keys may be
+            `Field` instances for standard CRM fields or strings for custom fields.
+        """
+        record_operations = RecordOperations(self.module_name)
+        request = BodyWrapper()
+
+        record = Record()
+        # Populate record fields
+        record.set_id(record_id)
+        for key, value in fields.items():
+            if isinstance(key, Field):
+                record.add_field_value(key, value)
+            else:
+                record.add_key_value(key, value)
+
+        # Add Record instance to the list
+        request.set_data([record])
+        request.set_trigger(["approval", "workflow", "blueprint"])
+        response = record_operations.update_record(
+            record_id, request, HeaderMap()
+        )
+        return response
+
+
+class LeadsModule(UpdateRecordMixin, SearchRecordMixin, ZohoModule):
     module_name = "Leads"
 
 
-class ContactsModule(SearchRecordMixin, ZohoModule):
+class ContactsModule(UpdateRecordMixin, SearchRecordMixin, ZohoModule):
     module_name = "Contacts"
