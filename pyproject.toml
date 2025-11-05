@@ -138,6 +138,7 @@ dev = [
 
 [tool.uv.sources]
 djangorestframework = { git = "https://github.com/encode/django-rest-framework.git", rev = "cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2" }
+juriscraper = { git = "https://github.com/freelawproject/juriscraper.git", rev = "1651-add-clean_extracted_text-method" }
 
 [tool.ruff]
 line-length = 79

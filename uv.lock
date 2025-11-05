@@ -471,7 +471,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.0.2" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", specifier = ">=2.6.68" },
+    { name = "juriscraper", git = "https://github.com/freelawproject/juriscraper.git?rev=1651-add-clean_extracted_text-method" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=5.3.1" },
     { name = "markdown2", specifier = ">=2.5.0" },
@@ -1754,7 +1754,7 @@ wheels = [
 [[package]]
 name = "juriscraper"
 version = "2.6.95"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/freelawproject/juriscraper.git?rev=1651-add-clean_extracted_text-method#f05b6f26e6cde6ac894f1c6188718c93786077ea" }
 dependencies = [
     { name = "certifi" },
     { name = "chardet" },
@@ -1770,10 +1770,6 @@ dependencies = [
     { name = "requests" },
     { name = "selenium" },
     { name = "tldextract" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ee/99/6f78f2c34bb8ff539787bad9e18b2e4295faa6600f5dce084d0330b69a53/juriscraper-2.6.95.tar.gz", hash = "sha256:3e300c979c3edd98b35974535cd34e6d461fcc25d01b2c5afb96c57dc925e9fe", size = 338169, upload-time = "2025-11-02T18:41:06.1Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/63/3f532b255f22754db6cb9c3055c37ecb27960fe51f9615bea810c2caf3af/juriscraper-2.6.95-py3-none-any.whl", hash = "sha256:8c9d99f8f124230d8f7c05c38fd2280cdd46f46206eb52bd62832aaea204c31b", size = 553853, upload-time = "2025-11-02T18:41:03.591Z" },
 ]
 
 [[package]]
