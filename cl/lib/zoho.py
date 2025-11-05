@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.conf import settings
 from django.core.cache import cache
 from zohocrmsdk.src.com.zoho.api.authenticator import OAuthToken
@@ -8,6 +10,7 @@ from zohocrmsdk.src.com.zoho.crm.api import (
 )
 from zohocrmsdk.src.com.zoho.crm.api.record import (
     APIException,
+    Field,
     RecordOperations,
     ResponseWrapper,
     SearchRecordsParam,
@@ -16,6 +19,45 @@ from zohocrmsdk.src.com.zoho.crm.api.record import (
 
 def get_zoho_cache_key() -> str:
     return "zoho_token"
+
+
+def build_zoho_payload_from_user(user) -> dict[str | Field, Any]:
+    """
+    Build a Zoho CRM payload dictionary from a User instance.
+
+    This function maps a User’s attributes and related profile data
+    to the corresponding Zoho CRM fields. Standard Zoho fields are represented
+    by `Field` instances, while custom fields use string keys.
+
+    :param user: The user whose data will be mapped to Zoho CRM fields.
+    :return: A dictionary mapping Zoho field identifiers (either `Field`
+    instances or string keys) to their corresponding values.
+    """
+    payload = {
+        "CourtListener_ID": user.pk,
+        Field.Leads.email(): user.email,
+    }
+    # Basic user info
+    if user.first_name:
+        payload[Field.Leads.first_name()] = user.first_name
+    if user.last_name:
+        payload[Field.Leads.last_name()] = user.last_name
+
+    # Profile-related fields
+    profile = user.profile
+    if profile.employer:
+        payload[Field.Leads.company()] = profile.employer
+
+    if profile.city:
+        payload[Field.Leads.city()] = profile.city
+
+    if profile.state:
+        payload[Field.Leads.state()] = profile.state
+
+    if profile.zip_code:
+        payload[Field.Leads.zip_code()] = profile.zip_code
+
+    return payload
 
 
 class ZohoModule:
