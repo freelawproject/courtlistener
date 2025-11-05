@@ -13,6 +13,11 @@ from cl.api.models import Webhook, WebhookEvent
 from cl.celery_init import app
 from cl.lib.email_utils import make_multipart_email
 from cl.lib.neon_utils import NeonClient
+from cl.lib.zoho import (
+    ContactsModule,
+    LeadsModule,
+    build_zoho_payload_from_user,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +119,59 @@ def update_neon_account(self: Task, user_id: int) -> None:
     profile = user.profile  # type: ignore
     neon_client = NeonClient()
     neon_client.update_account(user, profile.neon_account_id)
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(Timeout,),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def create_or_update_zoho_account(
+    self: Task, user_id: int, milestone: int
+) -> None:
+    """
+    Celery task to create or update a Zoho CRM record for a given user.
+
+    This task:
+    - Builds a Zoho payload from the User model
+    - Checks if the user exists as a Contact or Lead in Zoho
+    - Updates the existing record or creates a new Lead if none exist
+
+    :param user_id: The primary key of the user to sync with Zoho
+    :param milestone: A milestone value to store in the 'API_calls' field
+    """
+    user = User.objects.select_related("profile").get(pk=user_id)
+    payload = build_zoho_payload_from_user(user)
+    payload["API_calls"] = milestone
+
+    # Initialize Zoho modules
+    contacts_module = ContactsModule()
+    contacts_module.initialize()
+
+    leads_module = LeadsModule()
+    leads_module.initialize()
+
+    # Try to find existing Zoho records
+    contact_records = contacts_module.get_record_by_cl_id_or_email(
+        email=[user.email], cl_ids=[user.pk]
+    )
+    lead_records = leads_module.get_record_by_cl_id_or_email(
+        email=[user.email], cl_ids=[user.pk]
+    )
+    # Update the first matching Contact, if found
+    if contact_records:
+        contacts_module.update_record(contact_records[0].get_id(), payload)
+        return
+
+    # Update the first matching Lead, if found
+    if lead_records:
+        leads_module.update_record(lead_records[0].get_id(), payload)
+        return
+
+    # Otherwise, create a new Lead
+    leads_module.create_record(payload)
 
 
 @app.task(ignore_result=True)
