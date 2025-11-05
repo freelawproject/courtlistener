@@ -354,7 +354,7 @@ def extract_doc_content(
     # clean content before saving
     court_id = opinion.cluster.docket.court.pk
     site = get_scraper_object_by_name(court_id, juriscraper_module)
-    if site:
+    if site is not None:
         content = site.cleanup_extracted_text(content)
     else:
         logger.debug("No site found %s", juriscraper_module)
