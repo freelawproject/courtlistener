@@ -151,6 +151,42 @@ class SearchRecordMixin:
         return ZohoModule.handle_api_response(response)
 
 
+class CreateRecordMixin:
+    def create_record(self, fields: dict[str | Field, Any]):
+        """
+        Create a single Zoho CRM record with the given field values.
+
+        This method and sends a record creation request to the Zoho CRM API.
+        It supports both standard Zoho fields (represented by `Field`
+        instances) and custom fields (represented by string keys).
+
+        :param fields: A mapping of Zoho fields to their new values. Keys may
+            be `Field` instances for standard CRM fields or strings for custom
+            fields.
+        :return: The Zoho API response data, parsed and validated by
+            `ZohoModule.handle_api_response`.
+        """
+        record_operations = RecordOperations(self.module_name)
+        request = BodyWrapper()
+
+        record = Record()
+        # Populate record fields
+        for key, value in fields.items():
+            if isinstance(key, Field):
+                record.add_field_value(key, value)
+            else:
+                record.add_key_value(key, value)
+
+        # Build the request
+        request.set_data([record])
+        request.set_trigger(["approval", "workflow", "blueprint"])
+        request.set_process(["review_process"])
+
+        # Execute and handle response
+        response = record_operations.create_records(request, HeaderMap())
+        return ZohoModule.handle_api_response(response)
+
+
 class UpdateRecordMixin:
     def update_record(self, record_id: int, fields: dict[str | Field, Any]):
         """
@@ -159,6 +195,8 @@ class UpdateRecordMixin:
         :param record_id: The Zoho CRM record ID to update.
         :param fields: A mapping of Zoho fields to their new values. Keys may be
             `Field` instances for standard CRM fields or strings for custom fields.
+        :return: The Zoho API response data, parsed and validated by
+            `ZohoModule.handle_api_response`.
         """
         record_operations = RecordOperations(self.module_name)
         request = BodyWrapper()
@@ -181,9 +219,13 @@ class UpdateRecordMixin:
         return ZohoModule.handle_api_response(response)
 
 
-class LeadsModule(UpdateRecordMixin, SearchRecordMixin, ZohoModule):
+class LeadsModule(
+    CreateRecordMixin, UpdateRecordMixin, SearchRecordMixin, ZohoModule
+):
     module_name = "Leads"
 
 
-class ContactsModule(UpdateRecordMixin, SearchRecordMixin, ZohoModule):
+class ContactsModule(
+    CreateRecordMixin, UpdateRecordMixin, SearchRecordMixin, ZohoModule
+):
     module_name = "Contacts"
