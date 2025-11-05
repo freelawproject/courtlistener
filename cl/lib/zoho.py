@@ -18,7 +18,7 @@ def get_zoho_cache_key() -> str:
     return "zoho_token"
 
 
-class SearchableModule:
+class ZohoModule:
     module_name: str = ""
 
     @staticmethod
@@ -41,6 +41,8 @@ class SearchableModule:
             resource_path=settings.ZOHO_RESOURCE_PATH,
         )
 
+
+class SearchRecordMixin:
     def get_record_by_cl_id_or_email(
         self, cl_ids: list[int], email: list[str]
     ):
@@ -93,9 +95,9 @@ class SearchableModule:
         raise Exception("Unexpected response type received from the Zoho API.")
 
 
-class LeadsModule(SearchableModule):
+class LeadsModule(SearchRecordMixin, ZohoModule):
     module_name = "Leads"
 
 
-class ContactsModule(SearchableModule):
+class ContactsModule(SearchRecordMixin, ZohoModule):
     module_name = "Contacts"
