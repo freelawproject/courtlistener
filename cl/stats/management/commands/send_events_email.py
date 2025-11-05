@@ -17,11 +17,18 @@ class Command(VerboseCommand):
         today = now()
         yesterday = today - timedelta(days=1)
         events = Event.objects.filter(date_created__gte=yesterday)
-        if events.count() > 0:
-            template = loader.get_template("emails/events_email.txt")
-            send_mail(
-                subject=f"CourtListener events email for {today.date().isoformat()}",
-                message=template.render({"events": events}),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.PARTNERSHIP_EMAIL_ADDRESS],
-            )
+        if not events.count():
+            return
+
+        events_for_email = [
+            e
+            for e in events.all()
+            if not e.user or "webhook" in e.description.lower()
+        ]
+        template = loader.get_template("emails/events_email.txt")
+        send_mail(
+            subject=f"CourtListener events email for {today.date().isoformat()}",
+            message=template.render({"events": events_for_email}),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.PARTNERSHIP_EMAIL_ADDRESS],
+        )
