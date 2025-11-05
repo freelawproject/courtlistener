@@ -255,7 +255,7 @@ def clean_docket_number_raw(
 def create_llm_court_batches(
     llm_batch: list[int],
     r: Redis,
-) -> dict[str, list[dict[int, str]]]:
+) -> defaultdict[str | None, list[dict[int, str]]]:
     """
     Groups docket numbers by their associated court type for a given batch of docket_ids.
     Remove docket_ids that no longer exist, if any, from the Redis set.
@@ -265,7 +265,6 @@ def create_llm_court_batches(
     :return: A dictionary where each key is a court mapping (as determined by `court_map`),
               and each value is a list of dictionaries of {docket_id: docket_number_raw}.
     """
-    court_batches = {}
     existing_docket_ids = set()
     dockets = Docket.objects.filter(pk__in=llm_batch).values_list(
         "id", "court_id", "docket_number_raw"
@@ -314,16 +313,16 @@ def extract_with_llm(
                 "fingerprint": ["llm-docket-number-validation-error"],
             },
         )
-        return
+        return None
     except Exception as e:
         # Only expect to get instructor exceptions here to track them
         capture_exception(e)
-        return
+        return None
 
     if not isinstance(llm_response, CleanDocketNumber):
         # Added this to avoid mypy errors
         logger.error("LLM - Invalid response type: %s", type(llm_response))
-        return
+        return None
 
     records = {}
     for item in llm_response.docket_numbers:
@@ -361,7 +360,7 @@ def process_llm_batches(
         for i in range(0, len(llm_batches), batch_size)
     ]
     with ThreadPoolExecutor(
-        max_workers=settings.DOCKET_NUMBER_CLEANING_MAX_WORKERS
+        max_workers=settings.DOCKET_NUMBER_CLEANING_MAX_WORKERS  # type: ignore
     ) as executor:
         future_to_batch = {
             executor.submit(
@@ -434,8 +433,8 @@ def call_models_and_compare_results(
         system_prompt=system_prompts.get(court_mapping, ""),
         model_id=model_one,
         retry=0,
-        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
-        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
+        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,  # type: ignore
+        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,  # type: ignore
         all_cleaned=dict(),
     )
     model_two_results = process_llm_batches(
@@ -443,8 +442,8 @@ def call_models_and_compare_results(
         system_prompt=system_prompts.get(court_mapping, ""),
         model_id=model_two,
         retry=0,
-        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
-        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
+        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,  # type: ignore
+        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,  # type: ignore
         all_cleaned=dict(),
     )
 
