@@ -26,7 +26,8 @@ class SearchableModule:
         refresh_token = cache.get(f"{get_zoho_cache_key()}:refresh")
         if not refresh_token:
             raise Exception(
-                f"Cache miss: no value found for key {get_zoho_cache_key()}:refresh"
+                f"Cache miss: no value found for key {get_zoho_cache_key()}:refresh. "
+                "Please run `cl_get_zoho_tokens` to refresh and store new tokens."
             )
         token = OAuthToken(
             client_id=settings.ZOHO_CLIENT_ID,
@@ -64,16 +65,16 @@ class SearchableModule:
         )
 
         if response is None:
-            raise Exception("Received no response from the API.")
+            raise Exception("Received no response from the Zoho API.")
 
         status_code = response.get_status_code()
         if status_code in [204, 304]:
             msg = "No Content" if status_code == 204 else "Not Modified"
-            raise Exception(f"Search returned no records ({msg}).")
+            raise Exception(f"Zoho query returned no records ({msg}).")
 
         response_object = response.get_object()
         if response_object is None:
-            raise Exception("API returned an empty response object.")
+            raise Exception("Zoho API returned an empty response object.")
 
         if isinstance(response_object, ResponseWrapper):
             return response_object.get_data()
@@ -86,10 +87,10 @@ class SearchableModule:
 
             detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
             raise Exception(
-                f"API Exception [{code}] {status}: {message} | Details: {detail_str}"
+                f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
             )
 
-        raise Exception("Unexpected response type received from the API.")
+        raise Exception("Unexpected response type received from the Zoho API.")
 
 
 class LeadsModule(SearchableModule):
