@@ -78,4 +78,6 @@ jobs:
           cl/search/management/commands/sweep_indexer.py \
           cl/search/management/commands/pacer_bulk_fetch.py \
           cl/search/management/commands/generate_opinion_embeddings.py \
+          cl/search/management/commands/llm_clean_docket_number_daemon.py \
+          cl/search/docket_number_cleaner.py \
           cl/search/management/commands/clean_docket_number_raw.py \
