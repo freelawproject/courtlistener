@@ -19,6 +19,8 @@ from zohocrmsdk.src.com.zoho.crm.api.record import (
     SearchRecordsParam,
 )
 
+from cl.lib.command_utils import logger
+
 
 class HasModuleName(Protocol):
     module_name: str
@@ -105,7 +107,8 @@ class ZohoModule:
         status_code = response.get_status_code()
         if status_code in [204, 304]:
             msg = "No Content" if status_code == 204 else "Not Modified"
-            raise Exception(f"Zoho API returned no records ({msg}).")
+            logger.info(f"Zoho API returned no records ({msg}).")
+            return []
 
         response_object = response.get_object()
         if response_object is None:
