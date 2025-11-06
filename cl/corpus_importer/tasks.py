@@ -95,7 +95,7 @@ from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry
 from cl.lib.llm import call_llm
-from cl.lib.microservice_utils import microservice
+from cl.lib.microservice_utils import microservice, rd_page_count_service
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
@@ -2442,10 +2442,7 @@ def update_rd_metadata(
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         rd.sha1 = sha1(pdf_bytes)
-        response = async_to_sync(microservice)(
-            service="page-count",
-            item=rd,
-        )
+        response = async_to_sync(rd_page_count_service)(rd)
         if response.is_success:
             rd.page_count = int(response.text)
         assert isinstance(rd.page_count, (int | type(None))), (
