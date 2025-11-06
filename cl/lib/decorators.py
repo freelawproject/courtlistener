@@ -6,7 +6,7 @@ from functools import wraps
 from hashlib import md5
 from urllib.parse import urlparse
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import iscoroutinefunction, sync_to_async
 from django.core.cache import cache
 from django.utils.cache import patch_response_headers
 
@@ -39,68 +39,47 @@ def retry(
     :type logger: logging.Logger instance
     """
 
-    def deco_retry(f: Callable) -> Callable:
-        @wraps(f)
-        def f_retry(*args, **kwargs):
-            mtries, mdelay = tries, delay
-            while mtries > 1:
-                try:
-                    return f(*args, **kwargs)
-                except ExceptionToCheck as e:
-                    msg = "%s, Retrying in %s seconds..."
-                    params = (e, mdelay)
-                    if logger:
-                        logger.warning(msg, *params)
-                    else:
-                        print(msg % params)
-                    time.sleep(mdelay)
-                    mtries -= 1
-                    mdelay *= backoff
-            return f(*args, **kwargs)
-
-        return f_retry  # true decorator
-
-    return deco_retry
-
-
-def retry_async(
-    ExceptionToCheck: type[Exception] | tuple[type[Exception], ...],
-    tries: int = 4,
-    delay: float = 3,
-    backoff: float = 2,
-    logger: logging.Logger | None = None,
-) -> Callable:
-    """Retry calling the decorated async function using exponential backoff.
-
-    :param ExceptionToCheck: the exception to check. may be a tuple of
-    exceptions to check
-    :param tries: number of times to try (not retry) before giving up
-    :param delay: Initial delay between retries in seconds.
-    :param backoff: backoff multiplier e.g. value of 2 will double the delay
-    each retry
-    :param logger: logger to use. If None, print
-    """
+    def _log_wait(exc: Exception, wait: float) -> None:
+        msg = "%s, Retrying in %s seconds..."
+        params = (exc, wait)
+        if logger:
+            logger.warning(msg, *params)
+        else:
+            print(msg % params)
 
     def deco_retry(f: Callable) -> Callable:
-        @wraps(f)
-        async def f_retry(*args, **kwargs):
-            mtries, mdelay = tries, delay
-            while mtries > 1:
-                try:
-                    return await f(*args, **kwargs)
-                except ExceptionToCheck as e:
-                    msg = "%s, Retrying in %s seconds..."
-                    params = (e, mdelay)
-                    if logger:
-                        logger.warning(msg, *params)
-                    else:
-                        print(msg % params)
-                    await asyncio.sleep(mdelay)
-                    mtries -= 1
-                    mdelay *= backoff
-            return await f(*args, **kwargs)
+        if iscoroutinefunction(f):
 
-        return f_retry  # true decorator
+            @wraps(f)
+            async def f_retry(*args, **kwargs):
+                mtries, mdelay = tries, delay
+                while mtries > 1:
+                    try:
+                        return await f(*args, **kwargs)
+                    except ExceptionToCheck as e:
+                        _log_wait(e, mdelay)
+                        await asyncio.sleep(mdelay)
+                        mtries -= 1
+                        mdelay *= backoff
+                return await f(*args, **kwargs)
+
+            return f_retry  # true decorator
+        else:
+
+            @wraps(f)
+            def f_retry(*args, **kwargs):
+                mtries, mdelay = tries, delay
+                while mtries > 1:
+                    try:
+                        return f(*args, **kwargs)
+                    except ExceptionToCheck as e:
+                        _log_wait(e, mdelay)
+                        time.sleep(mdelay)
+                        mtries -= 1
+                        mdelay *= backoff
+                return f(*args, **kwargs)
+
+            return f_retry  # true decorator
 
     return deco_retry
 

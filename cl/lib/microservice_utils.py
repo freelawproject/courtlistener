@@ -14,7 +14,7 @@ from httpx import (
 )
 
 from cl.audio.models import Audio
-from cl.lib.decorators import retry_async
+from cl.lib.decorators import retry
 from cl.lib.exceptions import NoSuchKey
 from cl.search.models import Opinion, RECAPDocument
 
@@ -151,7 +151,7 @@ async def microservice(
         return await client.send(req)
 
 
-@retry_async(
+@retry(
     ExceptionToCheck=(NetworkError, TimeoutException, NoSuchKey),
     tries=3,
     delay=2,
