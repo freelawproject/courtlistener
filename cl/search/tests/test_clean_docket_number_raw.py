@@ -3,10 +3,10 @@ from django.core.management import call_command
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Docket
-from cl.tests.cases import TransactionTestCase
+from cl.tests.cases import TestCase
 
 
-class CleanDocketNumberRawCommandTests(TransactionTestCase):
+class CleanDocketNumberRawCommandTests(TestCase):
     def setUp(self):
         self.court_canb = CourtFactory(id="canb", jurisdiction="FB")
         self.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
@@ -69,11 +69,12 @@ class CleanDocketNumberRawCommandTests(TransactionTestCase):
         super().setUp()
 
     def test_docket_number_cleaning(self):
-        call_command(
-            "clean_docket_number_raw",
-            court_ids=["scotus", "ca1", "canb"],
-            test_mode=True,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            call_command(
+                "clean_docket_number_raw",
+                court_ids=["scotus", "ca1", "canb"],
+                test_mode=True,
+            )
 
         for i, docket in enumerate(
             [
@@ -104,12 +105,13 @@ class CleanDocketNumberRawCommandTests(TransactionTestCase):
     def test_docket_number_cleaning_auto_resume(self):
         self.r.set("docket_number_cleaning:last_docket_id", self.docket_2.id)
 
-        call_command(
-            "clean_docket_number_raw",
-            court_ids=["scotus", "ca1", "canb"],
-            test_mode=True,
-            auto_resume=True,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            call_command(
+                "clean_docket_number_raw",
+                court_ids=["scotus", "ca1", "canb"],
+                test_mode=True,
+                auto_resume=True,
+            )
 
         for i, docket in enumerate(
             [
