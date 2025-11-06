@@ -20,6 +20,9 @@ class Command(VerboseCommand):
         if not events.count():
             return
 
+        # Filter out API-related user milestones since those are now handled by
+        # the Zoho integration. This keeps only global API events, global
+        # webhook events, and user tracking webhook milestones.
         events_for_email = [
             e
             for e in events.all()
