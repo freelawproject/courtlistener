@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Protocol
 
 from django.conf import settings
 from django.core.cache import cache
@@ -18,6 +18,10 @@ from zohocrmsdk.src.com.zoho.crm.api.record import (
     ResponseWrapper,
     SearchRecordsParam,
 )
+
+
+class HasModuleName(Protocol):
+    module_name: str
 
 
 def get_zoho_cache_key() -> str:
@@ -126,7 +130,7 @@ class ZohoModule:
 
 class SearchRecordMixin:
     def get_record_by_cl_id_or_email(
-        self, cl_ids: list[int], email: list[str]
+        self: HasModuleName, cl_ids: list[int], email: list[str]
     ):
         record_operations = RecordOperations(self.module_name)
         param_instance = ParameterMap()
@@ -152,7 +156,7 @@ class SearchRecordMixin:
 
 
 class CreateRecordMixin:
-    def create_record(self, fields: dict[str | Field, Any]):
+    def create_record(self: HasModuleName, fields: dict[str | Field, Any]):
         """
         Create a single Zoho CRM record with the given field values.
 
@@ -188,7 +192,9 @@ class CreateRecordMixin:
 
 
 class UpdateRecordMixin:
-    def update_record(self, record_id: int, fields: dict[str | Field, Any]):
+    def update_record(
+        self: HasModuleName, record_id: int, fields: dict[str | Field, Any]
+    ):
         """
         Update a Zoho CRM record with the given field values.
 
