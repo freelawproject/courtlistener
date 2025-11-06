@@ -53,31 +53,29 @@ class Command(VerboseCommand):
         r = get_redis_interface("CACHE")
         redis_key = "docket_number_cleaning:last_docket_id"
 
+        dockets = (
+            Docket.objects.only(
+                "id", "court_id", "docket_number_raw", "docket_number"
+            )
+            .filter(court_id__in=court_ids)
+            .exclude(source=Docket.RECAP)
+            .order_by("pk")
+        )
+
         if auto_resume:
             start_id = r.get(redis_key)
-            logger.info(
-                "Auto-resume enabled starting docket_number_cleaning for ID: %s for courts %s",
-                start_id,
-                court_ids,
-            )
-            dockets = (
-                Docket.objects.only(
-                    "id", "court_id", "docket_number_raw", "docket_number"
+            if start_id is not None:
+                dockets = dockets.filter(id__gte=start_id)
+                logger.info(
+                    "Auto-resume enabled starting docket_number_cleaning for ID: %s for courts %s",
+                    start_id,
+                    court_ids,
                 )
-                .filter(court_id__in=court_ids)
-                .filter(id__gte=start_id)
-                .exclude(source=Docket.RECAP)
-                .order_by("pk")
-            )
-        else:
-            dockets = (
-                Docket.objects.only(
-                    "id", "court_id", "docket_number_raw", "docket_number"
+            else:
+                logger.info(
+                    "Auto-resume enabled but no last_docket_id found in Redis. Starting from beginning for courts %s",
+                    court_ids,
                 )
-                .filter(court_id__in=court_ids)
-                .exclude(source=Docket.RECAP)
-                .order_by("pk")
-            )
 
         logger.info("Getting count of dockets to process.")
         count = dockets.count()
@@ -87,10 +85,10 @@ class Command(VerboseCommand):
         for docket in dockets.iterator(chunk_size=1000):
             clean_docket_number_raw_and_update_redis_cache(docket, r)
             processed_count += 1
-            r.set(redis_key, docket.id)
 
-            if not processed_count % 1000:
-                # Log every 1000 dockets processed.
+            if not processed_count % 100:
+                # Log every 100 dockets processed.
+                r.set(redis_key, docket.id, ex=60 * 60 * 24 * 28)  # 4 weeks
                 logger.info(
                     "Processed %s/%s, (%s), last ID cleaned: %s",
                     processed_count,

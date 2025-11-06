@@ -138,8 +138,3 @@ class CleanDocketNumberRawCommandTests(TestCase):
             set([str(self.docket_3.id)]),
             "Redis cache set doesn't match",
         )
-        self.assertEqual(
-            self.r.get("docket_number_cleaning:last_docket_id"),
-            str(self.docket_5.id),
-            "Redis cache set doesn't match",
-        )

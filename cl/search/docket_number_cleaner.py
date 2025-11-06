@@ -13,9 +13,6 @@ from redis import Redis
 from sentry_sdk import capture_exception
 
 from cl.lib.llm import call_llm
-
-from redis import Redis
-
 from cl.lib.redis_utils import (
     get_redis_interface,
 )
@@ -27,10 +24,7 @@ from cl.search.models import Court, Docket
 logger = logging.getLogger(__name__)
 
 env = environ.FileAwareEnv()
-from cl.search.models import (
-    Court,
-    Docket,
-)
+
 
 court_map = {
     "scotus": Court.FEDERAL_APPELLATE,
@@ -483,7 +477,7 @@ def call_models_and_compare_results(
 def clean_docket_number_raw_and_update_redis_cache(
     docket: Docket, r: Redis | None = None
 ):
-    if not r:
+    if r is None:
         r = get_redis_interface("CACHE")
 
     result = clean_docket_number_raw(
