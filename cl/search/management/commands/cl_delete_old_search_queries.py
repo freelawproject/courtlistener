@@ -11,7 +11,7 @@ class Command(BaseCommand):
     help = "Deletes SearchQuery records older than the privacy cut off."
 
     def handle(self, *args, **options):
-        # Do cutoff minus one so that we do not have 
+        # Do cutoff minus one so that we do not have
         # queries older than the cutoff.
         # See: https://github.com/freelawproject/courtlistener/pull/6510#pullrequestreview-3430758461
         cutoff_date = (
