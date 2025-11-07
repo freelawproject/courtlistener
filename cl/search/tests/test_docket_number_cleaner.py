@@ -20,7 +20,7 @@ from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.llm_models import CleanDocketNumber, DocketItem
 from cl.search.models import Docket
 from cl.search.tasks import clean_docket_number_by_court
-from cl.tests.cases import TestCase, TransactionTestCase
+from cl.tests.cases import TestCase
 
 
 @dataclass
@@ -126,7 +126,7 @@ class TestCleanDocketNumberRaw(TestCase):
     "cl.search.docket_number_cleaner.get_redis_key_prefix",
     return_value="docket_number_cleaning_test1",
 )
-class TestLLMCleanDocketNumberRaw(TransactionTestCase):
+class TestLLMCleanDocketNumberRaw(TestCase):
     def setUp(self):
         self.court_canb = CourtFactory(id="canb", jurisdiction="FB")
         self.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
@@ -145,9 +145,10 @@ class TestLLMCleanDocketNumberRaw(TransactionTestCase):
         docket = DocketFactory(docket_number=self.docket_number)
         self.r.sadd(self.key_to_clean, docket.id)
         start_timestamp = timezone.now()
-        update_docket_number(
-            docket.id, self.new_docket_number, start_timestamp, self.r
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            update_docket_number(
+                docket.id, self.new_docket_number, start_timestamp, self.r
+            )
         docket.refresh_from_db()
         self.assertEqual(
             docket.docket_number,
@@ -648,7 +649,7 @@ class TestCallModelsCompareResults(TestCase):
     "cl.search.docket_number_cleaner.get_redis_key_prefix",
     return_value="docket_number_cleaning_test3",
 )
-class TestLLMCleanDocketNumberByCourt(TransactionTestCase):
+class TestLLMCleanDocketNumberByCourt(TestCase):
     def setUp(self):
         self.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
         self.docket_1 = DocketFactory(
@@ -699,9 +700,10 @@ class TestLLMCleanDocketNumberByCourt(TransactionTestCase):
             self.expected,  # First mini model results
             self.expected,  # Second mini model results
         ]
-        clean_docket_number_by_court(
-            self.court_batch, self.court_mapping, timezone.now(), self.r
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            clean_docket_number_by_court(
+                self.court_batch, self.court_mapping, timezone.now(), self.r
+            )
 
         # Verify that docket numbers were updated correctly
         for docket in [self.docket_1, self.docket_2, self.docket_3]:
@@ -739,9 +741,10 @@ class TestLLMCleanDocketNumberByCourt(TransactionTestCase):
                 self.docket_3.id: self.expected[self.docket_3.id]
             },  # Second full model results
         ]
-        clean_docket_number_by_court(
-            self.court_batch, self.court_mapping, timezone.now(), self.r
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            clean_docket_number_by_court(
+                self.court_batch, self.court_mapping, timezone.now(), self.r
+            )
 
         # Verify that docket numbers were updated correctly
         for docket in [self.docket_1, self.docket_2, self.docket_3]:
@@ -786,9 +789,10 @@ class TestLLMCleanDocketNumberByCourt(TransactionTestCase):
         mock_process_llm_batches_tasks.return_value = {
             self.docket_3.id: self.expected[self.docket_3.id]
         }  # Tie breaker model results
-        clean_docket_number_by_court(
-            self.court_batch, self.court_mapping, timezone.now(), self.r
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            clean_docket_number_by_court(
+                self.court_batch, self.court_mapping, timezone.now(), self.r
+            )
 
         # Verify that docket numbers were updated correctly
         for docket in [self.docket_1, self.docket_2, self.docket_3]:

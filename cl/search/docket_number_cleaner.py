@@ -13,6 +13,9 @@ from redis import Redis
 from sentry_sdk import capture_exception
 
 from cl.lib.llm import call_llm
+from cl.lib.redis_utils import (
+    get_redis_interface,
+)
 from cl.lib.string_utils import normalize_dashes
 from cl.search.llm_models import CleanDocketNumber
 from cl.search.llm_prompts import F_PROMPT, F_TIE_BREAKER
@@ -21,6 +24,7 @@ from cl.search.models import Court, Docket
 logger = logging.getLogger(__name__)
 
 env = environ.FileAwareEnv()
+
 
 court_map = {
     "scotus": Court.FEDERAL_APPELLATE,
@@ -468,3 +472,30 @@ def call_models_and_compare_results(
             if docket_number_raw is not None:
                 next_model_batches.append({docket_id: docket_number_raw})
     return next_model_batches
+
+
+def clean_docket_number_raw_and_update_redis_cache(
+    docket: Docket, r: Redis | None = None
+):
+    if r is None:
+        r = get_redis_interface("CACHE")
+
+    result = clean_docket_number_raw(
+        docket_id=docket.id,
+        docket_number_raw=docket.docket_number_raw,
+        court_id=docket.court_id,
+    )
+    if not result:
+        return
+
+    docket_number, docket_id_llm = result
+
+    # Update docket number if it was cleaned
+    if docket_number:
+        docket.docket_number = docket_number
+        docket.save(update_fields=["docket_number", "date_modified"])
+
+    # Add to redis cache for later processing
+    if docket_id_llm:
+        redis_key = "docket_number_cleaning:llm_batch"
+        r.sadd(redis_key, docket_id_llm)
