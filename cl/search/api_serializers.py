@@ -42,6 +42,7 @@ from cl.search.documents import (
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
@@ -92,6 +93,16 @@ class OriginalCourtInformationSerializer(
 ):
     class Meta:
         model = OriginatingCourtInformation
+        fields = "__all__"
+
+
+class BankruptcyInformationSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    class Meta:
+        model = BankruptcyInformation
         fields = "__all__"
 
 
