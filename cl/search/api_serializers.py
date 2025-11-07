@@ -144,6 +144,10 @@ class DocketSerializer(
         queryset=Person.objects.all(),
         style={"base_template": "input.html"},
     )
+    bankruptcy_information = serializers.HyperlinkedRelatedField(
+        read_only=True,
+        view_name="bankruptcyinformation-detail",
+    )
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
     )
