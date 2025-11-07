@@ -26,6 +26,7 @@ from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_serializers import (
+    BankruptcyInformationSerializer,
     CourtSerializer,
     DocketEntrySerializer,
     DocketESResultSerializer,
@@ -66,6 +67,7 @@ from cl.search.filters import (
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
+    BankruptcyInformation,
     ClusterRedirection,
     Court,
     Docket,
@@ -96,6 +98,25 @@ class OriginatingCourtInformationViewSet(
         "date_modified",
     ]
     queryset = OriginatingCourtInformation.objects.all().order_by("-id")
+
+
+class BankruptcyInformationViewSet(
+    DeferredFieldsMixin, viewsets.ModelViewSet
+):
+    serializer_class = BankruptcyInformationSerializer
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
+    queryset = BankruptcyInformation.objects.all().order_by("-id")
 
 
 class DocketViewSet(
