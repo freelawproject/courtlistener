@@ -42,6 +42,14 @@
         <li><a href="#attachment-pages">Scraping Attachment Page</a></li>
         <li><a href="#dockets">Purchasing Dockets</a></li>
       </ul>
+      <li><a href="#pray-and-pay-api">Pray and Pay API</a></li>
+      <ul>
+        <li><a href="#creating-prayers">Creating Prayers</a></li>
+        <li><a href="#listing-prayers">Listing Prayers</a></li>
+        <li><a href="#deleting-prayers">Deleting Prayers</a></li>
+        <li><a href="#prayer-webhooks">Webhook Notifications</a></li>
+        <li><a href="#prayer-limitations">Limitations</a></li>
+      </ul>
       <li><a href="#recap-upload">RECAP Upload API</a></li>
       <ul>
         <li><a href="#global-params">Global Parameters</a></li>
@@ -246,6 +254,106 @@
   <p>Sometimes, we get a PDF before we get a docket, making it impossible to know what case the PDF is associated with. We call these "orphan documents" because they do not have valid parent objects in our system.
   </p>
   <p>Later, when we receive new or updated docket information, we have an opportunity to fix this problem by checking our system for orphan documents. When this happens, the orphans will automatically be associated with the new docket information, and the case will have PDFs linked to it.
+  </p>
+
+
+  <h2 id="pray-and-pay-api">Pray and Pay API <small>— <code>{% url "prayer-list" version=version %}</code></small></h2>
+  <p>The <a href="{% url 'pray_and_pay_help' %}">Pray and Pay system</a> allows you to request PACER documents that are not yet available in the RECAP Archive. When you create a "prayer" for a document, you are flagging it as wanted. When another user purchases that document from PACER and it becomes available in our system, your prayer is automatically granted and you are notified.
+  </p>
+  <p>This API enables you to programmatically create and manage prayers, making it ideal for:
+  </p>
+  <ul>
+    <li>
+      <p><strong>Automated monitoring</strong> — Track when specific documents become available without manual checking.
+      </p>
+    </li>
+    <li>
+      <p><strong>Bulk document requests</strong> — Request multiple documents of interest efficiently.
+      </p>
+    </li>
+    <li>
+      <p><strong>Workflow integration</strong> — Integrate document availability notifications into your systems via <a href="{% url "webhooks_docs" %}#pray-and-pay">webhooks</a>.
+      </p>
+    </li>
+  </ul>
+  <p>To learn more about the Pray and Pay system itself, including how to fulfill prayers and contribute documents, see the help documentation:
+  </p>
+  <p>
+    <a href="{% url 'pray_and_pay_help' %}" class="btn btn-default">Pray and Pay Help</a>
+  </p>
+
+  <h3 id="creating-prayers">Creating Prayers</h3>
+  <p>To create a prayer, send an HTTP <code>POST</code> request with the <code>recap_document</code> ID of the document you want:
+  </p>
+  <pre class="scrollable">curl -X POST \
+  --data 'recap_document=112' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "prayer-list" version=version %}"</pre>
+  <p>The response will contain the created prayer:</p>
+  <pre class="scrollable">{
+  "id": 12345,
+  "date_created": "2025-01-15T10:30:00.123456-07:00",
+  "status": 1,
+  "recap_document": 112
+}</pre>
+  <p>The <code>status</code> field indicates whether the prayer is waiting (1) or has been granted (2). Newly created prayers always have status 1.
+  </p>
+  <p>To identify the <code>recap_document</code> ID, look up the RECAP Document in <a href="{% url "pacer_api_help" %}">our PACER API</a> and provide the CourtListener ID for the item.
+  </p>
+
+  <h3 id="listing-prayers">Listing Your Prayers</h3>
+  <p>To retrieve a list of your active (waiting) prayers, send an HTTP <code>GET</code> request:
+  </p>
+  <pre class="scrollable">curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "prayer-list" version=version %}"</pre>
+  <p>This returns only prayers with status 1 (WAITING). Once a prayer is granted (status 2), it will no longer appear in this list.
+  </p>
+
+  <h3 id="deleting-prayers">Deleting Prayers</h3>
+  <p>To delete a prayer before it is granted, send an HTTP <code>DELETE</code> request:
+  </p>
+  <pre class="scrollable">curl -X DELETE \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "prayer-detail" version=version pk="12345" %}"</pre>
+  <p>Note that prayers cannot be modified once created. The API does not support <code>PUT</code> or <code>PATCH</code> requests. If you need to change a prayer, delete it and create a new one.
+  </p>
+
+  <h3 id="prayer-webhooks">Webhook Notifications</h3>
+  <p>When a prayer is granted and the document becomes available, you can be notified immediately via webhooks. This is the recommended way to monitor your prayers instead of polling the API.
+  </p>
+  <p>Webhook events are sent as soon as a document becomes available and include the prayer ID, document ID, and status information. To set up webhook notifications for granted prayers, see the webhook documentation:
+  </p>
+  <p>
+    <a href="{% url "webhooks_docs" %}#pray-and-pay" class="btn btn-primary">Pray and Pay Webhooks</a>
+  </p>
+
+  <h3 id="prayer-limitations">Limitations and Future Plans</h3>
+  <p>The Pray and Pay API has the same limitations as the web interface:
+  </p>
+  <ul>
+    <li>
+      <p>Standard users can create a limited number of prayers per day (the same daily quota applies to both web and API usage).
+      </p>
+    </li>
+    <li>
+      <p>Free Law Project members have a higher daily prayer limit.
+      </p>
+    </li>
+    <li>
+      <p>Prayers cannot be modified once created; they can only be created or deleted.
+      </p>
+    </li>
+    <li>
+      <p>Many documents may be unavailable for purchase on PACER (sealed filings, delayed transcripts, etc.). After you create a prayer, our system checks PACER availability. If unavailable, you'll receive an email notification.
+      </p>
+    </li>
+    <li>
+      <p>Once a prayer is granted (the document becomes available), it cannot be deleted.
+      </p>
+    </li>
+  </ul>
+  <p>In the future, we may allow higher prayer limits on a per-account basis for API users who need to monitor hundreds of documents programmatically. If your organization has this need, please <a href="{% url "contact" %}">get in touch</a> to discuss options.
   </p>
 
 
