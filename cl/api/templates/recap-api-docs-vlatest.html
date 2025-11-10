@@ -258,7 +258,7 @@
 
 
   <h2 id="pray-and-pay-api">Pray and Pay API <small>— <code>{% url "prayer-list" version=version %}</code></small></h2>
-  <p>The <a href="{% url 'pray_and_pay_help' %}">Pray and Pay system</a> allows you to request PACER documents that are not yet available in the RECAP Archive. When you create a "prayer" for a document, you are flagging it as wanted. When another user purchases that document from PACER and it becomes available in our system, your prayer is automatically granted and you are notified.
+  <p>Use the <a href="{% url 'pray_and_pay_help' %}">Pray and Pay system</a> to monitor when PDFs are added to CourtListener. If a PACER document is not yet available in the RECAP Archive, you "Pray" for it via the <a href="xxx">Pray and Pay API</a>. Later, when another user purchases that document from PACER and it becomes available in our system, your prayer is "granted" and you are notified via this webhook.
   </p>
   <p>This API enables you to programmatically create and manage prayers, making it ideal for:
   </p>
