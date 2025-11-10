@@ -5,15 +5,24 @@ from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.api_serializers import SearchAlertSerializerModel
 from cl.alerts.models import Alert
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import (
+    Webhook,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookVersions,
+)
 from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
+from cl.favorites.api_serializers import PrayerSerializer
+from cl.favorites.models import Prayer
 from cl.lib.elasticsearch_utils import set_child_docs_and_score
 from cl.search.api_serializers import (
+    OpinionClusterWebhookResultSerializer,
     RECAPESWebhookResultSerializer,
     V3OAESResultSerializer,
+    V3OpinionESResultSerializer,
 )
 from cl.search.api_utils import ResultObject
 from cl.search.models import SEARCH_TYPES, DocketEntry
@@ -83,6 +92,38 @@ def send_docket_alert_webhook_events(
 
 
 @app.task()
+def send_pray_and_pay_webhooks(prayer_pk: int, webhook_pk: int) -> None:
+    """Send webhook event when a pray-and-pay request is granted.
+
+    :param prayer_id: Primary key of the granted Prayer instance.
+    :param webhook_id: Primary key of the Webhook to send the event to.
+    :return: None
+    """
+
+    prayer = Prayer.objects.get(pk=prayer_pk)
+    webhook = Webhook.objects.get(pk=webhook_pk)
+    # Only send webhook for granted prayers
+    if prayer.status != Prayer.GRANTED:
+        return
+
+    payload = PrayerSerializer(prayer).data
+    post_content = {
+        "webhook": generate_webhook_key_content(webhook),
+        "payload": payload,
+    }
+    renderer = JSONRenderer()
+    json_bytes = renderer.render(
+        post_content,
+        accepted_media_type="application/json;",
+    )
+    webhook_event = WebhookEvent.objects.create(
+        webhook=webhook,
+        content=post_content,
+    )
+    send_webhook_event(webhook_event, json_bytes)
+
+
+@app.task()
 def send_search_alert_webhook_es(
     results: list[ESDictDocument] | list[Hit],
     webhook_pk: int,
@@ -113,6 +154,14 @@ def send_search_alert_webhook_es(
             serialized_results = RECAPESWebhookResultSerializer(
                 results, many=True
             ).data
+        case SEARCH_TYPES.OPINION:
+            set_child_docs_and_score(results, merge_highlights=True)
+            serializer_class = (
+                V3OpinionESResultSerializer
+                if webhook.version == WebhookVersions.v1
+                else OpinionClusterWebhookResultSerializer
+            )
+            serialized_results = serializer_class(results, many=True).data
         case _:
             # No implemented alert type.
             return None

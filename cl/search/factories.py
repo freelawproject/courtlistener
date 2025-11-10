@@ -1,6 +1,7 @@
 import logging
 import string
 
+from django.conf import settings
 from django.db.utils import IntegrityError
 from factory import (
     DictFactory,
@@ -91,6 +92,7 @@ class DocketFactory(DjangoModelFactory):
     case_name_full = Faker("case_name", full=True)
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     docket_number = Faker("federal_district_docket_number")
+    docket_number_raw = Faker("federal_district_docket_number")
     slug = Faker("slug")
     date_argued = Faker("date_object")
     view_count = 0
@@ -383,7 +385,12 @@ class EmbeddingDataFactory(DictFactory):
     chunk_number = Faker("pyint", min_value=0, max_value=100)
     chunk = Faker("text", max_nb_chars=500)
     embedding = LazyFunction(
-        lambda: [0.036101438105106354 for _ in range(768)]
+        lambda: [
+            0.036101438105106354
+            for _ in range(
+                settings.EMBEDDING_DIMENSIONS,
+            )
+        ]
     )
 
 

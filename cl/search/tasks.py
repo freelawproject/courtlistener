@@ -42,6 +42,14 @@ from httpx import (
     RemoteProtocolError,
     TimeoutException,
 )
+from openai import (
+    APIConnectionError,
+    InternalServerError,
+    RateLimitError,
+)
+from openai import APIError as OpenAIApiError
+from openai import ConflictError as OpenAIApiConflictError
+from redis import Redis
 
 from cl.alerts.tasks import (
     percolator_response_processing,
@@ -56,6 +64,7 @@ from cl.lib.microservice_utils import (
     log_invalid_embedding_errors,
     microservice,
 )
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
@@ -68,6 +77,12 @@ from cl.lib.search_utils import (
 from cl.lib.storage import AWSMediaStorage, S3IntelligentTieringStorage
 from cl.lib.string_utils import camel_to_snake
 from cl.people_db.models import Person, Position
+from cl.search.docket_number_cleaner import (
+    call_models_and_compare_results,
+    process_llm_batches,
+    tie_breaker_prompts,
+    update_docket_number,
+)
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
@@ -571,13 +586,17 @@ def update_es_document(
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
 
+    fields_to_omit_percolation = {
+        "plain_text",
+        "filepath_local",
+    }
     if (
         (
             related_instance_app_label == "search.BankruptcyInformation"
             or (
                 main_app_label in ("search.RECAPDocument", "search.Docket")
                 and related_instance_app_label != "search.DocketEntry"
-                and not {"plain_text", "filepath_local"}
+                and not fields_to_omit_percolation
                 & set(
                     fields_to_update
                 )  # Percolation upon plain_text extraction will be delayed until citation matching completes.
@@ -1527,6 +1546,7 @@ def index_related_cites_fields(
     model_name: str,
     child_id: int,
     cluster_ids_to_update: list[int] | None = None,
+    percolate_opinion: bool = False,
 ) -> None:
     """Index 'cites' and 'citeCount' fields in ES documents in a one request.
     :param self: The Celery task instance.
@@ -1534,12 +1554,14 @@ def index_related_cites_fields(
     :param child_id: The child document ID to update with the cites.
     :param cluster_ids_to_update: Optional; the cluster IDs where 'citeCount'
     should be updated.
+    :param percolate_opinion: Whether to percolate the related opinion document in
+    order to trigger search alerts.
     :return: None.
     """
     documents_to_update = []
     cites_doc_to_update = {}
     base_doc = {}
-    recap_document = None
+    citing_doc = None
     es_child_doc_class = None
     match model_name:
         case OpinionsCited.__name__:
@@ -1554,7 +1576,7 @@ def index_related_cites_fields(
             # Finally build the Opinion dict for updating the cites.
             child_doc_model = Opinion
             es_child_doc_class = OpinionDocument
-            cites_doc_to_update, _ = build_bulk_cites_doc(
+            cites_doc_to_update, citing_doc = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
 
@@ -1567,7 +1589,7 @@ def index_related_cites_fields(
 
             child_doc_model = RECAPDocument
             es_child_doc_class = ESRECAPDocument
-            cites_doc_to_update, recap_document = build_bulk_cites_doc(
+            cites_doc_to_update, citing_doc = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
 
@@ -1585,16 +1607,17 @@ def index_related_cites_fields(
         OpinionClusterDocument._index.refresh()
         DocketDocument._index.refresh()
 
-    if all(
-        [
-            model_name == OpinionsCitedByRECAPDocument.__name__,
-            recap_document,
-            es_child_doc_class,
-        ]
+    if (
+        citing_doc
+        and es_child_doc_class
+        and (
+            model_name == OpinionsCitedByRECAPDocument.__name__
+            or percolate_opinion
+        )
     ):
-        # Percolate the related RECAPDocument to match queries that involve the
-        # cites field.
-        percolate_document(es_child_doc_class, child_id, recap_document)
+        # Percolate if it’s the RECAP‐cited‐by document or if percolation is
+        # enabled for opinions.
+        percolate_document(es_child_doc_class, child_id, citing_doc)
 
 
 @app.task(
@@ -1760,26 +1783,37 @@ def remove_documents_by_query(
     return response
 
 
-def inception_batch_request(batch: dict) -> list[dict]:
-    """Get embeddings from the inception batch microservice.
+def request_embeddings_for_batch(batch: dict, service_name: str) -> list[dict]:
+    """Get embeddings from the specified Inception batch microservice.
 
     param batch: A list of dictionaries, where each dictionary represents an
     opinion document with the following keys:
-    "id": The Opinion ID.
-    "text": The content of the opinion.
+        "id": The Opinion ID.
+        "text": The content of the opinion.
+    param service_name: The name of the Inception microservice to use, e.g.,
+        "inception-batch" or "inception-cpu-batch".
     :return: A list of dictionaries, each containing the embeddings for the
     corresponding opinion document as returned  by the inception microservice.
     """
-
     data = json.dumps(batch)
     response = asyncio.run(
         microservice(
-            service="inception-batch",
+            service=service_name,
             method="POST",
             data=data,
         )
     )
     return response.json()
+
+
+def inception_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the GPU version of the inception microservice."""
+    return request_embeddings_for_batch(batch, "inception-batch")
+
+
+def inception_cpu_batch_request(batch: dict) -> list[dict]:
+    """Get embeddings from the CPU version of the inception microservice."""
+    return request_embeddings_for_batch(batch, "inception-cpu-batch")
 
 
 def embeddings_cache_key():
@@ -1823,6 +1857,9 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     if not opinion:
         return None
 
+    if opinion.token_count < settings.MIN_OPINION_SIZE:
+        return None
+
     embeddings = asyncio.run(
         microservice(
             service="inception-text",
@@ -1864,13 +1901,15 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     retry_backoff=10,
 )
 def create_opinion_text_embeddings(
-    self, batch: list[int], database
+    self, batch: list[int], database: str, device: str = "cpu"
 ) -> str | None:
     """Get embeddings for Opinion texts from inception.
 
     :param self: The Celery task.
     :param batch: A list of Opinion IDs representing the batch to process.
     :param database: The database to be used during processing.
+    :param device: The device to run the embedding generation on (e.g., 'cpu'
+        or 'gpu'). Defaults to 'cpu'.
     :return: The cache key used to temporarily store embeddings.
     """
     opinions = (
@@ -1885,7 +1924,12 @@ def create_opinion_text_embeddings(
 
     batch_range = f"{batch[0]}_{batch[-1]}"
     batch_request = {"documents": opinions_to_vectorize}
-    embeddings = inception_batch_request(batch_request)
+    inception_service = (
+        inception_batch_request
+        if device == "gpu"
+        else inception_cpu_batch_request
+    )
+    embeddings = inception_service(batch_request)
     # Use a UUID to guarantee the uniqueness of this batch of stored embeddings
     batch_uuid = str(uuid.uuid4().hex)
     cache_key = get_embeddings_cache_key(batch_uuid, batch_range)
@@ -2078,10 +2122,12 @@ def index_embeddings(
     for embeddings in embeddings:
         opinion_id = embeddings["id"]
         opinion_instance = (
-            Opinion.objects.filter(id=opinion_id).only("pk", "cluster").first()
+            Opinion.objects.filter(id=opinion_id)
+            .only("pk", "cluster", "main_version")
+            .first()
         )
-        if not opinion_instance:
-            # The opinion has been removed from the DB
+        if not opinion_instance or opinion_instance.main_version:
+            # The opinion has been removed from the DB or has a main version
             continue
 
         doc_to_update = {
@@ -2103,3 +2149,77 @@ def index_embeddings(
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         OpinionClusterDocument._index.refresh()
+
+
+@app.task(
+    bind=True,
+    max_retries=5,
+    retry_backoff=True,
+    autoretry_for=(
+        RateLimitError,
+        APIConnectionError,
+        OpenAIApiConflictError,
+        InternalServerError,
+        OpenAIApiError,
+    ),
+    retry_kwargs={"max_retries": 5},
+)
+def clean_docket_number_by_court(
+    self: Task,
+    court_batch: list[dict[int, str]],
+    court_mapping: str,
+    start_timestamp: datetime,
+    r: Redis | None = None,
+) -> None:
+    """
+    Cleans docket numbers for the respective court_mapping using cascading model passes.
+
+    The cleaning process involves:
+    1. Running two mini models to find consensus on cleaned docket numbers.
+    2. For non-consensus results, running two full models for further comparison.
+    3. For remaining ties, using a tie-breaker model to finalize the cleaned docket numbers.
+    4. Updating the docket numbers in the database with the cleaned results.
+
+    :param court_batch: A batch of court records with docket IDs and numbers.
+    :param court_mapping: Identifier for the court mapping used in model prompts.
+    :param start_timestamp: Timestamp marking the start of the daemon job.
+    """
+    if r is None:
+        r = get_redis_interface("CACHE")
+    # First pass with two mini models to find consensus
+    next_model_batches = call_models_and_compare_results(
+        court_batch=court_batch,
+        court_mapping=court_mapping,
+        model_one="openai/gpt-4o-mini",
+        model_two="openai/gpt-4.1-mini",
+        start_timestamp=start_timestamp,
+        r=r,
+    )
+    # Next pass with two full models for non-consensus
+    if not next_model_batches:
+        return
+    tie_breaker_batches = call_models_and_compare_results(
+        court_batch=next_model_batches,
+        court_mapping=court_mapping,
+        model_one="openai/gpt-4o",
+        model_two="openai/gpt-4.1",
+        start_timestamp=start_timestamp,
+        r=r,
+    )
+    # Third pass with tie-breaker model
+    if not tie_breaker_batches:
+        return
+    tie_breaker_results = process_llm_batches(
+        llm_batches=tie_breaker_batches,
+        system_prompt=tie_breaker_prompts.get(court_mapping, ""),
+        model_id="openai/gpt-4o",
+        retry=0,
+        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
+        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
+        all_cleaned=dict(),
+    )
+    for (
+        docket_id,
+        docket_number,
+    ) in tie_breaker_results.items():
+        update_docket_number(docket_id, docket_number, start_timestamp, r)

@@ -148,6 +148,9 @@
   </p>
   <p>As with all other APIs, you can look up the field descriptions, filtering, ordering, and rendering options by making an <code>OPTIONS</code> request:
   </p>
+  <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up:</strong> When retrieving opinion text, prefer the <code>html_with_citations</code> field instead of <code>plain_text</code>. The <code>html_with_citations</code> field contains the raw text of the decision, and is the most reliable field for most purposes.<br><br>
+    Opinion URLs on the CourtListener website contain a <code>cluster_id</code>, not an <code>opinion_id</code>. If you want to look up a case using that ID, query the Cluster API. See <a href="#by-url">Finding a Case by URL</a>, below.
+  </p>
   <pre class="pre-scrollable">curl -v \
   -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \

@@ -1438,7 +1438,7 @@ class ReplicateRecapUploadsTest(TestCase):
             ],
             pacer_doc_id="04505578697",
             pacer_case_id="104491",
-            document_number="1",
+            document_number="2",
         )
         cls.de_data_2 = DocketEntriesDataFactory(
             docket_entries=[
@@ -1612,31 +1612,54 @@ class ReplicateRecapUploadsTest(TestCase):
         )
 
         att_1_data = self.att_data_2["attachments"][0]
-        att_2_data = self.att_data_2["attachments"][0]
+        att_2_data = self.att_data_2["attachments"][1]
 
+        d_1_1_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_1_2_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_1_2_attachment.attachment_number,
             att_2_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_2_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_2_1_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_2_1_attachment.document_number,
+            self.att_data_2["document_number"],
+        )
+
+        d_2_2_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_2_attachment.attachment_number,
             att_2_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_2_attachment.document_number,
+            self.att_data_2["document_number"],
         )
 
         # Assert the number of PQs created to process the additional subdocket RDs.
@@ -2123,31 +2146,54 @@ class ReplicateRecapUploadsTest(TestCase):
         )
 
         att_1_data = self.att_data_2["attachments"][0]
-        att_2_data = self.att_data_2["attachments"][0]
+        att_2_data = self.att_data_2["attachments"][1]
 
+        d_1_1_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_1_2_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_1_2_attachment.attachment_number,
             att_2_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_2_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_2_1_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_2_1_attachment.document_number,
+            self.att_data_2["document_number"],
+        )
+
+        d_2_2_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_2_attachment.attachment_number,
             att_2_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_2_attachment.document_number,
+            self.att_data_2["document_number"],
         )
 
         # Assert the number of PQs created to process the additional subdocket RDs.
