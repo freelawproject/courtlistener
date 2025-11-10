@@ -21,6 +21,13 @@ def get_zoho_cache_key() -> str:
 class SearchableModule:
     module_name: str = ""
 
+    def __init__(self):
+        if Initializer.get_initializer() is None:
+            self.initialize()
+
+        if not self.module_name:
+            raise Exception("Subclasses must set `module_name`.")
+
     @staticmethod
     def initialize():
         refresh_token = cache.get(f"{get_zoho_cache_key()}:refresh")
