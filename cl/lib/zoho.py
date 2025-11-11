@@ -51,7 +51,8 @@ class SearchableModule:
     def get_record_by_cl_id_or_email(
         self,
         cl_ids: list[int] | None = None,
-        email: list[str] | None = None,
+        emails: list[str] | None = None,
+        fields: list[str] | None = None,
     ):
         """Retrieve Zoho CRM records by CourtListener IDs or email addresses.
 
@@ -62,12 +63,14 @@ class SearchableModule:
 
         :param cl_ids: Optional list of CourtListener record IDs to search for.
         :param emails: Optional list of email addresses to search for.
+        :param fields: Optional list of field names to retrieve from each record.
         :return: A list of Zoho record data objects returned by the API.
         :raises ValueError: If both `cl_ids` and `emails` are empty or None.
         """
         cl_ids = cl_ids or []
-        email = email or []
-        if not cl_ids and not email:
+        emails = emails or []
+        fields = fields or []
+        if not cl_ids and not emails:
             raise ValueError(
                 "At least one of 'cl_ids' or 'emails' must be provided."
             )
@@ -76,7 +79,7 @@ class SearchableModule:
         param_instance = ParameterMap()
 
         ids_str = ",".join([str(i) for i in cl_ids])
-        emails_str = ",".join(email)
+        emails_str = ",".join(emails)
 
         criteria = []
         if emails_str:
@@ -86,6 +89,9 @@ class SearchableModule:
 
         criteria_str = " or ".join(criteria)
         param_instance.add(SearchRecordsParam.criteria, f"({criteria_str})")
+
+        for field in fields:
+            param_instance.add(SearchRecordsParam.fields, field)
 
         header_instance = HeaderMap()
         response = record_operations.search_records(
