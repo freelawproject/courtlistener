@@ -72,6 +72,13 @@ def build_zoho_payload_from_user(user) -> dict[str | Field, Any]:
 class ZohoModule:
     module_name: str = ""
 
+    def __init__(self):
+        if Initializer.get_initializer() is None:
+            self.initialize()
+
+        if not self.module_name:
+            raise Exception("Subclasses must set `module_name`.")
+
     @staticmethod
     def initialize():
         refresh_token = cache.get(f"{get_zoho_cache_key()}:refresh")
@@ -133,13 +140,37 @@ class ZohoModule:
 
 class SearchRecordMixin:
     def get_record_by_cl_id_or_email(
-        self: HasModuleName, cl_ids: list[int], email: list[str]
+        self: HasModuleName,
+        cl_ids: list[int] | None = None,
+        emails: list[str] | None = None,
+        fields: list[str] | None = None,
     ):
+        """Retrieve Zoho CRM records by CourtListener IDs or email addresses.
+
+        At least one of `cl_ids` or `emails` must be provided. The method
+        builds a search query using the provided identifiers and sends it
+        to the Zoho API. If matching records are found, they are returned
+        as a list of data objects.
+
+        :param cl_ids: Optional list of CourtListener record IDs to search for.
+        :param emails: Optional list of email addresses to search for.
+        :param fields: Optional list of field names to retrieve from each record.
+        :return: A list of Zoho record data objects returned by the API.
+        :raises ValueError: If both `cl_ids` and `emails` are empty or None.
+        """
+        cl_ids = cl_ids or []
+        emails = emails or []
+        fields = fields or []
+        if not cl_ids and not emails:
+            raise ValueError(
+                "At least one of 'cl_ids' or 'emails' must be provided."
+            )
+
         record_operations = RecordOperations(self.module_name)
         param_instance = ParameterMap()
 
         ids_str = ",".join([str(i) for i in cl_ids])
-        emails_str = ",".join(email)
+        emails_str = ",".join(emails)
 
         criteria = []
         if emails_str:
@@ -149,6 +180,9 @@ class SearchRecordMixin:
 
         criteria_str = " or ".join(criteria)
         param_instance.add(SearchRecordsParam.criteria, f"({criteria_str})")
+
+        for field in fields:
+            param_instance.add(SearchRecordsParam.fields, field)
 
         header_instance = HeaderMap()
         response = record_operations.search_records(
