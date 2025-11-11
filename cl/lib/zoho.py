@@ -49,8 +49,29 @@ class SearchableModule:
         )
 
     def get_record_by_cl_id_or_email(
-        self, cl_ids: list[int], email: list[str]
+        self,
+        cl_ids: list[int] | None = None,
+        email: list[str] | None = None,
     ):
+        """Retrieve Zoho CRM records by CourtListener IDs or email addresses.
+
+        At least one of `cl_ids` or `emails` must be provided. The method
+        builds a search query using the provided identifiers and sends it
+        to the Zoho API. If matching records are found, they are returned
+        as a list of data objects.
+
+        :param cl_ids: Optional list of CourtListener record IDs to search for.
+        :param emails: Optional list of email addresses to search for.
+        :return: A list of Zoho record data objects returned by the API.
+        :raises ValueError: If both `cl_ids` and `emails` are empty or None.
+        """
+        cl_ids = cl_ids or []
+        email = email or []
+        if not cl_ids and not email:
+            raise ValueError(
+                "At least one of 'cl_ids' or 'emails' must be provided."
+            )
+
         record_operations = RecordOperations(self.module_name)
         param_instance = ParameterMap()
 
