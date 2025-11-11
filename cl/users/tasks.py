@@ -143,8 +143,7 @@ def create_or_update_zoho_account(
     :param milestone: A milestone value to store in the 'API_calls' field
     """
     user = User.objects.select_related("profile").get(pk=user_id)
-    payload = build_zoho_payload_from_user(user)
-    payload["API_calls"] = milestone
+    milestone_payload = {"API_calls": milestone}
 
     # Initialize Zoho modules
     contacts_module = ContactsModule()
@@ -153,25 +152,35 @@ def create_or_update_zoho_account(
     leads_module = LeadsModule()
     leads_module.initialize()
 
+    lead_records = leads_module.get_record_by_cl_id_or_email(
+        emails=[user.email], cl_ids=[user.pk]
+    )
+    # Update the first matching Lead, if found
+    if lead_records:
+        payload = build_zoho_payload_from_user(user, leads_module.module_name)
+        leads_module.update_record(
+            lead_records[0].get_id(), payload | milestone_payload
+        )
+        return
+
     # Try to find existing Zoho records
     contact_records = contacts_module.get_record_by_cl_id_or_email(
-        email=[user.email], cl_ids=[user.pk]
-    )
-    lead_records = leads_module.get_record_by_cl_id_or_email(
-        email=[user.email], cl_ids=[user.pk]
+        emails=[user.email], cl_ids=[user.pk]
     )
     # Update the first matching Contact, if found
     if contact_records:
-        contacts_module.update_record(contact_records[0].get_id(), payload)
-        return
-
-    # Update the first matching Lead, if found
-    if lead_records:
-        leads_module.update_record(lead_records[0].get_id(), payload)
+        payload = build_zoho_payload_from_user(
+            user, contacts_module.module_name
+        )
+        contacts_module.update_record(
+            contact_records[0].get_id(), payload | milestone_payload
+        )
         return
 
     # Otherwise, create a new Lead
-    leads_module.create_record(payload)
+    leads_module.create_record(
+        build_zoho_payload_from_user(user, leads_module.module_name)
+    )
 
 
 @app.task(ignore_result=True)

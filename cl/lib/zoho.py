@@ -1,4 +1,4 @@
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from django.conf import settings
 from django.core.cache import cache
@@ -30,7 +30,9 @@ def get_zoho_cache_key() -> str:
     return "zoho_token"
 
 
-def build_zoho_payload_from_user(user) -> dict[str | Field, Any]:
+def build_zoho_payload_from_user(
+    user, module: Literal["Contacts", "Leads"]
+) -> dict[str | Field, Any]:
     """
     Build a Zoho CRM payload dictionary from a User instance.
 
@@ -39,6 +41,7 @@ def build_zoho_payload_from_user(user) -> dict[str | Field, Any]:
     by `Field` instances, while custom fields use string keys.
 
     :param user: The user whose data will be mapped to Zoho CRM fields.
+    :param module: The Zoho module name ('Leads' or 'Contacts').
     :return: A dictionary mapping Zoho field identifiers (either `Field`
     instances or string keys) to their corresponding values.
     """
@@ -52,19 +55,29 @@ def build_zoho_payload_from_user(user) -> dict[str | Field, Any]:
     if user.last_name:
         payload[Field.Leads.last_name()] = user.last_name
 
+    is_lead = module == "Leads"
     # Profile-related fields
     profile = user.profile
-    if profile.employer:
+    if profile.employer and is_lead:
         payload[Field.Leads.company()] = profile.employer
 
     if profile.city:
-        payload[Field.Leads.city()] = profile.city
+        field_name = (
+            Field.Leads.city() if is_lead else Field.Contacts.mailing_city()
+        )
+        payload[field_name] = profile.city
 
     if profile.state:
-        payload[Field.Leads.state()] = profile.state
+        field_name = (
+            Field.Leads.state() if is_lead else Field.Contacts.mailing_state()
+        )
+        payload[field_name] = profile.state
 
     if profile.zip_code:
-        payload[Field.Leads.zip_code()] = profile.zip_code
+        field_name = (
+            Field.Leads.zip_code() if is_lead else Field.Contacts.mailing_zip()
+        )
+        payload[field_name] = profile.zip_code
 
     return payload
 
