@@ -25,6 +25,17 @@ from cl.lib.command_utils import logger
 class HasModuleName(Protocol):
     module_name: str
 
+    def _build_record(
+        self, fields: dict[str | Any, Any], record_id: int | None = None
+    ) -> Record: ...
+
+    def _build_body_wrapper(
+        self,
+        records: list[Record],
+        process: list[str] | None = None,
+        trigger: list[str] | None = None,
+    ) -> BodyWrapper: ...
+
 
 def get_zoho_cache_key() -> str:
     return "zoho_token"
