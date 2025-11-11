@@ -150,6 +150,40 @@ class ZohoModule:
 
         raise Exception("Unexpected response type received from the Zoho API.")
 
+    def _build_record(
+        self, fields: dict[str | Field, Any], record_id: int | None = None
+    ) -> Record:
+        """
+        Build a Zoho Record instance from a dictionary of fields.
+        Optionally set a record ID for updates.
+        """
+        record = Record()
+        if record_id:
+            record.set_id(record_id)
+
+        for key, value in fields.items():
+            if isinstance(key, Field):
+                record.add_field_value(key, value)
+            else:
+                record.add_key_value(key, value)
+        return record
+
+    def _build_body_wrapper(
+        self,
+        records: list[Record],
+        triggers: list[str] | None = None,
+        process: list[str] | None = None,
+    ) -> BodyWrapper:
+        """
+        Wrap one or more Record instances in a BodyWrapper with optional process and trigger.
+        """
+        wrapper = BodyWrapper()
+        wrapper.set_data(records)
+        wrapper.set_trigger(triggers or ["approval", "workflow", "blueprint"])
+        if process:
+            wrapper.set_process(process)
+        return wrapper
+
 
 class SearchRecordMixin:
     def get_record_by_cl_id_or_email(
@@ -221,21 +255,10 @@ class CreateRecordMixin:
             `ZohoModule.handle_api_response`.
         """
         record_operations = RecordOperations(self.module_name)
-        request = BodyWrapper()
-
-        record = Record()
-        # Populate record fields
-        for key, value in fields.items():
-            if isinstance(key, Field):
-                record.add_field_value(key, value)
-            else:
-                record.add_key_value(key, value)
-
-        # Build the request
-        request.set_data([record])
-        request.set_trigger(["approval", "workflow", "blueprint"])
-        request.set_process(["review_process"])
-
+        record = self._build_record(fields)
+        request = self._build_body_wrapper(
+            [record], process=["review_process"]
+        )
         # Execute and handle response
         response = record_operations.create_records(request, HeaderMap())
         return ZohoModule.handle_api_response(response)
@@ -255,20 +278,8 @@ class UpdateRecordMixin:
             `ZohoModule.handle_api_response`.
         """
         record_operations = RecordOperations(self.module_name)
-        request = BodyWrapper()
-
-        record = Record()
-        # Populate record fields
-        record.set_id(record_id)
-        for key, value in fields.items():
-            if isinstance(key, Field):
-                record.add_field_value(key, value)
-            else:
-                record.add_key_value(key, value)
-
-        # Add Record instance to the list
-        request.set_data([record])
-        request.set_trigger(["approval", "workflow", "blueprint"])
+        record = self._build_record(fields, record_id)
+        request = self._build_body_wrapper([record])
         response = record_operations.update_record(
             record_id, request, HeaderMap()
         )
