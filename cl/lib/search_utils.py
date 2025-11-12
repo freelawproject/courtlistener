@@ -102,7 +102,7 @@ def make_get_string(
 
 
 def merge_form_with_courts(
-    courts: dict,
+    courts: QuerySet[Court],
     search_form: SearchForm,
 ) -> tuple[dict[str, list], str, str]:
     """Merges the courts dict with the values from the search form.
@@ -676,7 +676,7 @@ def do_es_search(
                     search_form,
                 )
 
-    courts, court_count_human, court_count = merge_form_with_courts(
+    courts_dict, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
     )
     search_summary_str = search_form.as_text(court_count_human)
@@ -695,7 +695,7 @@ def do_es_search(
         "search_summary_str": search_summary_str,
         "search_summary_dict": search_summary_dict,
         "error": error,
-        "courts": courts,
+        "courts": courts_dict,
         "court_count_human": court_count_human,
         "court_count": court_count,
         "query_citation": query_citation,
