@@ -1,9 +1,15 @@
-import pytest
-from asgiref.sync import async_to_sync
+from datetime import datetime
 
-from cl.stats.models import Stat
+import pytest
+import time_machine
+from asgiref.sync import async_to_sync
+from django.core import mail
+from django.core.management import call_command
+
+from cl.stats.models import Event, Stat
 from cl.stats.utils import get_milestone_range, tally_stat
 from cl.tests.cases import TestCase
+from cl.users.factories import UserFactory
 
 
 class MilestoneTests(TestCase):
@@ -11,6 +17,51 @@ class MilestoneTests(TestCase):
         numbers = get_milestone_range("XS", "SM")
         self.assertEqual(numbers[0], 1e1)
         self.assertEqual(numbers[-1], 5e4)
+
+
+class PartnershipEmailTests(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.api_user = UserFactory()
+        cls.webhook_user = UserFactory()
+
+    def test_command_can_filter_user_api_events(self) -> None:
+        with time_machine.travel(
+            datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
+            tick=False,
+        ):
+            global_api_event = Event.objects.create(
+                description="API v4 has logged 1000 total requests."
+            )
+            global_webhook_event = Event.objects.create(
+                description="Webhooks have logged 1000 total successful events."
+            )
+            api_user_event = Event.objects.create(
+                description=f"User '{self.api_user.username}' has placed their 3rd API v4 request.",
+                user=self.api_user,
+            )
+            webhook_user_event = Event.objects.create(
+                description=f"User '{self.api_user.username}' has placed their 3rd webhook event.",
+                user=self.webhook_user,
+            )
+            call_command("send_events_email")
+
+        # Assert an email was sent
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        email = mail.outbox[0]
+
+        # Extract email content
+        body = email.body
+
+        # Should include global and webhook user events
+        self.assertIn(global_api_event.description, body)
+        self.assertIn(global_webhook_event.description, body)
+        self.assertIn(webhook_user_event.description, body)
+
+        # Should exclude API user-specific event
+        self.assertNotIn(api_user_event.description, body)
 
 
 @pytest.mark.django_db
