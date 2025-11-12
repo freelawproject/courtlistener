@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
+from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
@@ -527,6 +528,7 @@ def do_es_search(
     facet: bool = True,
     cache_key: str | None = None,
     is_csv_export: bool = False,
+    courts: QuerySet[Court] = Court.objects.filter(in_use=True),
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -539,11 +541,11 @@ def do_es_search(
     is set or used. Results are saved for six hours.
     :param is_csv_export: Indicates if the data being processed is intended for
     an export process.
+    :param courts: QuerySet of courts used in the jurisdiction picker.
     :return: A big dict of variables for use in the search results, homepage, or
     other location.
     """
     paged_results = None
-    courts = Court.objects.filter(in_use=True)
     query_time: int | None = 0
     total_query_results: int | None = 0
     top_hits_limit: int | None = 5
