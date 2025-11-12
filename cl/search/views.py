@@ -316,9 +316,7 @@ def advanced(request: HttpRequest) -> HttpResponse:
         courts = courts_in_use = Court.objects.filter(in_use=True)
         if request.path == reverse("advanced_r"):
             obj_type = SEARCH_TYPES.RECAP
-            courts_in_use = courts.filter(
-                pacer_court_id__isnull=False, end_date__isnull=True
-            ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL)
+            courts_in_use = courts.recap_courts()
         elif request.path == reverse("advanced_oa"):
             obj_type = SEARCH_TYPES.ORAL_ARGUMENT
         elif request.path == reverse("advanced_p"):

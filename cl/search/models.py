@@ -1970,6 +1970,14 @@ class FederalCourtsQuerySet(models.QuerySet):
         return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
 
+class CourtQuerySet(models.QuerySet):
+    def recap_courts(self):
+        """QuerySet of valid PACER courts."""
+        return self.filter(
+            pacer_court_id__isnull=False, end_date__isnull=True
+        ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL)
+
+
 @pghistory.track()
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
@@ -2194,7 +2202,7 @@ class Court(models.Model):
         blank=True,
     )
 
-    objects = models.Manager()
+    objects = CourtQuerySet.as_manager()
     federal_courts = FederalCourtsQuerySet.as_manager()
 
     def __str__(self) -> str:
