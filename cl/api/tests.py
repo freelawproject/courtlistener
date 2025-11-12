@@ -557,13 +557,14 @@ class ApiEventCreationTestCase(TestCase):
         request.user = self.user
         await sync_to_async(view)(request, **{"version": f"{api_version}"})
 
+    @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
         return_value="api:Test",
     )
     @mock.patch.object(LoggingMixin, "milestones", new=[1])
     async def test_are_v3_events_created_properly(
-        self, mock_logging_prefix
+        self, mock_logging_prefix, mock_zoho_task
     ) -> None:
         """Are event objects created as v3 API requests are made?"""
         await self.hit_the_api("v3")
@@ -579,14 +580,16 @@ class ApiEventCreationTestCase(TestCase):
             f"User '{self.user.username}' has placed their 1st API v3 request."
         )
         self.assertEqual(event_descriptions, expected_descriptions)
+        mock_zoho_task.delay.assert_called_once_with(self.user.pk, 1)
 
+    @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
         return_value="api:Test",
     )
     @mock.patch.object(LoggingMixin, "milestones", new=[1])
     async def test_are_v4_events_created_properly(
-        self, mock_logging_prefix
+        self, mock_logging_prefix, mock_zoho_task
     ) -> None:
         """Are event objects created as V4 API requests are made?"""
         await self.hit_the_api("v4")
@@ -602,15 +605,19 @@ class ApiEventCreationTestCase(TestCase):
             f"User '{self.user.username}' has placed their 1st API v4 request."
         )
         self.assertEqual(event_descriptions, expected_descriptions)
+        mock_zoho_task.delay.assert_called_once_with(self.user.pk, 1)
 
     # Set the api prefix so that other tests
     # run in parallel do not affect this one.
+    @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
         side_effect=lambda *args,
         **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
     )
-    async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
+    async def test_api_logged_correctly(
+        self, mock_logging_prefix, mock_zoho_task
+    ) -> None:
         # Global stats
         self.assertEqual(mock_logging_prefix.called, 0)
         await self.hit_the_api("v3")
@@ -637,12 +644,15 @@ class ApiEventCreationTestCase(TestCase):
             int(self.r.get("api:v3-Test.timing")), 10, delta=2000
         )
 
+    @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
         side_effect=lambda *args,
         **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
     )
-    async def test_api_logged_correctly_v4(self, mock_logging_prefix) -> None:
+    async def test_api_logged_correctly_v4(
+        self, mock_logging_prefix, mock_zoho_task
+    ) -> None:
         # Global stats
         self.assertEqual(mock_logging_prefix.called, 0)
         await self.hit_the_api("v4")
