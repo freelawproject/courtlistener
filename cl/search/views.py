@@ -225,6 +225,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
         return TemplateResponse(request, "homepage.html", render_dict)
 
+    search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
     # This is a GET with parameters
     # User placed a search or is trying to edit an alert
     if edit_alert:
@@ -258,7 +259,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             initial={
                 "query": get_string,
                 "rate": "dly",
-                "alert_type": request.GET.get("type", SEARCH_TYPES.OPINION),
+                "alert_type": search_type,
                 "original_alert_type": request.GET.get(
                     "type", SEARCH_TYPES.OPINION
                 ),
@@ -266,7 +267,13 @@ def show_results(request: HttpRequest) -> HttpResponse:
             user=request.user,
         )
 
-    search_results = do_es_search(request.GET.copy())
+    if search_type == SEARCH_TYPES.RECAP:
+        search_results = do_es_search(
+            request.GET.copy(), courts=Court.objects.recap_courts()
+        )
+    else:
+        search_results = do_es_search(request.GET.copy())
+
     render_dict.update(search_results)
     store_search_query(request, search_results)
 
