@@ -8,6 +8,7 @@ from ..third_party.aws import AWS_S3_CUSTOM_DOMAIN
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 
+PRIVACY_POLICY_CUTOFF_DAYS = env.int("PRIVACY_POLICY_CUTOFF_DAYS", 84)
 ALLOWED_HOSTS: list[str] = env(
     "ALLOWED_HOSTS", default=["www.courtlistener.com"]
 )
