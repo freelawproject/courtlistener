@@ -1742,6 +1742,10 @@ div.subopinion-content img {
   }
 }
 
+.absolute {
+  position: absolute;
+}
+
 /* Custom CSS for opinion coverage page */
 .timelines-dialog {
     width: 95vw;

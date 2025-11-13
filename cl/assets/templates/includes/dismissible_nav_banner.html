@@ -8,6 +8,9 @@
     - cookie_name: Name of the cookie used to remember if the user has already
     dismissed the banner. This prevents them from seeing the same message
     repeatedly.
+    - responsive (optional): When `True`, text and button are in a row in larger screens,
+    and in a column in smaller ones. When `False`, layout is always the same, with the
+    button below the text.
     - button_text (optional): Text for the button. Defaults to "Learn More".
     - button_emoji (optional): An Idiomatic Text element (<i></i>) to display
     inside the button.
@@ -32,7 +35,7 @@
 
 {% if cookie_name  not in request.COOKIES %}
   <div
-    class="flex flex-column align-items-center flex-md-row alert-{% if variant %}{{ variant }}{% else %}danger{% endif %}"
+    class="flex flex-column align-items-center{% if responsive %} flex-md-row{% endif %} alert-{% if variant %}{{ variant }}{% else %}danger{% endif %}"
     style="border: 2px solid lightgray; padding-inline: 4rem; padding-block: 2rem; position: relative; gap: 1.5rem"
   >
     {# Banner text #}
@@ -51,7 +54,7 @@
     {# Close button #}
     <button
       type="button"
-      class="close absolute-max-md"
+      class="close {% if responsive %}absolute-max-md{% else %}absolute{% endif %}"
       style="right: 1.4rem; top: 0.5rem; padding: 1rem"
       data-cookie-name="{{cookie_name}}"
       data-duration="20"
