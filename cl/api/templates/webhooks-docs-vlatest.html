@@ -414,6 +414,8 @@ xargs -I % curl -X POST \
   <h3 id="pray-and-pay">Pray And Pay Events</h3>
   <p>The <a href="{% url 'pray_and_pay_help' %}">Pray and Pay system</a> allows users to request PACER documents that are not yet available in CourtListener's RECAP Archive. When a requested document becomes available, users who requested it are notified via email.
   </p>
+  <p>To programmatically create and manage prayers, see the <a href="{% url 'recap_api_help' %}#pray-and-pay-api">Pray and Pay API documentation</a>.
+  </p>
   <p>By subscribing to this webhook endpoint, your server can be notified when a Pray and Pay request you made has been granted and the document is now available.
   </p>
   <p>As with our other events, this webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>.</p>
