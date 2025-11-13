@@ -37,6 +37,7 @@
   <div
     class="flex flex-column align-items-center{% if responsive %} flex-md-row{% endif %} alert-{% if variant %}{{ variant }}{% else %}danger{% endif %}"
     style="border: 2px solid lightgray; padding-inline: 4rem; padding-block: 2rem; position: relative; gap: 1.5rem"
+    data-dismissible-alert
   >
     {# Banner text #}
     <p class="lead" style="margin: 0; flex-grow: 1">{{text}}</p>
