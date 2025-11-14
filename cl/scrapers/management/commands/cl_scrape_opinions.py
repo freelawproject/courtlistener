@@ -10,11 +10,12 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
-from juriscraper.lib.exceptions import InvalidDocumentError
+from juriscraper.lib.exceptions import BadContentError, InvalidDocumentError
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
+from cl import settings
 from cl.alerts.models import RealTimeQueue
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
@@ -22,14 +23,12 @@ from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
-    BadContentError,
     ConsecutiveDuplicatesError,
     SingleDuplicateError,
 )
-from cl.scrapers.tasks import extract_doc_content
+from cl.scrapers.tasks import extract_opinion_content
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
-    get_binary_content,
     get_child_court,
     get_extension,
     make_citation,
@@ -272,6 +271,9 @@ class Command(ScraperCommand):
 
         logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
 
+        # do not update the site hash on a backscrape or manual full crawl
+        update_site_hash = not full_crawl
+
         added = 0
         for i, item in enumerate(site):
             try:
@@ -286,12 +288,11 @@ class Command(ScraperCommand):
                 added += 1
             except ConsecutiveDuplicatesError:
                 break
-            except (
-                SingleDuplicateError,
-                BadContentError,
-                InvalidDocumentError,
-            ):
+            except SingleDuplicateError:
                 pass
+            except (BadContentError, InvalidDocumentError):
+                # do not update site hash to ensure a retry on the next scrape
+                update_site_hash = False
 
         # Update the hash if everything finishes properly.
         logger.debug(
@@ -301,8 +302,8 @@ class Command(ScraperCommand):
             len(site),
             self.scrape_target_descr,
         )
-        if not full_crawl:
-            # Only update the hash if no errors occurred.
+
+        if update_site_hash:
             dup_checker.update_site_hash(site.hash)
 
     def ingest_a_case(
@@ -317,7 +318,9 @@ class Command(ScraperCommand):
         if item.get("content"):
             content = item.pop("content")
         else:
-            content = get_binary_content(item["download_urls"], site)
+            content = site.download_content(
+                item["download_urls"], media_root=settings.MEDIA_ROOT
+            )
 
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
@@ -369,11 +372,11 @@ class Command(ScraperCommand):
                 "originating_court_information": originating_court_info,
             }
         )
-        extract_doc_content.delay(
+        extract_opinion_content.delay(
             opinion.pk,
             ocr_available=ocr_available,
-            citation_jitter=True,
             juriscraper_module=site.court_id,
+            percolate_opinion=True,
         )
 
         logger.info(

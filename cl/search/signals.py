@@ -21,6 +21,9 @@ from cl.people_db.models import (
     Position,
     School,
 )
+from cl.search.docket_number_cleaner import (
+    clean_docket_number_raw_and_update_redis_cache,
+)
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
@@ -455,6 +458,7 @@ o_field_mapping = {
                 "html_anon_2020": ["text"],
                 "html": ["text"],
                 "plain_text": ["text"],
+                "html_with_citations": ["text"],
                 "sha1": ["sha1"],
                 "ordering_key": ["ordering_key"],
             },
@@ -655,3 +659,24 @@ def update_court_cache(sender, instance: Court, created: bool, **kwargs):
 
     if created:
         logger.error("Create a courthouse for new court '%s'", instance.id)
+
+
+@receiver(
+    post_save,
+    sender=Docket,
+    dispatch_uid="handle_docket_number_raw_cleaning",
+)
+def handle_docket_number_raw_cleaning(
+    sender, instance: Docket, created=False, update_fields=None, **kwargs
+):
+    if not settings.DOCKET_NUMBER_CLEANING_ENABLED:
+        # Only perform cleaning if enabled
+        return
+
+    # Only clean if the docket was was non-recap source and newly created or docket_number_raw has changed
+    changed = bool(
+        update_fields and not created and "docket_number_raw" in update_fields
+    )
+    non_recap_sources = instance.source != Docket.RECAP
+    if (created or changed) and non_recap_sources:
+        clean_docket_number_raw_and_update_redis_cache(instance)

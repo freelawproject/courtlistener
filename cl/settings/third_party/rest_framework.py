@@ -87,6 +87,11 @@ REST_FRAMEWORK = {
         "shishir": "10/hour",
         "shishir.kumar": "10/hour",
         # Unresponsive
+        "lucas.begnini": "1/hour",
+        "w": "1/hour",
+        "wy": "1/hour",
+        "zlf": "1/hour",
+        "wg": "1/hour",
         "greatbanach@heywhatsoup.com": "1/hour",
         "faret38643": "1/hour",
         "htmlaw": "1/hour",
@@ -130,6 +135,8 @@ REST_FRAMEWORK = {
         "testname2024": "1/hour",
         "cadebe2258": "1/hour",
         "NicolasMadan": "10/hour",
+        # Running bad queries
+        "tannero20": "1/hour",
         # Too difficult
         "aanshshah": "1/hour",
         # Made 1M requests for commercial enterprise

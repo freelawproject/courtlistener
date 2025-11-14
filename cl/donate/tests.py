@@ -16,6 +16,7 @@ from cl.donate.factories import NeonWebhookEventFactory
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
+    NeonMembershipLevel,
     NeonWebhookEvent,
 )
 from cl.lib.test_helpers import UserProfileWithParentsFactory
@@ -112,7 +113,7 @@ class MembershipWebhookTest(TestCase):
 
         membership = await query.afirst()
         self.assertEqual(membership.user_id, self.user_profile.user.pk)
-        self.assertEqual(membership.level, NeonMembership.TIER_1)
+        self.assertEqual(membership.level, NeonMembershipLevel.TIER_1)
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
@@ -208,7 +209,7 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(await query.acount(), 1)
 
         membership = await query.afirst()
-        self.assertEqual(membership.level, membership.EDU)
+        self.assertEqual(membership.level, NeonMembershipLevel.EDU)
 
     @patch(
         "cl.lib.neon_utils.NeonClient.get_account_by_id",
@@ -256,7 +257,7 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(await query.acount(), 1)
 
         membership = await query.afirst()
-        self.assertEqual(membership.level, membership.EDU)
+        self.assertEqual(membership.level, NeonMembershipLevel.EDU)
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
@@ -317,7 +318,7 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(await query.acount(), 1)
 
         membership = await query.afirst()
-        self.assertEqual(membership.level, membership.EDU)
+        self.assertEqual(membership.level, NeonMembershipLevel.EDU)
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
@@ -353,7 +354,7 @@ class MembershipWebhookTest(TestCase):
 
         # checks the level was not updated
         membership = await query.afirst()
-        self.assertEqual(membership.level, NeonMembership.TIER_1)
+        self.assertEqual(membership.level, NeonMembershipLevel.TIER_1)
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
@@ -362,7 +363,7 @@ class MembershipWebhookTest(TestCase):
         await NeonMembership.objects.acreate(
             user=self.user_profile.user,
             neon_id="12345",
-            level=NeonMembership.TIER_1,
+            level=NeonMembershipLevel.TIER_1,
         )
 
         # Update the membership level and the trigger type
@@ -381,7 +382,7 @@ class MembershipWebhookTest(TestCase):
         membership = await NeonMembership.objects.aget(neon_id="12345")
 
         self.assertEqual(membership.neon_id, "12345")
-        self.assertEqual(membership.level, NeonMembership.TIER_4)
+        self.assertEqual(membership.level, NeonMembershipLevel.TIER_4)
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
@@ -392,7 +393,7 @@ class MembershipWebhookTest(TestCase):
         await NeonMembership.objects.acreate(
             user=self.user_profile.user,
             neon_id="12345",
-            level=NeonMembership.TIER_1,
+            level=NeonMembershipLevel.TIER_1,
             payment_status=MembershipPaymentStatus.PENDING,
         )
 
@@ -425,7 +426,7 @@ class MembershipWebhookTest(TestCase):
         await NeonMembership.objects.acreate(
             user=self.user_profile.user,
             neon_id="12345",
-            level=NeonMembership.TIER_1,
+            level=NeonMembershipLevel.TIER_1,
             payment_status=MembershipPaymentStatus.FAILED,
         )
 
@@ -456,7 +457,7 @@ class MembershipWebhookTest(TestCase):
         await NeonMembership.objects.acreate(
             user=self.user_profile.user,
             neon_id="9876",
-            level=NeonMembership.BASIC,
+            level=NeonMembershipLevel.BASIC,
         )
 
         # Update trigger type and membership id
@@ -739,7 +740,7 @@ class ProfileMembershipTest(TestCase):
         """
         termination_date = now().date() + timedelta(weeks=4)
         NeonMembership.objects.create(
-            level=NeonMembership.LEGACY,
+            level=NeonMembershipLevel.LEGACY,
             user=self.user_profile.user,
             termination_date=termination_date,
             payment_status=MembershipPaymentStatus.SUCCEEDED,

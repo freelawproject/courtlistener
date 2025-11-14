@@ -24,7 +24,7 @@ echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] http://apt.postgresql.org
   > /etc/apt/sources.list.d/pgdg.list
 
 apt-get update
-apt-get install -y postgresql-client
+apt-get install -y postgresql-client-17
 
 # We only need to set PGPASSWORD once
 export PGPASSWORD=$DB_PASSWORD

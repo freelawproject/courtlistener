@@ -1438,7 +1438,7 @@ class ReplicateRecapUploadsTest(TestCase):
             ],
             pacer_doc_id="04505578697",
             pacer_case_id="104491",
-            document_number="1",
+            document_number="2",
         )
         cls.de_data_2 = DocketEntriesDataFactory(
             docket_entries=[
@@ -1612,31 +1612,54 @@ class ReplicateRecapUploadsTest(TestCase):
         )
 
         att_1_data = self.att_data_2["attachments"][0]
-        att_2_data = self.att_data_2["attachments"][0]
+        att_2_data = self.att_data_2["attachments"][1]
 
+        d_1_1_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_1_2_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_1_2_attachment.attachment_number,
             att_2_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_2_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_2_1_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_2_1_attachment.document_number,
+            self.att_data_2["document_number"],
+        )
+
+        d_2_2_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_2_attachment.attachment_number,
             att_2_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_2_attachment.document_number,
+            self.att_data_2["document_number"],
         )
 
         # Assert the number of PQs created to process the additional subdocket RDs.
@@ -2123,31 +2146,54 @@ class ReplicateRecapUploadsTest(TestCase):
         )
 
         att_1_data = self.att_data_2["attachments"][0]
-        att_2_data = self.att_data_2["attachments"][0]
+        att_2_data = self.att_data_2["attachments"][1]
 
+        d_1_1_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_1_2_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_1_2_attachment.attachment_number,
             att_2_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_2_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_2_1_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_2_1_attachment.document_number,
+            self.att_data_2["document_number"],
+        )
+
+        d_2_2_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_2_attachment.attachment_number,
             att_2_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_2_attachment.document_number,
+            self.att_data_2["document_number"],
         )
 
         # Assert the number of PQs created to process the additional subdocket RDs.
@@ -4483,6 +4529,10 @@ class TerminatedEntitiesTest(TestCase):
         self.assertEqual(self.d.parties.count(), count_before)
 
 
+@mock.patch(
+    "cl.recap_rss.tasks.rss_cache_prefix",
+    return_value="rss_hash_test",
+)
 class RecapMinuteEntriesTest(TestCase):
     """Can we ingest minute and numberless entries properly?"""
 
@@ -4505,6 +4555,13 @@ class RecapMinuteEntriesTest(TestCase):
             upload_type=upload_type,
         )
 
+    @classmethod
+    def clean_rss_redis_cache(cls):
+        r = get_redis_interface("CACHE")
+        key = r.keys("rss_hash_test:*")
+        if key:
+            r.delete(*key)
+
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
 
@@ -4514,8 +4571,11 @@ class RecapMinuteEntriesTest(TestCase):
             pq.filepath_local.delete()
             pq.delete()
         Docket.objects.all().delete()
+        self.clean_rss_redis_cache()
 
-    def test_all_entries_ingested_without_duplicates(self) -> None:
+    def test_all_entries_ingested_without_duplicates(
+        self, mock_rss_cache_key
+    ) -> None:
         """Are all of the docket entries ingested?"""
         expected_entry_count = 23
 
@@ -4530,7 +4590,9 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(d1.pk, d2.pk)
         self.assertEqual(d2.docket_entries.count(), expected_entry_count)
 
-    def test_multiple_numberless_entries_multiple_times(self) -> None:
+    def test_multiple_numberless_entries_multiple_times(
+        self, mock_rss_cache_key
+    ) -> None:
         """Do we get the right number of entries when we add multiple
         numberless entries multiple times?
         """
@@ -4546,7 +4608,7 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(d1.pk, d2.pk)
         self.assertEqual(d2.docket_entries.count(), expected_entry_count)
 
-    def test_appellate_cases_ok(self) -> None:
+    def test_appellate_cases_ok(self, mock_rss_cache_key) -> None:
         """Do appellate cases get ordered/handled properly?"""
         expected_entry_count = 16
         pq = self.make_pq("ca1.html", upload_type=UPLOAD_TYPE.APPELLATE_DOCKET)
@@ -4554,7 +4616,7 @@ class RecapMinuteEntriesTest(TestCase):
         d1 = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d1.docket_entries.count(), expected_entry_count)
 
-    def test_rss_feed_ingestion(self) -> None:
+    def test_rss_feed_ingestion(self, mock_rss_cache_key) -> None:
         """Can we ingest RSS feeds without creating duplicates?"""
         court_id = "scotus"
         rss_feed = PacerRssFeed(court_id)
@@ -4580,7 +4642,9 @@ class RecapMinuteEntriesTest(TestCase):
         async_to_sync(add_docket_entries)(d, docket["docket_entries"])
         self.assertEqual(d.docket_entries.count(), expected_count)
 
-    def test_dhr_merges_separate_docket_entries(self) -> None:
+    def test_dhr_merges_separate_docket_entries(
+        self, mock_rss_cache_key
+    ) -> None:
         """Does the docket history report merge separate minute entries if
         one entry has a short description, and the other has a long
         description?
@@ -4632,7 +4696,9 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(d.docket_entries.count(), expected_item_count)
 
     @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
-    def test_appellate_rss_feed_ingestion(self, mock_enqueue_de) -> None:
+    def test_appellate_rss_feed_ingestion(
+        self, mock_enqueue_de, mock_rss_cache_key
+    ) -> None:
         """Can we ingest Appellate RSS feeds?"""
 
         court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
@@ -4649,7 +4715,7 @@ class RecapMinuteEntriesTest(TestCase):
 
     @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
     def test_appellate_merge_rss_feed_with_case_id(
-        self, mock_enqueue_de
+        self, mock_enqueue_de, mock_rss_cache_key
     ) -> None:
         """Can we merge an Appellate RSS feeds into an existing docket with
         pacer_case_id?
@@ -4676,7 +4742,7 @@ class RecapMinuteEntriesTest(TestCase):
 
     @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
     def test_appellate_merge_rss_feed_no_case_id(
-        self, mock_enqueue_de
+        self, mock_enqueue_de, mock_rss_cache_key
     ) -> None:
         """Can we merge an Appellate RSS feeds into a docket with no
         pacer_case_id?
@@ -4703,7 +4769,7 @@ class RecapMinuteEntriesTest(TestCase):
 
     @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
     def test_retain_existing_values_in_absent_rss_fields(
-        self, mock_enqueue_de
+        self, mock_enqueue_de, mock_rss_cache_key
     ) -> None:
         """Confirm that when 'assigned_to_str' and 'referred_to_str' fields
         are not present in an RSS Feed, pre-existing values in these fields are
@@ -4731,7 +4797,9 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(docket.assigned_to_str, "John Marshall")
         self.assertEqual(docket.referred_to_str, "Sophia Clinton")
 
-    def test_avoid_deleting_short_description(self) -> None:
+    def test_avoid_deleting_short_description(
+        self, mock_rss_cache_key
+    ) -> None:
         """Test that merging identical docket entries without a
         short_description does not delete or overwrite the existing short_description
         """
@@ -4769,6 +4837,41 @@ class RecapMinuteEntriesTest(TestCase):
         rd = RECAPDocument.objects.all().first()
         self.assertEqual(d.docket_entries.count(), 1)
         self.assertEqual(rd.description, "Case termination for COA")
+
+    def test_rss_ingestion_cache(self, mock_rss_cache_key) -> None:
+        """Test that cached (already seen) RSS items are skipped during the RSS
+        ingestion process.
+        """
+        court = CourtFactory(id="ca10", jurisdiction="F")
+        rss_feed = PacerRssFeed(court.pk)
+        with open(self.make_path("rss_ca10.xml"), "rb") as f:
+            rss_text = f.read().decode()
+        rss_feed._parse_text(rss_text)
+        rss_data = rss_feed.data
+        rss_data_2 = deepcopy(rss_data)
+
+        with mock.patch(
+            "cl.recap_rss.tasks.find_docket_object",
+            side_effect=find_docket_object,
+        ) as mock_find_docket:
+            # First ingestion: should process all 3 items
+            merge_rss_feed_contents(rss_data, court.pk)
+            first_call_count = mock_find_docket.call_count
+            self.assertEqual(
+                first_call_count, 3, "Should process 3 items on first pass"
+            )
+            self.assertEqual(Docket.objects.count(), 3)
+
+            # Second ingestion. No entries should be processed since they are
+            # in the cache.
+            merge_rss_feed_contents(rss_data_2, court.pk)
+
+            # Assert no additional calls on second pass
+            self.assertEqual(
+                mock_find_docket.call_count,
+                first_call_count,
+                "Second pass should not attempt to resolve any dockets",
+            )
 
 
 class DescriptionCleanupTest(SimpleTestCase):

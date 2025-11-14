@@ -112,6 +112,10 @@ def lookup_and_save(new, debug=False):
     for attr, v in new.__dict__.items():
         setattr(d, attr, v)
 
+    # `new` is an instance of PACERFreeDocumentRow
+    if new.docket_number:
+        d.docket_number_raw = new.docket_number
+
     if not debug:
         d.save()
         logger.info(

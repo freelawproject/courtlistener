@@ -1,11 +1,42 @@
+import json
+import logging
 from io import BufferedReader
+from typing import Any
 
 from asgiref.sync import sync_to_async
+from botocore.exceptions import ClientError
 from django.conf import settings
-from httpx import AsyncClient, Response
+from httpx import (
+    AsyncClient,
+    NetworkError,
+    Response,
+    TimeoutException,
+)
 
 from cl.audio.models import Audio
+from cl.lib.decorators import retry
+from cl.lib.exceptions import NoSuchKey
 from cl.search.models import Opinion, RECAPDocument
+
+logger = logging.getLogger(__name__)
+
+
+def log_invalid_embedding_errors(embeddings: Any):
+    """Log an error when the embeddings response is not a list.
+
+    :param embeddings: The embeddings object to validate and log.
+    """
+    if isinstance(embeddings, dict):
+        logger.error(
+            "Received API error response in embeddings: %s",
+            json.dumps(embeddings, default=str),
+        )
+    else:
+        logger.error(
+            "Unexpected data type for embeddings: %s (%s)",
+            str(embeddings)[:200],
+            type(embeddings),
+        )
 
 
 async def clean_up_recap_document_file(item: RECAPDocument) -> None:
@@ -118,3 +149,28 @@ async def microservice(
         )
 
         return await client.send(req)
+
+
+@retry(
+    ExceptionToCheck=(NetworkError, TimeoutException, NoSuchKey),
+    tries=3,
+    delay=2,
+    backoff=2,
+    logger=logger,
+)
+async def rd_page_count_service(rd: RECAPDocument) -> Response:
+    """Call page-count from doctor with retries
+
+    :param rd: the recap document to count pages
+    :return: Response object
+    """
+    try:
+        response = await microservice(
+            service="page-count",
+            item=rd,
+        )
+        return response
+    except ClientError as error:
+        if error.response["Error"]["Code"] == "NoSuchKey":
+            raise NoSuchKey("Key not found: The specified key does not exist.")
+        raise error

@@ -602,6 +602,14 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         db_index=True,
     )
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            "with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     federal_dn_office_code = models.CharField(
         help_text="A one digit statistical code (either alphabetic or numeric) "
         "of the office within the federal district. In this "
@@ -2757,15 +2765,21 @@ class OpinionCluster(AbstractDateTimeModel):
         #    list.
         #  - QuerySets are lazy by default, so we need to call list() on the
         #    queryset object to evaluate it here and now.
-        return OpinionCluster.objects.filter(
-            sub_opinions__in=sum(
-                [
-                    list(sub_opinion.opinions_cited.all().only("pk"))
-                    for sub_opinion in self.sub_opinions.all()
-                ],
-                [],
+        #  - We explicitly exclude self (self.pk) from the results to avoid
+        #    a cluster being listed as its own authority.
+        return (
+            OpinionCluster.objects.filter(
+                sub_opinions__in=sum(
+                    [
+                        list(sub_opinion.opinions_cited.all().only("pk"))
+                        for sub_opinion in self.sub_opinions.all()
+                    ],
+                    [],
+                )
             )
-        ).order_by("-citation_count", "-date_filed")
+            .exclude(pk=self.pk)
+            .order_by("-citation_count", "-date_filed")
+        )
 
     async def aauthorities(self):
         """Returns a queryset that can be used for querying and caching
@@ -2778,20 +2792,26 @@ class OpinionCluster(AbstractDateTimeModel):
         #    list.
         #  - QuerySets are lazy by default, so we need to call list() on the
         #    queryset object to evaluate it here and now.
-        return OpinionCluster.objects.filter(
-            sub_opinions__in=sum(
-                [
+        #  - We explicitly exclude self (self.pk) from the results to avoid
+        #    a cluster being listed as its own authority.
+        return (
+            OpinionCluster.objects.filter(
+                sub_opinions__in=sum(
                     [
-                        i
-                        async for i in sub_opinion.opinions_cited.all().only(
-                            "pk"
-                        )
-                    ]
-                    async for sub_opinion in self.sub_opinions.all()
-                ],
-                [],
+                        [
+                            i
+                            async for i in sub_opinion.opinions_cited.all().only(
+                                "pk"
+                            )
+                        ]
+                        async for sub_opinion in self.sub_opinions.all()
+                    ],
+                    [],
+                )
             )
-        ).order_by("-citation_count", "-date_filed")
+            .exclude(pk=self.pk)
+            .order_by("-citation_count", "-date_filed")
+        )
 
     @property
     def parentheticals(self):
@@ -2980,7 +3000,7 @@ class BaseCitation(models.Model):
             "72 Soc.Sec.Rep.Serv. 318)",
         ),
     )
-    volume = models.SmallIntegerField(help_text="The volume of the reporter")
+    volume = models.TextField(help_text="The volume of the reporter")
     reporter = models.TextField(
         help_text="The abbreviation for the reporter",
         # To generate lists of volumes for a reporter we need everything in a
@@ -3009,7 +3029,7 @@ class BaseCitation(models.Model):
 
 
 @pghistory.track()
-class Citation(BaseCitation):
+class Citation(BaseCitation, AbstractDateTimeModel):
     """A citation to an OpinionCluster"""
 
     cluster = models.ForeignKey(
@@ -3330,6 +3350,7 @@ class Opinion(AbstractDateTimeModel):
             "html_anon_2020",
             "html",
             "plain_text",
+            "html_with_citations",
             "sha1",
             "ordering_key",
         ]

@@ -78,6 +78,8 @@ from cl.search.constants import (
     api_child_highlight_map,
     cardinality_query_unique_ids,
     date_decay_relevance_types,
+    jurisdiction_relevance_multipliers,
+    opinion_boosts_es,
     recap_boosts_es,
 )
 from cl.search.exception import (
@@ -1010,7 +1012,7 @@ def build_custom_function_score_for_date(
     return query
 
 
-def build_decay_relevance_score(
+def build_custom_relevance_score(
     query: QueryString | str,
     date_field: str,
     scale: int,
@@ -1019,10 +1021,15 @@ def build_decay_relevance_score(
     boost_mode: str = "multiply",
     min_score: float = 0.0,
     default_current_date: datetime.date | None = None,
+    jurisdiction_relevancy: bool = False,
 ) -> QueryString:
     """
-    Build a decay relevance score query for Elasticsearch that adjusts the
-    relevance of documents based on a date field.
+    Build a custom relevance score query for Elasticsearch that adjusts
+    document relevance based on two criteria:
+     - Apply decay relevance using a date field.
+     - Adjust jurisdiction relevance for Case Law search based on the Opinion
+     Court jurisdiction hierarchy, according to multiplier factors defined in
+     jurisdiction_relevance_multipliers.
 
     :param query: The Elasticsearch query string or QueryString object.
     :param date_field: The date field used to compute the relevance decay.
@@ -1035,6 +1042,8 @@ def build_decay_relevance_score(
     :param min_score: The minimum score where the decay function stabilizes.
     :param default_current_date: The default current date to use for computing
      a stable decay relevance score across pagination in the V4 Search API.
+    :param jurisdiction_relevancy: Whether to apply jurisdiction relevance,
+    which is currently supported only for Case Law Search.
     :return:  The modified QueryString object with applied function score.
     """
 
@@ -1043,12 +1052,15 @@ def build_decay_relevance_score(
         if default_current_date
         else None
     )
+
     query = Q(
         "function_score",
         query=query,
         script_score={
             "script": {
                 "source": f"""
+
+                    // Date decay relevance for all supported search types.
                     long now;
                     if (params.default_current_time != null) {{
                             now = params.default_current_time;  // Use 'default_current_time' if provided
@@ -1075,8 +1087,37 @@ def build_decay_relevance_score(
                     def diff = Math.abs(docDate - now);
                     // Score: exp( λ * max(0, |docDate - now|) )
                     def decay_score = Math.exp(lambda * diff);
+
                     // Adjust the decay score to have a minimum value
-                    return min_score + ((1 - min_score) * decay_score);
+                    double date_relevance_score = min_score + ((1.0 - min_score) * decay_score);
+
+                    // Tune the influence of date_relevance_score based on
+                    // DATE_DECAY_FACTOR
+                    double tuned_date_decay_factor = (1 - {settings.DATE_DECAY_BOOST}) + (date_relevance_score * {settings.DATE_DECAY_BOOST});
+
+                    // Jurisdiction relevance only for Case Law Search.
+                    if ((boolean)params.jurisdiction_relevancy) {{
+                        String courtId = doc['court_id.raw'].value;
+                        // Default factor for SCOTUS and for docs with no
+                        // court_jurisdiction set.
+                        double jurisdiction_factor = 1.0;
+                        if (doc['court_jurisdiction'].size() > 0) {{
+                            String jurisdictionCode = doc['court_jurisdiction'].value;
+                            // Get jurisdiction factor for non-SCOTUS courts.
+                            if (!courtId.equals("scotus")) {{
+                                if (params.jurisdiction_multipliers.containsKey(jurisdictionCode)) {{
+                                    jurisdiction_factor = (double)params.jurisdiction_multipliers.get(jurisdictionCode);
+                                }}
+                            }}
+                        }}
+
+                    // Tune the influence of jurisdiction_factor based on
+                    // JURISDICTION_FACTOR
+                    double tuned_jurisdiction_factor = (1 - {settings.JURISDICTION_BOOST}) + (jurisdiction_factor * {settings.JURISDICTION_BOOST});
+                    return tuned_date_decay_factor * tuned_jurisdiction_factor;
+                    }}
+
+                    return tuned_date_decay_factor;
                     """,
                 "params": {
                     "default_missing_date": default_missing_date,
@@ -1084,6 +1125,8 @@ def build_decay_relevance_score(
                     "decay": decay,
                     "min_score": min_score,
                     "default_current_time": default_current_time,
+                    "jurisdiction_relevancy": jurisdiction_relevancy,
+                    "jurisdiction_multipliers": jurisdiction_relevance_multipliers,
                 },
             },
         },
@@ -1404,12 +1447,7 @@ def build_es_base_query(
             child_fields.extend(
                 add_fields_boosting(
                     cd,
-                    [
-                        "type",
-                        "text",
-                        "caseName.exact",
-                        "docketNumber",
-                    ],
+                    list(opinion_boosts_es.keys()),
                 ),
             )
             child_query_fields = {"opinion": child_fields}
@@ -2722,7 +2760,7 @@ def apply_custom_score_to_main_query(
     if is_valid_custom_score_field and api_version == "v4":
         # Applies a custom function score to sort Documents based on
         # a date field. This serves as a workaround to enable the use of the
-        # search_after cursor for pagination on documents with a None dates.
+        # search_after cursor for pagination on documents with None dates.
         query = build_custom_function_score_for_date(
             query,
             child_order_by,
@@ -2733,13 +2771,14 @@ def apply_custom_score_to_main_query(
         main_order_by == "score desc"
         and cd["type"] in valid_decay_relevance_types
     ):
+        jurisdiction_relevancy = cd["type"] == SEARCH_TYPES.OPINION
         default_current_date = cd.get("request_date")
         decay_settings = valid_decay_relevance_types[cd["type"]]
         date_field = str(decay_settings["field"])
         scale = int(decay_settings["scale"])
         decay = float(decay_settings["decay"])
         min_score = float(decay_settings["min_score"])
-        query = build_decay_relevance_score(
+        query = build_custom_relevance_score(
             query,
             date_field,
             scale=scale,
@@ -2747,12 +2786,15 @@ def apply_custom_score_to_main_query(
             boost_mode=boost_mode,
             min_score=min_score,
             default_current_date=default_current_date,
+            jurisdiction_relevancy=jurisdiction_relevancy,
         )
     return query
 
 
 def build_semantic_query(
-    text_query: str, filters: list[QueryString | Range]
+    text_query: str,
+    filters: list[QueryString | Range],
+    embedding: list[float] | None = None,
 ) -> tuple[str, list[Query]]:
     """
     Build a hybrid Elasticsearch query using both exact keyword matching and
@@ -2762,6 +2804,8 @@ def build_semantic_query(
         phrases for exact matching.
     :param filters: A list of filter clauses to apply as pre-filtering to the
         semantic KNN search query.
+    :param embedding: Optional precomputed embedding vector. If not provided,
+        the function generates embeddings from the `text_query`.
     :return: A two-tuple:
         - keyword_query: A string representing the AND-joined quoted phrases, if any.
         - semantic_query: A list of Elasticsearch Q objects, including the KNN vector search
@@ -2775,21 +2819,23 @@ def build_semantic_query(
 
     # Join extracted phrases to form a keyword query string
     keyword_query = " ".join([f'"{s}"' for s in exact_keywords])
+    if not embedding:
+        # Remove quotes from the query to prepare for embedding
+        cleaned_text_query = text_query.replace('"', "")
 
-    # Remove quotes from the query to prepare for embedding
-    cleaned_text_query = text_query.replace('"', "")
+        # Enforce character limit to avoid exceeding embedding constraints
+        if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
+            raise InputTooLongError(QueryType.QUERY_STRING)
 
-    # Enforce character limit to avoid exceeding embedding constraints
-    if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
-        raise InputTooLongError(QueryType.QUERY_STRING)
-
-    # Generate embedding vector using external microservice
-    embedding_request = async_to_sync(microservice)(
-        service="inception-query",
-        data=json.dumps({"text": cleaned_text_query}),
-    )
-    embedding_request.raise_for_status()
-    vectors = embedding_request.json()["embedding"]
+        # Generate embedding vector using external microservice
+        embedding_request = async_to_sync(microservice)(
+            service="inception-query",
+            data=json.dumps({"text": cleaned_text_query}),
+        )
+        embedding_request.raise_for_status()
+        vectors = embedding_request.json()["embedding"]
+    else:
+        vectors = embedding
 
     # If exact keyword query exists, build and add full-text query to results
     # This enables hybrid search by combining keyword and semantic results
@@ -2860,8 +2906,10 @@ def build_full_join_es_queries(
     ]
 
     # True if semantic search is enabled and the query has content to generate
-    # an embedding
-    has_valid_semantic_query = semantic_search_enabled and cd.get("q", "")
+    # an embedding or embedding is provided,
+    has_valid_semantic_query = semantic_search_enabled and (
+        cd.get("q", "") or cd.get("embedding", None)
+    )
     keyword_text_query = ""
     match cd["type"]:
         case (
@@ -2925,10 +2973,10 @@ def build_full_join_es_queries(
             child_text_query = [mlt_query]
         else:
             string_query = cd.get("q", "")
+            embeddings = cd.get("embedding", None)
             if has_valid_semantic_query:
                 keyword_text_query, child_text_query = build_semantic_query(
-                    string_query,
-                    child_filters,
+                    string_query, child_filters, embeddings
                 )
                 if not keyword_text_query:
                     child_filters = []

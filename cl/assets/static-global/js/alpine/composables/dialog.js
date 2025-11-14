@@ -1,5 +1,6 @@
 document.addEventListener('alpine:init', () => {
   Alpine.data('dialog', () => ({
+    ...createUtils(),
     isOpen: false,
     open() {
       this.isOpen = true;
@@ -20,15 +21,12 @@ document.addEventListener('alpine:init', () => {
       return ['dialog'];
     },
     init() {
-      const mobileBreakpoint = getComputedStyle(document.documentElement)
-        .getPropertyValue('--mobile-breakpoint')
-        .trim();
-      const mediaQuery = window.matchMedia(`(min-width: ${mobileBreakpoint})`);
-      mediaQuery.addEventListener('change', (e) => {
+      const callback = (e) => {
         if (e.matches && this.isOpen) {
           this.close();
         }
-      });
+      };
+      this.onBreakpointChange(callback);
     },
   }));
 });

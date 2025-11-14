@@ -1,21 +1,17 @@
 import json
-import os
 import re
 from datetime import date, datetime
 from urllib.parse import urljoin
 
 import httpx
-import requests
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
-from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db.models import Q
 from eyecite.find import get_citations
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
-from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 from reporters_db import REPORTERS
 from requests import Response, Session
@@ -26,11 +22,6 @@ from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.lib.storage import S3GlacierInstantRetrievalStorage
 from cl.recap.mergers import find_docket_object
-from cl.scrapers.exceptions import (
-    EmptyFileError,
-    NoDownloadUrlError,
-    UnexpectedContentTypeError,
-)
 from cl.search.models import (
     Citation,
     Court,
@@ -238,82 +229,6 @@ def get_extension(content: bytes) -> str:
     ).text
 
 
-def get_binary_content(
-    download_url: str,
-    site: AbstractSite,
-) -> bytes | str:
-    """Downloads the file, covering a few special cases such as invalid SSL
-    certificates and empty file errors.
-
-    :param download_url: The URL for the item you wish to download.
-    :param site: Site object used to download data
-
-    :return: The downloaded and cleaned content
-    :raises: NoDownloadUrlError, UnexpectedContentTypeError, EmptyFileError
-    """
-    if not download_url:
-        raise NoDownloadUrlError(download_url)
-
-    # noinspection PyBroadException
-    if site.method == "LOCAL":
-        # "LOCAL" is the method when testing
-        url = os.path.join(settings.MEDIA_ROOT, download_url)
-        mr = MockRequest(url=url)
-        r = mr.get()
-        s = requests.Session()
-    else:
-        # some sites require a custom ssl_context, contained in the Site's
-        # session. However, we can't send a request with both a
-        # custom ssl_context and `verify = False`
-        has_cipher = hasattr(site, "cipher")
-        s = site.request["session"] if has_cipher else requests.session()
-
-        if site.needs_special_headers:
-            headers = site.request["headers"]
-        else:
-            headers = {"User-Agent": "CourtListener"}
-
-        # Note that we do a GET even if site.method is POST. This is
-        # deliberate.
-        r = s.get(
-            download_url,
-            verify=has_cipher,  # WA has a certificate we don't understand
-            headers=headers,
-            cookies=site.cookies,
-            timeout=300,
-        )
-
-        # test for empty files (thank you CA1)
-        if len(r.content) == 0:
-            raise EmptyFileError(f"EmptyFileError: '{download_url}'")
-
-        # test for expected content type (thanks mont for nil)
-        if site.expected_content_types:
-            # Clean up content types like "application/pdf;charset=utf-8"
-            # and 'application/octet-stream; charset=UTF-8'
-            content_type = (
-                r.headers.get("Content-Type").lower().split(";")[0].strip()
-            )
-            m = any(
-                content_type in mime.lower()
-                for mime in site.expected_content_types
-            )
-
-            if not m:
-                court_str = site.court_id.split(".")[-1].split("_")[0]
-                fingerprint = [f"{court_str}-unexpected-content-type"]
-                msg = f"'{download_url}' '{content_type}' not in {site.expected_content_types}"
-                raise UnexpectedContentTypeError(msg, fingerprint=fingerprint)
-
-        # test for and follow meta redirects
-        r = follow_redirections(r, s)
-        r.raise_for_status()
-
-    content = site.cleanup_content(r.content)
-
-    return content
-
-
 def signal_handler(signal, frame):
     # Trigger this with CTRL+4
     logger.info("**************")
@@ -470,6 +385,7 @@ def update_or_create_docket(
             **docket_fields,
             source=source,
             docket_number=docket_number,
+            docket_number_raw=docket_number,
             court_id=court_id,
         )
 
