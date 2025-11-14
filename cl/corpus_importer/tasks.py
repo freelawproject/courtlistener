@@ -89,14 +89,13 @@ from cl.corpus_importer.utils import (
     is_long_appellate_document_number,
     make_iquery_probing_key,
     mark_ia_upload_needed,
-    winnow_case_name,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry
 from cl.lib.llm import call_llm
-from cl.lib.microservice_utils import microservice
+from cl.lib.microservice_utils import microservice, rd_page_count_service
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
@@ -2443,10 +2442,7 @@ def update_rd_metadata(
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         rd.sha1 = sha1(pdf_bytes)
-        response = async_to_sync(microservice)(
-            service="page-count",
-            item=rd,
-        )
+        response = async_to_sync(rd_page_count_service)(rd)
         if response.is_success:
             rd.page_count = int(response.text)
         assert isinstance(rd.page_count, (int | type(None))), (
@@ -3094,7 +3090,7 @@ def recap_document_into_opinions(
     ),
     retry_kwargs={"max_retries": 5},
 )
-def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
+def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
     """Use LLM to extract and verify the correct case name for an opinion ingested from Recap
 
     This task fetches an OpinionCluster instance, extracts the first 2000 characters of the first
@@ -3106,37 +3102,31 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     extracted case name.
 
     :param self: The Celery task instance
-    :param pk: Primary key of the OpinionCluster object to process
+    :param cluster_pk: Primary key of the OpinionCluster object to process
     :param recap_document_id: RECAPDocument id
     """
 
     OPENAI_CASE_LAW_INFERENCE_KEY = env(
         "OPENAI_CASE_LAW_INFERENCE_KEY", default=None
     )
-    system_prompt = CASE_NAME_EXTRACT_SYSTEM
 
-    try:
-        obj = (
-            OpinionCluster.objects.select_related("docket")
-            .prefetch_related("sub_opinions")
-            .get(pk=pk)
-        )
-    except OpinionCluster.DoesNotExist:
-        return
+    cluster = OpinionCluster.objects.prefetch_related("sub_opinions").get(
+        pk=cluster_pk
+    )
+    sub_opinion = cluster.sub_opinions.all().first()
 
-    sub_opinion = obj.sub_opinions.all().first()
     if not sub_opinion or not sub_opinion.plain_text:
+        logger.error(
+            "No content extracted to find case names for cluster_id=%s, recap_document_id=%s",
+            cluster_pk,
+            recap_document_id,
+        )
         return
-    plain_text = sub_opinion.plain_text[:2000]
-
-    cluster_name = obj.case_name or obj.case_name_full
-
-    user_message = f"{plain_text}"
 
     try:
         llm_response = call_llm(
-            system_prompt,
-            user_message,
+            system_prompt=CASE_NAME_EXTRACT_SYSTEM,
+            user_prompt=sub_opinion.plain_text[:2000],
             response_model=CaseNameExtractionResponse,
             max_completion_tokens=300,
             api_key=OPENAI_CASE_LAW_INFERENCE_KEY,
@@ -3144,7 +3134,7 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
     except ValidationError as e:
         logger.error(
             "LLM - Response validation error for cluster_id=%s, recap_document_id=%s",
-            pk,
+            cluster_pk,
             recap_document_id,
             extra={
                 "validation_errors": e.errors(),
@@ -3162,39 +3152,25 @@ def classify_case_name_by_llm(self, pk: int, recap_document_id: int):
         logger.error("LLM - Invalid response type: %s", type(llm_response))
         return
 
-    case_name = llm_response.case_name or obj.case_name
-    case_name_full = llm_response.case_name_full or obj.case_name_full
+    llm_case_name = llm_response.case_name or ""
+    llm_case_name_full = llm_response.case_name_full or ""
 
-    case_names_pairs = [
-        ("case_name_full", obj.case_name_full, case_name_full),
-        ("case_name", obj.case_name, case_name),
-    ]
-
-    # Check which values changed before updating the cluster
-    changed_fields = {
-        name: new
-        for name, old, new in case_names_pairs
-        if new not in (None, "") and old != new
-    }
-    if not changed_fields:
+    if not llm_case_name and not llm_case_name_full:
+        # The LLM did not return any names, add extra data to the dict for debugging purposes
+        dict_llm_response = llm_response.model_dump()
+        dict_llm_response["recap_document_id"] = recap_document_id
+        dict_llm_response["cluster"] = cluster_pk
+        dict_llm_response["cluster_case_name"] = cluster.case_name
+        dict_llm_response["cluster_case_name_full"] = cluster.case_name_full
+        logger.error("LLM - No case name returned", dict_llm_response)
         return
 
-    cluster_case_name_set = winnow_case_name(cluster_name)
     with transaction.atomic():
-        for field_name, new_case_name in changed_fields.items():
-            # Update only necessary fields
-            setattr(obj, field_name, new_case_name)
-            # Check for overlap between cluster case name and extracted case name
-            overlap = winnow_case_name(new_case_name) & cluster_case_name_set
-            if not overlap:
-                # The name of the docket case and the opinion do not necessarily match, we log it for manual review
-                dict_llm_response = llm_response.model_dump()
-                dict_llm_response["recap_document_id"] = recap_document_id
-                logger.error(
-                    "LLM - Case name did not match", dict_llm_response
-                )
-        obj.save()
+        # Update cluster names
+        cluster.case_name = llm_case_name
+        cluster.case_name_full = llm_case_name_full
+        cluster.save()
         logger.info(
             "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
-            obj.id,
+            cluster.id,
         )

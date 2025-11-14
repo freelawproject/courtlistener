@@ -74,6 +74,21 @@ class Command(VerboseCommand):
             default=5,
             help="The celery throttle min items.",
         )
+        parser.add_argument(
+            "--device",
+            type=str,
+            choices=["cpu", "gpu"],
+            default="gpu",
+            help="Which device to use for running the Inception service (CPU or GPU).",
+        )
+        parser.add_argument(
+            "--opinion-ids",
+            nargs="+",
+            type=int,
+            help="""The Opinion ids to process.
+            May be more than one. If this argument is used,
+            other filters will be ignored""",
+        )
 
     def send_batch(
         self,
@@ -81,6 +96,7 @@ class Command(VerboseCommand):
         embedding_queue: str,
         upload_queue: str,
         database: str,
+        device: str,
     ) -> None:
         """Send a batch of items for embedding creation and saving to S3.
 
@@ -92,7 +108,7 @@ class Command(VerboseCommand):
         """
         self.throttle.maybe_wait()
         chain(
-            create_opinion_text_embeddings.si(batch, database).set(
+            create_opinion_text_embeddings.si(batch, database, device).set(
                 queue=embedding_queue
             ),
             save_embeddings.s().set(queue=upload_queue),
@@ -108,33 +124,48 @@ class Command(VerboseCommand):
         min_opinion_size = settings.MIN_OPINION_SIZE
         start_id = options["start_id"]
         throttle_min_items = options["throttle_min_items"]
+        device = options["device"]
         self.throttle = CeleryThrottle(
             queue_name=embedding_queue, min_items=throttle_min_items
         )
-        if auto_resume:
-            start_id = get_last_parent_document_id_processed(
-                compose_redis_key()
-            )
-            self.stdout.write(
-                f"Auto-resume enabled starting embedding from ID: {start_id}."
-            )
 
-        opinions = (
-            Opinion.objects.using(database)
-            .filter(id__gte=start_id)
-            .order_by("pk")
-        )
-        # Limit opinions to retrieve if count was provided.
-        opinions_to_process = (
-            opinions[:count] if count is not None else opinions
-        )
+        if options["opinion_ids"]:
+            opinions = (
+                Opinion.objects.using(database)
+                .filter(
+                    id__in=options["opinion_ids"], main_version__isnull=True
+                )
+                .order_by("pk")
+            )
+        else:
+            if auto_resume:
+                start_id = get_last_parent_document_id_processed(
+                    compose_redis_key()
+                )
+                self.stdout.write(
+                    f"Auto-resume enabled starting embedding from ID: {start_id}."
+                )
+
+            opinions = (
+                Opinion.objects.using(database)
+                .filter(id__gte=start_id, main_version__isnull=True)
+                .order_by("pk")
+            )
+            # Limit opinions to retrieve if count was provided.
+            opinions_to_process = (
+                opinions[:count] if count is not None else opinions
+            )
         opinions_with_best_text = opinions.with_best_text()
         opinions_with_best_text = (
             opinions_with_best_text[:count] if count is not None else opinions
         )
 
         logger.info("Getting count of opinions to process.")
-        count = opinions_to_process.count()
+        count = (
+            opinions.count()
+            if options["opinion_ids"]
+            else opinions_to_process.count()
+        )
         logger.info("Count finished.")
         current_batch: list[int] = []
         current_batch_size = 0
@@ -156,7 +187,11 @@ class Command(VerboseCommand):
             if current_batch_size + token_count > token_count_limit:
                 # Send the current batch since adding this opinion would break the limit.
                 self.send_batch(
-                    current_batch, embedding_queue, upload_queue, database
+                    current_batch,
+                    embedding_queue,
+                    upload_queue,
+                    database,
+                    device,
                 )
                 current_batch = []
                 current_batch_size = 0
@@ -177,7 +212,7 @@ class Command(VerboseCommand):
         # Send any remainder
         if current_batch:
             self.send_batch(
-                current_batch, embedding_queue, upload_queue, database
+                current_batch, embedding_queue, upload_queue, database, device
             )
 
         logger.info(

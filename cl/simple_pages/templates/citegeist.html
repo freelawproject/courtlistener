@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version too.   ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
+
+{% block title %}The Citegeist Relevancy Engine – CourtListener.com{% endblock %}
+{% block og_title %}The Citegeist Relevancy Engine – CourtListener.com{% endblock %}
+{% block description %}Citegeist is the relevancy engine that ranks search results on CourtListener. It’s the product of years of enhancements and a deep background in legal research.{% endblock %}
+{% block og_description %}Citegeist is the name of the relevancy engine that ranks search results on CourtListener. It’s the product of years of enhancements and a deep background in legal research.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "help_home" %}">Back to Help</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "help_home" %}">Back to Help</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#keyword-search">Keyword Search</a></li>
+      <li><a href="#semantic-search">Semantic Search</a></li>
+    </ul>
+  </div>
+</div>
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">The Citegeist Relevancy Engine</h1>
+  <p class="lead">Citegeist is the name of the relevancy engine that ranks search results on CourtListener. It’s the product of years of enhancements and a deep background in legal research.
+  </p>
+  <p>Citegeist works by combining classic search relevancy algorithms with state-of-the-art legal ranking technology. At a high level, Citegeist has two ranking algorithms: keyword search and semantic search.
+  </p>
+  <p>Below, we provide a high-level summary of the ways we rank search results. This information is provided to help legal researchers understand how the CourtListener system works.
+  </p>
+
+
+  <h2 id="keyword-search">Keyword Search</h2>
+  <p>Keyword search looks for words and <a href="{% url "advanced_search" %}">connectors</a> in your query that match those of the content, and uses a variety of techniques to rank the results so that the best results are at the top.
+  </p>
+  <p>When you do a keyword search, the following technologies are used to rank the results:</p>
+  <ul>
+    <li><strong>Stemming</strong> — When a query is made, the first step is to find the root of each word so that the query can match all relevant documents. This step broadens each query so that words like <em>runner</em>, <em>running</em>, and <em>run</em> are all treated as equal.</li>
+    <li><strong>Synonyms</strong> — Citegeist has a list of nearly 1,000 synonyms so that queries containing words like <em>IRS</em> will match documents containing <em>Internal Revenue Service</em>. This list was created by analyzing the top acronyms used in legal documents.</li>
+    <li><strong>BM25</strong> — This <a href="https://en.wikipedia.org/wiki/Okapi_BM25">algorithm</a> forms the heart of keyword ranking. In brief, it uses the frequency of words and the length of documents to identify the most important results for a query.</li>
+    <li><strong>Field Boosting</strong> — Matches on some fields are more meaningful than others. For example, a match on the name of a case is more important than a match in the body of a case. We boost accordingly.</li>
+    <li><strong>Phrase Boosting</strong> — When a user makes a query with multiple words, we boost if those words are found near each other in a result, indicating that a phrase in your query matched a phrase in a result.</li>
+    <li><strong>Relevance Decay</strong> — As content gets older, it gets less relevant. A relevance decay curve is applied to our search results so that older content is demoted.</li>
+    <li><strong>Jurisdiction Boosting</strong> — The higher the court, the more important the result. Lower courts get demoted by Citegeist.</li>
+    <li><strong>Citation Boosting</strong> (coming soon) — We analyze the network of citations between cases in order to boost the cases that are most important.</li>
+  </ul>
+  <p>Not all of these technologies are used in all of our search engines. The following table shows where these technologies are used:</p>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th class="text-center">Case Law</th>
+        <th class="text-center">RECAP Archive</th>
+        <th class="text-center">Oral Arguments</th>
+        <th class="text-center">Judges</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>BM25</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+      </tr>
+      <tr>
+        <td>Synonyms</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+      </tr>
+      <tr>
+        <td>Field Boosting</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+      </tr>
+      <tr>
+        <td>Phrase Boosting</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+      </tr>
+      <tr>
+        <td>Relevance Decay</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">✅</td>
+      </tr>
+      <tr>
+        <td>Jurisdiction Boosting</td>
+        <td class="text-center">✅</td>
+        <td class="text-center">❌</td>
+        <td class="text-center">❌</td>
+        <td class="text-center">❌</td>
+      </tr>
+      <tr>
+        <td>Citation Boosting</td>
+        <td class="text-center">Coming Soon</td>
+        <td class="text-center">❌</td>
+        <td class="text-center">❌</td>
+        <td class="text-center">❌</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Keyword search aims to provide clear and intuitive results that clearly match the words, filters, and connectors you queried, but it has no notion of the underlying intent or meaning of your query. This can be limiting.
+  </p>
+
+
+  <h2 id="semantic-search">Semantic Search</h2>
+  <p>Semantic search — also known as AI search or vector search — is a modern approach to querying large data sets. Instead of matching particular keywords, it finds the underlying meaning of your query and finds results with similar meanings.
+  </p>
+  <p>Semantic search is currently available for case law <a href="{% url "rest_docs" version="v4" %}">via our API</a>, and we will be bringing it to our website soon.
+  </p>
+  <p>Semantic search can provide a number of advantages over keyword search:</p>
+  <ul>
+    <li>
+      <p><strong>Ranking can be better</strong> — Because semantic search understands the underlying meaning of your query, it often provides better results than keyword search, particularly for users that simply type in their problem in plain English, without using advanced query operators.</p>
+    </li>
+    <li>
+      <p><strong>Long queries are as fast</strong> — Keyword search engines slow down as you add words to your query. This limits how complex queries can be. Semantic search does not have this problem. Long queries are as fast as short ones, allowing you to provide more information and context to Citegeist.</p>
+    </li>
+    <li>
+      <p><strong>Synonyms are automatic</strong> — In a keyword search engine, an administrator must create a list of synonyms for the system to use. Semantic search engines are able to automatically broaden your search to match relevant synonyms.</p>
+    </li>
+    <li>
+      <p><strong>Hybrid search with both semantics and keywords</strong> — In addition to pure semantic search, you can enclose specific keywords in quotations to invoke hybrid search. That will retrieve both semantically relevant results and results with high BM25 on the enclosed keywords.</p>
+    </li>
+  </ul>
+  <p>There are also some reasons to choose keyword search:</p>
+  <ul>
+    <li>
+      <p><strong>It is predictable</strong> — Semantic search engines are powerful, but they can be hard to understand, and sometimes it’s unclear why certain results are returned. Keyword search returns <em>only</em> the results that match.</p>
+    </li>
+    <li>
+      <p><strong>It is complete</strong> — Many legal documents are only a few words long (e.g., SCOTUS cases that simply say, “AFFIRMED” or “CERT DENIED”). Such decisions do not have much actual meaning except in the context of other results, and are not well-suited to semantic search engines. We simply do not add these records to the semantic search engine.</p>
+    </li>
+    <li>
+      <p><strong>You can go deep</strong> — Semantic search engines only provide the top results. Keyword search engines allow you to deeply research a particular topic.</p>
+    </li>
+  </ul>
+
+  <p>Semantic search uses a language model and the <a href="https://www.elastic.co/blog/understanding-ann">approximate nearest neighbor algorithm</a> to identify semantic meaning between documents and queries. The quality of the model that we use determines how well the system works. To provide the best results possible, we <a href="https://free.law/2025/03/11/semantic-search">created a domain-adapted fine-tuned model</a>, which we released to the public for free.
+  </p>
+  <p>Citegeist uses this model in conjunction with BM25, date decay, and jurisdiction boosting to rank results (see above).</p>
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

@@ -2,12 +2,16 @@ from dataclasses import dataclass
 from unittest.mock import Mock, patch
 
 from django.db.models.signals import post_save
+from django.test import override_settings
 
+from cl.lib.redis_utils import get_redis_interface
 from cl.search.factories import (
+    CourtFactory,
     DocketEntryFactory,
+    DocketFactory,
     RECAPDocumentFactory,
 )
-from cl.search.models import RECAPDocument
+from cl.search.models import Docket, RECAPDocument
 from cl.search.signals import handle_recap_doc_change
 from cl.tests.cases import TestCase
 
@@ -81,3 +85,154 @@ class RECAPDocumentReceiverTests(TestCase):
                         )
                     else:
                         mock_apply.assert_not_called()
+
+
+@override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+class TestHandleDocketNumberRawCleaning(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+
+    def setUp(self) -> None:
+        self.r = get_redis_interface("CACHE")
+        key_to_clean = "docket_number_cleaning:llm_batch"
+        key = self.r.keys(key_to_clean)
+        if key:
+            self.r.delete(*key)
+
+    def test_docket_number_cleaning_triggered_with_cleaning(self):
+        docket = DocketFactory(
+            court=self.court_scotus,
+            docket_number_raw="12-1234-ag",
+            source=Docket.DEFAULT,
+        )
+        self.assertEqual(
+            docket.docket_number, "12-1234-AG", "Docket number doesn't match"
+        )
+        self.assertEqual(
+            self.r.scard("docket_number_cleaning:llm_batch"),
+            0,
+            "Redis cache count doesn't match",
+        )
+        self.assertEqual(
+            self.r.smembers("docket_number_cleaning:llm_batch"),
+            set(),
+            "Redis cache set doesn't match",
+        )
+
+        docket.docket_number_raw = "12--1234-ag"
+        docket.save(update_fields=["docket_number_raw"])
+        self.assertEqual(
+            docket.docket_number, "12-1234-AG", "Docket number doesn't match"
+        )
+        self.assertEqual(
+            self.r.scard("docket_number_cleaning:llm_batch"),
+            0,
+            "Redis cache count doesn't match",
+        )
+        self.assertEqual(
+            self.r.smembers("docket_number_cleaning:llm_batch"),
+            set(),
+            "Redis cache set doesn't match",
+        )
+
+    def test_docket_number_cleaning_not_triggered_for_recap_source(self):
+        docket = DocketFactory.create(
+            court=self.court_scotus,
+            docket_number_raw="Docket 12--1234-ag",
+            docket_number="Docket 12--1234-ag",
+            source=Docket.RECAP,
+        )
+        self.assertEqual(
+            docket.docket_number,
+            "Docket 12--1234-ag",
+            "Docket number doesn't match",
+        )
+        self.assertEqual(
+            self.r.scard("docket_number_cleaning:llm_batch"),
+            0,
+            "Redis cache count doesn't match",
+        )
+        self.assertEqual(
+            self.r.smembers("docket_number_cleaning:llm_batch"),
+            set(),
+            "Redis cache set doesn't match",
+        )
+
+    def test_docket_number_cleaning_triggered_without_cleaning(self):
+        docket = DocketFactory(
+            court=self.court_canb,
+            docket_number_raw="Docket 12-1234",
+            docket_number="12-1234",
+            source=Docket.DEFAULT,
+        )
+        self.assertEqual(
+            docket.docket_number,
+            "12-1234",
+            "Docket number doesn't match",
+        )
+        self.assertEqual(
+            self.r.scard("docket_number_cleaning:llm_batch"),
+            0,
+            "Redis cache count doesn't match",
+        )
+        self.assertEqual(
+            self.r.smembers("docket_number_cleaning:llm_batch"),
+            set(),
+            "Redis cache set doesn't match",
+        )
+
+        docket.court = self.court_scotus
+        docket.docket_number_raw = "Docket Nos. 12-1234-ag, 1235_"
+        docket.save(update_fields=["court", "docket_number_raw"])
+        self.assertEqual(
+            docket.docket_number,
+            "12-1234",
+            "Docket number doesn't match",
+        )
+        self.assertEqual(
+            self.r.scard("docket_number_cleaning:llm_batch"),
+            1,
+            "Redis cache count doesn't match",
+        )
+        self.assertEqual(
+            self.r.smembers("docket_number_cleaning:llm_batch"),
+            set([str(docket.id)]),
+            "Redis cache set doesn't match",
+        )
+
+    def test_docket_number_cleaning_triggered_without_cleaning_multiples(self):
+        docket_1 = DocketFactory(
+            court=self.court_scotus,
+            docket_number_raw="Docket Nos. 12-1234-ag, 1235",
+            docket_number="12-1234-ag, 1235",
+            source=Docket.DEFAULT,
+        )
+        docket_2 = DocketFactory(
+            court=self.court_scotus,
+            docket_number_raw="Docket Nos. 12-1234-ag, 1235_",
+            docket_number="12-1234-ag, 1235_",
+            source=Docket.DEFAULT,
+        )
+        self.assertEqual(
+            docket_1.docket_number,
+            "12-1234-ag, 1235",
+            "Docket number doesn't match",
+        )
+        self.assertEqual(
+            docket_2.docket_number,
+            "12-1234-ag, 1235_",
+            "Docket number doesn't match",
+        )
+        self.assertEqual(
+            self.r.scard("docket_number_cleaning:llm_batch"),
+            2,
+            "Redis cache count doesn't match",
+        )
+        self.assertEqual(
+            self.r.smembers("docket_number_cleaning:llm_batch"),
+            set([str(docket_1.id), str(docket_2.id)]),
+            "Redis cache set doesn't match",
+        )

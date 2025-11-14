@@ -5,12 +5,14 @@ from collections import OrderedDict
 from dateutil import parser
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
+from django.utils.html import strip_tags
 from django_elasticsearch_dsl import Document, fields
 from rest_framework import serializers
 from rest_framework.fields import empty
 from rest_framework.utils.field_mapping import get_field_kwargs
 
 from cl.custom_filters.templatetags.extras import render_string_or_list
+from cl.lib.date_time import fixed_midnight_pt
 
 
 class TimeStampField(serializers.Field):
@@ -68,6 +70,21 @@ class CoerceDateField(serializers.Field):
         return serializers.DateField().to_representation(value)
 
 
+class CoerceDateTimeField(serializers.Field):
+    """Coerces date-like inputs into a datetime midnight PT representation.
+    If the input is not a date, it returns the datetime directly.
+    """
+
+    def to_representation(self, value):
+        if isinstance(value, datetime.date):
+            return serializers.DateTimeField().to_representation(
+                fixed_midnight_pt(value)
+            )
+        return serializers.DateTimeField().to_representation(
+            fixed_midnight_pt(value.date())
+        )
+
+
 class NullableListField(serializers.ListField):
     """A custom ListField that returns None when serialized if the list is
     empty. For API V3 compatibility.
@@ -87,6 +104,13 @@ class HighlightedField(serializers.Field):
 
     def to_representation(self, value):
         return render_string_or_list(value)
+
+
+class SuppressHighlightsField(serializers.Field):
+    """Supress highlights from text fields."""
+
+    def to_representation(self, value):
+        return strip_tags(render_string_or_list(value))
 
 
 class NoneToListField(serializers.ListField):
