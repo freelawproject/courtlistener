@@ -415,6 +415,10 @@ a.button:active {
     flex-direction: column;
   }
 
+  .flex-md-row {
+    flex-direction: row;
+  }
+
 }
 
 @media (min-width: 992px) {
@@ -1732,6 +1736,14 @@ div.subopinion-content img {
   .xs-pull-right {
     float: right !important;
   }
+
+  .absolute-max-md {
+    position: absolute;
+  }
+}
+
+.absolute {
+  position: absolute;
 }
 
 /* Custom CSS for opinion coverage page */

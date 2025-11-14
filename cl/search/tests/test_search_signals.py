@@ -164,7 +164,8 @@ class TestHandleDocketNumberRawCleaning(TestCase):
     def test_docket_number_cleaning_triggered_without_cleaning(self):
         docket = DocketFactory(
             court=self.court_canb,
-            docket_number_raw="12-1234",
+            docket_number_raw="Docket 12-1234",
+            docket_number="12-1234",
             source=Docket.DEFAULT,
         )
         self.assertEqual(
@@ -188,7 +189,7 @@ class TestHandleDocketNumberRawCleaning(TestCase):
         docket.save(update_fields=["court", "docket_number_raw"])
         self.assertEqual(
             docket.docket_number,
-            "Docket Nos. 12-1234-ag, 1235_",
+            "12-1234",
             "Docket number doesn't match",
         )
         self.assertEqual(
@@ -206,21 +207,23 @@ class TestHandleDocketNumberRawCleaning(TestCase):
         docket_1 = DocketFactory(
             court=self.court_scotus,
             docket_number_raw="Docket Nos. 12-1234-ag, 1235",
+            docket_number="12-1234-ag, 1235",
             source=Docket.DEFAULT,
         )
         docket_2 = DocketFactory(
             court=self.court_scotus,
             docket_number_raw="Docket Nos. 12-1234-ag, 1235_",
+            docket_number="12-1234-ag, 1235_",
             source=Docket.DEFAULT,
         )
         self.assertEqual(
             docket_1.docket_number,
-            "Docket Nos. 12-1234-ag, 1235",
+            "12-1234-ag, 1235",
             "Docket number doesn't match",
         )
         self.assertEqual(
             docket_2.docket_number,
-            "Docket Nos. 12-1234-ag, 1235_",
+            "12-1234-ag, 1235_",
             "Docket number doesn't match",
         )
         self.assertEqual(

@@ -14,6 +14,7 @@ from lxml import etree
 
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
+from cl.lib.date_time import fixed_midnight_pt
 from cl.lib.utils import deepgetattr
 from cl.people_db.factories import (
     ABARatingFactory,
@@ -49,17 +50,6 @@ from cl.search.models import (
 )
 from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
-
-
-def midnight_pt_test(d: datetime.date) -> datetime.datetime:
-    """Cast a naive date object to midnight Pacific Time, either PST or PDT,
-    according to the date. This method also considers historical timezone
-    offsets, similar to how they are handled in DRF.
-    """
-    time_zone = timezone.get_current_timezone()
-    d = datetime.datetime.combine(d, datetime.time())
-    return timezone.make_aware(d, time_zone)
-
 
 opinion_cluster_v3_v4_common_fields = {
     "absolute_url": lambda x: x["result"].cluster.get_absolute_url(),
@@ -126,7 +116,7 @@ opinion_cluster_v3_v4_common_fields = {
         (
             x["result"].cluster.docket.date_argued.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].cluster.docket.date_argued
             ).isoformat()
         )
@@ -137,7 +127,7 @@ opinion_cluster_v3_v4_common_fields = {
         (
             x["result"].cluster.date_filed.isoformat()
             if x.get("V4")
-            else midnight_pt_test(x["result"].cluster.date_filed).isoformat()
+            else fixed_midnight_pt(x["result"].cluster.date_filed).isoformat()
         )
         if x["result"].cluster.date_filed
         else None
@@ -146,7 +136,7 @@ opinion_cluster_v3_v4_common_fields = {
         (
             x["result"].cluster.docket.date_reargued.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].cluster.docket.date_reargued
             ).isoformat()
         )
@@ -157,7 +147,7 @@ opinion_cluster_v3_v4_common_fields = {
         (
             x["result"].cluster.docket.date_reargument_denied.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].cluster.docket.date_reargument_denied
             ).isoformat()
         )
@@ -287,7 +277,7 @@ docket_api_common_keys = {
         (
             x["result"].docket_entry.docket.date_argued.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].docket_entry.docket.date_argued
             ).isoformat()
         )
@@ -298,7 +288,7 @@ docket_api_common_keys = {
         (
             x["result"].docket_entry.docket.date_filed.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].docket_entry.docket.date_filed
             ).isoformat()
         )
@@ -309,7 +299,7 @@ docket_api_common_keys = {
         (
             x["result"].docket_entry.docket.date_terminated.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].docket_entry.docket.date_terminated
             ).isoformat()
         )
@@ -427,7 +417,7 @@ recap_document_common_api_keys = {
         (
             x["result"].docket_entry.date_filed.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].docket_entry.date_filed
             ).isoformat()
         )
@@ -702,7 +692,7 @@ audio_common_fields = {
         (
             x["result"].docket.date_argued.isoformat()
             if x.get("V4")
-            else midnight_pt_test(x["result"].docket.date_argued).isoformat()
+            else fixed_midnight_pt(x["result"].docket.date_argued).isoformat()
         )
         if x["result"].docket.date_argued
         else None
@@ -711,7 +701,9 @@ audio_common_fields = {
         (
             x["result"].docket.date_reargued.isoformat()
             if x.get("V4")
-            else midnight_pt_test(x["result"].docket.date_reargued).isoformat()
+            else fixed_midnight_pt(
+                x["result"].docket.date_reargued
+            ).isoformat()
         )
         if x["result"].docket.date_reargued
         else None
@@ -720,7 +712,7 @@ audio_common_fields = {
         (
             x["result"].docket.date_reargument_denied.isoformat()
             if x.get("V4")
-            else midnight_pt_test(
+            else fixed_midnight_pt(
                 x["result"].docket.date_reargument_denied
             ).isoformat()
         )
@@ -1107,42 +1099,42 @@ class SearchTestCase(TestCase):
         )
 
         cls.citation_1 = CitationWithParentsFactory.create(
-            volume=33,
+            volume="33",
             reporter="state",
             page="1",
             type=1,
             cluster=cls.opinion_cluster_1,
         )
         cls.citation_2 = CitationWithParentsFactory.create(
-            volume=22,
+            volume="22",
             reporter="AL",
             page="339",
             type=8,
             cluster=cls.opinion_cluster_2,
         )
         cls.citation_3 = CitationWithParentsFactory.create(
-            volume=33,
+            volume="33",
             reporter="state",
             page="1",
             type=1,
             cluster=cls.opinion_cluster_2,
         )
         cls.citation_4 = CitationWithParentsFactory.create(
-            volume=1,
+            volume="1",
             reporter="Yeates",
             page="1",
             type=5,
             cluster=cls.opinion_cluster_2,
         )
         cls.citation_5 = CitationWithParentsFactory.create(
-            volume=56,
+            volume="56",
             reporter="F.2d",
             page="9",
             type=1,
             cluster=cls.opinion_cluster_2,
         )
         cls.citation_5 = CitationWithParentsFactory.create(
-            volume=56,
+            volume="56",
             reporter="F.2d",
             page="11",
             type=1,

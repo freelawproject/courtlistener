@@ -45,6 +45,7 @@
         <li><a href="#search-alerts">Search Alerts</a></li>
         <li><a href="#old-da-alerts-report">Old Docket Alerts</a></li>
         <li><a href="#recap-fetch">RECAP Fetch</a></li>
+         <li><a href="#pray-and-pay">Pray And Pay</a></li>
       </ul>
       <li><a href="#maintenance">Maintenance Schedule</a></li>
       <li><a href="#change-log">Change Log</a></li>
@@ -58,7 +59,7 @@
   </p>
   <p>To set this up, you create a URL on your server where CourtListener can send data. Then, whenever something important happens in CourtListener, we will POST an “event” to that URL as JSON data. When you receive the event, you can process it and perform whatever actions your system needs in response.
   </p>
-  <p>Currently, CourtListener can send webhook events whenever dockets are updated, search alerts are triggered, docket alerts expire, or when RECAP Fetch tasks complete. If you have other events of interest, please get in touch.
+  <p>Currently, CourtListener can send webhook events whenever dockets are updated, search alerts are triggered, docket alerts expire, RECAP Fetch tasks complete, or when pray-and-pay requests are granted. If you have other events of interest, please get in touch.
   </p>
 
   <h2 id="pricing">Pricing</h2>
@@ -114,6 +115,8 @@
           <li>DOCKET_ALERT = 1</li>
           <li>SEARCH_ALERT = 2</li>
           <li>RECAP_FETCH = 3</li>
+          <li>OLD_DOCKET_ALERTS_REPORT = 4</li>
+          <li>PRAY_AND_PAY = 5</li>
         </ul>
         <hr>
         <p><strong>date_created</strong> <span class="text-muted">ISO 8601 string</span></p>
@@ -133,7 +136,7 @@
   </ol>
   <p>We recommend adding these IP addresses to your network allow list and/or verifying that the webhook events you receive come from these addresses.
   </p>
-  <p>We also recommend you protect your webhook endpoints by giving them long, random, secret URLs instead of short preditable ones.</p>
+  <p>We also recommend you protect your webhook endpoints by giving them long, random, secret URLs instead of short predictable ones.</p>
   <p>Beyond this, our webhook system does not have an authentication mechanism to verify that a POST to your endpoint came from CourtListener. The <a href="https://github.com/freelawproject/courtlistener/issues/1650" rel="nofollow" target="_blank">decision not to support an authentication mechanism</a> was made after analyzing the risk of lacking authentication and after completing a review of the Stripe payments platform (which defaults to not using authentication despite being a high-risk environment).
   </p>
   <p>If the need for webhook authentication is a blocker for your organization, <a href="{% url 'contact' %}">please let us know</a> and we can revisit this decision.
@@ -406,6 +409,36 @@ xargs -I % curl -X POST \
   --url '{% get_full_host %}{% url "pacerfetchqueue-list" version="v4" %}' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' </pre>
   <p>After you set up this endpoint, you will be notified whenever one of your fetch requests terminates in success or failure.
+  </p>
+
+  <h3 id="pray-and-pay">Pray And Pay Events</h3>
+  <p>The <a href="{% url 'pray_and_pay_help' %}">Pray and Pay system</a> allows users to request PACER documents that are not yet available in CourtListener's RECAP Archive. When a requested document becomes available, users who requested it are notified via email.
+  </p>
+  <p>To programmatically create and manage prayers, see the <a href="{% url 'recap_api_help' %}#pray-and-pay-api">Pray and Pay API documentation</a>.
+  </p>
+  <p>By subscribing to this webhook endpoint, your server can be notified when a Pray and Pay request you made has been granted and the document is now available.
+  </p>
+  <p>As with our other events, this webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>.</p>
+  <p>The shape of the data is thus:</p>
+  <pre>{
+   "payload":{
+      "id": 1,
+      "date_created": "2025-04-16T21:24:18.879312-07:00",
+      "status": 2,
+      "recap_document": 436149610
+   },
+   "webhook":{...}
+}</pre>
+  <p>The <code>payload</code> contains the following fields:</p>
+  <ul>
+    <li><strong>id</strong> - The unique identifier for this prayer</li>
+    <li><strong>date_created</strong> - When the prayer was originally created</li>
+    <li><strong>status</strong> - The status of the prayer (1 = Waiting, 2 = Granted)</li>
+    <li><strong>recap_document</strong> - The ID of the RECAP document that was requested</li>
+  </ul>
+  <p>Webhook events are only sent when a prayer's status changes to <code>GRANTED</code> (status = 2), indicating the document is now available in the RECAP Archive.
+  </p>
+  <p>You can retrieve the full document details using the <a href="{% url 'rest_docs' version='v4' %}#recap-endpoint">RECAP Document API</a> with the <code>recap_document</code> ID provided in the payload.
   </p>
 
   <h2 id="maintenance">Maintenance Schedule</h2>
