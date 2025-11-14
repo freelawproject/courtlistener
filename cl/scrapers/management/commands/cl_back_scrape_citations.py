@@ -71,7 +71,26 @@ class Command(cl_back_scrape_opinions.Command):
             sha1_hash = sha1(force_bytes(content))
 
             try:
-                cluster = Opinion.objects.get(sha1=sha1_hash).cluster
+                if court.id == "scotus":
+                    # Ensure all criteria matches for scotus opinion and add the citation
+                    scotus_opinions = Opinion.objects.filter(
+                        cluster__docket__docket_number=case.get(
+                            "docket_numbers"
+                        ),
+                        cluster__case_name=case.get("case_names"),
+                        cluster__date_filed=case.get("case_dates"),
+                        cluster__judges=case.get("judges"),
+                        cluster__docket__court__id="scotus",
+                    )
+                    if len(scotus_opinions) > 1:
+                        # duplicates detected, check if we have the exact copy
+                        cluster = Opinion.objects.get(sha1=sha1_hash).cluster
+                    elif len(scotus_opinions) == 1:
+                        cluster = scotus_opinions.first().cluster
+                    else:
+                        raise Opinion.DoesNotExist
+                else:
+                    cluster = Opinion.objects.get(sha1=sha1_hash).cluster
             except Opinion.DoesNotExist:
                 # populate special key to avoid downloading the file again
                 case["content"] = content
