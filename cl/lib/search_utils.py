@@ -528,7 +528,7 @@ def do_es_search(
     facet: bool = True,
     cache_key: str | None = None,
     is_csv_export: bool = False,
-    courts: QuerySet[Court] = Court.objects.filter(in_use=True),
+    courts: QuerySet[Court] | None = None,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -545,6 +545,8 @@ def do_es_search(
     :return: A big dict of variables for use in the search results, homepage, or
     other location.
     """
+    if courts is None:
+        courts = Court.objects.filter(in_use=True)
     paged_results = None
     query_time: int | None = 0
     total_query_results: int | None = 0
