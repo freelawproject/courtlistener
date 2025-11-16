@@ -113,6 +113,9 @@
   .btn-grey {
     @apply btn bg-greyscale-100 hover:bg-greyscale-200 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:text-greyscale-400 disabled:bg-greyscale-50;
   }
+  .btn-white {
+    @apply btn text-greyscale-700 bg-white hover:bg-greyscale-100 border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:border-greyscale-200 disabled:text-greyscale-400;
+  }
   .banner {
     @apply flex flex-col gap-4 rounded-2xl bg-greyscale-100 border-2 border-greyscale-200 justify-between;
   }
