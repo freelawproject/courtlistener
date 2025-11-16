@@ -17,17 +17,23 @@ class Command(VerboseCommand):
         today = now()
         yesterday = today - timedelta(days=1)
         events = Event.objects.filter(date_created__gte=yesterday)
-        if not events.count():
+        if not events.exists():
             return
 
-        # Filter out API-related user milestones since those are now handled by
-        # the Zoho integration. This keeps only global API events, global
-        # webhook events, and user tracking webhook milestones.
-        events_for_email = [
-            e
-            for e in events.all()
-            if not e.user or "webhook" in e.description.lower()
-        ]
+        # Filter out v4 API-related user milestones since those are now handled
+        # by the Zoho integration. We keep:
+        #  - Global events (no user)
+        #  - Any webhook events
+        #  - Any v3 API events (global or user milestones)
+        def should_include(event: Event) -> bool:
+            desc = event.description.lower()
+            return event.user is None or "webhook" in desc or "v3" in desc
+
+        events_for_email = [e for e in events if should_include(e)]
+
+        if not events_for_email:
+            return
+
         template = loader.get_template("emails/events_email.txt")
         send_mail(
             subject=f"CourtListener events email for {today.date().isoformat()}",

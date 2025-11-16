@@ -30,14 +30,21 @@ class PartnershipEmailTests(TestCase):
             datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
             tick=False,
         ):
-            global_api_event = Event.objects.create(
+            global_v4_api_event = Event.objects.create(
                 description="API v4 has logged 1000 total requests."
+            )
+            global_v3_api_event = Event.objects.create(
+                description="API v3 has logged 1000 total requests."
             )
             global_webhook_event = Event.objects.create(
                 description="Webhooks have logged 1000 total successful events."
             )
-            api_user_event = Event.objects.create(
+            v4_api_user_event = Event.objects.create(
                 description=f"User '{self.api_user.username}' has placed their 3rd API v4 request.",
+                user=self.api_user,
+            )
+            v3_api_user_event = Event.objects.create(
+                description=f"User '{self.api_user.username}' has placed their 3rd API v3 request.",
                 user=self.api_user,
             )
             webhook_user_event = Event.objects.create(
@@ -56,12 +63,14 @@ class PartnershipEmailTests(TestCase):
         body = email.body
 
         # Should include global and webhook user events
-        self.assertIn(global_api_event.description, body)
+        self.assertIn(global_v3_api_event.description, body)
+        self.assertIn(global_v4_api_event.description, body)
+        self.assertIn(v3_api_user_event.description, body)
         self.assertIn(global_webhook_event.description, body)
         self.assertIn(webhook_user_event.description, body)
 
-        # Should exclude API user-specific event
-        self.assertNotIn(api_user_event.description, body)
+        # Should exclude v4 API user-specific event
+        self.assertNotIn(v4_api_user_event.description, body)
 
 
 @pytest.mark.django_db
