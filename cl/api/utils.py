@@ -447,7 +447,8 @@ class LoggingMixin:
                     description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
                     user=user,
                 )
-                create_or_update_zoho_account.delay(user.pk, user_count)
+                if api_version == "v4":
+                    create_or_update_zoho_account.delay(user.pk, user_count)
 
 
 class CacheListMixin:

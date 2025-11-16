@@ -580,7 +580,7 @@ class ApiEventCreationTestCase(TestCase):
             f"User '{self.user.username}' has placed their 1st API v3 request."
         )
         self.assertEqual(event_descriptions, expected_descriptions)
-        mock_zoho_task.delay.assert_called_once_with(self.user.pk, 1)
+        mock_zoho_task.delay.assert_not_called()
 
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
@@ -609,15 +609,12 @@ class ApiEventCreationTestCase(TestCase):
 
     # Set the api prefix so that other tests
     # run in parallel do not affect this one.
-    @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
         side_effect=lambda *args,
         **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
     )
-    async def test_api_logged_correctly(
-        self, mock_logging_prefix, mock_zoho_task
-    ) -> None:
+    async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
         self.assertEqual(mock_logging_prefix.called, 0)
         await self.hit_the_api("v3")
