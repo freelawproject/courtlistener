@@ -25,12 +25,13 @@ from cl.lib.command_utils import logger
 class HasModuleName(Protocol):
     module_name: str
 
+    @staticmethod
     def _build_record(
-        self, fields: dict[str | Any, Any], record_id: int | None = None
+        fields: dict[str | Any, Any], record_id: int | None = None
     ) -> Record: ...
 
+    @staticmethod
     def _build_body_wrapper(
-        self,
         records: list[Record],
         process: list[str] | None = None,
         trigger: list[str] | None = None,
@@ -161,8 +162,9 @@ class ZohoModule:
 
         raise Exception("Unexpected response type received from the Zoho API.")
 
+    @staticmethod
     def _build_record(
-        self, fields: dict[str | Field, Any], record_id: int | None = None
+        fields: dict[str | Field, Any], record_id: int | None = None
     ) -> Record:
         """
         Build a Zoho Record instance from a dictionary of fields.
@@ -179,8 +181,8 @@ class ZohoModule:
                 record.add_key_value(key, value)
         return record
 
+    @staticmethod
     def _build_body_wrapper(
-        self,
         records: list[Record],
         triggers: list[str] | None = None,
         process: list[str] | None = None,
