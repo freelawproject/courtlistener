@@ -12,6 +12,7 @@ from cl.donate.admin import (
     NeonMembershipInline,
 )
 from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
+from cl.favorites.models import UserTag
 from cl.lib.admin import AdminTweaksMixin, generate_admin_links
 from cl.users.models import (
     BarMembership,
@@ -92,6 +93,9 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         profile_id = (
             user.profile.pk if user and hasattr(user, "profile") else None
         )
+        has_tags = (
+            user and hasattr(user, "user_tags") and user.user_tags.count()
+        )
 
         custom_links = [
             {
@@ -110,6 +114,12 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
                 "should_add": user and hasattr(user, "search_queries"),
                 "label": "Search Queries",
                 "model_class": UserSearchQuery,
+                "query_params": {"user": object_id},
+            },
+            {
+                "should_add": has_tags,
+                "label": "Tags",
+                "model_class": UserTag,
                 "query_params": {"user": object_id},
             },
         ]
