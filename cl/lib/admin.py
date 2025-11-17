@@ -45,3 +45,31 @@ def build_admin_url(
     )
     encoded_query_params = urlencode(query_params)
     return f"{entries_changelist_url}?{encoded_query_params}"
+
+
+def generate_admin_links(
+    links: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    """
+    Construct a list of links with links to given admin views.
+    Each link should have the following keys:
+    - should_add: Condition to check whether the link should be added.
+    - label: Label for the link.
+    - model_class: The Django model class for which the admin URL will be built.
+    - query_params: Query parameters to append to the URL (e.g. {"docket": 123}).
+    """
+    generated_links = []
+
+    for link in links:
+        if link.get("should_add"):
+            generated_links.append(
+                {
+                    "href": build_admin_url(
+                        link.get("model_class"),
+                        query_params=link.get("query_params"),
+                    ),
+                    "label": link.get("label"),
+                }
+            )
+
+    return generated_links

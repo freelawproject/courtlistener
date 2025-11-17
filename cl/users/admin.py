@@ -12,7 +12,7 @@ from cl.donate.admin import (
     NeonMembershipInline,
 )
 from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
-from cl.lib.admin import AdminTweaksMixin, build_admin_url
+from cl.lib.admin import AdminTweaksMixin, generate_admin_links
 from cl.users.models import (
     BarMembership,
     EmailFlag,
@@ -89,24 +89,32 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         """Add links to related event admin pages filtered by user/profile."""
         extra_context = extra_context or {}
         user = self.get_object(request, object_id)
-
-        extra_context["proxy_events_url"] = build_admin_url(
-            UserProxyEvent,
-            {"pgh_obj": object_id},
+        profile_id = (
+            user.profile.pk if user and hasattr(user, "profile") else None
         )
 
-        if user and hasattr(user, "profile"):
-            profile_id = user.profile.pk
-            extra_context["profile_events_url"] = build_admin_url(
-                UserProfileEvent,
-                {"pgh_obj": profile_id},
-            )
+        custom_links = [
+            {
+                "should_add": True,
+                "label": "UserProxy Events",
+                "model_class": UserProxyEvent,
+                "query_params": {"pgh_obj": object_id},
+            },
+            {
+                "should_add": profile_id,
+                "label": "UserProfile Events",
+                "model_class": UserProfileEvent,
+                "query_params": {"pgh_obj": profile_id},
+            },
+            {
+                "should_add": user and hasattr(user, "search_queries"),
+                "label": "Search Queries",
+                "model_class": UserSearchQuery,
+                "query_params": {"user": object_id},
+            },
+        ]
 
-        if user and hasattr(user, "search_queries"):
-            extra_context["search_queries_url"] = build_admin_url(
-                UserSearchQuery,
-                {"user": object_id},
-            )
+        extra_context["custom_links"] = generate_admin_links(custom_links)
 
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context
