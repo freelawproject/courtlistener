@@ -259,6 +259,7 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
     :return None
     """
     is_error = search_results.get("error")
+    is_semantic = bool(request.GET.get("semantic"))
     search_query = SearchQuery(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -267,6 +268,9 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
         hit_cache=False,
         source=SearchQuery.WEBSITE,
         engine=SearchQuery.ELASTICSEARCH,
+        query_mode=SearchQuery.SEMANTIC
+        if is_semantic
+        else SearchQuery.KEYWORD,
     )
     if is_error:
         # Leave `query_time_ms` as None if there is an error
@@ -292,6 +296,7 @@ def store_search_api_query(
     :param engine: The search engine used to execute the query.
     :return: None
     """
+    is_semantic = bool(request.GET.get("semantic"))
     SearchQuery.objects.create(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -300,6 +305,9 @@ def store_search_api_query(
         hit_cache=False,
         source=SearchQuery.API,
         engine=engine,
+        query_mode=SearchQuery.SEMANTIC
+        if is_semantic
+        else SearchQuery.KEYWORD,
     )
 
 
