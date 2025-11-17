@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from collections.abc import Callable
@@ -5,7 +6,7 @@ from functools import wraps
 from hashlib import md5
 from urllib.parse import urlparse
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import iscoroutinefunction, sync_to_async
 from django.core.cache import cache
 from django.utils.cache import patch_response_headers
 
@@ -38,26 +39,47 @@ def retry(
     :type logger: logging.Logger instance
     """
 
-    def deco_retry(f: Callable) -> Callable:
-        @wraps(f)
-        def f_retry(*args, **kwargs):
-            mtries, mdelay = tries, delay
-            while mtries > 1:
-                try:
-                    return f(*args, **kwargs)
-                except ExceptionToCheck as e:
-                    msg = "%s, Retrying in %s seconds..."
-                    params = (e, mdelay)
-                    if logger:
-                        logger.warning(msg, *params)
-                    else:
-                        print(msg % params)
-                    time.sleep(mdelay)
-                    mtries -= 1
-                    mdelay *= backoff
-            return f(*args, **kwargs)
+    def _log_wait(exc: Exception, wait: float) -> None:
+        msg = "%s, Retrying in %s seconds..."
+        params = (exc, wait)
+        if logger:
+            logger.warning(msg, *params)
+        else:
+            print(msg % params)
 
-        return f_retry  # true decorator
+    def deco_retry(f: Callable) -> Callable:
+        if iscoroutinefunction(f):
+
+            @wraps(f)
+            async def f_retry(*args, **kwargs):
+                mtries, mdelay = tries, delay
+                while mtries > 1:
+                    try:
+                        return await f(*args, **kwargs)
+                    except ExceptionToCheck as e:
+                        _log_wait(e, mdelay)
+                        await asyncio.sleep(mdelay)
+                        mtries -= 1
+                        mdelay *= backoff
+                return await f(*args, **kwargs)
+
+            return f_retry  # true decorator
+        else:
+
+            @wraps(f)
+            def f_retry(*args, **kwargs):
+                mtries, mdelay = tries, delay
+                while mtries > 1:
+                    try:
+                        return f(*args, **kwargs)
+                    except ExceptionToCheck as e:
+                        _log_wait(e, mdelay)
+                        time.sleep(mdelay)
+                        mtries -= 1
+                        mdelay *= backoff
+                return f(*args, **kwargs)
+
+            return f_retry  # true decorator
 
     return deco_retry
 
