@@ -77,13 +77,14 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "profile__stub_account",
     )
     search_help_text = (
-        "Search Users by username, first name, last name, or email."
+        "Search Users by username, first name, last name, email, or pk."
     )
     search_fields = (
         "username",
         "first_name",
         "last_name",
         "email",
+        "pk",
     )
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
