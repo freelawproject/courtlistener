@@ -47,7 +47,10 @@ from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
-from cl.users.tasks import notify_failing_webhook
+from cl.users.tasks import (
+    create_or_update_zoho_account,
+    notify_failing_webhook,
+)
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 BOOLEAN_LOOKUPS = ["exact"]
@@ -444,6 +447,8 @@ class LoggingMixin:
                     description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
                     user=user,
                 )
+                if api_version == "v4":
+                    create_or_update_zoho_account.delay(user.pk, user_count)
 
 
 class CacheListMixin:
