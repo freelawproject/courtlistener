@@ -4,10 +4,12 @@ import time
 from collections.abc import Callable
 from functools import wraps
 from hashlib import md5
+from math import ceil
 from urllib.parse import urlparse
 
 from asgiref.sync import iscoroutinefunction, sync_to_async
-from django.core.cache import cache
+from django.conf import settings
+from django.core.cache import caches
 from django.utils.cache import patch_response_headers
 
 logger = logging.getLogger(__name__)
@@ -105,7 +107,14 @@ def cache_page_ignore_params(timeout: int):
         async def _wrapped_view(request, *args, **kwargs):
             url_path = urlparse(request.build_absolute_uri()).path
             hash_key = md5(url_path.encode("ascii"), usedforsecurity=False)
-            cache_key = f"custom.views.decorator.cache:{hash_key.hexdigest()}"
+            # Use S3 cache in production only
+            cache = (
+                caches["s3"] if not settings.DEVELOPMENT else caches["default"]
+            )
+            # Compute the time-based prefix
+            days = int(ceil(timeout / 60 * 60 * 24))
+            time_based_prefix = f"{days}-day" if days == 1 else f"{days}-days"
+            cache_key = f"{time_based_prefix}:custom.views.decorator.cache.{hash_key.hexdigest()}"
             response = cache.get(cache_key)
             if response is not None:
                 return response
