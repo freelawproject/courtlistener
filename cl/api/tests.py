@@ -92,7 +92,6 @@ from cl.recap.views import (
 )
 from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_views import (
-    BankruptcyInformationViewSet,
     CourtViewSet,
     DocketEntryViewSet,
     DocketViewSet,
@@ -4291,9 +4290,7 @@ class BankruptcyInformationAPITests(TestCase):
 
         # Confirm the bankruptcy_information field is None for dockets without it
         self.assertIn("bankruptcy_information", docket_without_bankruptcy)
-        self.assertIsNone(
-            docket_without_bankruptcy["bankruptcy_information"]
-        )
+        self.assertIsNone(docket_without_bankruptcy["bankruptcy_information"])
 
     async def test_bankruptcy_information_endpoint_returns_data(self) -> None:
         """Confirm that the bankruptcy-information endpoint returns the
@@ -4371,7 +4368,8 @@ class BankruptcyInformationAPITests(TestCase):
         the bankruptcy_information field can be included.
         """
         response = await self._api_v4_request(
-            "docket-list", {"fields": "id,docket_number,bankruptcy_information"}
+            "docket-list",
+            {"fields": "id,docket_number,bankruptcy_information"},
         )
         results = response.json()["results"]
 
@@ -4386,6 +4384,4 @@ class BankruptcyInformationAPITests(TestCase):
             set(docket_with_bankruptcy.keys()),
             {"id", "docket_number", "bankruptcy_information"},
         )
-        self.assertIsNotNone(
-            docket_with_bankruptcy["bankruptcy_information"]
-        )
+        self.assertIsNotNone(docket_with_bankruptcy["bankruptcy_information"])
