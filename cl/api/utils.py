@@ -448,7 +448,9 @@ class LoggingMixin:
                     user=user,
                 )
                 if api_version == "v4":
-                    create_or_update_zoho_account.delay(user.pk, user_count)
+                    create_or_update_zoho_account.delay(
+                        user.pk, int(user_count)
+                    )
 
 
 class CacheListMixin:
