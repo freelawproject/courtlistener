@@ -1,0 +1,311 @@
+from typing import Any, Literal, Protocol
+
+from django.conf import settings
+from django.core.cache import cache
+from zohocrmsdk.src.com.zoho.api.authenticator import OAuthToken
+from zohocrmsdk.src.com.zoho.crm.api import (
+    HeaderMap,
+    Initializer,
+    ParameterMap,
+)
+from zohocrmsdk.src.com.zoho.crm.api.record import (
+    ActionWrapper,
+    APIException,
+    BodyWrapper,
+    Field,
+    Record,
+    RecordOperations,
+    ResponseWrapper,
+    SearchRecordsParam,
+)
+
+from cl.lib.command_utils import logger
+
+
+class HasModuleName(Protocol):
+    module_name: str
+
+    @staticmethod
+    def _build_record(
+        fields: dict[str | Any, Any], record_id: int | None = None
+    ) -> Record: ...
+
+    @staticmethod
+    def _build_body_wrapper(
+        records: list[Record],
+        process: list[str] | None = None,
+        trigger: list[str] | None = None,
+    ) -> BodyWrapper: ...
+
+
+def get_zoho_cache_key() -> str:
+    return "zoho_token"
+
+
+def build_zoho_payload_from_user(
+    user, module: Literal["Contacts", "Leads"]
+) -> dict[str | Field, Any]:
+    """
+    Build a Zoho CRM payload dictionary from a User instance.
+
+    This function maps a User’s attributes and related profile data
+    to the corresponding Zoho CRM fields. Standard Zoho fields are represented
+    by `Field` instances, while custom fields use string keys.
+
+    :param user: The user whose data will be mapped to Zoho CRM fields.
+    :param module: The Zoho module name ('Leads' or 'Contacts').
+    :return: A dictionary mapping Zoho field identifiers (either `Field`
+    instances or string keys) to their corresponding values.
+    """
+    payload = {
+        "CourtListener_ID": user.pk,
+        Field.Leads.email(): user.email,
+    }
+    # Basic user info
+    if user.first_name:
+        payload[Field.Leads.first_name()] = user.first_name
+    if user.last_name:
+        payload[Field.Leads.last_name()] = user.last_name
+
+    is_lead = module == "Leads"
+    # Profile-related fields
+    profile = user.profile
+    if profile.employer and is_lead:
+        payload[Field.Leads.company()] = profile.employer
+
+    if profile.city:
+        field_name = (
+            Field.Leads.city() if is_lead else Field.Contacts.mailing_city()
+        )
+        payload[field_name] = profile.city
+
+    if profile.state:
+        field_name = (
+            Field.Leads.state() if is_lead else Field.Contacts.mailing_state()
+        )
+        payload[field_name] = profile.state
+
+    if profile.zip_code:
+        field_name = (
+            Field.Leads.zip_code() if is_lead else Field.Contacts.mailing_zip()
+        )
+        payload[field_name] = profile.zip_code
+
+    return payload
+
+
+class ZohoModule:
+    module_name: str = ""
+
+    def __init__(self):
+        if Initializer.get_initializer() is None:
+            self.initialize()
+
+        if not self.module_name:
+            raise Exception("Subclasses must set `module_name`.")
+
+    @staticmethod
+    def initialize():
+        refresh_token = cache.get(f"{get_zoho_cache_key()}:refresh")
+        if not refresh_token:
+            raise Exception(
+                f"Cache miss: no value found for key {get_zoho_cache_key()}:refresh. "
+                "Please run `cl_get_zoho_tokens` to refresh and store new tokens."
+            )
+        token = OAuthToken(
+            client_id=settings.ZOHO_CLIENT_ID,
+            client_secret=settings.ZOHO_CLIENT_SECRET,
+            refresh_token=refresh_token,
+        )
+        Initializer.initialize(
+            environment=settings.ZOHO_ENV,
+            token=token,
+            store=settings.ZOHO_STORE,
+            resource_path=settings.ZOHO_RESOURCE_PATH,
+        )
+
+    @staticmethod
+    def handle_api_response(response):
+        """
+        Handle a Zoho API response, raising exceptions on errors.
+
+        :param response: The response object from a Zoho API call.
+        :return: The data from the response if successful.
+        :raises Exception: if the response is None, empty, or contains an APIException.
+        """
+        if response is None:
+            raise Exception("Received no response from the API.")
+
+        status_code = response.get_status_code()
+        if status_code in [204, 304]:
+            msg = "No Content" if status_code == 204 else "Not Modified"
+            logger.info(f"Zoho API returned no records ({msg}).")
+            return []
+
+        response_object = response.get_object()
+        if response_object is None:
+            raise Exception("Zoho API returned an empty response object.")
+
+        if isinstance(response_object, ResponseWrapper | ActionWrapper):
+            return response_object.get_data()
+
+        if isinstance(response_object, APIException):
+            status = response_object.get_status().get_value()
+            code = response_object.get_code().get_value()
+            message = response_object.get_message().get_value()
+            details = response_object.get_details()
+
+            detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
+            raise Exception(
+                f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
+            )
+
+        raise Exception("Unexpected response type received from the Zoho API.")
+
+    @staticmethod
+    def _build_record(
+        fields: dict[str | Field, Any], record_id: int | None = None
+    ) -> Record:
+        """
+        Build a Zoho Record instance from a dictionary of fields.
+        Optionally set a record ID for updates.
+        """
+        record = Record()
+        if record_id:
+            record.set_id(record_id)
+
+        for key, value in fields.items():
+            if isinstance(key, Field):
+                record.add_field_value(key, value)
+            else:
+                record.add_key_value(key, value)
+        return record
+
+    @staticmethod
+    def _build_body_wrapper(
+        records: list[Record],
+        triggers: list[str] | None = None,
+        process: list[str] | None = None,
+    ) -> BodyWrapper:
+        """
+        Wrap one or more Record instances in a BodyWrapper with optional process and trigger.
+        """
+        wrapper = BodyWrapper()
+        wrapper.set_data(records)
+        wrapper.set_trigger(triggers or ["approval", "workflow", "blueprint"])
+        if process:
+            wrapper.set_process(process)
+        return wrapper
+
+
+class SearchRecordMixin:
+    def get_record_by_cl_id_or_email(
+        self: HasModuleName,
+        cl_ids: list[int] | None = None,
+        emails: list[str] | None = None,
+        fields: list[str] | None = None,
+    ):
+        """Retrieve Zoho CRM records by CourtListener IDs or email addresses.
+
+        At least one of `cl_ids` or `emails` must be provided. The method
+        builds a search query using the provided identifiers and sends it
+        to the Zoho API. If matching records are found, they are returned
+        as a list of data objects.
+
+        :param cl_ids: Optional list of CourtListener record IDs to search for.
+        :param emails: Optional list of email addresses to search for.
+        :param fields: Optional list of field names to retrieve from each record.
+        :return: A list of Zoho record data objects returned by the API.
+        :raises ValueError: If both `cl_ids` and `emails` are empty or None.
+        """
+        cl_ids = cl_ids or []
+        emails = emails or []
+        fields = fields or []
+        if not cl_ids and not emails:
+            raise ValueError(
+                "At least one of 'cl_ids' or 'emails' must be provided."
+            )
+
+        record_operations = RecordOperations(self.module_name)
+        param_instance = ParameterMap()
+
+        ids_str = ",".join([str(i) for i in cl_ids])
+        emails_str = ",".join(emails)
+
+        criteria = []
+        if emails_str:
+            criteria.append(f"(Email:in:{emails_str})")
+        if ids_str:
+            criteria.append(f"(CourtListener_ID:in:{ids_str})")
+
+        criteria_str = " or ".join(criteria)
+        param_instance.add(SearchRecordsParam.criteria, f"({criteria_str})")
+
+        for field in fields:
+            param_instance.add(SearchRecordsParam.fields, field)
+
+        header_instance = HeaderMap()
+        response = record_operations.search_records(
+            param_instance, header_instance
+        )
+
+        return ZohoModule.handle_api_response(response)
+
+
+class CreateRecordMixin:
+    def create_record(self: HasModuleName, fields: dict[str | Field, Any]):
+        """
+        Create a single Zoho CRM record with the given field values.
+
+        This method and sends a record creation request to the Zoho CRM API.
+        It supports both standard Zoho fields (represented by `Field`
+        instances) and custom fields (represented by string keys).
+
+        :param fields: A mapping of Zoho fields to their new values. Keys may
+            be `Field` instances for standard CRM fields or strings for custom
+            fields.
+        :return: The Zoho API response data, parsed and validated by
+            `ZohoModule.handle_api_response`.
+        """
+        record_operations = RecordOperations(self.module_name)
+        record = self._build_record(fields)
+        request = self._build_body_wrapper(
+            [record], process=["review_process"]
+        )
+        # Execute and handle response
+        response = record_operations.create_records(request, HeaderMap())
+        return ZohoModule.handle_api_response(response)
+
+
+class UpdateRecordMixin:
+    def update_record(
+        self: HasModuleName, record_id: int, fields: dict[str | Field, Any]
+    ):
+        """
+        Update a Zoho CRM record with the given field values.
+
+        :param record_id: The Zoho CRM record ID to update.
+        :param fields: A mapping of Zoho fields to their new values. Keys may be
+            `Field` instances for standard CRM fields or strings for custom fields.
+        :return: The Zoho API response data, parsed and validated by
+            `ZohoModule.handle_api_response`.
+        """
+        record_operations = RecordOperations(self.module_name)
+        record = self._build_record(fields, record_id)
+        request = self._build_body_wrapper([record])
+        response = record_operations.update_record(
+            record_id, request, HeaderMap()
+        )
+        return ZohoModule.handle_api_response(response)
+
+
+class LeadsModule(
+    CreateRecordMixin, UpdateRecordMixin, SearchRecordMixin, ZohoModule
+):
+    module_name = "Leads"
+
+
+class ContactsModule(
+    CreateRecordMixin, UpdateRecordMixin, SearchRecordMixin, ZohoModule
+):
+    module_name = "Contacts"
