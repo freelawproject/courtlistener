@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from asgiref.sync import iscoroutinefunction, sync_to_async
 from django.conf import settings
 from django.core.cache import caches
+from django.core.cache.backends.base import InvalidCacheBackendError
 from django.utils.cache import patch_response_headers
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,7 @@ def retry(
     return deco_retry
 
 
-def cache_page_ignore_params(timeout: int):
+def cache_page_ignore_params(timeout: int, cache_alias: str = "default"):
     """Cache the result of a view while ignoring URL query parameters.
     Ensuring that the cache is consistent for different requests with varying
     query strings.
@@ -99,6 +100,7 @@ def cache_page_ignore_params(timeout: int):
     exposing confidential information.
 
     :param timeout: Cache duration (seconds).
+    :param cache_alias: The cache alias to use.
     :return: The decorated view function, caching its response.
     """
 
@@ -107,14 +109,38 @@ def cache_page_ignore_params(timeout: int):
         async def _wrapped_view(request, *args, **kwargs):
             url_path = urlparse(request.build_absolute_uri()).path
             hash_key = md5(url_path.encode("ascii"), usedforsecurity=False)
-            # Use S3 cache in production only
-            cache = (
-                caches["s3"] if not settings.DEVELOPMENT else caches["default"]
+
+            is_dev_or_test = settings.DEVELOPMENT or settings.TESTING
+            should_use_time_based_prefix = (
+                cache_alias == "s3" and not is_dev_or_test
             )
-            # Compute the time-based prefix
-            days = int(ceil(timeout / 60 * 60 * 24))
-            time_based_prefix = f"{days}-day" if days == 1 else f"{days}-days"
-            cache_key = f"{time_based_prefix}:custom.views.decorator.cache.{hash_key.hexdigest()}"
+            # handle S3 cache keys differently
+            if should_use_time_based_prefix:
+                days = int(ceil(timeout / (60 * 60 * 24)))
+                # Compute the time-based prefix
+                time_based_prefix = f"{days}-days"
+                cache_key = f"{time_based_prefix}:custom.views.decorator.cache.{hash_key.hexdigest()}"
+            else:
+                cache_key = (
+                    f"custom.views.decorator.cache:{hash_key.hexdigest()}"
+                )
+
+            try:
+                # If the cache alias is "s3" but we're in DEVELOPMENT or TESTING
+                # mode, use the default cache instead of S3. Otherwise, use the
+                # cache specified by cache_alias.
+                if cache_alias == "s3" and is_dev_or_test:
+                    cache = caches["default"]
+                else:
+                    cache = caches[cache_alias]
+            except InvalidCacheBackendError as e:
+                logger.error(
+                    "Cache alias '%s' not found. Error: %s",
+                    cache_alias,
+                    str(e),
+                )
+                raise e
+
             response = cache.get(cache_key)
             if response is not None:
                 return response
