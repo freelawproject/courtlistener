@@ -19,6 +19,6 @@ ZOHO_ENV = USDataCenter.PRODUCTION()
 ZOHO_CONFIG = SDKConfig(
     auto_refresh_fields=True,
     pick_list_validation=False,
-    connect_timeout=None,
-    read_timeout=None,
+    connect_timeout=env.int("ZOHO_CONNECT_TIMEOUT", default=30),
+    read_timeout=env.int("ZOHO_READ_TIMEOUT", default=60),
 )
